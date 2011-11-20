@@ -2630,7 +2630,7 @@ accessManagerTest(const TestConfig &tc, int ac, char **av)
        return;*/
 
     //Testing new AccessManager, called AccessManager2
-    cerr <<
+    /*cerr <<
             "============================= AccessManager2 =================================="
             << endl;
     MetaAccess * meta;
@@ -2999,7 +2999,7 @@ accessManagerTest(const TestConfig &tc, int ac, char **av)
     string s6_key = am->getKey(s6);
     string m2_key = am->getKey(m2);
     string s6_key1 = marshallBinary(s6_key);
-    string m2_key1 = marshallBinary(m2_key);
+    string m2_key1 = marshallBinary(m2_key);*/
 #if 0   /* XXX this is all broken because of char->string changes */
     assert_s(s6_key,
             "subject 6 key is not available after it has been inserted");

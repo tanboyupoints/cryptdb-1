@@ -662,24 +662,25 @@ class CItemSubtype : public CItemType {
     }
 };
 
+//cat_red: integer?
 template<class T, Item::Type TYPE>
 class CItemSubtypeIT : public CItemSubtype<T> {
  public:
     CItemSubtypeIT() { itemTypes.reg(TYPE, this); }
 };
-
+//cat_red: functions?
 template<class T, Item_func::Functype TYPE>
 class CItemSubtypeFT : public CItemSubtype<T> {
  public:
     CItemSubtypeFT() { funcTypes.reg(TYPE, this); }
 };
-
+//cat_red: string?  sum?
 template<class T, Item_sum::Sumfunctype TYPE>
 class CItemSubtypeST : public CItemSubtype<T> {
  public:
     CItemSubtypeST() { sumFuncTypes.reg(TYPE, this); }
 };
-
+//cat_red: ???
 template<class T, const char *TYPE>
 class CItemSubtypeFN : public CItemSubtype<T> {
  public:
@@ -742,6 +743,15 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
                 }
             }
         }
+        //TODO: figure out how to gather over more than one level of the tree
+        //cat_red: do mp processing here: add functionality for annotation nodes
+        //if create, there will be speaks_for, enc_for, equals, external notations
+        //if not, there will be information about required keys
+        //        (how, what, where from?)
+        //if a field is marked enc_for, then we need to get all the keys to
+        // encrypt or decrypt this part
+        //if a field is marked speaks_for, that actually doesn't need to be recorded
+        //if we have an insert or delete to an external, then we to log people in
 
         return EncSet(m);
     }
@@ -816,7 +826,9 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     virtual void
     do_rewrite_proj_type(Item_field *i, Analysis & a, vector<Item *> &l) const
     {
-	//rewrite current projection field
+        //cat_red: select only
+        //rewrite current projection field
+        //cat_red: for mp, if it was enc_for, decrypt this field
         l.push_back(do_rewrite_type(i, a));
 
         // if there is a salt for the onion, then also fetch the onion from the server
@@ -836,6 +848,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     virtual void
     do_rewrite_insert_type(Item_field *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
+        //cat_red: insert
         assert(fm == NULL);
         // need to map this one field into all of its onions
         // TODO: this is kind of a duplicate of rewrite_create_field(),
@@ -2830,7 +2843,15 @@ string
 Rewriter::rewrite(const string & q, Analysis & a)
 {
     query_parse p(db, q);
+    /*if (p.annotation) {
+        Annotation annot = Annotation(q);
+        annot.parse();
+        //annotations have no rewritten variety
+        return "";
+        }*/
     LEX *lex = p.lex();
+    //cat_red: if CREATE & mp: process annotations; generate our own LEX
+    //  should be the same as normal LEX but with annotation nodes as well
 
     cerr << "query lex is " << *lex << "\n";
 

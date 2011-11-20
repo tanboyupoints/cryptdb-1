@@ -117,11 +117,21 @@ MultiPrinc::processAnnotation(list<string>::iterator & wordsIt,
         wordsIt++;
         string field2 = *wordsIt;
         wordsIt++;
-        int resacc = accMan->addGives(fullName(currentField, tablename));
+        string curFieldPrincType = accMan->getPrincType(fullName(currentField, tablename));
+        if (curFieldPrincType == "") {
+            accMan->startPrinc("gen_" + fullName(currentField, tablename));
+            accMan->addToPrinc(fullName(currentField, tablename), "gen_" + fullName(currentField, tablename));
+            curFieldPrincType = accMan->getPrincType(fullName(currentField, tablename));
+        }
+        string field2PrincType = accMan->getPrincType(fullName(field2, tablename));
+        if (field2PrincType == "") {
+            accMan->startPrinc("gen_" + fullName(field2, tablename));
+            accMan->addToPrinc(fullName(field2, tablename), "gen_" + fullName(field2, tablename));
+            field2PrincType = accMan->getPrincType(fullName(field2, tablename));
+        }
+        int resacc = accMan->addGives(curFieldPrincType);
         assert_s(resacc >=0, "access manager gives psswd failed");
-        resacc = accMan->addAccess( fullName(currentField,
-                                             tablename),
-                                    fullName(field2, tablename));
+        resacc = accMan->addSpeaksFor(curFieldPrincType, field2PrincType);
         assert_s(resacc >=0, "access manager addaccessto failed");
         tm[tablename]->hasSensitive = true;
         encryptfield = false;
@@ -144,8 +154,20 @@ MultiPrinc::processAnnotation(list<string>::iterator & wordsIt,
             wordsIt++;
             string hasAccess = fullName(currentField, tablename);
             string accessto = fullName(field2, tablename);
-            int resacc = accMan->addAccess(hasAccess, accessto);
-            assert_s(resacc >=0, "access manager addAccessto failed");
+            string genHasAccess;
+            if ((genHasAccess = accMan->getPrincType(hasAccess)) == "") {
+                genHasAccess = "gen_" + hasAccess;
+                accMan->startPrinc(genHasAccess);
+                accMan->addToPrinc(hasAccess,genHasAccess);
+            }
+            string genAccessTo;
+            if ((genAccessTo = accMan->getPrincType(accessto)) == "") {
+                genAccessTo = "gen_" + accMan->getPrincType(accessto);
+                accMan->startPrinc(genAccessTo);
+                accMan->addToPrinc(accessto,genAccessTo);
+            }
+            int resacc = accMan->addSpeaksFor(genHasAccess, genAccessTo);
+            assert_s(resacc >=0, "access manager addSpeaksFor failed");
             encryptfield = false;
             if (equalsIgnoreCase(*wordsIt, "if")) {             //predicate
                 LOG(mp) << "has predicate";
@@ -170,10 +192,16 @@ MultiPrinc::processAnnotation(list<string>::iterator & wordsIt,
             wordsIt++;
             string field2 = *wordsIt;
             wordsIt++;
-            int resacc = accMan->addEquals(fullName(currentField,
-                                                    tablename),
-                                           fullName(field2, tablename));
-            assert_s(resacc >=0, "access manager addEquals failed");
+            string gen;
+            //neither of these have a gen
+            if (((gen = accMan->getPrincType(fullName(currentField,tablename))) == "") && ((gen = accMan->getPrincType(fullName(field2,tablename))) == "")) {
+                gen = "gen_" + fullName(currentField,tablename);
+                accMan->startPrinc(gen);
+            }
+            int resacc;
+            resacc = accMan->addToPrinc(fullName(currentField,tablename), gen);
+            assert_s(resacc >=0, "access manager addToPrinc failed");
+            resacc = accMan->addToPrinc(fullName(field2, tablename), gen);
             encryptfield = false;
             continue;
         }

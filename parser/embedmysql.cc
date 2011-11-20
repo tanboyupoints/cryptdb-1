@@ -107,6 +107,14 @@ query_parse::query_parse(const std::string &db, const std::string &q)
     assert(create_embedded_thd(0));
     t = current_thd;
     assert(t != NULL);
+    
+    //if first word of query is CRYPTDB, we can't use the embedded db
+    //  set annotation to true and return
+    if (strncmp(q.c_str(), "CRYPTDB", 7) == 0) {
+        annotation = true;
+        return;
+    }
+    annotation = false;
 
     try {
         t->set_db(db.data(), db.length());

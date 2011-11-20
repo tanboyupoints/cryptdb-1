@@ -28,6 +28,7 @@ class query_parse {
     query_parse(const std::string &db, const std::string &q);
     virtual ~query_parse();
     LEX *lex();
+    bool annotation;
 
  private:
     void cleanup();
