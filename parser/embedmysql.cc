@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <parser/embedmysql.hh>
 #include <sql_base.h>
 #include <sql_select.h>
 #include <sql_delete.h>
@@ -11,7 +12,7 @@
 #include <sql_parse.h>
 #include <handler.h>
 
-#include <parser/embedmysql.hh>
+
 #include <parser/stringify.hh>
 
 #include <util/errstream.hh>
