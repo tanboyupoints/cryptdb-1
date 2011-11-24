@@ -1,11 +1,13 @@
 #include "Annotation.hh"
 
+using namespace std;
+
 //removes character c from the end of s, if it's the last character
 // if c isn't the last character, returns without doing anything
 static void
 end_prune(string &str, char c) {
     if (*str.rbegin() == c) {
-        str.erase(str.rbegin());
+        str.erase(str.length() - 1);
     }
 }
 
@@ -33,7 +35,7 @@ Annotation::getLeft() {
     if (type == SPEAKSFOR) {
         return left;
     }
-    LOG(error) << "Annotation asked for left when not SPEAKSFOR";
+    //LOG(error) << "Annotation asked for left when not SPEAKSFOR";
     PrincType empty;
     empty.princtype = "";
     empty.column = "";
@@ -45,7 +47,7 @@ Annotation::getRight() {
     if (type == SPEAKSFOR || type == ENCFOR) {
         return right;
     }
-    LOG(error) << "Annotation asked for right when not SPEAKSFOR or ENCFOR";
+    //LOG(error) << "Annotation asked for right when not SPEAKSFOR or ENCFOR";
     PrincType empty;
     empty.princtype = "";
     empty.column = "";
@@ -57,14 +59,14 @@ Annotation::getPrimitive() {
     if (type != SPEAKSFOR) {
         return primitive;
     }
-    LOG(error) << "Annotation asked for primitive when SPEAKSFOR";
+    //LOG(error) << "Annotation asked for primitive when SPEAKSFOR";
     return "";
 }
 
 string
 Annotation::getLeftTableName() {
     if (type != SPEAKSFOR) {
-        LOG(error) << "Annotation asked for left when not SPEAKSFOR";
+        //LOG(error) << "Annotation asked for left when not SPEAKSFOR";
         return "";
     }
     list<string> left_words = split(left.column, '.');
@@ -75,7 +77,7 @@ Annotation::getLeftTableName() {
 string
 Annotation::getRightTableName() {
     if (type != SPEAKSFOR && type != ENCFOR) {
-        LOG(error) << "Annotation asked for right when not SPEAKSFOR or ENCFOR";
+        //LOG(error) << "Annotation asked for right when not SPEAKSFOR or ENCFOR";
         return "";
     }
     list<string> right_words = split(right.column, '.');
@@ -86,7 +88,7 @@ Annotation::getRightTableName() {
 string
 Annotation::getPrimitiveTableName() {
     if (type != ENCFOR) {
-        LOG(error) << "Annotation asked for primitive when not ENCFOR";
+        //LOG(error) << "Annotation asked for primitive when not ENCFOR";
         return "";
     }
     list<string> prim_words = split(primitive, '.');
@@ -100,35 +102,35 @@ Annotation::getPrimitiveTableName() {
 Predicate *
 Annotation::getPredicate() {
     if (type != SPEAKSFOR) {
-        LOG(error) << "Annotation asked for predicate when not SPEAKSFOR";
+        //LOG(error) << "Annotation asked for predicate when not SPEAKSFOR";
         return NULL;
     }
     return pred;
 }
 
 string
-getLeftStr() {
+Annotation::getLeftStr() {
     if (type == SPEAKSFOR) {
         return left.princtype + "=" + left.column;
     }
-    LOG(error) << "Annotation asked for left when not SPEAKSFOR";
+    //LOG(error) << "Annotation asked for left when not SPEAKSFOR";
     return "";
 }
 
 string
-getLeftStr() {
+Annotation::getRightStr() {
     if (type == SPEAKSFOR || ENCFOR) {
         return right.princtype + "=" + right.column;
     }
-    LOG(error) << "Annotation asked for left when not SPEAKSFOR";
+    //LOG(error) << "Annotation asked for left when not SPEAKSFOR";
     return "";
 }    
 
 void
 Annotation::parse() {
     //remove trailing semicolon
-    prune(&query, ';');
-    list<string> query_list = split(&query, ' ');
+    end_prune(query, ';');
+    list<string> query_list = split(query, ' ');
     
     //type
     if (toLowerCase(query).find("princtype",0) != string::npos) {
@@ -153,7 +155,7 @@ Annotation::parse() {
     //first word/pair
     switch (type) {
     case PRINCTYPE:
-    case PRINCTYPE EXTERNAL:
+    case PRINCTYPE_EXTERNAL:
         assert_s(toLowerCase(*word) == "princtype", "PRINCTYPE annotation does not begin with PRINCTYPE");
         break;
     case ENCFOR:
@@ -170,7 +172,7 @@ Annotation::parse() {
     word++;
     switch(type) {
     case PRINCTYPE:
-    case PRINCTYPE EXTERNAL:
+    case PRINCTYPE_EXTERNAL:
         primitive = *word;
         break;
     case ENCFOR:
@@ -221,19 +223,19 @@ Annotation::parse() {
             OPEenclevel = SECLEVEL::OPE;
             break;
         }
-        if (equalsIgnorCase(levelnames[(int) SECLEVEL::SEMANTIC_AGG], *word)) {
+        if (equalsIgnoreCase(levelnames[(int) SECLEVEL::SEMANTIC_AGG], *word)) {
             AGGenclevel = true;
             break;
         }
     case SPEAKSFOR:
-        assert_s(toLowerCase(word) == "if", "SPEAKSFOR annotation predicate does not start with if");
+        assert_s(toLowerCase(*word) == "if", "SPEAKSFOR annotation predicate does not start with if");
         list<string> pred_split = split(*word, '(');
         assert_s(pred_split.size() == 2, "predicate has too many (");
         pred->name = *pred_split.begin();
-        prune(*pred_split.end(),')');
+        end_prune(*pred_split.end(),')');
         list<string> pred_fields = split(*pred_split.end(),',');
         for(auto field = pred_fields.begin(); field != pred_fields.end(); field++) {
-            pred->fields.push_back(word);
+            pred->fields.push_back(*word);
         }
     }
 }

@@ -82,4 +82,5 @@ private:
     Predicate *pred;
     SECLEVEL DETenclevel;
     SECLEVEL OPEenclevel;
+    bool AGGenclevel;
 };
