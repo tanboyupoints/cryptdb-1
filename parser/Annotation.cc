@@ -1,3 +1,5 @@
+#include "Annotation.hh"
+
 //removes character c from the end of s, if it's the last character
 // if c isn't the last character, returns without doing anything
 static void
