@@ -35,8 +35,8 @@
  */
 
 //TODO: fix PRINCVALUE to be application dependent
-#define PRINCTYPE "varchar(100)"
-#define PRINCVALUE "varchar(255)"
+#define SQL_PRINCTYPE "varchar(100)"
+#define SQL_PRINCVALUE "varchar(255)"
 #define TESTING 1
 #define THRESHOLD 100
 

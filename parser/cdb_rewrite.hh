@@ -7,18 +7,20 @@
  *  TODO: need to integrate it with util.h: some declarations are repeated
  */
 
-#include <crypto-old/CryptoManager.hh>
-#include <util/onions.hh>
+//#include <crypto-old/CryptoManager.hh>
+//#include <util/onions.hh>
 #include <edb/Translator.hh>
+#include <edb/MultiPrinc.hh>
 
 #include <sql_select.h>
 #include <sql_delete.h>
 #include <sql_insert.h>
 #include <sql_update.h>
 
-#include <parser/embedmysql.hh>
-#include <parser/stringify.hh>
-//#include <parser/annotation.hh>
+//#include <parser/embedmysql.hh>
+//#include <parser/stringify.hh>
+#include <parser/Analysis.hh>
+#include <parser/Annotation.hh>
 
 #include <util/errstream.hh>
 #include <util/cleanup.hh>
@@ -26,7 +28,7 @@
 
 using namespace std;
 
-struct FieldMeta;
+//struct FieldMeta;
 
 /**
  * Field here is either:
@@ -34,25 +36,25 @@ struct FieldMeta;
  * B) the field that the onion is key-ed on. this
  *    only has semantic meaning for DET and OPE
  */
-typedef std::pair<SECLEVEL, FieldMeta *> LevelFieldPair;
-typedef std::map<onion, LevelFieldPair>  OnionLevelFieldMap;
-typedef std::pair<onion, LevelFieldPair> OnionLevelFieldPair;
-typedef std::map<onion, SECLEVEL>        OnionLevelMap;
+//typedef std::pair<SECLEVEL, FieldMeta *> LevelFieldPair;
+//typedef std::map<onion, LevelFieldPair>  OnionLevelFieldMap;
+//typedef std::pair<onion, LevelFieldPair> OnionLevelFieldPair;
+//typedef std::map<onion, SECLEVEL>        OnionLevelMap;
 
 /**
  * Use to keep track of a field's encryption onions.
  */
-class EncDesc {
+/*class EncDesc {
 public:
     EncDesc(OnionLevelMap input) : olm(input) {}
     EncDesc(const EncDesc & ed): olm(ed.olm) {}
-    /**
+    **
      * Returns true if something was changed, false otherwise.
-     */
+     *
     bool restrict(onion o, SECLEVEL maxl);
 
     OnionLevelMap olm;
-};
+};*/
 
 /**
  * Used to keep track of encryption constraints during
@@ -150,7 +152,7 @@ const EncSet EMPTY_EncSet = {
 
 /******* ENCRYPTED SCHEMA INFORMATION ********/
 
-struct TableMeta;
+/*struct TableMeta;
 //TODO: FieldMeta and TableMeta are partly duplicates with the original
 // FieldMetadata an TableMetadata
 // which contains data we want to add to this structure soon
@@ -190,12 +192,14 @@ typedef struct TableMeta {
 
     std::map<std::string, FieldMeta *> fieldMetaMap;
 
+    bool hasSensitive;
+
     bool has_salt;
     std::string salt_name;
 
      TableMeta();
     ~TableMeta();
-} TableMeta;
+    } TableMeta;
 
 
 typedef struct SchemaInfo {
@@ -207,13 +211,13 @@ typedef struct SchemaInfo {
     ~SchemaInfo() {cerr << "called schema destructor"; tableMetaMap.clear();}
     TableMeta * getTableMeta(const string & table);
     FieldMeta * getFieldMeta(const string & table, const string & field);
-} SchemaInfo;
+    } SchemaInfo;*/
 
 
 /***************************************************/
 
 // metadata for field analysis
-class FieldAMeta {
+/*class FieldAMeta {
 public:
     EncDesc exposedLevels; //field identifier to max sec level allowed to process a query
     FieldAMeta(const EncDesc & ed) : exposedLevels(ed) {}
@@ -266,7 +270,7 @@ public:
 private:
     MYSQL * m;
 
-};
+    };*/
 
 class FieldReturned {
 public:
@@ -343,6 +347,7 @@ private:
     CryptoManager* cm;
     unsigned int   totalTables;
     MYSQL*         m;
+    MultiPrinc*    mp;
 };
 
 class ScopedMySQLRes {

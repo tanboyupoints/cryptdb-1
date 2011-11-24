@@ -9,7 +9,7 @@
 
 #include <edb/AccessManager.hh>
 #include <edb/Translator.hh>
-
+#include <parser/Analysis.hh>
 
 class MultiPrinc {
  public:
@@ -27,11 +27,13 @@ class MultiPrinc {
      * updates encforMap and accMan
      * sets encryptfield
      */
-    void processAnnotation(std::list<std::string>::iterator & wordsIt,
+    /*void processAnnotation(std::list<std::string>::iterator & wordsIt,
                            std::list<std::string> & words, std::string tablename,
                            std::string currentField,
                            bool & encryptfield, std::map<std::string,
-                                                    TableMetadata *> & tm);
+                           TableMetadata *> & tm);*/
+    void processAnnotation(Annotation &annot, bool &encryptField,
+                           Analysis &analysis);
 
     int commitAnnotations();
 

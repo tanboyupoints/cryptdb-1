@@ -4,9 +4,8 @@
  */
 
 #include <edb/MultiPrinc.hh>
-#include <util/ctr.hh>
+//#include <util/ctr.hh>
 #include <util/cryptdb_log.hh>
-
 
 using namespace std;
 
@@ -34,6 +33,60 @@ MultiPrinc::~MultiPrinc()
 const bool VERBOSE = true;
 
 void
+MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
+                              Analysis &analysis) {
+    int accres;
+    switch (annot.type) {
+    case PRINCTYPE:
+        accres = accMan->startPrinc(annot.getPrimitive());
+        assert_s(accres >= 0, "access manager could not start principal " + annot.getPrimitive());
+        encryptfield = false;
+        return;
+    case PRINCTYPE_EXTERNAL:
+        accres = accMan->startPrinc(annot.getPrimitive());
+        assert_s(accres >= 0, "access manager could not start principal " + annot.getPrimitive());
+        accres = accMan->addGives(annot.getPrimitive());
+        assert_s(accres >= 0, "access manager could not make principal external " + annot.getPrimitive());
+        analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->hasSensitive = true;
+        encryptfield = false;
+        return;
+    case SPEAKSFOR: {
+        analysis.schema->tableMetaMap[annot.getLeftTableName()]->hasSensitive = true;
+        analysis.schema->tableMetaMap[annot.getRightTableName()]->hasSensitive = true;
+
+        accres = accMan->addToPrinc(annot.getLeft().column, annot.getLeft().princtype);
+        assert_s(accres >= 0, "access manager could not add to princ " + annot.getLeftStr());
+        accres = accMan->addToPrinc(annot.getRight().column, annot.getRight().princtype);
+        assert_s(accres >= 0, "access manager could not add to princ " + annot.getRightStr());
+
+        accres = accMan->addSpeaksFor(annot.getLeft().princtype, annot.getRight().princtype);
+        assert_s(accres >= 0, "access manager could not add " + annot.getLeftStr() + " speaks for " + annot.getRightStr());
+        encryptfield = false;
+        Predicate *pred = annot.getPredicate();
+        if(pred) {
+            mkm.condAccess[AccessRelation(annot.getLeft().column, annot.getRight().column)] = pred;
+        }
+        return;
+    }
+    case ENCFOR:
+        accres = accMan->addToPrinc(annot.getRight().column, annot.getRight().princtype);
+        assert_s(accres >= 0, "access manager could not add to princ " + annot.getRightStr());
+
+        mkm.encForMap[annot.getPrimitive()] = annot.getRight().column;
+        mkm.reverseEncFor[annot.getRight().column] = true;
+        encryptfield = true;
+
+        analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->hasSensitive = true;
+        analysis.schema->tableMetaMap[annot.getRightTableName()]->hasSensitive = true;
+
+        FieldMeta *fm = analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->fieldMetaMap[annot.getPrimitive()];
+        fm->onionnames[oAGG] = "";
+        //XXX set enc level; onions
+        return;
+    }
+}
+
+/*void
 MultiPrinc::processAnnotation(list<string>::iterator & wordsIt,
                               list<string> & words, string tablename,
                               string currentField,
@@ -210,7 +263,7 @@ MultiPrinc::processAnnotation(list<string>::iterator & wordsIt,
 
     encryptfield = false;
 
-}
+}*/
 
 int
 MultiPrinc::commitAnnotations()
@@ -335,7 +388,7 @@ MultiPrinc::getEncForFromFilter(command comm, list<string> query, TMKM & tmkm,
                                                     TableMetadata *> &
                                 tableMetaMap)
 {
-    ANON_REGION(__func__, &perf_cg);
+    //ANON_REGION(__func__, &perf_cg);
 
     if (!PARSING) {
         tmkm.encForVal = map<string, string>();
@@ -396,7 +449,7 @@ MultiPrinc::prepareSelect(list<string> & words, TMKM & tmkm, QueryMeta & qm,
                           map<string,
                               TableMetadata *> & tm)
 {
-    ANON_REGION(__func__, &perf_cg);
+    //ANON_REGION(__func__, &perf_cg);
 
     // records for which principals some values are encrypted by looking in
     // the where clause as well
@@ -434,7 +487,7 @@ MultiPrinc::selectEncFor(string table, string field, QueryMeta & qm,
                          TMKM & tmkm, TableMetadata * tm,
                          FieldMetadata * fm)
 {
-    ANON_REGION(__func__, &perf_cg);
+    //ANON_REGION(__func__, &perf_cg);
 
     string princ = mkm.encForMap[fullName(field, table)];
     if (tmkm.principalsSeen.find(princ) == tmkm.principalsSeen.end()) {
@@ -457,7 +510,7 @@ MultiPrinc::processReturnedField(unsigned int index, bool nextIsSalt, string ful
                                  TMKM & tmkm,
                                  bool & ignore)
 {
-    ANON_REGION(__func__, &perf_cg);
+    //ANON_REGION(__func__, &perf_cg);
 
     ignore = false;
 
@@ -504,8 +557,8 @@ getPsswdTable(string table)
 bool
 MultiPrinc::checkPsswd(command comm, list<string> & words)
 {
-    ANON_REGION(__func__, &perf_cg);
-
+    //ANON_REGION(__func__, &perf_cg);
+    
     /*
      * checks for
      * INSERT INTO cryptdbpsswd__TABLENAME (fieldname, psswd) VALUES (...)"
@@ -569,7 +622,7 @@ MultiPrinc::checkPsswd(command comm, list<string> & words)
 bool
 MultiPrinc::checkPredicate(const AccessRelation & accRel, map<string, string> & vals)
 {
-    ANON_REGION(__func__, &perf_cg);
+    //ANON_REGION(__func__, &perf_cg);
 
     if (mkm.condAccess.find(accRel) != mkm.condAccess.end()) {
         Predicate * pred = mkm.condAccess[accRel];
@@ -609,7 +662,7 @@ MultiPrinc::insertRelations(const list<pair<string, bool> > & values, string tab
                             list<string> fields,
                             TMKM & tmkm)
 {
-    ANON_REGION(__func__, &perf_cg);
+    //ANON_REGION(__func__, &perf_cg);
 
     //first collect all values in a list
     map<string, string> vals;
@@ -706,7 +759,7 @@ MultiPrinc::isActiveUsers(const string &query)
 string
 MultiPrinc::get_key(string fieldName, TempMKM & tmkm)
 {
-    ANON_REGION(__func__, &perf_cg);
+    //ANON_REGION(__func__, &perf_cg);
 
     assert_s(mkm.encForMap.find(
                  fieldName) != mkm.encForMap.end(),
@@ -736,7 +789,7 @@ string
 MultiPrinc::get_key(string fieldName, TMKM & tmkm,
                     const vector<SqlItem> &res)
 {
-    ANON_REGION(__func__, &perf_cg);
+    //ANON_REGION(__func__, &perf_cg);
 
     assert_s(mkm.encForMap.find(
                  fieldName) != mkm.encForMap.end(),

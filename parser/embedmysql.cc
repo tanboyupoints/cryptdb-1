@@ -82,6 +82,9 @@ extern "C" void *create_embedded_thd(int client_flag);
 void
 query_parse::cleanup()
 {
+    if (annot) {
+        delete annot;
+    }
     if (t) {
         t->end_statement();
         t->cleanup_after_query();
@@ -111,7 +114,7 @@ query_parse::query_parse(const std::string &db, const std::string &q)
     //if first word of query is CRYPTDB, we can't use the embedded db
     //  set annotation to true and return
     if (strncmp(q.c_str(), "CRYPTDB", 7) == 0) {
-        annotation = true;
+        annot = new Annotation(q);
         return;
     }
     annotation = false;

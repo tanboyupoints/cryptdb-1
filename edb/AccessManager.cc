@@ -485,8 +485,8 @@ MetaAccess::CreateTables()
     if (execute(sql) < 0) {
         return -1;
     }
-    sql = "CREATE TABLE " + public_table + " (Type " +  PRINCTYPE +
-          ", Value " PRINCVALUE ", Asym_Public_Key " TN_PK_KEY
+    sql = "CREATE TABLE " + public_table + " (Type " +  SQL_PRINCTYPE +
+        ", Value " SQL_PRINCVALUE ", Asym_Public_Key " TN_PK_KEY
           ", Asym_Secret_Key " TN_PK_KEY
           ", Salt " + TN_SALT + ", PRIMARY KEY (Type,Value))";
     if (execute(sql) < 0) {
@@ -498,9 +498,9 @@ MetaAccess::CreateTables()
         return -1;
     }
     sql = "CREATE TABLE " + access_table + " (hasAccessType " + 
-          PRINCTYPE + ", hasAccessValue " PRINCVALUE
-          ", accessToType " + PRINCTYPE + ", accessToValue "
-          PRINCVALUE ", Sym_Key " TN_SYM_KEY ", Salt " TN_SALT
+          SQL_PRINCTYPE + ", hasAccessValue " SQL_PRINCVALUE
+          ", accessToType " + SQL_PRINCTYPE + ", accessToValue "
+          SQL_PRINCVALUE ", Sym_Key " TN_SYM_KEY ", Salt " TN_SALT
           ", Asym_Key " TN_PK_KEY ", PRIMARY KEY (hasAccessType," +
           " hasAccessValue, accessToType, accessToValue), " +
           "KEY (accessToType, accessToValue))";

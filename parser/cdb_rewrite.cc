@@ -2605,6 +2605,7 @@ Rewriter::Rewriter(const std::string & db) : db(db)
     schema = new SchemaInfo();
     totalTables = 0;
     initSchema();
+    mp = new MultiPrinc(m);
 }
 
 Rewriter::~Rewriter()
@@ -2843,19 +2844,18 @@ string
 Rewriter::rewrite(const string & q, Analysis & a)
 {
     query_parse p(db, q);
-    /*if (p.annotation) {
-        Annotation annot = Annotation(q);
-        annot.parse();
+    Analysis analysis = Analysis(conn(), schema, cm);
+    if (p.annot) {
+        bool encryptField;
+        mp->processAnnotation(*annot, encryptField, analysis);
+        //XXX what if, anything, do we want to do with encryptField
         //annotations have no rewritten variety
         return "";
-        }*/
+    }
     LEX *lex = p.lex();
-    //cat_red: if CREATE & mp: process annotations; generate our own LEX
-    //  should be the same as normal LEX but with annotation nodes as well
 
     cerr << "query lex is " << *lex << "\n";
 
-    Analysis analysis = Analysis(conn(), schema, cm);
     query_analyze(db, q, lex, analysis);
 
     int ret = updateMeta(db, q, lex, analysis);
