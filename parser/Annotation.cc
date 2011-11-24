@@ -30,6 +30,10 @@ Annotation::Annotation(const string &q) {
     parse();
 }
 
+Annotation::~Annotation() {
+    delete pred;
+}
+
 PrincType
 Annotation::getLeft() {
     if (type == SPEAKSFOR) {

@@ -7,18 +7,15 @@
  *  TODO: need to integrate it with util.h: some declarations are repeated
  */
 
-//#include <crypto-old/CryptoManager.hh>
-//#include <util/onions.hh>
 #include <edb/Translator.hh>
 #include <edb/MultiPrinc.hh>
+#include <edb/Connect.hh>
 
 #include <sql_select.h>
 #include <sql_delete.h>
 #include <sql_insert.h>
 #include <sql_update.h>
 
-//#include <parser/embedmysql.hh>
-//#include <parser/stringify.hh>
 #include <parser/Analysis.hh>
 #include <parser/Annotation.hh>
 
@@ -328,7 +325,12 @@ public:
 
 class Rewriter {
 public:
-    Rewriter(const std::string & db);
+    //Rewriter(const std::string & db);
+    Rewriter(const std::string& server,
+             const std::string& user,
+             const std::string& psswd,
+             const std::string& dbname,
+             uint port = 0);
     ~Rewriter();
 
     void setMasterKey(const std::string &mkey);
@@ -347,6 +349,7 @@ private:
     CryptoManager* cm;
     unsigned int   totalTables;
     MYSQL*         m;
+    Connect*       c;
     MultiPrinc*    mp;
 };
 

@@ -118,7 +118,6 @@ query_parse::query_parse(const std::string &db, const std::string &q)
         annot = new Annotation(q);
         return;
     }
-    annotation = false;
 
     try {
         t->set_db(db.data(), db.length());

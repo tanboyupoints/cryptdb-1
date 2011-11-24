@@ -2585,7 +2585,11 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
     return adjustOnions(db, a);
 }
 
-Rewriter::Rewriter(const std::string & db) : db(db)
+Rewriter::Rewriter(const std::string& server,
+                   const std::string& user,
+                   const std::string& psswd,
+                   const std::string& db,
+                   uint port) : db(db)
 {
     // create mysql connection to embedded
     // server
@@ -2605,7 +2609,10 @@ Rewriter::Rewriter(const std::string & db) : db(db)
     schema = new SchemaInfo();
     totalTables = 0;
     initSchema();
-    mp = new MultiPrinc(m);
+
+    //XXX at some point we probably want to use c rather than m
+    c = new Connect(server, user, psswd, db, port);
+    mp = new MultiPrinc(c);
 }
 
 Rewriter::~Rewriter()
@@ -2847,7 +2854,7 @@ Rewriter::rewrite(const string & q, Analysis & a)
     Analysis analysis = Analysis(conn(), schema, cm);
     if (p.annot) {
         bool encryptField;
-        mp->processAnnotation(*annot, encryptField, analysis);
+        mp->processAnnotation(*p.annot, encryptField, analysis);
         //XXX what if, anything, do we want to do with encryptField
         //annotations have no rewritten variety
         return "";

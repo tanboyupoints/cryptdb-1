@@ -68,7 +68,8 @@ main(int ac, char **av)
     atexit(__write_history);
 
     string db(av[2]);
-    Rewriter r(db);
+    //HACK (cat_red) currently hard-coding other db information
+    Rewriter r("localhost", "root", "letmein", db);
     r.setMasterKey("2392834");
 
     cerr << "connecting to localhost db cryptdbtest user root pass letmein" << "\n";
