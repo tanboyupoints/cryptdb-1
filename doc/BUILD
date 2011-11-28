@@ -26,6 +26,7 @@ newer implementation:
   % wget http://yuma.csail.mit.edu/mysql-5.5.14.tar.gz
   % tar zxf mysql-5.5.14.tar.gz
   % cp -R .../cryptdb/parser/mysql_mods/* mysql-5.5.14/
+  % rm mysql-5.5.14/sql/sql_yacc.{cc,h}
   % cd mysql-5.5.14
   % mkdir build
   % cd build
