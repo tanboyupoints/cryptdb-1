@@ -15,6 +15,7 @@
 #include <crypto/bn.hh>
 #include <crypto/ecjoin.hh>
 #include <crypto/search.hh>
+#include <crypto/skip32.hh>
 #include <util/timer.hh>
 #include <NTL/ZZ.h>
 #include <NTL/RR.h>
@@ -191,6 +192,23 @@ test_search()
     assert(s.match(cl, s.wordkey("world")));
 }
 
+static void
+test_skip32(void)
+{
+    std::vector<uint8_t> k = { 0x00, 0x99, 0x88, 0x77, 0x66,
+                               0x55, 0x44, 0x33, 0x22, 0x11 };
+    skip32 s(k);
+
+    uint8_t pt[4] = { 0x33, 0x22, 0x11, 0x00 };
+    uint8_t ct[4];
+    s.block_encrypt(pt, ct);
+    assert(ct[0] == 0x81 && ct[1] == 0x9d && ct[2] == 0x5f && ct[3] == 0x1f);
+
+    uint8_t pt2[4];
+    s.block_decrypt(ct, pt2);
+    assert(pt2[0] == 0x33 && pt2[1] == 0x22 && pt2[2] == 0x11 && pt2[3] == 0x00);
+}
+
 int
 main(int ac, char **av)
 {
@@ -202,6 +220,7 @@ main(int ac, char **av)
     test_ecjoin();
     test_search();
     test_paillier();
+    test_skip32();
 
     AES aes128(u.rand_vec<uint8_t>(16));
     test_block_cipher(&aes128, &u, "aes-128");
@@ -211,6 +230,9 @@ main(int ac, char **av)
 
     blowfish bf(u.rand_vec<uint8_t>(128));
     test_block_cipher(&bf, &u, "blowfish");
+
+    skip32 s32(u.rand_vec<uint8_t>(10));
+    test_block_cipher(&s32, &u, "skip32");
 
     auto hv = sha256::hash("Hello world\n");
     for (auto &x: hv)
