@@ -9,17 +9,39 @@ class cbcmac {
     cbcmac(const BlockCipher *cx) {
         c = cx;
         memset(v, 0, BlockCipher::blocksize);
+        mbytes = 0;
+    }
+
+    cbcmac(const BlockCipher *cx, uint8_t *iv) {
+        c = cx;
+        memcpy(v, iv, BlockCipher::blocksize);
+        mbytes = 0;
     }
 
     void update(const void *data, size_t len) {
-        assert(len % BlockCipher::blocksize == 0);
         const uint8_t *d = static_cast<const uint8_t *> (data);
 
-        for (size_t off = 0; off < len; off += BlockCipher::blocksize) {
-            uint8_t x[BlockCipher::blocksize];
-            for (size_t i = 0; i < BlockCipher::blocksize; i++)
-                x[i] = v[i] ^ d[off + i];
-            c->block_encrypt(x, v);
+        if (mbytes) {
+            size_t ncopy = min(len, BlockCipher::blocksize - mbytes);
+            memcpy(&m[mbytes], d, ncopy);
+            d += ncopy;
+            len -= ncopy;
+        }
+
+        if (mbytes == BlockCipher::blocksize) {
+            do_block(m);
+            mbytes = 0;
+        }
+
+        while (len >= BlockCipher::blocksize) {
+            do_block(d);
+            d += BlockCipher::blocksize;
+            len -= BlockCipher::blocksize;
+        }
+
+        if (len) {
+            memcpy(m, d, len);
+            mbytes = len;
         }
     }
 
@@ -28,6 +50,11 @@ class cbcmac {
     }
 
     void final(uint8_t *buf) {
+        if (mbytes) {
+            memset(&m[mbytes], 0, BlockCipher::blocksize - mbytes);
+            do_block(m);
+        }
+
         memcpy(buf, v, BlockCipher::blocksize);
     }
 
@@ -38,6 +65,16 @@ class cbcmac {
     }
 
  private:
+    void do_block(const uint8_t *p) {
+        uint8_t x[BlockCipher::blocksize];
+        for (size_t i = 0; i < BlockCipher::blocksize; i++)
+            x[i] = v[i] ^ p[i];
+        c->block_encrypt(x, v);
+    }
+
     uint8_t v[BlockCipher::blocksize];
+    uint8_t m[BlockCipher::blocksize];
+    uint8_t mbytes;
+
     const BlockCipher *c;
 };
