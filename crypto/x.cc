@@ -16,6 +16,7 @@
 #include <crypto/ecjoin.hh>
 #include <crypto/search.hh>
 #include <crypto/skip32.hh>
+#include <crypto/cbcmac.hh>
 #include <util/timer.hh>
 #include <NTL/ZZ.h>
 #include <NTL/RR.h>
@@ -241,6 +242,12 @@ main(int ac, char **av)
 
     auto mv = hmac<sha256>::mac("Hello world\n", "key");
     for (auto &x: mv)
+        cout << hex << setw(2) << setfill('0') << (uint) x;
+    cout << dec << endl;
+
+    cbcmac<AES> cmac(&aes256);
+    cmac.update(sha256::hash("Hello world\n"));
+    for (auto &x: cmac.final())
         cout << hex << setw(2) << setfill('0') << (uint) x;
     cout << dec << endl;
 
