@@ -17,6 +17,7 @@
 #include <crypto/search.hh>
 #include <crypto/skip32.hh>
 #include <crypto/cbcmac.hh>
+#include <crypto/ffx.hh>
 #include <util/timer.hh>
 #include <NTL/ZZ.h>
 #include <NTL/RR.h>
@@ -210,6 +211,40 @@ test_skip32(void)
     assert(pt2[0] == 0x33 && pt2[1] == 0x22 && pt2[2] == 0x11 && pt2[3] == 0x00);
 }
 
+static void
+test_ffx()
+{
+    urandom u;
+
+    AES key(u.rand_vec<uint8_t>(16));
+    ffx f(&key);
+
+    for (int i = 0; i < 100; i++) {
+        auto p = u.rand_vec<uint8_t>(2 * (1 + (u.rand<uint>() % 8)));
+        auto t = u.rand_vec<uint8_t>(u.rand<uint>() % 1024);
+        auto c = f.encrypt(p, t);
+        auto p2 = f.decrypt(c, t);
+
+        cout << "plaintext: ";
+        for (auto &x: p)
+            cout << hex << setw(2) << setfill('0') << (uint) x;
+        cout << dec << endl;
+
+        cout << "ciphertext: ";
+        for (auto &x: c)
+            cout << hex << setw(2) << setfill('0') << (uint) x;
+        cout << dec << endl;
+
+        cout << "plaintext2: ";
+        for (auto &x: p2)
+            cout << hex << setw(2) << setfill('0') << (uint) x;
+        cout << dec << endl;
+
+        assert(p != c);
+        assert(p == p2);
+    }
+}
+
 int
 main(int ac, char **av)
 {
@@ -222,6 +257,7 @@ main(int ac, char **av)
     test_search();
     test_paillier();
     test_skip32();
+    test_ffx();
 
     AES aes128(u.rand_vec<uint8_t>(16));
     test_block_cipher(&aes128, &u, "aes-128");
