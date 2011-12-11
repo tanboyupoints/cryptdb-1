@@ -199,3 +199,24 @@ class ffx {
 
     AES *k;
 };
+
+template<uint nbits>
+class ffx_block_cipher {
+ public:
+    ffx_block_cipher(const ffx *farg, const std::vector<uint8_t> &targ)
+        : f(farg), t(targ) {}
+
+    void block_encrypt(const uint8_t *ptext, uint8_t *ctext) const {
+        f->encrypt(ptext, ctext, nbits, t);
+    }
+
+    void block_decrypt(const uint8_t *ctext, uint8_t *ptext) const {
+        f->decrypt(ctext, ptext, nbits, t);
+    }
+
+    static const size_t blocksize = (nbits + 7) / 8;
+
+ private:
+    const ffx *f;
+    const std::vector<uint8_t> &t;
+};

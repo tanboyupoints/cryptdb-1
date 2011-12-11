@@ -47,7 +47,7 @@ test_block_cipher(T *c, PRNG *u, const std::string &cname)
     cmc_decrypt(c, cbc_ct, &cbc_pt2);
     assert(cbc_pt == cbc_pt2);
 
-    enum { nperf = 10 * 1000 };
+    enum { nperf = 1000 };
     auto cbc_perf_pt = u->rand_vec<uint8_t>(1024);
     auto cbc_perf_iv = u->rand_vec<uint8_t>(c->blocksize);
     vector<uint8_t> cbc_perf_ct, cbc_perf_pt2;
@@ -234,26 +234,44 @@ test_ffx()
         f.encrypt(&pt[0], &ct[0], nbits, t);
         f.decrypt(&ct[0], &pt2[0], nbits, t);
 
-        cout << "nbits: " << nbits << endl;
+        if (0) {
+            cout << "nbits: " << nbits << endl;
 
-        cout << "plaintext:  ";
-        for (auto &x: pt)
-            cout << hex << setw(2) << setfill('0') << (uint) x;
-        cout << dec << endl;
+            cout << "plaintext:  ";
+            for (auto &x: pt)
+                cout << hex << setw(2) << setfill('0') << (uint) x;
+            cout << dec << endl;
 
-        cout << "ciphertext: ";
-        for (auto &x: ct)
-            cout << hex << setw(2) << setfill('0') << (uint) x;
-        cout << dec << endl;
+            cout << "ciphertext: ";
+            for (auto &x: ct)
+                cout << hex << setw(2) << setfill('0') << (uint) x;
+            cout << dec << endl;
 
-        cout << "plaintext2: ";
-        for (auto &x: pt2)
-            cout << hex << setw(2) << setfill('0') << (uint) x;
-        cout << dec << endl;
+            cout << "plaintext2: ";
+            for (auto &x: pt2)
+                cout << hex << setw(2) << setfill('0') << (uint) x;
+            cout << dec << endl;
+        }
 
         assert(pt != ct);
         assert(pt == pt2);
     }
+
+    urandom u;
+    ffx_block_cipher<128> fbc128(&f, {});
+    test_block_cipher(&fbc128, &u, "ffx128-aes128");
+
+    ffx_block_cipher<64> fbc64(&f, {});
+    test_block_cipher(&fbc64, &u, "ffx64-aes128");
+
+    ffx_block_cipher<32> fbc32(&f, {});
+    test_block_cipher(&fbc32, &u, "ffx32-aes128");
+
+    // ffx_block_cipher<16> fbc16(&f, {});
+    // test_block_cipher(&fbc16, &u, "ffx16-aes128");
+
+    // ffx_block_cipher<8> fbc8(&f, {});
+    // test_block_cipher(&fbc8, &u, "ffx8-aes128");
 }
 
 int
