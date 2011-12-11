@@ -20,56 +20,38 @@ class ffx {
         k = key;
     }
 
-    std::vector<uint8_t>
-        encrypt(const std::vector<uint8_t> &x,
-                const std::vector<uint8_t> &t) const
+    void encrypt(const uint8_t *pt, uint8_t *ct, uint nbits,
+                 const std::vector<uint8_t> &t) const
     {
-        assert(x.size() % 2 == 0);
-        uint64_t n = x.size() * 8;
-        const ffx_mac_header h(n, t);
+        const ffx_mac_header h(nbits, t);
 
-        uint64_t lbytes = h.s / 8;
-        std::vector<uint8_t> a(&x[0], &x[lbytes]),
-                             b(&x[lbytes+1], &x[lbytes*2]),
-                             c;
+        uint64_t a, b, c;
+        mem_to_u64(pt, &a, &b, h.s, h.n - h.s);
 
-        c.resize(lbytes);
         for (int i = 0; i < h.rounds; i++) {
-            auto fk = f(n, t, i, b, h);
-            for (uint j = 0; j < lbytes; j++)
-                c[j] = a[j] ^ fk[j];
+            c = a ^ f(h, i, b, t);
             a = b;
             b = c;
         }
 
-        a.insert(a.end(), b.begin(), b.end());
-        return a;
+        u64_to_mem(a, b, h.s, h.n - h.s, ct);
     }
 
-    std::vector<uint8_t>
-        decrypt(const std::vector<uint8_t> &y,
-                const std::vector<uint8_t> &t) const
+    void decrypt(const uint8_t *ct, uint8_t *pt, uint nbits,
+                 const std::vector<uint8_t> &t) const
     {
-        assert(y.size() % 2 == 0);
-        uint64_t n = y.size() * 8;
-        const ffx_mac_header h(n, t);
+        const ffx_mac_header h(nbits, t);
 
-        uint64_t lbytes = h.s / 8;
-        std::vector<uint8_t> a(&y[0], &y[lbytes]),
-                             b(&y[lbytes+1], &y[lbytes*2]),
-                             c;
+        uint64_t a, b, c;
+        mem_to_u64(ct, &a, &b, h.s, h.n - h.s);
 
-        c.resize(lbytes);
         for (int i = h.rounds - 1; i >= 0; i--) {
             c = b;
             b = a;
-            auto fk = f(n, t, i, b, h);
-            for (uint j = 0; j < lbytes; j++)
-                a[j] = c[j] ^ fk[j];
+            a = c ^ f(h, i, b, t);
         }
 
-        a.insert(a.end(), b.begin(), b.end());
-        return a;
+        u64_to_mem(a, b, h.s, h.n - h.s, pt);
     }
 
  private:
@@ -109,31 +91,110 @@ class ffx {
         return 12;
     }
 
-    std::vector<uint8_t>
-        f(uint64_t n, const std::vector<uint8_t> &t,
-          uint8_t i, const std::vector<uint8_t> &b,
-          const ffx_mac_header &h) const
+    /*
+     * For non-multiple-of-8-bit values, the bits come from MSB.
+     */
+    static void mem_to_u64(const uint8_t *p,
+                           uint64_t *a, uint64_t *b,
+                           uint abits, uint bbits)
     {
-        assert(n % 8 == 0);
+        assert(abits <= 64 && bbits <= 64);
 
-        cbcmac<AES> m(k);
-        m.update(&h, sizeof(h));
-        m.update(&t[0], t.size());
+        *a = 0;
+        *b = 0;
 
-        /*
-         * XXX difference from FFX: no zero padding around tweak & i
-         */
-        m.update(&i, 1);
-        m.update(&b[0], b.size());
+        while (abits >= 8) {
+            *a = *a << 8 | *p;
+            p++;
+            abits -= 8;
+        }
 
-        std::vector<uint8_t> y = m.final();
+        if (abits) {
+            *a = *a << abits | *p >> (8 - abits);
+            uint8_t pleft = *p & ((1 << (8 - abits)) - 1);
+            if (bbits < 8 - abits) {
+                *b = pleft >> (8 - bbits);
+                bbits = 0;
+            } else {
+                *b = pleft;
+                bbits -= 8 - abits;
+            }
+            p++;
+        }
 
-        /*
-         * XXX difference from FFX: take the first m bits of CBC-MAC output,
-         * rather than the last m bits.
-         */
-        y.resize(h.s / 8);
-        return y;
+        while (bbits >= 8) {
+            *b = *b << 8 | *p;
+            p++;
+            bbits -= 8;
+        }
+
+        if (bbits)
+            *b = *b << bbits | *p >> (8 - bbits);
+    }
+
+    static void u64_to_mem(uint64_t a, uint64_t b,
+                           uint64_t abits, uint64_t bbits,
+                           uint8_t *p)
+    {
+        assert(abits <= 64 && bbits <= 64);
+
+        while (abits >= 8) {
+            *p = a >> (abits - 8);
+            p++;
+            abits -= 8;
+        }
+
+        if (abits) {
+            *p = a & ((1 << abits) - 1);
+            if (bbits < 8 - abits) {
+                *p = (*p << bbits | (b & ((1 << bbits) - 1))) << (8 - abits - bbits);
+                bbits = 0;
+            } else {
+                *p = *p << (8 - abits) | b >> (bbits - (8 - abits));
+                bbits -= (8 - abits);
+            }
+            p++;
+        }
+
+        while (bbits >= 8) {
+            *p = b >> (bbits - 8);
+            p++;
+            bbits -= 8;
+        }
+
+        if (bbits)
+            *p = b << (8 - bbits);
+    }
+
+    uint64_t f(const ffx_mac_header &h, uint8_t i, uint64_t b,
+               const std::vector<uint8_t> &t) const
+    {
+        cbcmac<AES> mac(k);
+        mac.update(&h, sizeof(h));
+        mac.update(&t[0], t.size());
+
+        struct {
+            uint8_t zero[16 + 7];
+            uint8_t i;
+            uint64_t b;
+        } tail;
+
+        uint tailoff = t.size() % 16;
+        if (tailoff + 16 <= sizeof(tail.zero))
+            tailoff += 16;
+
+        memset(tail.zero, 0, sizeof(tail.zero));
+        tail.i = i;
+        tail.b = b;
+        mac.update(&tail.zero[tailoff], sizeof(tail) - tailoff);
+
+        uint8_t out[16];
+        mac.final(out);
+
+        uint m = (i % 2) ? (h.n -  h.s) : h.s;
+        uint64_t r, dummy;
+        mem_to_u64(out, &r, &dummy, m, 0);
+        return r;
     }
 
     AES *k;

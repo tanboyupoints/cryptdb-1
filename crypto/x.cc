@@ -214,34 +214,45 @@ test_skip32(void)
 static void
 test_ffx()
 {
-    urandom u;
+    streamrng<arc4> rnd("test seed");
 
-    AES key(u.rand_vec<uint8_t>(16));
+    AES key(rnd.rand_vec<uint8_t>(16));
     ffx f(&key);
 
     for (int i = 0; i < 100; i++) {
-        auto p = u.rand_vec<uint8_t>(2 * (1 + (u.rand<uint>() % 8)));
-        auto t = u.rand_vec<uint8_t>(u.rand<uint>() % 1024);
-        auto c = f.encrypt(p, t);
-        auto p2 = f.decrypt(c, t);
+        uint nbits = 8 + (rnd.rand<uint>() % 121);
+        nbits = (nbits / 8) * 8;
+        nbits = std::max(nbits, 32U);
 
-        cout << "plaintext: ";
-        for (auto &x: p)
+        auto pt = rnd.rand_vec<uint8_t>((nbits + 7) / 8);
+        auto t = rnd.rand_vec<uint8_t>(rnd.rand<uint>() % 1024);
+
+        std::vector<uint8_t> ct, pt2;
+        ct.resize(pt.size());
+        pt2.resize(pt.size());
+
+        f.encrypt(&pt[0], &ct[0], nbits, t);
+        f.decrypt(&ct[0], &pt2[0], nbits, t);
+
+        cout << "nbits: " << nbits << endl;
+
+        cout << "plaintext:  ";
+        for (auto &x: pt)
             cout << hex << setw(2) << setfill('0') << (uint) x;
         cout << dec << endl;
 
         cout << "ciphertext: ";
-        for (auto &x: c)
+        for (auto &x: ct)
             cout << hex << setw(2) << setfill('0') << (uint) x;
         cout << dec << endl;
 
         cout << "plaintext2: ";
-        for (auto &x: p2)
+        for (auto &x: pt2)
             cout << hex << setw(2) << setfill('0') << (uint) x;
         cout << dec << endl;
 
-        assert(p != c);
-        assert(p == p2);
+        assert(pt != ct);
+        assert(pt == pt2);
     }
 }
 
