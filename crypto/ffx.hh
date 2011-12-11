@@ -17,31 +17,32 @@
 #include <crypto/cbcmac.hh>
 
 struct ffx_a2_mac_header {
-    uint16_t ver;
-    uint8_t method;
-    uint8_t addition;
-    uint8_t radix;
-    uint8_t n;
-    uint8_t s;
-    uint8_t rounds;
-    uint64_t tlen;
+    const uint16_t ver;
+    const uint8_t method;
+    const uint8_t addition;
+    const uint8_t radix;
+    const uint8_t n;
+    const uint8_t s;
+    const uint8_t rounds;
+    const uint64_t tlen;
 
     ffx_a2_mac_header(uint64_t narg, const std::vector<uint8_t> &t)
         : ver(1), method(2), addition(0), radix(2), n(narg),
-          s(n/2), tlen(t.size())
-    {
+          s(n/2), rounds(rnds(narg)), tlen(t.size()) {}
+
+ private:
+    static uint8_t rnds(uint8_t n) {
         assert(n >= 8 && n <= 128);
 
         if (n <= 9)
-            rounds = 36;
-        else if (n <= 13)
-            rounds = 30;
-        else if (n <= 19)
-            rounds = 24;
-        else if (n <= 31)
-            rounds = 18;
-        else
-            rounds = 12;
+            return 36;
+        if (n <= 13)
+            return 30;
+        if (n <= 19)
+            return 24;
+        if (n <= 31)
+            return 18;
+        return 12;
     }
 };
 
