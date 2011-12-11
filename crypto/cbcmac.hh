@@ -26,6 +26,7 @@ class cbcmac {
             memcpy(&m[mbytes], d, ncopy);
             d += ncopy;
             len -= ncopy;
+            mbytes += ncopy;
         }
 
         if (mbytes == BlockCipher::blocksize) {
