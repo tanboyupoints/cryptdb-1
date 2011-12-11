@@ -258,19 +258,21 @@ test_ffx()
     }
 
     urandom u;
-    ffx_a2_block_cipher<128> fbc128(&f, {});
+    auto tweak = u.rand_vec<uint8_t>(1024);
+
+    ffx_a2_block_cipher<128> fbc128(&f, tweak);
     test_block_cipher(&fbc128, &u, "ffx128-aes128");
 
-    ffx_a2_block_cipher<64> fbc64(&f, {});
+    ffx_a2_block_cipher<64> fbc64(&f, tweak);
     test_block_cipher(&fbc64, &u, "ffx64-aes128");
 
-    ffx_a2_block_cipher<32> fbc32(&f, {});
+    ffx_a2_block_cipher<32> fbc32(&f, tweak);
     test_block_cipher(&fbc32, &u, "ffx32-aes128");
 
-    // ffx_a2_block_cipher<16> fbc16(&f, {});
+    // ffx_a2_block_cipher<16> fbc16(&f, tweak);
     // test_block_cipher(&fbc16, &u, "ffx16-aes128");
 
-    // ffx_a2_block_cipher<8> fbc8(&f, {});
+    // ffx_a2_block_cipher<8> fbc8(&f, tweak);
     // test_block_cipher(&fbc8, &u, "ffx8-aes128");
 }
 
