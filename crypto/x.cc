@@ -217,7 +217,6 @@ test_ffx()
     streamrng<arc4> rnd("test seed");
 
     AES key(rnd.rand_vec<uint8_t>(16));
-    ffx_a2 f(&key);
 
     for (int i = 0; i < 100; i++) {
         uint nbits = 8 + (rnd.rand<uint>() % 121);
@@ -231,8 +230,11 @@ test_ffx()
         ct.resize(pt.size());
         pt2.resize(pt.size());
 
-        f.init(nbits, t).encrypt(&pt[0], &ct[0]);
-        f.init(nbits, t).decrypt(&ct[0], &pt2[0]);
+        ffx_a2_inited f0(&key, nbits, t);
+        f0.encrypt(&pt[0], &ct[0]);
+
+        ffx_a2_inited f1(&key, nbits, t);   /* duplicate of f0, for testing */
+        f1.decrypt(&ct[0], &pt2[0]);
 
         if (0) {
             cout << "nbits: " << nbits << endl;
@@ -260,19 +262,19 @@ test_ffx()
     urandom u;
     auto tweak = u.rand_vec<uint8_t>(1024);
 
-    ffx_a2_block_cipher<128> fbc128(&f, tweak);
+    ffx_a2_block_cipher<128> fbc128(&key, tweak);
     test_block_cipher(&fbc128, &u, "ffx128-aes128");
 
-    ffx_a2_block_cipher<64> fbc64(&f, tweak);
+    ffx_a2_block_cipher<64> fbc64(&key, tweak);
     test_block_cipher(&fbc64, &u, "ffx64-aes128");
 
-    ffx_a2_block_cipher<32> fbc32(&f, tweak);
+    ffx_a2_block_cipher<32> fbc32(&key, tweak);
     test_block_cipher(&fbc32, &u, "ffx32-aes128");
 
-    ffx_a2_block_cipher<16> fbc16(&f, tweak);
+    ffx_a2_block_cipher<16> fbc16(&key, tweak);
     test_block_cipher(&fbc16, &u, "ffx16-aes128");
 
-    ffx_a2_block_cipher<8> fbc8(&f, tweak);
+    ffx_a2_block_cipher<8> fbc8(&key, tweak);
     test_block_cipher(&fbc8, &u, "ffx8-aes128");
 }
 

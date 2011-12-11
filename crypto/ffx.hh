@@ -63,26 +63,11 @@ class ffx_a2_inited : public ffx_a2_mac_header {
     cbcmac<AES> mac_base;
 };
 
-class ffx_a2 {
- public:
-    ffx_a2(const AES *key) {
-        k = key;
-    }
-
-    ffx_a2_inited init(uint nbits, const std::vector<uint8_t> &t) const {
-        ffx_a2_inited fi(k, nbits, t);
-        return fi;
-    }
-
- private:
-    const AES *k;
-};
-
 template<uint nbits>
 class ffx_a2_block_cipher {
  public:
-    ffx_a2_block_cipher(const ffx_a2 *f, const std::vector<uint8_t> &t)
-        : fi(f->init(nbits, t)) {}
+    ffx_a2_block_cipher(const AES *key, const std::vector<uint8_t> &t)
+        : fi(key, nbits, t) {}
 
     void block_encrypt(const uint8_t *ptext, uint8_t *ctext) const {
         fi.encrypt(ptext, ctext);
