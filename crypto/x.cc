@@ -231,8 +231,8 @@ test_ffx()
         ct.resize(pt.size());
         pt2.resize(pt.size());
 
-        f.encrypt(&pt[0], &ct[0], nbits, t);
-        f.decrypt(&ct[0], &pt2[0], nbits, t);
+        f.init(nbits, t).encrypt(&pt[0], &ct[0]);
+        f.init(nbits, t).decrypt(&ct[0], &pt2[0]);
 
         if (0) {
             cout << "nbits: " << nbits << endl;

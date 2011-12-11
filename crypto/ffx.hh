@@ -74,18 +74,6 @@ class ffx_a2 {
         return fi;
     }
 
-    void encrypt(const uint8_t *pt, uint8_t *ct, uint nbits,
-                 const std::vector<uint8_t> &t) const {
-        auto fi = init(nbits, t);
-        fi.encrypt(pt, ct);
-    }
-
-    void decrypt(const uint8_t *ct, uint8_t *pt, uint nbits,
-                 const std::vector<uint8_t> &t) const {
-        auto fi = init(nbits, t);
-        fi.decrypt(ct, pt);
-    }
-
  private:
     const AES *k;
 };
