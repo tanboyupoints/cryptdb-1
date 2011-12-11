@@ -269,11 +269,11 @@ test_ffx()
     ffx_a2_block_cipher<32> fbc32(&f, tweak);
     test_block_cipher(&fbc32, &u, "ffx32-aes128");
 
-    // ffx_a2_block_cipher<16> fbc16(&f, tweak);
-    // test_block_cipher(&fbc16, &u, "ffx16-aes128");
+    ffx_a2_block_cipher<16> fbc16(&f, tweak);
+    test_block_cipher(&fbc16, &u, "ffx16-aes128");
 
-    // ffx_a2_block_cipher<8> fbc8(&f, tweak);
-    // test_block_cipher(&fbc8, &u, "ffx8-aes128");
+    ffx_a2_block_cipher<8> fbc8(&f, tweak);
+    test_block_cipher(&fbc8, &u, "ffx8-aes128");
 }
 
 int
