@@ -16,19 +16,70 @@
 #include <crypto/aes.hh>
 #include <crypto/cbcmac.hh>
 
+struct ffx_a2_mac_header {
+    uint16_t ver;
+    uint8_t method;
+    uint8_t addition;
+    uint8_t radix;
+    uint8_t n;
+    uint8_t s;
+    uint8_t rounds;
+    uint64_t tlen;
+
+    ffx_a2_mac_header(uint64_t narg, const std::vector<uint8_t> &t)
+        : ver(1), method(2), addition(0), radix(2), n(narg),
+          s(n/2), tlen(t.size())
+    {
+        assert(n >= 8 && n <= 128);
+
+        if (n <= 9)
+            rounds = 36;
+        else if (n <= 13)
+            rounds = 30;
+        else if (n <= 19)
+            rounds = 24;
+        else if (n <= 31)
+            rounds = 18;
+        else
+            rounds = 12;
+    }
+};
+
+class ffx_a2_inited : public ffx_a2_mac_header {
+ public:
+    ffx_a2_inited(const AES *key, uint nbits, const std::vector<uint8_t> &t);
+
+    /*
+     * For non-multiple-of-8-bit values, the bits come from MSB.
+     */
+    void encrypt(const uint8_t *pt, uint8_t *ct) const;
+    void decrypt(const uint8_t *ct, uint8_t *pt) const;
+
+ private:
+    uint64_t f(uint8_t i, uint64_t b) const;
+
+    const AES *k;
+    cbcmac<AES> mac_base;
+    uint tailoff;
+};
+
 class ffx_a2 {
  public:
     ffx_a2(const AES *key) {
         k = key;
     }
 
-    /*
-     * For non-multiple-of-8-bit values, the bits come from MSB.
-     */
     void encrypt(const uint8_t *pt, uint8_t *ct, uint nbits,
-                 const std::vector<uint8_t> &t) const;
+                 const std::vector<uint8_t> &t) const {
+        ffx_a2_inited fi(k, nbits, t);
+        fi.encrypt(pt, ct);
+    }
+
     void decrypt(const uint8_t *ct, uint8_t *pt, uint nbits,
-                 const std::vector<uint8_t> &t) const;
+                 const std::vector<uint8_t> &t) const {
+        ffx_a2_inited fi(k, nbits, t);
+        fi.decrypt(ct, pt);
+    }
 
  private:
     const AES *k;
