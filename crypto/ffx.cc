@@ -104,48 +104,61 @@ struct a2_mac_header {
     }
 };
 
-static uint64_t f(const a2_mac_header &h, const AES *k,
-                  uint8_t i, uint64_t b,
-                  const vector<uint8_t> &t)
-{
-    cbcmac<AES> mac(k);
-    mac.update(&h, sizeof(h));
-    mac.update(&t[0], t.size());
+class a2_f : public a2_mac_header {
+ public:
+    a2_f(const AES *key, uint64_t n, const vector<uint8_t> &t)
+        : a2_mac_header(n, t), k(key), mac_base(k)
+    {
+        auto h = static_cast<const a2_mac_header *> (this);
+        mac_base.update(h, sizeof(*h));
+        mac_base.update(&t[0], t.size());
 
-    struct {
+        tailoff = t.size() % 16;
+        struct tail *dummy_tail;
+        if (tailoff + 16 <= sizeof(dummy_tail->zero))
+            tailoff += 16;
+    }
+
+    uint64_t f(uint8_t i, uint64_t b) const {
+        cbcmac<AES> mac = mac_base;
+
+        struct tail tail;
+        memset(&tail.zero[tailoff], 0, sizeof(tail.zero) - tailoff);
+        tail.i = i;
+        tail.b = b;
+        mac.update(&tail.zero[tailoff], sizeof(tail) - tailoff);
+
+        uint8_t out[16];
+        mac.final(out);
+
+        uint m = (i % 2) ? (n -  s) : s;
+        uint64_t r, dummy;
+        mem_to_u64(out, &r, &dummy, m, 0);
+        return r;
+    }
+
+ private:
+    const AES *k;
+    cbcmac<AES> mac_base;
+    uint tailoff;
+
+    struct tail {
         uint8_t zero[16 + 7];
         uint8_t i;
         uint64_t b;
-    } tail;
-
-    uint tailoff = t.size() % 16;
-    if (tailoff + 16 <= sizeof(tail.zero))
-        tailoff += 16;
-
-    memset(tail.zero, 0, sizeof(tail.zero));
-    tail.i = i;
-    tail.b = b;
-    mac.update(&tail.zero[tailoff], sizeof(tail) - tailoff);
-
-    uint8_t out[16];
-    mac.final(out);
-
-    uint m = (i % 2) ? (h.n -  h.s) : h.s;
-    uint64_t r, dummy;
-    mem_to_u64(out, &r, &dummy, m, 0);
-    return r;
-}
+    };
+};
 
 void ffx_a2::encrypt(const uint8_t *pt, uint8_t *ct, uint nbits,
                      const vector<uint8_t> &t) const
 {
-    const a2_mac_header h(nbits, t);
+    const a2_f h(k, nbits, t);
 
     uint64_t a, b, c;
     mem_to_u64(pt, &a, &b, h.s, h.n - h.s);
 
     for (int i = 0; i < h.rounds; i++) {
-        c = a ^ f(h, k, i, b, t);
+        c = a ^ h.f(i, b);
         a = b;
         b = c;
     }
@@ -156,7 +169,7 @@ void ffx_a2::encrypt(const uint8_t *pt, uint8_t *ct, uint nbits,
 void ffx_a2::decrypt(const uint8_t *ct, uint8_t *pt, uint nbits,
                      const vector<uint8_t> &t) const
 {
-    const a2_mac_header h(nbits, t);
+    const a2_f h(k, nbits, t);
 
     uint64_t a, b, c;
     mem_to_u64(ct, &a, &b, h.s, h.n - h.s);
@@ -164,7 +177,7 @@ void ffx_a2::decrypt(const uint8_t *ct, uint8_t *pt, uint nbits,
     for (int i = h.rounds - 1; i >= 0; i--) {
         c = b;
         b = a;
-        a = c ^ f(h, k, i, b, t);
+        a = c ^ h.f(i, b);
     }
 
     u64_to_mem(a, b, h.s, h.n - h.s, pt);
