@@ -217,7 +217,7 @@ test_ffx()
     streamrng<arc4> rnd("test seed");
 
     AES key(rnd.rand_vec<uint8_t>(16));
-    ffx f(&key);
+    ffx_a2 f(&key);
 
     for (int i = 0; i < 100; i++) {
         uint nbits = 8 + (rnd.rand<uint>() % 121);
@@ -258,19 +258,19 @@ test_ffx()
     }
 
     urandom u;
-    ffx_block_cipher<128> fbc128(&f, {});
+    ffx_a2_block_cipher<128> fbc128(&f, {});
     test_block_cipher(&fbc128, &u, "ffx128-aes128");
 
-    ffx_block_cipher<64> fbc64(&f, {});
+    ffx_a2_block_cipher<64> fbc64(&f, {});
     test_block_cipher(&fbc64, &u, "ffx64-aes128");
 
-    ffx_block_cipher<32> fbc32(&f, {});
+    ffx_a2_block_cipher<32> fbc32(&f, {});
     test_block_cipher(&fbc32, &u, "ffx32-aes128");
 
-    // ffx_block_cipher<16> fbc16(&f, {});
+    // ffx_a2_block_cipher<16> fbc16(&f, {});
     // test_block_cipher(&fbc16, &u, "ffx16-aes128");
 
-    // ffx_block_cipher<8> fbc8(&f, {});
+    // ffx_a2_block_cipher<8> fbc8(&f, {});
     // test_block_cipher(&fbc8, &u, "ffx8-aes128");
 }
 
