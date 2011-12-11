@@ -60,7 +60,6 @@ class ffx_a2_inited : public ffx_a2_mac_header {
 
     const AES *k;
     cbcmac<AES> mac_base;
-    uint tailoff;
 };
 
 class ffx_a2 {

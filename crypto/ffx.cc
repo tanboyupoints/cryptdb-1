@@ -75,12 +75,6 @@ static void u64_to_mem(uint64_t a, uint64_t b,
         *p = b << (8 - bbits);
 }
 
-struct a2_mac_tail {
-    uint8_t zero[16 + 7];
-    uint8_t i;
-    uint64_t b;
-};
-
 ffx_a2_inited::ffx_a2_inited(const AES *key,
                              uint n, const vector<uint8_t> &t)
     : ffx_a2_mac_header(n, t), k(key), mac_base(k)
@@ -88,11 +82,6 @@ ffx_a2_inited::ffx_a2_inited(const AES *key,
     auto h = static_cast<const ffx_a2_mac_header *> (this);
     mac_base.update(h, sizeof(*h));
     mac_base.update(&t[0], t.size());
-
-    tailoff = t.size() % 16;
-    struct a2_mac_tail *dummy_tail;
-    if (tailoff + 16 <= sizeof(dummy_tail->zero))
-        tailoff += 16;
 }
 
 uint64_t
@@ -100,11 +89,10 @@ ffx_a2_inited::f(uint8_t i, uint64_t b) const
 {
     cbcmac<AES> mac = mac_base;
 
-    struct a2_mac_tail tail;
-    memset(&tail.zero[tailoff], 0, sizeof(tail.zero) - tailoff);
+    struct { uint8_t alignpad[7]; uint8_t i; uint64_t b; } tail;
     tail.i = i;
     tail.b = b;
-    mac.update(&tail.zero[tailoff], sizeof(tail) - tailoff);
+    mac.update(&tail.i, sizeof(tail) - sizeof(tail.alignpad));
 
     uint8_t out[16];
     mac.final(out);
