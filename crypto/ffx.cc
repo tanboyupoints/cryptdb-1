@@ -89,9 +89,11 @@ ffx_a2_inited::f(uint8_t i, uint64_t b) const
 {
     cbcmac<AES> mac = mac_base;
 
-    struct { uint8_t alignpad[7]; uint8_t i; uint64_t b; } tail;
-    tail.i = i;
-    tail.b = b;
+    struct {
+        uint8_t alignpad[7];
+        uint8_t i;
+        uint64_t b;
+    } tail = { { 0 }, i, b };
     mac.update(&tail.i, sizeof(tail) - sizeof(tail.alignpad));
 
     uint8_t out[16];
