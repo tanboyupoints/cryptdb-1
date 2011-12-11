@@ -69,15 +69,20 @@ class ffx_a2 {
         k = key;
     }
 
+    ffx_a2_inited init(uint nbits, const std::vector<uint8_t> &t) const {
+        ffx_a2_inited fi(k, nbits, t);
+        return fi;
+    }
+
     void encrypt(const uint8_t *pt, uint8_t *ct, uint nbits,
                  const std::vector<uint8_t> &t) const {
-        ffx_a2_inited fi(k, nbits, t);
+        auto fi = init(nbits, t);
         fi.encrypt(pt, ct);
     }
 
     void decrypt(const uint8_t *ct, uint8_t *pt, uint nbits,
                  const std::vector<uint8_t> &t) const {
-        ffx_a2_inited fi(k, nbits, t);
+        auto fi = init(nbits, t);
         fi.decrypt(ct, pt);
     }
 
@@ -88,20 +93,19 @@ class ffx_a2 {
 template<uint nbits>
 class ffx_a2_block_cipher {
  public:
-    ffx_a2_block_cipher(const ffx_a2 *farg, const std::vector<uint8_t> &targ)
-        : f(farg), t(targ) {}
+    ffx_a2_block_cipher(const ffx_a2 *f, const std::vector<uint8_t> &t)
+        : fi(f->init(nbits, t)) {}
 
     void block_encrypt(const uint8_t *ptext, uint8_t *ctext) const {
-        f->encrypt(ptext, ctext, nbits, t);
+        fi.encrypt(ptext, ctext);
     }
 
     void block_decrypt(const uint8_t *ctext, uint8_t *ptext) const {
-        f->decrypt(ctext, ptext, nbits, t);
+        fi.decrypt(ctext, ptext);
     }
 
     static const size_t blocksize = (nbits + 7) / 8;
 
  private:
-    const ffx_a2 *f;
-    const std::vector<uint8_t> &t;
+    const ffx_a2_inited fi;
 };
