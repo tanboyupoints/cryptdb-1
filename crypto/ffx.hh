@@ -46,9 +46,9 @@ struct ffx_a2_mac_header {
     }
 };
 
-class ffx_a2_inited : public ffx_a2_mac_header {
+class ffx_a2 : public ffx_a2_mac_header {
  public:
-    ffx_a2_inited(const AES *key, uint nbits, const std::vector<uint8_t> &t);
+    ffx_a2(const AES *key, uint nbits, const std::vector<uint8_t> &t);
 
     /*
      * For non-multiple-of-8-bit values, the bits come from MSB.
@@ -80,5 +80,5 @@ class ffx_a2_block_cipher {
     static const size_t blocksize = (nbits + 7) / 8;
 
  private:
-    const ffx_a2_inited fi;
+    const ffx_a2 fi;
 };

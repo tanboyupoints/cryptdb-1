@@ -230,10 +230,10 @@ test_ffx()
         ct.resize(pt.size());
         pt2.resize(pt.size());
 
-        ffx_a2_inited f0(&key, nbits, t);
+        ffx_a2 f0(&key, nbits, t);
         f0.encrypt(&pt[0], &ct[0]);
 
-        ffx_a2_inited f1(&key, nbits, t);   /* duplicate of f0, for testing */
+        ffx_a2 f1(&key, nbits, t);   /* duplicate of f0, for testing */
         f1.decrypt(&ct[0], &pt2[0]);
 
         if (0) {

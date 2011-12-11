@@ -75,8 +75,7 @@ static void u64_to_mem(uint64_t a, uint64_t b,
         *p = b << (8 - bbits);
 }
 
-ffx_a2_inited::ffx_a2_inited(const AES *key,
-                             uint n, const vector<uint8_t> &t)
+ffx_a2::ffx_a2(const AES *key, uint n, const vector<uint8_t> &t)
     : ffx_a2_mac_header(n, t), k(key), mac_base(k)
 {
     auto h = static_cast<const ffx_a2_mac_header *> (this);
@@ -85,7 +84,7 @@ ffx_a2_inited::ffx_a2_inited(const AES *key,
 }
 
 uint64_t
-ffx_a2_inited::f(uint8_t i, uint64_t b) const
+ffx_a2::f(uint8_t i, uint64_t b) const
 {
     cbcmac<AES> mac = mac_base;
 
@@ -106,7 +105,7 @@ ffx_a2_inited::f(uint8_t i, uint64_t b) const
 }
 
 void
-ffx_a2_inited::encrypt(const uint8_t *pt, uint8_t *ct) const
+ffx_a2::encrypt(const uint8_t *pt, uint8_t *ct) const
 {
     uint64_t a, b, c;
     mem_to_u64(pt, &a, &b, s, n - s);
@@ -121,7 +120,7 @@ ffx_a2_inited::encrypt(const uint8_t *pt, uint8_t *ct) const
 }
 
 void
-ffx_a2_inited::decrypt(const uint8_t *ct, uint8_t *pt) const
+ffx_a2::decrypt(const uint8_t *ct, uint8_t *pt) const
 {
     uint64_t a, b, c;
     mem_to_u64(ct, &a, &b, s, n - s);
