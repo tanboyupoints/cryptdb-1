@@ -95,13 +95,14 @@ ffx_a2::f(uint8_t i, uint64_t b) const
     } tail = { { 0 }, i, b };
     mac.update(&tail.i, sizeof(tail) - sizeof(tail.alignpad));
 
-    uint8_t out[16];
-    mac.final(out);
+    union {
+        uint8_t u8[16];
+        uint64_t u64[2];
+    } out;
+    mac.final(out.u8);
 
     uint m = (i % 2) ? (n -  s) : s;
-    uint64_t r, dummy;
-    mem_to_u64(out, &r, &dummy, m, 0);
-    return r;
+    return out.u64[0] >> (64 - m);
 }
 
 void
