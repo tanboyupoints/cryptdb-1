@@ -230,10 +230,10 @@ test_ffx()
         ct.resize(pt.size());
         pt2.resize(pt.size());
 
-        ffx_a2<AES> f0(&key, nbits, t);
+        ffx2<AES> f0(&key, nbits, t);
         f0.encrypt(&pt[0], &ct[0]);
 
-        ffx_a2<AES> f1(&key, nbits, t);   /* duplicate of f0, for testing */
+        ffx2<AES> f1(&key, nbits, t);   /* duplicate of f0, for testing */
         f1.decrypt(&ct[0], &pt2[0]);
 
         if (0) {
@@ -263,35 +263,35 @@ test_ffx()
     auto tweak = u.rand_vec<uint8_t>(1024);
     blowfish bf(u.rand_vec<uint8_t>(128));
 
-    ffx_a2_block_cipher<AES, 128> fbca128(&key, tweak);
+    ffx2_block_cipher<AES, 128> fbca128(&key, tweak);
     test_block_cipher(&fbca128, &u, "ffx128-aes128");
 
-    ffx_a2_block_cipher<blowfish, 128> fbcb128(&bf, tweak);
+    ffx2_block_cipher<blowfish, 128> fbcb128(&bf, tweak);
     test_block_cipher(&fbcb128, &u, "ffx128-bf");
 
-    ffx_a2_block_cipher<AES, 64> fbc64(&key, tweak);
+    ffx2_block_cipher<AES, 64> fbc64(&key, tweak);
     test_block_cipher(&fbc64, &u, "ffx64-aes128");
 
-    ffx_a2_block_cipher<blowfish, 64> fbcb64(&bf, tweak);
+    ffx2_block_cipher<blowfish, 64> fbcb64(&bf, tweak);
     test_block_cipher(&fbcb64, &u, "ffx64-bf");
 
-    ffx_a2_block_cipher<AES, 32> fbc32(&key, tweak);
+    ffx2_block_cipher<AES, 32> fbc32(&key, tweak);
     test_block_cipher(&fbc32, &u, "ffx32-aes128");
 
-    ffx_a2_block_cipher<blowfish, 32> fbcb32(&bf, tweak);
+    ffx2_block_cipher<blowfish, 32> fbcb32(&bf, tweak);
     test_block_cipher(&fbcb32, &u, "ffx32-bf");
 
     if (0) {    /* Painfully slow */
-        ffx_a2_block_cipher<AES, 16> fbc16(&key, tweak);
+        ffx2_block_cipher<AES, 16> fbc16(&key, tweak);
         test_block_cipher(&fbc16, &u, "ffx16-aes128");
 
-        ffx_a2_block_cipher<blowfish, 16> fbcb16(&bf, tweak);
+        ffx2_block_cipher<blowfish, 16> fbcb16(&bf, tweak);
         test_block_cipher(&fbcb16, &u, "ffx16-bf");
 
-        ffx_a2_block_cipher<AES, 8> fbc8(&key, tweak);
+        ffx2_block_cipher<AES, 8> fbc8(&key, tweak);
         test_block_cipher(&fbc8, &u, "ffx8-aes128");
 
-        ffx_a2_block_cipher<blowfish, 8> fbcb8(&bf, tweak);
+        ffx2_block_cipher<blowfish, 8> fbcb8(&bf, tweak);
         test_block_cipher(&fbcb8, &u, "ffx8-bf");
     }
 }

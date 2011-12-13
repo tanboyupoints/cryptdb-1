@@ -7,7 +7,11 @@
  * by Bellare, Rogaway, and Spies.
  * http://csrc.nist.gov/groups/ST/toolkit/BCM/documents/proposedmodes/ffx/ffx-spec.pdf
  *
- * This implementation follows FFX-A2, and is hard-coded to use:
+ * and the addendum to the above, "A parameter collection for enciphering strings
+ * of arbitrary radix and length".
+ * http://csrc.nist.gov/groups/ST/toolkit/BCM/documents/proposedmodes/ffx/ffx-spec2.pdf
+ *
+ * This implementation follows FFX[2], and is hard-coded to use:
  *   radix:    2 (binary)
  *   addition: 0 (character-wise addition, i.e., XOR)
  *   method:   2 (alternating Feistel)
@@ -25,7 +29,7 @@ void ffx_u64_to_mem(uint64_t a, uint64_t b,
                     uint64_t abits, uint64_t bbits,
                     uint8_t *p);
 
-struct ffx_a2_mac_header {
+struct ffx2_mac_header {
     const uint16_t ver;
     const uint8_t method;
     const uint8_t addition;
@@ -35,34 +39,19 @@ struct ffx_a2_mac_header {
     const uint8_t rounds;
     const uint64_t tlen;
 
-    ffx_a2_mac_header(uint64_t narg, const std::vector<uint8_t> &t)
+    ffx2_mac_header(uint64_t narg, const std::vector<uint8_t> &t)
         : ver(1), method(2), addition(0), radix(2), n(narg),
-          s(n/2), rounds(rnds(narg)), tlen(t.size()) {}
-
- private:
-    static uint8_t rnds(uint8_t n) {
-        assert(n >= 8 && n <= 128);
-
-        if (n <= 9)
-            return 36;
-        if (n <= 13)
-            return 30;
-        if (n <= 19)
-            return 24;
-        if (n <= 31)
-            return 18;
-        return 12;
-    }
+          s(n/2), rounds(10), tlen(t.size()) {}
 };
 
 template<class BlockCipher>
-class ffx_a2 : public ffx_a2_mac_header {
+class ffx2 : public ffx2_mac_header {
  public:
-    ffx_a2(const BlockCipher *key, uint nbits, const std::vector<uint8_t> &t)
-        : ffx_a2_mac_header(nbits, t), mac_base(key)
+    ffx2(const BlockCipher *key, uint nbits, const std::vector<uint8_t> &t)
+        : ffx2_mac_header(nbits, t), mac_base(key)
     {
         _static_assert(BlockCipher::blocksize >= 8);
-        auto h = static_cast<const ffx_a2_mac_header *> (this);
+        auto h = static_cast<const ffx2_mac_header *> (this);
         mac_base.update(h, sizeof(*h));
         mac_base.update(&t[0], t.size());
     }
@@ -121,9 +110,9 @@ class ffx_a2 : public ffx_a2_mac_header {
 };
 
 template<class BlockCipher, uint nbits>
-class ffx_a2_block_cipher {
+class ffx2_block_cipher {
  public:
-    ffx_a2_block_cipher(const BlockCipher *key, const std::vector<uint8_t> &t)
+    ffx2_block_cipher(const BlockCipher *key, const std::vector<uint8_t> &t)
         : fi(key, nbits, t)
     {
         _static_assert(nbits % 8 == 0);
@@ -140,5 +129,5 @@ class ffx_a2_block_cipher {
     static const size_t blocksize = (nbits + 7) / 8;
 
  private:
-    const ffx_a2<BlockCipher> fi;
+    const ffx2<BlockCipher> fi;
 };
