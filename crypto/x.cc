@@ -218,7 +218,7 @@ test_ffx()
 
     AES key(rnd.rand_vec<uint8_t>(16));
 
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 1000; i++) {
         uint nbits = 8 + (rnd.rand<uint>() % 121);
         auto pt = rnd.rand_vec<uint8_t>((nbits + 7) / 8);
         auto t = rnd.rand_vec<uint8_t>(rnd.rand<uint>() % 1024);
