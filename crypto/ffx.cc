@@ -1,11 +1,8 @@
-#include <string.h>
 #include <crypto/ffx.hh>
 
-using namespace std;
-
-static void mem_to_u64(const uint8_t *p,
-                       uint64_t *a, uint64_t *b,
-                       uint abits, uint bbits)
+void ffx_mem_to_u64(const uint8_t *p,
+                    uint64_t *a, uint64_t *b,
+                    uint abits, uint bbits)
 {
     assert(abits <= 64 && bbits <= 64);
 
@@ -41,9 +38,9 @@ static void mem_to_u64(const uint8_t *p,
         *b = *b << bbits | *p >> (8 - bbits);
 }
 
-static void u64_to_mem(uint64_t a, uint64_t b,
-                       uint64_t abits, uint64_t bbits,
-                       uint8_t *p)
+void ffx_u64_to_mem(uint64_t a, uint64_t b,
+                    uint64_t abits, uint64_t bbits,
+                    uint8_t *p)
 {
     assert(abits <= 64 && bbits <= 64);
 
@@ -73,64 +70,4 @@ static void u64_to_mem(uint64_t a, uint64_t b,
 
     if (bbits)
         *p = b << (8 - bbits);
-}
-
-ffx_a2::ffx_a2(const AES *key, uint n, const vector<uint8_t> &t)
-    : ffx_a2_mac_header(n, t), mac_base(key)
-{
-    auto h = static_cast<const ffx_a2_mac_header *> (this);
-    mac_base.update(h, sizeof(*h));
-    mac_base.update(&t[0], t.size());
-}
-
-uint64_t
-ffx_a2::f(uint8_t i, uint64_t b) const
-{
-    cbcmac<AES> mac = mac_base;
-
-    struct {
-        uint8_t alignpad[7];
-        uint8_t i;
-        uint64_t b;
-    } tail = { { 0 }, i, b };
-    mac.update(&tail.i, sizeof(tail) - sizeof(tail.alignpad));
-
-    union {
-        uint8_t u8[16];
-        uint64_t u64[2];
-    } out;
-    mac.final(out.u8);
-
-    uint m = (i % 2) ? (n -  s) : s;
-    return out.u64[0] >> (64 - m);
-}
-
-void
-ffx_a2::encrypt(const uint8_t *pt, uint8_t *ct) const
-{
-    uint64_t a, b, c;
-    mem_to_u64(pt, &a, &b, s, n - s);
-
-    for (int i = 0; i < rounds; i++) {
-        c = a ^ f(i, b);
-        a = b;
-        b = c;
-    }
-
-    u64_to_mem(a, b, s, n - s, ct);
-}
-
-void
-ffx_a2::decrypt(const uint8_t *ct, uint8_t *pt) const
-{
-    uint64_t a, b, c;
-    mem_to_u64(ct, &a, &b, s, n - s);
-
-    for (int i = rounds - 1; i >= 0; i--) {
-        c = b;
-        b = a;
-        a = c ^ f(i, b);
-    }
-
-    u64_to_mem(a, b, s, n - s, pt);
 }

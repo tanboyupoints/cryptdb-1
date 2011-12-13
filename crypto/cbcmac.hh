@@ -65,6 +65,8 @@ class cbcmac {
         return f;
     }
 
+    static const size_t blocksize = BlockCipher::blocksize;
+
  private:
     void do_block(const uint8_t *p) {
         uint8_t x[BlockCipher::blocksize];
