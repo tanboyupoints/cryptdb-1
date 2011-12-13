@@ -1,5 +1,7 @@
 #pragma once
 
+#include <util/static_assert.hh>
+
 /*
  * Based on "The FFX Mode of Operation for Format-Preserving Encryption"
  * by Bellare, Rogaway, and Spies.
@@ -66,7 +68,10 @@ template<uint nbits>
 class ffx_a2_block_cipher {
  public:
     ffx_a2_block_cipher(const AES *key, const std::vector<uint8_t> &t)
-        : fi(key, nbits, t) {}
+        : fi(key, nbits, t)
+    {
+        _static_assert(nbits % 8 == 0);
+    }
 
     void block_encrypt(const uint8_t *ptext, uint8_t *ctext) const {
         fi.encrypt(ptext, ctext);
