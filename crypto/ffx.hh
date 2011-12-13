@@ -59,7 +59,6 @@ class ffx_a2 : public ffx_a2_mac_header {
  private:
     uint64_t f(uint8_t i, uint64_t b) const;
 
-    const AES *k;
     cbcmac<AES> mac_base;
 };
 

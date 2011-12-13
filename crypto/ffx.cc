@@ -76,7 +76,7 @@ static void u64_to_mem(uint64_t a, uint64_t b,
 }
 
 ffx_a2::ffx_a2(const AES *key, uint n, const vector<uint8_t> &t)
-    : ffx_a2_mac_header(n, t), k(key), mac_base(k)
+    : ffx_a2_mac_header(n, t), mac_base(key)
 {
     auto h = static_cast<const ffx_a2_mac_header *> (this);
     mac_base.update(h, sizeof(*h));
