@@ -76,3 +76,4 @@ ope_server<EncT>::~ope_server()
  */
 template class ope_server<uint64_t>;
 template class ope_server<uint32_t>;
+template class ope_server<uint16_t>;

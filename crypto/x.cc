@@ -302,11 +302,13 @@ test_online_ope()
 {
     urandom u;
     blowfish bf(u.rand_vec<uint8_t>(128));
-    ope_server<uint64_t> ope_serv;
-    ope_client<uint64_t, blowfish> ope_clnt(&bf, &ope_serv);
+    ffx2_block_cipher<blowfish, 16> fk(&bf, {});
+
+    ope_server<uint16_t> ope_serv;
+    ope_client<uint16_t, ffx2_block_cipher<blowfish, 16>> ope_clnt(&fk, &ope_serv);
 
     for (uint i = 0; i < 1000; i++) {
-        uint64_t pt = u.rand<uint64_t>();
+        uint64_t pt = u.rand<uint16_t>();
         // cout << "online-ope pt:  " << pt << endl;
 
         auto ct = ope_clnt.encrypt(pt);
