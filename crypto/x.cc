@@ -302,8 +302,8 @@ test_online_ope()
 {
     urandom u;
     blowfish bf(u.rand_vec<uint8_t>(128));
-    ope_server ope_serv;
-    ope_client ope_clnt(&bf, &ope_serv);
+    ope_server<uint64_t> ope_serv;
+    ope_client<uint64_t, blowfish> ope_clnt(&bf, &ope_serv);
 
     for (uint i = 0; i < 1000; i++) {
         uint64_t pt = u.rand<uint64_t>();

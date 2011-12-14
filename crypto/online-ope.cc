@@ -2,12 +2,13 @@
 #include <string.h>
 #include <crypto/online-ope.hh>
 
+template<class EncT>
 struct tree_node {
-    uint64_t enc_val;
-    struct tree_node *left;
-    struct tree_node *right;
+    EncT enc_val;
+    tree_node *left;
+    tree_node *right;
 
-    tree_node(uint64_t ev) : enc_val(ev), left(0), right(0) {}
+    tree_node(const EncT &ev) : enc_val(ev), left(0), right(0) {}
     ~tree_node() {
         if (left)
             delete left;
@@ -16,8 +17,9 @@ struct tree_node {
     }
 };
 
-static struct tree_node *
-tree_lookup(struct tree_node *root, uint64_t v, uint64_t nbits)
+template<class EncT>
+static tree_node<EncT> *
+tree_lookup(tree_node<EncT> *root, uint64_t v, uint64_t nbits)
 {
     if (nbits == 0)
         return root;
@@ -28,13 +30,14 @@ tree_lookup(struct tree_node *root, uint64_t v, uint64_t nbits)
     return tree_lookup((v&(1ULL<<(nbits-1))) ? root->right : root->left, v, nbits-1);
 }
 
+template<class EncT>
 static void
-tree_insert(struct tree_node **np, uint64_t v,
-            uint64_t encval, uint64_t nbits)
+tree_insert(tree_node<EncT> **np, uint64_t v,
+            const EncT &encval, uint64_t nbits)
 {
     if (nbits == 0) {
         assert(*np == 0);
-        struct tree_node *n = new tree_node(encval);
+        tree_node<EncT> *n = new tree_node<EncT>(encval);
         *np = n;
     } else {
         assert(*np);
@@ -43,75 +46,33 @@ tree_insert(struct tree_node **np, uint64_t v,
     }
 }
 
-class lookup_failure {
-};
-
-uint64_t
-ope_server::lookup(uint64_t v, uint64_t nbits) const
+template<class EncT>
+EncT
+ope_server<EncT>::lookup(uint64_t v, uint64_t nbits) const
 {
-    struct tree_node *n = tree_lookup(root, v, nbits);
+    tree_node<EncT> *n = tree_lookup(root, v, nbits);
     if (!n)
-        throw lookup_failure();    /* XXX */
+        throw ope_lookup_failure();
 
     return n->enc_val;
 }
 
+template<class EncT>
 void
-ope_server::insert(uint64_t v, uint64_t nbits, uint64_t encval)
+ope_server<EncT>::insert(uint64_t v, uint64_t nbits, const EncT &encval)
 {
     tree_insert(&root, v, encval, nbits);
 }
 
-ope_server::~ope_server()
+template<class EncT>
+ope_server<EncT>::~ope_server()
 {
     if (root)
         delete root;
 }
 
-uint64_t
-ope_client::local_decrypt(uint64_t ct) const
-{
-    uint64_t pt;
-    b->block_decrypt((const uint8_t *) &ct, (uint8_t *) &pt);
-    return pt;
-}
-
-uint64_t
-ope_client::local_encrypt(uint64_t pt) const
-{
-    uint64_t ct;
-    b->block_encrypt((const uint8_t *) &pt, (uint8_t *) &ct);
-    return ct;
-}
-
-uint64_t
-ope_client::decrypt(uint64_t v) const
-{
-    uint64_t nbits = 64-ffsl(v);
-    return local_decrypt(s->lookup(v>>(64-nbits), nbits));
-}
-
-uint64_t
-ope_client::encrypt(uint64_t pt) const
-{
-    uint64_t v = 0;
-    uint64_t nbits = 0;
-    try {
-        for (;;) {
-            uint64_t xct = s->lookup(v, nbits);
-            uint64_t xpt = local_decrypt(xct);
-            if (pt == xpt)
-                break;
-            if (pt < xpt)
-                v = (v<<1) | 0;
-            else
-                v = (v<<1) | 1;
-            nbits++;
-        }
-    } catch (lookup_failure&) {
-        s->insert(v, nbits, local_encrypt(pt));
-    }
-
-    assert(nbits <= 63);
-    return (v<<(64-nbits)) | (1ULL<<(63-nbits));
-}
+/*
+ * Explicitly instantiate the ope_server template for various ciphertext types.
+ */
+template class ope_server<uint64_t>;
+template class ope_server<uint32_t>;
