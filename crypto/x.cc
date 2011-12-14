@@ -310,7 +310,7 @@ test_online_ope()
         // cout << "online-ope pt:  " << pt << endl;
 
         auto ct = ope_clnt.encrypt(pt);
-        // cout << "online-ope ct:  " << hex << ct << endl;
+        // cout << "online-ope ct:  " << hex << ct << dec << endl;
 
         auto pt2 = ope_clnt.decrypt(ct);
         // cout << "online-ope pt2: " << pt2 << endl;
@@ -325,8 +325,8 @@ test_online_ope()
         auto ac = ope_clnt.encrypt(a);
         auto bc = ope_clnt.encrypt(b);
 
-        // cout << "a=" << hex << (uint64_t) a << ", ac=" << ac << endl;
-        // cout << "b=" << hex << (uint64_t) b << ", bc=" << bc << endl;
+        // cout << "a=" << hex << (uint64_t) a << ", ac=" << ac << dec << endl;
+        // cout << "b=" << hex << (uint64_t) b << ", bc=" << bc << dec << endl;
 
         if (a == b)
             assert(ac == bc);
