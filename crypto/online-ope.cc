@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <string.h>
 #include <crypto/online-ope.hh>
 
 struct tree_node {
@@ -86,7 +87,8 @@ ope_client::local_encrypt(uint64_t pt) const
 uint64_t
 ope_client::decrypt(uint64_t v) const
 {
-    return local_decrypt(s->lookup(v>>8, v&0xff));
+    uint64_t nbits = 64-ffsl(v);
+    return local_decrypt(s->lookup(v>>(64-nbits), nbits));
 }
 
 uint64_t
@@ -110,6 +112,6 @@ ope_client::encrypt(uint64_t pt) const
         s->insert(v, nbits, local_encrypt(pt));
     }
 
-    assert(nbits <= 56);
-    return (v<<8) | (nbits&0xff);
+    assert(nbits <= 63);
+    return (v<<(64-nbits)) | (1ULL<<(63-nbits));
 }
