@@ -18,6 +18,7 @@
 #include <crypto/skip32.hh>
 #include <crypto/cbcmac.hh>
 #include <crypto/ffx.hh>
+#include <crypto/online-ope.hh>
 #include <util/timer.hh>
 #include <NTL/ZZ.h>
 #include <NTL/RR.h>
@@ -296,6 +297,51 @@ test_ffx()
     }
 }
 
+static void
+test_online_ope()
+{
+    urandom u;
+    blowfish bf(u.rand_vec<uint8_t>(128));
+    ope_server ope_serv;
+    ope_client ope_clnt(&bf, &ope_serv);
+
+    for (uint i = 0; i < 1000; i++) {
+        uint64_t pt = u.rand<uint64_t>();
+        cout << "online-ope pt:  " << pt << endl;
+
+        auto ct = ope_clnt.encrypt(pt);
+        cout << "online-ope ct:  ";
+        for (uint j = 0; j < ct.size(); j++)
+            cout << (ct[j] ? "1" : "0");
+        cout << endl;
+
+        auto pt2 = ope_clnt.decrypt(ct);
+        cout << "online-ope pt2: " << pt2 << endl;
+
+        assert(pt == pt2);
+    }
+
+    for (uint i = 0; i < 1000; i++) {
+        uint8_t a = u.rand<uint8_t>();
+        uint8_t b = u.rand<uint8_t>();
+
+        auto ac = ope_clnt.encrypt(a);
+        auto bc = ope_clnt.encrypt(b);
+
+        if (a == b)
+            assert(ac == bc);
+        if (a > b) {
+            swap(a, b);
+            swap(ac, bc);
+        }
+
+        for (uint j = 0; ; j++) {
+            /* XXX check if ac[j] < bc[j] ... */
+            break;
+        }
+    }
+}
+
 int
 main(int ac, char **av)
 {
@@ -308,6 +354,7 @@ main(int ac, char **av)
     test_search();
     test_paillier();
     test_skip32();
+    test_online_ope();
     test_ffx();
 
     AES aes128(u.rand_vec<uint8_t>(16));
