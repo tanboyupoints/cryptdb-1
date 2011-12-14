@@ -7,6 +7,12 @@ struct tree_node {
     struct tree_node *right;
 
     tree_node(uint64_t ev) : enc_val(ev), left(0), right(0) {}
+    ~tree_node() {
+        if (left)
+            delete left;
+        if (right)
+            delete right;
+    }
 };
 
 static struct tree_node *
@@ -57,6 +63,12 @@ void
 ope_server::insert(const std::vector<bool> &v, uint64_t encval)
 {
     tree_insert(&root, v, encval, 0);
+}
+
+ope_server::~ope_server()
+{
+    if (root)
+        delete root;
 }
 
 uint64_t

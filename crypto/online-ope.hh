@@ -10,6 +10,7 @@ class ope_server {
  public:
     uint64_t lookup(const std::vector<bool> &v) const;
     void insert(const std::vector<bool> &v, uint64_t encval);
+    ~ope_server();
 
  private:
     struct tree_node *root;
