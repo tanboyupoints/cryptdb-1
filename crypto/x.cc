@@ -310,10 +310,7 @@ test_online_ope()
         cout << "online-ope pt:  " << pt << endl;
 
         auto ct = ope_clnt.encrypt(pt);
-        cout << "online-ope ct:  ";
-        for (uint j = 0; j < ct.size(); j++)
-            cout << (ct[j] ? "1" : "0");
-        cout << endl;
+        cout << "online-ope ct:  " << hex << ct << endl;
 
         auto pt2 = ope_clnt.decrypt(ct);
         cout << "online-ope pt2: " << pt2 << endl;
@@ -335,10 +332,7 @@ test_online_ope()
             swap(ac, bc);
         }
 
-        for (uint j = 0; ; j++) {
-            /* XXX check if ac[j] < bc[j] ... */
-            break;
-        }
+        assert(ac < bc);
     }
 }
 

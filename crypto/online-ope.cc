@@ -16,33 +16,29 @@ struct tree_node {
 };
 
 static struct tree_node *
-tree_lookup(struct tree_node *root,
-            const std::vector<bool> &v,
-            uint vidx)
+tree_lookup(struct tree_node *root, uint64_t v, uint64_t nbits)
 {
-    if (v.size() == vidx)
+    if (nbits == 0)
         return root;
 
     if (!root)
         return 0;
 
-    return tree_lookup(v[vidx] ? root->right : root->left, v, vidx+1);
+    return tree_lookup((v&1) ? root->right : root->left, v>>1, nbits-1);
 }
 
 static void
-tree_insert(struct tree_node **np,
-            const std::vector<bool> &v,
-            uint64_t encval,
-            uint vidx)
+tree_insert(struct tree_node **np, uint64_t v,
+            uint64_t encval, uint64_t nbits)
 {
-    if (v.size() == vidx) {
+    if (nbits == 0) {
         assert(*np == 0);
         struct tree_node *n = new tree_node(encval);
         *np = n;
     } else {
         assert(*np);
-        tree_insert(v[vidx] ? &(*np)->right : &(*np)->left,
-                    v, encval, vidx+1);
+        tree_insert((v&1) ? &(*np)->right : &(*np)->left,
+                    v>>1, encval, nbits-1);
     }
 }
 
@@ -50,9 +46,9 @@ class lookup_failure {
 };
 
 uint64_t
-ope_server::lookup(const std::vector<bool> &v) const
+ope_server::lookup(uint64_t v, uint64_t nbits) const
 {
-    struct tree_node *n = tree_lookup(root, v, 0);
+    struct tree_node *n = tree_lookup(root, v, nbits);
     if (!n)
         throw lookup_failure();    /* XXX */
 
@@ -60,9 +56,9 @@ ope_server::lookup(const std::vector<bool> &v) const
 }
 
 void
-ope_server::insert(const std::vector<bool> &v, uint64_t encval)
+ope_server::insert(uint64_t v, uint64_t nbits, uint64_t encval)
 {
-    tree_insert(&root, v, encval, 0);
+    tree_insert(&root, v, encval, nbits);
 }
 
 ope_server::~ope_server()
@@ -88,29 +84,32 @@ ope_client::local_encrypt(uint64_t pt) const
 }
 
 uint64_t
-ope_client::decrypt(const std::vector<bool> &v) const
+ope_client::decrypt(uint64_t v) const
 {
-    return local_decrypt(s->lookup(v));
+    return local_decrypt(s->lookup(v>>8, v&0xff));
 }
 
-std::vector<bool>
+uint64_t
 ope_client::encrypt(uint64_t pt) const
 {
-    std::vector<bool> v;
+    uint64_t v = 0;
+    uint64_t nbits = 0;
     try {
         for (;;) {
-            uint64_t xct = s->lookup(v);
+            uint64_t xct = s->lookup(v, nbits);
             uint64_t xpt = local_decrypt(xct);
             if (pt == xpt)
                 return v;
             if (pt < xpt)
-                v.push_back(false);
+                v |= 0<<nbits;
             else
-                v.push_back(true);
+                v |= 1<<nbits;
+            nbits++;
         }
     } catch (lookup_failure&) {
-        s->insert(v, local_encrypt(pt));
+        s->insert(v, nbits, local_encrypt(pt));
     }
 
-    return v;
+    assert(nbits <= 56);
+    return (v<<8) | (nbits&0xff);
 }
