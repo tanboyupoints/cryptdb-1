@@ -25,7 +25,7 @@ tree_lookup(struct tree_node *root, uint64_t v, uint64_t nbits)
     if (!root)
         return 0;
 
-    return tree_lookup((v&1) ? root->right : root->left, v>>1, nbits-1);
+    return tree_lookup((v&(1ULL<<(nbits-1))) ? root->right : root->left, v, nbits-1);
 }
 
 static void
@@ -38,8 +38,8 @@ tree_insert(struct tree_node **np, uint64_t v,
         *np = n;
     } else {
         assert(*np);
-        tree_insert((v&1) ? &(*np)->right : &(*np)->left,
-                    v>>1, encval, nbits-1);
+        tree_insert((v&(1ULL<<(nbits-1))) ? &(*np)->right : &(*np)->left,
+                    v, encval, nbits-1);
     }
 }
 
@@ -101,11 +101,11 @@ ope_client::encrypt(uint64_t pt) const
             uint64_t xct = s->lookup(v, nbits);
             uint64_t xpt = local_decrypt(xct);
             if (pt == xpt)
-                return v;
+                break;
             if (pt < xpt)
-                v |= 0<<nbits;
+                v = (v<<1) | 0;
             else
-                v |= 1<<nbits;
+                v = (v<<1) | 1;
             nbits++;
         }
     } catch (lookup_failure&) {

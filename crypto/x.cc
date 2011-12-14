@@ -307,13 +307,13 @@ test_online_ope()
 
     for (uint i = 0; i < 1000; i++) {
         uint64_t pt = u.rand<uint64_t>();
-        cout << "online-ope pt:  " << pt << endl;
+        // cout << "online-ope pt:  " << pt << endl;
 
         auto ct = ope_clnt.encrypt(pt);
-        cout << "online-ope ct:  " << hex << ct << endl;
+        // cout << "online-ope ct:  " << hex << ct << endl;
 
         auto pt2 = ope_clnt.decrypt(ct);
-        cout << "online-ope pt2: " << pt2 << endl;
+        // cout << "online-ope pt2: " << pt2 << endl;
 
         assert(pt == pt2);
     }
@@ -325,14 +325,15 @@ test_online_ope()
         auto ac = ope_clnt.encrypt(a);
         auto bc = ope_clnt.encrypt(b);
 
+        // cout << "a=" << hex << (uint64_t) a << ", ac=" << ac << endl;
+        // cout << "b=" << hex << (uint64_t) b << ", bc=" << bc << endl;
+
         if (a == b)
             assert(ac == bc);
-        if (a > b) {
-            swap(a, b);
-            swap(ac, bc);
-        }
-
-        assert(ac < bc);
+        else if (a > b)
+            assert(ac > bc);
+        else
+            assert(ac < bc);
     }
 }
 
