@@ -18,7 +18,7 @@
 #include <crypto/skip32.hh>
 #include <crypto/cbcmac.hh>
 #include <crypto/ffx.hh>
-#include <crypto/online-ope.hh>
+#include <crypto/online_ope.hh>
 #include <util/timer.hh>
 #include <NTL/ZZ.h>
 #include <NTL/RR.h>

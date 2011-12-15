@@ -1,6 +1,6 @@
 #include <assert.h>
 #include <string.h>
-#include <crypto/online-ope.hh>
+#include <crypto/online_ope.hh>
 
 template<class EncT>
 struct tree_node {
