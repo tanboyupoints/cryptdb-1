@@ -17,7 +17,7 @@ class Paillier {
 
     template<class PackT>
     uint32_t pack_count() {
-        return (nbits + sizeof(PackT)*16) / 2 / (sizeof(PackT)*16);
+        return (nbits + sizeof(PackT)*8) / 2 / (sizeof(PackT)*8);
     }
 
     template<class PackT>
@@ -27,7 +27,7 @@ class Paillier {
 
         NTL::ZZ sum = NTL::to_ZZ(0);
         for (uint i = 0; i < npack; i++)
-            sum += NTL::to_ZZ(items[i]) << (i*sizeof(PackT)*16);
+            sum += NTL::to_ZZ(items[i]) << (i*sizeof(PackT)*8);
         return encrypt(sum);
     }
 
@@ -36,7 +36,7 @@ class Paillier {
         uint32_t npack = pack_count<PackT>();
         assert(packidx < npack);
 
-        NTL::ZZ s = mul(pack, NTL::to_ZZ(1) << (npack-1-packidx) * (sizeof(PackT)*16));
+        NTL::ZZ s = mul(pack, NTL::to_ZZ(1) << (npack-1-packidx) * (sizeof(PackT)*8));
         return add(agg, s);
     }
 
@@ -66,7 +66,7 @@ class Paillier_priv : public Paillier {
         uint32_t npack = pack_count<PackT>();
         NTL::ZZ plain = decrypt(pack);
         PackT result;
-        NTL::conv(result, plain >> (npack - 1) * sizeof(PackT) * 16);
+        NTL::conv(result, plain >> (npack - 1) * sizeof(PackT) * 8);
         return result;
     }
 

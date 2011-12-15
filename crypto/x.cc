@@ -155,8 +155,9 @@ test_paillier_packing()
     Paillier_priv pp(Paillier_priv::keygen());
     Paillier p(pp.pubkey());
 
-    std::vector<uint32_t> a;
-    for (uint i = 0; i < 8; i++)
+    uint32_t npack = p.pack_count<uint64_t>();
+    std::vector<uint64_t> a;
+    for (uint i = 0; i < npack; i++)
         a.push_back(u.rand<uint32_t>());
 
     ZZ ct = p.encrypt_pack(a);
@@ -165,15 +166,15 @@ test_paillier_packing()
         ZZ agg = to_ZZ(1);
         uint32_t plainagg = 0;
 
-        uint8_t mask = u.rand<uint8_t>();
-        for (uint idx = 0; idx < 8; idx++) {
+        uint64_t mask = u.rand<uint64_t>();
+        for (uint idx = 0; idx < npack; idx++) {
             if (mask & (1 << idx)) {
                 plainagg += a[idx];
-                agg = p.add_pack<uint32_t>(agg, ct, idx);
+                agg = p.add_pack<uint64_t>(agg, ct, idx);
             }
         }
 
-        uint32_t decagg = pp.decrypt_pack<uint32_t>(agg);
+        uint32_t decagg = pp.decrypt_pack<uint64_t>(agg);
         // cout << hex << decagg << ", " << plainagg << dec << endl;
         assert(decagg == to_ZZ(plainagg));
     }
