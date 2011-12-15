@@ -142,6 +142,10 @@ test_paillier()
     assert(pp.decrypt(ct0) == pt0);
     assert(pp.decrypt(ct1) == pt1);
     assert(pp.decrypt(sum) == (pt0 + pt1));
+
+    ZZ v0 = u.rand_zz_mod(to_ZZ(1) << 256);
+    ZZ v1 = u.rand_zz_mod(to_ZZ(1) << 256);
+    assert(pp.decrypt(p.mul(p.encrypt(v0), v1)) == v0 * v1);
 }
 
 static void
