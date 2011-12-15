@@ -15,6 +15,24 @@ struct tree_node {
         if (right)
             delete right;
     }
+
+    uint64_t height() {
+        uint64_t h = 0;
+        if (left)
+            h = max(h, 1 + left->height());
+        if (right)
+            h = max(h, 1 + right->height());
+        return h;
+    }
+
+    uint64_t count() {
+        uint64_t n = 1;
+        if (left)
+            n += left->count();
+        if (right)
+            n += right->count();
+        return n;
+    }
 };
 
 template<class EncT>
