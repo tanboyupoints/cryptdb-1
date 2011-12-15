@@ -66,7 +66,7 @@ class Paillier_priv : public Paillier {
         uint32_t npack = pack_count<PackT>();
         NTL::ZZ plain = decrypt(pack);
         PackT result;
-        conv(result, plain >> (npack - 1) * sizeof(PackT) * 16);
+        NTL::conv(result, plain >> (npack - 1) * sizeof(PackT) * 16);
         return result;
     }
 
