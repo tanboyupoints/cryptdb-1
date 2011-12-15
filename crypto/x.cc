@@ -156,6 +156,7 @@ test_paillier_packing()
     Paillier p(pp.pubkey());
 
     uint32_t npack = p.pack_count<uint64_t>();
+    cout << "paillier pack count for uint64_t: " << npack << endl;
     std::vector<uint64_t> a;
     for (uint i = 0; i < npack; i++)
         a.push_back(u.rand<uint32_t>());
@@ -164,7 +165,7 @@ test_paillier_packing()
 
     for (uint x = 0; x < 10; x++) {
         ZZ agg = to_ZZ(1);
-        uint32_t plainagg = 0;
+        uint64_t plainagg = 0;
 
         uint64_t mask = u.rand<uint64_t>();
         for (uint idx = 0; idx < npack; idx++) {
@@ -174,8 +175,37 @@ test_paillier_packing()
             }
         }
 
-        uint32_t decagg = pp.decrypt_pack<uint64_t>(agg);
-        // cout << hex << decagg << ", " << plainagg << dec << endl;
+        uint64_t decagg = pp.decrypt_pack<uint64_t>(agg);
+        // cout << hex << "pack: " << decagg << ", " << plainagg << dec << endl;
+        assert(decagg == to_ZZ(plainagg));
+    }
+
+    uint32_t npack2 = p.pack2_count<uint64_t>();
+    cout << "paillier pack2 count for uint64_t: " << npack2 << endl;
+    std::vector<uint64_t> b[32];
+    ZZ bct[32];
+    for (uint i = 0; i < 32; i++) {
+        for (uint j = 0; j < npack2; j++)
+            b[i].push_back(u.rand<uint32_t>());
+        bct[i] = p.encrypt_pack2(b[i]);
+    }
+
+    for (uint x = 0; x < 100; x++) {
+        Paillier::pack2_agg agg(npack2);
+        uint64_t plainagg = 0;
+
+        for (uint i = 0; i < 32; i++) {
+            uint64_t mask = u.rand<uint64_t>();
+            for (uint idx = 0; idx < npack2; idx++) {
+                if (mask & (1 << idx)) {
+                    plainagg += b[i][idx];
+                    p.add_pack2<uint64_t>(&agg, bct[i], idx);
+                }
+            }
+        }
+
+        uint64_t decagg = pp.decrypt_pack2<uint64_t>(agg);
+        // cout << hex << "pack2: " << decagg << ", " << plainagg << dec << endl;
         assert(decagg == to_ZZ(plainagg));
     }
 }

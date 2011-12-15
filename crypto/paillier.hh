@@ -15,9 +15,13 @@ class Paillier {
 
     void rand_gen(size_t niter = 100, size_t nmax = 1000);
 
+    /*
+     * For packing, choose a PackT such that addition will never overflow.
+     * E.g., for 32-bit values, using uint64_t as PackT may be a good idea.
+     */
     template<class PackT>
     uint32_t pack_count() {
-        return (nbits + sizeof(PackT)*8) / 2 / (sizeof(PackT)*8);
+        return (nbits - 1 + sizeof(PackT)*8) / 2 / (sizeof(PackT)*8);
     }
 
     template<class PackT>
@@ -38,6 +42,42 @@ class Paillier {
 
         NTL::ZZ s = mul(pack, NTL::to_ZZ(1) << (npack-1-packidx) * (sizeof(PackT)*8));
         return add(agg, s);
+    }
+
+    /*
+     * A different packing scheme that achieves 2x the density, at the
+     * cost of a larger aggregate value.
+     */
+    struct pack2_agg {
+        std::vector<NTL::ZZ> aggs;
+        pack2_agg(uint32_t count) : aggs(count) {
+            for (uint32_t i = 0; i < count; i++)
+                aggs[i] = NTL::to_ZZ(1);
+        }
+    };
+
+    template<class PackT>
+    uint32_t pack2_count() {
+        return (nbits - 1) / (sizeof(PackT) * 8);
+    }
+
+    template<class PackT>
+    NTL::ZZ encrypt_pack2(const std::vector<PackT> &items) {
+        uint32_t npack = pack2_count<PackT>();
+        assert(items.size() == npack);
+
+        NTL::ZZ sum = NTL::to_ZZ(0);
+        for (uint i = 0; i < npack; i++)
+            sum += NTL::to_ZZ(items[i]) << (i*sizeof(PackT)*8);
+        return encrypt(sum);
+    }
+
+    template<class PackT>
+    void add_pack2(pack2_agg *agg, const NTL::ZZ &pack, uint32_t packidx) {
+        uint32_t npack = pack2_count<PackT>();
+        assert(packidx < npack);
+
+        agg->aggs[packidx] = add(agg->aggs[packidx], pack);
     }
 
  protected:
@@ -67,6 +107,17 @@ class Paillier_priv : public Paillier {
         NTL::ZZ plain = decrypt(pack);
         PackT result;
         NTL::conv(result, plain >> (npack - 1) * sizeof(PackT) * 8);
+        return result;
+    }
+
+    template<class PackT>
+    PackT decrypt_pack2(const pack2_agg &agg) {
+        uint32_t npack = pack2_count<PackT>();
+        PackT result = 0, tmp;
+        for (uint32_t i = 0; i < npack; i++) {
+            NTL::conv(tmp, decrypt(agg.aggs[i]) >> (i*sizeof(PackT)*8));
+            result += tmp;
+        }
         return result;
     }
 
