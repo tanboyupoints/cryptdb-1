@@ -15,6 +15,31 @@ class Paillier {
 
     void rand_gen(size_t niter = 100, size_t nmax = 1000);
 
+    template<class PackT>
+    uint32_t pack_count() {
+        return (nbits + sizeof(PackT)*16) / 2 / (sizeof(PackT)*16);
+    }
+
+    template<class PackT>
+    NTL::ZZ encrypt_pack(const std::vector<PackT> &items) {
+        uint32_t npack = pack_count<PackT>();
+        assert(items.size() == npack);
+
+        NTL::ZZ sum = NTL::to_ZZ(0);
+        for (uint i = 0; i < npack; i++)
+            sum += NTL::to_ZZ(items[i]) << (i*sizeof(PackT)*16);
+        return encrypt(sum);
+    }
+
+    template<class PackT>
+    NTL::ZZ add_pack(const NTL::ZZ &agg, const NTL::ZZ &pack, uint32_t packidx) {
+        uint32_t npack = pack_count<PackT>();
+        assert(packidx < npack);
+
+        NTL::ZZ s = mul(pack, NTL::to_ZZ(1) << (npack-1-packidx) * (sizeof(PackT)*16));
+        return add(agg, s);
+    }
+
  protected:
     /* Public key */
     const NTL::ZZ n, g;
@@ -35,6 +60,15 @@ class Paillier_priv : public Paillier {
     NTL::ZZ decrypt(const NTL::ZZ &ciphertext) const;
 
     static std::vector<NTL::ZZ> keygen(uint nbits = 1024, uint abits = 256);
+
+    template<class PackT>
+    PackT decrypt_pack(const NTL::ZZ &pack) {
+        uint32_t npack = pack_count<PackT>();
+        NTL::ZZ plain = decrypt(pack);
+        PackT result;
+        conv(result, plain >> (npack - 1) * sizeof(PackT) * 16);
+        return result;
+    }
 
  private:
     /* Private key, including g from public part; n=pq */
