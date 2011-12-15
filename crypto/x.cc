@@ -191,7 +191,7 @@ test_paillier_packing()
     }
 
     for (uint x = 0; x < 100; x++) {
-        Paillier::pack2_agg agg(npack2);
+        Paillier::pack2_agg<uint64_t> agg(&p);
         uint64_t plainagg = 0;
 
         for (uint i = 0; i < 32; i++) {
@@ -199,7 +199,7 @@ test_paillier_packing()
             for (uint idx = 0; idx < npack2; idx++) {
                 if (mask & (1 << idx)) {
                     plainagg += b[i][idx];
-                    p.add_pack2<uint64_t>(&agg, bct[i], idx);
+                    agg.add(bct[i], idx);
                 }
             }
         }
