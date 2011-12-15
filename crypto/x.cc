@@ -149,6 +149,40 @@ test_paillier()
 }
 
 static void
+test_paillier_packing()
+{
+    urandom u;
+    Paillier_priv pp(Paillier_priv::keygen());
+    Paillier p(pp.pubkey());
+
+    uint32_t a[8];
+    for (uint i = 0; i < 8; i++)
+        a[i] = u.rand<uint32_t>();
+
+    ZZ pt = to_ZZ(0);
+    for (uint i = 0; i < 8; i++)
+        pt += to_ZZ(a[i]) << (i*64);
+    ZZ ct = p.encrypt(pt);
+
+    for (uint x = 0; x < 10; x++) {
+        ZZ agg = p.encrypt(to_ZZ(0));
+        uint64_t plainagg = 0;
+
+        uint8_t mask = u.rand<uint8_t>();
+        for (uint bit = 0; bit < 8; bit++) {
+            if (mask & (1 << bit)) {
+                plainagg += a[bit];
+                agg = p.add(agg, p.mul(ct, to_ZZ(1) << (64*(7-bit))));
+            }
+        }
+
+        ZZ decagg = (pp.decrypt(agg) >> 64*7) & ((to_ZZ(1) << 64) - 1);
+        // cout << decagg << ", " << plainagg << endl;
+        assert(decagg == to_ZZ(plainagg));
+    }
+}
+
+static void
 test_bn()
 {
     bignum a(123);
@@ -354,6 +388,7 @@ main(int ac, char **av)
     test_ecjoin();
     test_search();
     test_paillier();
+    test_paillier_packing();
     test_skip32();
     test_online_ope();
     test_ffx();
