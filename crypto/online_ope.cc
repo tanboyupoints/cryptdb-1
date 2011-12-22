@@ -55,8 +55,7 @@ tree_insert(tree_node<EncT> **np, uint64_t v,
 {
     if (nbits == 0) {
         assert(*np == 0);
-        tree_node<EncT> *n = new tree_node<EncT>(encval);
-        *np = n;
+        *np = new tree_node<EncT>(encval);
     } else {
         assert(*np);
         tree_insert((v&(1ULL<<(nbits-1))) ? &(*np)->right : &(*np)->left,
@@ -68,7 +67,7 @@ template<class EncT>
 EncT
 ope_server<EncT>::lookup(uint64_t v, uint64_t nbits) const
 {
-    tree_node<EncT> *n = tree_lookup(root, v, nbits);
+    auto n = tree_lookup(root, v, nbits);
     if (!n)
         throw ope_lookup_failure();
 
