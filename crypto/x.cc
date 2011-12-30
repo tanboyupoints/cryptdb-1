@@ -122,7 +122,7 @@ test_hgd()
     s = HGD(to_ZZ(100), to_ZZ(100), to_ZZ(0), &r);
     assert(s == 100);
 }
-
+/*
 static void
 test_paillier()
 {
@@ -146,8 +146,8 @@ test_paillier()
     ZZ v0 = u.rand_zz_mod(to_ZZ(1) << 256);
     ZZ v1 = u.rand_zz_mod(to_ZZ(1) << 256);
     assert(pp.decrypt(p.mul(p.encrypt(v0), v1)) == v0 * v1);
-}
-
+    }*/
+/*
 static void
 test_paillier_packing()
 {
@@ -209,7 +209,7 @@ test_paillier_packing()
         assert(decagg == to_ZZ(plainagg));
     }
 }
-
+*/
 static void
 test_bn()
 {
@@ -366,6 +366,7 @@ test_ffx()
 static void
 test_online_ope()
 {
+    cerr << "test online ope .. \n";
     urandom u;
     blowfish bf(u.rand_vec<uint8_t>(128));
     ffx2_block_cipher<blowfish, 16> fk(&bf, {});
@@ -374,14 +375,18 @@ test_online_ope()
     ope_client<uint16_t, ffx2_block_cipher<blowfish, 16>> ope_clnt(&fk, &ope_serv);
 
     for (uint i = 0; i < 1000; i++) {
+	cerr << "============= i = " << i << "========" << "\n";
+
         uint64_t pt = u.rand<uint16_t>();
-        // cout << "online-ope pt:  " << pt << endl;
+        cout << "online-ope pt:  " << pt << endl;
 
         auto ct = ope_clnt.encrypt(pt);
-        // cout << "online-ope ct:  " << hex << ct << dec << endl;
+        cout << "online-ope ct:  " << hex << ct << dec << endl;
 
+	//print_tree(ope_serv.root);
+	
         auto pt2 = ope_clnt.decrypt(ct);
-        // cout << "online-ope pt2: " << pt2 << endl;
+        cout << "online-ope pt2: " << pt2 << endl;
 
         assert(pt == pt2);
     }
@@ -390,11 +395,14 @@ test_online_ope()
         uint8_t a = u.rand<uint8_t>();
         uint8_t b = u.rand<uint8_t>();
 
-        auto ac = ope_clnt.encrypt(a);
-        auto bc = ope_clnt.encrypt(b);
+        ope_clnt.encrypt(a);
+        ope_clnt.encrypt(b);
 
-        // cout << "a=" << hex << (uint64_t) a << ", ac=" << ac << dec << endl;
-        // cout << "b=" << hex << (uint64_t) b << ", bc=" << bc << dec << endl;
+	auto ac = ope_clnt.encrypt(a);
+	auto bc = ope_clnt.encrypt(b);
+
+        //cout << "a=" << hex << (uint64_t) a << ", ac=" << ac << dec << endl;
+        //cout << "b=" << hex << (uint64_t) b << ", bc=" << bc << dec << endl;
 
         if (a == b)
             assert(ac == bc);
@@ -405,6 +413,28 @@ test_online_ope()
     }
 }
 
+static void
+test_online_ope_rebalance() {
+    urandom u;
+    blowfish bf(u.rand_vec<uint8_t>(128));
+    ffx2_block_cipher<blowfish, 16> fk(&bf, {});
+
+    ope_server<uint16_t> ope_serv;
+    ope_client<uint16_t, ffx2_block_cipher<blowfish, 16>> ope_clnt(&fk, &ope_serv);
+
+    cerr << "before encrypting \n";
+    //only manual testing so far -- when balancing is implemented this will be automated
+    ope_clnt.encrypt(10);
+    ope_clnt.encrypt(20);
+    ope_clnt.encrypt(30);
+    ope_clnt.encrypt(5);
+    ope_clnt.encrypt(1);
+    ope_clnt.encrypt(8);
+    ope_clnt.encrypt(3);
+    ope_clnt.encrypt(200);
+
+    cerr << "test online ope rebalance OK \n";
+}
 int
 main(int ac, char **av)
 {
@@ -412,11 +442,13 @@ main(int ac, char **av)
     cout << u.rand<uint64_t>() << endl;
     cout << u.rand<int64_t>() << endl;
 
+    test_online_ope_rebalance();
+    
     test_bn();
     test_ecjoin();
     test_search();
-    test_paillier();
-    test_paillier_packing();
+//    test_paillier();
+//    test_paillier_packing();
     test_skip32();
     test_online_ope();
     test_ffx();
