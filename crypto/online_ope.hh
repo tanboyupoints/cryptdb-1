@@ -15,9 +15,6 @@ struct tree_node;
 
 class ope_lookup_failure {};
 
-template<class EncT> 
-void print_tree(tree_node<EncT> * r);
-
 static int
 ffsl(uint64_t mask)
 {
@@ -39,10 +36,9 @@ class ope_server {
 
     ope_server();
     ~ope_server();
-    tree_node<EncT> *root;
-
+  
  private:
-   
+    tree_node<EncT> *root; 
 
     tree_node<EncT> * tree_lookup(tree_node<EncT> *root, uint64_t v, uint64_t nbits) const;
     void tree_insert(tree_node<EncT> **np, uint64_t v, const EncT &encval,
