@@ -2855,7 +2855,7 @@ Rewriter::rewrite(const string & q, Analysis & a)
     if (p.annot) {
         bool encryptField;
         mp->processAnnotation(*p.annot, encryptField, analysis);
-        //XXX what if, anything, do we want to do with encryptField
+        //XXX what, if anything, do we want to do with encryptField?
         //annotations have no rewritten variety
         return "";
     }

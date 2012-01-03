@@ -24,10 +24,12 @@ typedef struct PrincType {
  *  CRYPTDB PRINCTYPE princtypename;
  *  CRYPTDB PRINCTYPE princtypename EXTERNAL;
  *  CRYPTDB primitive ENCFOR right [enclevel];
- *  CRYPTDB left SPEAKSFOR right IF [predicate];
+ *  CRYPTDB left SPEAKSFOR right [IF predicate];
  *
  * primitive := tablename.columnname
  * princtype := tablename.columnname princtypename
+ * left      := princtype
+ * right     := princtype
  *
  * For example:
  *  CRYPTDB PRINCTYPE msg

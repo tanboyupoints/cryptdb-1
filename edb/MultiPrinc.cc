@@ -47,12 +47,14 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
         assert_s(accres >= 0, "access manager could not start principal " + annot.getPrimitive());
         accres = accMan->addGives(annot.getPrimitive());
         assert_s(accres >= 0, "access manager could not make principal external " + annot.getPrimitive());
-        analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->hasSensitive = true;
+        //XXX this needs to happen *after* tables are created, not in annotation processing
+        //analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->hasSensitive = true;
         encryptfield = false;
         return;
     case SPEAKSFOR: {
-        analysis.schema->tableMetaMap[annot.getLeftTableName()]->hasSensitive = true;
-        analysis.schema->tableMetaMap[annot.getRightTableName()]->hasSensitive = true;
+        //XXX this needs to happen *after* tables are created, not in annotation processing
+        //analysis.schema->tableMetaMap[annot.getLeftTableName()]->hasSensitive = true;
+        //analysis.schema->tableMetaMap[annot.getRightTableName()]->hasSensitive = true;
 
         accres = accMan->addToPrinc(annot.getLeft().column, annot.getLeft().princtype);
         assert_s(accres >= 0, "access manager could not add to princ " + annot.getLeftStr());
@@ -76,11 +78,12 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
         mkm.reverseEncFor[annot.getRight().column] = true;
         encryptfield = true;
 
-        analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->hasSensitive = true;
-        analysis.schema->tableMetaMap[annot.getRightTableName()]->hasSensitive = true;
+        //XXX this needs to happen *after* tables are created, not in annotation processing
+        //analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->hasSensitive = true;
+        //analysis.schema->tableMetaMap[annot.getRightTableName()]->hasSensitive = true;
 
-        FieldMeta *fm = analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->fieldMetaMap[annot.getPrimitive()];
-        fm->onionnames[oAGG] = "";
+        //FieldMeta *fm = analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->fieldMetaMap[annot.getPrimitive()];
+        //fm->onionnames[oAGG] = "";
         //XXX set enc level; onions
         return;
     }
