@@ -65,6 +65,10 @@ typedef struct FieldMeta {
         return it->second;
     }
 
+    inline bool setOnionLevel(onion o, SECLEVEL maxl) {
+        return encdesc.restrict(o, maxl);
+    }
+
 } FieldMeta;
 
 

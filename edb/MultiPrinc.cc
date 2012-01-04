@@ -47,14 +47,11 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
         assert_s(accres >= 0, "access manager could not start principal " + annot.getPrimitive());
         accres = accMan->addGives(annot.getPrimitive());
         assert_s(accres >= 0, "access manager could not make principal external " + annot.getPrimitive());
-        //XXX this needs to happen *after* tables are created, not in annotation processing
-        //analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->hasSensitive = true;
         encryptfield = false;
         return;
     case SPEAKSFOR: {
-        //XXX this needs to happen *after* tables are created, not in annotation processing
-        //analysis.schema->tableMetaMap[annot.getLeftTableName()]->hasSensitive = true;
-        //analysis.schema->tableMetaMap[annot.getRightTableName()]->hasSensitive = true;
+        assert_s(setSensitive(analysis.schema, annot.getLeftTableName(), annot.getLeftFieldName()), "could not set left speaksfor table as sensitive");
+        assert_s(setSensitive(analysis.schema, annot.getRightTableName(), annot.getRightFieldName()), "could not set right speaksfor table as sensitive");
 
         accres = accMan->addToPrinc(annot.getLeft().column, annot.getLeft().princtype);
         assert_s(accres >= 0, "access manager could not add to princ " + annot.getLeftStr());
@@ -78,15 +75,40 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
         mkm.reverseEncFor[annot.getRight().column] = true;
         encryptfield = true;
 
-        //XXX this needs to happen *after* tables are created, not in annotation processing
-        //analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->hasSensitive = true;
-        //analysis.schema->tableMetaMap[annot.getRightTableName()]->hasSensitive = true;
+        assert_s(setSensitive(analysis.schema, annot.getPrimitiveTableName(), annot.getPrimitiveFieldName()), "could not set primitive encfor table as sensitive");
+        assert_s(setSensitive(analysis.schema, annot.getRightTableName(), annot.getRightFieldName()), "could not set right encfor table as sensitive");
 
-        //FieldMeta *fm = analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->fieldMetaMap[annot.getPrimitive()];
-        //fm->onionnames[oAGG] = "";
-        //XXX set enc level; onions
+        FieldMeta *fm = analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->fieldMetaMap[annot.getPrimitive()];
+        //if level not specified, it will be SECLEVEL::INVALID
+        if (annot.getDETLevel() != SECLEVEL::INVALID) {
+            fm->setOnionLevel(oDET, annot.getDETLevel());
+            cerr << "WARNING: other onions should be deleted" << endl;
+        }
+        if (annot.getOPELevel() != SECLEVEL::INVALID) {
+            fm->setOnionLevel(oOPE, annot.getOPELevel());
+            cerr << "WARNING: other onions should be deleted" << endl; 
+        }
+        if (annot.getAGGLevel()) {
+            fm->setOnionLevel(oAGG, SECLEVEL::SEMANTIC_AGG);
+            cerr << "WARNING: other onions should be deleted" << endl;
+        }
+        if (annot.getSWPLevel()) {
+            fm->setOnionLevel(oSWP, SECLEVEL::SWP);
+            cerr << "WARNING: other onions should be deleted" << endl;
+        }        
         return;
     }
+}
+
+bool
+MultiPrinc::setSensitive(SchemaInfo *schema, string table_name, string field) {
+    //check that table exists
+    if (schema->tableMetaMap.find(table_name) == schema->tableMetaMap.end()) {
+        LOG(warn) << "table " << table_name << " does not exist; please create it before this annotation";
+        return false;
+    }
+    schema->tableMetaMap[table_name]->hasSensitive = true;
+    return true;
 }
 
 /*void

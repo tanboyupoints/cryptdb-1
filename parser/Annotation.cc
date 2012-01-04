@@ -24,13 +24,15 @@ split(string &str, char c) {
         result.push_back(word);
         s = s.substr(delim+1,string::npos);
         i++;
-        //assert_s(i < 10, "infinite loop");
     }
     return result;
 }
 
 Annotation::Annotation(const string &q) {
     query = q;
+    DETenclevel = SECLEVEL::INVALID;
+    OPEenclevel = SECLEVEL::INVALID;
+    AGGenclevel = false;
     pred = new Predicate();
     parse();
     return;
@@ -83,7 +85,18 @@ Annotation::getLeftTableName() {
     }
     list<string> left_words = split(left.column, '.');
     assert_s(left_words.size() == 2, "table or column name has a . in it");
-    return *left_words.begin();
+    return left_words.front();
+}
+
+string
+Annotation::getLeftFieldName() {
+    if (type != SPEAKSFOR) {
+        //LOG(error) << "Annotation asked for left when not SPEAKSFOR";
+        return "";
+    }
+    list<string> left_words = split(left.column, '.');
+    assert_s(left_words.size() == 2, "table or column name has a . in it");
+    return left_words.back();
 }
 
 string
@@ -94,7 +107,18 @@ Annotation::getRightTableName() {
     }
     list<string> right_words = split(right.column, '.');
     assert_s(right_words.size() == 2, "table or column name has a . in it");
-    return *right_words.begin();
+    return right_words.front();
+}
+
+string
+Annotation::getRightFieldName() {
+    if (type != SPEAKSFOR && type != ENCFOR) {
+        //LOG(error) << "Annotation asked for right when not SPEAKSFOR or ENCFOR";
+        return "";
+    }
+    list<string> right_words = split(right.column, '.');
+    assert_s(right_words.size() == 2, "table or column name has a . in it");
+    return right_words.back();
 }
 
 string
@@ -105,11 +129,57 @@ Annotation::getPrimitiveTableName() {
     }
     list<string> prim_words = split(primitive, '.');
     assert_s(prim_words.size() == 2, "table or column name has a . in it");
-    return *prim_words.begin();
+    return prim_words.front();
 }
 
-//XXX
-//enclevel encoding stuff
+string
+Annotation::getPrimitiveFieldName() {
+    if (type != ENCFOR) {
+        //LOG(error) << "Annotation asked for primitive when not ENCFOR";
+        return "";
+    }
+    list<string> prim_words = split(primitive, '.');
+    assert_s(prim_words.size() == 2, "table or column name has a . in it");
+    return prim_words.back();
+}
+
+SECLEVEL
+Annotation::getDETLevel() {
+    if (type != ENCFOR) {
+        //LOG(error) << "Annotation asked for DETLevel when not ENCFOR";
+        //XXX is INVALID an error SECLEVEL?
+        return SECLEVEL::INVALID;
+    }
+    return DETenclevel;
+}
+
+SECLEVEL
+Annotation::getOPELevel() {
+    if (type != ENCFOR) {
+        //LOG(error) << "Annotation asked for DETLevel when not ENCFOR";
+        //XXX is INVALID an error SECLEVEL?
+        return SECLEVEL::INVALID;
+    }
+    return OPEenclevel;
+}
+
+bool
+Annotation::getAGGLevel() {
+    if (type != ENCFOR) {
+        //LOG(error) << "Annotation asked for DETLevel when not ENCFOR";
+        return false;
+    }
+    return AGGenclevel;
+}
+
+bool
+Annotation::getSWPLevel() {
+    if (type != ENCFOR) {
+        //LOG(error) << "Annotation asked for DETLevel when not ENCFOR";
+        return false;
+    }
+    return SWPenclevel;
+}
 
 Predicate *
 Annotation::getPredicate() {
@@ -222,26 +292,29 @@ Annotation::parse() {
         assert_s(word == query_list.end(), "annotation has too many words");
         return;
     case ENCFOR:
-        if (word == query_list.end()) {
-            break;
+        while (word != query_list.end()) {
+            if (equalsIgnoreCase(levelnames[(int) SECLEVEL::DET], *word)) {
+                DETenclevel = SECLEVEL::DET;
+            }
+            else if (equalsIgnoreCase(levelnames[(int) SECLEVEL::DETJOIN], *word)) {
+                DETenclevel = SECLEVEL::DETJOIN;
+            }
+            else if (equalsIgnoreCase(levelnames[(int) SECLEVEL::OPE], *word)) {
+                DETenclevel = SECLEVEL::DET;
+                OPEenclevel = SECLEVEL::OPE;
+            }
+            else if (equalsIgnoreCase(levelnames[(int) SECLEVEL::SEMANTIC_AGG], *word)) {
+                AGGenclevel = true;
+            }
+            else if (equalsIgnoreCase(levelnames[(int) SECLEVEL::SWP], *word)) {
+                SWPenclevel = true;
+            }
+            else {
+                assert_s(false, "ENCFOR annotation followed by a word that does not specify an encryption level");
+            }
+            word++;
         }
-        if (equalsIgnoreCase(levelnames[(int) SECLEVEL::DET], *word)) {
-            DETenclevel = SECLEVEL::DET;
-            break;
-        }
-        if (equalsIgnoreCase(levelnames[(int) SECLEVEL::DETJOIN], *word)) {
-            DETenclevel = SECLEVEL::DETJOIN;
-            break;
-        }
-        if (equalsIgnoreCase(levelnames[(int) SECLEVEL::OPE], *word)) {
-            DETenclevel = SECLEVEL::DET;
-            OPEenclevel = SECLEVEL::OPE;
-            break;
-        }
-        if (equalsIgnoreCase(levelnames[(int) SECLEVEL::SEMANTIC_AGG], *word)) {
-            AGGenclevel = true;
-            break;
-        }
+        break;
     case SPEAKSFOR:
         if (word == query_list.end()) {
             break;

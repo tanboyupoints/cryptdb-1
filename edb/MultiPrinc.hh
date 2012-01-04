@@ -101,4 +101,6 @@ class MultiPrinc {
     MultiKeyMeta mkm;
     KeyAccess * accMan;
 
+    //utility function for checking that schema is okay, and setting tm to sensitive
+    bool setSensitive(SchemaInfo *schema, string table_name, string field);
 };

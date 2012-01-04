@@ -59,12 +59,18 @@ public:
     //requires: fields requested (primitive or princtype.column) to be of the 
     //          form tablename.fieldname
     std::string getLeftTableName();
+    std::string getLeftFieldName();
     std::string getPrimitiveTableName();
+    std::string getPrimitiveFieldName();
     std::string getRightTableName();
+    std::string getRightFieldName();
 
     //returns the encryption level for primitive
     //requires: type to be ENCFOR
-    SECLEVEL getEncLevel();
+    SECLEVEL getDETLevel();
+    SECLEVEL getOPELevel();
+    bool getAGGLevel();
+    bool getSWPLevel();
 
     //return the predicate, if it exists
     //requires: type to be SPEAKSFOR
@@ -85,4 +91,5 @@ private:
     SECLEVEL DETenclevel;
     SECLEVEL OPEenclevel;
     bool AGGenclevel;
+    bool SWPenclevel;
 };
