@@ -658,7 +658,7 @@ Connection::start() {
         this->conn = conn_set.begin();
         break;
     }
-        //single -- new EDBProxy
+    /*        //single -- new EDBProxy
     case SINGLE:
         cl = new EDBProxy(tc.host, tc.user, tc.pass, tc.db, tc.port, false);
         cl->setMasterKey(masterKey);
@@ -669,6 +669,22 @@ Connection::start() {
         cl->setMasterKey(masterKey);
         assert_s(cl->plain_execute("DROP FUNCTION IF EXISTS test").ok, "dropping test for multi");
         assert_s(cl->plain_execute("CREATE FUNCTION test (optionid integer) RETURNS bool RETURN optionid=20").ok, "creating test function for multi");
+        break;*/
+        //single -- new Rewriter
+    case SINGLE:
+        Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
+        conn_set.insert(c);
+        this->conn = conn_set.begin();
+        //XXX why does Rewriter need these arguments?  it never uses them
+        re = new Rewriter(tc.host, tc.user, tc.pass, tc.db, tc.port);
+        break;
+        //multi -- new Rewriter
+    case MULTI:
+        Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
+        conn_set.insert(c);
+        this->conn = conn_set.begin();
+        //XXX why does Rewriter need these arguments?  it never uses them
+        re = new Rewriter(tc.host, tc.user, tc.pass, tc.db, tc.port);
         break;
         //proxy -- start proxy in separate process and initialize connection
     case PROXYPLAIN:
@@ -738,18 +754,21 @@ Connection::start() {
 void
 Connection::stop() {
     switch (type) {
-    case SINGLE:
-    case MULTI:
-        if (cl) {
-            delete cl;
-            cl = NULL;
-        }
-        break;
     case PROXYPLAIN:
     case PROXYSINGLE:
     case PROXYMULTI:
         if (proxy_pid > 0)
             kill(proxy_pid, SIGKILL);
+    case SINGLE:
+    case MULTI:
+        /*if (cl) {
+            delete cl;
+            cl = NULL;
+            }*/
+        if (re) {
+            delete re;
+            re = NULL;
+        }
     case UNENCRYPTED:
         for (auto c = conn_set.begin(); c != conn_set.end(); c++) {
             delete *c;
@@ -771,7 +790,8 @@ Connection::execute(string query) {
         return executeConn(query);
     case SINGLE:
     case MULTI:
-        return executeEDBProxy(query);
+        //return executeEDBProxy(query);
+        return executeRewriter(query);
     default:
         assert_s(false, "unrecognized type in Connection");
     }
@@ -810,12 +830,26 @@ Connection::executeConn(string query) {
     return dbres->unpack();
 }
 
+ResType
+Connection::executeRewriter(string query) {
+    //translate the query
+    Analysis analysis;
+    // should be list, yes?
+    string enc_query = re->rewrite(query, analysis);
+    
+    //excute
+    ResType enc_res = executeConn(enc_query);
+
+    //decrypt results
+    return re->decryptResults(enc_res, analysis);
+}
+
 my_ulonglong
 Connection::executeLast() {
     switch(type) {
     case SINGLE:
     case MULTI:
-        return executeLastEDB();
+        //return executeLastEDB();
     case UNENCRYPTED:
     case PROXYPLAIN:
     case PROXYSINGLE:
@@ -834,7 +868,7 @@ Connection::executeLastConn() {
         conn = conn_set.begin();
     }
     return (*conn)->last_insert_id();
-} 
+}
 
 my_ulonglong
 Connection::executeLastEDB() {
