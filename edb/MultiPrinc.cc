@@ -9,6 +9,35 @@
 
 using namespace std;
 
+//XXX
+// copied from cdb_rewrite; should probably be put is some standard location
+//  but I'm not sure where...
+static inline bool
+IsMySQLTypeNumeric(enum_field_types t) {
+    switch (t) {
+    case MYSQL_TYPE_DECIMAL:
+    case MYSQL_TYPE_TINY:
+    case MYSQL_TYPE_SHORT:
+    case MYSQL_TYPE_LONG:
+    case MYSQL_TYPE_FLOAT:
+    case MYSQL_TYPE_DOUBLE:
+    case MYSQL_TYPE_LONGLONG:
+    case MYSQL_TYPE_INT24:
+    case MYSQL_TYPE_NEWDECIMAL:
+        // numeric also includes dates for now,
+        // since it makes sense to do +/- on date types
+    case MYSQL_TYPE_TIMESTAMP:
+    case MYSQL_TYPE_DATE:
+    case MYSQL_TYPE_TIME:
+    case MYSQL_TYPE_DATETIME:
+    case MYSQL_TYPE_YEAR:
+    case MYSQL_TYPE_NEWDATE:
+        return true;
+    default: return false;
+    }
+}
+
+
 MultiPrinc::MultiPrinc(Connect * connarg)
 {
     conn = connarg;
@@ -32,23 +61,24 @@ MultiPrinc::~MultiPrinc()
 
 const bool VERBOSE = true;
 
-void
+list<string>
 MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
                               Analysis &analysis) {
     int accres;
+    list<string> query_list;
     switch (annot.type) {
     case PRINCTYPE:
         accres = accMan->startPrinc(annot.getPrimitive());
         assert_s(accres >= 0, "access manager could not start principal " + annot.getPrimitive());
         encryptfield = false;
-        return;
+        break;
     case PRINCTYPE_EXTERNAL:
         accres = accMan->startPrinc(annot.getPrimitive());
         assert_s(accres >= 0, "access manager could not start principal " + annot.getPrimitive());
         accres = accMan->addGives(annot.getPrimitive());
         assert_s(accres >= 0, "access manager could not make principal external " + annot.getPrimitive());
         encryptfield = false;
-        return;
+        break;
     case SPEAKSFOR: {
         assert_s(setSensitive(analysis.schema, annot.getLeftTableName(), annot.getLeftFieldName()), "could not set left speaksfor table as sensitive");
         assert_s(setSensitive(analysis.schema, annot.getRightTableName(), annot.getRightFieldName()), "could not set right speaksfor table as sensitive");
@@ -65,7 +95,7 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
         if(pred) {
             mkm.condAccess[AccessRelation(annot.getLeft().column, annot.getRight().column)] = pred;
         }
-        return;
+        break;
     }
     case ENCFOR:
         accres = accMan->addToPrinc(annot.getRight().column, annot.getRight().princtype);
@@ -80,24 +110,44 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
 
         FieldMeta *fm = analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->fieldMetaMap[annot.getPrimitive()];
         //if level not specified, it will be SECLEVEL::INVALID
+        string query = "ALTER TABLE " + annot.getPrimitiveTableName();
+        //there will always be a DET onion
+        if (fm->onionnames.find(oDET) == fm->onionnames.end()) {
+            fm->onionnames[oDET] = anonymizeFieldName(0, oDET, fm->fname, true);
+        }
         if (annot.getDETLevel() != SECLEVEL::INVALID) {
             fm->setOnionLevel(oDET, annot.getDETLevel());
-            cerr << "WARNING: other onions should be deleted" << endl;
+        }
+        if (IsMySQLTypeNumeric(fm->sql_field->sql_type)) {
+            query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onionnames[oDET] + " " + TN_I64 + ";");
+        } else {
+            query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onionnames[oDET] + " " + TN_TEXT + ";");
+        }
+        //there will always be an OPE onion
+        if (fm->onionnames.find(oOPE) == fm->onionnames.end()) {
+            fm->onionnames[oOPE] = anonymizeFieldName(0, oOPE, fm->fname, true);
         }
         if (annot.getOPELevel() != SECLEVEL::INVALID) {
             fm->setOnionLevel(oOPE, annot.getOPELevel());
-            cerr << "WARNING: other onions should be deleted" << endl; 
         }
+        query_list.push_back(query + " ADD " + fm->onionnames[oOPE] + " " + TN_I64 + ";");
         if (annot.getAGGLevel()) {
+            if (fm->onionnames.find(oAGG) == fm->onionnames.end()) {
+                fm->onionnames[oAGG] = anonymizeFieldName(0, oAGG, fm->fname, true);
+            }
             fm->setOnionLevel(oAGG, SECLEVEL::SEMANTIC_AGG);
-            cerr << "WARNING: other onions should be deleted" << endl;
+            query_list.push_back(query + " ADD " + fm->onionnames[oAGG] + " " + TN_HOM + ";");
         }
         if (annot.getSWPLevel()) {
+            if (fm->onionnames.find(oOPE) == fm->onionnames.end()) {
+                fm->onionnames[oOPE] = anonymizeFieldName(0, oOPE, fm->fname, true);
+            }
             fm->setOnionLevel(oSWP, SECLEVEL::SWP);
-            cerr << "WARNING: other onions should be deleted" << endl;
-        }        
-        return;
+            query_list.push_back(query + " ADD " + fm->onionnames[oAGG] + " " + TN_TEXT + ";");
+        }
+        break;
     }
+    return query_list;
 }
 
 bool

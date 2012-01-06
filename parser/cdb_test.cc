@@ -27,6 +27,8 @@
 
 using namespace std;
 
+static bool Multi = false;
+
 static inline string user_homedir() {
     return getenv("HOME");
 }
@@ -69,7 +71,7 @@ main(int ac, char **av)
 
     string db(av[2]);
     //HACK (cat_red) currently hard-coding other db information
-    Rewriter r("localhost", "root", "letmein", db);
+    Rewriter r("localhost", "root", "letmein", db, Multi);
     r.setMasterKey("2392834");
 
     cerr << "connecting to localhost db cryptdbtest user root pass letmein" << "\n";
@@ -92,9 +94,12 @@ main(int ac, char **av)
         string new_q;
         try {
             Analysis analysis;
-            new_q = r.rewrite(q, analysis);
-            cerr << "SUCCESS: " << new_q << endl;
-            conn.execute(new_q, dbres);
+            list<string> new_queries = r.rewrite(q, analysis);
+            //only last query should return anything
+            for (auto new_q = new_queries.begin(); new_q != new_queries.end(); new_q++) {
+                cerr << "SUCCESS: " << *new_q << endl;
+                conn.execute(*new_q, dbres);
+            }
             if (!dbres) {
                 continue;
             }

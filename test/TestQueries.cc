@@ -675,7 +675,6 @@ Connection::start() {
         Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
         conn_set.insert(c);
         this->conn = conn_set.begin();
-        //XXX why does Rewriter need these arguments?  it never uses them
         re = new Rewriter(tc.host, tc.user, tc.pass, tc.db, tc.port);
         break;
         //multi -- new Rewriter
@@ -683,7 +682,6 @@ Connection::start() {
         Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
         conn_set.insert(c);
         this->conn = conn_set.begin();
-        //XXX why does Rewriter need these arguments?  it never uses them
         re = new Rewriter(tc.host, tc.user, tc.pass, tc.db, tc.port);
         break;
         //proxy -- start proxy in separate process and initialize connection
@@ -834,12 +832,15 @@ ResType
 Connection::executeRewriter(string query) {
     //translate the query
     Analysis analysis;
-    // should be list, yes?
-    string enc_query = re->rewrite(query, analysis);
+    list<string> enc_queries = re->rewrite(query, analysis);
     
-    //excute
-    ResType enc_res = executeConn(enc_query);
-
+    //execute
+    // only the last query should actually have a useful result
+    ResType enc_res;
+    for (auto q = enc_queries.begin(); q = enc_queries.end(); q++) {
+        enc_res = executeConn(*q);
+    }
+    
     //decrypt results
     return re->decryptResults(enc_res, analysis);
 }

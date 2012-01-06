@@ -2010,7 +2010,6 @@ rewrite_table_list(TABLE_LIST *t, Analysis &a)
 static void
 rewrite_table_list(List<TABLE_LIST> *tll, Analysis & a)
 {
-
     List_iterator<TABLE_LIST> join_it(*tll);
     for (;;) {
         TABLE_LIST *t = join_it++;
@@ -2035,7 +2034,7 @@ rewrite_table_list(List<TABLE_LIST> *tll, Analysis & a)
 }
 
 static void
-add_table(SchemaInfo * schema, const string & table, LEX *lex) {
+add_table(SchemaInfo * schema, const string & table, LEX *lex, bool mp) {
     assert(lex->sql_command == SQLCOM_CREATE_TABLE);
 
     auto it = schema->tableMetaMap.find(table);
@@ -2074,18 +2073,22 @@ add_table(SchemaInfo * schema, const string & table, LEX *lex) {
 
         // certain field types cannot have certain onions. for instance,
         // AGG makes no sense for non numeric types
-        if (IsMySQLTypeNumeric(field->sql_type)) {
-            fm->encdesc = NUMERIC_EncDec;
-        } else {
-            fm->encdesc = EQ_SEARCH_EncDesc;
-        }
+        // MultiPrinc on has onions on encfor fields, and those will be added by mp->processAnnotations
+        // so by default add no onions or encryption paraphernalia
+        if (mp) {
+            if (IsMySQLTypeNumeric(field->sql_type)) {
+                fm->encdesc = NUMERIC_EncDec;
+            } else {
+                fm->encdesc = EQ_SEARCH_EncDesc;
+            }
 
-        for (auto pr : fm->encdesc.olm) {
-            fm->onionnames[pr.first] = anonymizeFieldName(index, pr.first, fm->fname, false);
-        }
+            for (auto pr : fm->encdesc.olm) {
+                fm->onionnames[pr.first] = anonymizeFieldName(index, pr.first, fm->fname, false);
+            }
 
-        fm->has_salt = true;
-        fm->salt_name = getFieldSalt(index, tm->anonTableName);
+            fm->has_salt = true;
+            fm->salt_name = getFieldSalt(index, tm->anonTableName);
+        }
 
         assert(tm->fieldMetaMap.find(fm->fname) == tm->fieldMetaMap.end());
         tm->fieldMetaMap[fm->fname] = fm;
@@ -2225,7 +2228,7 @@ process_create_lex(LEX * lex, Analysis & a)
 {
     const string &table =
         lex->select_lex.table_list.first->table_name;
-    add_table(a.schema, table, lex);
+    add_table(a.schema, table, lex, a.is_mp);
 }
 
 static void
@@ -2589,7 +2592,8 @@ Rewriter::Rewriter(const std::string& server,
                    const std::string& user,
                    const std::string& psswd,
                    const std::string& db,
-                   uint port) : db(db)
+                   uint port,
+                   bool multi) : db(db)
 {
     // create mysql connection to embedded
     // server
@@ -2610,14 +2614,27 @@ Rewriter::Rewriter(const std::string& server,
     totalTables = 0;
     initSchema();
 
-    //XXX at some point we probably want to use c rather than m
-    c = new Connect(server, user, psswd, db, port);
-    mp = new MultiPrinc(c);
+    //XXX at some point we probably want to use c rather than MYSQL *m
+    // which means we want it to connect to shadow db??? YES
+    //conn = new Connect(server, user, psswd, db, port);
+    if (multi) {
+        mp = new MultiPrinc(new Connect(server, user, psswd, db, port));
+    } else {
+        this->mp = NULL;
+    }
 }
 
 Rewriter::~Rewriter()
 {
     mysql_close(m);
+    if (c) {
+        delete c;
+        c = NULL;
+    }
+    if (mp) {
+        delete mp;
+        mp = NULL;
+    }
 }
 
 void
@@ -2847,17 +2864,17 @@ Rewriter::setMasterKey(const string &mkey)
     cm = new CryptoManager(mkey);
 }
 
-string
+list<string>
 Rewriter::rewrite(const string & q, Analysis & a)
 {
     query_parse p(db, q);
     Analysis analysis = Analysis(conn(), schema, cm);
     if (p.annot) {
         bool encryptField;
-        mp->processAnnotation(*p.annot, encryptField, analysis);
-        //XXX what, if anything, do we want to do with encryptField?
-        //annotations have no rewritten variety
-        return "";
+        return mp->processAnnotation(*p.annot, encryptField, analysis);
+    }
+    if (mp) {
+        analysis.is_mp = true;
     }
     LEX *lex = p.lex();
 
@@ -2874,7 +2891,10 @@ Rewriter::rewrite(const string & q, Analysis & a)
 
     ss << *lex;
 
-    return ss.str();
+    list<string> queries;
+    queries.push_back(ss.str());
+
+    return queries;
 }
 
 

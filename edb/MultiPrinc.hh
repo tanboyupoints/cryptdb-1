@@ -32,8 +32,8 @@ class MultiPrinc {
                            std::string currentField,
                            bool & encryptfield, std::map<std::string,
                            TableMetadata *> & tm);*/
-    void processAnnotation(Annotation &annot, bool &encryptField,
-                           Analysis &analysis);
+    list<std::string> processAnnotation(Annotation &annot, bool &encryptField,
+                                        Analysis &analysis);
 
     int commitAnnotations();
 
@@ -100,6 +100,7 @@ class MultiPrinc {
     Connect * conn;
     MultiKeyMeta mkm;
     KeyAccess * accMan;
+    MultiPrinc * mp;
 
     //utility function for checking that schema is okay, and setting tm to sensitive
     bool setSensitive(SchemaInfo *schema, string table_name, string field);

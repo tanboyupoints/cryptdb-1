@@ -135,6 +135,7 @@ public:
     Analysis(MYSQL *m, SchemaInfo * schema, CryptoManager *cm)
         : pos(0), schema(schema), cm(cm), m(m) {
         assert(m != NULL);
+        is_mp = false;
     }
     Analysis(): pos(0), schema(NULL), cm(NULL), m(NULL) {
     }
@@ -150,6 +151,8 @@ public:
     std::set<Item*>                     itemHasRewrite;
     SchemaInfo *                        schema;
     CryptoManager *                     cm;
+
+    bool is_mp;
 
     ReturnMeta rmeta;
 

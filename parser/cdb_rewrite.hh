@@ -330,11 +330,12 @@ public:
              const std::string& user,
              const std::string& psswd,
              const std::string& dbname,
-             uint port = 0);
+             uint port = 0,
+             bool MultiPrinc = false);
     ~Rewriter();
 
     void setMasterKey(const std::string &mkey);
-    std::string rewrite(const std::string &q, Analysis & a);
+    list<std::string> rewrite(const std::string &q, Analysis & a);
     ResType decryptResults(ResType & dbres, Analysis & a);
     inline MYSQL* conn() {
         mysql_thread_init();
