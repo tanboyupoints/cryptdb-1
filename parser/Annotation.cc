@@ -16,22 +16,30 @@ static list<string>
 split(string &str, char c) {
     string s = str;
     list<string> result;
-    size_t delim;
-    while((delim = s.find(c)) != string::npos) {
+    size_t delim = 0;
+    int i = 0;
+    while(delim != string::npos) {
+        delim = s.find(c);
         string word = s.substr(0,delim);
         result.push_back(word);
-        s = s.substr(delim,string::npos);
+        s = s.substr(delim+1,string::npos);
+        i++;
+        //assert_s(i < 10, "infinite loop");
     }
     return result;
 }
 
 Annotation::Annotation(const string &q) {
     query = q;
+    pred = new Predicate();
     parse();
+    return;
 }
 
 Annotation::~Annotation() {
-    delete pred;
+    if (pred) {
+        delete pred;
+    }
 }
 
 PrincType
@@ -135,7 +143,7 @@ Annotation::parse() {
     //remove trailing semicolon
     end_prune(query, ';');
     list<string> query_list = split(query, ' ');
-    
+
     //type
     if (toLowerCase(query).find("princtype",0) != string::npos) {
         if (toLowerCase(query).find("external",0) != string::npos) {
@@ -166,9 +174,9 @@ Annotation::parse() {
         primitive = *word;
         break;
     case SPEAKSFOR:
-        left.princtype = *word;
-        word++;
         left.column = *word;
+        word++;
+        left.princtype = *word;
         break;
     }
 
@@ -195,21 +203,24 @@ Annotation::parse() {
         return;
     case PRINCTYPE_EXTERNAL:
         assert_s(toLowerCase(*word) == "external", "PRINCTYPE EXERNAL annotation does not have EXTERNAL after primitive");
+        break;
     case ENCFOR:
     case SPEAKSFOR:
-        right.princtype = *word;
-        word++;
         right.column = *word;
+        word++;
+        right.princtype = *word;
+        break;
     }
 
     //encryption level or predicate, if exists
     word++;
     switch(type) {
     case PRINCTYPE:
+        assert_s(false, "annotation has too many words");
     case PRINCTYPE_EXTERNAL:
         //this should be the end
         assert_s(word == query_list.end(), "annotation has too many words");
-        break;
+        return;
     case ENCFOR:
         if (word == query_list.end()) {
             break;
@@ -232,14 +243,22 @@ Annotation::parse() {
             break;
         }
     case SPEAKSFOR:
+        if (word == query_list.end()) {
+            break;
+        }
         assert_s(toLowerCase(*word) == "if", "SPEAKSFOR annotation predicate does not start with if");
+        word++;
+        //pred name and fields
+        assert_s(word != query_list.end(), "no predicate after IF");
         list<string> pred_split = split(*word, '(');
         assert_s(pred_split.size() == 2, "predicate has too many (");
-        pred->name = *pred_split.begin();
-        end_prune(*pred_split.end(),')');
-        list<string> pred_fields = split(*pred_split.end(),',');
+        pred->name = pred_split.front();
+        end_prune(pred_split.back(),')');
+        list<string> pred_fields = split(pred_split.back(),',');
         for(auto field = pred_fields.begin(); field != pred_fields.end(); field++) {
-            pred->fields.push_back(*word);
+            pred->fields.push_back(*field);
         }
+        
     }
+    return;
 }
