@@ -2056,7 +2056,8 @@ add_table(SchemaInfo * schema, const string & table, LEX *lex, bool mp) {
     schema->tableMetaMap[table] = tm;
 
     tm->tableNo = schema->totalTables++;
-    tm->anonTableName = anonymizeTableName(tm->tableNo, table, false);
+    tm->anonTableName = anonymizeTableName(tm->tableNo, table, mp);
+    cerr << "anon table name is " << tm->anonTableName << endl;
 
     unsigned int index =  0;
     for (auto it = List_iterator<Create_field>(lex->alter_info.create_list);;) {
@@ -2075,7 +2076,7 @@ add_table(SchemaInfo * schema, const string & table, LEX *lex, bool mp) {
         // AGG makes no sense for non numeric types
         // MultiPrinc on has onions on encfor fields, and those will be added by mp->processAnnotations
         // so by default add no onions or encryption paraphernalia
-        if (mp) {
+        if (!mp) {
             if (IsMySQLTypeNumeric(field->sql_type)) {
                 fm->encdesc = NUMERIC_EncDec;
             } else {
@@ -2088,6 +2089,8 @@ add_table(SchemaInfo * schema, const string & table, LEX *lex, bool mp) {
 
             fm->has_salt = true;
             fm->salt_name = getFieldSalt(index, tm->anonTableName);
+        } else {
+            fm->has_salt = false;
         }
 
         assert(tm->fieldMetaMap.find(fm->fname) == tm->fieldMetaMap.end());
@@ -2173,6 +2176,12 @@ static void rewrite_create_field(const string &table_name,
 {
     FieldMeta *fm = a.schema->getFieldMeta(table_name, f->field_name);
 
+    // if it has no onions, return the original field
+    if (fm->onionnames.empty()) {
+        l.push_back(f);
+        return;
+    }
+
     // create each onion column
     for (auto it = fm->onionnames.begin();
          it != fm->onionnames.end();
@@ -2198,6 +2207,7 @@ static void rewrite_create_field(const string &table_name,
 
     // create salt column
     if (fm->has_salt) {
+        cerr << fm->salt_name << endl;
         assert(!fm->salt_name.empty());
         THD *thd         = current_thd;
         Create_field *f0 = f->clone(thd->mem_root);
@@ -2224,11 +2234,15 @@ static void rewrite_key(const string &table_name,
  *
  */
 static void
-process_create_lex(LEX * lex, Analysis & a)
+process_create_lex(LEX * lex, Analysis & a, MultiPrinc * mp)
 {
     const string &table =
         lex->select_lex.table_list.first->table_name;
-    add_table(a.schema, table, lex, a.is_mp);
+    if (mp) {
+        add_table(a.schema, table, lex, true);
+    } else {
+        add_table(a.schema, table, lex, false);
+    }
 }
 
 static void
@@ -2289,6 +2303,7 @@ rewrite_create_lex(LEX *lex, Analysis &a)
 static void
 rewrite_insert_lex(LEX *lex, Analysis &a)
 {
+    //mp->insertRelations
     // fields
     vector<FieldMeta *> fmVec;
     if (lex->field_list.head()) {
@@ -2353,12 +2368,12 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
 }
 
 static void
-do_query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis & analysis) {
+do_query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis & analysis, MultiPrinc * mp) {
     // iterate over the entire select statement..
     // based on st_select_lex::print in mysql-server/sql/sql_select.cc
 
     if (lex->sql_command == SQLCOM_CREATE_TABLE) {
-        process_create_lex(lex, analysis);
+        process_create_lex(lex, analysis, mp);
         return;
     }
 
@@ -2387,13 +2402,13 @@ do_query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysi
  * Results are set in analysis.
  */
 static void
-query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis & analysis)
+query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis & analysis, MultiPrinc * mp)
 {
     // optimize the query first
     optimize_table_list(&lex->select_lex.top_join_list, analysis);
     optimize_select_lex(&lex->select_lex, analysis);
 
-    do_query_analyze(db, q, lex, analysis);
+    do_query_analyze(db, q, lex, analysis, mp);
     //print(analysis.schema->tableMetaMap);
 
 }
@@ -2870,20 +2885,22 @@ Rewriter::rewrite(const string & q, Analysis & a)
     query_parse p(db, q);
     Analysis analysis = Analysis(conn(), schema, cm);
     if (p.annot) {
+        assert_s(mp, "Rewriter must have a multiprinc to process anotations\n");
         bool encryptField;
+        //what if anything do we want to do with encryptField?
         return mp->processAnnotation(*p.annot, encryptField, analysis);
-    }
-    if (mp) {
-        analysis.is_mp = true;
     }
     LEX *lex = p.lex();
 
     cerr << "query lex is " << *lex << "\n";
 
-    query_analyze(db, q, lex, analysis);
+    query_analyze(db, q, lex, analysis, mp);
 
     int ret = updateMeta(db, q, lex, analysis);
     if (ret < 0) assert(false);
+    stringstream s;
+    s << *lex;
+    cerr << s.str() << endl;
 
     lex_rewrite(db, lex, analysis);
 

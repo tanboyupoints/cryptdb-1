@@ -107,8 +107,9 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
 
         assert_s(setSensitive(analysis.schema, annot.getPrimitiveTableName(), annot.getPrimitiveFieldName()), "could not set primitive encfor table as sensitive");
         assert_s(setSensitive(analysis.schema, annot.getRightTableName(), annot.getRightFieldName()), "could not set right encfor table as sensitive");
-
-        FieldMeta *fm = analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->fieldMetaMap[annot.getPrimitive()];
+        cerr << "sensitive done" << endl;
+        FieldMeta *fm = analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->fieldMetaMap[annot.getPrimitiveFieldName()];
+        assert_s(fm, "ENCFOR received primitive that does not exist; please put CREATE TABLE query before ENCFOR annotation\n");
         //if level not specified, it will be SECLEVEL::INVALID
         string query = "ALTER TABLE " + annot.getPrimitiveTableName();
         //there will always be a DET onion
@@ -145,6 +146,8 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
             fm->setOnionLevel(oSWP, SECLEVEL::SWP);
             query_list.push_back(query + " ADD " + fm->onionnames[oAGG] + " " + TN_TEXT + ";");
         }
+        cerr << "onions good" << endl;
+
         break;
     }
     return query_list;
@@ -732,6 +735,8 @@ MultiPrinc::checkPredicate(const AccessRelation & accRel, map<string, string> & 
 }
 
 //wordsIt points to the first value
+//bool is whether value is NULL or not
+//TODO pass values as pointers, rather than copying them
 void
 MultiPrinc::insertRelations(const list<pair<string, bool> > & values, string table,
                             list<string> fields,

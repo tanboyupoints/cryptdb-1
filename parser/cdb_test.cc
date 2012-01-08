@@ -27,7 +27,8 @@
 
 using namespace std;
 
-static bool Multi = false;
+// if true, uses MultiPrinc mode
+static bool Multi = true;
 
 static inline string user_homedir() {
     return getenv("HOME");
@@ -71,7 +72,7 @@ main(int ac, char **av)
 
     string db(av[2]);
     //HACK (cat_red) currently hard-coding other db information
-    Rewriter r("localhost", "root", "letmein", db, Multi);
+    Rewriter r("localhost", "root", "letmein", db, 3306, Multi);
     r.setMasterKey("2392834");
 
     cerr << "connecting to localhost db cryptdbtest user root pass letmein" << "\n";

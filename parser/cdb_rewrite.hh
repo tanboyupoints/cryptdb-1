@@ -8,8 +8,8 @@
  */
 
 #include <edb/Translator.hh>
-#include <edb/MultiPrinc.hh>
 #include <edb/Connect.hh>
+#include <edb/MultiPrinc.hh>
 
 #include <sql_select.h>
 #include <sql_delete.h>

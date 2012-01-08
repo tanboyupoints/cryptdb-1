@@ -12,10 +12,12 @@
 #include <edb/Connect.hh>
 #include <test/test_utils.hh>
 
+#include <parser/cdb_rewrite.hh>
 
 typedef enum test_mode {
     UNENCRYPTED, SINGLE, MULTI,
-    PROXYPLAIN, PROXYSINGLE, PROXYMULTI
+    PROXYPLAIN, PROXYSINGLE, PROXYMULTI,
+    TESTINVALID
 } test_mode;
 
 struct QueryChoice {

@@ -671,19 +671,19 @@ Connection::start() {
         assert_s(cl->plain_execute("CREATE FUNCTION test (optionid integer) RETURNS bool RETURN optionid=20").ok, "creating test function for multi");
         break;*/
         //single -- new Rewriter
-    case SINGLE:
+    case SINGLE: {
         Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
         conn_set.insert(c);
         this->conn = conn_set.begin();
         re = new Rewriter(tc.host, tc.user, tc.pass, tc.db, tc.port);
-        break;
+        break; }
         //multi -- new Rewriter
-    case MULTI:
+    case MULTI: {
         Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
         conn_set.insert(c);
         this->conn = conn_set.begin();
         re = new Rewriter(tc.host, tc.user, tc.pass, tc.db, tc.port);
-        break;
+        break; }
         //proxy -- start proxy in separate process and initialize connection
     case PROXYPLAIN:
     case PROXYSINGLE:
@@ -802,14 +802,14 @@ Connection::executeFail(string query) {
     LOG(test) << "Query: " << query << " could not execute" << endl;
 }
 
-ResType
+/*ResType
 Connection::executeEDBProxy(string query) {
     ResType res = cl->execute(query);
     if (!res.ok) {
         executeFail(query);
     }
     return res;
-}
+    }*/
     
 ResType
 Connection::executeConn(string query) {
@@ -837,7 +837,7 @@ Connection::executeRewriter(string query) {
     //execute
     // only the last query should actually have a useful result
     ResType enc_res;
-    for (auto q = enc_queries.begin(); q = enc_queries.end(); q++) {
+    for (auto q = enc_queries.begin(); q != enc_queries.end(); q++) {
         enc_res = executeConn(*q);
     }
     
@@ -1080,6 +1080,7 @@ string_to_test_mode(const string &s)
         return PROXYMULTI;
     else
         thrower() << "unknown test mode " << s;
+    return TESTINVALID;
 }
 
 void
