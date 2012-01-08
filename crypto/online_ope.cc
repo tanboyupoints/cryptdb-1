@@ -137,9 +137,8 @@ ope_server<EncT>::relabel(tree_node<EncT> * parent, bool isLeft, uint64_t size) 
 	root = w->left;
     }
 
-    free(w);
-
-    	
+    w->left = 0;    /* Something seems fishy here */
+    delete w;
 }
 
 ////////////////////////////////////////////////////
