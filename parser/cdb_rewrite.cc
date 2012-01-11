@@ -662,25 +662,24 @@ class CItemSubtype : public CItemType {
     }
 };
 
-//cat_red: integer?
 template<class T, Item::Type TYPE>
 class CItemSubtypeIT : public CItemSubtype<T> {
  public:
     CItemSubtypeIT() { itemTypes.reg(TYPE, this); }
 };
-//cat_red: functions?
+
 template<class T, Item_func::Functype TYPE>
 class CItemSubtypeFT : public CItemSubtype<T> {
  public:
     CItemSubtypeFT() { funcTypes.reg(TYPE, this); }
 };
-//cat_red: string?  sum?
+
 template<class T, Item_sum::Sumfunctype TYPE>
 class CItemSubtypeST : public CItemSubtype<T> {
  public:
     CItemSubtypeST() { sumFuncTypes.reg(TYPE, this); }
 };
-//cat_red: ???
+
 template<class T, const char *TYPE>
 class CItemSubtypeFN : public CItemSubtype<T> {
  public:
@@ -848,6 +847,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     virtual void
     do_rewrite_insert_type(Item_field *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
+        cerr << "do_rewrite_insert_type L701" << endl;
         //cat_red: insert
         assert(fm == NULL);
         // need to map this one field into all of its onions
@@ -859,11 +859,16 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
              it != fm->onionnames.end();
              ++it) {
             const string &name = it->second;
+            cerr << "onion " << name << endl;
             l.push_back(make_from_template(i, name.c_str()));
         }
         if (fm->has_salt) {
             assert(!fm->salt_name.empty());
             l.push_back(make_from_template(i, fm->salt_name.c_str()));
+        }
+        //if no onions: grab the field, for reals
+        if (l.empty()) {
+            l.push_back(make_from_template(i, fm->fname.c_str()));
         }
     }
 
@@ -891,6 +896,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     virtual void
     do_rewrite_insert_type(Item_string *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
+        cerr << "do_rewrite_insert_type L880" << endl;
         assert(fm != NULL);
         String s;
         String *s0 = i->val_str(&s);
@@ -926,7 +932,10 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
             string salt_s = strFromVal(salt);
             l.push_back(new Item_hex_string(salt_s.data(), salt_s.length()));
         }
-
+        //if no onions: grab the field, for reals
+        if (l.empty()) {
+            l.push_back(new Item_hex_string(plaindata.data(), plaindata.length()));
+        }
     }
 } ANON;
 
@@ -950,7 +959,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     virtual void
     do_rewrite_insert_type(Item_num *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
-
+        cerr << "do_rewrite_insert_type L942" << endl;
         //TODO: this part is quite repetitive with string or
         //any other type -- write a function
 
@@ -982,6 +991,10 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
         if (fm->has_salt) {
             l.push_back(new Item_int((ulonglong) salt));
         }
+        //if no onions: grab the field, for reals
+        if (l.empty()) {
+            l.push_back(new Item_int((ulonglong) valFromStr(plaindata)));
+        }
     }
 } ANON;
 
@@ -1008,6 +1021,7 @@ static class ANON : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITEM
     virtual void
     do_rewrite_insert_type(Item_decimal *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
+        cerr << "do_rewrite_insert_type L997" << endl;
         assert(fm != NULL);
         double n = i->val_real();
         char buf[sizeof(double) * 2];
@@ -1018,6 +1032,10 @@ static class ANON : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITEM
             l.push_back(new Item_hex_string(buf, sizeof(buf)));
         }
         if (fm->has_salt) {
+            l.push_back(new Item_hex_string(buf, sizeof(buf)));
+        }
+        //if no onions, add field as is
+        if (l.empty()) {
             l.push_back(new Item_hex_string(buf, sizeof(buf)));
         }
     }
@@ -2301,9 +2319,8 @@ rewrite_create_lex(LEX *lex, Analysis &a)
 }
 
 static void
-rewrite_insert_lex(LEX *lex, Analysis &a)
+rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp)
 {
-    //mp->insertRelations
     // fields
     vector<FieldMeta *> fmVec;
     if (lex->field_list.head()) {
@@ -2315,6 +2332,7 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
                 break;
             assert(i->type() == Item::FIELD_ITEM);
             Item_field *ifd = static_cast<Item_field*>(i);
+            cerr << "field " << ifd->table_name << "." << ifd->field_name << endl;
             fmVec.push_back(a.schema->getFieldMeta(ifd->table_name, ifd->field_name));
             vector<Item *> l;
             itemTypes.do_rewrite_insert(i, a, l, NULL);
@@ -2326,6 +2344,7 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
     }
 
     if (fmVec.empty()) {
+        cerr << "fmVec.empty()" << endl;
         // use the table order now
         const string &table =
             lex->select_lex.table_list.first->table_name;
@@ -2364,6 +2383,11 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
             newList.push_back(newList0);
         }
         lex->many_values = newList;
+    }
+    
+    //if this is MultiPrinc, insert may need keys; certainly needs to update AccMan
+    if (mp) {
+        //mp->insertRelations();
     }
 }
 
@@ -2461,7 +2485,7 @@ TableMeta::~TableMeta()
  * Fills rmeta with information about how to decrypt fields returned.
  */
 static int
-lex_rewrite(const string & db, LEX * lex, Analysis & analysis)
+lex_rewrite(const string & db, LEX * lex, Analysis & analysis, MultiPrinc * mp)
 {
     switch (lex->sql_command) {
     case SQLCOM_CREATE_TABLE:
@@ -2469,7 +2493,7 @@ lex_rewrite(const string & db, LEX * lex, Analysis & analysis)
         break;
     case SQLCOM_INSERT:
     case SQLCOM_REPLACE:
-        rewrite_insert_lex(lex, analysis);
+        rewrite_insert_lex(lex, analysis, mp);
         break;
     case SQLCOM_DROP_TABLE:
         rewrite_table_list(&lex->select_lex.table_list, analysis);
@@ -2882,6 +2906,8 @@ Rewriter::setMasterKey(const string &mkey)
 list<string>
 Rewriter::rewrite(const string & q, Analysis & a)
 {
+    list<string> queries;
+    cerr << "begin" << endl;
     query_parse p(db, q);
     Analysis analysis = Analysis(conn(), schema, cm);
     if (p.annot) {
@@ -2891,6 +2917,11 @@ Rewriter::rewrite(const string & q, Analysis & a)
         return mp->processAnnotation(*p.annot, encryptField, analysis);
     }
     LEX *lex = p.lex();
+    //login/logout command; nothing needs to be passed on
+    if ((lex->sql_command == SQLCOM_DELETE || lex->sql_command == SQLCOM_INSERT) && mp && mp->checkPsswd(lex)) {
+        cerr << "login/logout " << *lex << endl;
+        return queries;
+    }
 
     cerr << "query lex is " << *lex << "\n";
 
@@ -2900,15 +2931,14 @@ Rewriter::rewrite(const string & q, Analysis & a)
     if (ret < 0) assert(false);
     stringstream s;
     s << *lex;
-    cerr << s.str() << endl;
+    cerr << "before lex_rewrite is " << s.str() << endl;
 
-    lex_rewrite(db, lex, analysis);
+    lex_rewrite(db, lex, analysis, mp);
 
     stringstream ss;
 
     ss << *lex;
 
-    list<string> queries;
     queries.push_back(ss.str());
 
     return queries;

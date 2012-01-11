@@ -41,7 +41,8 @@ class MultiPrinc {
 
     bool isActiveUsers(const std::string &query);
 
-    bool checkPsswd(command comm, std::list<std::string> & words);
+    bool checkPsswd(LEX *lex);
+    //bool checkPsswd(command comm, std::list<std::string> & words);
 
     /** FILTERS "WHERE" tasks **/
 

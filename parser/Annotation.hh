@@ -37,7 +37,7 @@ typedef struct PrincType {
  *  CRYPTDB PRINCTYPE username EXTERNAL
  *  CRYPTDB privmsg.senderid user SPEAKSFOR privmsg.msgid msg
  *  CRYPTDB msgs.msgtext ENCFOR msgs.msgid msg
- *  CRYPTDB users.userid user SPEAKSFOR users.username username
+ *  CRYPTDB users.username username SPEAKSFOR users.userid user
  *
  */
 class Annotation {

@@ -632,15 +632,72 @@ getPsswdTable(string table)
     return "";
 }
 
+/*
+ * checks for
+ * INSERT INTO pwdcryptdb__TABLENAME (fieldname, psswd) VALUES (...)
+ *   or
+ * DELETE FROM pwdcryptdb__TABLENAME WHERE fieldname=psswd;
+ */
 bool
+MultiPrinc::checkPsswd(LEX *lex) {
+    //get tablename
+    string table = lex->select_lex.table_list.first->table_name;
+    string pw_table;
+
+    //if not login, return false
+    if ((pw_table = getPsswdTable(table)).length() == 0) {
+        return false;
+    }
+
+    string type, password, uname;
+    int resacc;
+    if (lex->sql_command == SQLCOM_INSERT) {
+        //fieldname for first (non-password) field
+        assert_s(lex->field_list.head(), "login does not have fields named");
+        auto it_f = List_iterator<Item>(lex->field_list);
+        Item *i = it_f++;
+        assert_s(i, "login does not have fields");
+        assert(i->type() == Item::FIELD_ITEM);
+        Item_field *ifd = static_cast<Item_field*>(i);
+        type = fullName(ifd->field_name, pw_table);
+        
+        //values for fieldname and password
+        assert_s(lex->many_values.head(), "login does not have values");
+        auto it_l = List_iterator<List_item>(lex->many_values);
+        List_item *li = it_l++;
+        assert_s(li, "login does not have List_item");
+        auto it = List_iterator<Item>(*li);
+        //fieldname
+        i = it++;
+        assert_s(i, "login does not have fieldname value");
+        String S_uname;
+        String *S0_uname = i->val_str(&S_uname);
+        uname = string(S0_uname->ptr(), S0_uname->length());
+        //password
+        i = it++;
+        assert_s(i, "login does not have password value");
+        String S_pass;
+        String *S0_pass = i->val_str(&S_pass);
+        password = string(S0_pass->ptr(), S0_pass->length());
+
+        //insert into accMan
+        password.resize(AES_KEY_BYTES);
+        resacc = accMan->insertPsswd(Prin(type, uname), password);
+        assert_s(resacc >= 0, "access manager insert password failed");
+        return true;
+    } else {
+        assert_s(false, "query should not have gone mp->checkPsswd");
+    }
+
+    return false;
+}
+
+
+/*bool
 MultiPrinc::checkPsswd(command comm, list<string> & words)
 {
     //ANON_REGION(__func__, &perf_cg);
     
-    /*
-     * checks for
-     * INSERT INTO cryptdbpsswd__TABLENAME (fieldname, psswd) VALUES (...)"
-     */
     list<string>::iterator wordsIt = words.begin();
     string table;
 
@@ -660,10 +717,8 @@ MultiPrinc::checkPsswd(command comm, list<string> & words)
             wordsIt++;
             string p = removeApostrophe(*wordsIt);
 
-            /*
              * XXX
              * we should hash this password!
-             */
             string passwd = p;
             passwd.resize(AES_KEY_BYTES);
 
@@ -695,7 +750,7 @@ MultiPrinc::checkPsswd(command comm, list<string> & words)
 
     assert_s(false, "checkpasswd should be called only for insert and delete");
     return false;
-}
+}*/
 
 bool
 MultiPrinc::checkPredicate(const AccessRelation & accRel, map<string, string> & vals)

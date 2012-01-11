@@ -476,7 +476,7 @@ MetaAccess::CreateTables()
     LOG(am_v) << "create tables";
     assert_s(
         CheckAccess(),
-        "ERROR: there is an access chain that does not terminate at a givesPsswd principal");
+        "there is an access chain that does not terminate at a givesPsswd principal");
     string sql, num;
     map<string, std::set<string> >::iterator it;
     std::set<string>::iterator it_s;

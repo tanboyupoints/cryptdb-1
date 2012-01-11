@@ -1,0 +1,18 @@
+cryptdb princtype msg;
+cryptdb princtype user;
+cryptdb princtype username external;
+
+create table privmsg (sendid integer, recid integer, msgid integer);
+CRYPTDB privmsg.sendid user SPEAKSFOR privmsg.msgid msg;
+create table msgs (msgid integer, msgtext text);
+CRYPTDB msgs.msgtext ENCFOR msgs.msgid msg;
+create table users (username text, userid integer);
+CRYPTDB users.username username SPEAKSFOR users.userid user
+
+insert into pwdcryptdb__users (username, psswd) values ('alice', 'secretalice');
+
+
+
+drop table privmsg;
+drop table msgs;
+drop table users;

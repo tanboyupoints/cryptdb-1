@@ -186,7 +186,11 @@ query_parse::query_parse(const std::string &db, const std::string &q)
         case SQLCOM_DROP_TABLE:
         case SQLCOM_DROP_INDEX:
             return;
-
+        case SQLCOM_INSERT:
+        case SQLCOM_DELETE:
+            if (string(lex->select_lex.table_list.first->table_name).substr(0, PWD_TABLE_PREFIX.length()) == PWD_TABLE_PREFIX) {
+                return;
+            }
         default:
             break;
         }
