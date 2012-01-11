@@ -33,6 +33,7 @@ Annotation::Annotation(const string &q) {
     DETenclevel = SECLEVEL::INVALID;
     OPEenclevel = SECLEVEL::INVALID;
     AGGenclevel = false;
+    SWPenclevel = false;
     pred = new Predicate();
     parse();
     return;

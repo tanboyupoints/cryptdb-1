@@ -140,11 +140,11 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
             query_list.push_back(query + " ADD " + fm->onionnames[oAGG] + " " + TN_HOM + ";");
         }
         if (annot.getSWPLevel()) {
-            if (fm->onionnames.find(oOPE) == fm->onionnames.end()) {
-                fm->onionnames[oOPE] = anonymizeFieldName(0, oOPE, fm->fname, true);
+            if (fm->onionnames.find(oSWP) == fm->onionnames.end()) {
+                fm->onionnames[oSWP] = anonymizeFieldName(0, oSWP, fm->fname, true);
             }
             fm->setOnionLevel(oSWP, SECLEVEL::SWP);
-            query_list.push_back(query + " ADD " + fm->onionnames[oAGG] + " " + TN_TEXT + ";");
+            query_list.push_back(query + " ADD " + fm->onionnames[oSWP] + " " + TN_TEXT + ";");
         }
         cerr << "onions good" << endl;
 

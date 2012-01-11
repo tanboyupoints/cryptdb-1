@@ -267,8 +267,27 @@ public:
 private:
     MYSQL * m;
 
-    };*/
+    };
 
+struct ConnectionData {
+    std::string server;
+    std::string user;
+    std::string psswd;
+    std::string dbname;
+    std::string port;
+
+    ConnectionData() {}
+
+    ConnectionData(std::string serverarg, std::string userarg, std::string psswdarg, std::string dbnamearg, std::string portarg = 0) {
+        server = serverarg;
+        user = userarg;
+        psswd = psswdarg;
+        dbname = dbnamearg;
+        port = portarg;
+    }
+
+} ConnectionData;
+*/
 class FieldReturned {
 public:
     bool encrypted;
@@ -326,11 +345,8 @@ public:
 class Rewriter {
 public:
     //Rewriter(const std::string & db);
-    Rewriter(const std::string& server,
-             const std::string& user,
-             const std::string& psswd,
-             const std::string& dbname,
-             uint port = 0,
+    Rewriter(ConnectionData db,
+             ConnectionData shadow,
              bool MultiPrinc = false);
     ~Rewriter();
 

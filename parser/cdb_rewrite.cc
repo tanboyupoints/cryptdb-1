@@ -2627,12 +2627,9 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
     return adjustOnions(db, a);
 }
 
-Rewriter::Rewriter(const std::string& server,
-                   const std::string& user,
-                   const std::string& psswd,
-                   const std::string& db,
-                   uint port,
-                   bool multi) : db(db)
+Rewriter::Rewriter(ConnectionData db,
+                   ConnectionData shadow,
+                   bool multi) : db(shadow.dbname)
 {
     // create mysql connection to embedded
     // server
@@ -2644,8 +2641,9 @@ Rewriter::Rewriter(const std::string& server,
         cryptdb_err() << "mysql_real_connect: " << mysql_error(m);
     }
     // HACK: create this DB if it doesn't exist, for now
-    string create_q = "CREATE DATABASE IF NOT EXISTS " + db;
-    string use_q    = "USE " + db + ";";
+    assert(shadow.dbname == db.dbname);
+    string create_q = "CREATE DATABASE IF NOT EXISTS " + shadow.dbname;
+    string use_q    = "USE " + shadow.dbname + ";";
     mysql_query_wrapper(m, create_q);
     mysql_query_wrapper(m, use_q);
 
@@ -2653,11 +2651,8 @@ Rewriter::Rewriter(const std::string& server,
     totalTables = 0;
     initSchema();
 
-    //XXX at some point we probably want to use c rather than MYSQL *m
-    // which means we want it to connect to shadow db??? YES
-    //conn = new Connect(server, user, psswd, db, port);
     if (multi) {
-        mp = new MultiPrinc(new Connect(server, user, psswd, db, port));
+        mp = new MultiPrinc(new Connect(db.server, db.user, db.psswd, db.dbname, db.port));
     } else {
         this->mp = NULL;
     }

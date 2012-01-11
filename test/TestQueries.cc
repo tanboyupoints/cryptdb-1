@@ -675,14 +675,16 @@ Connection::start() {
         Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
         conn_set.insert(c);
         this->conn = conn_set.begin();
-        re = new Rewriter(tc.host, tc.user, tc.pass, tc.db, tc.port);
+        ConnectionData cd = ConnectionData(tc.host, tc.user, tc.pass, tc.db, tc.port);
+        re = new Rewriter(cd, cd, false);
         break; }
         //multi -- new Rewriter
     case MULTI: {
         Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
         conn_set.insert(c);
         this->conn = conn_set.begin();
-        re = new Rewriter(tc.host, tc.user, tc.pass, tc.db, tc.port);
+        ConnectionData cd = ConnectionData(tc.host, tc.user, tc.pass, tc.db, tc.port);
+        re = new Rewriter(cd, cd, true);
         break; }
         //proxy -- start proxy in separate process and initialize connection
     case PROXYPLAIN:
