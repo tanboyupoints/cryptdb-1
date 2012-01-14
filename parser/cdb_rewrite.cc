@@ -117,6 +117,20 @@ sq(MYSQL *m, const string &s)
     return string("'") + string(buf, len) + string("'");
 }
 
+
+static string
+crypt(Analysis & a, string plaindata, fieldType ft, string fieldname, SECLEVEL fromlevel, SECLEVEL tolevel, bool & isBin, uint64_t salt, MultiPrinc * mp, FieldMeta *fm, TMKM & tmkm) {
+    AES_KEY * mkey;
+    if (mp) {
+        string key = mp->get_key(fullName(fm->fname, fm->tm->anonTableName), tmkm);
+        mkey = a.cm->getKey(key);
+    } else {
+        mkey = a.cm->getmkey();
+    }
+    return a.cm->crypt(mkey, plaindata, ft, fieldname, fromlevel, tolevel, isBin, salt);
+}
+
+
 /********  parser utils; TODO: put in separate file **/
 
 static string
@@ -129,6 +143,8 @@ ItemToString(Item * i) {
 
 // encrypts a constant item based on the information in a
 static string
+//TODO (cat_red) fix this to work for mp
+//encryptConstantItem(Item * i, const Analysis & a, MultiPrinc * mp, TMKM & tmkm){
 encryptConstantItem(Item * i, const Analysis & a){
     string plaindata = ItemToString(i);
 
@@ -140,6 +156,7 @@ encryptConstantItem(Item * i, const Analysis & a){
 
     string anonname = fullName(fm->onionnames[im->o], fm->tm->anonTableName);
     bool isBin;
+    //return crypt(a, plaindata, TYPE_TEXT, anonName, getMin(im->o), fm->encdesc.olm[im->o], isBin, 0, mp, fm, tmkm);
     return a.cm->crypt(a.cm->getmkey(), plaindata, TYPE_TEXT,
                        anonname, getMin(im->o), fm->encdesc.olm[im->o], isBin);
 }
@@ -327,9 +344,8 @@ class CItemType {
     virtual Item * do_optimize(Item *, Analysis &) const = 0;
     virtual Item * do_rewrite(Item *, Analysis &) const = 0;
     virtual void   do_rewrite_proj(Item *, Analysis &, vector<Item *> &) const = 0;
-    virtual void   do_rewrite_insert(Item *, Analysis &, vector<Item *> &, FieldMeta *fm) const = 0;
+    virtual void   do_rewrite_insert(Item *, Analysis &, vector<Item *> &, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkmm) const = 0;
 };
-
 
 /*
  * Directories for locating an appropriate CItemType for a given Item.
@@ -364,8 +380,8 @@ class CItemTypeDir : public CItemType {
         lookup(i)->do_rewrite_proj(i, a, l);
     }
 
-    void do_rewrite_insert(Item *i, Analysis &a, vector<Item *> &l, FieldMeta *fm) const {
-        lookup(i)->do_rewrite_insert(i, a, l, fm);
+    void do_rewrite_insert(Item *i, Analysis &a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const {
+        lookup(i)->do_rewrite_insert(i, a, l, fm, mp, tmkm);
     }
 
  protected:
@@ -643,8 +659,8 @@ class CItemSubtype : public CItemType {
     virtual void  do_rewrite_proj(Item *i, Analysis & a, vector<Item *> &l) const {
         do_rewrite_proj_type((T*) i, a, l);
     }
-    virtual void  do_rewrite_insert(Item *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const {
-        do_rewrite_insert_type((T*) i, a, l, fm);
+    virtual void  do_rewrite_insert(Item *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const {
+        do_rewrite_insert_type((T*) i, a, l, fm, mp, tmkm);
     }
  private:
     virtual EncSet do_gather_type(T *, const constraints&, Analysis & a) const = 0;
@@ -656,7 +672,7 @@ class CItemSubtype : public CItemType {
     virtual void   do_rewrite_proj_type(T *i, Analysis & a, vector<Item *> &l) const {
         l.push_back(do_rewrite_type(i, a));
     }
-    virtual void   do_rewrite_insert_type(T *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const {
+    virtual void   do_rewrite_insert_type(T *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const {
         // default is un-implemented. we'll implement these as they come
         UNIMPLEMENTED;
     }
@@ -845,7 +861,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     }
 
     virtual void
-    do_rewrite_insert_type(Item_field *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
+    do_rewrite_insert_type(Item_field *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const
     {
         cerr << "do_rewrite_insert_type L701" << endl;
         //cat_red: insert
@@ -894,13 +910,12 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     }
 
     virtual void
-    do_rewrite_insert_type(Item_string *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
+    do_rewrite_insert_type(Item_string *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const
     {
         cerr << "do_rewrite_insert_type L880" << endl;
         assert(fm != NULL);
         String s;
         String *s0 = i->val_str(&s);
-
         string plaindata = string(s0->ptr(), s0->length());
 
         uint64_t salt = 0;
@@ -920,9 +935,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
             string anonName = fullName(it->second, fm->tm->anonTableName);
             bool isBin;
 
-            string enc = a.cm->crypt(a.cm->getmkey(), plaindata, TYPE_TEXT,
-                                     anonName, getMin(it->first),
-                                     getMax(it->first), isBin, salt);
+            string enc = crypt(a, plaindata, TYPE_TEXT, anonName, getMin(it->first), getMax(it->first), isBin, salt, mp, fm, tmkm);
 
             l.push_back(new Item_hex_string(enc.data(), enc.length()));
 
@@ -957,7 +970,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
         return new Item_int((ulonglong) valFromStr(enc));
     }
     virtual void
-    do_rewrite_insert_type(Item_num *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
+    do_rewrite_insert_type(Item_num *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const
     {
         cerr << "do_rewrite_insert_type L942" << endl;
         //TODO: this part is quite repetitive with string or
@@ -982,10 +995,8 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
             string anonName = fullName(it->second, fm->tm->anonTableName);
             bool isBin;
 
-            string enc = a.cm->crypt(a.cm->getmkey(), plaindata, TYPE_INTEGER,
-                                     anonName, getMin(it->first),
-                                     getMax(it->first), isBin, salt);
-
+            string enc = crypt(a, plaindata, TYPE_INTEGER, anonName, getMin(it->first), getMax(it->first), isBin, salt, mp, fm, tmkm);
+            
             l.push_back(new Item_int((ulonglong) valFromStr(enc)));
         }
         if (fm->has_salt) {
@@ -1019,7 +1030,7 @@ static class ANON : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITEM
         return new Item_hex_string(buf, sizeof(buf));
     }
     virtual void
-    do_rewrite_insert_type(Item_decimal *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
+    do_rewrite_insert_type(Item_decimal *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const
     {
         cerr << "do_rewrite_insert_type L997" << endl;
         assert(fm != NULL);
@@ -1874,7 +1885,6 @@ optimize_select_lex(st_select_lex *select_lex, Analysis & a)
 static void
 process_select_lex(st_select_lex *select_lex, const constraints &tr, Analysis & a)
 {
-    cerr << "in process select lex \n";
     //select clause
     auto item_it = List_iterator<Item>(select_lex->item_list);
     for (;;) {
@@ -2321,6 +2331,13 @@ rewrite_create_lex(LEX *lex, Analysis &a)
 static void
 rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp)
 {
+    //if this is MultiPrinc, insert may need keys; certainly needs to update AccMan
+    TMKM tmkm;
+    if (mp) {
+        tmkm.processingQuery = true;
+        mp->insertLex(lex, a, tmkm);
+    }
+
     // fields
     vector<FieldMeta *> fmVec;
     if (lex->field_list.head()) {
@@ -2335,7 +2352,7 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp)
             cerr << "field " << ifd->table_name << "." << ifd->field_name << endl;
             fmVec.push_back(a.schema->getFieldMeta(ifd->table_name, ifd->field_name));
             vector<Item *> l;
-            itemTypes.do_rewrite_insert(i, a, l, NULL);
+            itemTypes.do_rewrite_insert(i, a, l, NULL, mp, tmkm);
             for (auto it0 = l.begin(); it0 != l.end(); ++it0) {
                 newList.push_back(*it0);
             }
@@ -2344,7 +2361,6 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp)
     }
 
     if (fmVec.empty()) {
-        cerr << "fmVec.empty()" << endl;
         // use the table order now
         const string &table =
             lex->select_lex.table_list.first->table_name;
@@ -2374,7 +2390,7 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp)
                 if (!i)
                     break;
                 vector<Item *> l;
-                itemTypes.do_rewrite_insert(i, a, l, *fmVecIt);
+                itemTypes.do_rewrite_insert(i, a, l, *fmVecIt, mp, tmkm);
                 for (auto it1 = l.begin(); it1 != l.end(); ++it1) {
                     newList0->push_back(*it1);
                 }
@@ -2385,10 +2401,6 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp)
         lex->many_values = newList;
     }
     
-    //if this is MultiPrinc, insert may need keys; certainly needs to update AccMan
-    if (mp) {
-        //mp->insertRelations();
-    }
 }
 
 static void
@@ -2902,7 +2914,6 @@ list<string>
 Rewriter::rewrite(const string & q, Analysis & a)
 {
     list<string> queries;
-    cerr << "begin" << endl;
     query_parse p(db, q);
     Analysis analysis = Analysis(conn(), schema, cm);
     if (p.annot) {
@@ -2917,9 +2928,6 @@ Rewriter::rewrite(const string & q, Analysis & a)
         cerr << "login/logout " << *lex << endl;
         return queries;
     }
-
-    cerr << "query lex is " << *lex << "\n";
-
     query_analyze(db, q, lex, analysis, mp);
 
     int ret = updateMeta(db, q, lex, analysis);

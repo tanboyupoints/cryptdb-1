@@ -74,7 +74,8 @@ class MultiPrinc {
     bool checkPredicate(const AccessRelation & accRel, std::map<std::string, std::string> & vals);
 
     /*** INSERT tasks ***/
-
+    
+    void insertLex(LEX *lex, Analysis &a, TMKM &tmkm);
     //wordsIt points to the first value
     void insertRelations(const std::list<std::pair<std::string, bool> > & values, std::string table,
                          std::list<std::string> fields,

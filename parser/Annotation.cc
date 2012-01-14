@@ -34,7 +34,7 @@ Annotation::Annotation(const string &q) {
     OPEenclevel = SECLEVEL::INVALID;
     AGGenclevel = false;
     SWPenclevel = false;
-    pred = new Predicate();
+    pred = NULL;
     parse();
     return;
 }
@@ -323,6 +323,7 @@ Annotation::parse() {
         assert_s(toLowerCase(*word) == "if", "SPEAKSFOR annotation predicate does not start with if");
         word++;
         //pred name and fields
+        pred = new Predicate();
         assert_s(word != query_list.end(), "no predicate after IF");
         list<string> pred_split = split(*word, '(');
         assert_s(pred_split.size() == 2, "predicate has too many (");

@@ -101,7 +101,6 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
         accres = accMan->addToPrinc(annot.getRight().column, annot.getRight().princtype);
         assert_s(accres >= 0, "access manager could not add to princ " + annot.getRightStr());
 
-        mkm.encForMap[annot.getPrimitive()] = annot.getRight().column;
         mkm.reverseEncFor[annot.getRight().column] = true;
         encryptfield = true;
 
@@ -110,6 +109,8 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
         cerr << "sensitive done" << endl;
         FieldMeta *fm = analysis.schema->tableMetaMap[annot.getPrimitiveTableName()]->fieldMetaMap[annot.getPrimitiveFieldName()];
         assert_s(fm, "ENCFOR received primitive that does not exist; please put CREATE TABLE query before ENCFOR annotation\n");
+        mkm.encForMap[fullName(fm->fname, annot.getPrimitiveTableName())] = annot.getRight().column;
+        cerr << "process annotations mkm " << fullName(fm->fname, annot.getPrimitiveTableName()) << "->" << annot.getRight().column << endl;
         //if level not specified, it will be SECLEVEL::INVALID
         string query = "ALTER TABLE " + annot.getPrimitiveTableName();
         //there will always be a DET onion
@@ -119,6 +120,8 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
         if (annot.getDETLevel() != SECLEVEL::INVALID) {
             fm->setOnionLevel(oDET, annot.getDETLevel());
         }
+        //mkm.encForMap[fullName(fm->onionnames[oDET], annot.getPrimitiveTableName())] = annot.getRight().column;
+        //cerr << "process annotations mkm " << fullName(fm->onionnames[oDET], annot.getPrimitiveTableName()) << "->" << annot.getRight().column << endl;
         if (IsMySQLTypeNumeric(fm->sql_field->sql_type)) {
             query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onionnames[oDET] + " " + TN_I64 + ";");
         } else {
@@ -131,12 +134,15 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
         if (annot.getOPELevel() != SECLEVEL::INVALID) {
             fm->setOnionLevel(oOPE, annot.getOPELevel());
         }
+        //mkm.encForMap[fullName(fm->onionnames[oOPE], annot.getPrimitiveTableName())] = annot.getRight().column;
+        //cerr << "process annotations mkm " << fullName(fm->onionnames[oOPE], annot.getPrimitiveTableName()) << "->" << annot.getRight().column << endl;
         query_list.push_back(query + " ADD " + fm->onionnames[oOPE] + " " + TN_I64 + ";");
         if (annot.getAGGLevel()) {
             if (fm->onionnames.find(oAGG) == fm->onionnames.end()) {
                 fm->onionnames[oAGG] = anonymizeFieldName(0, oAGG, fm->fname, true);
             }
             fm->setOnionLevel(oAGG, SECLEVEL::SEMANTIC_AGG);
+            //mkm.encForMap[fullName(fm->onionnames[oAGG], annot.getPrimitiveTableName())] = annot.getRight().column;
             query_list.push_back(query + " ADD " + fm->onionnames[oAGG] + " " + TN_HOM + ";");
         }
         if (annot.getSWPLevel()) {
@@ -144,10 +150,9 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
                 fm->onionnames[oSWP] = anonymizeFieldName(0, oSWP, fm->fname, true);
             }
             fm->setOnionLevel(oSWP, SECLEVEL::SWP);
+            //mkm.encForMap[fullName(fm->onionnames[oSWP], annot.getPrimitiveTableName())] = annot.getRight().column;
             query_list.push_back(query + " ADD " + fm->onionnames[oSWP] + " " + TN_TEXT + ";");
         }
-        cerr << "onions good" << endl;
-
         break;
     }
     return query_list;
@@ -756,7 +761,6 @@ bool
 MultiPrinc::checkPredicate(const AccessRelation & accRel, map<string, string> & vals)
 {
     //ANON_REGION(__func__, &perf_cg);
-
     if (mkm.condAccess.find(accRel) != mkm.condAccess.end()) {
         Predicate * pred = mkm.condAccess[accRel];
 
@@ -787,6 +791,80 @@ MultiPrinc::checkPredicate(const AccessRelation & accRel, map<string, string> & 
     //no predicate
     LOG(mp) << "no predicate to check";
     return true;
+}
+
+void
+MultiPrinc::insertLex(LEX *lex, Analysis &a, TMKM & tmkm) {
+    assert_s(lex->sql_command == SQLCOM_INSERT, "insertLex should only get insert commands");
+    string table = lex->select_lex.table_list.first->table_name;
+    if (!lex->many_values.head()) {
+        cerr << "not values head in insertLex" << endl;
+        return;
+    }
+
+    list<string> field_names;
+    if (lex->field_list.head()) {
+        auto it_fname = List_iterator<Item>(lex->field_list);
+        Item *f;
+        for (;;) {
+            f = it_fname++;
+            if(!f) {
+                break;
+            }
+            assert(f->type() == Item::FIELD_ITEM);
+            Item_field *ifd = static_cast<Item_field*>(f);
+            field_names.push_back(ifd->field_name);
+        }
+    } else {
+        auto it = a.schema->tableMetaMap.find(table);
+        assert(it != a.schema->tableMetaMap.end());
+        field_names = it->second->fieldNames;
+    }
+
+    //construct map from fieldname to values
+    map<string, string> vals;
+    auto it_l = List_iterator<List_item>(lex->many_values);
+    List_item *li = it_l++;
+    assert_s(li, "insertLex does not have values");
+    auto it_v = List_iterator<Item>(*li);
+    Item *v;
+    for (auto it_f = field_names.begin(); it_f != field_names.end(); it_f++) {
+        v = it_v++;
+        if(!v) {
+            break;
+        }
+        String s;
+        String *s_ptr = v->val_str(&s);
+        vals[*it_f] = string(s_ptr->ptr(), s_ptr->length());
+    }
+    
+    for(auto it = vals.begin(); it != vals.end(); it++) {        
+        string speaks = fullName(it->first, table);
+        //cerr << "speaks " << speaks << endl;
+        //if current field has an ENC_FOR, note that it needs to be encrypted
+        if (mkm.encForMap.find(speaks) != mkm.encForMap.end()) {
+            string encForField = fullName(mkm.encForMap[speaks], table);
+            tmkm.encForVal[encForField] = vals[getField(encForField)];
+        }
+        //examine cur_fields keychain, and add this value if necessary
+        if (accMan->isType(speaks)) {
+            std::set<string> speaks_for = accMan->getTypesHasAccessTo(speaks);
+            for (auto accIt = speaks_for.begin(); accIt != speaks_for.end(); accIt++) {
+                string spoken = *accIt; 
+                //cerr << " spoken " << spoken << endl;
+                if (getTable(spoken) != table) {
+                    //this link in the chain is not in this table, so won't touch this insert
+                    continue;
+                }
+                if (checkPredicate(AccessRelation(speaks, spoken), vals)) {
+                    int resacc = accMan->insert(Prin(speaks, vals[it->first]),
+                                                Prin(spoken, vals[getField(spoken)]));
+                    assert_s(resacc >= 0, "access manager insert failed");
+                }
+            }
+        }
+    }
+    vals.clear();
 }
 
 //wordsIt points to the first value
@@ -898,7 +976,7 @@ MultiPrinc::get_key(string fieldName, TempMKM & tmkm)
 
     assert_s(mkm.encForMap.find(
                  fieldName) != mkm.encForMap.end(),
-             "cryptappgetkey gets unencrypted feild <"+fieldName+">");
+             "cryptappgetkey gets unencrypted field <"+fieldName+">");
     string encForField = mkm.encForMap[fieldName];
 
     if (tmkm.encForVal.find(encForField) != tmkm.encForVal.end()) {
