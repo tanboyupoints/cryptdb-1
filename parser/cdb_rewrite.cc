@@ -77,9 +77,9 @@ getAnonName(const ItemMeta * im) {
 static fieldType
 getTypeForDec(const ItemMeta * im) {
     if (IsMySQLTypeNumeric(im->basefield->sql_field->sql_type)) {
-	return TYPE_INTEGER;
+        return TYPE_INTEGER;
     } else {
-	return TYPE_TEXT;
+        return TYPE_TEXT;
     }
 }
 
@@ -90,9 +90,9 @@ addToReturn(ReturnMeta & rm, int pos, ItemMeta * im, bool has_salt) {
     rf.is_salt = false;
     rf.im = im;
     if (has_salt) {
-	rf.pos_salt = pos+1;
+        rf.pos_salt = pos+1;
     } else {
-	rf.pos_salt = -1;
+        rf.pos_salt = -1;
     }
     rm.rfmeta[pos] = rf;
 }
@@ -334,7 +334,11 @@ get_column_name(const string & table,
     if (fit == it->second->fieldMetaMap.end()) {
         thrower() << "field " << field << "unknown \n";
     }
-    return fit->second->onionnames[o];
+    if (fit->second->onionnames.find(o) != fit->second->onionnames.end()) {
+        return fit->second->onionnames[o];
+    } else {
+        return field;
+    }
 }
 
 class CItemType {
@@ -805,6 +809,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     virtual Item *
     do_rewrite_type(Item_field *i, Analysis & a) const
     {
+        cerr << "do_rewrite_type L806" << endl;
         auto it = a.itemHasRewrite.find(i);
         if (it == a.itemHasRewrite.end()) {
             // fix table name
@@ -817,10 +822,11 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
                 cryptdb_err() << "should have recorded item meta object in enforce()";
             }
             ItemMeta *im = it->second;
-            cerr << "onion is " << im->o << "\n";
-            cerr << "table: " << table << endl;
-            cerr << "i->field_name: " << i->field_name << endl;
+            //cerr << "onion is " << im->o << "\n";
+            //cerr << "table: " << table << endl;
+            //cerr << "i->field_name: " << i->field_name << endl;
             i->field_name = make_thd_string(get_column_name(string(table), string(i->field_name), im->o,  a));
+            //cerr << "i->field_name " << i->field_name << endl;
             a.itemHasRewrite.insert(i);
         }
         return i;
@@ -850,20 +856,26 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         auto it = a.itemToFieldMeta.find(i);
         assert(it != a.itemToFieldMeta.end());
         FieldMeta *fm = it->second;
+        addToReturn(a.rmeta, a.pos++, a.itemToMeta[i], fm->has_salt);
+        /*for (auto x = a.rmeta.rfmeta.begin(); x != a.rmeta.rfmeta.end(); x++) {
+            if (x->second.im) {
+                if (x->second.im->basefield) {
+                    cerr << x->first << " " << x->second.im->basefield->fname << endl;
+                }
+            }
+            }*/
 
-	addToReturn(a.rmeta, a.pos++, a.itemToMeta[i], fm->has_salt);
-
-	if (fm->has_salt) {
+        if (fm->has_salt) {
             assert(!fm->salt_name.empty());
             l.push_back(make_from_template(i, fm->salt_name.c_str()));
-	    addSaltToReturn(a.rmeta, a.pos++);
+            addSaltToReturn(a.rmeta, a.pos++);
         }
     }
 
     virtual void
     do_rewrite_insert_type(Item_field *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const
     {
-        cerr << "do_rewrite_insert_type L701" << endl;
+        cerr << "do_rewrite_insert_type L701 (IT)" << endl;
         //cat_red: insert
         assert(fm == NULL);
         // need to map this one field into all of its onions
@@ -905,6 +917,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     }
 
     virtual Item * do_rewrite_type(Item_string *i, Analysis & a) const {
+        cerr << "do_rewrite_type L908" << endl;
         string enc = encryptConstantItem(i,  a);
         return new Item_hex_string(enc.data(), enc.length());
     }
@@ -912,7 +925,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     virtual void
     do_rewrite_insert_type(Item_string *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const
     {
-        cerr << "do_rewrite_insert_type L880" << endl;
+        cerr << "do_rewrite_insert_type L880 (IT)" << endl;
         assert(fm != NULL);
         String s;
         String *s0 = i->val_str(&s);
@@ -947,7 +960,12 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
         }
         //if no onions: grab the field, for reals
         if (l.empty()) {
-            l.push_back(new Item_hex_string(plaindata.data(), plaindata.length()));
+            //cerr << "adding str " << plaindata.c_str() << " of length " << plaindata.length() << endl;
+            //l.push_back(new Item_string(plaindata.data(), plaindata.length(), i->default_charset()));
+            //l.push_back(new Item_string("alice", 5, i->default_charset()));
+            //l.push_back(new Item_hex_string(plaindata.data(), plaindata.length()));
+            //l.push_back(new Item_bin_string(plaindata.data(), plaindata.length()));
+            l.push_back(i);
         }
     }
 } ANON;
@@ -966,6 +984,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
         return i;
     }
     virtual Item * do_rewrite_type(Item_num *i, Analysis & a) const {
+        cerr << "do_rewrite_type L970" << endl;
         string enc = encryptConstantItem(i, a);
         return new Item_int((ulonglong) valFromStr(enc));
     }
@@ -1023,6 +1042,7 @@ static class ANON : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITEM
         return i;
     }
     virtual Item * do_rewrite_type(Item_decimal *i, Analysis & a) const {
+        cerr << "do_rewrite_type L1028" << endl;
         double n = i->val_real();
         char buf[sizeof(double) * 2];
         sprintf(buf, "%x", (unsigned int)n);
@@ -1165,6 +1185,7 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
         return do_optimize_type_self_and_args(i, a);
     }
     virtual Item * do_rewrite_type(Item_func *i, Analysis & a) const {
+        cerr << "do_rewrite_type L1171" << endl;
         return do_rewrite_type_args(i, a);
     }
 };
@@ -1198,6 +1219,7 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
         return do_optimize_type_self_and_args(i, a);
     }
     virtual Item * do_rewrite_type(Item_cond *i, Analysis & a) const {
+        cerr << "do_rewrite_type L1207" << endl;
         auto item_it = List_iterator<Item>(*i->argument_list());
         for (;;) {
             if (!item_it++)
@@ -1297,6 +1319,7 @@ class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
         return do_optimize_type_self_and_args(i, a);
     }
     virtual Item * do_rewrite_type(Item_func_additive_op *i, Analysis & a) const {
+        cerr << "do_rewrite_type L1305" << endl;
         // rewrite children
         do_rewrite_type_args(i, a);
 
@@ -1926,6 +1949,7 @@ process_select_lex(st_select_lex *select_lex, const constraints &tr, Analysis & 
 static void
 rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
 {
+    //cerr << "SELECT_LEX " << *select_lex << endl;
     auto item_it = List_iterator<Item>(select_lex->item_list);
 
     List<Item> newList;
@@ -1940,7 +1964,7 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
             newList.push_back(*it);
         }
     }
-
+    //cerr << "SELECT LEX " << *select_lex << endl;
     // TODO(stephentu): investigate whether or not this is a memory leak
     select_lex->item_list = newList;
 
@@ -1960,6 +1984,7 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
 
     for (ORDER *o = select_lex->order_list.first; o; o = o->next)
         rewrite(o->item, a);
+
 }
 
 static void
@@ -2329,10 +2354,9 @@ rewrite_create_lex(LEX *lex, Analysis &a)
 }
 
 static void
-rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp)
+rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp, TMKM &tmkm)
 {
     //if this is MultiPrinc, insert may need keys; certainly needs to update AccMan
-    TMKM tmkm;
     if (mp) {
         tmkm.processingQuery = true;
         mp->insertLex(lex, a, tmkm);
@@ -2393,14 +2417,35 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp)
                 itemTypes.do_rewrite_insert(i, a, l, *fmVecIt, mp, tmkm);
                 for (auto it1 = l.begin(); it1 != l.end(); ++it1) {
                     newList0->push_back(*it1);
+                    String s;
+                    (*it1)->print(&s, QT_ORDINARY);
+                    cerr << s << endl;
+                    String *s0 = (*it1)->val_str(&s);
+                    cerr << *s0 << endl;
                 }
                 ++fmVecIt;
             }
+
             newList.push_back(newList0);
         }
+        /*cerr << "newList" << endl;
+        auto a = newList.head();
+        while(a) {
+            auto b = a->head();
+            while(b) {
+                String s;
+                b->print(&s, QT_ORDINARY);
+                cerr << s << " ";
+                b++;
+            }
+            cerr << endl;
+            a++;
+            }*/
+
+
         lex->many_values = newList;
     }
-    
+    cerr << "rewrite_insert_lex " << *lex << endl;
 }
 
 static void
@@ -2497,7 +2542,7 @@ TableMeta::~TableMeta()
  * Fills rmeta with information about how to decrypt fields returned.
  */
 static int
-lex_rewrite(const string & db, LEX * lex, Analysis & analysis, MultiPrinc * mp)
+lex_rewrite(const string & db, LEX * lex, Analysis & analysis, MultiPrinc * mp, TMKM &tmkm)
 {
     switch (lex->sql_command) {
     case SQLCOM_CREATE_TABLE:
@@ -2505,7 +2550,7 @@ lex_rewrite(const string & db, LEX * lex, Analysis & analysis, MultiPrinc * mp)
         break;
     case SQLCOM_INSERT:
     case SQLCOM_REPLACE:
-        rewrite_insert_lex(lex, analysis, mp);
+        rewrite_insert_lex(lex, analysis, mp, tmkm);
         break;
     case SQLCOM_DROP_TABLE:
         rewrite_table_list(&lex->select_lex.table_list, analysis);
@@ -2913,6 +2958,11 @@ Rewriter::setMasterKey(const string &mkey)
 list<string>
 Rewriter::rewrite(const string & q, Analysis & a)
 {
+    //start new temp mkm
+    tmkm.encForVal.empty();
+    tmkm.encForReturned.empty();
+    tmkm.processingQuery = false;
+    tmkm.returnBitMap.empty();
     list<string> queries;
     query_parse p(db, q);
     Analysis analysis = Analysis(conn(), schema, cm);
@@ -2932,18 +2982,14 @@ Rewriter::rewrite(const string & q, Analysis & a)
 
     int ret = updateMeta(db, q, lex, analysis);
     if (ret < 0) assert(false);
-    stringstream s;
-    s << *lex;
-    cerr << "before lex_rewrite is " << s.str() << endl;
+    //cerr << "before lex_rewrite is " << *lex << endl;
 
-    lex_rewrite(db, lex, analysis, mp);
-
+    lex_rewrite(db, lex, analysis, mp, tmkm);
     stringstream ss;
-
     ss << *lex;
 
     queries.push_back(ss.str());
-
+    a = analysis;
     return queries;
 }
 
@@ -2955,56 +3001,52 @@ Rewriter::decryptResults(ResType & dbres,
     unsigned int rows = dbres.rows.size();
 
     unsigned int cols = dbres.names.size();
-
+ 
     ResType res = ResType();
 
     unsigned int index = 0;
       // un-anonymize the names
     for (auto it = dbres.names.begin(); it != dbres.names.end(); it++) {
-	ReturnField rf = a.rmeta.rfmeta[index];
-	if (rf.is_salt) {
-
-	} else {
-	    //need to return this field
-	    res.names.push_back(rf.im->basefield->fname);
-
-	}
-	index++;
+        ReturnField rf = a.rmeta.rfmeta[index];
+        if (rf.is_salt) {
+            //TODO: is something supposed to happen here?
+        } else {
+            //need to return this field
+            res.names.push_back(rf.im->basefield->fname);
+        }
+        index++;
     }
 
     unsigned int real_cols = dbres.names.size();
-
     // switch types to original ones : TODO
 
     //allocate space in results for decrypted rows
     res.rows = vector<vector<SqlItem> >(rows);
     for (unsigned int i = 0; i < rows; i++) {
-	res.rows[i] = vector<SqlItem>(real_cols);
+        res.rows[i] = vector<SqlItem>(real_cols);
     }
 
     // decrypt rows
-
     unsigned int col_index = 0;
     for (unsigned int c = 0; c < cols; c++) {
-	ReturnField rf = a.rmeta.rfmeta[c];
-	ItemMeta * im = rf.im;
-	if (rf.is_salt) {
+        ReturnField rf = a.rmeta.rfmeta[c];
+        ItemMeta * im = rf.im;
+        if (rf.is_salt) {
 
-	} else {
-	    for (unsigned int r = 0; r < rows; r++) {
-		bool isBin;
-		res.rows[r][col_index] = dbres.rows[r][c];
-		res.rows[r][col_index].data = a.cm->crypt(cm->getmkey(), dbres.rows[r][c].data,
-					     getTypeForDec(rf.im), getAnonName(rf.im), im->uptolevel, getMin(im->o), isBin);
-	    }
-	    col_index++;
-	}
-
+        } else {
+            for (unsigned int r = 0; r < rows; r++) {
+                bool isBin;
+                res.rows[r][col_index] = dbres.rows[r][c];
+                if (!im->basefield->onionnames.empty()) {
+                    res.rows[r][col_index].data = crypt(a, dbres.rows[r][c].data, getTypeForDec(rf.im), getAnonName(rf.im), im->uptolevel, getMin(im->o), isBin, 0, mp, im->basefield, tmkm);
+                }
+                //res.rows[r][col_index].data = a.cm->crypt(cm->getmkey(), dbres.rows[r][c].data, getTypeForDec(rf.im), getAnonName(rf.im), im->uptolevel, getMin(im->o), isBin);
+            }
+            col_index++;
+        }
     }
 
-
-
-    return dbres;
+    return res;
 }
 
 

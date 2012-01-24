@@ -368,6 +368,7 @@ private:
     MYSQL*         m;
     Connect*       c;
     MultiPrinc*    mp;
+    TMKM           tmkm;
 };
 
 class ScopedMySQLRes {

@@ -22,6 +22,9 @@ insert into users values ('bob', 2);
 insert into privmsg values (1, 2, 1);
 insert into msgs values (1, 'hello!');
 
+select * from privmsg;
+select * from users;
+select msgid, msgtext from msgs;
 
 drop table privmsg;
 drop table msgs;

@@ -466,7 +466,7 @@ getEqualityExpr(list<string>::iterator & it, list<string> & query,
 }
 
 void
-MultiPrinc::getEncForFromFilter(command comm, list<string> query, TMKM & tmkm,
+MultiPrinc::getEncForFromFilter(command comm, list<string> query, TMKM &tmkm,
                                 QueryMeta & qm, map<string,
                                                     TableMetadata *> &
                                 tableMetaMap)
@@ -567,7 +567,8 @@ MultiPrinc::prepareSelect(list<string> & words, TMKM & tmkm, QueryMeta & qm,
 
 string
 MultiPrinc::selectEncFor(string table, string field, QueryMeta & qm,
-                         TMKM & tmkm, TableMetadata * tm,
+                         TMKM & tmkm,
+                         TableMetadata * tm,
                          FieldMetadata * fm)
 {
     //ANON_REGION(__func__, &perf_cg);
@@ -590,7 +591,7 @@ MultiPrinc::selectEncFor(string table, string field, QueryMeta & qm,
 // should not be returned to the user
 void
 MultiPrinc::processReturnedField(unsigned int index, bool nextIsSalt, string fullname, onion o,
-                                 TMKM & tmkm,
+                                 TMKM &tmkm,
                                  bool & ignore)
 {
     //ANON_REGION(__func__, &perf_cg);
@@ -872,8 +873,7 @@ MultiPrinc::insertLex(LEX *lex, Analysis &a, TMKM & tmkm) {
 //TODO pass values as pointers, rather than copying them
 void
 MultiPrinc::insertRelations(const list<pair<string, bool> > & values, string table,
-                            list<string> fields,
-                            TMKM & tmkm)
+                            list<string> fields, TMKM &tmkm) 
 {
     //ANON_REGION(__func__, &perf_cg);
 
@@ -972,16 +972,18 @@ MultiPrinc::isActiveUsers(const string &query)
 string
 MultiPrinc::get_key(string fieldName, TempMKM & tmkm)
 {
+    cerr << "mp get_key" << endl;
     //ANON_REGION(__func__, &perf_cg);
 
     assert_s(mkm.encForMap.find(
                  fieldName) != mkm.encForMap.end(),
              "cryptappgetkey gets unencrypted field <"+fieldName+">");
     string encForField = mkm.encForMap[fieldName];
-
+    cerr << encForField << endl;
     if (tmkm.encForVal.find(encForField) != tmkm.encForVal.end()) {
         if (VERBOSE_G) {LOG(mp) << "asking get key for " << encForField <<
                         " <" << tmkm.encForVal[encForField] << "> \n"; }
+        cerr << "asking get key for " << encForField << " <" << tmkm.encForVal[encForField] << "> \n";
         string key =
             accMan->getKey(Prin(encForField,
                                 removeApostrophe(tmkm.encForVal[encForField])));
@@ -999,8 +1001,7 @@ MultiPrinc::get_key(string fieldName, TempMKM & tmkm)
 }
 
 string
-MultiPrinc::get_key(string fieldName, TMKM & tmkm,
-                    const vector<SqlItem> &res)
+MultiPrinc::get_key(string fieldName, TMKM & tmkm, const vector<SqlItem> &res)
 {
     //ANON_REGION(__func__, &perf_cg);
 
