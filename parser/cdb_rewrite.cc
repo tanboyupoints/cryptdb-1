@@ -119,15 +119,21 @@ sq(MYSQL *m, const string &s)
 
 
 static string
-crypt(Analysis & a, string plaindata, fieldType ft, string fieldname, SECLEVEL fromlevel, SECLEVEL tolevel, bool & isBin, uint64_t salt, MultiPrinc * mp, FieldMeta *fm, TMKM & tmkm) {
+crypt(Analysis & a, string plaindata, fieldType ft, string fieldname, SECLEVEL fromlevel, SECLEVEL tolevel, bool & isBin, uint64_t salt, MultiPrinc * mp, FieldMeta *fm, TMKM tmkm) {
+    cerr << "***\tplaindata " << plaindata << "; ft " << ft << "; fieldname " << fieldname << "; isBin " << isBin << "; salt " << salt << endl;
+    cerr << "ft TYPE_TEXT is " << TYPE_TEXT << " and TYPE_INTEGER is " << TYPE_INTEGER << endl;
     AES_KEY * mkey;
     if (mp) {
         string key = mp->get_key(fullName(fm->fname, fm->tm->anonTableName), tmkm);
+        //cerr << "with mp key " << marshallBinary(key) << endl;
         mkey = a.cm->getKey(key);
     } else {
         mkey = a.cm->getmkey();
     }
-    return a.cm->crypt(mkey, plaindata, ft, fieldname, fromlevel, tolevel, isBin, salt);
+    cerr << "crypt '" << plaindata << "' with length before crypt " << plaindata.length() << endl;
+    string c = a.cm->crypt(mkey, plaindata, ft, fieldname, fromlevel, tolevel, isBin, salt);
+    cerr << "crypt '" << c << "' with length after crypt " << c.length() << endl;
+    return c;
 }
 
 
@@ -314,8 +320,10 @@ anonymize_table_name(const string &tname,
 
     //hack for now, will fix soon
     if (a.schema->tableMetaMap.find(tname) == a.schema->tableMetaMap.end()) {
+        cerr << "not found" << endl;
         return tname;
     } else {
+        cerr << "found" << endl;
         return a.schema->tableMetaMap[tname]->anonTableName;
     }
 }
@@ -348,7 +356,7 @@ class CItemType {
     virtual Item * do_optimize(Item *, Analysis &) const = 0;
     virtual Item * do_rewrite(Item *, Analysis &) const = 0;
     virtual void   do_rewrite_proj(Item *, Analysis &, vector<Item *> &) const = 0;
-    virtual void   do_rewrite_insert(Item *, Analysis &, vector<Item *> &, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkmm) const = 0;
+    virtual void   do_rewrite_insert(Item *, Analysis &, vector<Item *> &, FieldMeta *fm, MultiPrinc *mp, TMKM tmkm) const = 0;
 };
 
 /*
@@ -384,7 +392,7 @@ class CItemTypeDir : public CItemType {
         lookup(i)->do_rewrite_proj(i, a, l);
     }
 
-    void do_rewrite_insert(Item *i, Analysis &a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const {
+    void do_rewrite_insert(Item *i, Analysis &a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM tmkm) const {
         lookup(i)->do_rewrite_insert(i, a, l, fm, mp, tmkm);
     }
 
@@ -663,7 +671,7 @@ class CItemSubtype : public CItemType {
     virtual void  do_rewrite_proj(Item *i, Analysis & a, vector<Item *> &l) const {
         do_rewrite_proj_type((T*) i, a, l);
     }
-    virtual void  do_rewrite_insert(Item *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const {
+    virtual void  do_rewrite_insert(Item *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM tmkm) const {
         do_rewrite_insert_type((T*) i, a, l, fm, mp, tmkm);
     }
  private:
@@ -815,6 +823,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
             // fix table name
             const char * table = i->table_name;
             i->table_name = make_thd_string(anonymize_table_name(i->table_name, a));
+            cerr << "table name " << i->table_name << endl;
             // pick the column corresponding to the onion we want
             auto it = a.itemToMeta.find(i);
             if (it == a.itemToMeta.end()) {
@@ -939,32 +948,35 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
             //need to use table salt in this case
         }
 
+        string save_det;
         assert(s0 != NULL);
         for (auto it = fm->onionnames.begin();
              it != fm->onionnames.end();
              ++it)
         {
-
             string anonName = fullName(it->second, fm->tm->anonTableName);
             bool isBin;
-
             string enc = crypt(a, plaindata, TYPE_TEXT, anonName, getMin(it->first), getMax(it->first), isBin, salt, mp, fm, tmkm);
-
-            l.push_back(new Item_hex_string(enc.data(), enc.length()));
-
+            Item *itest = new Item_string(enc.data(), enc.length(), i->default_charset());
+            if (it->first == oDET) {
+                assert_s(crypt(a, ItemToString(itest), TYPE_TEXT, anonName, getMax(it->first), getMin(it->first), isBin, 0, mp, fm, tmkm) == plaindata, "crypt(crypt(plaindata)) != plaindata");
+                save_det = enc;
+            } else {
+                assert_s(save_det == (*(l.begin()))->str_value.ptr(), "det str somehow changed >_< from " + save_det + " to " + (*(l.begin()))->str_value.ptr());
+            }
+            l.push_back(itest);
+        }
+        cerr << "l HAS IN IT:" << endl;
+        for (auto m = l.begin(); m != l.end(); m++) {
+            cerr << (*m)->str_value << endl;
         }
 
         if (fm->has_salt) {
             string salt_s = strFromVal(salt);
-            l.push_back(new Item_hex_string(salt_s.data(), salt_s.length()));
+            l.push_back(new Item_string(salt_s.data(), salt_s.length(), i->default_charset()));
         }
         //if no onions: grab the field, for reals
         if (l.empty()) {
-            //cerr << "adding str " << plaindata.c_str() << " of length " << plaindata.length() << endl;
-            //l.push_back(new Item_string(plaindata.data(), plaindata.length(), i->default_charset()));
-            //l.push_back(new Item_string("alice", 5, i->default_charset()));
-            //l.push_back(new Item_hex_string(plaindata.data(), plaindata.length()));
-            //l.push_back(new Item_bin_string(plaindata.data(), plaindata.length()));
             l.push_back(i);
         }
     }
@@ -2055,6 +2067,7 @@ rewrite_table_list(TABLE_LIST *t, Analysis &a)
 {
     string anon_name = anonymize_table_name(string(t->table_name,
                                                    t->table_name_length), a);
+    cerr << "table name " << anon_name << endl;
     t->table_name = make_thd_string(anon_name, &t->table_name_length);
     // TODO: handle correctly
     t->alias      = make_thd_string(anon_name);
@@ -2106,6 +2119,8 @@ add_table(SchemaInfo * schema, const string & table, LEX *lex, bool mp) {
     }
 
     TableMeta *tm = new TableMeta();
+    //cat_red
+    cerr << "add " << tm << " as " << table << endl;
     schema->tableMetaMap[table] = tm;
 
     tm->tableNo = schema->totalTables++;
@@ -2409,6 +2424,7 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp, TMKM &tmkm)
             List<Item> *newList0 = new List<Item>();
             auto it0 = List_iterator<Item>(*li);
             auto fmVecIt = fmVec.begin();
+            cerr << "lex before rewriting values " << *lex << endl;
             for (;;) {
                 Item *i = it0++;
                 if (!i)
@@ -2420,29 +2436,12 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp, TMKM &tmkm)
                     String s;
                     (*it1)->print(&s, QT_ORDINARY);
                     cerr << s << endl;
-                    String *s0 = (*it1)->val_str(&s);
-                    cerr << *s0 << endl;
                 }
                 ++fmVecIt;
             }
-
+            cerr << "a list0 added to newList of size " << newList0->elements << endl;
             newList.push_back(newList0);
         }
-        /*cerr << "newList" << endl;
-        auto a = newList.head();
-        while(a) {
-            auto b = a->head();
-            while(b) {
-                String s;
-                b->print(&s, QT_ORDINARY);
-                cerr << s << " ";
-                b++;
-            }
-            cerr << endl;
-            a++;
-            }*/
-
-
         lex->many_values = newList;
     }
     cerr << "rewrite_insert_lex " << *lex << endl;
@@ -3035,10 +3034,11 @@ Rewriter::decryptResults(ResType & dbres,
 
         } else {
             for (unsigned int r = 0; r < rows; r++) {
-                bool isBin;
+                bool isBin = true;
                 res.rows[r][col_index] = dbres.rows[r][c];
                 if (!im->basefield->onionnames.empty()) {
-                    res.rows[r][col_index].data = crypt(a, dbres.rows[r][c].data, getTypeForDec(rf.im), getAnonName(rf.im), im->uptolevel, getMin(im->o), isBin, 0, mp, im->basefield, tmkm);
+                    cerr << "plaindata should be " << dbres.rows[r][c].data << endl;
+                    res.rows[r][col_index].data = crypt(a, dbres.rows[r][c].data, getTypeForDec(rf.im), fullName(getAnonName(rf.im), im->basefield->tm->anonTableName), im->uptolevel, getMin(im->o), isBin, 0, mp, im->basefield, tmkm);
                 }
                 //res.rows[r][col_index].data = a.cm->crypt(cm->getmkey(), dbres.rows[r][c].data, getTypeForDec(rf.im), getAnonName(rf.im), im->uptolevel, getMin(im->o), isBin);
             }
