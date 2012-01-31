@@ -120,19 +120,16 @@ sq(MYSQL *m, const string &s)
 
 static string
 crypt(Analysis & a, string plaindata, fieldType ft, string fieldname, SECLEVEL fromlevel, SECLEVEL tolevel, bool & isBin, uint64_t salt, MultiPrinc * mp, FieldMeta *fm, TMKM tmkm) {
-    cerr << "***\tplaindata " << plaindata << "; ft " << ft << "; fieldname " << fieldname << "; isBin " << isBin << "; salt " << salt << endl;
-    cerr << "ft TYPE_TEXT is " << TYPE_TEXT << " and TYPE_INTEGER is " << TYPE_INTEGER << endl;
     AES_KEY * mkey;
     if (mp) {
         string key = mp->get_key(fullName(fm->fname, fm->tm->anonTableName), tmkm);
-        //cerr << "with mp key " << marshallBinary(key) << endl;
         mkey = a.cm->getKey(key);
     } else {
         mkey = a.cm->getmkey();
     }
-    cerr << "crypt '" << plaindata << "' with length before crypt " << plaindata.length() << endl;
+    //cerr << "crypt '" << plaindata << "' with length before crypt " << plaindata.length() << endl;
     string c = a.cm->crypt(mkey, plaindata, ft, fieldname, fromlevel, tolevel, isBin, salt);
-    cerr << "crypt '" << c << "' with length after crypt " << c.length() << endl;
+    //cerr << "crypt '" << c << "' with length after crypt " << c.length() << endl;
     return c;
 }
 
@@ -169,15 +166,6 @@ encryptConstantItem(Item * i, const Analysis & a){
 
 /***********end of parser utils *****************/
 
-/*static
-void print(const map<string, TableMeta*>& t) {
-    cerr<<"tables ";
-    for (auto p:t) {
-        cerr << p.first << " ";
-    }
-    cerr << "\n";
-}
-*/
 bool
 EncDesc::restrict(onion o, SECLEVEL maxl)
 {
@@ -320,10 +308,8 @@ anonymize_table_name(const string &tname,
 
     //hack for now, will fix soon
     if (a.schema->tableMetaMap.find(tname) == a.schema->tableMetaMap.end()) {
-        cerr << "not found" << endl;
         return tname;
     } else {
-        cerr << "found" << endl;
         return a.schema->tableMetaMap[tname]->anonTableName;
     }
 }
@@ -771,7 +757,8 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
             }
         }
         //TODO: figure out how to gather over more than one level of the tree
-        //cat_red: do mp processing here: add functionality for annotation nodes
+
+        //cat_red: this is dealt with in Annotation, actually
         //if create, there will be speaks_for, enc_for, equals, external notations
         //if not, there will be information about required keys
         //        (how, what, where from?)
@@ -823,7 +810,6 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
             // fix table name
             const char * table = i->table_name;
             i->table_name = make_thd_string(anonymize_table_name(i->table_name, a));
-            cerr << "table name " << i->table_name << endl;
             // pick the column corresponding to the onion we want
             auto it = a.itemToMeta.find(i);
             if (it == a.itemToMeta.end()) {
@@ -856,9 +842,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     virtual void
     do_rewrite_proj_type(Item_field *i, Analysis & a, vector<Item *> &l) const
     {
-        //cat_red: select only
         //rewrite current projection field
-        //cat_red: for mp, if it was enc_for, decrypt this field
         l.push_back(do_rewrite_type(i, a));
 
         // if there is a salt for the onion, then also fetch the onion from the server
@@ -866,13 +850,6 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         assert(it != a.itemToFieldMeta.end());
         FieldMeta *fm = it->second;
         addToReturn(a.rmeta, a.pos++, a.itemToMeta[i], fm->has_salt);
-        /*for (auto x = a.rmeta.rfmeta.begin(); x != a.rmeta.rfmeta.end(); x++) {
-            if (x->second.im) {
-                if (x->second.im->basefield) {
-                    cerr << x->first << " " << x->second.im->basefield->fname << endl;
-                }
-            }
-            }*/
 
         if (fm->has_salt) {
             assert(!fm->salt_name.empty());
@@ -885,7 +862,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     do_rewrite_insert_type(Item_field *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const
     {
         cerr << "do_rewrite_insert_type L701 (IT)" << endl;
-        //cat_red: insert
+
         assert(fm == NULL);
         // need to map this one field into all of its onions
         // TODO: this is kind of a duplicate of rewrite_create_field(),
@@ -896,7 +873,6 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
              it != fm->onionnames.end();
              ++it) {
             const string &name = it->second;
-            cerr << "onion " << name << endl;
             l.push_back(make_from_template(i, name.c_str()));
         }
         if (fm->has_salt) {
@@ -965,10 +941,6 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
                 assert_s(save_det == (*(l.begin()))->str_value.ptr(), "det str somehow changed >_< from " + save_det + " to " + (*(l.begin()))->str_value.ptr());
             }
             l.push_back(itest);
-        }
-        cerr << "l HAS IN IT:" << endl;
-        for (auto m = l.begin(); m != l.end(); m++) {
-            cerr << (*m)->str_value << endl;
         }
 
         if (fm->has_salt) {
@@ -1961,7 +1933,6 @@ process_select_lex(st_select_lex *select_lex, const constraints &tr, Analysis & 
 static void
 rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
 {
-    //cerr << "SELECT_LEX " << *select_lex << endl;
     auto item_it = List_iterator<Item>(select_lex->item_list);
 
     List<Item> newList;
@@ -1976,7 +1947,6 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
             newList.push_back(*it);
         }
     }
-    //cerr << "SELECT LEX " << *select_lex << endl;
     // TODO(stephentu): investigate whether or not this is a memory leak
     select_lex->item_list = newList;
 
@@ -2067,7 +2037,6 @@ rewrite_table_list(TABLE_LIST *t, Analysis &a)
 {
     string anon_name = anonymize_table_name(string(t->table_name,
                                                    t->table_name_length), a);
-    cerr << "table name " << anon_name << endl;
     t->table_name = make_thd_string(anon_name, &t->table_name_length);
     // TODO: handle correctly
     t->alias      = make_thd_string(anon_name);
@@ -2119,13 +2088,10 @@ add_table(SchemaInfo * schema, const string & table, LEX *lex, bool mp) {
     }
 
     TableMeta *tm = new TableMeta();
-    //cat_red
-    cerr << "add " << tm << " as " << table << endl;
     schema->tableMetaMap[table] = tm;
 
     tm->tableNo = schema->totalTables++;
     tm->anonTableName = anonymizeTableName(tm->tableNo, table, mp);
-    cerr << "anon table name is " << tm->anonTableName << endl;
 
     unsigned int index =  0;
     for (auto it = List_iterator<Create_field>(lex->alter_info.create_list);;) {
@@ -2275,7 +2241,7 @@ static void rewrite_create_field(const string &table_name,
 
     // create salt column
     if (fm->has_salt) {
-        cerr << fm->salt_name << endl;
+        //cerr << fm->salt_name << endl;
         assert(!fm->salt_name.empty());
         THD *thd         = current_thd;
         Create_field *f0 = f->clone(thd->mem_root);
@@ -2388,7 +2354,7 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp, TMKM &tmkm)
                 break;
             assert(i->type() == Item::FIELD_ITEM);
             Item_field *ifd = static_cast<Item_field*>(i);
-            cerr << "field " << ifd->table_name << "." << ifd->field_name << endl;
+            //cerr << "field " << ifd->table_name << "." << ifd->field_name << endl;
             fmVec.push_back(a.schema->getFieldMeta(ifd->table_name, ifd->field_name));
             vector<Item *> l;
             itemTypes.do_rewrite_insert(i, a, l, NULL, mp, tmkm);
@@ -2424,7 +2390,6 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp, TMKM &tmkm)
             List<Item> *newList0 = new List<Item>();
             auto it0 = List_iterator<Item>(*li);
             auto fmVecIt = fmVec.begin();
-            cerr << "lex before rewriting values " << *lex << endl;
             for (;;) {
                 Item *i = it0++;
                 if (!i)
@@ -2433,18 +2398,16 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp, TMKM &tmkm)
                 itemTypes.do_rewrite_insert(i, a, l, *fmVecIt, mp, tmkm);
                 for (auto it1 = l.begin(); it1 != l.end(); ++it1) {
                     newList0->push_back(*it1);
-                    String s;
+                    /*String s;
                     (*it1)->print(&s, QT_ORDINARY);
-                    cerr << s << endl;
+                    cerr << s << endl;*/
                 }
                 ++fmVecIt;
             }
-            cerr << "a list0 added to newList of size " << newList0->elements << endl;
             newList.push_back(newList0);
         }
         lex->many_values = newList;
     }
-    cerr << "rewrite_insert_lex " << *lex << endl;
 }
 
 static void
@@ -2974,14 +2937,13 @@ Rewriter::rewrite(const string & q, Analysis & a)
     LEX *lex = p.lex();
     //login/logout command; nothing needs to be passed on
     if ((lex->sql_command == SQLCOM_DELETE || lex->sql_command == SQLCOM_INSERT) && mp && mp->checkPsswd(lex)) {
-        cerr << "login/logout " << *lex << endl;
+        //cerr << "login/logout " << *lex << endl;
         return queries;
     }
     query_analyze(db, q, lex, analysis, mp);
 
     int ret = updateMeta(db, q, lex, analysis);
     if (ret < 0) assert(false);
-    //cerr << "before lex_rewrite is " << *lex << endl;
 
     lex_rewrite(db, lex, analysis, mp, tmkm);
     stringstream ss;
@@ -3037,10 +2999,8 @@ Rewriter::decryptResults(ResType & dbres,
                 bool isBin = true;
                 res.rows[r][col_index] = dbres.rows[r][c];
                 if (!im->basefield->onionnames.empty()) {
-                    cerr << "plaindata should be " << dbres.rows[r][c].data << endl;
                     res.rows[r][col_index].data = crypt(a, dbres.rows[r][c].data, getTypeForDec(rf.im), fullName(getAnonName(rf.im), im->basefield->tm->anonTableName), im->uptolevel, getMin(im->o), isBin, 0, mp, im->basefield, tmkm);
                 }
-                //res.rows[r][col_index].data = a.cm->crypt(cm->getmkey(), dbres.rows[r][c].data, getTypeForDec(rf.im), getAnonName(rf.im), im->uptolevel, getMin(im->o), isBin);
             }
             col_index++;
         }
