@@ -825,11 +825,11 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
                 cryptdb_err() << "should have recorded item meta object in enforce()";
             }
             ItemMeta *im = it->second;
-            //cerr << "onion is " << im->o << "\n";
-            //cerr << "table: " << table << endl;
-            //cerr << "i->field_name: " << i->field_name << endl;
+            cerr << "onion is " << im->o << "\n";
+            cerr << "table: " << table << endl;
+            cerr << "i->field_name: " << i->field_name << endl;
             i->field_name = make_thd_string(get_column_name(string(table), string(i->field_name), im->o,  a));
-            //cerr << "i->field_name " << i->field_name << endl;
+            cerr << "i->field_name " << i->field_name << endl;
             a.itemHasRewrite.insert(i);
         }
         return i;
