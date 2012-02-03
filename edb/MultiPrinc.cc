@@ -982,7 +982,6 @@ MultiPrinc::get_key(string fieldName, TempMKM & tmkm)
     if (tmkm.encForVal.find(encForField) != tmkm.encForVal.end()) {
         if (VERBOSE_G) {LOG(mp) << "asking get key for " << encForField <<
                         " <" << tmkm.encForVal[encForField] << "> \n"; }
-        cerr << "asking get key for " << encForField << " <" << tmkm.encForVal[encForField] << "> \n";
         string key =
             accMan->getKey(Prin(encForField,
                                 removeApostrophe(tmkm.encForVal[encForField])));

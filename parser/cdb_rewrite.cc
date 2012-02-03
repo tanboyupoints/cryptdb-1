@@ -71,12 +71,8 @@ IsMySQLTypeNumeric(enum_field_types t) {
 static string
 getAnonName(const ItemMeta * im) {
     cerr << "getAnonName " << im->basefield->fname << ": " << im->basefield->onionnames.size() << endl;
-    if (im->basefield->onionnames.size() == 0) {
+    if (im->basefield->onionnames.find(im->o) == im->basefield->onionnames.end()) {
         return "";
-    }
-    cerr << "looking for onion " << im->o << " in:"  << endl;
-    for (auto i = im->basefield->onionnames.begin(); i != im->basefield->onionnames.end(); i++) {
-        cerr << i->first << " " << i->second << endl;
     }
     return im->basefield->onionnames[im->o];
 }
@@ -135,9 +131,9 @@ crypt(const Analysis & a, string plaindata, fieldType ft, string fieldname, SECL
     } else {
         mkey = a.cm->getmkey();
     }
-    cerr << "crypt '" << plaindata << "' with length before crypt " << plaindata.length() << endl;
+    //cerr << "crypt '" << plaindata << "' with length before crypt " << plaindata.length() << endl;
     string c = a.cm->crypt(mkey, plaindata, ft, fieldname, fromlevel, tolevel, isBin, salt);
-    cerr << "crypt '" << c << "' with length after crypt " << c.length() << endl;
+    //cerr << "crypt '" << c << "' with length after crypt " << c.length() << endl;
     return c;
 }
 
@@ -156,7 +152,6 @@ ItemToString(Item * i) {
 //TODO cat_red fix for mp
 static string
 encryptConstantItem(Item * i, const Analysis & a, MultiPrinc * mp, TMKM &tmkm){
-    cerr << "encrypt constant" << endl;
     string plaindata = ItemToString(i);
 
     auto itemMeta = a.itemToMeta.find(i);
@@ -164,7 +159,7 @@ encryptConstantItem(Item * i, const Analysis & a, MultiPrinc * mp, TMKM &tmkm){
 
     ItemMeta * im = itemMeta->second;
     FieldMeta * fm = im->basefield;
-    if (fm->onionnames[im->o] == "") {
+    if (fm->onionnames.find(im->o) == fm->onionnames.end()) {
         return plaindata;
     }
     string anonName = fullName(fm->onionnames[im->o], fm->tm->anonTableName);
@@ -338,9 +333,8 @@ get_column_name(const string & table,
     }
     if (fit->second->onionnames.find(o) != fit->second->onionnames.end()) {
         return fit->second->onionnames[o];
-    } else {
-        return field;
     }
+    return field;
 }
 
 class CItemType {
@@ -825,11 +819,11 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
                 cryptdb_err() << "should have recorded item meta object in enforce()";
             }
             ItemMeta *im = it->second;
-            cerr << "onion is " << im->o << "\n";
-            cerr << "table: " << table << endl;
-            cerr << "i->field_name: " << i->field_name << endl;
+            //cerr << "onion is " << im->o << "\n";
+            //cerr << "table: " << table << endl;
+            //cerr << "i->field_name: " << i->field_name << endl;
             i->field_name = make_thd_string(get_column_name(string(table), string(i->field_name), im->o,  a));
-            cerr << "i->field_name " << i->field_name << endl;
+            //cerr << "i->field_name " << i->field_name << endl;
             a.itemHasRewrite.insert(i);
         }
         return i;
@@ -3007,7 +3001,7 @@ Rewriter::decryptResults(ResType & dbres,
                 bool isBin = true;
                 res.rows[r][col_index] = dbres.rows[r][c];
                 string anonName = getAnonName(im);
-                cerr << anonName << " has onions size " << im->basefield->onionnames.size() << endl;
+                //cerr << anonName << " has onions size " << im->basefield->onionnames.size() << endl;
                 if (!im->basefield->onionnames.empty() && anonName != "") {
                     res.rows[r][col_index].data = crypt(a, dbres.rows[r][c].data, getTypeForDec(im), fullName(anonName, im->basefield->tm->anonTableName), im->uptolevel, getMin(im->o), isBin, 0, mp, im->basefield, tmkm);
                 }
