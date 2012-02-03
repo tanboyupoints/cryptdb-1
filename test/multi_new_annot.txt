@@ -26,6 +26,13 @@ select * from privmsg;
 select * from users;
 select msgid, msgtext from msgs;
 
+select * from users where username = 'alice';
+select senderid from privmsg where msgid = 1;
+select * from msgs where msgid = 1;
+select * from msgs where msgtext = 'hello!';
+
+delete;
+
 drop table privmsg;
 drop table msgs;
 drop table users;

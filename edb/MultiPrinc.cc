@@ -972,14 +972,13 @@ MultiPrinc::isActiveUsers(const string &query)
 string
 MultiPrinc::get_key(string fieldName, TempMKM & tmkm)
 {
-    cerr << "mp get_key" << endl;
     //ANON_REGION(__func__, &perf_cg);
 
     assert_s(mkm.encForMap.find(
                  fieldName) != mkm.encForMap.end(),
              "cryptappgetkey gets unencrypted field <"+fieldName+">");
     string encForField = mkm.encForMap[fieldName];
-    cerr << encForField << endl;
+
     if (tmkm.encForVal.find(encForField) != tmkm.encForVal.end()) {
         if (VERBOSE_G) {LOG(mp) << "asking get key for " << encForField <<
                         " <" << tmkm.encForVal[encForField] << "> \n"; }

@@ -70,6 +70,14 @@ IsMySQLTypeNumeric(enum_field_types t) {
 
 static string
 getAnonName(const ItemMeta * im) {
+    cerr << "getAnonName " << im->basefield->fname << ": " << im->basefield->onionnames.size() << endl;
+    if (im->basefield->onionnames.size() == 0) {
+        return "";
+    }
+    cerr << "looking for onion " << im->o << " in:"  << endl;
+    for (auto i = im->basefield->onionnames.begin(); i != im->basefield->onionnames.end(); i++) {
+        cerr << i->first << " " << i->second << endl;
+    }
     return im->basefield->onionnames[im->o];
 }
 
@@ -119,7 +127,7 @@ sq(MYSQL *m, const string &s)
 
 
 static string
-crypt(Analysis & a, string plaindata, fieldType ft, string fieldname, SECLEVEL fromlevel, SECLEVEL tolevel, bool & isBin, uint64_t salt, MultiPrinc * mp, FieldMeta *fm, TMKM tmkm) {
+crypt(const Analysis & a, string plaindata, fieldType ft, string fieldname, SECLEVEL fromlevel, SECLEVEL tolevel, bool & isBin, uint64_t salt, MultiPrinc * mp, FieldMeta *fm, TMKM &tmkm) {
     AES_KEY * mkey;
     if (mp) {
         string key = mp->get_key(fullName(fm->fname, fm->tm->anonTableName), tmkm);
@@ -127,9 +135,9 @@ crypt(Analysis & a, string plaindata, fieldType ft, string fieldname, SECLEVEL f
     } else {
         mkey = a.cm->getmkey();
     }
-    //cerr << "crypt '" << plaindata << "' with length before crypt " << plaindata.length() << endl;
+    cerr << "crypt '" << plaindata << "' with length before crypt " << plaindata.length() << endl;
     string c = a.cm->crypt(mkey, plaindata, ft, fieldname, fromlevel, tolevel, isBin, salt);
-    //cerr << "crypt '" << c << "' with length after crypt " << c.length() << endl;
+    cerr << "crypt '" << c << "' with length after crypt " << c.length() << endl;
     return c;
 }
 
@@ -145,10 +153,10 @@ ItemToString(Item * i) {
 }
 
 // encrypts a constant item based on the information in a
+//TODO cat_red fix for mp
 static string
-//TODO (cat_red) fix this to work for mp
-//encryptConstantItem(Item * i, const Analysis & a, MultiPrinc * mp, TMKM & tmkm){
-encryptConstantItem(Item * i, const Analysis & a){
+encryptConstantItem(Item * i, const Analysis & a, MultiPrinc * mp, TMKM &tmkm){
+    cerr << "encrypt constant" << endl;
     string plaindata = ItemToString(i);
 
     auto itemMeta = a.itemToMeta.find(i);
@@ -156,12 +164,12 @@ encryptConstantItem(Item * i, const Analysis & a){
 
     ItemMeta * im = itemMeta->second;
     FieldMeta * fm = im->basefield;
-
-    string anonname = fullName(fm->onionnames[im->o], fm->tm->anonTableName);
+    if (fm->onionnames[im->o] == "") {
+        return plaindata;
+    }
+    string anonName = fullName(fm->onionnames[im->o], fm->tm->anonTableName);
     bool isBin;
-    //return crypt(a, plaindata, TYPE_TEXT, anonName, getMin(im->o), fm->encdesc.olm[im->o], isBin, 0, mp, fm, tmkm);
-    return a.cm->crypt(a.cm->getmkey(), plaindata, TYPE_TEXT,
-                       anonname, getMin(im->o), fm->encdesc.olm[im->o], isBin);
+    return crypt(a, plaindata, TYPE_TEXT, anonName, getMin(im->o), fm->encdesc.olm[im->o], isBin, 0, mp, fm, tmkm);
 }
 
 /***********end of parser utils *****************/
@@ -340,8 +348,8 @@ class CItemType {
     virtual EncSet do_gather(Item *, const constraints&, Analysis &) const = 0;
     virtual void   do_enforce(Item *, const constraints&, Analysis &) const = 0;
     virtual Item * do_optimize(Item *, Analysis &) const = 0;
-    virtual Item * do_rewrite(Item *, Analysis &) const = 0;
-    virtual void   do_rewrite_proj(Item *, Analysis &, vector<Item *> &) const = 0;
+    virtual Item * do_rewrite(Item *, Analysis &, MultiPrinc *, TMKM) const = 0;
+    virtual void   do_rewrite_proj(Item *, Analysis &, vector<Item *> &, MultiPrinc*, TMKM) const = 0;
     virtual void   do_rewrite_insert(Item *, Analysis &, vector<Item *> &, FieldMeta *fm, MultiPrinc *mp, TMKM tmkm) const = 0;
 };
 
@@ -370,12 +378,12 @@ class CItemTypeDir : public CItemType {
         return lookup(i)->do_optimize(i, a);
     }
 
-    Item* do_rewrite(Item *i, Analysis &a) const {
-        return lookup(i)->do_rewrite(i, a);
+    Item* do_rewrite(Item *i, Analysis &a, MultiPrinc *mp, TMKM tmkm) const {
+        return lookup(i)->do_rewrite(i, a, mp, tmkm);
     }
 
-    void do_rewrite_proj(Item *i, Analysis &a, vector<Item *> &l) const {
-        lookup(i)->do_rewrite_proj(i, a, l);
+    void do_rewrite_proj(Item *i, Analysis &a, vector<Item *> &l, MultiPrinc *mp, TMKM tmkm) const {
+        lookup(i)->do_rewrite_proj(i, a, l, mp, tmkm);
     }
 
     void do_rewrite_insert(Item *i, Analysis &a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM tmkm) const {
@@ -475,8 +483,8 @@ optimize(Item **i, Analysis &a) {
 
 // TODO: template this with optimize()
 static inline void
-rewrite(Item **i, Analysis &a) {
-    Item *i0 = itemTypes.do_rewrite(*i, a);
+rewrite(Item **i, Analysis &a, MultiPrinc *mp, TMKM tmkm) {
+    Item *i0 = itemTypes.do_rewrite(*i, a, mp, tmkm);
     if (i0 != *i) {
         i0->name = (*i)->name; // preserve the name (alias)
         *i = i0;
@@ -626,10 +634,10 @@ record_item_meta_for_constraints(Item *i,
 
 template <class T>
 static Item *
-do_rewrite_type_args(T *i, Analysis &a) {
+do_rewrite_type_args(T *i, Analysis &a, MultiPrinc *mp, TMKM tmkm) {
     Item **args = i->arguments();
     for (uint x = 0; x < i->argument_count(); x++) {
-        rewrite(&args[x], a);
+        rewrite(&args[x], a, mp, tmkm);
         args[x]->name = NULL; // args should never have aliases...
     }
     return i;
@@ -651,11 +659,11 @@ class CItemSubtype : public CItemType {
     virtual Item* do_optimize(Item *i, Analysis & a) const {
         return do_optimize_type((T*) i, a);
     }
-    virtual Item* do_rewrite(Item *i, Analysis & a) const {
-        return do_rewrite_type((T*) i, a);
+    virtual Item* do_rewrite(Item *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const {
+        return do_rewrite_type((T*) i, a, mp, tmkm);
     }
-    virtual void  do_rewrite_proj(Item *i, Analysis & a, vector<Item *> &l) const {
-        do_rewrite_proj_type((T*) i, a, l);
+    virtual void  do_rewrite_proj(Item *i, Analysis & a, vector<Item *> &l, MultiPrinc *mp, TMKM tmkm) const {
+        do_rewrite_proj_type((T*) i, a, l, mp, tmkm);
     }
     virtual void  do_rewrite_insert(Item *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM tmkm) const {
         do_rewrite_insert_type((T*) i, a, l, fm, mp, tmkm);
@@ -666,11 +674,11 @@ class CItemSubtype : public CItemType {
     virtual Item * do_optimize_type(T *i, Analysis & a) const {
         return do_optimize_const_item(i, a);
     }
-    virtual Item * do_rewrite_type(T *i, Analysis & a) const { return i; }
-    virtual void   do_rewrite_proj_type(T *i, Analysis & a, vector<Item *> &l) const {
-        l.push_back(do_rewrite_type(i, a));
+    virtual Item * do_rewrite_type(T *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const { return i; }
+    virtual void   do_rewrite_proj_type(T *i, Analysis & a, vector<Item *> &l, MultiPrinc *mp, TMKM tmkm) const {
+        l.push_back(do_rewrite_type(i, a, mp, tmkm));
     }
-    virtual void   do_rewrite_insert_type(T *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const {
+    virtual void   do_rewrite_insert_type(T *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM tmkm) const {
         // default is un-implemented. we'll implement these as they come
         UNIMPLEMENTED;
     }
@@ -708,7 +716,7 @@ static void process_select_lex(st_select_lex *select_lex, const constraints &tr,
 
 static void optimize_select_lex(st_select_lex *select_lex, Analysis & a);
 
-static void rewrite_select_lex(st_select_lex *select_lex, Analysis & a);
+static void rewrite_select_lex(st_select_lex *select_lex, Analysis & a, MultiPrinc *mp, TMKM tmkm);
 
 static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
@@ -802,7 +810,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     }
 
     virtual Item *
-    do_rewrite_type(Item_field *i, Analysis & a) const
+    do_rewrite_type(Item_field *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const
     {
         cerr << "do_rewrite_type L806" << endl;
         auto it = a.itemHasRewrite.find(i);
@@ -840,10 +848,10 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     }
 
     virtual void
-    do_rewrite_proj_type(Item_field *i, Analysis & a, vector<Item *> &l) const
+    do_rewrite_proj_type(Item_field *i, Analysis & a, vector<Item *> &l, MultiPrinc *mp, TMKM tmkm) const
     {
         //rewrite current projection field
-        l.push_back(do_rewrite_type(i, a));
+        l.push_back(do_rewrite_type(i, a, mp, tmkm));
 
         // if there is a salt for the onion, then also fetch the onion from the server
         auto it = a.itemToFieldMeta.find(i);
@@ -859,7 +867,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     }
 
     virtual void
-    do_rewrite_insert_type(Item_field *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const
+    do_rewrite_insert_type(Item_field *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM tmkm) const
     {
         cerr << "do_rewrite_insert_type L701 (IT)" << endl;
 
@@ -901,14 +909,14 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
         return i;
     }
 
-    virtual Item * do_rewrite_type(Item_string *i, Analysis & a) const {
+    virtual Item * do_rewrite_type(Item_string *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const {
         cerr << "do_rewrite_type L908" << endl;
-        string enc = encryptConstantItem(i,  a);
-        return new Item_hex_string(enc.data(), enc.length());
+        string enc = encryptConstantItem(i,  a, mp, tmkm);
+        return new Item_string(enc.data(), enc.length(), i->default_charset());
     }
 
     virtual void
-    do_rewrite_insert_type(Item_string *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const
+    do_rewrite_insert_type(Item_string *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM tmkm) const
     {
         cerr << "do_rewrite_insert_type L880 (IT)" << endl;
         assert(fm != NULL);
@@ -967,13 +975,13 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     virtual Item * do_optimize_type(Item_num *i, Analysis & a) const {
         return i;
     }
-    virtual Item * do_rewrite_type(Item_num *i, Analysis & a) const {
+    virtual Item * do_rewrite_type(Item_num *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const {
         cerr << "do_rewrite_type L970" << endl;
-        string enc = encryptConstantItem(i, a);
+        string enc = encryptConstantItem(i, a, mp, tmkm);
         return new Item_int((ulonglong) valFromStr(enc));
     }
     virtual void
-    do_rewrite_insert_type(Item_num *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const
+    do_rewrite_insert_type(Item_num *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM tmkm) const
     {
         cerr << "do_rewrite_insert_type L942" << endl;
         //TODO: this part is quite repetitive with string or
@@ -1025,7 +1033,7 @@ static class ANON : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITEM
     virtual Item * do_optimize_type(Item_decimal *i, Analysis & a) const {
         return i;
     }
-    virtual Item * do_rewrite_type(Item_decimal *i, Analysis & a) const {
+    virtual Item * do_rewrite_type(Item_decimal *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const {
         cerr << "do_rewrite_type L1028" << endl;
         double n = i->val_real();
         char buf[sizeof(double) * 2];
@@ -1034,7 +1042,7 @@ static class ANON : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITEM
         return new Item_hex_string(buf, sizeof(buf));
     }
     virtual void
-    do_rewrite_insert_type(Item_decimal *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM &tmkm) const
+    do_rewrite_insert_type(Item_decimal *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM tmkm) const
     {
         cerr << "do_rewrite_insert_type L997" << endl;
         assert(fm != NULL);
@@ -1168,9 +1176,9 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
     virtual Item * do_optimize_type(Item_func *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-    virtual Item * do_rewrite_type(Item_func *i, Analysis & a) const {
+    virtual Item * do_rewrite_type(Item_func *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const {
         cerr << "do_rewrite_type L1171" << endl;
-        return do_rewrite_type_args(i, a);
+        return do_rewrite_type_args(i, a, mp, tmkm);
     }
 };
 
@@ -1202,13 +1210,13 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
     virtual Item * do_optimize_type(Item_cond *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-    virtual Item * do_rewrite_type(Item_cond *i, Analysis & a) const {
+    virtual Item * do_rewrite_type(Item_cond *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const {
         cerr << "do_rewrite_type L1207" << endl;
         auto item_it = List_iterator<Item>(*i->argument_list());
         for (;;) {
             if (!item_it++)
                 break;
-            rewrite(item_it.ref(), a);
+            rewrite(item_it.ref(), a, mp, tmkm);
         }
         return i;
     }
@@ -1302,10 +1310,10 @@ class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
     virtual Item * do_optimize_type(Item_func_additive_op *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-    virtual Item * do_rewrite_type(Item_func_additive_op *i, Analysis & a) const {
+    virtual Item * do_rewrite_type(Item_func_additive_op *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const {
         cerr << "do_rewrite_type L1305" << endl;
         // rewrite children
-        do_rewrite_type_args(i, a);
+        do_rewrite_type_args(i, a, mp, tmkm);
 
         List<Item> l;
         Item **args = i->arguments();
@@ -1931,7 +1939,7 @@ process_select_lex(st_select_lex *select_lex, const constraints &tr, Analysis & 
 
 // TODO: template this
 static void
-rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
+rewrite_select_lex(st_select_lex *select_lex, Analysis & a, MultiPrinc *mp, TMKM tmkm)
 {
     auto item_it = List_iterator<Item>(select_lex->item_list);
 
@@ -1941,7 +1949,7 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
         if (!item)
             break;
         vector<Item *> l;
-        itemTypes.do_rewrite_proj(item, a, l);
+        itemTypes.do_rewrite_proj(item, a, l, mp, tmkm);
         for (auto it = l.begin(); it != l.end(); ++it) {
             (*it)->name = NULL; // TODO: fix this
             newList.push_back(*it);
@@ -1951,21 +1959,21 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
     select_lex->item_list = newList;
 
     if (select_lex->where)
-        rewrite(&select_lex->where, a);
+        rewrite(&select_lex->where, a, mp, tmkm);
 
     if (select_lex->join &&
         select_lex->join->conds &&
         select_lex->where != select_lex->join->conds)
-        rewrite(&select_lex->join->conds, a);
+        rewrite(&select_lex->join->conds, a, mp, tmkm);
 
     if (select_lex->having)
-        rewrite(&select_lex->having, a);
+        rewrite(&select_lex->having, a, mp, tmkm);
 
     for (ORDER *o = select_lex->group_list.first; o; o = o->next)
-        rewrite(o->item, a);
+        rewrite(o->item, a, mp, tmkm);
 
     for (ORDER *o = select_lex->order_list.first; o; o = o->next)
-        rewrite(o->item, a);
+        rewrite(o->item, a, mp, tmkm);
 
 }
 
@@ -2033,7 +2041,7 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
 }
 
 static inline void
-rewrite_table_list(TABLE_LIST *t, Analysis &a)
+rewrite_table_list(TABLE_LIST *t, Analysis &a, MultiPrinc *mp, TMKM tmkm)
 {
     string anon_name = anonymize_table_name(string(t->table_name,
                                                    t->table_name_length), a);
@@ -2043,7 +2051,7 @@ rewrite_table_list(TABLE_LIST *t, Analysis &a)
 }
 
 static void
-rewrite_table_list(List<TABLE_LIST> *tll, Analysis & a)
+rewrite_table_list(List<TABLE_LIST> *tll, Analysis & a, MultiPrinc *mp, TMKM tmkm)
 {
     List_iterator<TABLE_LIST> join_it(*tll);
     for (;;) {
@@ -2051,19 +2059,19 @@ rewrite_table_list(List<TABLE_LIST> *tll, Analysis & a)
         if (!t)
             break;
 
-        rewrite_table_list(t, a);
+        rewrite_table_list(t, a, mp, tmkm);
 
         if (t->nested_join) {
-            rewrite_table_list(&t->nested_join->join_list, a);
+            rewrite_table_list(&t->nested_join->join_list, a, mp, tmkm);
             return;
         }
 
         if (t->on_expr)
-            rewrite(&t->on_expr, a);
+            rewrite(&t->on_expr, a, mp, tmkm);
 
         if (t->derived) {
             st_select_lex_unit *u = t->derived;
-            rewrite_select_lex(u->first_select(), a);
+            rewrite_select_lex(u->first_select(), a, mp, tmkm);
         }
     }
 }
@@ -2280,22 +2288,22 @@ process_create_lex(LEX * lex, Analysis & a, MultiPrinc * mp)
 }
 
 static void
-rewrite_table_list(SQL_I_List<TABLE_LIST> *tlist, Analysis &a)
+rewrite_table_list(SQL_I_List<TABLE_LIST> *tlist, Analysis &a, MultiPrinc *mp, TMKM tmkm)
 {
     TABLE_LIST *tbl = tlist->first;
     for (; tbl; tbl = tbl->next_local) {
-        rewrite_table_list(tbl, a);
+        rewrite_table_list(tbl, a, mp, tmkm);
     }
 }
 
 static void
-rewrite_create_lex(LEX *lex, Analysis &a)
+rewrite_create_lex(LEX *lex, Analysis &a, MultiPrinc *mp, TMKM tmkm)
 {
     // table name
     const string &table =
         lex->select_lex.table_list.first->table_name;
 
-    rewrite_table_list(&lex->select_lex.table_list, a);
+    rewrite_table_list(&lex->select_lex.table_list, a, mp, tmkm);
 
     //TODO: support for "create table like"
     if (lex->create_info.options & HA_LEX_CREATE_TABLE_LIKE) {
@@ -2508,18 +2516,18 @@ lex_rewrite(const string & db, LEX * lex, Analysis & analysis, MultiPrinc * mp, 
 {
     switch (lex->sql_command) {
     case SQLCOM_CREATE_TABLE:
-        rewrite_create_lex(lex, analysis);
+        rewrite_create_lex(lex, analysis, mp, tmkm);
         break;
     case SQLCOM_INSERT:
     case SQLCOM_REPLACE:
         rewrite_insert_lex(lex, analysis, mp, tmkm);
         break;
     case SQLCOM_DROP_TABLE:
-        rewrite_table_list(&lex->select_lex.table_list, analysis);
+        rewrite_table_list(&lex->select_lex.table_list, analysis, mp, tmkm);
         break;
     default:
-        rewrite_table_list(&lex->select_lex.top_join_list, analysis);
-        rewrite_select_lex(&lex->select_lex, analysis);
+        rewrite_table_list(&lex->select_lex.top_join_list, analysis, mp, tmkm);
+        rewrite_select_lex(&lex->select_lex, analysis, mp, tmkm);
         break;
     }
     return true;
@@ -2998,8 +3006,10 @@ Rewriter::decryptResults(ResType & dbres,
             for (unsigned int r = 0; r < rows; r++) {
                 bool isBin = true;
                 res.rows[r][col_index] = dbres.rows[r][c];
-                if (!im->basefield->onionnames.empty()) {
-                    res.rows[r][col_index].data = crypt(a, dbres.rows[r][c].data, getTypeForDec(rf.im), fullName(getAnonName(rf.im), im->basefield->tm->anonTableName), im->uptolevel, getMin(im->o), isBin, 0, mp, im->basefield, tmkm);
+                string anonName = getAnonName(im);
+                cerr << anonName << " has onions size " << im->basefield->onionnames.size() << endl;
+                if (!im->basefield->onionnames.empty() && anonName != "") {
+                    res.rows[r][col_index].data = crypt(a, dbres.rows[r][c].data, getTypeForDec(im), fullName(anonName, im->basefield->tm->anonTableName), im->uptolevel, getMin(im->o), isBin, 0, mp, im->basefield, tmkm);
                 }
             }
             col_index++;
