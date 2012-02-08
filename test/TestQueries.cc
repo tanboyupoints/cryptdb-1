@@ -672,11 +672,29 @@ Connection::start() {
         break;*/
         //single -- new Rewriter
     case SINGLE: {
-        Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
+        string dir_arg = "--datadir=" + tc.shadowdb_dir;
+
+        const char *mysql_av[] =
+            { "progname",
+              "--skip-grant-tables",
+              dir_arg.c_str(),
+              "--chracter-set-server=utf8",
+              "--language=" MYSQL_BUILD_DIR "/sql/shar/"
+            };
+        assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
+                                   (char**) mysql_av, 0));
+        assert(0 == mysql_thread_init());
+
+        cerr << "connect to " << tc.host << "." << tc.db << " as " << tc.user << " with password " << tc.pass << endl;
+        Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db);
         conn_set.insert(c);
         this->conn = conn_set.begin();
-        ConnectionData cd = ConnectionData(tc.host, tc.user, tc.pass, tc.db, tc.port);
+        ConnectionData cd = ConnectionData(tc.host, tc.user, tc.pass, tc.db);
+
+        cerr << "starting rewriter" << endl;
         re = new Rewriter(cd, cd, false);
+        cerr << "rewrite initialized" << endl;
+        re->setMasterKey("2392834");
         break; }
         //multi -- new Rewriter
     case MULTI: {

@@ -27,11 +27,18 @@ select * from users;
 select msgid, msgtext from msgs;
 
 select * from users where username = 'alice';
-select senderid from privmsg where msgid = 1;
+select sendid from privmsg where msgid = 1;
 select * from msgs where msgid = 1;
-select * from msgs where msgtext = 'hello!';
+select * from msgs where msgid = 1 and msgtext = 'hello!';
 
-delete;
+insert into privmsg values (2, 1, 2);
+insert into msgs values (2, 'hello!');
+select * from msgs;
+select * from msgs where msgid = 1 and msgtext = 'hello!';
+select * from msgs where msgtext = 'hello!' and msgid = 2;
+
+delete from pwdcryptdb__users where username = 'alice';
+
 
 drop table privmsg;
 drop table msgs;

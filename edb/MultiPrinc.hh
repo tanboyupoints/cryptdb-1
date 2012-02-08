@@ -64,6 +64,7 @@ class MultiPrinc {
     void prepareSelect(std::list<std::string> & words, TMKM & tmkm, QueryMeta & qm,
                        std::map<std::string,
                                 TableMetadata *> & tm);
+    bool hasEncFor(std::string field);
 
     // fills tmkm.encForReturned and decides if the next field was added by us
     // and should not be returned to the user
