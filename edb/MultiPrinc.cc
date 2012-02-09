@@ -699,29 +699,30 @@ MultiPrinc::checkPsswd(LEX *lex) {
     }
 
     if (lex->sql_command == SQLCOM_DELETE) {
-        //fieldname for first (non-password) field
-        //TODO: delete does not have field_list -- that's in where.  I think?
-        assert_s(lex->field_list.head(), "login does not have fields named");
-        auto it_f = List_iterator<Item>(lex->field_list);
-        Item *i = it_f++;
-        assert_s(i, "login does not have fields");
-        assert(i->type() == Item::FIELD_ITEM);
-        Item_field *ifd = static_cast<Item_field*>(i);
-        type = fullName(ifd->field_name, pw_table);
-        cerr << "type is " << type << endl;
-
-        //username
-        assert_s(lex->many_values.head(), "login does not have values");
-        auto it_l = List_iterator<List_item>(lex->many_values);
-        List_item *li = it_l++;
-        assert_s(li, "login does not have List_item");
-        auto it = List_iterator<Item>(*li);
-        i = it++;
-        assert_s(i, "login does not have fieldname value");
-        String S_uname;
-        String *S0_uname = i->val_str(&S_uname);
-        uname = string(S0_uname->ptr(), S0_uname->length());
-        cerr << "uname is " << uname << endl;
+        //HACK!!!
+        //TODO (cat_red): make this less dependant on the form Rewriter turns out
+        assert_s(lex->select_lex.where, "logout requires that a username be specified");
+        stringstream ss;
+        ss << *(lex->select_lex.where) << endl;
+        string s = ss.str();
+        list<string> q = split(s, ' ');
+        auto it = q.begin();
+        for (; it != q.end(); it++) {
+            if (*it == "=") {
+                break;
+            }
+        }
+        assert_s(it != q.begin() && it != q.end(), "improperly formatted logout query");
+        type = *(--it);
+        start_prune(type, '(');
+        prune(type, '`');
+        type = fullName(type, pw_table);
+        it++;
+        assert_s(*it == "=", "logic fail in checkPsswd");
+        uname = *(++it);
+        end_prune(uname, '\n');
+        end_prune(uname, ')');
+        prune(uname, '\'');
 
         resacc = accMan->removePsswd(Prin(type, uname));
         assert_s(resacc >= 0, "access manager delete password failed");

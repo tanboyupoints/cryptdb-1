@@ -126,7 +126,7 @@ crypt(const Analysis & a, string plaindata, fieldType ft, string fieldname, SECL
     AES_KEY * mkey;
     if (mp) {
         string key;
-        cerr << "crypt fm->fname = " << fullName(fm->fname, fm->tm->anonTableName) << endl;
+        //cerr << "crypt fm->fname = " << fullName(fm->fname, fm->tm->anonTableName) << endl;
         if (tmkm.processingQuery) {
             key = mp->get_key(fullName(fm->fname, fm->tm->anonTableName), tmkm);
         } else {
@@ -506,7 +506,7 @@ do_optimize_const_item(T *i, Analysis &a) {
         stringstream buf;
         buf << "SELECT " << *i;
         string q(buf.str());
-
+        cerr << q << endl;
         MYSQL *m = a.conn();
         mysql_query_wrapper(m, q);
 
@@ -529,7 +529,6 @@ do_optimize_const_item(T *i, Analysis &a) {
             char *p = row[0];
             unsigned long *lengths = mysql_fetch_lengths(r);
             assert(lengths != NULL);
-
             if (p) {
 
 //enum enum_field_types { MYSQL_TYPE_DECIMAL, MYSQL_TYPE_TINY,
@@ -1898,7 +1897,7 @@ optimize_select_lex(st_select_lex *select_lex, Analysis & a)
 
     if (select_lex->where)
         optimize(&select_lex->where, a);
-
+    //cerr << "where okay" << endl;
     if (select_lex->join &&
         select_lex->join->conds &&
         select_lex->where != select_lex->join->conds)
@@ -2969,6 +2968,7 @@ Rewriter::rewrite(const string & q, Analysis & a)
         cerr << "login/logout " << *lex << endl;
         return queries;
     }
+
     query_analyze(db, q, lex, analysis, mp, tmkm);
 
     int ret = updateMeta(db, q, lex, analysis);
@@ -2989,7 +2989,7 @@ Rewriter::decryptResults(ResType & dbres,
 			 Analysis & a) {
     tmkm.processingQuery = false;
     for (auto i = a.rmeta.rfmeta.begin(); i != a.rmeta.rfmeta.end(); i++) {
-        cerr << i->second.im->basefield->fname << "->" << i->first << endl;
+        //cerr << i->second.im->basefield->fname << "->" << i->first << endl;
         tmkm.encForReturned[fullName(i->second.im->basefield->fname, i->second.im->basefield->tm->anonTableName)] = i->first;
     }
 
