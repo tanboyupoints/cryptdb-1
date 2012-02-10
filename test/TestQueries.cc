@@ -647,6 +647,7 @@ alloc_port()
 
 void
 Connection::start() {
+    cerr << "starting  " << tc.db << endl;
     uint64_t mkey = 1133421234;
     string masterKey = BytesFromInt(mkey, AES_KEY_BYTES); 
     switch (type) {
@@ -671,18 +672,22 @@ Connection::start() {
         assert_s(cl->plain_execute("CREATE FUNCTION test (optionid integer) RETURNS bool RETURN optionid=20").ok, "creating test function for multi");
         break;*/
         //single -- new Rewriter
-    case SINGLE: {
+        //multi -- new Rewriter
+    case SINGLE:
+    case MULTI:
+    {
         string dir_arg = "--datadir=" + tc.shadowdb_dir;
 
         const char *mysql_av[] =
             { "progname",
               "--skip-grant-tables",
               dir_arg.c_str(),
-              "--chracter-set-server=utf8",
-              "--language=" MYSQL_BUILD_DIR "/sql/shar/"
+              "--character-set-server=utf8",
+              "--language=" MYSQL_BUILD_DIR "/sql/share/"
             };
+        cerr << dir_arg << endl;
         assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
-                                   (char**) mysql_av, 0));
+                                       (char**) mysql_av, 0));
         assert(0 == mysql_thread_init());
 
         cerr << "connect to " << tc.host << "." << tc.db << " as " << tc.user << " with password " << tc.pass << endl;
@@ -691,19 +696,11 @@ Connection::start() {
         this->conn = conn_set.begin();
         ConnectionData cd = ConnectionData(tc.host, tc.user, tc.pass, tc.db);
 
-        cerr << "starting rewriter" << endl;
-        re = new Rewriter(cd, cd, false);
+        re = new Rewriter(cd, (type == MULTI));
         cerr << "rewrite initialized" << endl;
         re->setMasterKey("2392834");
-        break; }
-        //multi -- new Rewriter
-    case MULTI: {
-        Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
-        conn_set.insert(c);
-        this->conn = conn_set.begin();
-        ConnectionData cd = ConnectionData(tc.host, tc.user, tc.pass, tc.db, tc.port);
-        re = new Rewriter(cd, cd, true);
-        break; }
+        break;
+    }
         //proxy -- start proxy in separate process and initialize connection
     case PROXYPLAIN:
     case PROXYSINGLE:
@@ -1160,7 +1157,7 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
 
     TestConfig control_tc = TestConfig();
     control_tc.db = control_tc.db+"_control";
-    
+ 
     Connection control_(control_tc, control_type);
     control = &control_;
 

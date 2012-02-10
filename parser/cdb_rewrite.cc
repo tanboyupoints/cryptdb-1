@@ -136,9 +136,9 @@ crypt(const Analysis & a, string plaindata, fieldType ft, string fieldname, SECL
     } else {
         mkey = a.cm->getmkey();
     }
-    //cerr << "crypt '" << plaindata << "' with length before crypt " << plaindata.length() << endl;
+    cerr << "crypt '" << plaindata << "' with length before crypt " << plaindata.length() << endl;
     string c = a.cm->crypt(mkey, plaindata, ft, fieldname, fromlevel, tolevel, isBin, salt);
-    //cerr << "crypt '" << c << "' with length after crypt " << c.length() << endl;
+    cerr << "crypt '" << c << "' with length after crypt " << c.length() << endl;
     return c;
 }
 
@@ -814,7 +814,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     virtual Item *
     do_rewrite_type(Item_field *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const
     {
-        cerr << "do_rewrite_type L806" << endl;
+        cerr << "do_rewrite_type L806 " << endl;
         auto it = a.itemHasRewrite.find(i);
         if (it == a.itemHasRewrite.end()) {
             // fix table name
@@ -1193,7 +1193,7 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
         return do_optimize_type_self_and_args(i, a);
     }
     virtual Item * do_rewrite_type(Item_func *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const {
-        cerr << "do_rewrite_type L1171" << endl;
+        cerr << "do_rewrite_type L1171 " << endl;
         return do_rewrite_type_args(i, a, mp, tmkm);
     }
 };
@@ -1897,7 +1897,7 @@ optimize_select_lex(st_select_lex *select_lex, Analysis & a)
 
     if (select_lex->where)
         optimize(&select_lex->where, a);
-    //cerr << "where okay" << endl;
+
     if (select_lex->join &&
         select_lex->join->conds &&
         select_lex->where != select_lex->join->conds)
@@ -2540,12 +2540,14 @@ lex_rewrite(const string & db, LEX * lex, Analysis & analysis, MultiPrinc * mp, 
         break;
     case SQLCOM_INSERT:
     case SQLCOM_REPLACE:
+        cerr << "lex rewrite insert, replace" << endl;
         rewrite_insert_lex(lex, analysis, mp, tmkm);
         break;
     case SQLCOM_DROP_TABLE:
         rewrite_table_list(&lex->select_lex.table_list, analysis, mp, tmkm);
         break;
     default:
+        cerr << "lex rewrite default" << endl;
         rewrite_table_list(&lex->select_lex.top_join_list, analysis, mp, tmkm);
         rewrite_select_lex(&lex->select_lex, analysis, mp, tmkm);
         break;
@@ -2675,8 +2677,7 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
 }
 
 Rewriter::Rewriter(ConnectionData db,
-                   ConnectionData shadow,
-                   bool multi) : db(shadow.dbname)
+                   bool multi) : db(db.dbname)
 {
     // create mysql connection to embedded
     // server
@@ -2688,16 +2689,17 @@ Rewriter::Rewriter(ConnectionData db,
         cryptdb_err() << "mysql_real_connect: " << mysql_error(m);
     }
     // HACK: create this DB if it doesn't exist, for now
-    assert(shadow.dbname == db.dbname);
-    string create_q = "CREATE DATABASE IF NOT EXISTS " + shadow.dbname;
-    string use_q    = "USE " + shadow.dbname + ";";
+    string create_q = "CREATE DATABASE IF NOT EXISTS " + db.dbname;
+    string use_q    = "USE " + db.dbname + ";";
+    cerr << "creating db: " << create_q << endl;
     mysql_query_wrapper(m, create_q);
+    cerr << "using db: " << use_q << endl;
     mysql_query_wrapper(m, use_q);
-
+    cerr << "mysql okay -- try for schema" << endl;
     schema = new SchemaInfo();
     totalTables = 0;
     initSchema();
-
+    cerr << "schema set up" << endl;
     if (multi) {
         mp = new MultiPrinc(new Connect(db.server, db.user, db.psswd, db.dbname, db.port));
     } else {

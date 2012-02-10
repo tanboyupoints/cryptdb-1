@@ -346,7 +346,6 @@ class Rewriter {
 public:
     //Rewriter(const std::string & db);
     Rewriter(ConnectionData db,
-             ConnectionData shadow,
              bool MultiPrinc = false);
     ~Rewriter();
 

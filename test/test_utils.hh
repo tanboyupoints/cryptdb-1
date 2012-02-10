@@ -21,7 +21,7 @@ class TestConfig {
         pass = "letmein";
         host = "localhost";
         db   = "cryptdbtest";
-        shadowdb_dir = "~/shadow-db";
+        shadowdb_dir = "/home/cat/shadow-db";
         port = 3306;
         stop_if_fail = false;
 
