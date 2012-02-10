@@ -647,7 +647,6 @@ alloc_port()
 
 void
 Connection::start() {
-    cerr << "starting  " << tc.db << endl;
     uint64_t mkey = 1133421234;
     string masterKey = BytesFromInt(mkey, AES_KEY_BYTES); 
     switch (type) {
@@ -685,7 +684,6 @@ Connection::start() {
               "--character-set-server=utf8",
               "--language=" MYSQL_BUILD_DIR "/sql/share/"
             };
-        cerr << dir_arg << endl;
         assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
                                        (char**) mysql_av, 0));
         assert(0 == mysql_thread_init());
@@ -697,7 +695,6 @@ Connection::start() {
         ConnectionData cd = ConnectionData(tc.host, tc.user, tc.pass, tc.db);
 
         re = new Rewriter(cd, (type == MULTI));
-        cerr << "rewrite initialized" << endl;
         re->setMasterKey("2392834");
         break;
     }

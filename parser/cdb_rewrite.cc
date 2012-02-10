@@ -2691,15 +2691,13 @@ Rewriter::Rewriter(ConnectionData db,
     // HACK: create this DB if it doesn't exist, for now
     string create_q = "CREATE DATABASE IF NOT EXISTS " + db.dbname;
     string use_q    = "USE " + db.dbname + ";";
-    cerr << "creating db: " << create_q << endl;
     mysql_query_wrapper(m, create_q);
-    cerr << "using db: " << use_q << endl;
     mysql_query_wrapper(m, use_q);
-    cerr << "mysql okay -- try for schema" << endl;
+
     schema = new SchemaInfo();
     totalTables = 0;
     initSchema();
-    cerr << "schema set up" << endl;
+
     if (multi) {
         mp = new MultiPrinc(new Connect(db.server, db.user, db.psswd, db.dbname, db.port));
     } else {
