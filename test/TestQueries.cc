@@ -27,7 +27,9 @@ static Connection * test;
 static QueryList Insert = QueryList("SingleInsert",
     { "CREATE TABLE test_insert (id integer primary key auto_increment, age integer, salary integer, address text, name text)" },
     { "CREATE TABLE test_insert (id integer primary key auto_increment, age enc integer, salary enc integer, address enc text, name text)" },
-    { "CREATE TABLE test_insert (id integer primary key auto_increment, age integer, salary integer, address text, name text)" },
+    //multi currently has no KEY functionality
+    //{ "CREATE TABLE test_insert (id integer primary key auto_increment, age integer, salary integer, address text, name text)" },
+    { "CREATE TABLE test_insert (id integer, age integer, salary integer, address text, name text)" },
     { Query("INSERT INTO test_insert VALUES (1, 21, 100, '24 Rosedale, Toronto, ONT', 'Pat Carlson')", false),
       Query("SELECT * FROM test_insert", false),
       Query("INSERT INTO test_insert (id, age, salary, address, name) VALUES (2, 23, 101, '25 Rosedale, Toronto, ONT', 'Pat Carlson2')", false),
@@ -224,15 +226,21 @@ static QueryList Search = QueryList("SingleSearch",
     { "DROP TABLE test_search" } );
 
 static QueryList Basic = QueryList("MultiBasic",
-    { "CREATE TABLE t1 (id integer, post text, age bigint)",
+    { "","",
+      "CREATE TABLE t1 (id integer, post text, age bigint)",
+      "","",
       "CREATE TABLE u_basic (id integer, username text)",
       "CREATE TABLE "+PWD_TABLE_PREFIX+"u_basic (username text, psswd text)" },
-    { "CREATE TABLE t1 (id integer, post text, age bigint)",
+    { "","",
+      "CREATE TABLE t1 (id integer, post text, age bigint)",
+      "","",
       "CREATE TABLE u_basic (id integer, username text)",
       "CREATE TABLE "+PWD_TABLE_PREFIX+"u_basic (username text, psswd text)" },
-    { "CREATE TABLE t1 (id integer, post encfor id det text, age encfor id ope bigint)",
+    { "CRYPTDB PRINCTYPE id", "CRYPTDB PRINCTYPE uname EXTERNAL",
+      "CREATE TABLE t1 (id integer, post text, age bigint)",
+      "CRYPTDB t1.post ENCFOR t1.id id det", "CRYPTDB t1.age ENCFOR t1.id id ope",
       "CREATE TABLE u_basic (id equals t1.id integer, username givespsswd id text)",
-      "COMMIT ANNOTATIONS" },
+      "CRYPTDB u.username uname SPEAKSFOR u.id id" },
     { Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_basic (username, psswd) VALUES ('alice', 'secretalice')", false),
       Query("DELETE FROM "+PWD_TABLE_PREFIX+"u_basic WHERE username='alice'", false),
       Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_basic (username, psswd) VALUES ('alice', 'secretalice')", false),
@@ -647,6 +655,7 @@ alloc_port()
 
 void
 Connection::start() {
+    cerr << "start " << tc.db << endl;
     uint64_t mkey = 1133421234;
     string masterKey = BytesFromInt(mkey, AES_KEY_BYTES); 
     switch (type) {
@@ -1155,11 +1164,11 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
     TestConfig control_tc = TestConfig();
     control_tc.db = control_tc.db+"_control";
  
-    Connection control_(control_tc, control_type);
-    control = &control_;
-
     Connection test_(tc, test_type);
     test = &test_;
+
+    Connection control_(control_tc, control_type);
+    control = &control_;
 
     enum { nrounds = 1 };
     for (uint i = 0; i < nrounds; i++)

@@ -2688,6 +2688,8 @@ Rewriter::Rewriter(ConnectionData db,
         mysql_close(m);
         cryptdb_err() << "mysql_real_connect: " << mysql_error(m);
     }
+    //mysql_query_wrapper(m, "show databases;");
+
     // HACK: create this DB if it doesn't exist, for now
     string create_q = "CREATE DATABASE IF NOT EXISTS " + db.dbname;
     string use_q    = "USE " + db.dbname + ";";
