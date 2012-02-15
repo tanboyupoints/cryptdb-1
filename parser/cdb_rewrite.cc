@@ -672,7 +672,11 @@ class CItemSubtype : public CItemType {
     virtual Item * do_optimize_type(T *i, Analysis & a) const {
         return do_optimize_const_item(i, a);
     }
-    virtual Item * do_rewrite_type(T *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const { return i; }
+    virtual Item * do_rewrite_type(T *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const { 
+        cerr << "do_rewrite_type L676 " << *i << endl;
+        //addToReturn(ReturnMeta, int pos, ItemMeta, false)
+        return i;
+    }
     virtual void   do_rewrite_proj_type(T *i, Analysis & a, vector<Item *> &l, MultiPrinc *mp, TMKM tmkm) const {
         l.push_back(do_rewrite_type(i, a, mp, tmkm));
     }
@@ -852,6 +856,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     virtual void
     do_rewrite_proj_type(Item_field *i, Analysis & a, vector<Item *> &l, MultiPrinc *mp, TMKM tmkm) const
     {
+        cerr << "do_rewrite_proj_type (L855)" << endl;
         //rewrite current projection field
         l.push_back(do_rewrite_type(i, a, mp, tmkm));
 
@@ -920,8 +925,13 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
 
     virtual Item * do_rewrite_type(Item_string *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const {
         cerr << "do_rewrite_type L908" << endl;
+        string unenc = ItemToString(i);
         string enc = encryptConstantItem(i,  a, mp, tmkm);
-        return new Item_string(enc.data(), enc.length(), i->default_charset());
+        if (enc != unenc) {
+            return new Item_string(enc.data(), enc.length(), i->default_charset());
+        } else {
+            return i;
+        }
     }
 
     virtual void
@@ -1193,8 +1203,10 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
         return do_optimize_type_self_and_args(i, a);
     }
     virtual Item * do_rewrite_type(Item_func *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const {
-        cerr << "do_rewrite_type L1171 " << endl;
-        return do_rewrite_type_args(i, a, mp, tmkm);
+        cerr << "do_rewrite_type L1171 " << *i << endl;
+        Item *temp = do_rewrite_type_args(i, a, mp, tmkm);
+        cerr << "return 1171 " << *temp << endl;
+        return temp;
     }
 };
 
@@ -1964,8 +1976,10 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis & a, MultiPrinc *mp, TMKM
         Item *item = item_it++;
         if (!item)
             break;
+        cerr << "rewrite_select_lex " << *item << endl;
         vector<Item *> l;
         itemTypes.do_rewrite_proj(item, a, l, mp, tmkm);
+        cerr << "passed rewrite proj" << endl;
         for (auto it = l.begin(); it != l.end(); ++it) {
             (*it)->name = NULL; // TODO: fix this
             newList.push_back(*it);
@@ -2540,14 +2554,12 @@ lex_rewrite(const string & db, LEX * lex, Analysis & analysis, MultiPrinc * mp, 
         break;
     case SQLCOM_INSERT:
     case SQLCOM_REPLACE:
-        cerr << "lex rewrite insert, replace" << endl;
         rewrite_insert_lex(lex, analysis, mp, tmkm);
         break;
     case SQLCOM_DROP_TABLE:
         rewrite_table_list(&lex->select_lex.table_list, analysis, mp, tmkm);
         break;
     default:
-        cerr << "lex rewrite default" << endl;
         rewrite_table_list(&lex->select_lex.top_join_list, analysis, mp, tmkm);
         rewrite_select_lex(&lex->select_lex, analysis, mp, tmkm);
         break;
@@ -2975,11 +2987,11 @@ Rewriter::rewrite(const string & q, Analysis & a)
 
     int ret = updateMeta(db, q, lex, analysis);
     if (ret < 0) assert(false);
-
+    cerr << "before rewrite " << *lex << endl;
     lex_rewrite(db, lex, analysis, mp, tmkm);
     stringstream ss;
     ss << *lex;
-
+    cerr << "FINAL QUERY: " << *lex << endl;
     queries.push_back(ss.str());
     a = analysis;
     return queries;
@@ -2998,7 +3010,7 @@ Rewriter::decryptResults(ResType & dbres,
     unsigned int rows = dbres.rows.size();
 
     unsigned int cols = dbres.names.size();
- 
+
     ResType res = ResType();
 
     unsigned int index = 0;
@@ -3009,6 +3021,7 @@ Rewriter::decryptResults(ResType & dbres,
             //TODO: is something supposed to happen here?
         } else {
             //need to return this field
+            assert_s(rf.im, "ReturnField has no ItemMeta associated with it");
             res.names.push_back(rf.im->basefield->fname);
         }
         index++;
