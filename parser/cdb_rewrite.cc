@@ -89,6 +89,7 @@ getTypeForDec(const ItemMeta * im) {
 
 static void
 addToReturn(ReturnMeta & rm, int pos, ItemMeta * im, bool has_salt) {
+    cerr << "ADD TO RETURN" << endl;
     ReturnField rf = ReturnField();
     rf.is_salt = false;
     rf.im = im;
@@ -98,6 +99,12 @@ addToReturn(ReturnMeta & rm, int pos, ItemMeta * im, bool has_salt) {
         rf.pos_salt = -1;
     }
     rm.rfmeta[pos] = rf;
+}
+
+static void
+addToReturn(ReturnMeta &rm, int pos, ItemMeta * im, bool has_salt, string name) {
+    addToReturn(rm, pos, im, has_salt);
+    rm.rfmeta[pos].field_called = name;
 }
 
 
@@ -485,6 +492,9 @@ static inline void
 rewrite(Item **i, Analysis &a, MultiPrinc *mp, TMKM tmkm) {
     Item *i0 = itemTypes.do_rewrite(*i, a, mp, tmkm);
     if (i0 != *i) {
+        if (i0->name) {
+            cerr << "rewrite " << (*i)->name << "->" << i0->name << endl;
+        }
         i0->name = (*i)->name; // preserve the name (alias)
         *i = i0;
     }
@@ -864,7 +874,9 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         auto it = a.itemToFieldMeta.find(i);
         assert(it != a.itemToFieldMeta.end());
         FieldMeta *fm = it->second;
-        addToReturn(a.rmeta, a.pos++, a.itemToMeta[i], fm->has_salt);
+        if (i->name) {
+            addToReturn(a.rmeta, a.pos++, a.itemToMeta[i], fm->has_salt, i->name);
+        }
 
         if (fm->has_salt) {
             assert(!fm->salt_name.empty());
@@ -1969,6 +1981,7 @@ process_select_lex(st_select_lex *select_lex, const constraints &tr, Analysis & 
 static void
 rewrite_select_lex(st_select_lex *select_lex, Analysis & a, MultiPrinc *mp, TMKM tmkm)
 {
+    cerr << "rewrite select lex input is " << *select_lex << endl;
     auto item_it = List_iterator<Item>(select_lex->item_list);
 
     List<Item> newList;
@@ -1976,12 +1989,12 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis & a, MultiPrinc *mp, TMKM
         Item *item = item_it++;
         if (!item)
             break;
-        cerr << "rewrite_select_lex " << *item << endl;
+        cerr << "rewrite_select_lex " << *item << " with name " << item->name << endl;
         vector<Item *> l;
         itemTypes.do_rewrite_proj(item, a, l, mp, tmkm);
-        cerr << "passed rewrite proj" << endl;
         for (auto it = l.begin(); it != l.end(); ++it) {
-            (*it)->name = NULL; // TODO: fix this
+            //TODO: why was this here?  it ruins AS
+            //(*it)->name = NULL;
             newList.push_back(*it);
         }
     }
@@ -3003,7 +3016,7 @@ Rewriter::decryptResults(ResType & dbres,
 			 Analysis & a) {
     tmkm.processingQuery = false;
     for (auto i = a.rmeta.rfmeta.begin(); i != a.rmeta.rfmeta.end(); i++) {
-        //cerr << i->second.im->basefield->fname << "->" << i->first << endl;
+        cerr << i->second.im->basefield->fname << "->" << i->first << " called " << i->second.field_called << endl;
         tmkm.encForReturned[fullName(i->second.im->basefield->fname, i->second.im->basefield->tm->anonTableName)] = i->first;
     }
 
@@ -3022,7 +3035,7 @@ Rewriter::decryptResults(ResType & dbres,
         } else {
             //need to return this field
             assert_s(rf.im, "ReturnField has no ItemMeta associated with it");
-            res.names.push_back(rf.im->basefield->fname);
+            res.names.push_back(rf.field_called);
         }
         index++;
     }

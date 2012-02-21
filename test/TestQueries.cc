@@ -28,8 +28,8 @@ static QueryList Insert = QueryList("SingleInsert",
     { "CREATE TABLE test_insert (id integer primary key auto_increment, age integer, salary integer, address text, name text)" },
     { "CREATE TABLE test_insert (id integer primary key auto_increment, age enc integer, salary enc integer, address enc text, name text)" },
                                     // TODO parser currently has no KEY functionality
-    //{ "CREATE TABLE test_insert (id integer primary key auto_increment, age integer, salary integer, address text, name text)" },
-    { "CREATE TABLE test_insert (id integer, age integer, salary integer, address text, name text)" },
+    { "CREATE TABLE test_insert (id integer primary key auto_increment, age integer, salary integer, address text, name text)" },
+                                    //{ "CREATE TABLE test_insert (id integer, age integer, salary integer, address text, name text)" },
     { Query("INSERT INTO test_insert VALUES (1, 21, 100, '24 Rosedale, Toronto, ONT', 'Pat Carlson')", false),
       Query("SELECT * FROM test_insert", false),
       Query("INSERT INTO test_insert (id, age, salary, address, name) VALUES (2, 23, 101, '25 Rosedale, Toronto, ONT', 'Pat Carlson2')", false),
@@ -101,7 +101,7 @@ static QueryList Select = QueryList("SingleSelect",
       //Query("SELECT sum(age) z FROM test_select", false),
       //Query("SELECT min(t.id) a FROM test_select AS t", false),
             //TODO: aborts on new parser
-      //Query("SELECT t.address AS b FROM test_select t", false)
+      Query("SELECT t.address AS b FROM test_select t", false)
       },
     { "DROP TABLE test_select" },
     { "DROP TABLE test_select" },
