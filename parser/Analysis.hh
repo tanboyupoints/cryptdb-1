@@ -45,6 +45,7 @@ typedef struct FieldMeta {
     TableMeta * tm; //point to table belonging in
     std::string fname;
     Create_field * sql_field;
+    int index;
 
     map<onion, string> onionnames;
     EncDesc encdesc;

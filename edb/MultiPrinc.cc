@@ -67,6 +67,8 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
     int accres;
     list<string> query_list;
     switch (annot.type) {
+    case SINGLE_ENC:
+        assert_s(false, "mp received SINGLE type annotation");
     case PRINCTYPE:
         accres = accMan->startPrinc(annot.getPrimitive());
         assert_s(accres >= 0, "access manager could not start principal " + annot.getPrimitive());
