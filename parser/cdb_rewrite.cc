@@ -3010,18 +3010,36 @@ Rewriter::rewrite(const string & q, Analysis & a)
     return queries;
 }
 
-
+string ReturnField::stringify() {
+    stringstream res;
+    res << " is_salt: " << is_salt << " filed_called " << field_called;
+    res <<" im  ";
+    string ss = stringify_ptr<ItemMeta>(im);
+    res << ss << " pos_salt " << pos_salt;
+    return res.str();
+}
+string ReturnMeta::stringify() {
+    stringstream res;
+    res << "rmeta contains " << rfmeta.size() << " elements: \n";
+    for (auto i : rfmeta) {
+	res << i.first << " " << i.second.stringify() << "\n";
+    }
+    return res.str();
+}
 ResType
 Rewriter::decryptResults(ResType & dbres,
 			 Analysis & a) {
     tmkm.processingQuery = false;
+    cerr << a.rmeta.stringify() << "\n";
     for (auto i = a.rmeta.rfmeta.begin(); i != a.rmeta.rfmeta.end(); i++) {
-        cerr << i->second.im->basefield->fname << "->" << i->first << " called " << i->second.field_called << endl;
-        tmkm.encForReturned[fullName(i->second.im->basefield->fname, i->second.im->basefield->tm->anonTableName)] = i->first;
+	if (!i->second.is_salt) {
+	    tmkm.encForReturned[fullName(i->second.im->basefield->fname, i->second.im->basefield->tm->anonTableName)] = i->first;
+	}
     }
 
     unsigned int rows = dbres.rows.size();
 
+    cerr << "rows in result " << rows << "\n";
     unsigned int cols = dbres.names.size();
 
     ResType res = ResType();

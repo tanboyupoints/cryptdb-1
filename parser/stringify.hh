@@ -7,6 +7,16 @@
 #include <iostream>
 
 
+template<class T>
+std::string stringify_ptr(T * x) {
+    if (x == NULL ) {
+	return "NULL";
+    } else {
+	return x->stringify();
+    }
+}
+
+
 static inline std::ostream&
 operator<<(std::ostream &out, String &s)
 {

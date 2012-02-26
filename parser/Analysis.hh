@@ -69,6 +69,8 @@ typedef struct FieldMeta {
         return encdesc.restrict(o, maxl);
     }
 
+    string stringify();
+    
 } FieldMeta;
 
 
@@ -115,6 +117,7 @@ public:
     onion o;
     SECLEVEL uptolevel;
     FieldMeta * basefield;
+    std::string stringify();
 };
 extern "C" void *create_embedded_thd(int client_flag);
 
@@ -124,10 +127,12 @@ typedef struct ReturnField {
     ItemMeta *im;
     int pos_salt; //position of salt of this field in the query results,
                   // or -1 if such salt was not requested
+    string stringify();
 } ReturnField;
 
 typedef struct ReturnMeta {
     map<int, ReturnField> rfmeta;
+    string stringify();
 } ReturnMeta;
 
 

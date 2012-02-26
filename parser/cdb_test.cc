@@ -28,7 +28,7 @@
 using namespace std;
 
 // if true, uses MultiPrinc mode
-static bool Multi = true;
+static bool Multi = false;
 
 static inline string user_homedir() {
     return getenv("HOME");

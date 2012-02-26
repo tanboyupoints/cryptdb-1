@@ -24,7 +24,7 @@
 #include <util/errstream.hh>
 #include <util/onions.hh>
 #include <util/params.hh>
-
+#include <util/util.hh>
 
 // ==== CONSTANTS ============== //
 
@@ -115,7 +115,6 @@ class ResType {
     std::vector<std::vector<SqlItem> > rows;
     AutoInc ai;
 };
-
 
 void
 printRes(const ResType &r);
