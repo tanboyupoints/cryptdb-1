@@ -347,7 +347,8 @@ class Rewriter {
 public:
     //Rewriter(const std::string & db);
     Rewriter(ConnectionData db,
-             bool MultiPrinc = false);
+             bool MultiPrinc = false,
+             bool encByDefualt = false);
     ~Rewriter();
 
     void setMasterKey(const std::string &mkey);
@@ -360,6 +361,7 @@ public:
 private:
     void initSchema();
     void createMetaTablesIfNotExists();
+    list<string> processAnnotation(Annotation annot, Analysis &a);
 
     std::string    db;
     SchemaInfo*    schema;
@@ -369,6 +371,7 @@ private:
     Connect*       c;
     MultiPrinc*    mp;
     TMKM           tmkm;
+    bool           encByDefault;
 };
 
 class ScopedMySQLRes {

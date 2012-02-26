@@ -89,7 +89,6 @@ getTypeForDec(const ItemMeta * im) {
 
 static void
 addToReturn(ReturnMeta & rm, int pos, ItemMeta * im, bool has_salt) {
-    cerr << "ADD TO RETURN" << endl;
     ReturnField rf = ReturnField();
     rf.is_salt = false;
     rf.im = im;
@@ -657,7 +656,7 @@ do_rewrite_type_args(T *i, Analysis &a, MultiPrinc *mp, TMKM tmkm) {
 template<class T>
 class CItemSubtype : public CItemType {
     virtual EncSet do_gather(Item *i, const constraints &tr, Analysis & a, MultiPrinc *mp, TMKM &tmkm) const {
-        cerr << "CItemSubtype do_gather " << *i << " encset " << tr.encset << "\n";
+        cerr << "CItemSubtype do_gather (L659)" << *i << " encset " << tr.encset << "\n";
         return do_gather_type((T*) i, tr, a, mp, tmkm);
     }
     virtual void do_enforce(Item *i, const constraints &tr, Analysis & a) const {
@@ -684,7 +683,13 @@ class CItemSubtype : public CItemType {
     }
     virtual Item * do_rewrite_type(T *i, Analysis & a, MultiPrinc *mp, TMKM tmkm) const { 
         cerr << "do_rewrite_type L676 " << *i << endl;
-        //addToReturn(ReturnMeta, int pos, ItemMeta, false)
+        if (a.itemToMeta.find(i) != a.itemToMeta.end()) {
+            cerr << "itemtometa exists" << endl;
+            addToReturn(a.rmeta, 0, a.itemToMeta[i], false, i->name);
+        } else {
+            cerr << "nothing in itemtometa" << endl;
+            addToReturn(a.rmeta, 0, NULL, false, i->name);
+        }
         return i;
     }
     virtual void   do_rewrite_proj_type(T *i, Analysis & a, vector<Item *> &l, MultiPrinc *mp, TMKM tmkm) const {
@@ -2120,7 +2125,7 @@ rewrite_table_list(List<TABLE_LIST> *tll, Analysis & a, MultiPrinc *mp, TMKM tmk
 }
 
 static void
-add_table(SchemaInfo * schema, const string & table, LEX *lex, bool mp) {
+add_table(SchemaInfo * schema, const string & table, LEX *lex, bool encByDefault) {
     assert(lex->sql_command == SQLCOM_CREATE_TABLE);
 
     auto it = schema->tableMetaMap.find(table);
@@ -2142,7 +2147,7 @@ add_table(SchemaInfo * schema, const string & table, LEX *lex, bool mp) {
     schema->tableMetaMap[table] = tm;
 
     tm->tableNo = schema->totalTables++;
-    tm->anonTableName = anonymizeTableName(tm->tableNo, table, mp);
+    tm->anonTableName = anonymizeTableName(tm->tableNo, table, !encByDefault);
 
     unsigned int index =  0;
     for (auto it = List_iterator<Create_field>(lex->alter_info.create_list);;) {
@@ -2159,9 +2164,11 @@ add_table(SchemaInfo * schema, const string & table, LEX *lex, bool mp) {
 
         // certain field types cannot have certain onions. for instance,
         // AGG makes no sense for non numeric types
-        // MultiPrinc on has onions on encfor fields, and those will be added by mp->processAnnotations
-        // so by default add no onions or encryption paraphernalia
-        if (!mp) {
+        // MultiPrinc on have onions on encfor fields, and those will be added by
+        // mp->processAnnotations so by default add no onions or encryption paraphernalia
+        // Similarly, non-encByDefault single princ shouldn't have any additional encryption info
+        if (encByDefault) {
+            cerr << "encByDefault" << endl;
             if (IsMySQLTypeNumeric(field->sql_type)) {
                 fm->encdesc = NUMERIC_EncDec;
             } else {
@@ -2178,6 +2185,7 @@ add_table(SchemaInfo * schema, const string & table, LEX *lex, bool mp) {
             fm->has_salt = false;
         }
 
+        fm->index = index;
         assert(tm->fieldMetaMap.find(fm->fname) == tm->fieldMetaMap.end());
         tm->fieldMetaMap[fm->fname] = fm;
         tm->fieldNames.push_back(fm->fname);
@@ -2319,15 +2327,12 @@ static void rewrite_key(const string &table_name,
  *
  */
 static void
-process_create_lex(LEX * lex, Analysis & a, MultiPrinc * mp)
+process_create_lex(LEX * lex, Analysis & a, bool encByDefault)
 {
     const string &table =
         lex->select_lex.table_list.first->table_name;
-    if (mp) {
-        add_table(a.schema, table, lex, true);
-    } else {
-        add_table(a.schema, table, lex, false);
-    }
+    cerr << "table is " << table << " and encByDefault is " << encByDefault << " and true is " << true << endl;
+    add_table(a.schema, table, lex, encByDefault);
 }
 
 static void
@@ -2462,12 +2467,16 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp, TMKM &tmkm)
 }
 
 static void
-do_query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis & analysis, MultiPrinc * mp, TMKM &tmkm) {
+do_query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis & analysis, MultiPrinc * mp, TMKM &tmkm, bool encByDefault) {
     // iterate over the entire select statement..
     // based on st_select_lex::print in mysql-server/sql/sql_select.cc
 
     if (lex->sql_command == SQLCOM_CREATE_TABLE) {
-        process_create_lex(lex, analysis, mp);
+        if (mp || !encByDefault) {
+            process_create_lex(lex, analysis, false);
+        } else {
+            process_create_lex(lex, analysis, true);
+        }
         return;
     }
 
@@ -2496,13 +2505,13 @@ do_query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysi
  * Results are set in analysis.
  */
 static void
-query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis & analysis, MultiPrinc * mp, TMKM &tmkm)
+query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis & analysis, MultiPrinc * mp, TMKM &tmkm, bool encByDefault)
 {
     // optimize the query first
     optimize_table_list(&lex->select_lex.top_join_list, analysis);
     optimize_select_lex(&lex->select_lex, analysis);
 
-    do_query_analyze(db, q, lex, analysis, mp, tmkm);
+    do_query_analyze(db, q, lex, analysis, mp, tmkm, encByDefault);
     //print(analysis.schema->tableMetaMap);
     for (auto it = tmkm.encForVal.begin(); it != tmkm.encForVal.end(); it++) {
         if (it->first == "" || it->second == "") {
@@ -2702,7 +2711,8 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
 }
 
 Rewriter::Rewriter(ConnectionData db,
-                   bool multi) : db(db.dbname)
+                   bool multi, bool encByDefault)
+    : db(db.dbname), encByDefault(encByDefault)
 {
     // create mysql connection to embedded
     // server
@@ -2973,6 +2983,51 @@ Rewriter::setMasterKey(const string &mkey)
 }
 
 list<string>
+Rewriter::processAnnotation(Annotation annot, Analysis &a)
+{
+    assert_s(annot.getPrimitive() != "", "enc annotation has no primitive");
+    cerr << "table is " << annot.getPrimitiveTableName() << "; field is " << annot.getPrimitiveFieldName() << endl;
+    TableMeta *tm = schema->tableMetaMap[annot.getPrimitiveTableName()];
+    FieldMeta *fm = tm->fieldMetaMap[annot.getPrimitiveFieldName()];
+    
+    list<string> query_list;
+    string query = "ALTER TABLE " + tm->anonTableName;
+
+    bool numeric = IsMySQLTypeNumeric(fm->sql_field->sql_type);
+
+    if (numeric) {
+        fm->encdesc = NUMERIC_EncDec;
+    } else {
+        fm->encdesc = EQ_SEARCH_EncDesc;
+    }
+
+    for (auto pr : fm->encdesc.olm) {
+        fm->onionnames[pr.first] = anonymizeFieldName(fm->index, pr.first, fm->fname, true);
+        if (pr.first == oDET) {
+            if (numeric) {
+                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onionnames[pr.first] + " " + TN_I64 + ";");
+            } else {
+                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onionnames[pr.first] + " " + TN_TEXT + ";");
+            }
+        } else if (pr.first == oOPE) {
+            query_list.push_back(query + " ADD " + fm->onionnames[pr.first] + " " + TN_I64 + ";");
+        } else if (pr.first == oAGG) {
+            query_list.push_back(query + " ADD " + fm->onionnames[pr.first] + " " + TN_HOM + ";");
+        } else if (pr.first == oSWP) {
+            query_list.push_back(query + " ADD " + fm->onionnames[pr.first] + " " + TN_TEXT + ";");
+        } else {
+            assert_s(false, "unknown onion type");
+        }
+    }
+
+    fm->has_salt = true;
+    fm->salt_name = getFieldSalt(fm->index, tm->anonTableName);
+    query_list.push_back(query + " ADD " + fm->salt_name + " " + TN_SALT + ";");
+
+    return query_list;
+}
+
+list<string>
 Rewriter::rewrite(const string & q, Analysis & a)
 {
     //start new temp mkm
@@ -2984,10 +3039,13 @@ Rewriter::rewrite(const string & q, Analysis & a)
     query_parse p(db, q);
     Analysis analysis = Analysis(conn(), schema, cm);
     if (p.annot) {
-        assert_s(mp, "Rewriter must have a multiprinc to process anotations\n");
-        bool encryptField;
-        //what if anything do we want to do with encryptField?
-        return mp->processAnnotation(*p.annot, encryptField, analysis);
+        if (mp) {
+            bool encryptField;
+            //what if anything do we want to do with encryptField?
+            return mp->processAnnotation(*p.annot, encryptField, analysis);
+        } else {
+            return processAnnotation(*p.annot, analysis);
+        }
     }
     LEX *lex = p.lex();
     //login/logout command; nothing needs to be passed on
@@ -2996,7 +3054,7 @@ Rewriter::rewrite(const string & q, Analysis & a)
         return queries;
     }
 
-    query_analyze(db, q, lex, analysis, mp, tmkm);
+    query_analyze(db, q, lex, analysis, mp, tmkm, encByDefault);
 
     int ret = updateMeta(db, q, lex, analysis);
     if (ret < 0) assert(false);
@@ -3029,6 +3087,7 @@ string ReturnMeta::stringify() {
 ResType
 Rewriter::decryptResults(ResType & dbres,
 			 Analysis & a) {
+    printRes(dbres);
     tmkm.processingQuery = false;
     cerr << a.rmeta.stringify() << "\n";
     for (auto i = a.rmeta.rfmeta.begin(); i != a.rmeta.rfmeta.end(); i++) {
