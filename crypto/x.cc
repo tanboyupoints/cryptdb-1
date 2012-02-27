@@ -19,6 +19,7 @@
 #include <crypto/cbcmac.hh>
 #include <crypto/ffx.hh>
 #include <crypto/online_ope.hh>
+#include <crypto/padding.hh>
 #include <util/timer.hh>
 #include <NTL/ZZ.h>
 #include <NTL/RR.h>
@@ -375,18 +376,18 @@ test_online_ope()
     ope_client<uint16_t, ffx2_block_cipher<blowfish, 16>> ope_clnt(&fk, &ope_serv);
 
     for (uint i = 0; i < 1000; i++) {
-	cerr << "============= i = " << i << "========" << "\n";
+	// cerr << "============= i = " << i << "========" << "\n";
 
         uint64_t pt = u.rand<uint16_t>();
-        cout << "online-ope pt:  " << pt << endl;
+        // cout << "online-ope pt:  " << pt << endl;
 
         auto ct = ope_clnt.encrypt(pt);
-        cout << "online-ope ct:  " << hex << ct << dec << endl;
+        // cout << "online-ope ct:  " << hex << ct << dec << endl;
 
 	//print_tree(ope_serv.root);
 	
         auto pt2 = ope_clnt.decrypt(ct);
-        cout << "online-ope pt2: " << pt2 << endl;
+        // cout << "online-ope pt2: " << pt2 << endl;
 
         assert(pt == pt2);
     }
@@ -414,7 +415,8 @@ test_online_ope()
 }
 
 static void
-test_online_ope_rebalance() {
+test_online_ope_rebalance()
+{
     urandom u;
     blowfish bf(u.rand_vec<uint8_t>(128));
     ffx2_block_cipher<blowfish, 16> fk(&bf, {});
@@ -435,6 +437,25 @@ test_online_ope_rebalance() {
 
     cerr << "test online ope rebalance OK \n";
 }
+
+static void
+test_padding()
+{
+    urandom u;
+
+    for (int i = 0; i < 1000; i++) {
+        size_t blocksize = 1 + (u.rand<size_t>() % 32);
+        auto v = u.rand_vec<uint8_t>(u.rand<size_t>() % 8192);
+        auto v2 = v;
+        pad_blocksize(&v2, blocksize);
+        assert((v2.size() % blocksize) == 0);
+        unpad_blocksize(&v2, blocksize);
+        assert(v == v2);
+    }
+
+    cout << "test padding ok\n";
+}
+
 int
 main(int ac, char **av)
 {
@@ -444,6 +465,7 @@ main(int ac, char **av)
 
     test_online_ope_rebalance();
     
+    test_padding();
     test_bn();
     test_ecjoin();
     test_search();
