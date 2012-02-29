@@ -72,7 +72,7 @@ struct QueryList {
           create(pc, sc, mc),
           common(c),
           drop(pd, sd, md)
-    {cerr << name << endl;}
+    {}
 };
 
 class Connection {

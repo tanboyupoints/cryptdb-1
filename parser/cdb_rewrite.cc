@@ -127,6 +127,21 @@ sq(MYSQL *m, const string &s)
 }
 
 
+static void
+printOnion(onion level) {
+    if (level == oDET) {
+        cerr << "oDET" << endl;
+    } else if (level == oOPE) {
+        cerr << "oOPE" << endl;
+    } else if (level == oAGG) {
+        cerr << "oAGG" << endl;
+    } else if (level == oSWP) {
+        cerr << "oSWP" << endl;
+    } else {
+        cerr << "NOT A KNOWN ONION" << endl;
+    }
+}
+
 static string
 crypt(const Analysis & a, string plaindata, fieldType ft, string fieldname, SECLEVEL fromlevel, SECLEVEL tolevel, bool & isBin, uint64_t salt, MultiPrinc * mp, FieldMeta *fm, TMKM &tmkm, const vector<SqlItem> &res = vector<SqlItem>()) {
     AES_KEY * mkey;
@@ -1026,7 +1041,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     virtual void
     do_rewrite_insert_type(Item_num *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM tmkm) const
     {
-        cerr << "do_rewrite_insert_type L942" << endl;
+        cerr << "do_rewrite_insert_type L942 " << *i << endl;
         //TODO: this part is quite repetitive with string or
         //any other type -- write a function
 
@@ -1048,7 +1063,8 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
              ++it) {
             string anonName = fullName(it->second, fm->tm->anonTableName);
             bool isBin;
-
+            cerr << fm->fname << " on onion ";
+            printOnion(it->first);
             string enc = crypt(a, plaindata, TYPE_INTEGER, anonName, getMin(it->first), getMax(it->first), isBin, salt, mp, fm, tmkm);
             
             l.push_back(new Item_int((ulonglong) valFromStr(enc)));
@@ -2428,9 +2444,9 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp, TMKM &tmkm)
         auto it = a.schema->tableMetaMap.find(table);
         assert(it != a.schema->tableMetaMap.end());
         TableMeta *tm = it->second;
-        for (auto it0 = tm->fieldMetaMap.begin();
-             it0 != tm->fieldMetaMap.end(); ++it0) {
-            fmVec.push_back(it0->second);
+        //keep fields in order
+        for (auto it0 = tm->fieldNames.begin(); it0 != tm->fieldNames.end(); it0++) {
+            fmVec.push_back(tm->fieldMetaMap[*it0]);
         }
     }
 
@@ -3004,17 +3020,21 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
     for (auto pr : fm->encdesc.olm) {
         fm->onionnames[pr.first] = anonymizeFieldName(fm->index, pr.first, fm->fname, true);
         if (pr.first == oDET) {
+            cerr << fm->fname << " (" << fm->index << ") gets DET onion" << endl;
             if (numeric) {
                 query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onionnames[pr.first] + " " + TN_I64 + ";");
             } else {
                 query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onionnames[pr.first] + " " + TN_TEXT + ";");
             }
         } else if (pr.first == oOPE) {
-            query_list.push_back(query + " ADD " + fm->onionnames[pr.first] + " " + TN_I64 + ";");
+            cerr << fm->fname << " (" << fm->index << ") gets OPE onion" << endl;
+            query_list.push_back(query + " ADD " + fm->onionnames[pr.first] + " " + TN_I64 + " AFTER " + fm->onionnames[oDET] + ";");
         } else if (pr.first == oAGG) {
-            query_list.push_back(query + " ADD " + fm->onionnames[pr.first] + " " + TN_HOM + ";");
+            cerr << fm->fname << " (" << fm->index << ") gets AGG onion" << endl;
+            query_list.push_back(query + " ADD " + fm->onionnames[pr.first] + " " + TN_HOM + " AFTER " + fm->onionnames[oOPE] + ";");
         } else if (pr.first == oSWP) {
-            query_list.push_back(query + " ADD " + fm->onionnames[pr.first] + " " + TN_TEXT + ";");
+            cerr << fm->fname << " (" << fm->index << ") gets SWP onion" << endl;
+            query_list.push_back(query + " ADD " + fm->onionnames[pr.first] + " " + TN_TEXT + " AFTER " + fm->onionnames[oOPE] + ";");
         } else {
             assert_s(false, "unknown onion type");
         }
@@ -3022,7 +3042,7 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
 
     fm->has_salt = true;
     fm->salt_name = getFieldSalt(fm->index, tm->anonTableName);
-    query_list.push_back(query + " ADD " + fm->salt_name + " " + TN_SALT + ";");
+    query_list.push_back(query + " ADD " + fm->salt_name + " " + TN_SALT + " AFTER " + fm->onionnames.rbegin()->second + ";");
 
     return query_list;
 }
