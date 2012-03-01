@@ -142,8 +142,36 @@ printOnion(onion level) {
     }
 }
 
+static void
+printSecLevel(SECLEVEL l) {
+    map<SECLEVEL, string> seclevel_map = {
+        {SECLEVEL::INVALID, "INVALID"},
+        {SECLEVEL::PLAIN, "PLAIN"},
+        {SECLEVEL::PLAIN_DET, "PLAIN_DET"},
+        {SECLEVEL::DETJOIN, "DETJOIN"},
+        {SECLEVEL::DET, "DET"},
+        {SECLEVEL::SEMANTIC_DET, "SEMANTIC_DET"},
+        {SECLEVEL::PLAIN_OPE, "PLAIN_OPE"},
+        {SECLEVEL::OPEJOIN, "OPEJOIN"},
+        {SECLEVEL::OPE, "OPE"},
+        {SECLEVEL::SEMANTIC_OPE, "SEMANTIC_OPE"},
+        {SECLEVEL::PLAIN_AGG, "PLAIN_AGG"},
+        {SECLEVEL::SEMANTIC_AGG, "SEMANTIC_AGG"},
+        {SECLEVEL::PLAIN_SWP, "PLAIN_SWP"}, 
+        {SECLEVEL::SWP, "SWP"},
+        {SECLEVEL::SEMANTIC_VAL, "SEMANTIC_VAL"},
+        {SECLEVEL::SECLEVEL_LAST, "SECLEVEL_LAST"} };
+    if (seclevel_map.find(l) != seclevel_map.end()) {
+        cerr << seclevel_map[l];
+        return;
+    }
+    cerr << "[not a valid seclevel]";
+}
+
+
 static string
 crypt(const Analysis & a, string plaindata, fieldType ft, string fieldname, SECLEVEL fromlevel, SECLEVEL tolevel, bool & isBin, uint64_t salt, MultiPrinc * mp, FieldMeta *fm, TMKM &tmkm, const vector<SqlItem> &res = vector<SqlItem>()) {
+    cerr << "crypt " << plaindata << " from "; printSecLevel(fromlevel); cerr << " to "; printSecLevel(tolevel); cerr << endl;
     AES_KEY * mkey;
     if (mp) {
         string key;
@@ -157,9 +185,11 @@ crypt(const Analysis & a, string plaindata, fieldType ft, string fieldname, SECL
     } else {
         mkey = a.cm->getmkey();
     }
-    cerr << "crypt '" << plaindata << "' with length before crypt " << plaindata.length() << endl;
+    //cerr << "crypt '" << plaindata << "' with length before crypt " << plaindata.length() << endl;
     string c = a.cm->crypt(mkey, plaindata, ft, fieldname, fromlevel, tolevel, isBin, salt);
-    cerr << "crypt '" << c << "' with length after crypt " << c.length() << endl;
+    //cerr << "crypt '" << c << "' with length after crypt " << c.length() << endl;
+    string m = a.cm->crypt(mkey, c, ft, fieldname, tolevel, fromlevel, isBin, salt);
+    assert_s(m == plaindata, "crypt seems to be sadly broken");
     return c;
 }
 
@@ -969,7 +999,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     virtual void
     do_rewrite_insert_type(Item_string *i, Analysis & a, vector<Item *> &l, FieldMeta *fm, MultiPrinc *mp, TMKM tmkm) const
     {
-        cerr << "do_rewrite_insert_type L880 (IT)" << endl;
+        cerr << "do_rewrite_insert_type L880 " << *i << endl;
         assert(fm != NULL);
         String s;
         String *s0 = i->val_str(&s);
@@ -991,10 +1021,12 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
         {
             string anonName = fullName(it->second, fm->tm->anonTableName);
             bool isBin;
+            cerr << "field " << fm->fname << " on onion ";
+            printOnion(it->first);
             string enc = crypt(a, plaindata, TYPE_TEXT, anonName, getMin(it->first), getMax(it->first), isBin, salt, mp, fm, tmkm);
             Item *itest = new Item_string(enc.data(), enc.length(), i->default_charset());
             if (it->first == oDET) {
-                assert_s(crypt(a, ItemToString(itest), TYPE_TEXT, anonName, getMax(it->first), getMin(it->first), isBin, 0, mp, fm, tmkm) == plaindata, "crypt(crypt(plaindata)) != plaindata");
+                assert_s(crypt(a, ItemToString(itest), TYPE_TEXT, anonName, getMax(it->first), getMin(it->first), isBin, salt, mp, fm, tmkm) == plaindata, "crypt(crypt(plaindata)) != plaindata");
                 save_det = enc;
             } else {
                 assert_s(save_det == (*(l.begin()))->str_value.ptr(), "det str somehow changed >_< from " + save_det + " to " + (*(l.begin()))->str_value.ptr());
@@ -1063,8 +1095,6 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
              ++it) {
             string anonName = fullName(it->second, fm->tm->anonTableName);
             bool isBin;
-            cerr << fm->fname << " on onion ";
-            printOnion(it->first);
             string enc = crypt(a, plaindata, TYPE_INTEGER, anonName, getMin(it->first), getMax(it->first), isBin, salt, mp, fm, tmkm);
             
             l.push_back(new Item_int((ulonglong) valFromStr(enc)));
