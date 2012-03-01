@@ -187,9 +187,6 @@ crypt(const Analysis & a, string plaindata, fieldType ft, string fieldname, SECL
     }
     //cerr << "crypt '" << plaindata << "' with length before crypt " << plaindata.length() << endl;
     string c = a.cm->crypt(mkey, plaindata, ft, fieldname, fromlevel, tolevel, isBin, salt);
-    //cerr << "crypt '" << c << "' with length after crypt " << c.length() << endl;
-    string m = a.cm->crypt(mkey, c, ft, fieldname, tolevel, fromlevel, isBin, salt);
-    assert_s(m == plaindata, "crypt seems to be sadly broken");
     return c;
 }
 
