@@ -2781,7 +2781,7 @@ Rewriter::createMetaTablesIfNotExists()
                    "      , 'SWP'"
                    "      , 'SEMANTIC_VAL'"
                    "      , 'SECLEVEL_LAST'"
-                   "      ) NOT NULL DEFAULT 'INVALID'"
+                   "      ) not NULL DEFAULT 'INVALID'"
                    ", sec_level_det enum"
                    "      ( 'INVALID'"
                    "      , 'PLAIN'"
