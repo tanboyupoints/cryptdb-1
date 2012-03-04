@@ -406,6 +406,9 @@ std::string stringToByteInts(const std::string &s);
 std::string angleBrackets(const std::string &s);
 static inline std::string id_op(const std::string &x) { return x; }
 
+char *
+getCStr(const std::string & x);
+
 /*
  * Turn a std::list (of type C) into a std::string, applying op to each element.
  * Handy ops are id_op, angleBrackets, and std::stringToByteInts.

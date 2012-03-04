@@ -2375,6 +2375,18 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp, TMKM &tmkm)
         mp->insertLex(lex, a, tmkm);
     }
 
+    const string &table =
+            lex->select_lex.table_list.first->table_name;
+    auto itt = a.schema->tableMetaMap.find(table);
+    assert(itt != a.schema->tableMetaMap.end());
+
+    //rewrite table name
+    //free(lex->select_lex.table_list.first->table_name);TODO: we leak memory
+    //without this leak, right?
+    lex->select_lex.table_list.first->table_name = getCStr(itt->second->anonTableName);
+    cerr << "new table name is " << lex->select_lex.table_list.first->table_name <<"\n";
+    lex->select_lex.table_list.first->table_name_length = itt->second->anonTableName.size();
+	
     // fields
     vector<FieldMeta *> fmVec;
     if (lex->field_list.head()) {
@@ -2399,11 +2411,7 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp, TMKM &tmkm)
 
     if (fmVec.empty()) {
         // use the table order now
-        const string &table =
-            lex->select_lex.table_list.first->table_name;
-        auto it = a.schema->tableMetaMap.find(table);
-        assert(it != a.schema->tableMetaMap.end());
-        TableMeta *tm = it->second;
+        TableMeta *tm = itt->second;
         //keep fields in order
         for (auto it0 = tm->fieldNames.begin(); it0 != tm->fieldNames.end(); it0++) {
             fmVec.push_back(tm->fieldMetaMap[*it0]);
@@ -3007,17 +3015,26 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
     return query_list;
 }
 
-list<string>
-Rewriter::rewrite(const string & q, Analysis & a)
-{
+void
+Rewriter::mp_init() {
     //start new temp mkm
     tmkm.encForVal.clear();
     tmkm.encForReturned.clear();
     tmkm.processingQuery = false;
     tmkm.returnBitMap.clear();
+}
+
+list<string>
+Rewriter::rewrite(const string & q, Analysis & a)
+{
+
+    //initialize multi-principal
+    mp_init();
+    
     list<string> queries;
     query_parse p(db, q);
     Analysis analysis = Analysis(conn(), schema, cm);
+
     if (p.annot) {
         if (mp) {
             bool encryptField;
@@ -3027,6 +3044,7 @@ Rewriter::rewrite(const string & q, Analysis & a)
             return processAnnotation(*p.annot, analysis);
         }
     }
+
     LEX *lex = p.lex();
     //login/logout command; nothing needs to be passed on
     if ((lex->sql_command == SQLCOM_DELETE || lex->sql_command == SQLCOM_INSERT) && mp && mp->checkPsswd(lex)) {
@@ -3034,10 +3052,15 @@ Rewriter::rewrite(const string & q, Analysis & a)
         return queries;
     }
 
+    //analyze query
     query_analyze(db, q, lex, analysis, mp, tmkm, encByDefault);
 
+    //update metadata about onions
     int ret = updateMeta(db, q, lex, analysis);
+
     if (ret < 0) assert(false);
+
+    //rewrite query
     cerr << "before rewrite " << *lex << endl;
     lex_rewrite(db, lex, analysis, mp, tmkm);
     stringstream ss;
