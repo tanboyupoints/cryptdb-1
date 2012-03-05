@@ -286,6 +286,7 @@ make_thd_string(const string &s, size_t *lenp = 0)
     return thd->strmake(s.data(), s.size());
 }
 
+// anonymizes table name based on the information in a.schema
 static string
 anonymize_table_name(const string &tname,
                      Analysis & a)
@@ -2370,13 +2371,7 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp, TMKM &tmkm)
             lex->select_lex.table_list.first->table_name;
 
     //rewrite table name
-    //free(lex->select_lex.table_list.first->table_name);TODO: we leak memory
-    //without this leak, right?
     rewrite_table_list(lex->select_lex.table_list.first, a, mp, tmkm);
-
-    //   lex->select_lex.table_list.first->table_name = getCStr(itt->second->anonTableName);
-    //cerr << "new table name is " << lex->select_lex.table_list.first->table_name <<"\n";
-    //lex->select_lex.table_list.first->table_name_length = itt->second->anonTableName.size();
 	
     // fields
     vector<FieldMeta *> fmVec;
