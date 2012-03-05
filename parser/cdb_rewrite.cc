@@ -290,17 +290,8 @@ static string
 anonymize_table_name(const string &tname,
                      Analysis & a)
 {
-    // TODO(stephentu):
-    // A) do an actual mapping
-    // B) figure out where to actually allocate the memory for strs
-    //    (right now, just putting it in the THD mem pools)
-
-    //hack for now, will fix soon
-    if (a.schema->tableMetaMap.find(tname) == a.schema->tableMetaMap.end()) {
-        return tname;
-    } else {
-        return a.schema->tableMetaMap[tname]->anonTableName;
-    }
+    assert(a.schema->tableMetaMap.find(tname) != a.schema->tableMetaMap.end());
+    return a.schema->tableMetaMap[tname]->anonTableName;
 }
 
 static string
@@ -2377,15 +2368,15 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp, TMKM &tmkm)
 
     const string &table =
             lex->select_lex.table_list.first->table_name;
-    auto itt = a.schema->tableMetaMap.find(table);
-    assert(itt != a.schema->tableMetaMap.end());
 
     //rewrite table name
     //free(lex->select_lex.table_list.first->table_name);TODO: we leak memory
     //without this leak, right?
-    lex->select_lex.table_list.first->table_name = getCStr(itt->second->anonTableName);
-    cerr << "new table name is " << lex->select_lex.table_list.first->table_name <<"\n";
-    lex->select_lex.table_list.first->table_name_length = itt->second->anonTableName.size();
+    rewrite_table_list(lex->select_lex.table_list.first, a, mp, tmkm);
+
+    //   lex->select_lex.table_list.first->table_name = getCStr(itt->second->anonTableName);
+    //cerr << "new table name is " << lex->select_lex.table_list.first->table_name <<"\n";
+    //lex->select_lex.table_list.first->table_name_length = itt->second->anonTableName.size();
 	
     // fields
     vector<FieldMeta *> fmVec;
@@ -2411,6 +2402,9 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp, TMKM &tmkm)
 
     if (fmVec.empty()) {
         // use the table order now
+	auto itt = a.schema->tableMetaMap.find(table);
+	assert(itt != a.schema->tableMetaMap.end());
+
         TableMeta *tm = itt->second;
         //keep fields in order
         for (auto it0 = tm->fieldNames.begin(); it0 != tm->fieldNames.end(); it0++) {

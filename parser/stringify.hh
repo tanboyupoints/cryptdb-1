@@ -500,6 +500,7 @@ operator<<(std::ostream &out, LEX &lex)
             }
 
             lex.query_tables->print(t, &s, QT_ORDINARY);
+	    std::cerr << "s is " << s << "\n";
             out << "into " << s;
             if (lex.field_list.head())
                 out << " " << lex.field_list;
