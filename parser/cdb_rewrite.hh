@@ -270,7 +270,7 @@ private:
     void createMetaTablesIfNotExists();
     list<string> processAnnotation(Annotation annot, Analysis &a);
     //initialize multi-principal data structures
-    void mp_init();
+    void mp_init(Analysis &a);
     
     std::string    db;
     SchemaInfo*    schema;

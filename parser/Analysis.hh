@@ -5,7 +5,8 @@
 
 #include <parser/embedmysql.hh>
 #include <parser/stringify.hh>
-#include <util/schema.hh>
+#include <edb/MultiPrinc.hh>
+//#include <util/schema.hh>
 
 using namespace std;
 
@@ -115,9 +116,10 @@ typedef struct ReturnMeta {
 
 class Analysis {
 public:
-    Analysis(MYSQL *m, SchemaInfo * schema, CryptoManager *cm)
+    Analysis(MYSQL *m, SchemaInfo * schema, CryptoManager *cm, MultiPrinc *mp)
         : pos(0), schema(schema), cm(cm), m(m) {
         assert(m != NULL);
+        this->mp = mp;
     }
     Analysis(): pos(0), schema(NULL), cm(NULL), m(NULL) {
     }
@@ -133,6 +135,8 @@ public:
     std::set<Item*>                     itemHasRewrite;
     SchemaInfo *                        schema;
     CryptoManager *                     cm;
+    MultiPrinc *                        mp;
+    TMKM                                tmkm;
 
     ReturnMeta rmeta;
 
