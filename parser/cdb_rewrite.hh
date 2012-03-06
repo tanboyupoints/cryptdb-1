@@ -255,7 +255,7 @@ public:
     //Rewriter(const std::string & db);
     Rewriter(ConnectionData db,
              bool MultiPrinc = false,
-             bool encByDefualt = false);
+             bool encByDefault = true);
     ~Rewriter();
 
     void setMasterKey(const std::string &mkey);
@@ -269,7 +269,9 @@ private:
     void initSchema();
     void createMetaTablesIfNotExists();
     list<string> processAnnotation(Annotation annot, Analysis &a);
-
+    //initialize multi-principal data structures
+    void mp_init(Analysis &a);
+    
     std::string    db;
     SchemaInfo*    schema;
     CryptoManager* cm;
