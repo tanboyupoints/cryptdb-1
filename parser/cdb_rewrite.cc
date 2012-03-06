@@ -920,7 +920,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
         string unenc = ItemToString(i);
         string enc = encryptConstantItem(i,  a, mp, tmkm);
         if (enc != unenc) {
-            return new Item_string(enc.data(), enc.length(), i->default_charset());
+            return new Item_string(make_thd_string(enc), enc.length(), i->default_charset());
         } else {
             return i;
         }
@@ -954,7 +954,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
             cerr << "field " << fm->fname << " on onion ";
             printOnion(it->first);
             string enc = crypt(a, plaindata, TYPE_TEXT, anonName, getMin(it->first), getMax(it->first), isBin, salt, mp, fm, tmkm);
-            Item *itest = new Item_string(enc.data(), enc.length(), i->default_charset());
+            Item *itest = new Item_string(make_thd_string(enc), enc.length(), i->default_charset());
             if (it->first == oDET) {
                 assert_s(crypt(a, ItemToString(itest), TYPE_TEXT, anonName, getMax(it->first), getMin(it->first), isBin, salt, mp, fm, tmkm) == plaindata, "crypt(crypt(plaindata)) != plaindata");
                 save_det = enc;
@@ -966,7 +966,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
 
         if (fm->has_salt) {
             string salt_s = strFromVal(salt);
-            l.push_back(new Item_string(salt_s.data(), salt_s.length(), i->default_charset()));
+            l.push_back(new Item_string(make_thd_string(salt_s), salt_s.length(), i->default_charset()));
         }
         //if no onions: grab the field, for reals
         if (l.empty()) {
