@@ -2364,7 +2364,7 @@ rewrite_insert_lex(LEX *lex, Analysis &a, MultiPrinc * mp, TMKM &tmkm)
     //if this is MultiPrinc, insert may need keys; certainly needs to update AccMan
     if (mp) {
         tmkm.processingQuery = true;
-        mp->insertLex(lex, a, tmkm);
+        mp->insertLex(lex, a.schema, tmkm);
     }
 
     const string &table =
@@ -2510,28 +2510,6 @@ static int
 adjustOnions(const std::string &db, const Analysis & analysis)
 {
     return 0;
-}
-
-
-FieldMeta::FieldMeta():encdesc(FULL_EncDesc)
-{
-    fname = "";
-    sql_field = NULL;
-    salt_name = "";
-    has_salt = true;
-
-}
-
-TableMeta::TableMeta() {
-    anonTableName = "";
-    tableNo = 0;
-}
-
-TableMeta::~TableMeta()
-{
-    for (auto i = fieldMetaMap.begin(); i != fieldMetaMap.end(); i++)
-        delete i->second;
-
 }
 
 
@@ -2934,21 +2912,6 @@ Rewriter::initSchema()
     }
 }
 
-TableMeta *
-SchemaInfo::getTableMeta(const string & table) {
-    auto it = tableMetaMap.find(table);
-    assert_s(it != tableMetaMap.end(), "could not find table " + table);
-    return it->second;
-}
-
-FieldMeta *
-SchemaInfo::getFieldMeta(const string & table, const string & field) {
-    TableMeta * tm = getTableMeta(table);
-    auto it = tm->fieldMetaMap.find(field);
-    assert_s(it != tm->fieldMetaMap.end(), "could not find field " + field + " in table " +  table );
-    return it->second;
-}
-
 void
 Rewriter::setMasterKey(const string &mkey)
 {
@@ -3028,7 +2991,7 @@ Rewriter::rewrite(const string & q, Analysis & a)
         if (mp) {
             bool encryptField;
             //what if anything do we want to do with encryptField?
-            return mp->processAnnotation(*p.annot, encryptField, analysis);
+            return mp->processAnnotation(*p.annot, encryptField, analysis.schema);
         } else {
             return processAnnotation(*p.annot, analysis);
         }

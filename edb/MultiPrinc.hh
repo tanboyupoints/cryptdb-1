@@ -33,7 +33,7 @@ class MultiPrinc {
                            bool & encryptfield, std::map<std::string,
                            TableMetadata *> & tm);*/
     list<std::string> processAnnotation(Annotation &annot, bool &encryptField,
-                                        Analysis &analysis);
+                                        SchemaInfo * schema);
 
     int commitAnnotations();
 
@@ -76,7 +76,7 @@ class MultiPrinc {
 
     /*** INSERT tasks ***/
     
-    void insertLex(LEX *lex, Analysis &a, TMKM &tmkm);
+    void insertLex(LEX *lex, SchemaInfo * schema, TMKM &tmkm);
     //wordsIt points to the first value
     void insertRelations(const std::list<std::pair<std::string, bool> > & values, std::string table,
                          std::list<std::string> fields,
