@@ -2113,6 +2113,7 @@ add_table(SchemaInfo * schema, const string & table, LEX *lex, bool encByDefault
     }
 
     TableMeta *tm = new TableMeta();
+    cerr << "adding " << table << " to schema->tableMetaMap" << endl;
     schema->tableMetaMap[table] = tm;
 
     tm->tableNo = schema->totalTables++;
@@ -2983,9 +2984,10 @@ Rewriter::rewrite(const string & q, Analysis & a)
     list<string> queries;
     query_parse p(db, q);
     Analysis analysis = Analysis(conn(), schema, cm, mp);
+
     //initialize multi-principal
     mp_init(analysis);
-    
+
     if (p.annot) {
         if (analysis.mp) {
             bool encryptField;
@@ -3006,14 +3008,19 @@ Rewriter::rewrite(const string & q, Analysis & a)
     //analyze query
     query_analyze(db, q, lex, analysis, encByDefault);
 
-    //update metadata about onions
-    int ret = updateMeta(db, q, lex, analysis);
-
-    if (ret < 0) assert(false);
+    //update metadata about onions if it's not delete
+    int ret;
+    if (lex->sql_command != SQLCOM_DROP_TABLE) {
+        ret = updateMeta(db, q, lex, analysis);
+        if (ret < 0) assert(false);
+    }
 
     //rewrite query
-    cerr << "before rewrite " << *lex << endl;
     lex_rewrite(db, lex, analysis);
+    if (lex->sql_command == SQLCOM_DROP_TABLE) {
+        ret = updateMeta(db, q, lex, analysis);
+        if (ret < 0) assert(false);
+    }
     stringstream ss;
     ss << *lex;
     cerr << "FINAL QUERY: " << *lex << endl;

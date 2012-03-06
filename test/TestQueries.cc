@@ -1210,11 +1210,11 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
     TestConfig control_tc = TestConfig();
     control_tc.db = control_tc.db+"_control";
  
-    Connection control_(control_tc, control_type);
-    control = &control_;
-
     Connection test_(tc, test_type);
     test = &test_;
+
+    Connection control_(control_tc, control_type);
+    control = &control_;
 
     enum { nrounds = 1 };
     for (uint i = 0; i < nrounds; i++)
