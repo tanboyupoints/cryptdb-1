@@ -3045,10 +3045,11 @@ string ReturnMeta::stringify() {
     }
     return res.str();
 }
-ResType
-Rewriter::decryptResults(ResType & dbres,
-			 Analysis & a) {
-    printRes(dbres);
+
+static void
+mp_init_decrypt(MultiPrinc * mp, Analysis & a) {
+    if (!mp) {return;}
+    
     a.tmkm.processingQuery = false;
     cerr << a.rmeta.stringify() << "\n";
     for (auto i = a.rmeta.rfmeta.begin(); i != a.rmeta.rfmeta.end(); i++) {
@@ -3056,6 +3057,14 @@ Rewriter::decryptResults(ResType & dbres,
 	    a.tmkm.encForReturned[fullName(i->second.im->basefield->fname, i->second.im->basefield->tm->anonTableName)] = i->first;
 	}
     }
+}
+
+ResType
+Rewriter::decryptResults(ResType & dbres,
+			 Analysis & a) {
+    printRes(dbres);
+
+    mp_init_decrypt(mp, a);
 
     unsigned int rows = dbres.rows.size();
 
@@ -3065,7 +3074,8 @@ Rewriter::decryptResults(ResType & dbres,
     ResType res = ResType();
 
     unsigned int index = 0;
-      // un-anonymize the names
+    
+    // un-anonymize the names
     for (auto it = dbres.names.begin(); it != dbres.names.end(); it++) {
         ReturnField rf = a.rmeta.rfmeta[index];
         if (rf.is_salt) {
@@ -3101,7 +3111,13 @@ Rewriter::decryptResults(ResType & dbres,
                 string anonName = getAnonName(im);
                 //cerr << anonName << " has onions size " << im->basefield->onionnames.size() << endl;
                 if (!im->basefield->onionnames.empty() && anonName != "") {
-                    res.rows[r][col_index].data = crypt(a, dbres.rows[r][c].data, getTypeForDec(im), fullName(anonName, im->basefield->tm->anonTableName), im->uptolevel, getMin(im->o), isBin, 0, im->basefield, res.rows[r]);
+		    uint64_t salt = 0;
+		    if (rf.pos_salt>=0) {
+			SqlItem si = dbres.rows[r][rf.pos_salt];
+			assert(!si.null);
+			salt = valFromStr(dbres.rows[r][rf.pos_salt].data);
+		    }
+		    res.rows[r][col_index].data = crypt(a, dbres.rows[r][c].data, getTypeForDec(im), fullName(anonName, im->basefield->tm->anonTableName), im->uptolevel, getMin(im->o), isBin, salt, im->basefield, res.rows[r]);
                 }
             }
             col_index++;
