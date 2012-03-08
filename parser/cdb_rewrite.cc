@@ -2275,8 +2275,8 @@ static void rewrite_create_field(const string &table_name,
         THD *thd         = current_thd;
         Create_field *f0 = f->clone(thd->mem_root);
         f0->field_name   = thd->strdup(fm->salt_name.c_str());
-        f0->sql_type     = MYSQL_TYPE_VARCHAR;
-        f0->charset      = &my_charset_bin;
+        f0->sql_type     = MYSQL_TYPE_LONGLONG;
+        //f0->charset      = &my_charset_bin;
         f0->length       = 8;
         l.push_back(f0);
     }
