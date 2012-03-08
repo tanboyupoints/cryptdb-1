@@ -2,32 +2,10 @@
 
 using namespace std;
 
-string FieldMeta::stringify() {
-    string res = " [FieldMeta " + fname + "]";
-    return res;
-}
-
 string ItemMeta::stringify() {
     stringstream res;
     res << "(ItemMeta: onion " << o << " uptolevel " << (int)uptolevel << " basefield " << stringify_ptr(basefield) << ") ";
     return res.str();
-}
-
-bool
-EncDesc::restrict(onion o, SECLEVEL maxl)
-{
-    //TODO:
-    //assert(maxl is on onion o);
-
-    auto it = olm.find(o);
-    assert(it != olm.end());
-
-    if (it->second > maxl) {
-        it->second = maxl;
-        return true;
-    }
-
-    return false;
 }
 
 EncSet::EncSet() : osl(FULL_EncSet.osl) {}
