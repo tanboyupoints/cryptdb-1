@@ -800,7 +800,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     virtual Item *
     do_rewrite_type(Item_field *i, Analysis & a) const
     {
-        cerr << "do_rewrite_type L806 " << endl;
+        cerr << "do_rewrite_type L806 " << *i << endl;
         auto it = a.itemHasRewrite.find(i);
         if (it == a.itemHasRewrite.end()) {
             // fix table name
@@ -989,7 +989,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
         return i;
     }
     virtual Item * do_rewrite_type(Item_num *i, Analysis & a) const {
-        cerr << "do_rewrite_type L970" << endl;
+        cerr << "do_rewrite_type L970 " << *i << endl;
         string enc = encryptConstantItem(i, a);
         return new Item_int((ulonglong) valFromStr(enc));
     }
@@ -2361,20 +2361,36 @@ rewrite_create_lex(LEX *lex, Analysis &a)
 }
 
 static void
-map_fields_values(LEX *lex, Analysis &a)
+mp_update_init(LEX *lex, Analysis &a)
 {
-    const string &table =
-            lex->select_lex.table_list.first->table_name;
+    if (!a.mp) {return;}
+    auto it = List_iterator<Item>(lex->select_lex.item_list);
+    for (;;) {
+        Item_field *i = (Item_field *) it++;
+        if (!i) {
+            break;
+        }
+        string fname = a.itemToFieldMeta[i]->tm->anonTableName + "." + a.itemToFieldMeta[i]->fname;
+        if (a.mp->hasEncFor(fname)) {
+            assert_s(false, "cannot update changes to access tree");
+        }
+    }
+}
+
+static void
+rewrite_update_lex(LEX *lex, Analysis &a)
+{
+    assert_s(lex->select_lex.item_list.head(), "update needs to have item_list");
+
+    mp_update_init(lex, a);
 
     //rewrite table name
     rewrite_table_list(lex->select_lex.table_list.first, a);
 
-    //assert_s(lex->select_lex, "update needs to have select_lex");
-    assert_s(lex->select_lex.item_list.head(), "update needs to have item_list");
     // fields
     vector<FieldMeta *> fmVec;
     if (lex->select_lex.item_list.head()) {
-        auto it = List_iterator<Item>(lex->field_list);
+        auto it = List_iterator<Item>(lex->select_lex.item_list);
         List<Item> newList;
         for (;;) {
             Item *i = it++;
@@ -2382,59 +2398,54 @@ map_fields_values(LEX *lex, Analysis &a)
                 break;
             assert(i->type() == Item::FIELD_ITEM);
             Item_field *ifd = static_cast<Item_field*>(i);
-            cerr << "field " << ifd->table_name << "." << ifd->field_name << endl;
             fmVec.push_back(a.schema->getFieldMeta(ifd->table_name, ifd->field_name));
             vector<Item *> l;
             itemTypes.do_rewrite_insert(i, a, l, NULL);
+            cerr << "fields" << endl;
             for (auto it0 = l.begin(); it0 != l.end(); ++it0) {
+                cerr << **it0 << endl;
                 newList.push_back(*it0);
             }
         }
-        lex->field_list = newList;
+        lex->select_lex.item_list = newList;
     }
 
     if (fmVec.empty()) {
-        // use the table order now
-        auto itt = a.schema->tableMetaMap.find(table);
-        assert(itt != a.schema->tableMetaMap.end());
-
-        TableMeta *tm = itt->second;
-        //keep fields in order
-        for (auto it0 = tm->fieldNames.begin(); it0 != tm->fieldNames.end(); it0++) {
-            fmVec.push_back(tm->fieldMetaMap[*it0]);
-        }
+        cerr << "NO FIELDS TO UPDATE IN UPDATE" << endl;
+        return;
     }
 
     // values
-    if (lex->many_values.head()) {
-        auto it = List_iterator<List_item>(lex->many_values);
-        List<List_item> newList;
+    if (lex->value_list.head()) {
+        auto it = List_iterator<Item>(lex->value_list);
+        List<Item> newList;
+        auto fmVecIt = fmVec.begin();
         for (;;) {
-            List_item *li = it++;
-            if (!li)
+            Item *i = it++;
+            if (!i)
                 break;
-            assert(li->elements == fmVec.size());
-            List<Item> *newList0 = new List<Item>();
-            auto it0 = List_iterator<Item>(*li);
-            auto fmVecIt = fmVec.begin();
-            for (;;) {
-                Item *i = it0++;
-                if (!i)
-                    break;
-                vector<Item *> l;
-                itemTypes.do_rewrite_insert(i, a, l, *fmVecIt);
-                cerr << "values" << endl;
-                for (auto it1 = l.begin(); it1 != l.end(); ++it1) {
-                    newList0->push_back(*it1);
-                    cerr << *it1 << endl;
-                }
-                ++fmVecIt;
+            vector<Item *> l;
+            itemTypes.do_rewrite_insert(i, a, l, *fmVecIt);
+            cerr << "values" << endl;
+            for (auto it1 = l.begin(); it1 != l.end(); ++it1) {
+                newList.push_back(*it1);
+                cerr << **it1 << endl;
             }
-            newList.push_back(newList0);
+            ++fmVecIt;
         }
-        lex->many_values = newList;
+        lex->value_list = newList;
     }
 
+    if (lex->select_lex.where)
+        rewrite(&lex->select_lex.where, a);
+
+    if (lex->select_lex.join &&
+        lex->select_lex.join->conds &&
+        lex->select_lex.where != lex->select_lex.join->conds)
+        rewrite(&lex->select_lex.join->conds, a);
+
+    if (lex->select_lex.having)
+        rewrite(&lex->select_lex.having, a);
 }
 
 static void
@@ -2617,7 +2628,8 @@ lex_rewrite(const string & db, LEX * lex, Analysis & analysis)
         rewrite_table_list(&lex->select_lex.table_list, analysis);
         break;
     case SQLCOM_UPDATE:
-        map_fields_values(lex, analysis);
+        rewrite_update_lex(lex, analysis);
+        break;
     default:
         rewrite_table_list(&lex->select_lex.top_join_list, analysis);
         rewrite_select_lex(&lex->select_lex, analysis);
