@@ -2361,13 +2361,95 @@ rewrite_create_lex(LEX *lex, Analysis &a)
 }
 
 static void
+map_fields_values(LEX *lex, Analysis &a)
+{
+    const string &table =
+            lex->select_lex.table_list.first->table_name;
+
+    //rewrite table name
+    rewrite_table_list(lex->select_lex.table_list.first, a);
+
+    //assert_s(lex->select_lex, "update needs to have select_lex");
+    assert_s(lex->select_lex.item_list.head(), "update needs to have item_list");
+    // fields
+    vector<FieldMeta *> fmVec;
+    if (lex->select_lex.item_list.head()) {
+        auto it = List_iterator<Item>(lex->field_list);
+        List<Item> newList;
+        for (;;) {
+            Item *i = it++;
+            if (!i)
+                break;
+            assert(i->type() == Item::FIELD_ITEM);
+            Item_field *ifd = static_cast<Item_field*>(i);
+            cerr << "field " << ifd->table_name << "." << ifd->field_name << endl;
+            fmVec.push_back(a.schema->getFieldMeta(ifd->table_name, ifd->field_name));
+            vector<Item *> l;
+            itemTypes.do_rewrite_insert(i, a, l, NULL);
+            for (auto it0 = l.begin(); it0 != l.end(); ++it0) {
+                newList.push_back(*it0);
+            }
+        }
+        lex->field_list = newList;
+    }
+
+    if (fmVec.empty()) {
+        // use the table order now
+        auto itt = a.schema->tableMetaMap.find(table);
+        assert(itt != a.schema->tableMetaMap.end());
+
+        TableMeta *tm = itt->second;
+        //keep fields in order
+        for (auto it0 = tm->fieldNames.begin(); it0 != tm->fieldNames.end(); it0++) {
+            fmVec.push_back(tm->fieldMetaMap[*it0]);
+        }
+    }
+
+    // values
+    if (lex->many_values.head()) {
+        auto it = List_iterator<List_item>(lex->many_values);
+        List<List_item> newList;
+        for (;;) {
+            List_item *li = it++;
+            if (!li)
+                break;
+            assert(li->elements == fmVec.size());
+            List<Item> *newList0 = new List<Item>();
+            auto it0 = List_iterator<Item>(*li);
+            auto fmVecIt = fmVec.begin();
+            for (;;) {
+                Item *i = it0++;
+                if (!i)
+                    break;
+                vector<Item *> l;
+                itemTypes.do_rewrite_insert(i, a, l, *fmVecIt);
+                cerr << "values" << endl;
+                for (auto it1 = l.begin(); it1 != l.end(); ++it1) {
+                    newList0->push_back(*it1);
+                    cerr << *it1 << endl;
+                }
+                ++fmVecIt;
+            }
+            newList.push_back(newList0);
+        }
+        lex->many_values = newList;
+    }
+
+}
+
+static void
+mp_insert_init(LEX *lex, Analysis &a)
+{
+    if (!a.mp) {return; }
+    //if this is MultiPrinc, insert may need keys; certainly needs to update AccMan
+    a.tmkm.processingQuery = true;
+    a.mp->insertLex(lex, a.schema, a.tmkm);
+}
+
+static void
 rewrite_insert_lex(LEX *lex, Analysis &a)
 {
-    //if this is MultiPrinc, insert may need keys; certainly needs to update AccMan
-    if (a.mp) {
-        a.tmkm.processingQuery = true;
-        a.mp->insertLex(lex, a.schema, a.tmkm);
-    }
+    mp_insert_init(lex, a);
 
     const string &table =
             lex->select_lex.table_list.first->table_name;
@@ -2534,6 +2616,8 @@ lex_rewrite(const string & db, LEX * lex, Analysis & analysis)
     case SQLCOM_DROP_TABLE:
         rewrite_table_list(&lex->select_lex.table_list, analysis);
         break;
+    case SQLCOM_UPDATE:
+        map_fields_values(lex, analysis);
     default:
         rewrite_table_list(&lex->select_lex.top_join_list, analysis);
         rewrite_select_lex(&lex->select_lex, analysis);
@@ -3053,9 +3137,9 @@ mp_init_decrypt(MultiPrinc * mp, Analysis & a) {
     a.tmkm.processingQuery = false;
     cerr << a.rmeta.stringify() << "\n";
     for (auto i = a.rmeta.rfmeta.begin(); i != a.rmeta.rfmeta.end(); i++) {
-	if (!i->second.is_salt) {
-	    a.tmkm.encForReturned[fullName(i->second.im->basefield->fname, i->second.im->basefield->tm->anonTableName)] = i->first;
-	}
+        if (!i->second.is_salt) {
+            a.tmkm.encForReturned[fullName(i->second.im->basefield->fname, i->second.im->basefield->tm->anonTableName)] = i->first;
+        }
     }
 }
 
