@@ -2165,17 +2165,17 @@ add_table(SchemaInfo * schema, const string & table, LEX *lex, bool encByDefault
     }
 }
 
-class OnionFieldHandler {
+class OnionTypeHandler {
 private:
     int                   field_length;
     enum enum_field_types type;
     CHARSET_INFO *        charset;
 public:
-    OnionFieldHandler(enum enum_field_types t) :
+    OnionTypeHandler(enum enum_field_types t) :
         field_length(-1), type(t), charset(NULL) {}
-    OnionFieldHandler(enum enum_field_types t, size_t f) :
+    OnionTypeHandler(enum enum_field_types t, size_t f) :
         field_length((int)f), type(t), charset(NULL) {}
-    OnionFieldHandler(enum enum_field_types t,
+    OnionTypeHandler(enum enum_field_types t,
                       size_t f,
                       CHARSET_INFO *charset) :
         field_length((int)f), type(t), charset(charset) {}
@@ -2190,46 +2190,48 @@ public:
             f0->length = field_length;
         }
         f0->sql_type = type;
+	
         if (charset != NULL) {
             f0->charset = charset;
-        }
+        } else {
+	    //encryption is always unsigned
+	    Field_num * fn = static_cast<Field_num *>(f->field);
+	    cerr << "f g is null? " << (fn==NULL) << "\n";
+	    fn->unsigned_flag = true;
+	}
         return f0;
     }
 };
 
-typedef set< enum enum_field_types >   S;
-typedef pair< S, OnionFieldHandler * > H;
-typedef vector< H >                    V;
+//maps a raw field type to an onion field handler returning the correspondig onion type
+typedef map<onion, OnionTypeHandler *> typeToOnionHandler;
+
+//typedef set< enum enum_field_types >   S;
+//typedef pair< S, OnionFieldHandler * > H;
+//typedef vector< H >                    V;
+
+const map<int, map<int,int> > hi = {
+    {1,{{1,1}}},
+    {3,{{1,1}}}
+};
 
 // TODO: this list is incomplete
-const map<onion, V> OnionHandlers = {
-    {oDET, V({H(S({MYSQL_TYPE_LONG,
-                   MYSQL_TYPE_INT24}),
-                new OnionFieldHandler(MYSQL_TYPE_LONGLONG)),
-              H(S({MYSQL_TYPE_DECIMAL,
-                   MYSQL_TYPE_DOUBLE,
-                   MYSQL_TYPE_VARCHAR,
-                   MYSQL_TYPE_BLOB}),
-                new OnionFieldHandler(MYSQL_TYPE_BLOB))})},
-
-    {oOPE, V({H(S({MYSQL_TYPE_LONG,
-                   MYSQL_TYPE_INT24}),
-                new OnionFieldHandler(MYSQL_TYPE_LONGLONG)),
-              H(S({MYSQL_TYPE_DECIMAL,
-                   MYSQL_TYPE_DOUBLE,
-                   MYSQL_TYPE_VARCHAR,
-                   MYSQL_TYPE_BLOB}),
-                new OnionFieldHandler(MYSQL_TYPE_BLOB))})},
-
-    {oAGG, V({H(S({MYSQL_TYPE_LONG,
-                   MYSQL_TYPE_INT24,
-                   MYSQL_TYPE_DECIMAL,
-                   MYSQL_TYPE_DOUBLE}),
-		    new OnionFieldHandler(MYSQL_TYPE_VARCHAR, 256, &my_charset_bin))})},
-
-    {oSWP, V({H(S({MYSQL_TYPE_VARCHAR,
-                   MYSQL_TYPE_BLOB}),
-                new OnionFieldHandler(MYSQL_TYPE_BLOB))})},
+//maps data type to the type 
+const map<enum enum_field_types, typeToOnionHandler> OnionHandlers = {
+    {MYSQL_TYPE_LONG,
+     {
+	 {oDET, new OnionTypeHandler(MYSQL_TYPE_LONGLONG)},
+	 {oOPE, new OnionTypeHandler(MYSQL_TYPE_LONGLONG)},
+	 {oAGG, new OnionTypeHandler(MYSQL_TYPE_VARCHAR, 256, &my_charset_bin)}
+     }
+    },
+    {MYSQL_TYPE_VARCHAR,
+     {
+	 {oDET, new OnionTypeHandler(MYSQL_TYPE_BLOB)},
+	 {oOPE, new OnionTypeHandler(MYSQL_TYPE_BLOB)},
+	 {oSWP, new OnionTypeHandler(MYSQL_TYPE_BLOB)}
+     }
+    }
 };
 
 static void rewrite_create_field(const string &table_name,
@@ -2239,6 +2241,7 @@ static void rewrite_create_field(const string &table_name,
 {
     FieldMeta *fm = a.schema->getFieldMeta(table_name, f->field_name);
 
+    //TODO: the onions with which you start should match the ones in OnionHandlers
     // if it has no onions, return the original field
     if (fm->onionnames.empty()) {
         l.push_back(f);
@@ -2249,22 +2252,21 @@ static void rewrite_create_field(const string &table_name,
     for (auto it = fm->onionnames.begin();
          it != fm->onionnames.end();
          ++it) {
-        auto it_h = OnionHandlers.find(it->first);
-        assert(it_h != OnionHandlers.end());
-        auto v = it_h->second;
-        Create_field *newF = NULL;
-        for (auto h : v) {
-            auto s = h.first;
-            if (s.find(f->sql_type) != s.end()) {
-                newF = h.second->newOnionCreateField(
-                        it->second.c_str(), f);
-                break;
-            }
-        }
+
+	auto it_t = OnionHandlers.find(f->sql_type);
+	assert(it_t != OnionHandlers.end());
+
+	auto it_o = it_t->second.find(it->first);
+	assert(it_o != it_t->second.end());
+
+	Create_field *newF = NULL;
+	newF = it_o->second->newOnionCreateField(it->second.c_str(), f);
+	
         if (newF == NULL) {
             cryptdb_err() << "Could not rewrite for onion: " <<
                         it->first << ", type: " << f->sql_type;
         }
+	
         l.push_back(newF);
     }
 
@@ -2275,9 +2277,10 @@ static void rewrite_create_field(const string &table_name,
         THD *thd         = current_thd;
         Create_field *f0 = f->clone(thd->mem_root);
         f0->field_name   = thd->strdup(fm->salt_name.c_str());
+	Field_num * fn = static_cast<Field_num *>(f->field);
+	fn->unsigned_flag = true;
         f0->sql_type     = MYSQL_TYPE_LONGLONG;
-        //f0->charset      = &my_charset_bin;
-        f0->length       = 8;
+	f0->length       = 8;
         l.push_back(f0);
     }
 }
