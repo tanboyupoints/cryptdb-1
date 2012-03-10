@@ -20,6 +20,7 @@
 #include <crypto/ffx.hh>
 #include <crypto/online_ope.hh>
 #include <crypto/padding.hh>
+#include <crypto/mont.hh>
 #include <util/timer.hh>
 #include <NTL/ZZ.h>
 #include <NTL/RR.h>
@@ -228,6 +229,44 @@ test_paillier_packing()
         // cout << hex << "pack2: " << decagg << ", " << plainagg << dec << endl;
         assert(decagg == to_ZZ(plainagg));
     }
+}
+
+static void
+test_montgomery()
+{
+    urandom u;
+    ZZ m = RandomPrime_ZZ(2048);
+    montgomery mm(m);
+
+    for (int i = 0; i < 1000; i++) {
+        ZZ a = u.rand_zz_mod(m);
+        ZZ b = u.rand_zz_mod(m);
+        ZZ ma = mm.to_mont(a);
+        ZZ mb = mm.to_mont(b);
+        assert(a == mm.from_mont(ma));
+        assert(b == mm.from_mont(mb));
+
+        ZZ ab = MulMod(a, b, m);
+        ZZ mab = mm.mmul(ma, mb);
+        assert(ab == mm.from_mont(mab));
+    }
+
+    cout << "montgomery ok" << endl;
+
+    ZZ x = u.rand_zz_mod(m);
+    ZZ mx = mm.to_mont(x);
+
+    timer tplain;
+    ZZ p = x;
+    for (int i = 0; i < 100000; i++)
+        p = MulMod(p, x, m);
+    cout << "regular multiply: " << tplain.lap() << " usec for 100k" << endl;
+
+    timer tmont;
+    ZZ mp = mx;
+    for (int i = 0; i < 100000; i++)
+        mp = mm.mmul(mp, mx);
+    cout << "montgomery multiply: " << tmont.lap() << " usec for 100k" << endl;
 }
 
 static void
@@ -489,6 +528,7 @@ main(int ac, char **av)
     test_search();
     test_paillier();
     test_paillier_packing();
+    test_montgomery();
     test_skip32();
     test_online_ope();
     test_ffx();
