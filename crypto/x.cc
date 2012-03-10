@@ -235,7 +235,8 @@ static void
 test_montgomery()
 {
     urandom u;
-    ZZ m = RandomPrime_ZZ(2048);
+    ZZ n = RandomPrime_ZZ(512) * RandomPrime_ZZ(512);
+    ZZ m = n * n;
     montgomery mm(m);
 
     for (int i = 0; i < 0; i++) {
