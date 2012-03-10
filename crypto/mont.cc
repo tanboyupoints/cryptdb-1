@@ -24,11 +24,7 @@ montgomery::mmul(const ZZ &a, const ZZ &b)
     ZZ l;   // low bits that need to be shot down
     trunc(l, abr, _mbits);
 
-    ZZ x = l * _minusm_inv_modr;
-
-    ZZ xlow;
-    trunc(xlow, x, _mbits);
-    ZZ c = _m * xlow;
+    ZZ c = l * _minusm_inv_modr_m;
 
     // assert((abr + c) % _r == 0);
 
