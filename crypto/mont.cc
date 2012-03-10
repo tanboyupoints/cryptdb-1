@@ -21,11 +21,11 @@ montgomery::mmul(const ZZ &a, const ZZ &b)
 {
     ZZ abr = a * b;
     ZZ l = trunc_ZZ(abr, _mbits);   // low bits that need to be shot down
-    ZZ c = l * _minusm_inv_modr_m;
+    ZZ c = l * _minusm_inv_modr;
 
     // assert((abr + c) % _r == 0);
 
-    ZZ ab = (abr + c) >> _mbits;
+    ZZ ab = (abr + c * _m) >> _mbits;
     if (ab >= _m)
         return ab - _m;
     else
