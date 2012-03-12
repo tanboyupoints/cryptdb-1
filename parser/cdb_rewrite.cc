@@ -3095,7 +3095,7 @@ Rewriter::rewrite(const string & q, Analysis & a)
     }
 
     LEX *lex = p.lex();
-    cerr << "lex after rewrite is " << *lex << "\n";
+   
     //login/logout command; nothing needs to be passed on
     if ((lex->sql_command == SQLCOM_DELETE || lex->sql_command == SQLCOM_INSERT) && analysis.mp && analysis.mp->checkPsswd(lex)) {
         cerr << "login/logout " << *lex << endl;
