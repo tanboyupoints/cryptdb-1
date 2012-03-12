@@ -390,6 +390,11 @@ class KeyAccess {
     bool isInstance(Prin prin);
     bool isOrphan(Prin prin);
 
+    //writes prin to file, logging that prin's key has been accessed
+    void log(Prin prin);
+
+    std::string log_file;
+
 #if TESTING
  public:
 #endif

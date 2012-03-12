@@ -596,6 +596,7 @@ KeyAccess::KeyAccess(Connect * connect)
     this->crypt_man = new CryptoManager(randomBytes(AES_KEY_BYTES));
     this->conn = connect;
     this->meta_finished = false;
+    this->log_file = "CryptDB_log.txt";
 }
 
 ResType
@@ -1137,6 +1138,15 @@ KeyAccess::removeFromOrphans(Prin orphan)
     return 0;
 }
 
+void
+KeyAccess::log(Prin prin)
+{
+    ofstream f;
+    f.open(log_file, ios::app);
+    f << prin.gen << " " << prin.value << "\n";
+    f.close();
+}
+
 string
 KeyAccess::getKey(Prin prin)
 {
@@ -1155,6 +1165,7 @@ KeyAccess::getKey(Prin prin)
         }
     }
     //cerr << "returning null? " << (prinkey.key.length() == 0) << "\n";
+    log(prin);
     return prinkey.key;
 }
 
