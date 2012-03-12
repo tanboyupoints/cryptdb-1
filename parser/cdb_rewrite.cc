@@ -2195,9 +2195,7 @@ public:
             f0->charset = charset;
         } else {
 	    //encryption is always unsigned
-	    Field_num * fn = static_cast<Field_num *>(f->field);
-	    cerr << "f g is null? " << (fn==NULL) << "\n";
-	    fn->unsigned_flag = true;
+	    f0->flags = f0->flags | UNSIGNED_FLAG; 
 	}
         return f0;
     }
@@ -2277,8 +2275,7 @@ static void rewrite_create_field(const string &table_name,
         THD *thd         = current_thd;
         Create_field *f0 = f->clone(thd->mem_root);
         f0->field_name   = thd->strdup(fm->salt_name.c_str());
-	Field_num * fn = static_cast<Field_num *>(f->field);
-	fn->unsigned_flag = true;
+	f0->flags = f0->flags | UNSIGNED_FLAG;//salt is unsigned
         f0->sql_type     = MYSQL_TYPE_LONGLONG;
 	f0->length       = 8;
         l.push_back(f0);
@@ -3098,6 +3095,7 @@ Rewriter::rewrite(const string & q, Analysis & a)
     }
 
     LEX *lex = p.lex();
+    cerr << "lex after rewrite is " << *lex << "\n";
     //login/logout command; nothing needs to be passed on
     if ((lex->sql_command == SQLCOM_DELETE || lex->sql_command == SQLCOM_INSERT) && analysis.mp && analysis.mp->checkPsswd(lex)) {
         cerr << "login/logout " << *lex << endl;
