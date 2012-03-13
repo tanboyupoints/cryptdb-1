@@ -486,6 +486,7 @@ std::string strFromVal(uint32_t x);
 
 uint64_t valFromStr(const std::string & str);
 
+
 //marshalls a binary value into characters readable by Postgres
 std::string marshallBinary(const std::string &s);
 /*

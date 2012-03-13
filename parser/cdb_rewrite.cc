@@ -233,9 +233,10 @@ ItemToString(Item * i) {
 // encrypts a constant item based on the information in a
 //TODO cat_red fix for mp
 static string
-encryptConstantItem(Item * i, Analysis & a){
-    string plaindata = ItemToString(i);
+encryptConstantItem(Item * i, Analysis & a, fieldType ft){
 
+    string plaindata = ItemToString(i);
+    cerr << "encrypting constant " << plaindata << "\n";
     auto itemMeta = a.itemToMeta.find(i);
     assert_s(itemMeta != a.itemToMeta.end(), "there is no meta for item in analysis");
 
@@ -246,7 +247,9 @@ encryptConstantItem(Item * i, Analysis & a){
     }
     string anonName = fullName(fm->onionnames[im->o], fm->tm->anonTableName);
     bool isBin;
-    return crypt(a, plaindata, TYPE_TEXT, anonName, getMin(im->o), fm->encdesc.olm[im->o], isBin, 0, fm);
+    string encryption = crypt(a, plaindata, ft, anonName, getMin(im->o), fm->encdesc.olm[im->o], isBin, 0, fm);
+    cerr << "encryption is " << encryption << "\n";
+    return encryption;
 }
 
 /***********end of parser utils *****************/
@@ -910,8 +913,9 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     virtual Item * do_rewrite_type(Item_string *i, Analysis & a) const {
         cerr << "do_rewrite_type L908" << endl;
         string unenc = ItemToString(i);
-        string enc = encryptConstantItem(i,  a);
+        string enc = encryptConstantItem(i,  a, TYPE_TEXT);
         if (enc != unenc) {
+	    cerr << "here in enc!=unenc \n";
             return new Item_string(make_thd_string(enc), enc.length(), i->default_charset());
         } else {
             return i;
@@ -990,8 +994,10 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     }
     virtual Item * do_rewrite_type(Item_num *i, Analysis & a) const {
         cerr << "do_rewrite_type L970 " << *i << endl;
-        string enc = encryptConstantItem(i, a);
-        return new Item_int((ulonglong) valFromStr(enc));
+        string enc = encryptConstantItem(i, a, TYPE_INTEGER);
+	cerr << "enc is " << enc << "\n";
+
+	return new Item_int((ulonglong) valFromStr(enc));
     }
     virtual void
     do_rewrite_insert_type(Item_num *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const

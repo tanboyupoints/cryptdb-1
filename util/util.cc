@@ -371,12 +371,16 @@ StringFromVal(uint64_t value, uint padLen)
     return ss.str();
 }
 
+//Transforms a string that contains an integer (in decimal form) into the
+//integer
+// Does not work as wanted if str codifies a number in binary.
 uint64_t
 valFromStr(const string &str)
 {
-    stringstream ss(str);
-    uint64_t val;
-    ss >> val;
+   stringstream ss(str);
+   uint64_t val;
+   ss >> val;
+        
     return  val;
 }
 
