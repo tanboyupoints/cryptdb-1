@@ -644,7 +644,7 @@ static QueryList ManyConnections = QueryList("Multiple connections",
 Connection::Connection(const TestConfig &input_tc, test_mode input_type) {
     tc = input_tc;
     type = input_type;
-    cl = 0;
+    //cl = 0;
     proxy_pid = -1;
 
     try {
@@ -897,7 +897,7 @@ Connection::executeConn(string query) {
 ResType
 Connection::executeRewriter(string query) {
     //translate the query
-    Analysis analysis;
+    Analysis analysis(*conn);
     list<string> enc_queries = re->rewrite(query, analysis);
     
     //execute

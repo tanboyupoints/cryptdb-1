@@ -9,9 +9,7 @@
 
 #include <string>
 #include <assert.h>
-
-#include <edb/EDBProxy.hh>
-
+#include <util/util.hh>
 
 class TestConfig {
  public:
@@ -70,9 +68,9 @@ void PrintRes(const ResType &res);
 
 template <int N> ResType convert(std::string rows[][N], int num_rows);
 
-ResType myExecute(EDBProxy * cl, std::string query);
+//ResType myExecute(EDBProxy * cl, std::string query);
 
-ResType myCreate(EDBProxy * cl, std::string annotated_query, std::string plain_query);
+//ResType myCreate(EDBProxy * cl, std::string annotated_query, std::string plain_query);
 
 static inline void
 assert_res(const ResType &r, const char *msg)

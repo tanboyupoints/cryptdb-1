@@ -17,7 +17,7 @@
 #include <crypto-old/HGD.hh>
 #include <crypto-old/CryptoManager.hh>
 
-#include <edb/EDBProxy.hh>
+//#include <edb/EDBProxy.hh>
 #include <edb/AccessManager.hh>
 #include <edb/Connect.hh>
 
@@ -26,13 +26,13 @@
 #include <util/cryptdb_log.hh>
 
 #include <test/test_utils.hh>
-#include <test/TestSinglePrinc.hh>
-#include <test/TestMultiPrinc.hh>
+//#include <test/TestSinglePrinc.hh>
+//#include <test/TestMultiPrinc.hh>
 #include <test/TestCrypto.hh>
 #include <test/TestAccessManager.hh>
 #include <test/TestProxy.hh>
 #include <test/TestQueries.hh>
-#include <test/TestNotConsider.hh>
+//#include <test/TestNotConsider.hh>
 
 
 using namespace std;
@@ -386,7 +386,7 @@ evaluateMetrics(const TestConfig &tc, int argc, char ** argv)
 }
 */
 //tests protected methods of EDBProxy
-class tester : public EDBProxy {
+ /*class tester : public EDBProxy {
 public:
     tester(const TestConfig &tc, const string &masterKey) : EDBProxy(tc.host,
             tc.user,
@@ -410,7 +410,7 @@ tester::testClientParser()
 {
     cerr << "testClientParser uses old EDBProxy -- not run" << endl;
 
-    /*list<string> queries = list<string>();
+    list<string> queries = list<string>();
     //queries.push_back(string("CREATE TABLE people (id integer, age integer,
             // name integer);"));
     queries.push_back(string(
@@ -461,9 +461,9 @@ tester::testClientParser()
 
     exit();
     cerr << "TEST TRANSLATOR PASSED \n";
-    */
+    
 }
-
+*/
 static void __attribute__((unused))
 testCryptoManager()
 {

@@ -8,7 +8,6 @@
 #include <signal.h>
 #include <stdlib.h>
 
-#include <edb/EDBProxy.hh>
 #include <edb/Connect.hh>
 #include <test/test_utils.hh>
 
@@ -91,7 +90,7 @@ class Connection {
     test_mode type;
     TestConfig tc;
     //connection object for encryption test
-    EDBProxy * cl;
+    //EDBProxy * cl;
     //connection object for using rewriter
     Rewriter * re;
     //connection objects for plain and proxy test

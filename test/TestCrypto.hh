@@ -12,7 +12,6 @@
 #include <crypto-old/OPE.hh>
 #include <test/test_utils.hh>
 
-
 class TestCrypto {
  public:
     TestCrypto();
