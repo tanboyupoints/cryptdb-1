@@ -27,26 +27,6 @@
 using namespace std;
 
 
-/*
-struct ConnectionData {
-    std::string server;
-    std::string user;
-    std::string psswd;
-    std::string dbname;
-    std::string port;
-
-    ConnectionData() {}
-
-    ConnectionData(std::string serverarg, std::string userarg, std::string psswdarg, std::string dbnamearg, std::string portarg = 0) {
-        server = serverarg;
-        user = userarg;
-        psswd = psswdarg;
-        dbname = dbnamearg;
-        port = portarg;
-    }
-
-} ConnectionData;
-*/
 class FieldReturned {
 public:
     bool encrypted;

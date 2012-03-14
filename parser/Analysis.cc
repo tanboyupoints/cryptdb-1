@@ -4,7 +4,7 @@ using namespace std;
 
 string ItemMeta::stringify() {
     stringstream res;
-    res << "(ItemMeta: onion " << o << " uptolevel " << (int)uptolevel << " basefield " << stringify_ptr(basefield) << ") ";
+    res << "(ItemMeta: onion " << o << " basefield " << stringify_ptr(basefield) << ") ";
     return res.str();
 }
 

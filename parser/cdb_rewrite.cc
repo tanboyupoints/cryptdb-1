@@ -19,6 +19,8 @@
 
 using namespace std;
 
+//TODO: replace table/field with FieldMeta * for speed and conciseness
+
 static inline void
 mysql_query_wrapper(MYSQL *m, const string &q)
 {
@@ -69,15 +71,15 @@ operator<<(ostream &out, const EncDesc & ed)
 //records what onions need to be adjusted at the server for a query with
 //information in a
 static void
-recordAdjustments(string fieldname, onion o, SECLEVEL l, Analysis & a) {
+recordAdjustments(FieldMeta * fm, onion o, SECLEVEL l, Analysis & a) {
     auto ito = a.onionAdjust.find(o);
     if (ito == a.onionAdjust.end()) {
-	a.onionAdjust[o]= map<string, SECLEVEL>();
-	a.onionAdjust[o][fieldname] = l;
+	a.onionAdjust[o]= map<FieldMeta *, SECLEVEL>();
+	a.onionAdjust[o][fm] = l;
     } else {
-	auto itf = ito->second.find(fieldname);
+	auto itf = ito->second.find(fm);
 	if (itf == ito->second.end()) {
-	    ito->second[fieldname] = l;
+	    ito->second[fm] = l;
 	} else {
 	    itf->second = min(l, itf->second);
 	}
@@ -86,12 +88,12 @@ recordAdjustments(string fieldname, onion o, SECLEVEL l, Analysis & a) {
 
 //removes onion layer at the DB 
 static int
-removeOnionLayer(FieldMeta * fm, string table, string field, Analysis & a, onion o, SECLEVEL l) {
+removeOnionLayer(FieldMeta * fm, Analysis & a, onion o, SECLEVEL l) {
 
     string fieldanon = map_getAssert<onion, string>(fm->onionnames, o);
     string tableanon = fm->tm->anonTableName;
     
-    string query = "UPDATE TABLE " + tableanon + " SET " + fieldanon  + " = ";
+    string query = "UPDATE " + tableanon + " SET " + fieldanon  + " = ";
     
     if (fm->ol_id == OLID_NUM) {
 	switch (l) {
@@ -131,6 +133,8 @@ removeOnionLayer(FieldMeta * fm, string table, string field, Analysis & a, onion
     //execute decryption query
     assert_s(a.conn->execute(query), "failed to execute onion decryption query");
 
+    LOG(cdb_v) << "adjust onions: \n" << query << " ... success! \n";
+    
     return 0;
 }
 
@@ -138,20 +142,13 @@ removeOnionLayer(FieldMeta * fm, string table, string field, Analysis & a, onion
  * Same as adjustOnions but for one specific field and onion.
  */
 static int
-adjustOnion(onion o, string fieldname, SECLEVEL levelto, Analysis & a) {
+adjustOnion(onion o, FieldMeta * fm, SECLEVEL levelto, Analysis & a) {
 
-    //TODO: a better representation of field name, or perhaps by FieldMeta --
-    //obviates these
-    string table = getTable(fieldname);
-    string field = getField(fieldname);
-
-    FieldMeta * fm = a.schema->getFieldMeta(table, field);
-
-    //TODO: use map_getAssert and map_set  in more places
+    //TODO: use map_getAssert in more places
     SECLEVEL oldlevel = map_getAssert(fm->encdesc.olm, o);
 
     while (oldlevel > levelto) {
-	if (removeOnionLayer(fm, table, field, a, o, oldlevel) < 0) {
+	if (removeOnionLayer(fm, a, o, oldlevel) < 0) {
 	    return -1;
 	}
 	oldlevel = decreaseLevel(oldlevel, fm->ol_id, o);
@@ -732,7 +729,6 @@ record_item_meta_for_constraints(Item *i,
         im = it->second;
     }
     im->o         = c.first;
-    im->uptolevel = c.second.first;
     im->basefield = c.second.second;
 }
 
@@ -907,23 +903,20 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
         string fieldname = extract_fieldname(i);
         auto it = a.fieldToAMeta.find(fieldname);
-        if (it == a.fieldToAMeta.end()) {
-            FieldMeta *fm = a.schema->getFieldMeta(i->table_name, i->field_name);
-            if (fm) {
-                // bootstrap a new FieldAMeta from the FieldMeta's encdesc
-                a.fieldToAMeta[fieldname] = new FieldAMeta(fm->encdesc);
-                a.itemToFieldMeta[i]      = fm;
-                it = a.fieldToAMeta.find(fieldname);
-            } else {
-                // we aren't aware of this field. this is an error
-                // for now
-                cryptdb_err() << "Cannot find FieldMeta information for: " << *i;
-            }
+
+	FieldMeta *fm = a.schema->getFieldMeta(i->table_name, i->field_name);
+	
+	if (it == a.fieldToAMeta.end()) {
+	    // bootstrap a new FieldAMeta from the FieldMeta's encdesc
+	    a.fieldToAMeta[fieldname] = new FieldAMeta(fm->encdesc);
+	    a.itemToFieldMeta[i]      = fm;
+	    it = a.fieldToAMeta.find(fieldname);
         }
+	
         bool restricted = it->second->exposedLevels.restrict(encpair.first,
                                            encpair.second.first);
 	if (restricted) {
-	    recordAdjustments(fieldname, encpair.first, encpair.second.first, a);
+	    recordAdjustments(fm, encpair.first, encpair.second.first, a);
 	}
 
         LOG(cdb_v) << "ENCSET FOR FIELD " << fieldname << " is " << a.fieldToAMeta[fieldname]->exposedLevels;
@@ -3282,7 +3275,6 @@ Rewriter::decryptResults(ResType & dbres,
     mp_init_decrypt(mp, a);
 
     unsigned int rows = dbres.rows.size();
-
     LOG(cdb_v) << "rows in result " << rows << "\n";
     unsigned int cols = dbres.names.size();
 
@@ -3293,10 +3285,8 @@ Rewriter::decryptResults(ResType & dbres,
     // un-anonymize the names
     for (auto it = dbres.names.begin(); it != dbres.names.end(); it++) {
         ReturnField rf = a.rmeta.rfmeta[index];
-        if (rf.is_salt) {
-            //TODO: is something supposed to happen here?
-        } else {
-            //need to return this field
+        if (!rf.is_salt) {
+	    //need to return this field
             assert_s(rf.im, "ReturnField has no ItemMeta associated with it");
             res.names.push_back(rf.field_called);
         }
@@ -3332,7 +3322,7 @@ Rewriter::decryptResults(ResType & dbres,
 			assert(!si.null);
 			salt = valFromStr(dbres.rows[r][rf.pos_salt].data);
 		    }
-		    res.rows[r][col_index].data = crypt(a, dbres.rows[r][c].data, getTypeForDec(im), fullName(anonName, im->basefield->tm->anonTableName), im->uptolevel, getMin(im->o), isBin, salt, im->basefield, res.rows[r]);
+		    res.rows[r][col_index].data = crypt(a, dbres.rows[r][c].data, getTypeForDec(im), fullName(anonName, im->basefield->tm->anonTableName), map_getAssert(im->basefield->encdesc.olm, im->o), getMin(im->o), isBin, salt, im->basefield, res.rows[r]);
                 }
             }
             col_index++;

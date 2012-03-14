@@ -93,13 +93,12 @@ public:
 class ItemMeta {
 public:
     onion o;
-    SECLEVEL uptolevel;
     FieldMeta * basefield;
     std::string stringify();
 };
 extern "C" void *create_embedded_thd(int client_flag);
 
-typedef struct ReturnField {
+typedef struct ReturnField {//TODO: isn't FieldMeta more fit than ItemMeta?
     bool is_salt;
     std::string field_called;
     ItemMeta *im;
@@ -140,7 +139,7 @@ public:
     TMKM                                tmkm;
 
     //fields that needs onions adjusted
-    std::map<onion, std::map<std::string, SECLEVEL> > onionAdjust;
+    std::map<onion, std::map<FieldMeta *, SECLEVEL> > onionAdjust;
    
     ReturnMeta rmeta;
 
