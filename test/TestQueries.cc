@@ -710,18 +710,6 @@ Connection::start() {
         this->conn = conn_set.begin();
         break;
     }
-    /*        //single -- new EDBProxy
-    case SINGLE:
-        cl = new EDBProxy(tc.host, tc.user, tc.pass, tc.db, tc.port, false);
-        cl->setMasterKey(masterKey);
-        break;
-        //multi -- new EDBProxy
-    case MULTI:
-        cl = new EDBProxy(tc.host, tc.user, tc.pass, tc.db, tc.port, true);
-        cl->setMasterKey(masterKey);
-        assert_s(cl->plain_execute("DROP FUNCTION IF EXISTS test").ok, "dropping test for multi");
-        assert_s(cl->plain_execute("CREATE FUNCTION test (optionid integer) RETURNS bool RETURN optionid=20").ok, "creating test function for multi");
-        break;*/
         //single -- new Rewriter
         //multi -- new Rewriter
     case SINGLE:
@@ -897,6 +885,10 @@ Connection::executeConn(string query) {
 ResType
 Connection::executeRewriter(string query) {
     //translate the query
+    conn++;
+    if (conn == conn_set.end()) {
+        conn = conn_set.begin();
+    }
     Analysis analysis(*conn);
     list<string> enc_queries = re->rewrite(query, analysis);
     

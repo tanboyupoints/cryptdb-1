@@ -3192,12 +3192,12 @@ Rewriter::mp_init(Analysis &a) {
 }
 
 list<string>
-Rewriter::rewrite(const string & q, Analysis & a)
+Rewriter::rewrite(const string & q, Analysis & analysis)
 {
     list<string> queries;
     query_parse p(db, q);
     //TODO: why do we have two analysis here? can't we just use a?
-    Analysis analysis = Analysis(a.connect(), schema, cm, mp, a.conn);
+    analysis = Analysis(m, schema, cm, mp, analysis.conn);
 
     //initialize multi-principal
     mp_init(analysis);
@@ -3240,7 +3240,7 @@ Rewriter::rewrite(const string & q, Analysis & a)
     ss << *lex;
     LOG(cdb_v) << "FINAL QUERY: " << *lex << endl;
     queries.push_back(ss.str());
-    a = analysis;
+    //a = analysis;
     return queries;
 }
 
