@@ -132,72 +132,7 @@ typedef enum class cmd {
 
 const std::string BASE_SALT_NAME = "cdb_salt";
 
-typedef struct FieldMetadata {
 
-    bool isEncrypted;     //indicates if this field is encrypted or not
-
-    fieldType type;
-    std::string fieldName;
-
-    bool can_be_null;
-    enum_field_types mysql_type;
-
-    std::string anonFieldNameDET;
-    std::string anonFieldNameOPE;
-    std::string anonFieldNameAGG;
-    std::string anonFieldNameSWP;
-
-    //true if the onions are used
-    bool has_ope;
-    bool has_agg;
-    bool has_search;
-    bool has_salt; //whether this field has its own salt
-
-    std::string salt_name;
-
-    FieldMetadata();
-
-    enum SECLEVEL secLevelOPE, secLevelDET;
-
-    bool INCREMENT_HAPPENED;
-
-    //records if some onion was used for training
-    bool ope_used;
-    bool agg_used;
-    bool search_used;
-    bool update_set_performed;
-
-    //returns true if the given field exists in the database
-    static bool exists(const std::string &field);
-
-} FieldMetadata;
-
-typedef struct IndexMetadata {
-    std::string anonIndexName;
-    std::list<std::string> fields;
-    bool isUnique;
-} IndexMetadata;
-
-typedef struct TableMetadata { //each anonymized field
-    std::list<std::string> fieldNames;     //in order field names
-    unsigned int tableNo;
-    std::string anonTableName;
-    std::map<std::string, std::string> fieldNameMap;
-        // map of anonymized field name to true field name
-    std::map<std::string, FieldMetadata *> fieldMetaMap;
-        // map of true field name to field metadata
-    std::string salt_name;
-
-    AutoInc ai;     //autoincrement
-
-    std::list<std::string> primaryKey;
-    std::list<IndexMetadata *> indexes;
-    bool hasEncrypted;     //true if the table contains an encrypted field
-    bool hasSensitive;    //true if any field is involved in access control of mp
-
-    TableMetadata();
-    ~TableMetadata();
-} TableMetadata;
 
 typedef struct FieldsToDecrypt {
     std::list<std::string> OPEJoinFields;
@@ -468,6 +403,14 @@ roll(typename std::list<T>::iterator & it,  int count)
         }
     }
 }
+
+template<typename A, typename B>
+B map_getAssert(std::map<A, B> & m, A x) {
+    auto it = m.find(x);
+    assert_s(it != m.end(), "item not present in map");
+    return it->second;
+}
+
 
 template <typename T>
 bool

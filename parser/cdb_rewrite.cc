@@ -65,6 +65,132 @@ operator<<(ostream &out, const EncDesc & ed)
     return out;
 }
 
+
+//records what onions need to be adjusted at the server for a query with
+//information in a
+static void
+recordAdjustments(string fieldname, onion o, SECLEVEL l, Analysis & a) {
+    auto ito = a.onionAdjust.find(o);
+    if (ito == a.onionAdjust.end()) {
+	a.onionAdjust[o]= map<string, SECLEVEL>();
+	a.onionAdjust[o][fieldname] = l;
+    } else {
+	auto itf = ito->second.find(fieldname);
+	if (itf == ito->second.end()) {
+	    ito->second[fieldname] = l;
+	} else {
+	    itf->second = min(l, itf->second);
+	}
+    }
+}
+
+//removes onion layer at the DB 
+static int
+removeOnionLayer(FieldMeta * fm, string table, string field, Analysis & a, onion o, SECLEVEL l) {
+
+    string fieldanon = map_getAssert<onion, string>(fm->onionnames, o);
+    string tableanon = fm->tm->anonTableName;
+    
+    string query = "UPDATE TABLE " + tableanon + " SET " + fieldanon  + " = ";
+    
+    if (fm->ol_id == OLID_NUM) {
+	switch (l) {
+	case SECLEVEL::SEMANTIC_DET: {
+	    //same as SEMANTIC_OPE
+	}
+	case SECLEVEL::SEMANTIC_OPE: {
+	    query += "decrypt_int_sem( " +
+		fieldanon + ", " + 
+		a.cm->marshallKey(a.cm->getKey(fullName(fieldanon, tableanon), l)) + "," +
+		fm->salt_name + ");";
+	    break;
+	}
+	default: {
+	    assert_s(false, "incorrect seclevel");
+	}
+	}
+    } else {
+	//OLID_TEXT
+	switch (l) {
+	case SECLEVEL::SEMANTIC_DET: {
+	    //same as SEMANTIC_OPE 
+	}
+	case SECLEVEL::SEMANTIC_OPE: {
+	    query += "decrypt_text_sem( " +
+		fieldanon + ", " + 
+		a.cm->marshallKey(a.cm->getKey(fullName(fieldanon, tableanon), l)) + "," +
+		fm->salt_name + ");";
+	    break;
+	}
+	default: {
+	    assert_s(false, "incorrect seclevel");
+	}
+	}
+    }
+
+    //execute decryption query
+    assert_s(a.conn->execute(query), "failed to execute onion decryption query");
+
+    return 0;
+}
+
+/*
+ * Same as adjustOnions but for one specific field and onion.
+ */
+static int
+adjustOnion(onion o, string fieldname, SECLEVEL levelto, Analysis & a) {
+
+    //TODO: a better representation of field name, or perhaps by FieldMeta --
+    //obviates these
+    string table = getTable(fieldname);
+    string field = getField(fieldname);
+
+    FieldMeta * fm = a.schema->getFieldMeta(table, field);
+
+    //TODO: use map_getAssert and map_set  in more places
+    SECLEVEL oldlevel = map_getAssert(fm->encdesc.olm, o);
+
+    while (oldlevel > levelto) {
+	if (removeOnionLayer(fm, table, field, a, o, oldlevel) < 0) {
+	    return -1;
+	}
+	oldlevel = decreaseLevel(oldlevel, fm->ol_id, o);
+	//update schema
+	fm->encdesc.olm[o] = oldlevel;
+
+    }
+    
+    return 0;
+}
+
+
+    //TODO: propagate these adjustments in the embedded database?
+
+/*
+ * Examines the current onion levels of fields and the encryption levels
+ * needed for a query (as given by analysis).
+ *
+ * Issues queries for decryption to the DBMS.
+ *
+ * Adjusts the schema metadata at the proxy about onion layers. Propagates the
+ * changed schema to persistent storage.
+ *
+ * Returns negative on error.
+ *
+ */
+static int
+adjustOnions(const std::string &db, Analysis & a)
+{
+
+    for (auto it : a.onionAdjust) {
+	for (auto itt : it.second) {
+	    adjustOnion(it.first, itt.first, itt.second, a);
+	}
+    }
+  
+    return 0;
+}
+
 static inline bool
 FieldQualifies(const FieldMeta * restriction,
                const FieldMeta * field)
@@ -107,12 +233,12 @@ getAnonName(const ItemMeta * im) {
 }
 
 //TODO raluca: should unify enc/dec for numeric and strings
-static fieldType
+static OnionLayoutId
 getTypeForDec(const ItemMeta * im) {
     if (IsMySQLTypeNumeric(im->basefield->sql_field->sql_type)) {
-        return TYPE_INTEGER;
+        return OLID_NUM;
     } else {
-        return TYPE_TEXT;
+        return OLID_TEXT;
     }
 }
 
@@ -200,7 +326,7 @@ printSecLevel(SECLEVEL l) {
 
 
 static string
-crypt(Analysis & a, string plaindata, fieldType ft, string fieldname, SECLEVEL fromlevel, SECLEVEL tolevel, bool & isBin, uint64_t salt, FieldMeta *fm, const vector<SqlItem> &res = vector<SqlItem>()) {
+crypt(Analysis & a, string plaindata, OnionLayoutId ft, string fieldname, SECLEVEL fromlevel, SECLEVEL tolevel, bool & isBin, uint64_t salt, FieldMeta *fm, const vector<SqlItem> &res = vector<SqlItem>()) {
     LOG(cdb_v) << "crypt " << plaindata << " from "; printSecLevel(fromlevel); LOG(cdb_v) << " to "; printSecLevel(tolevel);
     AES_KEY * mkey;
     if (a.mp) {
@@ -234,7 +360,7 @@ ItemToString(Item * i) {
 // encrypts a constant item based on the information in a
 //TODO cat_red fix for mp
 static string
-encryptConstantItem(Item * i, Analysis & a, fieldType ft){
+encryptConstantItem(Item * i, Analysis & a, OnionLayoutId ft){
 
     string plaindata = ItemToString(i);
     cerr << "encrypting constant " << plaindata << "\n";
@@ -487,7 +613,7 @@ do_optimize_const_item(T *i, Analysis &a) {
         buf << "SELECT " << *i;
         string q(buf.str());
         LOG(cdb_v) << q;
-        MYSQL *m = a.conn();
+        MYSQL *m = a.connect();
         mysql_query_wrapper(m, q);
 
         THD *thd = current_thd;
@@ -794,8 +920,11 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
                 cryptdb_err() << "Cannot find FieldMeta information for: " << *i;
             }
         }
-        it->second->exposedLevels.restrict(encpair.first,
+        bool restricted = it->second->exposedLevels.restrict(encpair.first,
                                            encpair.second.first);
+	if (restricted) {
+	    recordAdjustments(fieldname, encpair.first, encpair.second.first, a);
+	}
 
         LOG(cdb_v) << "ENCSET FOR FIELD " << fieldname << " is " << a.fieldToAMeta[fieldname]->exposedLevels;
         record_item_meta_for_constraints(i, tr, a);
@@ -914,7 +1043,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     virtual Item * do_rewrite_type(Item_string *i, Analysis & a) const {
         LOG(cdb_v) << "do_rewrite_type L908";
         string unenc = ItemToString(i);
-        string enc = encryptConstantItem(i,  a, TYPE_TEXT);
+        string enc = encryptConstantItem(i,  a, OLID_TEXT);
         if (enc != unenc) {
 	    cerr << "here in enc!=unenc \n";
             return new Item_string(make_thd_string(enc), enc.length(), i->default_charset());
@@ -951,10 +1080,10 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
             LOG(cdb_v) << "field " << fm->fname << " on onion ";
             printOnion(it->first);
 
-            string enc = crypt(a, plaindata, TYPE_TEXT, anonName, getMin(it->first), getMax(it->first), isBin, salt, fm);
+            string enc = crypt(a, plaindata, OLID_TEXT, anonName, getMin(it->first), getMax(it->first), isBin, salt, fm);
             Item *itest = new Item_string(make_thd_string(enc), enc.length(), i->default_charset());
             if (it->first == oDET) {
-                assert_s(crypt(a, ItemToString(itest), TYPE_TEXT, anonName, getMax(it->first), getMin(it->first), isBin, salt, fm) == plaindata, "crypt(crypt(plaindata)) != plaindata");
+                assert_s(crypt(a, ItemToString(itest), OLID_TEXT, anonName, getMax(it->first), getMin(it->first), isBin, salt, fm) == plaindata, "crypt(crypt(plaindata)) != plaindata");
                 save_det = enc;
             } else {
                 assert_s(save_det == (*(l.begin()))->str_value.ptr(), "det str somehow changed >_< from " + save_det + " to " + (*(l.begin()))->str_value.ptr());
@@ -996,7 +1125,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     virtual Item * do_rewrite_type(Item_num *i, Analysis & a) const {
 
         LOG(cdb_v) << "do_rewrite_type L970 " << *i << endl;
-        string enc = encryptConstantItem(i, a, TYPE_INTEGER);
+        string enc = encryptConstantItem(i, a, OLID_NUM);
 	
 	return new Item_int((ulonglong) valFromStr(enc));
 
@@ -1026,7 +1155,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
              ++it) {
             string anonName = fullName(it->second, fm->tm->anonTableName);
             bool isBin;
-            string enc = crypt(a, plaindata, TYPE_INTEGER, anonName, getMin(it->first), getMax(it->first), isBin, salt, fm);
+            string enc = crypt(a, plaindata, OLID_NUM, anonName, getMin(it->first), getMax(it->first), isBin, salt, fm);
             
             l.push_back(new Item_int((ulonglong) valFromStr(enc)));
         }
@@ -2597,25 +2726,6 @@ query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis &
 
 
 /*
- * Examines the embedded database and the encryption levels needed for a query (as given by analysis).
- *
- * Issues queries for decryption to the DBMS.
- *
- * Adjusts the metadata at the proxy about onion layers.
- *
- * Adjusts analysis to indicate the final encryption schemes to use.
- *
- * Returns negative on error.
- *
- */
-static int
-adjustOnions(const std::string &db, const Analysis & analysis)
-{
-    return 0;
-}
-
-
-/*
  * Rewrites lex by translating and encrypting based on information in analysis.
  *
  * Fills rmeta with information about how to decrypt fields returned.
@@ -2650,7 +2760,7 @@ drop_table_update_meta(const string &q,
                        LEX *lex,
                        Analysis &a)
 {
-    MYSQL *m = a.conn();
+    MYSQL *m = a.connect();
 
     mysql_query_wrapper(m, "START TRANSACTION");
 
@@ -2679,7 +2789,7 @@ add_table_update_meta(const string &q,
                       LEX *lex,
                       Analysis &a)
 {
-    MYSQL *m = a.conn();
+    MYSQL *m = a.connect();
 
     mysql_query_wrapper(m, "START TRANSACTION");
 
@@ -2814,7 +2924,7 @@ Rewriter::~Rewriter()
 void
 Rewriter::createMetaTablesIfNotExists()
 {
-    MYSQL *m = conn();
+    MYSQL *m = connect();
     mysql_query_wrapper(m, "CREATE DATABASE IF NOT EXISTS proxy_db");
 
     mysql_query_wrapper(m,
@@ -2890,7 +3000,7 @@ Rewriter::initSchema()
 {
     createMetaTablesIfNotExists();
 
-    MYSQL *m = conn();
+    MYSQL *m = connect();
     vector<string> tablelist;
 
     {
@@ -3086,7 +3196,8 @@ Rewriter::rewrite(const string & q, Analysis & a)
 {
     list<string> queries;
     query_parse p(db, q);
-    Analysis analysis = Analysis(conn(), schema, cm, mp);
+    //TODO: why do we have two analysis here? can't we just use a?
+    Analysis analysis = Analysis(a.connect(), schema, cm, mp, a.conn);
 
     //initialize multi-principal
     mp_init(analysis);

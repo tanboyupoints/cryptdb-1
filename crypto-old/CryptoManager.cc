@@ -199,138 +199,6 @@ highestEq(SECLEVEL sl)
 }
 
 
-
-
-static onion
-getOnion(SECLEVEL l1)
-{
-    switch (l1) {
-    case SECLEVEL::PLAIN_DET: {return oDET; }
-    case SECLEVEL::DETJOIN: {return oDET; }
-    case SECLEVEL::DET: {return oDET; }
-    case SECLEVEL::SEMANTIC_DET: {return oDET; }
-    case SECLEVEL::PLAIN_OPE: {return oOPE; }
-    case SECLEVEL::OPEJOIN: {return oOPE; }
-    case SECLEVEL::OPE: {return oOPE; }
-    case SECLEVEL::SEMANTIC_OPE: {return oOPE; }
-    case SECLEVEL::PLAIN_AGG: {return oAGG; }
-    case SECLEVEL::SEMANTIC_AGG: {return oAGG; }
-    case SECLEVEL::PLAIN_SWP: {return oSWP; }
-    case SECLEVEL::SWP: {return oSWP; }
-    case SECLEVEL::PLAIN: {return oNONE; }
-    default: {return oINVALID; }
-    }
-    return oINVALID;
-}
-
-static SECLEVEL
-decreaseLevel(SECLEVEL l, fieldType ft,  onion o)
-{
-    switch (o) {
-    case oDET: {
-        switch (l) {
-        case SECLEVEL::SEMANTIC_DET: {return SECLEVEL::DET; }
-        case SECLEVEL::DET: {
-            return SECLEVEL::DETJOIN;
-        }
-        case SECLEVEL::DETJOIN: {return SECLEVEL::PLAIN_DET; }
-        default: {
-            assert_s(false, "cannot decrease level");
-            return SECLEVEL::INVALID;
-        }
-        }
-    }
-    case oOPE: {
-        switch (l) {
-        case SECLEVEL::SEMANTIC_OPE: {return SECLEVEL::OPE; }
-        case SECLEVEL::OPE: {
-            if (ft == TYPE_INTEGER) {
-                return SECLEVEL::OPEJOIN;
-            } else {
-                return SECLEVEL::PLAIN_OPE;
-            }
-        }
-        case SECLEVEL::OPEJOIN: {return SECLEVEL::PLAIN_OPE;}
-        default: {
-            assert_s(false, "cannot decrease level");
-            return SECLEVEL::INVALID;
-        }
-        }
-    }
-    case oAGG: {
-        switch (l) {
-        case SECLEVEL::SEMANTIC_AGG: {return SECLEVEL::PLAIN_AGG; }
-        default: {
-            assert_s(false, "cannot decrease level");
-            return SECLEVEL::INVALID;
-        }
-        }
-    }
-    case oSWP: {
-            assert_s(l == SECLEVEL::SWP, "cannot decrease level for other than level SWP on the SWP onion");
-            return SECLEVEL::PLAIN_SWP;
-    }
-    default: {
-        assert_s(false, "cannot decrease level");
-        return SECLEVEL::INVALID;
-    }
-    }
-
-}
-
-static SECLEVEL
-increaseLevel(SECLEVEL l, fieldType ft, onion o)
-{
-    switch (o) {
-    case oDET: {
-        switch (l) {
-        case SECLEVEL::DET:         return SECLEVEL::SEMANTIC_DET;
-        case SECLEVEL::DETJOIN:     return SECLEVEL::DET;
-        case SECLEVEL::PLAIN_DET:   return SECLEVEL::DETJOIN;
-        default: {
-            assert_s(false, "cannot increase level");
-            return SECLEVEL::INVALID;   // unreachable
-        }
-        }
-    }
-    case oOPE: {
-        switch (l) {
-        case SECLEVEL::OPE: {return SECLEVEL::SEMANTIC_OPE; }
-        case SECLEVEL::PLAIN_OPE: {
-            if (ft == TYPE_INTEGER) {
-                return SECLEVEL::OPEJOIN;
-            } else {
-                return SECLEVEL::OPE;
-            }
-        }
-        case SECLEVEL::OPEJOIN: {return SECLEVEL::OPE;}
-        default: {
-            assert_s(false, "cannot increase level");
-            return SECLEVEL::INVALID;
-        }
-        }
-    }
-    case oAGG: {
-        switch (l) {
-        case SECLEVEL::PLAIN_AGG: {return SECLEVEL::SEMANTIC_AGG; }
-        default: {
-            assert_s(false, "cannot increase level");
-            return SECLEVEL::INVALID;
-        }
-        }
-    }
-    case oSWP: {
-        assert_s(l == SECLEVEL::PLAIN_SWP,  "cannot increase beyond SWP");
-        return SECLEVEL::SWP;
-    }
-    default: {
-        assert_s(false, "cannot increase level");
-        return SECLEVEL::INVALID;
-    }
-    }
-
-}
-
 //TODO: this function should be replaced with actual functionality..
 // for now, it does not interfere with tpcc performance because all filters are on integers or strings
 static string
@@ -352,7 +220,7 @@ removeUnsupportedMath(string data) {
 // when we want to decrypt many items from a column, in this way, we do not
 // need to construct the key every time
 string
-CryptoManager::crypt(AES_KEY * mkey, string data, fieldType ft,
+CryptoManager::crypt(AES_KEY * mkey, string data, OnionLayoutId ft,
                      string fullfieldname,
                      SECLEVEL fromlevel, SECLEVEL tolevel, bool & isBin,
                      uint64_t salt)
@@ -380,7 +248,7 @@ CryptoManager::crypt(AES_KEY * mkey, string data, fieldType ft,
         //need to decrypt
 
         switch (ft) {
-        case TYPE_INTEGER: {
+        case OLID_NUM: {
 
 
             switch (o) {
@@ -485,7 +353,7 @@ CryptoManager::crypt(AES_KEY * mkey, string data, fieldType ft,
             assert_s(false, "no other onions possible\n");
             return "";
         }
-        case TYPE_TEXT: {
+        case OLID_TEXT: {
 
             switch (o) {
             case oDET: {
@@ -582,7 +450,7 @@ CryptoManager::crypt(AES_KEY * mkey, string data, fieldType ft,
     myassert(fromlevel < tolevel, "problem with crypt: comp should be > 0");
 
     switch (ft) {
-    case TYPE_INTEGER: {
+    case OLID_NUM: {
 
         switch (o) {
         case oDET: {
@@ -696,7 +564,7 @@ CryptoManager::crypt(AES_KEY * mkey, string data, fieldType ft,
         assert_s(false, "no other onions possible\n");
         return "";
     }
-    case TYPE_TEXT: {
+    case OLID_TEXT: {
 
         switch (o) {
         case oDET: {

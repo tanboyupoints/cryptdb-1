@@ -116,14 +116,14 @@ typedef struct ReturnMeta {
 
 class Analysis {
 public:
-    Analysis(MYSQL *m, SchemaInfo * schema, CryptoManager *cm, MultiPrinc *mp)
-        : pos(0), schema(schema), cm(cm), m(m) {
+    Analysis(MYSQL *m, SchemaInfo * schema, CryptoManager *cm, MultiPrinc *mp, Connect * conn)
+        : pos(0), schema(schema), cm(cm), conn(conn), m(m) {
         assert(m != NULL);
         this->mp = mp;
     }
-    Analysis(): pos(0), schema(NULL), cm(NULL), m(NULL) {
+    Analysis(Connect * conn): pos(0), schema(NULL), cm(NULL), conn(conn), m(NULL) {
     }
-    inline MYSQL* conn() {
+    inline MYSQL* connect() {
         mysql_thread_init();
         return m;
     }
@@ -135,9 +135,13 @@ public:
     std::set<Item*>                     itemHasRewrite;
     SchemaInfo *                        schema;
     CryptoManager *                     cm;
+    Connect *                           conn;
     MultiPrinc *                        mp;
     TMKM                                tmkm;
 
+    //fields that needs onions adjusted
+    std::map<onion, std::map<std::string, SECLEVEL> > onionAdjust;
+   
     ReturnMeta rmeta;
 
 private:

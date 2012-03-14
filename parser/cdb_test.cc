@@ -81,9 +81,11 @@ main(int ac, char **av)
     r.setMasterKey("2392834");
 
     cerr << "connecting to localhost db cryptdbtest user root pass letmein" << "\n";
-    Connect conn("localhost", "root", "letmein", "cryptdbtest");
+    Connect *  conn = new Connect("localhost", "root", "letmein", "cryptdbtest");
     DBResult * dbres;
 
+
+    //TODO: are connect and Mysql * m redundant?
     for (;;) {
         char *input = readline("CryptDB=# ");
 
@@ -99,12 +101,12 @@ main(int ac, char **av)
         add_history(input);
         string new_q;
         try {
-            Analysis analysis;
+            Analysis analysis(conn);
             list<string> new_queries = r.rewrite(q, analysis);
             //only last query should return anything
             for (auto new_q = new_queries.begin(); new_q != new_queries.end(); new_q++) {
                 cerr << "SUCCESS: " << *new_q << endl;
-                conn.execute(*new_q, dbres);
+                conn->execute(*new_q, dbres);
             }
             if (!dbres) {
                 continue;

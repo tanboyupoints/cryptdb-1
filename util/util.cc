@@ -64,52 +64,7 @@ ParserMeta::ParserMeta() : clauseKeywords_p(), querySeparators_p()
         querySeparators_p.insert(querySeparators[i]);
 }
 
-FieldMetadata::FieldMetadata()
-{
-    isEncrypted = false;
 
-    can_be_null = true;
-
-
-    type = TYPE_TEXT;
-
-
-    //by default, all onions are at maximum security
-    secLevelDET = SECLEVEL::SEMANTIC_DET;
-    secLevelOPE = SECLEVEL::SEMANTIC_OPE;
-
-
-    INCREMENT_HAPPENED = false;
-
-    //onions used by default
-    has_ope = true;
-    has_agg = true;
-    has_search = true;
-    has_salt = true;
-
-    salt_name = "";
-
-    //none of the onions used yet
-    ope_used = false;
-    agg_used = false;
-    search_used = false;
-    update_set_performed = false;
-}
-
-TableMetadata::TableMetadata() {
-    anonTableName = "";
-    tableNo = 0;
-    hasEncrypted = false;
-    hasSensitive = false;
-}
-
-TableMetadata::~TableMetadata()
-{
-    for (auto i = fieldMetaMap.begin(); i != fieldMetaMap.end(); i++)
-        delete i->second;
-    for (auto i = indexes.begin(); i != indexes.end(); i++)
-        delete *i;
-}
 
 double
 timeInSec(struct timeval tvstart, struct timeval tvend)

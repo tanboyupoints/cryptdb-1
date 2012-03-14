@@ -73,6 +73,7 @@ typedef struct FieldMeta {
     Create_field * sql_field;
     int index;
 
+    OnionLayoutId ol_id; //the type of onion layout for this field
     std::map<onion, std::string> onionnames;
     EncDesc encdesc;
 

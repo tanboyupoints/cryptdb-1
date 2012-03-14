@@ -41,7 +41,7 @@ class CryptoManager {
     // from fullfieldname and tolevel/fromlevel
     //assumes the two levels are one the same onion
     // salt need only be provided for semantic encryptions
-    std::string crypt(AES_KEY * mkey, std::string data, fieldType ft,
+    std::string crypt(AES_KEY * mkey, std::string data, OnionLayoutId ft,
                  std::string fullfieldname, SECLEVEL fromlevel, SECLEVEL tolevel, bool & isBin,
                  uint64_t salt = 0);
 
