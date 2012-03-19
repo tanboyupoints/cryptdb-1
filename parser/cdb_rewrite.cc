@@ -2941,16 +2941,11 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
     return adjustOnions(db, a);
 }
 
-<<<<<<< HEAD
-Rewriter::Rewriter(Connect *conn, string dbname,
-                   bool multi, bool encByDefault)
-    : db(dbname), encByDefault(encByDefault)
-=======
 static void dropF(Connect * conn, const string & func) {
     myassert(conn->execute("DROP FUNCTION IF EXISTS " + func + "; "),
-             "cannot drop " + func + ");");
-    
+             "cannot drop " + func + ");");    
 }
+
 static void
 dropAll(Connect * conn)
 {
