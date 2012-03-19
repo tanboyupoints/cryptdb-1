@@ -732,9 +732,9 @@ Connection::start() {
         Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db);
         conn_set.insert(c);
         this->conn = conn_set.begin();
-        ConnectionData cd = ConnectionData(tc.host, tc.user, tc.pass, tc.db);
+        Connect *rewriter_conn = new Connect(tc.host, tc.user, tc.pass, tc.db);
 
-        re = new Rewriter(cd, (type == MULTI), false);
+        re = new Rewriter(rewriter_conn, tc.db, (type == MULTI), false);
         re->setMasterKey("2392834");
         break;
     }

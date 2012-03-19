@@ -2876,9 +2876,9 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
     return adjustOnions(db, a);
 }
 
-Rewriter::Rewriter(ConnectionData db,
+Rewriter::Rewriter(Connect *conn, string dbname,
                    bool multi, bool encByDefault)
-    : db(db.dbname), encByDefault(encByDefault)
+    : db(dbname), encByDefault(encByDefault)
 {
     // create mysql connection to embedded
     // server
@@ -2892,8 +2892,8 @@ Rewriter::Rewriter(ConnectionData db,
     //mysql_query_wrapper(m, "show databases;");
 
     // HACK: create this DB if it doesn't exist, for now
-    string create_q = "CREATE DATABASE IF NOT EXISTS " + db.dbname;
-    string use_q    = "USE " + db.dbname + ";";
+    string create_q = "CREATE DATABASE IF NOT EXISTS " + dbname;
+    string use_q    = "USE " + dbname + ";";
     mysql_query_wrapper(m, create_q);
     mysql_query_wrapper(m, use_q);
 
@@ -2902,7 +2902,7 @@ Rewriter::Rewriter(ConnectionData db,
     initSchema();
 
     if (multi) {
-        mp = new MultiPrinc(new Connect(db.server, db.user, db.psswd, db.dbname, db.port));
+        mp = new MultiPrinc(conn);
     } else {
         this->mp = NULL;
     }
@@ -3240,7 +3240,6 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
     ss << *lex;
     LOG(cdb_v) << "FINAL QUERY: " << *lex << endl;
     queries.push_back(ss.str());
-    //a = analysis;
     return queries;
 }
 

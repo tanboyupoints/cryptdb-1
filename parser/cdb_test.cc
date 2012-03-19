@@ -76,8 +76,8 @@ main(int ac, char **av)
 
     string db(av[2]);
     //HACK (cat_red) currently hard-coding other db information
-    ConnectionData cd = ConnectionData("localhost", "root", "letmein", db);
-    Rewriter r(cd, Multi, encByDefault);
+    Connect *re_conn = new Connect("localhost", "root", "letmein", db);
+    Rewriter r(re_conn, db, Multi, encByDefault);
     r.setMasterKey("2392834");
 
     cerr << "connecting to localhost db cryptdbtest user root pass letmein" << "\n";
