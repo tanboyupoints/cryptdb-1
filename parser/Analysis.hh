@@ -36,6 +36,8 @@ public:
         return OnionLevelFieldPair(it->first, it->second);
     }
 
+    void setFieldForOnion(onion o, FieldMeta * fm);
+    
     OnionLevelFieldMap osl; //max level on each onion
 };
 
@@ -93,13 +95,12 @@ public:
 class ItemMeta {
 public:
     onion o;
-    SECLEVEL uptolevel;
     FieldMeta * basefield;
     std::string stringify();
 };
 extern "C" void *create_embedded_thd(int client_flag);
 
-typedef struct ReturnField {
+typedef struct ReturnField {//TODO: isn't FieldMeta more fit than ItemMeta?
     bool is_salt;
     std::string field_called;
     ItemMeta *im;
@@ -129,10 +130,15 @@ public:
     }
 
     unsigned int pos; //a counter indicating how many projection fields have been analyzed so far                                                                    
-    std::map<std::string, FieldAMeta *> fieldToAMeta;
+    std::map<std::string, FieldAMeta *> fieldToAMeta;//TODO: currently
+						     //fieldAMeta is not used
+						     //for smth useful: remove?
+
+    //maps an Item to metadata about that item
     std::map<Item*, ItemMeta *>         itemToMeta;
     std::map<Item_field*, FieldMeta*>   itemToFieldMeta;
     std::set<Item*>                     itemHasRewrite;
+    
     SchemaInfo *                        schema;
     CryptoManager *                     cm;
     Connect *                           conn;
@@ -140,7 +146,7 @@ public:
     TMKM                                tmkm;
 
     //fields that needs onions adjusted
-    std::map<onion, std::map<std::string, SECLEVEL> > onionAdjust;
+    std::map<onion, std::map<FieldMeta *, SECLEVEL> > onionAdjust;
    
     ReturnMeta rmeta;
 

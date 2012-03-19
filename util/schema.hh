@@ -16,6 +16,7 @@ struct FieldMeta;
  */
 typedef std::pair<SECLEVEL, FieldMeta *> LevelFieldPair;
 typedef std::map<onion, LevelFieldPair>  OnionLevelFieldMap;
+
 typedef std::pair<onion, LevelFieldPair> OnionLevelFieldPair;
 typedef std::map<onion, SECLEVEL>        OnionLevelMap;
 
@@ -66,7 +67,6 @@ struct TableMeta;
 //TODO: FieldMeta and TableMeta are partly duplicates with the original
 // FieldMetadata an TableMetadata
 // which contains data we want to add to this structure soon
-// we can remove old ones when we have needed functionality here
 typedef struct FieldMeta {
     TableMeta * tm; //point to table belonging in
     std::string fname;

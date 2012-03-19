@@ -40,6 +40,7 @@ SchemaInfo::getFieldMeta(const string & table, const string & field) {
     TableMeta * tm = getTableMeta(table);
     auto it = tm->fieldMetaMap.find(field);
     assert_s(it != tm->fieldMetaMap.end(), "could not find field " + field + " in table " +  table );
+    assert_s(it->second != NULL, "field " + table + "." + field + " not present in proxy schema ");
     return it->second;
 }
 

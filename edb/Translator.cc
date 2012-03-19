@@ -212,6 +212,11 @@ isField(string token)
     return true;
 }
 
+/*
+ * The following functions return field name and table name.
+ * Require the data to be in the format table.field or field.
+ *
+ */
 string
 getField(string tablefield)
 {

@@ -13,11 +13,16 @@
 #include <parser/cdb_rewrite.hh>
 #include <util/cryptdb_log.hh>
 
+//TODO: so far, do_enforce methods don't seem to do what analyze cannot do
+// needed?
+
 #define UNIMPLEMENTED \
     throw runtime_error(string("Unimplemented: ") + \
                         string(__PRETTY_FUNCTION__))
 
 using namespace std;
+
+//TODO: replace table/field with FieldMeta * for speed and conciseness
 
 static inline void
 mysql_query_wrapper(MYSQL *m, const string &q)
@@ -69,15 +74,15 @@ operator<<(ostream &out, const EncDesc & ed)
 //records what onions need to be adjusted at the server for a query with
 //information in a
 static void
-recordAdjustments(string fieldname, onion o, SECLEVEL l, Analysis & a) {
+recordAdjustments(FieldMeta * fm, onion o, SECLEVEL l, Analysis & a) {
     auto ito = a.onionAdjust.find(o);
     if (ito == a.onionAdjust.end()) {
-	a.onionAdjust[o]= map<string, SECLEVEL>();
-	a.onionAdjust[o][fieldname] = l;
+	a.onionAdjust[o]= map<FieldMeta *, SECLEVEL>();
+	a.onionAdjust[o][fm] = l;
     } else {
-	auto itf = ito->second.find(fieldname);
+	auto itf = ito->second.find(fm);
 	if (itf == ito->second.end()) {
-	    ito->second[fieldname] = l;
+	    ito->second[fm] = l;
 	} else {
 	    itf->second = min(l, itf->second);
 	}
@@ -86,12 +91,12 @@ recordAdjustments(string fieldname, onion o, SECLEVEL l, Analysis & a) {
 
 //removes onion layer at the DB 
 static int
-removeOnionLayer(FieldMeta * fm, string table, string field, Analysis & a, onion o, SECLEVEL l) {
+removeOnionLayer(FieldMeta * fm, Analysis & a, onion o, SECLEVEL l) {
 
     string fieldanon = map_getAssert<onion, string>(fm->onionnames, o);
     string tableanon = fm->tm->anonTableName;
     
-    string query = "UPDATE TABLE " + tableanon + " SET " + fieldanon  + " = ";
+    string query = "UPDATE " + tableanon + " SET " + fieldanon  + " = ";
     
     if (fm->ol_id == OLID_NUM) {
 	switch (l) {
@@ -131,6 +136,8 @@ removeOnionLayer(FieldMeta * fm, string table, string field, Analysis & a, onion
     //execute decryption query
     assert_s(a.conn->execute(query), "failed to execute onion decryption query");
 
+    LOG(cdb_v) << "adjust onions: \n" << query << " ... success! \n";
+    
     return 0;
 }
 
@@ -138,20 +145,13 @@ removeOnionLayer(FieldMeta * fm, string table, string field, Analysis & a, onion
  * Same as adjustOnions but for one specific field and onion.
  */
 static int
-adjustOnion(onion o, string fieldname, SECLEVEL levelto, Analysis & a) {
+adjustOnion(onion o, FieldMeta * fm, SECLEVEL levelto, Analysis & a) {
 
-    //TODO: a better representation of field name, or perhaps by FieldMeta --
-    //obviates these
-    string table = getTable(fieldname);
-    string field = getField(fieldname);
-
-    FieldMeta * fm = a.schema->getFieldMeta(table, field);
-
-    //TODO: use map_getAssert and map_set  in more places
+    //TODO: use map_getAssert in more places
     SECLEVEL oldlevel = map_getAssert(fm->encdesc.olm, o);
 
     while (oldlevel > levelto) {
-	if (removeOnionLayer(fm, table, field, a, o, oldlevel) < 0) {
+	if (removeOnionLayer(fm, a, o, oldlevel) < 0) {
 	    return -1;
 	}
 	oldlevel = decreaseLevel(oldlevel, fm->ol_id, o);
@@ -727,13 +727,14 @@ record_item_meta_for_constraints(Item *i,
     auto it = a.itemToMeta.find(i);
     ItemMeta *im;
     if (it == a.itemToMeta.end()) {
-        a.itemToMeta[i] = im = new ItemMeta;
+	im = new ItemMeta;
+        a.itemToMeta[i] = im;
     } else {
         im = it->second;
     }
     im->o         = c.first;
-    im->uptolevel = c.second.first;
     im->basefield = c.second.second;
+    assert_s(im->basefield, "NULL basefield");
 }
 
 template <class T>
@@ -907,23 +908,20 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
         string fieldname = extract_fieldname(i);
         auto it = a.fieldToAMeta.find(fieldname);
-        if (it == a.fieldToAMeta.end()) {
-            FieldMeta *fm = a.schema->getFieldMeta(i->table_name, i->field_name);
-            if (fm) {
-                // bootstrap a new FieldAMeta from the FieldMeta's encdesc
-                a.fieldToAMeta[fieldname] = new FieldAMeta(fm->encdesc);
-                a.itemToFieldMeta[i]      = fm;
-                it = a.fieldToAMeta.find(fieldname);
-            } else {
-                // we aren't aware of this field. this is an error
-                // for now
-                cryptdb_err() << "Cannot find FieldMeta information for: " << *i;
-            }
+
+	FieldMeta *fm = a.schema->getFieldMeta(i->table_name, i->field_name);
+	
+	if (it == a.fieldToAMeta.end()) {
+	    // bootstrap a new FieldAMeta from the FieldMeta's encdesc
+	    a.fieldToAMeta[fieldname] = new FieldAMeta(fm->encdesc);
+	    a.itemToFieldMeta[i]      = fm;
+	    it = a.fieldToAMeta.find(fieldname);
         }
+	
         bool restricted = it->second->exposedLevels.restrict(encpair.first,
                                            encpair.second.first);
 	if (restricted) {
-	    recordAdjustments(fieldname, encpair.first, encpair.second.first, a);
+	    recordAdjustments(fm, encpair.first, encpair.second.first, a);
 	}
 
         LOG(cdb_v) << "ENCSET FOR FIELD " << fieldname << " is " << a.fieldToAMeta[fieldname]->exposedLevels;
@@ -1406,9 +1404,30 @@ static class ANON : public CItemSubtypeFT<Item_func_get_system_var, Item_func::F
 // hom-add, then we will just lie about its existence. Eventually we could
 // probably pull the udf_func object out of the embedded db.
 
+
+static LEX_STRING s_HomSum = {
+    (char*)"agg_add",
+    sizeof("agg_add"),
+};
+
+static udf_func s_HomSumUdfFunc = {
+    s_HomSum,
+    STRING_RESULT,
+    UDFTYPE_AGGREGATE,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0L,
+};
+
 static LEX_STRING s_HomAdd = {
-        (char*)"hom_add",
-        sizeof("hom_add"),
+        (char*)"agg",
+        sizeof("agg"),
+	
     };
 
 static udf_func s_HomAddUdfFunc = {
@@ -1462,7 +1481,8 @@ class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
         return do_optimize_type_self_and_args(i, a);
     }
     virtual Item * do_rewrite_type(Item_func_additive_op *i, Analysis & a) const {
-        LOG(cdb_v) << "do_rewrite_type L1305";
+        LOG(cdb_v) << "do_rewrite_type Item_func_additive_op";
+;
         // rewrite children
         do_rewrite_type_args(i, a);
 
@@ -1933,16 +1953,61 @@ static CItemChooseOrder<Item_sum::Sumfunctype::MAX_FUNC> ANON;
 template<Item_sum::Sumfunctype SFT>
 class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
     virtual EncSet do_gather_type(Item_sum_sum *i, const constraints &tr, Analysis & a) const {
-        LOG(cdb_v) << "do_a_t Item_sum_sum reason " << tr;
-        if (i->has_with_distinct())
-            analyze(i->get_arg(0), constraints(EQ_EncSet, "agg_distinct", i, &tr, false), a);
+        LOG(cdb_v) << "gather in CItemSum reason " << tr;
+	Item * child_item = i->get_arg(0);
+	
+	if (i->has_with_distinct()) {
+	    UNIMPLEMENTED;
+	    analyze(child_item, constraints(EQ_EncSet, "agg_distinct", i, &tr, false), a);
+	    
+	}
+	constraints new_tr = constraints(tr.encset.intersect(ADD_EncSet), "sum/avg", i, &tr, false);
+	analyze(child_item, new_tr, a);
 
-        analyze(i->get_arg(0), constraints(tr.encset.intersect(ADD_EncSet), "sum/avg", i, &tr, false), a);
-        return tr.encset;
+	new_tr.encset.setFieldForOnion(oAGG,
+					 map_getAssert<Item_field*, FieldMeta*>(a.itemToFieldMeta,
+										(Item_field *)child_item));
+	
+	cerr << "CONSTRAINTS after gathers in item_sum_sum: " << new_tr << "\n";
+	return new_tr.encset;
     }
     virtual void do_enforce_type(Item_sum_sum *i, const constraints &tr, Analysis & a) const
-    {}
+    {
+	LOG(cdb_v) << "enforce in CItemSum tr: " << tr << "\n";
+	record_item_meta_for_constraints(i, tr, a);
+    }
+    
+    virtual Item * do_rewrite_type(Item_sum_sum * i, Analysis & a) const {
+	LOG(cdb_v) << "rewrite in CItemAdditive ";
+
+	//record information for decrypting results
+	addToReturn(a.rmeta, a.pos++,
+		    map_getAssert<Item*, ItemMeta*>(a.itemToMeta, i),
+		    false, i->name);
+
+	//rewrite children
+	List<Item> l;
+	uint count = i->get_arg_count();
+	for (uint ind = 0 ;ind < count; ind++) {
+	    Item * arg = i->get_arg(ind); 
+	    rewrite(&arg, a);
+	    l.push_back(arg);
+	}
+	
+	//need to add public key info for HOM
+	string pk = marshallBinary(a.cm->getPKInfo());//TODO: do we need to marshall?
+        Item * pk_item = new Item_string(make_thd_string(pk), 
+				pk.length(),
+				i->default_charset());	
+	pk_item->name = NULL; //no need for alias
+	l.push_back(pk_item);
+    
+	return new Item_func_udf_str(&s_HomAddUdfFunc, l);
+
+    }
 };
+
+//TODO: field OPE should not be blob for text either
 
 static CItemSum<Item_sum::Sumfunctype::SUM_FUNC> ANON;
 static CItemSum<Item_sum::Sumfunctype::SUM_DISTINCT_FUNC> ANON;
@@ -2876,9 +2941,60 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
     return adjustOnions(db, a);
 }
 
+<<<<<<< HEAD
 Rewriter::Rewriter(Connect *conn, string dbname,
                    bool multi, bool encByDefault)
     : db(dbname), encByDefault(encByDefault)
+=======
+static void dropF(Connect * conn, const string & func) {
+    myassert(conn->execute("DROP FUNCTION IF EXISTS " + func + "; "),
+             "cannot drop " + func + ");");
+    
+}
+static void
+dropAll(Connect * conn)
+{
+    dropF(conn, "decrypt_int_sem");
+    dropF(conn, "decrypt_int_det");
+    dropF(conn, "decrypt_text_sem");
+    dropF(conn, "decrypt_text_det");
+    dropF(conn, "searchSWP");
+    dropF(conn, "agg");
+    dropF(conn, "func_add_set");   
+}
+
+static void
+createF(Connect * conn, const string & func, const string & ret, bool isAggregate = false){
+    string functype = "";
+    if (isAggregate) {
+	functype = "AGGREGATE";
+    }
+    myassert(conn->execute(
+                 "CREATE  " + functype + " FUNCTION " + func + " RETURNS " + ret + " SONAME 'edb.so'; "),
+             "failed to create udf " + func);    
+}
+static void
+createAll(Connect * conn)
+{
+    createF(conn, "decrypt_int_sem", "INTEGER");
+    createF(conn, "decrypt_int_det", "INTEGER");
+    createF(conn, "decrypt_text_sem", "STRING");
+    createF(conn, "decrypt_text_det", "STRING");
+    createF(conn, "searchSWP", "INTEGER");
+    createF(conn, "agg", "STRING", true);
+    createF(conn, "func_add_set", "STRING");
+}
+
+static void
+loadUDFs(Connect * conn) {
+    dropAll(conn);
+    createAll(conn);
+    LOG(cdb_v) << "Loaded CryptDB's UDFs.";
+}
+
+Rewriter::Rewriter(Connect * conn, string dbname,
+                   bool multi, bool encByDefault)
+    : conn(conn), db(dbname), encByDefault(encByDefault)
 {
     // create mysql connection to embedded
     // server
@@ -2901,6 +3017,8 @@ Rewriter::Rewriter(Connect *conn, string dbname,
     totalTables = 0;
     initSchema();
 
+    loadUDFs(conn);
+
     if (multi) {
         mp = new MultiPrinc(conn);
     } else {
@@ -2911,9 +3029,9 @@ Rewriter::Rewriter(Connect *conn, string dbname,
 Rewriter::~Rewriter()
 {
     mysql_close(m);
-    if (c) {
-        delete c;
-        c = NULL;
+    if (conn) {
+        delete conn;
+        conn = NULL;
     }
     if (mp) {
         delete mp;
@@ -3281,7 +3399,6 @@ Rewriter::decryptResults(ResType & dbres,
     mp_init_decrypt(mp, a);
 
     unsigned int rows = dbres.rows.size();
-
     LOG(cdb_v) << "rows in result " << rows << "\n";
     unsigned int cols = dbres.names.size();
 
@@ -3292,10 +3409,8 @@ Rewriter::decryptResults(ResType & dbres,
     // un-anonymize the names
     for (auto it = dbres.names.begin(); it != dbres.names.end(); it++) {
         ReturnField rf = a.rmeta.rfmeta[index];
-        if (rf.is_salt) {
-            //TODO: is something supposed to happen here?
-        } else {
-            //need to return this field
+        if (!rf.is_salt) {
+	    //need to return this field
             assert_s(rf.im, "ReturnField has no ItemMeta associated with it");
             res.names.push_back(rf.field_called);
         }
@@ -3331,7 +3446,7 @@ Rewriter::decryptResults(ResType & dbres,
 			assert(!si.null);
 			salt = valFromStr(dbres.rows[r][rf.pos_salt].data);
 		    }
-		    res.rows[r][col_index].data = crypt(a, dbres.rows[r][c].data, getTypeForDec(im), fullName(anonName, im->basefield->tm->anonTableName), im->uptolevel, getMin(im->o), isBin, salt, im->basefield, res.rows[r]);
+		    res.rows[r][col_index].data = crypt(a, dbres.rows[r][c].data, getTypeForDec(im), fullName(anonName, im->basefield->tm->anonTableName), map_getAssert(im->basefield->encdesc.olm, im->o), getMin(im->o), isBin, salt, im->basefield, res.rows[r]);
                 }
             }
             col_index++;

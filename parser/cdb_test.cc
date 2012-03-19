@@ -30,7 +30,7 @@ using namespace std;
 // if true, uses MultiPrinc mode
 static bool Multi = false;
 
-static bool encByDefault = false;
+static bool encByDefault = true;
 
 
 static inline string user_homedir() {
@@ -75,13 +75,12 @@ main(int ac, char **av)
     atexit(__write_history);
 
     string db(av[2]);
-    //HACK (cat_red) currently hard-coding other db information
-    Connect *re_conn = new Connect("localhost", "root", "letmein", db);
-    Rewriter r(re_conn, db, Multi, encByDefault);
-    r.setMasterKey("2392834");
-
     cerr << "connecting to localhost db cryptdbtest user root pass letmein" << "\n";
     Connect *  conn = new Connect("localhost", "root", "letmein", "cryptdbtest");
+    Rewriter r(conn, db, Multi, encByDefault);
+
+    r.setMasterKey("2392834");
+
     DBResult * dbres;
 
 

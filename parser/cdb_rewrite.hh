@@ -69,8 +69,7 @@ public:
     }
 
     EncSet encset;
-    SchemaInfo * schema;
-
+  
     bool soft;      /* can be evaluated at proxy */
 
     std::string why_t;
@@ -102,13 +101,13 @@ private:
     list<string> processAnnotation(Annotation annot, Analysis &a);
     //initialize multi-principal data structures
     void mp_init(Analysis &a);
-    
+
+    Connect*       conn;
     std::string    db;
     SchemaInfo*    schema;
     CryptoManager* cm;
     unsigned int   totalTables;
     MYSQL*         m;
-    Connect*       c;
     MultiPrinc*    mp;
     TMKM           tmkm;
     bool           encByDefault;

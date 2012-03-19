@@ -4,7 +4,7 @@ using namespace std;
 
 string ItemMeta::stringify() {
     stringstream res;
-    res << "(ItemMeta: onion " << o << " uptolevel " << (int)uptolevel << " basefield " << stringify_ptr(basefield) << ") ";
+    res << "(ItemMeta: onion " << o << " basefield " << stringify_ptr(basefield) << ") ";
     return res.str();
 }
 
@@ -33,6 +33,13 @@ EncSet::intersect(const EncSet & es2) const
         }
     }
     return EncSet(m);
+}
+
+void
+EncSet::setFieldForOnion(onion o, FieldMeta * fm) {
+    LevelFieldPair lfp = map_getAssert(osl, o);
+
+    osl[o] = LevelFieldPair(lfp.first, fm);
 }
 
 EncSet
