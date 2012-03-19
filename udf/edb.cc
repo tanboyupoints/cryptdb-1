@@ -589,13 +589,13 @@ agg_add(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
 {
     agg_state *as = (agg_state *) initid->ptr;
     if (!as->n2_set) {
-        ZZFromBytesFast(as->n2, (const uint8_t *) args->args[1],
+        ZZFromBytes(as->n2, (const uint8_t *) args->args[1],
                         args->lengths[1]);
         as->n2_set = 1;
     }
-
+  
     ZZ e;
-    ZZFromBytesFast(e, (const uint8_t *) args->args[0], args->lengths[0]);
+    ZZFromBytes(e, (const uint8_t *) args->args[0], args->lengths[0]);
 
     MulMod(as->sum, as->sum, e, as->n2);
     return true;

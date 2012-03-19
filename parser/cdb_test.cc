@@ -75,13 +75,14 @@ main(int ac, char **av)
     atexit(__write_history);
 
     string db(av[2]);
-    //HACK (cat_red) currently hard-coding other db information
-    ConnectionData cd = ConnectionData("localhost", "root", "letmein", db);
-    Rewriter r(cd, Multi, encByDefault);
-    r.setMasterKey("2392834");
-
     cerr << "connecting to localhost db cryptdbtest user root pass letmein" << "\n";
     Connect *  conn = new Connect("localhost", "root", "letmein", "cryptdbtest");
+    //TODO (raluca): I think ConnectionData is superfluous..
+    //HACK (cat_red) currently hard-coding other db information
+    ConnectionData cd = ConnectionData("localhost", "root", "letmein", db);
+    Rewriter r(conn, cd, Multi, encByDefault);
+    r.setMasterKey("2392834");
+
     DBResult * dbres;
 
 

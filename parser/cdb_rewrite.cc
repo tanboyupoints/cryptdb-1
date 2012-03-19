@@ -13,6 +13,9 @@
 #include <parser/cdb_rewrite.hh>
 #include <util/cryptdb_log.hh>
 
+//TODO: so far, do_enforce methods don't seem to do what analyze cannot do
+// needed?
+
 #define UNIMPLEMENTED \
     throw runtime_error(string("Unimplemented: ") + \
                         string(__PRETTY_FUNCTION__))
@@ -724,12 +727,14 @@ record_item_meta_for_constraints(Item *i,
     auto it = a.itemToMeta.find(i);
     ItemMeta *im;
     if (it == a.itemToMeta.end()) {
-        a.itemToMeta[i] = im = new ItemMeta;
+	im = new ItemMeta;
+        a.itemToMeta[i] = im;
     } else {
         im = it->second;
     }
     im->o         = c.first;
     im->basefield = c.second.second;
+    assert_s(im->basefield, "NULL basefield");
 }
 
 template <class T>
@@ -1399,9 +1404,30 @@ static class ANON : public CItemSubtypeFT<Item_func_get_system_var, Item_func::F
 // hom-add, then we will just lie about its existence. Eventually we could
 // probably pull the udf_func object out of the embedded db.
 
+
+static LEX_STRING s_HomSum = {
+    (char*)"agg_add",
+    sizeof("agg_add"),
+};
+
+static udf_func s_HomSumUdfFunc = {
+    s_HomSum,
+    STRING_RESULT,
+    UDFTYPE_AGGREGATE,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0L,
+};
+
 static LEX_STRING s_HomAdd = {
-        (char*)"hom_add",
-        sizeof("hom_add"),
+        (char*)"agg",
+        sizeof("agg"),
+	
     };
 
 static udf_func s_HomAddUdfFunc = {
@@ -1455,7 +1481,8 @@ class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
         return do_optimize_type_self_and_args(i, a);
     }
     virtual Item * do_rewrite_type(Item_func_additive_op *i, Analysis & a) const {
-        LOG(cdb_v) << "do_rewrite_type L1305";
+        LOG(cdb_v) << "do_rewrite_type Item_func_additive_op";
+;
         // rewrite children
         do_rewrite_type_args(i, a);
 
@@ -1926,16 +1953,61 @@ static CItemChooseOrder<Item_sum::Sumfunctype::MAX_FUNC> ANON;
 template<Item_sum::Sumfunctype SFT>
 class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
     virtual EncSet do_gather_type(Item_sum_sum *i, const constraints &tr, Analysis & a) const {
-        LOG(cdb_v) << "do_a_t Item_sum_sum reason " << tr;
-        if (i->has_with_distinct())
-            analyze(i->get_arg(0), constraints(EQ_EncSet, "agg_distinct", i, &tr, false), a);
+        LOG(cdb_v) << "gather in CItemSum reason " << tr;
+	Item * child_item = i->get_arg(0);
+	
+	if (i->has_with_distinct()) {
+	    UNIMPLEMENTED;
+	    analyze(child_item, constraints(EQ_EncSet, "agg_distinct", i, &tr, false), a);
+	    
+	}
+	constraints new_tr = constraints(tr.encset.intersect(ADD_EncSet), "sum/avg", i, &tr, false);
+	analyze(child_item, new_tr, a);
 
-        analyze(i->get_arg(0), constraints(tr.encset.intersect(ADD_EncSet), "sum/avg", i, &tr, false), a);
-        return tr.encset;
+	new_tr.encset.setFieldForOnion(oAGG,
+					 map_getAssert<Item_field*, FieldMeta*>(a.itemToFieldMeta,
+										(Item_field *)child_item));
+	
+	cerr << "CONSTRAINTS after gathers in item_sum_sum: " << new_tr << "\n";
+	return new_tr.encset;
     }
     virtual void do_enforce_type(Item_sum_sum *i, const constraints &tr, Analysis & a) const
-    {}
+    {
+	LOG(cdb_v) << "enforce in CItemSum tr: " << tr << "\n";
+	record_item_meta_for_constraints(i, tr, a);
+    }
+    
+    virtual Item * do_rewrite_type(Item_sum_sum * i, Analysis & a) const {
+	LOG(cdb_v) << "rewrite in CItemAdditive ";
+
+	//record information for decrypting results
+	addToReturn(a.rmeta, a.pos++,
+		    map_getAssert<Item*, ItemMeta*>(a.itemToMeta, i),
+		    false, i->name);
+
+	//rewrite children
+	List<Item> l;
+	uint count = i->get_arg_count();
+	for (uint ind = 0 ;ind < count; ind++) {
+	    Item * arg = i->get_arg(ind); 
+	    rewrite(&arg, a);
+	    l.push_back(arg);
+	}
+	
+	//need to add public key info for HOM
+	string pk = marshallBinary(a.cm->getPKInfo());//TODO: do we need to marshall?
+        Item * pk_item = new Item_string(make_thd_string(pk), 
+				pk.length(),
+				i->default_charset());	
+	pk_item->name = NULL; //no need for alias
+	l.push_back(pk_item);
+    
+	return new Item_func_udf_str(&s_HomAddUdfFunc, l);
+
+    }
 };
+
+//TODO: field OPE should not be blob for text either
 
 static CItemSum<Item_sum::Sumfunctype::SUM_FUNC> ANON;
 static CItemSum<Item_sum::Sumfunctype::SUM_DISTINCT_FUNC> ANON;
@@ -2869,9 +2941,55 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
     return adjustOnions(db, a);
 }
 
-Rewriter::Rewriter(ConnectionData db,
+static void dropF(Connect * conn, const string & func) {
+    myassert(conn->execute("DROP FUNCTION IF EXISTS " + func + "; "),
+             "cannot drop " + func + ");");
+    
+}
+static void
+dropAll(Connect * conn)
+{
+    dropF(conn, "decrypt_int_sem");
+    dropF(conn, "decrypt_int_det");
+    dropF(conn, "decrypt_text_sem");
+    dropF(conn, "decrypt_text_det");
+    dropF(conn, "searchSWP");
+    dropF(conn, "agg");
+    dropF(conn, "func_add_set");   
+}
+
+static void
+createF(Connect * conn, const string & func, const string & ret, bool isAggregate = false){
+    string functype = "";
+    if (isAggregate) {
+	functype = "AGGREGATE";
+    }
+    myassert(conn->execute(
+                 "CREATE  " + functype + " FUNCTION " + func + " RETURNS " + ret + " SONAME 'edb.so'; "),
+             "failed to create udf " + func);    
+}
+static void
+createAll(Connect * conn)
+{
+    createF(conn, "decrypt_int_sem", "INTEGER");
+    createF(conn, "decrypt_int_det", "INTEGER");
+    createF(conn, "decrypt_text_sem", "STRING");
+    createF(conn, "decrypt_text_det", "STRING");
+    createF(conn, "searchSWP", "INTEGER");
+    createF(conn, "agg", "STRING", true);
+    createF(conn, "func_add_set", "STRING");
+}
+
+static void
+loadUDFs(Connect * conn) {
+    dropAll(conn);
+    createAll(conn);
+    LOG(cdb_v) << "Loaded CryptDB's UDFs.";
+}
+
+Rewriter::Rewriter(Connect * conn, ConnectionData db,
                    bool multi, bool encByDefault)
-    : db(db.dbname), encByDefault(encByDefault)
+    : conn(conn), db(db.dbname), encByDefault(encByDefault)
 {
     // create mysql connection to embedded
     // server
@@ -2894,6 +3012,8 @@ Rewriter::Rewriter(ConnectionData db,
     totalTables = 0;
     initSchema();
 
+    loadUDFs(conn);
+
     if (multi) {
         mp = new MultiPrinc(new Connect(db.server, db.user, db.psswd, db.dbname, db.port));
     } else {
@@ -2904,9 +3024,9 @@ Rewriter::Rewriter(ConnectionData db,
 Rewriter::~Rewriter()
 {
     mysql_close(m);
-    if (c) {
-        delete c;
-        c = NULL;
+    if (conn) {
+        delete conn;
+        conn = NULL;
     }
     if (mp) {
         delete mp;

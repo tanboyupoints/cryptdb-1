@@ -36,6 +36,8 @@ public:
         return OnionLevelFieldPair(it->first, it->second);
     }
 
+    void setFieldForOnion(onion o, FieldMeta * fm);
+    
     OnionLevelFieldMap osl; //max level on each onion
 };
 
@@ -128,10 +130,15 @@ public:
     }
 
     unsigned int pos; //a counter indicating how many projection fields have been analyzed so far                                                                    
-    std::map<std::string, FieldAMeta *> fieldToAMeta;
+    std::map<std::string, FieldAMeta *> fieldToAMeta;//TODO: currently
+						     //fieldAMeta is not used
+						     //for smth useful: remove?
+
+    //maps an Item to metadata about that item
     std::map<Item*, ItemMeta *>         itemToMeta;
     std::map<Item_field*, FieldMeta*>   itemToFieldMeta;
     std::set<Item*>                     itemHasRewrite;
+    
     SchemaInfo *                        schema;
     CryptoManager *                     cm;
     Connect *                           conn;

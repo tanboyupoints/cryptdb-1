@@ -734,7 +734,8 @@ Connection::start() {
         this->conn = conn_set.begin();
         ConnectionData cd = ConnectionData(tc.host, tc.user, tc.pass, tc.db);
 
-        re = new Rewriter(cd, (type == MULTI), false);
+	//TODO: we need to remove redundancy between ConnectionData and Connect?
+        re = new Rewriter(c, cd, (type == MULTI), false);
         re->setMasterKey("2392834");
         break;
     }
