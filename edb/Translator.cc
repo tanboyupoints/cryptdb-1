@@ -12,12 +12,12 @@
 using namespace std;
 
 string
-fullName(string field, string name)
+fullName(string field, string table)
 {
     if (isTableField(field)) {
         return field;
     } else {
-        return name + "." + field;
+        return table + "." + field;
     }
 }
 

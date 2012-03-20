@@ -12,6 +12,7 @@
 
 #include <parser/cdb_rewrite.hh>
 #include <util/cryptdb_log.hh>
+#include <parser/OnionHandlers.hh>
 
 //TODO: so far, do_enforce methods don't seem to do what analyze cannot do
 // needed?
@@ -70,6 +71,37 @@ operator<<(ostream &out, const EncDesc & ed)
     return out;
 }
 
+
+//maps a raw field type to an onion field handler returning the correspondig onion type
+typedef map<onion, OnionTypeHandler *> typeToOnionHandler;
+
+//typedef set< enum enum_field_types >   S;
+//typedef pair< S, OnionFieldHandler * > H;
+//typedef vector< H >                    V;
+
+const map<int, map<int,int> > hi = {
+    {1,{{1,1}}},
+    {3,{{1,1}}}
+};
+
+// TODO: this list is incomplete
+//maps data type to the type 
+const map<enum enum_field_types, typeToOnionHandler> OnionHandlers = {
+    {MYSQL_TYPE_LONG,
+     {
+	 {oDET, new OnionTypeHandler(MYSQL_TYPE_LONGLONG)},
+	 {oOPE, new OnionTypeHandler(MYSQL_TYPE_LONGLONG)},
+	 {oAGG, new OnionTypeHandler(MYSQL_TYPE_VARCHAR, 256, &my_charset_bin)}
+     }
+    },
+    {MYSQL_TYPE_VARCHAR,
+     {
+	 {oDET, new OnionTypeHandler(MYSQL_TYPE_BLOB)},
+	 {oOPE, new OnionTypeHandler(MYSQL_TYPE_BLOB)},
+	 {oSWP, new OnionTypeHandler(MYSQL_TYPE_BLOB)}
+     }
+    }
+};
 
 //records what onions need to be adjusted at the server for a query with
 //information in a
@@ -282,7 +314,7 @@ sq(MYSQL *m, const string &s)
     return string("'") + string(buf, len) + string("'");
 }
 
-
+//TODO: be consistent thruout code: stringify or print?
 static void
 printOnion(onion level) {
     if (level == oDET) {
@@ -346,6 +378,33 @@ crypt(Analysis & a, string plaindata, OnionLayoutId ft, string fieldname, SECLEV
     return c;
 }
 
+static Item * createItem(const string & data, FieldMeta * fm, onion o) {
+
+    //TODO: I don';t like this; the handler for the onion already knows type, I
+    //should just store the handler somewhere in fm instead of deriving it
+    //always
+    auto it = OnionHandlers.find(fm->sql_field->sql_type);
+    assert_s(it != OnionHandlers.end(), "sql_type not found in OnionHandlers");
+    
+    return map_getAssert<onion, OnionTypeHandler *>
+	(it->second, o)->createItem(data);
+}
+
+static Item *
+cryptedItem(Analysis & a, string plaindata, FieldMeta * fm,
+	    onion o, SECLEVEL fromlevel, SECLEVEL tolevel,
+	    uint64_t salt){
+    bool isBin;
+    string anonName = fullName(fm->onionnames[o], fm->tm->anonTableName);
+    string enc = crypt(a, plaindata, OLID_NUM, anonName,
+		       fromlevel, tolevel,
+		       isBin, salt, fm);
+
+    LOG(cdb_v) << "for onion "; printOnion(o);
+    LOG(cdb_v) << " enc is " << enc << "\n";
+
+    return createItem(enc, fm, o);
+}
 
 /********  parser utils; TODO: put in separate file **/
 
@@ -1147,16 +1206,14 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
             //need to use table salt in this case
         }
 
-
         for (auto it = fm->onionnames.begin();
              it != fm->onionnames.end();
-             ++it) {
-            string anonName = fullName(it->second, fm->tm->anonTableName);
-            bool isBin;
-            string enc = crypt(a, plaindata, OLID_NUM, anonName, getMin(it->first), getMax(it->first), isBin, salt, fm);
-            
-            l.push_back(new Item_int((ulonglong) valFromStr(enc)));
+             ++it) {        
+            l.push_back(cryptedItem(a, plaindata, fm,
+				    it->first, getMin(it->first), getMax(it->first),
+				    salt));
         }
+	
         if (fm->has_salt) {
             l.push_back(new Item_int((ulonglong) salt));
         }
@@ -2366,72 +2423,6 @@ add_table(SchemaInfo * schema, const string & table, LEX *lex, bool encByDefault
     }
 }
 
-class OnionTypeHandler {
-private:
-    int                   field_length;
-    enum enum_field_types type;
-    CHARSET_INFO *        charset;
-public:
-    OnionTypeHandler(enum enum_field_types t) :
-        field_length(-1), type(t), charset(NULL) {}
-    OnionTypeHandler(enum enum_field_types t, size_t f) :
-        field_length((int)f), type(t), charset(NULL) {}
-    OnionTypeHandler(enum enum_field_types t,
-                      size_t f,
-                      CHARSET_INFO *charset) :
-        field_length((int)f), type(t), charset(charset) {}
-
-    Create_field*
-    newOnionCreateField(const char * anon_name,
-                        const Create_field *f) const {
-        THD *thd = current_thd;
-        Create_field *f0 = f->clone(thd->mem_root);
-        f0->field_name = thd->strdup(anon_name);
-        if (field_length != -1) {
-            f0->length = field_length;
-        }
-        f0->sql_type = type;
-	
-        if (charset != NULL) {
-            f0->charset = charset;
-        } else {
-	    //encryption is always unsigned
-	    f0->flags = f0->flags | UNSIGNED_FLAG; 
-	}
-        return f0;
-    }
-};
-
-//maps a raw field type to an onion field handler returning the correspondig onion type
-typedef map<onion, OnionTypeHandler *> typeToOnionHandler;
-
-//typedef set< enum enum_field_types >   S;
-//typedef pair< S, OnionFieldHandler * > H;
-//typedef vector< H >                    V;
-
-const map<int, map<int,int> > hi = {
-    {1,{{1,1}}},
-    {3,{{1,1}}}
-};
-
-// TODO: this list is incomplete
-//maps data type to the type 
-const map<enum enum_field_types, typeToOnionHandler> OnionHandlers = {
-    {MYSQL_TYPE_LONG,
-     {
-	 {oDET, new OnionTypeHandler(MYSQL_TYPE_LONGLONG)},
-	 {oOPE, new OnionTypeHandler(MYSQL_TYPE_LONGLONG)},
-	 {oAGG, new OnionTypeHandler(MYSQL_TYPE_VARCHAR, 256, &my_charset_bin)}
-     }
-    },
-    {MYSQL_TYPE_VARCHAR,
-     {
-	 {oDET, new OnionTypeHandler(MYSQL_TYPE_BLOB)},
-	 {oOPE, new OnionTypeHandler(MYSQL_TYPE_BLOB)},
-	 {oSWP, new OnionTypeHandler(MYSQL_TYPE_BLOB)}
-     }
-    }
-};
 
 static void rewrite_create_field(const string &table_name,
                                  Create_field *f,

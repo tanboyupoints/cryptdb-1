@@ -63,6 +63,7 @@ const EncDesc EQ_SEARCH_EncDesc = {
 };
 
 
+
 struct TableMeta;
 //TODO: FieldMeta and TableMeta are partly duplicates with the original
 // FieldMetadata an TableMetadata

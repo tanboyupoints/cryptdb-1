@@ -405,7 +405,7 @@ roll(typename std::list<T>::iterator & it,  int count)
 }
 
 template<typename A, typename B>
-B map_getAssert(std::map<A, B> & m, A x) {
+B map_getAssert(const std::map<A, B> & m, const A & x) {
     auto it = m.find(x);
     assert_s(it != m.end(), "item not present in map");
     return it->second;
