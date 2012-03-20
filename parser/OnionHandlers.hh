@@ -33,19 +33,67 @@ public:
     
 };
 
+typedef struct cdb_key {
+    
+} cdb_key;
 
+//TODO: currently, we have one such object per onion layer per field
+// optimize storage by sharing these handlers among objects with same type
+class OnionLayer {
+public:
+    virtual Create_field * layerCreateField(Create_field *) = 0;
+    
+    virtual Item * encrypt(cdb_key * key, Item * ptext, uint64_t IV = 0) = 0;
+    virtual Item * decrypt(cdb_key * key, Item * i, uint64_t IV = 0) = 0;
 
+protected:
 
-class OnionLayerHandler {
+};
+
+class OnionLayerRND : OnionLayer {
 public:
     Create_field * layerCreateField(Create_field *);
     
-    virtual Item * encrypt(Item * i);
-    virtual Item * decrypt(Item * i);
-private:
-    int              field_length;
+    Item * encrypt(cdb_key * key, Item * ptext, uint64_t IV = 0);
+    Item * decrypt(cdb_key * key, Item * i, uint64_t IV = 0);
+
+    std::string decryptUDF(std::string field);
 };
 
+class OnionLayerDET : OnionLayer {
+public:
+    Create_field * layerCreateField(Create_field *);
+    
+    Item * encrypt(cdb_key * key, Item * ptext, uint64_t IV = 0);
+    Item * decrypt(cdb_key * key, Item * i, uint64_t IV = 0);
+
+    std::string decryptUDF(std::string field);
+};
+
+class OnionLayerHOM : OnionLayer {
+public:
+    Create_field * layerCreateField(Create_field *);
+    
+    Item * encrypt(cdb_key * key, Item * ptext, uint64_t IV = 0);
+    Item * decrypt(cdb_key * key, Item * i, uint64_t IV = 0);
+
+    std::string sumUDF(cdb_key * key, std::string field);
+    
+};
+
+class OnionLayerSearch : OnionLayer {
+public:
+    Create_field * layerCreateField(Create_field *);
+    
+    Item * encrypt(cdb_key * key, Item * ptext, uint64_t IV = 0);
+    Item * decrypt(cdb_key * key, Item * i, uint64_t IV = 0);
+
+    std::string seachUDF(cdb_key * key, std::string field, std::string token);
+};
+
+    
+
+  
 
 
 
