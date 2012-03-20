@@ -34,15 +34,18 @@ public:
 };
 
 
-/*
+
 
 class OnionLayerHandler {
-
-    encrypt()
-    decrypt()
+public:
+    Create_field * layerCreateField(Create_field *);
     
-}
+    virtual Item * encrypt(Item * i);
+    virtual Item * decrypt(Item * i);
+private:
+    int              field_length;
+};
 
-*/
+
 
 
