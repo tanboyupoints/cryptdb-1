@@ -138,13 +138,13 @@ test_hgd()
 static void
 test_paillier()
 {
-    auto sk = Paillier_priv::keygen();
+    urandom u;
+    auto sk = Paillier_priv::keygen(&u);
     Paillier_priv pp(sk);
 
     auto pk = pp.pubkey();
     Paillier p(pk);
 
-    urandom u;
     ZZ pt0 = u.rand_zz_mod(to_ZZ(1) << 256);
     ZZ pt1 = u.rand_zz_mod(to_ZZ(1) << 256);
 
@@ -167,13 +167,25 @@ test_paillier()
     }
     cout << "paillier add: "
          << ((double) sumperf.lap()) / 1000 << " usec" << endl;
+
+    for (int i = 0; i < 10; i++) {
+        blockrng<AES> br(u.rand_vec<uint8_t>(16));
+        auto v = u.rand_vec<uint8_t>(AES::blocksize);
+        br.set_ctr(v);
+        auto sk0 = Paillier_priv::keygen(&br);
+
+        br.set_ctr(v);
+        auto sk1 = Paillier_priv::keygen(&br);
+
+        assert(sk0 == sk1);
+    }
 }
 
 static void
 test_paillier_packing()
 {
     urandom u;
-    Paillier_priv pp(Paillier_priv::keygen());
+    Paillier_priv pp(Paillier_priv::keygen(&u));
     Paillier p(pp.pubkey());
 
     uint32_t npack = p.pack_count<uint64_t>();

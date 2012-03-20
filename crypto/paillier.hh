@@ -3,6 +3,7 @@
 #include <list>
 #include <vector>
 #include <NTL/ZZ.h>
+#include <crypto/prng.hh>
 
 class Paillier {
  public:
@@ -104,7 +105,7 @@ class Paillier_priv : public Paillier {
 
     NTL::ZZ decrypt(const NTL::ZZ &ciphertext) const;
 
-    static std::vector<NTL::ZZ> keygen(uint nbits = 1024, uint abits = 256);
+    static std::vector<NTL::ZZ> keygen(PRNG*, uint nbits = 1024, uint abits = 256);
 
     template<class PackT>
     PackT decrypt_pack(const NTL::ZZ &pack) {

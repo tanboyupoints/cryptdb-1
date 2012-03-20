@@ -37,6 +37,9 @@ class PRNG {
         return NTL::ZZFromBytes(buf, sizeof(buf)) % max;
     }
 
+    NTL::ZZ rand_zz_nbits(size_t nbits);
+    NTL::ZZ rand_zz_prime(size_t nbits);
+
     bignum rand_bn_mod(const bignum &max) {
         uint8_t buf[BN_num_bytes(max.bn())];
         rand_bytes(sizeof(buf), buf);
