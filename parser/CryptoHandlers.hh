@@ -2,6 +2,7 @@
 
 #include <util/util.hh>
 #include <crypto/prng.hh>
+#include <crypto-old/BasicCrypto.hh>
 
 #include <sql_select.h>
 #include <sql_delete.h>
@@ -43,56 +44,110 @@ public:
 // Each onion layer reads the necessary number of bytes from the
 // PRNG to generate its key (AES, blowfish, Paillier, SWP, ...)
 //
-// The naive version of this is likely inefficient (it will require
+// TODO: The naive version of this is likely inefficient (it will require
 // performing key setup each time), but it should be possible to
 // retrofit a suitable caching scheme once everything else works.
-typedef PRNG cdb_key;
 
+
+
+//TODO: call enclayer? 
 //TODO: currently, we have one such object per onion layer per field
 // optimize storage by sharing these handlers among objects with same type
-class OnionLayer {
+
+//TODO: need to writeup cleanup & destructors
+
+class EncLayer {
 public:
-    virtual Create_field * layerCreateField(Create_field *) = 0;
+    virtual Create_field * newCreateField() = 0;
     
-    virtual Item * encrypt(cdb_key * key, Item * ptext, uint64_t IV = 0) = 0;
-    virtual Item * decrypt(cdb_key * key, Item * i, uint64_t IV = 0) = 0;
-    virtual Item * decryptUDF(cdb_key * key, Item *columnref, Item *ivcolumnref = 0) {
+    virtual Item * encrypt(Item * ptext, uint64_t IV = 0) = 0;
+    virtual Item * decrypt(Item * i, uint64_t IV = 0) = 0;
+    virtual std::string decryptUDF(const std::string & col, const std::string & ivcol = "") {
         thrower() << "decryptUDF not supported";
     }
 };
 
-class OnionLayerRND : public OnionLayer {
+class RND_int : public EncLayer {
 public:
-    Create_field * layerCreateField(Create_field *);
+    RND_int(Create_field *, PRNG * key);
+
+    Create_field * newCreateField();
+    
+    Item * encrypt(Item * ptext, uint64_t IV);
+    Item * decrypt(Item * ctext, uint64_t IV);
+    std::string decryptUDF(const std::string & col, const std::string & ivcol);
+
+private:
+    Create_field * cf;
+    std::string rawkey;
+    blowfish * key;
+    static const int bf_key_size = 16;
+    static const int ciph_size = 8;
+};
+
+class RND_string : public EncLayer {
+public:
+    RND_string(Create_field *, PRNG * key);
+
+    Create_field * newCreateField();
+    
+    Item * encrypt(Item * ptext, uint64_t IV);
+    Item * decrypt(Item * ctext, uint64_t IV);
+    std::string decryptUDF(const std::string & col, const std::string & ivcol);
+
+private:
+    Create_field * cf;
+    std::string rawkey;
+    static const int key_bytes = 16;
+    AES_KEY * enckey;
+    AES_KEY * deckey;
+};
+
+class EncLayerFactory {
+    static EncLayer * encLayer(SECLEVEL sl, Create_field * cf, PRNG * key);
+};
+
+
+/*
+  class EncLayerDET : public EncLayer {
+public:
+    Create_field * createField(Create_field *);
     
     Item * encrypt(cdb_key * key, Item * ptext, uint64_t IV);
     Item * decrypt(cdb_key * key, Item * i, uint64_t IV);
     Item * decryptUDF(cdb_key *key, Item *columnref, Item *ivcolumnref);
+
+private:
+    cdb_key * getKey(PRNG * prng);
 };
 
-class OnionLayerDET : public OnionLayer {
+class EncLayerHOM : public EncLayer {
 public:
-    Create_field * layerCreateField(Create_field *);
-    
-    Item * encrypt(cdb_key * key, Item * ptext, uint64_t IV);
-    Item * decrypt(cdb_key * key, Item * i, uint64_t IV);
-    Item * decryptUDF(cdb_key *key, Item *columnref, Item *ivcolumnref);
-};
+    Create_field * createField(Create_field *);
 
-class OnionLayerHOM : public OnionLayer {
-public:
-    Create_field * layerCreateField(Create_field *);
+    cdb_key * getKey(PRNG * prng);
     
     Item * encrypt(cdb_key * key, Item * ptext, uint64_t IV);
     Item * decrypt(cdb_key * key, Item * i, uint64_t IV);
     Item * sumUDF(cdb_key * key, Item *columnref);
+
+private:    
+    cdb_key * getKey(PRNG * prng);
+
 };
 
-class OnionLayerSearch : public OnionLayer {
+class EncLayerSearch : public EncLayer {
 public:
-    Create_field * layerCreateField(Create_field *);
+    Create_field * createField(Create_field *);
     
     Item * encrypt(cdb_key * key, Item * ptext, uint64_t IV);
     Item * decrypt(cdb_key * key, Item * i, uint64_t IV);
     Item * seachUDF(cdb_key * key, Item *columnref, std::string keyword);
+
+private:    
+    cdb_key * getKey(PRNG * prng);
+
 };
+
+    cdb_key * getKey(PRNG * prng);
+*/

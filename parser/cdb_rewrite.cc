@@ -12,18 +12,19 @@
 
 #include <parser/cdb_rewrite.hh>
 #include <util/cryptdb_log.hh>
-#include <parser/OnionHandlers.hh>
+#include <parser/CryptoHandlers.hh>
 
 //TODO: so far, do_enforce methods don't seem to do what analyze cannot do
 // needed?
+
+using namespace std;
+
+//TODO: replace table/field with FieldMeta * for speed and conciseness
 
 #define UNIMPLEMENTED \
     throw runtime_error(string("Unimplemented: ") + \
                         string(__PRETTY_FUNCTION__))
 
-using namespace std;
-
-//TODO: replace table/field with FieldMeta * for speed and conciseness
 
 static inline void
 mysql_query_wrapper(MYSQL *m, const string &q)
@@ -40,6 +41,7 @@ mysql_query_wrapper(MYSQL *m, const string &q)
     void* ret = create_embedded_thd(0);
     if (!ret) assert(false);
 }
+
 
 
 static ostream&
