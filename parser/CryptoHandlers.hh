@@ -80,8 +80,9 @@ public:
 private:
     Create_field * cf;
     std::string rawkey;
-    blowfish * key;
-    static const int bf_key_size = 16;
+    static const int key_bytes = 16;
+    AES_KEY * key;
+    
     static const int ciph_size = 8;
 };
 
@@ -103,23 +104,47 @@ private:
     AES_KEY * deckey;
 };
 
+class DET_int : public EncLayer {
+public:
+    DET_int(Create_field *, PRNG * key);
+
+    Create_field * newCreateField();
+    
+    Item * encrypt(Item * ptext, uint64_t IV);
+    Item * decrypt(Item * ctext, uint64_t IV);
+    std::string decryptUDF(const std::string & col, const std::string & ivcol);
+
+private:
+    Create_field * cf;
+    std::string rawkey;
+    blowfish * key;
+    static const int bf_key_size = 16;
+    static const int ciph_size = 8;
+};
+
+class DET_string : public EncLayer {
+public:
+    DET_string(Create_field *, PRNG * key);
+
+    Create_field * newCreateField();
+    
+    Item * encrypt(Item * ptext, uint64_t IV);
+    Item * decrypt(Item * ctext, uint64_t IV);
+    std::string decryptUDF(const std::string & col, const std::string & ivcol);
+
+private:
+    Create_field * cf;
+    std::string rawkey;
+    static const int key_bytes = 16;
+    AES_KEY * enckey;
+    AES_KEY * deckey;
+};
+
 class EncLayerFactory {
     static EncLayer * encLayer(SECLEVEL sl, Create_field * cf, PRNG * key);
 };
 
-
 /*
-  class EncLayerDET : public EncLayer {
-public:
-    Create_field * createField(Create_field *);
-    
-    Item * encrypt(cdb_key * key, Item * ptext, uint64_t IV);
-    Item * decrypt(cdb_key * key, Item * i, uint64_t IV);
-    Item * decryptUDF(cdb_key *key, Item *columnref, Item *ivcolumnref);
-
-private:
-    cdb_key * getKey(PRNG * prng);
-};
 
 class EncLayerHOM : public EncLayer {
 public:

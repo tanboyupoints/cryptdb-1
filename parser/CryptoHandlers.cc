@@ -55,12 +55,6 @@ OnionTypeHandler::createItem(const string & data) {
     exit(-1);
 }
 
-RND_int::RND_int(Create_field * f, PRNG * key) {
-    cf = f;
-    rawkey = key->rand_string(bf_key_size);
-    this->key = new blowfish(rawkey);
-}
-
 //TODO: remove above newcreatefield
 static Create_field*
 createFieldHelper(const Create_field *f, int field_length,
@@ -109,6 +103,14 @@ IsMySQLTypeNumeric(enum_field_types t) {
     }
 }
 
+
+RND_int::RND_int(Create_field * f, PRNG * key) {
+    cf = f;
+    rawkey = key->rand_string(key_bytes);
+    this->key = CryptoManager::get_key_SEM(rawkey);
+}
+
+
 Create_field *
 RND_int::newCreateField() {
     return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG);
@@ -117,12 +119,13 @@ RND_int::newCreateField() {
 //TODO: may want to do more specialized crypto for lengths
 Item *
 RND_int::encrypt(Item * ptext, uint64_t IV) {
-    return new Item_int(key->encrypt(static_cast<Item_int *>(ptext)->value));
+    //TODO: should have encrypt_SEM work for any length
+    return new Item_int(CryptoManager::encrypt_SEM((uint64_t)static_cast<Item_int *>(ptext)->value, key, IV));
 }
 
 Item *
 RND_int::decrypt(Item * ctext, uint64_t IV) {
-    return new Item_int(key->decrypt(static_cast<Item_int*>(ctext)->value));
+    return new Item_int(CryptoManager::decrypt_SEM((uint64_t)static_cast<Item_int*>(ctext)->value, key, IV));
 }
 
 std::string
@@ -202,4 +205,39 @@ RND_string::decryptUDF(const std::string & col, const std::string & ivcol) {
     
     return query;
 
+}
+
+
+DET_int::DET_int(Create_field * f, PRNG * key) {
+    cf = f;
+    rawkey = key->rand_string(bf_key_size);
+    this->key = new blowfish(rawkey);
+}
+
+Create_field *
+DET_int::newCreateField() {
+    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG);
+}
+
+//TODO: may want to do more specialized crypto for lengths
+Item *
+DET_int::encrypt(Item * ptext, uint64_t IV) {
+    return new Item_int(key->encrypt(static_cast<Item_int *>(ptext)->value));
+}
+
+Item *
+DET_int::decrypt(Item * ctext, uint64_t IV) {
+    return new Item_int(key->decrypt(static_cast<Item_int*>(ctext)->value));
+}
+
+std::string
+DET_int::decryptUDF(const string & col, const string & ivcol) {
+    cerr << "udf expects key represented in different manner, fix udf";
+    std::string query = "UPDATE columnref SET col = decrypt_int_sem(" \
+	+ col + ", " + \
+	rawkey + "," + \
+	ivcol + ");";
+
+    return query;
+	
 }
