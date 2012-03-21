@@ -16,7 +16,7 @@ make_thd_string(const string &s, size_t *lenp = 0)
     return thd->strmake(s.data(), s.size());
 }
 
-
+//TODO: OnionTypeHandler not needed any more
 Create_field*
 OnionTypeHandler::newOnionCreateField(const char * anon_name,
 		    const Create_field *f) const {
