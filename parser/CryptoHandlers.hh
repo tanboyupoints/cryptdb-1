@@ -3,6 +3,7 @@
 #include <util/util.hh>
 #include <crypto/prng.hh>
 #include <crypto-old/BasicCrypto.hh>
+#include <crypto-old/CryptoManager.hh>
 
 #include <sql_select.h>
 #include <sql_delete.h>
@@ -110,9 +111,9 @@ public:
 
     Create_field * newCreateField();
     
-    Item * encrypt(Item * ptext, uint64_t IV);
-    Item * decrypt(Item * ctext, uint64_t IV);
-    std::string decryptUDF(const std::string & col, const std::string & ivcol);
+    Item * encrypt(Item * ptext, uint64_t IV = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0);
+    std::string decryptUDF(const std::string & col, const std::string & ivcol = "");
 
 private:
     Create_field * cf;
@@ -122,15 +123,16 @@ private:
     static const int ciph_size = 8;
 };
 
+
 class DET_string : public EncLayer {
 public:
     DET_string(Create_field *, PRNG * key);
 
     Create_field * newCreateField();
     
-    Item * encrypt(Item * ptext, uint64_t IV);
-    Item * decrypt(Item * ctext, uint64_t IV);
-    std::string decryptUDF(const std::string & col, const std::string & ivcol);
+    Item * encrypt(Item * ptext, uint64_t IV = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0);
+    std::string decryptUDF(const std::string & col, const std::string & ivcol="");
 
 private:
     Create_field * cf;
@@ -139,6 +141,48 @@ private:
     AES_KEY * enckey;
     AES_KEY * deckey;
 };
+
+
+
+class OPE_int : public EncLayer {
+public:
+    OPE_int(Create_field *, PRNG * key);
+
+    Create_field * newCreateField();
+    
+    Item * encrypt(Item * ptext, uint64_t IV);
+    Item * decrypt(Item * ctext, uint64_t IV);
+
+private:
+    Create_field * cf;
+    std::string rawkey;
+    OPE * key;
+    static const int key_bytes = 16;
+    static const int plain_size = 4;
+    static const int ciph_size = 8;
+};
+
+
+class OPE_string : public EncLayer {
+public:
+    OPE_string(Create_field *, PRNG * key);
+
+    Create_field * newCreateField();
+    
+    Item * encrypt(Item * ptext, uint64_t IV = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0)  __attribute__((noreturn));
+  
+private:
+    Create_field * cf;
+    std::string rawkey;
+    OPE * key;
+    static const int key_bytes = 16;
+    static const int plain_size = 4;
+    static const int ciph_size = 8;
+};
+
+
+
 
 class EncLayerFactory {
     static EncLayer * encLayer(SECLEVEL sl, Create_field * cf, PRNG * key);
