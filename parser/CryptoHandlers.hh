@@ -4,6 +4,7 @@
 #include <crypto/prng.hh>
 #include <crypto-old/BasicCrypto.hh>
 #include <crypto-old/CryptoManager.hh>
+#include <crypto/paillier.hh>
 
 #include <sql_select.h>
 #include <sql_delete.h>
@@ -182,6 +183,26 @@ private:
 };
 
 
+class HOM : public EncLayer {
+public:
+    HOM(Create_field * cf, PRNG * key);
+
+    Create_field * newCreateField();
+
+    Item * encrypt(Item * ptext, uint64_t IV = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0);
+
+    //expr is the expression (e.g. a field) over which to sum
+    Item * sumUDF(Item * expr);
+    
+private:
+    Create_field * cf;
+    static const uint nbits = 1024;
+    std::vector<NTL::ZZ> sk;
+    Paillier_priv * skP;
+    std::vector<NTL::ZZ> pk;
+    Paillier * pkP;
+};
 
 
 class EncLayerFactory {
@@ -189,21 +210,6 @@ class EncLayerFactory {
 };
 
 /*
-
-class EncLayerHOM : public EncLayer {
-public:
-    Create_field * createField(Create_field *);
-
-    cdb_key * getKey(PRNG * prng);
-    
-    Item * encrypt(cdb_key * key, Item * ptext, uint64_t IV);
-    Item * decrypt(cdb_key * key, Item * i, uint64_t IV);
-    Item * sumUDF(cdb_key * key, Item *columnref);
-
-private:    
-    cdb_key * getKey(PRNG * prng);
-
-};
 
 class EncLayerSearch : public EncLayer {
 public:

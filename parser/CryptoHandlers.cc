@@ -2,6 +2,7 @@
 #include <util/util.hh>
 
 using namespace std;
+using namespace NTL;
 
 //TODO: this is duplicated in cdb_rewrite
 static char *
@@ -357,6 +358,7 @@ DET_str::decryptUDF(Item * col, Item * ivcol) {
 
 }
 
+/**************** OPE **************************/
 
 OPE_int::OPE_int(Create_field * cf, PRNG *key) {
     this->cf = cf;
@@ -403,6 +405,85 @@ Item *
 OPE_str::decrypt(Item * ctext, uint64_t IV)   {
     thrower() << "should not decrypt string from OPE \n";
 }
+
+/**************** HOM ***************************/
+
+HOM::HOM(Create_field * cf, PRNG * key) {
+    this->cf = cf;
+    sk = Paillier_priv::keygen(key, nbits);
+    skP = new Paillier_priv(sk);
+
+    pk = skP->pubkey();
+    pkP = new Paillier(pk);
+}
+
+Create_field *
+HOM::newCreateField() {
+    return createFieldHelper(cf, 2*nbits, MYSQL_TYPE_STRING);
+}
+
+static ZZ
+ItemToZZ(Item * ptext) {
+    ulonglong val = ((Item_int*) ptext)->value;
+    return to_ZZ((unsigned long)val);
+}
+
+static Item *
+ZZToItem(const ZZ & val) {
+    return new Item_int(to_int(val));
+}
+
+Item *
+HOM::encrypt(Item * ptext, uint64_t IV) {
+    
+    ZZ enc = pkP->encrypt(ItemToZZ(ptext));
+
+    return ZZToItem(enc);
+}
+
+Item *
+HOM::decrypt(Item * ctext, uint64_t IV) {
+    ZZ dec = skP->decrypt(ItemToZZ(ctext));
+
+    return ZZToItem(dec);
+}
+
+
+static LEX_STRING n_sum = {
+    (char*)"agg_add",
+    sizeof("agg_add"),
+};
+
+static udf_func u_sum = {
+    n_sum,
+    STRING_RESULT,
+    UDFTYPE_AGGREGATE,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0L,
+};
+
+
+Item *
+HOM::sumUDF(Item * expr) {
+    cerr << "udf expects key represented in different manner, fix udf";
+       
+    List<Item> l;
+    l.push_back(expr);
+    for (ZZ i : pk) {
+	l.push_back(ZZToItem(i));
+    }
+    
+    return new Item_func_udf_str(&u_sum, l);
+
+}
+
+
 
 /************ EncLayer factory creation  ********/
 
