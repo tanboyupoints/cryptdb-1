@@ -63,7 +63,7 @@ public:
     
     virtual Item * encrypt(Item * ptext, uint64_t IV = 0) = 0;
     virtual Item * decrypt(Item * i, uint64_t IV = 0) = 0;
-    virtual std::string decryptUDF(const std::string & col, const std::string & ivcol = "") {
+    virtual Item * decryptUDF(Item * col, Item * ivcol = NULL) {
         thrower() << "decryptUDF not supported";
     }
 };
@@ -76,7 +76,7 @@ public:
     
     Item * encrypt(Item * ptext, uint64_t IV);
     Item * decrypt(Item * ctext, uint64_t IV);
-    std::string decryptUDF(const std::string & col, const std::string & ivcol);
+    Item * decryptUDF(Item * col, Item * ivcol);
 
 private:
     Create_field * cf;
@@ -87,15 +87,15 @@ private:
     static const int ciph_size = 8;
 };
 
-class RND_string : public EncLayer {
+class RND_str : public EncLayer {
 public:
-    RND_string(Create_field *, PRNG * key);
+    RND_str(Create_field *, PRNG * key);
 
     Create_field * newCreateField();
     
     Item * encrypt(Item * ptext, uint64_t IV);
     Item * decrypt(Item * ctext, uint64_t IV);
-    std::string decryptUDF(const std::string & col, const std::string & ivcol);
+    Item * decryptUDF(Item * col, Item * ivcol);
 
 private:
     Create_field * cf;
@@ -113,7 +113,7 @@ public:
     
     Item * encrypt(Item * ptext, uint64_t IV = 0);
     Item * decrypt(Item * ctext, uint64_t IV = 0);
-    std::string decryptUDF(const std::string & col, const std::string & ivcol = "");
+    Item * decryptUDF(Item * col, Item * ivcol = NULL);
 
 private:
     Create_field * cf;
@@ -124,15 +124,15 @@ private:
 };
 
 
-class DET_string : public EncLayer {
+class DET_str : public EncLayer {
 public:
-    DET_string(Create_field *, PRNG * key);
+    DET_str(Create_field *, PRNG * key);
 
     Create_field * newCreateField();
     
     Item * encrypt(Item * ptext, uint64_t IV = 0);
     Item * decrypt(Item * ctext, uint64_t IV = 0);
-    std::string decryptUDF(const std::string & col, const std::string & ivcol="");
+    Item * decryptUDF(Item * col, Item * = NULL);
 
 private:
     Create_field * cf;
@@ -163,9 +163,9 @@ private:
 };
 
 
-class OPE_string : public EncLayer {
+class OPE_str : public EncLayer {
 public:
-    OPE_string(Create_field *, PRNG * key);
+    OPE_str(Create_field *, PRNG * key);
 
     Create_field * newCreateField();
     

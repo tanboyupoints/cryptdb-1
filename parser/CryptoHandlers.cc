@@ -15,6 +15,14 @@ make_thd_string(const string &s, size_t *lenp = 0)
     return thd->strmake(s.data(), s.size());
 }
 
+static string
+ItemToString(Item * i) {
+    String s;
+    String *s0 = i->val_str(&s);
+    assert(s0 != NULL);
+    return string(s0->ptr(), s0->length());
+}
+
 //TODO: OnionTypeHandler not needed any more
 Create_field*
 OnionTypeHandler::newOnionCreateField(const char * anon_name,
@@ -102,6 +110,7 @@ IsMySQLTypeNumeric(enum_field_types t) {
     }
 }
 
+/****************** RND *********************/
 
 RND_int::RND_int(Create_field * f, PRNG * key) {
     cf = f;
@@ -127,47 +136,41 @@ RND_int::decrypt(Item * ctext, uint64_t IV) {
     return new Item_int(CryptoManager::decrypt_SEM((uint64_t)static_cast<Item_int*>(ctext)->value, key, IV));
 }
 
-std::string
-RND_int::decryptUDF(const string & col, const string & ivcol) {
+
+static LEX_STRING n_decRNDInt = {
+    (char *) "decrypt_int_sem",
+    sizeof("decrypt_int_sem"),
+};
+
+static udf_func u_decRNDInt = {
+    n_decRNDInt,
+    INT_RESULT,
+    UDFTYPE_FUNCTION,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0L,
+};
+
+
+Item * 
+RND_int::decryptUDF(Item * col, Item * ivcol) {
     cerr << "udf expects key represented in different manner, fix udf";
-    std::string query = "UPDATE columnref SET col = decrypt_int_sem(" \
-	+ col + ", " + \
-	rawkey + "," + \
-	ivcol + ");";
-
-    return query;
-	
-}
-
-EncLayer *
-EncLayerFactory::encLayer(SECLEVEL sl, Create_field * cf, PRNG * key) {
-    switch (sl) {
-    case SECLEVEL::SEMANTIC_DET:
-    case SECLEVEL::SEMANTIC_OPE: {
-	if (IsMySQLTypeNumeric(cf->sql_type)) {
-	    return new RND_int(cf, key);
-	} else {
-	    return new RND_string(cf, key);
-	}
-    }
-    default:{
-	
-    }
-    }
-    thrower() << "unknown or unimplemented security level \n";
-}
+       
+    List<Item> l;
+    l.push_back(col);
+    l.push_back(new Item_string(make_thd_string(rawkey), rawkey.length(), &my_charset_bin));
+    l.push_back(ivcol);
     
-static string
-ItemToString(Item * i) {
-    String s;
-    String *s0 = i->val_str(&s);
-    assert(s0 != NULL);
-    return string(s0->ptr(), s0->length());
+    return new Item_func_udf_int(&u_decRNDInt, l);	
 }
 
 
-
-RND_string::RND_string(Create_field * f, PRNG * key) {
+RND_str::RND_str(Create_field * f, PRNG * key) {
     cf = f;
     rawkey = key->rand_string(key_bytes);
     enckey = get_AES_enc_key(rawkey);
@@ -175,13 +178,13 @@ RND_string::RND_string(Create_field * f, PRNG * key) {
 }
 
 Create_field *
-RND_string::newCreateField() {
+RND_str::newCreateField() {
 //TODO: use more precise sizes and types
     return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB);
 }
 
 Item *
-RND_string::encrypt(Item * ptext, uint64_t IV) {
+RND_str::encrypt(Item * ptext, uint64_t IV) {
     string enc = CryptoManager::encrypt_SEM(
 	ItemToString(static_cast<Item_string *>(ptext)),
 	enckey, IV);
@@ -189,23 +192,50 @@ RND_string::encrypt(Item * ptext, uint64_t IV) {
 }
 
 Item *
-RND_string::decrypt(Item * ctext, uint64_t IV) {
+RND_str::decrypt(Item * ctext, uint64_t IV) {
     string dec = CryptoManager::decrypt_SEM(
 	ItemToString(static_cast<Item_string *>(ctext)),
 	deckey, IV);
     return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
 }
 
-std::string
-RND_string::decryptUDF(const std::string & col, const std::string & ivcol) {
-    cerr << "udf expects key represented in different manner, fix udf";
-    std::string query = "UPDATE columnref SET col = decrypt_text_sem(" + col + ", " +
-	rawkey + "," +
-	ivcol + ");";
-    
-    return query;
 
+//TODO; make edb.cc udf naming consistent with these handlers
+static LEX_STRING n_decRNDString = {
+    (char *) "decrypt_text_sem",
+    sizeof("decrypt_text_sem"),
+};
+
+static udf_func u_decRNDString = {
+    n_decRNDString,
+    STRING_RESULT,
+    UDFTYPE_FUNCTION,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0L,
+};
+
+
+Item *
+RND_str::decryptUDF(Item * col, Item * ivcol) {
+    cerr << "udf expects key represented in different manner, fix udf";
+       
+    List<Item> l;
+    l.push_back(col);
+    l.push_back(new Item_string(make_thd_string(rawkey), rawkey.length(), &my_charset_bin));
+    l.push_back(ivcol);
+    
+    return new Item_func_udf_str(&u_decRNDString, l);	
 }
+
+
+/********** DET ************************/
+
 
 
 DET_int::DET_int(Create_field * f, PRNG * key) {
@@ -230,18 +260,39 @@ DET_int::decrypt(Item * ctext, uint64_t IV) {
     return new Item_int(key->decrypt(static_cast<Item_int*>(ctext)->value));
 }
 
-std::string
-DET_int::decryptUDF(const string & col, const string & ivcol) {
-    cerr << "udf expects key represented in different manner, fix udf";
-    std::string query = "UPDATE columnref SET col = decrypt_int_det(" \
-	+ col + ", " + \
-	rawkey + ");";
 
-    return query;
-	
+static LEX_STRING n_decDETInt = {
+    (char *) "decrypt_int_det",
+    sizeof("decrypt_int_det"),
+};
+
+static udf_func u_decDETInt = {
+    n_decDETInt,
+    INT_RESULT,
+    UDFTYPE_FUNCTION,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0L,
+};
+
+
+Item *
+DET_int::decryptUDF(Item * col, Item * ivcol) {
+    cerr << "udf expects key represented in different manner, fix udf";
+       
+    List<Item> l;
+    l.push_back(col);
+    l.push_back(new Item_string(make_thd_string(rawkey), rawkey.length(), &my_charset_bin));
+    
+    return new Item_func_udf_int(&u_decDETInt, l);	
 }
 
-DET_string::DET_string(Create_field * f, PRNG * key) {
+DET_str::DET_str(Create_field * f, PRNG * key) {
     cf = f;
     rawkey = key->rand_string(key_bytes);
     enckey = get_AES_enc_key(rawkey);
@@ -250,13 +301,13 @@ DET_string::DET_string(Create_field * f, PRNG * key) {
 
 
 Create_field *
-DET_string::newCreateField() {
+DET_str::newCreateField() {
 //TODO: use more precise sizes and types
     return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB);
 }
 
 Item *
-DET_string::encrypt(Item * ptext, uint64_t IV) {
+DET_str::encrypt(Item * ptext, uint64_t IV) {
     string enc = encrypt_AES_CMC(
 	ItemToString(static_cast<Item_string *>(ptext)),
 	enckey, false);
@@ -264,20 +315,45 @@ DET_string::encrypt(Item * ptext, uint64_t IV) {
 }
 
 Item *
-DET_string::decrypt(Item * ctext, uint64_t IV) {
+DET_str::decrypt(Item * ctext, uint64_t IV) {
     string dec = decrypt_AES_CMC(
 	ItemToString(static_cast<Item_string *>(ctext)),
 	deckey, false);
     return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
 }
 
-std::string
-DET_string::decryptUDF(const std::string & col, const std::string & ivcol) {
+
+
+static LEX_STRING n_decDETStr = {
+    (char *) "decrypt_text_det",
+    sizeof("decrypt_text_det"),
+};
+
+static udf_func u_decDETStr = {
+    n_decDETStr,
+    STRING_RESULT,
+    UDFTYPE_FUNCTION,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0L,
+};
+
+
+
+Item *
+DET_str::decryptUDF(Item * col, Item * ivcol) {
     cerr << "udf expects key represented in different manner, fix udf";
-    std::string query = "UPDATE columnref SET col = decrypt_text_det(" + col + ", " +
-	rawkey + ");";
+       
+    List<Item> l;
+    l.push_back(col);
+    l.push_back(new Item_string(make_thd_string(rawkey), rawkey.length(), &my_charset_bin));
     
-    return query;
+    return new Item_func_udf_str(&u_decDETStr, l);
 
 }
 
@@ -306,25 +382,44 @@ OPE_int::decrypt(Item * ctext, uint64_t IV) {
 }
 
 
-OPE_string::OPE_string(Create_field * cf, PRNG *key) {
+OPE_str::OPE_str(Create_field * cf, PRNG *key) {
     this->cf = cf;
     rawkey = key->rand_string(key_bytes);
     this->key = CryptoManager::get_key_OPE(rawkey, plain_size, ciph_size);
 }
 
 Create_field *
-OPE_string::newCreateField() {
+OPE_str::newCreateField() {
     return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG);
 }
 
 Item *
-OPE_string::encrypt(Item * ptext, uint64_t IV) {
+OPE_str::encrypt(Item * ptext, uint64_t IV) {
     uint64_t enc = CryptoManager::encrypt_OPE_text_wrapper(ItemToString(ptext), key);
     return new Item_int(enc);
 }
 
 Item *
-OPE_string::decrypt(Item * ctext, uint64_t IV)   {
+OPE_str::decrypt(Item * ctext, uint64_t IV)   {
     thrower() << "should not decrypt string from OPE \n";
 }
 
+/************ EncLayer factory creation  ********/
+
+EncLayer *
+EncLayerFactory::encLayer(SECLEVEL sl, Create_field * cf, PRNG * key) {
+    switch (sl) {
+    case SECLEVEL::SEMANTIC_DET:
+    case SECLEVEL::SEMANTIC_OPE: {
+	if (IsMySQLTypeNumeric(cf->sql_type)) {
+	    return new RND_int(cf, key);
+	} else {
+	    return new RND_str(cf, key);
+	}
+    }
+    default:{
+	
+    }
+    }
+    thrower() << "unknown or unimplemented security level \n";
+}

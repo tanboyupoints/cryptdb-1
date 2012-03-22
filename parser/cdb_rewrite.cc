@@ -1945,7 +1945,7 @@ static class ANON : public CItemSubtypeFT<Item_func_in, Item_func::Functype::BET
 template<const char *FN>
 class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
     virtual EncSet do_gather_type(Item_func_min_max *i, const constraints &tr, Analysis & a) const {
-        //cerr << "do_a_t Item_fuc_min_max reason " << tr << "\n";
+        //cerr << "do_a_t Item_fu_min_max reason " << tr << "\n";
         Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++)
             analyze(args[x], constraints(ORD_EncSet, "min/max", i, &tr), a);
