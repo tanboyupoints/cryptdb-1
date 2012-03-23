@@ -198,10 +198,7 @@ public:
 private:
     Create_field * cf;
     static const uint nbits = 1024;
-    std::vector<NTL::ZZ> sk;
-    Paillier_priv * skP;
-    std::vector<NTL::ZZ> pk;
-    Paillier * pkP;
+    Paillier_priv sk;
 };
 
 class Search : public EncLayer {

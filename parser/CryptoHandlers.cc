@@ -412,13 +412,10 @@ OPE_str::decrypt(Item * ctext, uint64_t IV)   {
 
 /**************** HOM ***************************/
 
-HOM::HOM(Create_field * cf, PRNG * key) {
-    this->cf = cf;
-    sk = Paillier_priv::keygen(key, nbits);
-    skP = new Paillier_priv(sk);
-
-    pk = skP->pubkey();
-    pkP = new Paillier(pk);
+HOM::HOM(Create_field *c, PRNG * key)
+    : cf(c),
+      sk(Paillier_priv::keygen(key, nbits))
+{
 }
 
 Create_field *
@@ -439,16 +436,13 @@ ZZToItem(const ZZ & val) {
 
 Item *
 HOM::encrypt(Item * ptext, uint64_t IV) {
-    
-    ZZ enc = pkP->encrypt(ItemToZZ(ptext));
-
+    ZZ enc = sk.encrypt(ItemToZZ(ptext));
     return ZZToItem(enc);
 }
 
 Item *
 HOM::decrypt(Item * ctext, uint64_t IV) {
-    ZZ dec = skP->decrypt(ItemToZZ(ctext));
-
+    ZZ dec = sk.decrypt(ItemToZZ(ctext));
     return ZZToItem(dec);
 }
 
@@ -479,12 +473,11 @@ HOM::sumUDF(Item * expr) {
        
     List<Item> l;
     l.push_back(expr);
-    for (ZZ i : pk) {
+    for (ZZ i: sk.pubkey()) {
 	l.push_back(ZZToItem(i));
     }
     
     return new Item_func_udf_str(&u_sum, l);
-
 }
 
 /******* SEARCH **************************/
