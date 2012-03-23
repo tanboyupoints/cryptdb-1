@@ -129,12 +129,16 @@ RND_int::newCreateField() {
 Item *
 RND_int::encrypt(Item * ptext, uint64_t IV) {
     //TODO: should have encrypt_SEM work for any length
-    return new Item_int(CryptoManager::encrypt_SEM((uint64_t)static_cast<Item_int *>(ptext)->value, key, IV));
+    uint64_t p = static_cast<Item_int *>(ptext)->value;
+    uint64_t c = CryptoManager::encrypt_SEM(p, key, IV);
+    return new Item_int((ulonglong) c);
 }
 
 Item *
 RND_int::decrypt(Item * ctext, uint64_t IV) {
-    return new Item_int(CryptoManager::decrypt_SEM((uint64_t)static_cast<Item_int*>(ctext)->value, key, IV));
+    uint64_t c = static_cast<Item_int*>(ctext)->value;
+    uint64_t p = CryptoManager::decrypt_SEM(c, key, IV);
+    return new Item_int((ulonglong) p);
 }
 
 
@@ -253,12 +257,12 @@ DET_int::newCreateField() {
 //TODO: may want to do more specialized crypto for lengths
 Item *
 DET_int::encrypt(Item * ptext, uint64_t IV) {
-    return new Item_int(key->encrypt(static_cast<Item_int *>(ptext)->value));
+    return new Item_int((ulonglong) key->encrypt(static_cast<Item_int *>(ptext)->value));
 }
 
 Item *
 DET_int::decrypt(Item * ctext, uint64_t IV) {
-    return new Item_int(key->decrypt(static_cast<Item_int*>(ctext)->value));
+    return new Item_int((ulonglong) key->decrypt(static_cast<Item_int*>(ctext)->value));
 }
 
 
@@ -374,13 +378,13 @@ OPE_int::newCreateField() {
 Item *
 OPE_int::encrypt(Item * ptext, uint64_t IV) {
     uint64_t enc = CryptoManager::encrypt_OPE(static_cast<Item_int *>(ptext)->value, key);
-    return new Item_int(enc);
+    return new Item_int((ulonglong) enc);
 }
 
 Item *
 OPE_int::decrypt(Item * ctext, uint64_t IV) {
     uint32_t dec = CryptoManager::decrypt_OPE(static_cast<Item_int*>(ctext)->value, key);
-    return new Item_int((ulonglong)dec);
+    return new Item_int((ulonglong) dec);
 }
 
 
@@ -398,7 +402,7 @@ OPE_str::newCreateField() {
 Item *
 OPE_str::encrypt(Item * ptext, uint64_t IV) {
     uint64_t enc = CryptoManager::encrypt_OPE_text_wrapper(ItemToString(ptext), key);
-    return new Item_int(enc);
+    return new Item_int((ulonglong) enc);
 }
 
 Item *
