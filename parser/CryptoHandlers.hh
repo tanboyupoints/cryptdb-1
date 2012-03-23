@@ -171,7 +171,7 @@ public:
     Create_field * newCreateField();
     
     Item * encrypt(Item * ptext, uint64_t IV = 0);
-    Item * decrypt(Item * ctext, uint64_t IV = 0)  __attribute__((noreturn));
+    Item * decrypt(Item * ctext, uint64_t IV = 0)__attribute__((noreturn));
   
 private:
     Create_field * cf;
@@ -204,6 +204,24 @@ private:
     Paillier * pkP;
 };
 
+class Search : public EncLayer {
+public:
+    Search(Create_field * cf, PRNG * key);
+    
+    Create_field * newCreateField();
+
+    Item * encrypt(Item * ptext, uint64_t IV = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0)__attribute__((noreturn));
+
+    //expr is the expression (e.g. a field) over which to sum
+    Item * searchUDF(Item * expr);
+    
+private:
+    Create_field * cf;
+    static const uint key_bytes = 16;
+    std::string rawkey;
+    Binary key;
+};
 
 class EncLayerFactory {
     static EncLayer * encLayer(SECLEVEL sl, Create_field * cf, PRNG * key);

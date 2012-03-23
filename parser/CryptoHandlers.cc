@@ -483,7 +483,99 @@ HOM::sumUDF(Item * expr) {
 
 }
 
+/******* SEARCH **************************/
 
+Search::Search(Create_field * cf, PRNG * key) {
+    this->cf = cf;
+    rawkey = key->rand_string(key_bytes);
+    this->key = Binary(key_bytes, (unsigned char *)rawkey.data());
+}
+
+Create_field *
+Search::newCreateField() {
+    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB);
+}
+
+
+//this function should in fact be provided by the programmer
+//currently, we split by whitespaces
+// only consider words at least 3 chars in len
+// discard not unique objects
+static list<Binary> *
+tokenize(string text)
+{
+    static const std::set<char> myDelimsStay = {};
+    static const std::set<char> myDelimsGo   = {' ', ',', ';', ':', '.'};
+    static const std::set<char> myKeepIntact = {};
+
+    list<string> tokens = parse(text, myDelimsStay, myDelimsGo, myKeepIntact);
+
+    std::set<string> search_tokens;
+
+    list<Binary> * res = new list<Binary>();
+
+    for (list<string>::iterator it = tokens.begin(); it != tokens.end();
+         it++) {
+        if ((it->length() >= 3) &&
+            (search_tokens.find(*it) == search_tokens.end())) {
+            string token = toLowerCase(*it);
+            search_tokens.insert(token);
+            res->push_back(Binary((uint) it->length(),
+                                  (unsigned char *) token.data()));
+        }
+    }
+
+    search_tokens.clear();
+    return res;
+
+}
+
+Item *
+Search::encrypt(Item * ptext, uint64_t IV) {
+    string plainstr = ItemToString(ptext);
+    //TODO: remove Binary, string serves this purpose now..
+    list<Binary> * tokens = tokenize(plainstr);
+    Binary ciph = CryptoManager::encryptSWP(key, *tokens);
+    
+    return new Item_string((const char *)ciph.content, ciph.len, &my_charset_bin);
+}
+
+Item *
+Search::decrypt(Item * ctext, uint64_t IV) {
+    thrower() << "decryption from SWP not supported \n";
+}
+
+
+static LEX_STRING n_search = {
+    (char*)"searchSWP",
+    sizeof("searchSWP"),
+};
+
+static udf_func u_search = {
+    n_search,
+    INT_RESULT,
+    UDFTYPE_FUNCTION,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0L,
+};
+
+Item *
+Search::searchUDF(Item * expr) {
+    Token t = CryptoManager::token(key, Binary(ItemToString(expr)));
+    
+    List<Item> l;
+    l.push_back(expr);
+    l.push_back(new Item_string((const char *)t.ciph.content, t.ciph.len, &my_charset_bin));
+    l.push_back(new Item_string((const char *)t.wordKey.content, t.wordKey.len, & my_charset_bin));
+    
+    return new Item_func_udf_int(&u_sum, l);
+}
 
 /************ EncLayer factory creation  ********/
 
