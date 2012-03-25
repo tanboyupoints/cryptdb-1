@@ -18,6 +18,18 @@ class blowfish {
         BF_ecb_encrypt(ctext, ptext, &k, BF_DECRYPT);
     }
 
+    uint64_t encrypt(uint64_t pt) const {
+        uint64_t ct;
+        block_encrypt((const uint8_t*) &pt, (uint8_t*) &ct);
+        return ct;
+    }
+
+    uint64_t decrypt(uint64_t ct) const {
+        uint64_t pt;
+        block_decrypt((const uint8_t*) &ct, (uint8_t*) &pt);
+        return pt;
+    }
+
     static const size_t blocksize = 8;
 
  private:
