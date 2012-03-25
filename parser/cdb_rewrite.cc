@@ -15,7 +15,7 @@
 #include <parser/CryptoHandlers.hh>
 
 //TODO: so far, do_enforce methods don't seem to do what analyze cannot do
-// needed?
+// needed? maybe we can define it only for needed cases
 
 using namespace std;
 
@@ -25,6 +25,23 @@ using namespace std;
     throw runtime_error(string("Unimplemented: ") + \
                         string(__PRETTY_FUNCTION__))
 
+
+/********  parser utils; TODO: put in util **/
+
+static Item *
+stringToItem(string s) {
+    return new Item_string(s.c_str(), s.length(), &my_charset_bin);
+}
+/*
+static string
+ItemToString(Item * i) {
+    String s;
+    String *s0 = i->val_str(&s);
+    assert(s0 != NULL);
+    return string(s0->ptr(), s0->length());
+}
+*/
+/******************************************************/
 
 static inline void
 mysql_query_wrapper(MYSQL *m, const string &q)
@@ -74,37 +91,6 @@ operator<<(ostream &out, const EncDesc & ed)
 }
 
 
-//maps a raw field type to an onion field handler returning the correspondig onion type
-typedef map<onion, OnionTypeHandler *> typeToOnionHandler;
-
-//typedef set< enum enum_field_types >   S;
-//typedef pair< S, OnionFieldHandler * > H;
-//typedef vector< H >                    V;
-
-const map<int, map<int,int> > hi = {
-    {1,{{1,1}}},
-    {3,{{1,1}}}
-};
-
-// TODO: this list is incomplete
-//maps data type to the type 
-const map<enum enum_field_types, typeToOnionHandler> OnionHandlers = {
-    {MYSQL_TYPE_LONG,
-     {
-	 {oDET, new OnionTypeHandler(MYSQL_TYPE_LONGLONG)},
-	 {oOPE, new OnionTypeHandler(MYSQL_TYPE_LONGLONG)},
-	 {oAGG, new OnionTypeHandler(MYSQL_TYPE_VARCHAR, 256, &my_charset_bin)}
-     }
-    },
-    {MYSQL_TYPE_VARCHAR,
-     {
-	 {oDET, new OnionTypeHandler(MYSQL_TYPE_BLOB)},
-	 {oOPE, new OnionTypeHandler(MYSQL_TYPE_BLOB)},
-	 {oSWP, new OnionTypeHandler(MYSQL_TYPE_BLOB)}
-     }
-    }
-};
-
 //records what onions need to be adjusted at the server for a query with
 //information in a
 static void
@@ -123,78 +109,47 @@ recordAdjustments(FieldMeta * fm, onion o, SECLEVEL l, Analysis & a) {
     }
 }
 
-//removes onion layer at the DB 
-static int
-removeOnionLayer(FieldMeta * fm, Analysis & a, onion o, SECLEVEL l) {
+//l gets updated to the new level
+static void
+removeOnionLayer(FieldMeta * fm, Analysis & a, onion o, SECLEVEL & l) {
 
-    string fieldanon = map_getAssert<onion, string>(fm->onionnames, o);
-    string tableanon = fm->tm->anonTableName;
-    
-    string query = "UPDATE " + tableanon + " SET " + fieldanon  + " = ";
-    
-    if (fm->ol_id == OLID_NUM) {
-	switch (l) {
-	case SECLEVEL::SEMANTIC_DET: {
-	    //same as SEMANTIC_OPE
-	}
-	case SECLEVEL::SEMANTIC_OPE: {
-	    query += "decrypt_int_sem( " +
-		fieldanon + ", " + 
-		a.cm->marshallKey(a.cm->getKey(fullName(fieldanon, tableanon), l)) + "," +
-		fm->salt_name + ");";
-	    break;
-	}
-	default: {
-	    assert_s(false, "incorrect seclevel");
-	}
-	}
-    } else {
-	//OLID_TEXT
-	switch (l) {
-	case SECLEVEL::SEMANTIC_DET: {
-	    //same as SEMANTIC_OPE 
-	}
-	case SECLEVEL::SEMANTIC_OPE: {
-	    query += "decrypt_text_sem( " +
-		fieldanon + ", " + 
-		a.cm->marshallKey(a.cm->getKey(fullName(fieldanon, tableanon), l)) + "," +
-		fm->salt_name + ");";
-	    break;
-	}
-	default: {
-	    assert_s(false, "incorrect seclevel");
-	}
-	}
-    }
+    OnionMeta om      = getAssert(fm->onions, o);
+    string fieldanon  = om.onionname;
+    string tableanon  = fm->tm->anonTableName;
 
+    //removes onion layer at the DB 
+    stringstream query;
+    query << "UPDATE " << tableanon << " SET " << fieldanon  << " = ";
+
+    Item * decUDF = om.layers.back()->decryptUDF(stringToItem(fieldanon), stringToItem(fm->salt_name));
+
+    query << decUDF << ";";
+    
     //execute decryption query
-    assert_s(a.conn->execute(query), "failed to execute onion decryption query");
+    assert_s(a.conn->execute(query.str()), "failed to execute onion decryption query");
 
-    LOG(cdb_v) << "adjust onions: \n" << query << " ... success! \n";
-    
-    return 0;
+    LOG(cdb_v) << "adjust onions: \n" << query.str() << " ... success! \n";
+
+    //remove onion layer in schema
+    om.layers.pop_back();
+    l = om.layers.back()->level();
+    fm->encdesc.olm[o] = l;   //todo:we do not need olm
+						    //any more; then, do we need level
+						    //in Enclayer?
 }
 
 /*
  * Same as adjustOnions but for one specific field and onion.
  */
-static int
+static void
 adjustOnion(onion o, FieldMeta * fm, SECLEVEL levelto, Analysis & a) {
 
-    //TODO: use map_getAssert in more places
-    SECLEVEL oldlevel = map_getAssert(fm->encdesc.olm, o);
+    //TODO: use getAssert in more places
+    SECLEVEL newlevel = getAssert(fm->encdesc.olm, o);
 
-    while (oldlevel > levelto) {
-	if (removeOnionLayer(fm, a, o, oldlevel) < 0) {
-	    return -1;
-	}
-	oldlevel = decreaseLevel(oldlevel, fm->ol_id, o);
-	//update schema
-	fm->encdesc.olm[o] = oldlevel;
-
+    while (newlevel > levelto) {
+	removeOnionLayer(fm, a, o, newlevel);
     }
-    
-    return 0;
 }
 
 
@@ -209,20 +164,15 @@ adjustOnion(onion o, FieldMeta * fm, SECLEVEL levelto, Analysis & a) {
  * Adjusts the schema metadata at the proxy about onion layers. Propagates the
  * changed schema to persistent storage.
  *
- * Returns negative on error.
- *
  */
-static int
+static void
 adjustOnions(const std::string &db, Analysis & a)
 {
-
     for (auto it : a.onionAdjust) {
 	for (auto itt : it.second) {
 	    adjustOnion(it.first, itt.first, itt.second, a);
 	}
     }
-  
-    return 0;
 }
 
 static inline bool
@@ -230,50 +180,6 @@ FieldQualifies(const FieldMeta * restriction,
                const FieldMeta * field)
 {
     return !restriction || restriction == field;
-}
-
-static inline bool
-IsMySQLTypeNumeric(enum_field_types t) {
-    switch (t) {
-        case MYSQL_TYPE_DECIMAL:
-        case MYSQL_TYPE_TINY:
-        case MYSQL_TYPE_SHORT:
-        case MYSQL_TYPE_LONG:
-        case MYSQL_TYPE_FLOAT:
-        case MYSQL_TYPE_DOUBLE:
-        case MYSQL_TYPE_LONGLONG:
-        case MYSQL_TYPE_INT24:
-        case MYSQL_TYPE_NEWDECIMAL:
-
-        // numeric also includes dates for now,
-        // since it makes sense to do +/- on date types
-        case MYSQL_TYPE_TIMESTAMP:
-        case MYSQL_TYPE_DATE:
-        case MYSQL_TYPE_TIME:
-        case MYSQL_TYPE_DATETIME:
-        case MYSQL_TYPE_YEAR:
-        case MYSQL_TYPE_NEWDATE:
-            return true;
-        default: return false;
-    }
-}
-
-static string
-getAnonName(const ItemMeta * im) {
-    if (im->basefield->onionnames.find(im->o) == im->basefield->onionnames.end()) {
-        return "";
-    }
-    return im->basefield->onionnames[im->o];
-}
-
-//TODO raluca: should unify enc/dec for numeric and strings
-static OnionLayoutId
-getTypeForDec(const ItemMeta * im) {
-    if (IsMySQLTypeNumeric(im->basefield->sql_field->sql_type)) {
-        return OLID_NUM;
-    } else {
-        return OLID_TEXT;
-    }
 }
 
 
@@ -315,7 +221,7 @@ sq(MYSQL *m, const string &s)
     size_t len = mysql_real_escape_string(m, buf, s.c_str(), s.size());
     return string("'") + string(buf, len) + string("'");
 }
-
+/*
 //TODO: be consistent thruout code: stringify or print?
 static void
 printOnion(onion level) {
@@ -335,21 +241,13 @@ printOnion(onion level) {
 static void
 printSecLevel(SECLEVEL l) {
     map<SECLEVEL, string> seclevel_map = {
-        {SECLEVEL::INVALID, "INVALID"},
         {SECLEVEL::PLAIN, "PLAIN"},
-        {SECLEVEL::PLAIN_DET, "PLAIN_DET"},
-        {SECLEVEL::DETJOIN, "DETJOIN"},
+	{SECLEVEL::DETJOIN, "DETJOIN"},
         {SECLEVEL::DET, "DET"},
-        {SECLEVEL::SEMANTIC_DET, "SEMANTIC_DET"},
-        {SECLEVEL::PLAIN_OPE, "PLAIN_OPE"},
-        {SECLEVEL::OPEJOIN, "OPEJOIN"},
-        {SECLEVEL::OPE, "OPE"},
-        {SECLEVEL::SEMANTIC_OPE, "SEMANTIC_OPE"},
-        {SECLEVEL::PLAIN_AGG, "PLAIN_AGG"},
-        {SECLEVEL::SEMANTIC_AGG, "SEMANTIC_AGG"},
-        {SECLEVEL::PLAIN_SWP, "PLAIN_SWP"}, 
-        {SECLEVEL::SWP, "SWP"},
-        {SECLEVEL::SEMANTIC_VAL, "SEMANTIC_VAL"},
+        {SECLEVEL::RND, "RND"},
+	{SECLEVEL::OPE, "OPE"},
+	{SECLEVEL::SEARCH, "SEARCH"},
+        {SECLEVEL::HOM, "HOM"},
         {SECLEVEL::SECLEVEL_LAST, "SECLEVEL_LAST"} };
     if (seclevel_map.find(l) != seclevel_map.end()) {
         LOG(cdb_v) << seclevel_map[l];
@@ -357,87 +255,71 @@ printSecLevel(SECLEVEL l) {
     }
     LOG(cdb_v) << "[not a valid seclevel]";
 }
+*/
+//TODO: which encrypt/decrypt should handle null?
+static Item *
+encrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV = 0) {
 
+    assert_s(layers.size() > 0, "field must have at least one layer");
 
-static string
-crypt(Analysis & a, string plaindata, OnionLayoutId ft, string fieldname, SECLEVEL fromlevel, SECLEVEL tolevel, bool & isBin, uint64_t salt, FieldMeta *fm, const vector<SqlItem> &res = vector<SqlItem>()) {
-    LOG(cdb_v) << "crypt " << plaindata << " from "; printSecLevel(fromlevel); LOG(cdb_v) << " to "; printSecLevel(tolevel);
-    AES_KEY * mkey;
-    if (a.mp) {
-        string key;
-        //LOG(cdb_v) << "crypt fm->fname = " << fullName(fm->fname, fm->tm->anonTableName);
-        if (a.tmkm.processingQuery) {
-            key = a.mp->get_key(fullName(fm->fname, fm->tm->anonTableName), a.tmkm);
-        } else {
-            key = a.mp->get_key(fullName(fm->fname, fm->tm->anonTableName), a.tmkm, res);
-        }
-        mkey = a.cm->getKey(key);
-    } else {
-        mkey = a.cm->getmkey();
+    Item * enc = i;
+    Item * prev_enc = NULL;
+    for (auto layer : layers) {
+	enc = layer->encrypt(enc, IV);
+	//need to free space for all enc
+	//except the last one
+	if (prev_enc) {
+	    free(prev_enc);
+	}
+	prev_enc = enc;
     }
-    //LOG(cdb_v) << "crypt '" << plaindata << "' with length before crypt " << plaindata.length();
-    string c = a.cm->crypt(mkey, plaindata, ft, fieldname, fromlevel, tolevel, isBin, salt);
-    return c;
-}
 
-static Item * createItem(const string & data, FieldMeta * fm, onion o) {
-
-    //TODO: I don';t like this; the handler for the onion already knows type, I
-    //should just store the handler somewhere in fm instead of deriving it
-    //always
-    auto it = OnionHandlers.find(fm->sql_field->sql_type);
-    assert_s(it != OnionHandlers.end(), "sql_type not found in OnionHandlers");
-    
-    return map_getAssert<onion, OnionTypeHandler *>
-	(it->second, o)->createItem(data);
+    return enc;
 }
 
 static Item *
-cryptedItem(Analysis & a, string plaindata, FieldMeta * fm,
-	    onion o, SECLEVEL fromlevel, SECLEVEL tolevel,
-	    uint64_t salt){
-    bool isBin;
-    string anonName = fullName(fm->onionnames[o], fm->tm->anonTableName);
-    string enc = crypt(a, plaindata, OLID_NUM, anonName,
-		       fromlevel, tolevel,
-		       isBin, salt, fm);
+decrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV) {
+    Item * prev_dec = NULL;
+    Item * dec = i;
+    
+    for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
+	dec = (*it)->decrypt(dec, IV);
+	if (prev_dec) {
+	    delete prev_dec;
+	}
+	prev_dec = dec;
+    }
 
-    LOG(cdb_v) << "for onion "; printOnion(o);
-    LOG(cdb_v) << " enc is " << enc << "\n";
-
-    return createItem(enc, fm, o);
-}
-
-/********  parser utils; TODO: put in separate file **/
-
-static string
-ItemToString(Item * i) {
-    String s;
-    String *s0 = i->val_str(&s);
-    assert(s0 != NULL);
-    return string(s0->ptr(), s0->length());
+    return dec;
 }
 
 // encrypts a constant item based on the information in a
 //TODO cat_red fix for mp
-static string
-encryptConstantItem(Item * i, Analysis & a, OnionLayoutId ft){
+static Item *
+encrypt_item(Item * i, Analysis & a){
 
-    string plaindata = ItemToString(i);
-    cerr << "encrypting constant " << plaindata << "\n";
-    auto itemMeta = a.itemToMeta.find(i);
-    assert_s(itemMeta != a.itemToMeta.end(), "there is no meta for item in analysis");
-
-    ItemMeta * im = itemMeta->second;
+    ItemMeta * im = getAssert(a.itemToMeta, i,
+			"there is no meta for item in analysis");
     FieldMeta * fm = im->basefield;
-    if (fm->onionnames.find(im->o) == fm->onionnames.end()) {
-        return plaindata;
+    onion o        = im->o;
+    
+    return encrypt_item_layers(i, fm->onions[o].layers);
+}
+
+static void
+encrypt_item_all_onions(Item * i, FieldMeta * fm,
+			uint64_t IV, vector<Item*> & l) {
+    for (auto it : fm->onions) {
+	l.push_back(encrypt_item_layers(i, it.second.layers, IV));
     }
-    string anonName = fullName(fm->onionnames[im->o], fm->tm->anonTableName);
-    bool isBin;
-    string encryption = crypt(a, plaindata, ft, anonName, getMin(im->o), fm->encdesc.olm[im->o], isBin, 0, fm);
-    cerr << "encryption is " << encryption << "\n";
-    return encryption;
+}
+
+static Item *
+decrypt_item(ItemMeta * im, Item * i, uint64_t IV) {
+    FieldMeta * fm       = im->basefield;
+    onion o              = im->o;
+
+    return decrypt_item_layers(i, fm->onions[o].layers, IV);
 }
 
 /***********end of parser utils *****************/
@@ -500,8 +382,8 @@ get_column_name(const string & table,
     if (fit == it->second->fieldMetaMap.end()) {
         thrower() << "field " << field << "unknown \n";
     }
-    if (fit->second->onionnames.find(o) != fit->second->onionnames.end()) {
-        return fit->second->onionnames[o];
+    if (fit->second->onions.find(o) != fit->second->onions.end()) {
+        return fit->second->onions[o].onionname;
     }
     return field;
 }
@@ -910,11 +792,11 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
         string fieldname = i->field_name;
         string table = i->table_name;
-
+/* REMOVED FOR NOW
         if (a.mp && a.mp->hasEncFor(fullName(fieldname, table))) {
             a.tmkm.encForVal[fullName(fieldname, table)] = "";
         }
-
+*/
         FieldMeta * fm = a.schema->getFieldMeta(table, fieldname);
 
         // check compatibility for each of the constraints given
@@ -1060,10 +942,10 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         // but not quite. see if we can somehow reconcile these two
         // pieces of code
         fm = a.schema->getFieldMeta(i->table_name, i->field_name);
-        for (auto it = fm->onionnames.begin();
-             it != fm->onionnames.end();
+        for (auto it = fm->onions.begin();
+             it != fm->onions.end();
              ++it) {
-            const string &name = it->second;
+            const string &name = it->second.onionname;
             l.push_back(make_from_template(i, name.c_str()));
         }
         if (fm->has_salt) {
@@ -1101,59 +983,34 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
 
     virtual Item * do_rewrite_type(Item_string *i, Analysis & a) const {
         LOG(cdb_v) << "do_rewrite_type L908";
-        string unenc = ItemToString(i);
-        string enc = encryptConstantItem(i,  a, OLID_TEXT);
-        if (enc != unenc) {
-	    cerr << "here in enc!=unenc \n";
-            return new Item_string(make_thd_string(enc), enc.length(), i->default_charset());
-        } else {
-            return i;
-        }
+        
+        return encrypt_item(i,  a);
     }
 
     virtual void
     do_rewrite_insert_type(Item_string *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
         LOG(cdb_v) << "do_rewrite_insert_type L880 " << *i;
-        assert(fm != NULL);
-        String s;
-        String *s0 = i->val_str(&s);
-        string plaindata = string(s0->ptr(), s0->length());
 
+	if (fm->onions.size() == 0) {//field is not encrypted
+	    l.push_back(i);
+	    return;
+	}
+
+	//field is encrypted
         uint64_t salt = 0;
         if (fm->has_salt) {
             salt = randomValue();
         } else {
-            //TODO raluca
-            //need to use table salt in this case
+            //TODO: need to use table salt in this case
         }
 
-        string save_det;
-        assert(s0 != NULL);
-        for (auto it = fm->onionnames.begin();
-             it != fm->onionnames.end();
-             ++it)
-        {
-            string anonName = fullName(it->second, fm->tm->anonTableName);
-            bool isBin;
-            LOG(cdb_v) << "field " << fm->fname << " on onion ";
-            printOnion(it->first);
-
-            string enc = crypt(a, plaindata, OLID_TEXT, anonName, getMin(it->first), getMax(it->first), isBin, salt, fm);
-            Item *itest = new Item_string(make_thd_string(enc), enc.length(), i->default_charset());
-            if (it->first == oDET) {
-                assert_s(crypt(a, ItemToString(itest), OLID_TEXT, anonName, getMax(it->first), getMin(it->first), isBin, salt, fm) == plaindata, "crypt(crypt(plaindata)) != plaindata");
-                save_det = enc;
-            } else {
-                assert_s(save_det == (*(l.begin()))->str_value.ptr(), "det str somehow changed >_< from " + save_det + " to " + (*(l.begin()))->str_value.ptr());
-            }
-            l.push_back(itest);
-        }
-
+	encrypt_item_all_onions(i, fm, salt, l);
+       
         if (fm->has_salt) {
-            string salt_s = strFromVal(salt);
-            l.push_back(new Item_string(make_thd_string(salt_s), salt_s.length(), i->default_charset()));
+            l.push_back(new Item_int(salt));
         }
+	
         //if no onions: grab the field, for reals
         if (l.empty()) {
             l.push_back(i);
@@ -1181,24 +1038,16 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     virtual Item * do_optimize_type(Item_num *i, Analysis & a) const {
         return i;
     }
+
     virtual Item * do_rewrite_type(Item_num *i, Analysis & a) const {
-
-        LOG(cdb_v) << "do_rewrite_type L970 " << *i << endl;
-        string enc = encryptConstantItem(i, a, OLID_NUM);
-	
-	return new Item_int((ulonglong) valFromStr(enc));
-
+        LOG(cdb_v) << "do_rewrite_type " << *i << endl;
+        return encrypt_item(i, a);	
     }
+ 
     virtual void
     do_rewrite_insert_type(Item_num *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
         LOG(cdb_v) << "do_rewrite_insert_type L942 " << *i << endl;
-        //TODO: this part is quite repetitive with string or
-        //any other type -- write a function
-
-        assert(fm != NULL);
-        longlong n = i->val_int();
-        string plaindata = strFromVal((uint64_t)n);
 
         uint64_t salt = 0;
         if (fm->has_salt) {
@@ -1208,20 +1057,19 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
             //need to use table salt in this case
         }
 
-        for (auto it = fm->onionnames.begin();
-             it != fm->onionnames.end();
-             ++it) {        
-            l.push_back(cryptedItem(a, plaindata, fm,
-				    it->first, getMin(it->first), getMax(it->first),
-				    salt));
+	//check if not encrypted
+	if (!fm->onions.size()) {
+	    l.push_back(i);
+	    return;
+	}
+
+	//encrypt for each onion
+        for (auto it = fm->onions.begin(); it != fm->onions.end();it++) {
+	    l.push_back(encrypt_item_layers(i, it->second.layers, salt));
         }
 	
         if (fm->has_salt) {
             l.push_back(new Item_int((ulonglong) salt));
-        }
-        //if no onions: grab the field, for reals
-        if (l.empty()) {
-            l.push_back(new Item_int((ulonglong) valFromStr(plaindata)));
         }
     }
 } ANON;
@@ -1255,8 +1103,8 @@ static class ANON : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITEM
         double n = i->val_real();
         char buf[sizeof(double) * 2];
         sprintf(buf, "%x", (unsigned int)n);
-        for (auto it = fm->onionnames.begin();
-             it != fm->onionnames.end();
+        for (auto it = fm->onions.begin();
+             it != fm->onions.end();
              ++it) {
             l.push_back(new Item_hex_string(buf, sizeof(buf)));
         }
@@ -2024,7 +1872,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
 	analyze(child_item, new_tr, a);
 
 	new_tr.encset.setFieldForOnion(oAGG,
-					 map_getAssert<Item_field*, FieldMeta*>(a.itemToFieldMeta,
+					 getAssert<Item_field*, FieldMeta*>(a.itemToFieldMeta,
 										(Item_field *)child_item));
 	
 	cerr << "CONSTRAINTS after gathers in item_sum_sum: " << new_tr << "\n";
@@ -2039,30 +1887,16 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
     virtual Item * do_rewrite_type(Item_sum_sum * i, Analysis & a) const {
 	LOG(cdb_v) << "rewrite in CItemAdditive ";
 
+	ItemMeta * im = getAssert(a.itemToMeta, (Item *)i);
+	
 	//record information for decrypting results
-	addToReturn(a.rmeta, a.pos++,
-		    map_getAssert<Item*, ItemMeta*>(a.itemToMeta, i),
+	addToReturn(a.rmeta, a.pos++, im,
 		    false, i->name);
 
-	//rewrite children
-	List<Item> l;
-	uint count = i->get_arg_count();
-	for (uint ind = 0 ;ind < count; ind++) {
-	    Item * arg = i->get_arg(ind); 
-	    rewrite(&arg, a);
-	    l.push_back(arg);
-	}
-	
-	//need to add public key info for HOM
-	string pk = marshallBinary(a.cm->getPKInfo());//TODO: do we need to marshall?
-        Item * pk_item = new Item_string(make_thd_string(pk), 
-				pk.length(),
-				i->default_charset());	
-	pk_item->name = NULL; //no need for alias
-	l.push_back(pk_item);
-    
-	return new Item_func_udf_str(&s_HomAddUdfFunc, l);
-
+	FieldMeta * fm = im->basefield;
+	EncLayer * el = getAssert(fm->onions, oAGG).layers.back();
+	assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
+	return ((HOM *)el)->sumUDF(i->get_arg(0));
     }
 };
 
@@ -2354,19 +2188,67 @@ rewrite_table_list(List<TABLE_LIST> *tll, Analysis & a)
     }
 }
 
+//Onion layouts - initial structure of onions
+typedef map<onion, list<SECLEVEL> > onionlayout;
+
+static onionlayout NUM_ONION_LAYOUT = {
+    {oDET, list<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
+    {oOPE, list<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
+    {oAGG, list<SECLEVEL>({SECLEVEL::HOM})}
+};
+    
+static onionlayout STR_ONION_LAYOUT = {
+    {oDET, list<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
+    {oOPE, list<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
+    {oAGG, list<SECLEVEL>({SECLEVEL::SEARCH})}
+};
+
+
+static PRNG *
+getLayerKey(AES_KEY * mKey, string uniqueFieldName, SECLEVEL l) {
+    string rawkey = CryptoManager::getKey(mKey, uniqueFieldName, l);
+    urandom * key = new urandom();
+    key->seed_bytes(rawkey.length(), (uint8_t*)rawkey.data());
+    return key;
+}
+
 static void
-add_table(SchemaInfo * schema, const string & table, LEX *lex, bool encByDefault) {
+init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf, onionlayout ol) {
+    for (auto it: ol) {
+	onion o = it.first;
+	OnionMeta om = OnionMeta();
+
+        //anonymize onion name
+	om.onionname = anonymizeFieldName(index, o, fm->fname, false);
+
+	//generate enclayers
+	for (auto l: it.second) {
+	    PRNG * key = getLayerKey(mKey, fullName(om.onionname, fm->tm->anonTableName), l);	    
+	    om.layers.push_back(EncLayerFactory::encLayer(l, cf, key));
+	}
+
+	//set outer layer
+	fm->encdesc.olm[o] = it.second.back(); 
+    }
+}
+
+static void
+init_onions(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf) {
+    if (IsMySQLTypeNumeric(cf->sql_type)) {
+	init_onions_layout(mKey, fm, index, cf, NUM_ONION_LAYOUT);
+    } else {
+	init_onions_layout(mKey, fm, index, cf, STR_ONION_LAYOUT);
+    }
+}
+
+static void
+add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
     assert(lex->sql_command == SQLCOM_CREATE_TABLE);
 
-    auto it = schema->tableMetaMap.find(table);
-    if (it != schema->tableMetaMap.end()) {
-        // we already hold the in mem data structure representing this
-        // table.
-        //
-        // if this isn't a create table if not exists, then issue a
-        // warning and quit
+    auto it = a.schema->tableMetaMap.find(table);
+    if (it != a.schema->tableMetaMap.end()) {
         if (!(lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS)) {
-            LOG(warn) << "ERROR: Embedded DB possibly"
+            LOG(warn) << "ERROR: Table exists. Embedded DB possibly"
                     "out of sync with regular DB (or, just programmer error)";
         }
         return;
@@ -2374,12 +2256,12 @@ add_table(SchemaInfo * schema, const string & table, LEX *lex, bool encByDefault
 
     TableMeta *tm = new TableMeta();
     LOG(cdb_v) << "adding " << table << " to schema->tableMetaMap";
-    schema->tableMetaMap[table] = tm;
+    a.schema->tableMetaMap[table] = tm;
 
-    tm->tableNo = schema->totalTables++;
+    tm->tableNo = a.schema->totalTables++;
     tm->anonTableName = anonymizeTableName(tm->tableNo, table, !encByDefault);
 
-    unsigned int index =  0;
+    uint index =  0;
     for (auto it = List_iterator<Create_field>(lex->alter_info.create_list);;) {
         Create_field * field = it++;
         if (!field) {
@@ -2387,35 +2269,21 @@ add_table(SchemaInfo * schema, const string & table, LEX *lex, bool encByDefault
         }
         FieldMeta * fm = new FieldMeta();
 
-        fm->tm        = tm;
-        fm->sql_field = field->clone(current_thd->mem_root);
-
-        fm->fname = string(fm->sql_field->field_name);
-
-        // certain field types cannot have certain onions. for instance,
-        // AGG makes no sense for non numeric types
-        // MultiPrinc on have onions on encfor fields, and those will be added by
-        // mp->processAnnotations so by default add no onions or encryption paraphernalia
-        // Similarly, non-encByDefault single princ shouldn't have any additional encryption info
-        if (encByDefault) {
-            LOG(cdb_v) << "encByDefault";
-            if (IsMySQLTypeNumeric(field->sql_type)) {
-                fm->encdesc = NUMERIC_EncDec;
-            } else {
-                fm->encdesc = EQ_SEARCH_EncDesc;
-            }
-
-            for (auto pr : fm->encdesc.olm) {
-                fm->onionnames[pr.first] = anonymizeFieldName(index, pr.first, fm->fname, false);
-            }
-
+        fm->tm            = tm;
+        fm->sql_field     = field->clone(current_thd->mem_root);
+        fm->fname         = string(fm->sql_field->field_name);
+        fm->index         = index;
+	
+	if (encByDefault) { 
+	    init_onions(a.masterKey, fm, index, field);
+          
             fm->has_salt = true;
             fm->salt_name = getFieldSalt(index, tm->anonTableName);
         } else {
             fm->has_salt = false;
         }
 
-        fm->index = index;
+
         assert(tm->fieldMetaMap.find(fm->fname) == tm->fieldMetaMap.end());
         tm->fieldMetaMap[fm->fname] = fm;
         tm->fieldNames.push_back(fm->fname);
@@ -2425,7 +2293,7 @@ add_table(SchemaInfo * schema, const string & table, LEX *lex, bool encByDefault
     }
 }
 
-
+//TODO: no need to pass create_field to this
 static void rewrite_create_field(const string &table_name,
                                  Create_field *f,
                                  Analysis &a,
@@ -2433,33 +2301,23 @@ static void rewrite_create_field(const string &table_name,
 {
     FieldMeta *fm = a.schema->getFieldMeta(table_name, f->field_name);
 
-    //TODO: the onions with which you start should match the ones in OnionHandlers
-    // if it has no onions, return the original field
-    if (fm->onionnames.empty()) {
+    //check if field is not encrypted
+    if (fm->onions.empty()) {
         l.push_back(f);
         return;
     }
 
     // create each onion column
-    for (auto it = fm->onionnames.begin();
-         it != fm->onionnames.end();
-         ++it) {
+    for (auto oit = fm->onions.begin();
+         oit != fm->onions.end();
+         ++oit) {
 
-	auto it_t = OnionHandlers.find(f->sql_type);
-	assert(it_t != OnionHandlers.end());
-
-	auto it_o = it_t->second.find(it->first);
-	assert(it_o != it_t->second.end());
-
-	Create_field *newF = NULL;
-	newF = it_o->second->newOnionCreateField(it->second.c_str(), f);
-	
-        if (newF == NULL) {
-            cryptdb_err() << "Could not rewrite for onion: " <<
-                        it->first << ", type: " << f->sql_type;
-        }
-	
-        l.push_back(newF);
+	EncLayer * last_layer = oit->second.layers.back();
+	Create_field * new_cf = last_layer->newCreateField();
+		
+	//use anonymous onionname
+	new_cf->field_name = oit->second.onionname.c_str();
+        l.push_back(new_cf);
     }
 
     // create salt column
@@ -2496,7 +2354,7 @@ process_create_lex(LEX * lex, Analysis & a, bool encByDefault)
     const string &table =
         lex->select_lex.table_list.first->table_name;
     LOG(cdb_v) << "table is " << table << " and encByDefault is " << encByDefault << " and true is " << true;
-    add_table(a.schema, table, lex, encByDefault);
+    add_table(a, table, lex, encByDefault);
 }
 
 static void
@@ -2553,7 +2411,7 @@ rewrite_create_lex(LEX *lex, Analysis &a)
         lex->alter_info.key_list = newList0;
     }
 }
-
+/* REMOVED FOR NOW
 static void
 mp_update_init(LEX *lex, Analysis &a)
 {
@@ -2565,19 +2423,20 @@ mp_update_init(LEX *lex, Analysis &a)
             break;
         }
         string fname = a.itemToFieldMeta[i]->tm->anonTableName + "." + a.itemToFieldMeta[i]->fname;
-        if (a.mp->hasEncFor(fname)) {
+          if (a.mp->hasEncFor(fname)) {
             assert_s(false, "cannot update changes to access tree");
-        }
+	    } 
     }
 }
-
+*/
 static void
 rewrite_update_lex(LEX *lex, Analysis &a)
 {
     assert_s(lex->select_lex.item_list.head(), "update needs to have item_list");
 
-    mp_update_init(lex, a);
-
+    /* REMOVED FOR NOW
+       mp_update_init(lex, a);
+    */
     //rewrite table name
     rewrite_table_list(lex->select_lex.table_list.first, a);
 
@@ -2641,7 +2500,7 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     if (lex->select_lex.having)
         rewrite(&lex->select_lex.having, a);
 }
-
+/* REMOVED FOR NOW
 static void
 mp_insert_init(LEX *lex, Analysis &a)
 {
@@ -2650,12 +2509,13 @@ mp_insert_init(LEX *lex, Analysis &a)
     a.tmkm.processingQuery = true;
     a.mp->insertLex(lex, a.schema, a.tmkm);
 }
-
+*/
 static void
 rewrite_insert_lex(LEX *lex, Analysis &a)
 {
+    /* REMOVED FOR NOW
     mp_insert_init(lex, a);
-
+    */
     const string &table =
             lex->select_lex.table_list.first->table_name;
 
@@ -2882,8 +2742,8 @@ add_table_update_meta(const string &q,
 
 #define __temp_write(o) \
         { \
-            auto it = fm->onionnames.find(o); \
-            if (it != fm->onionnames.end()) { s << sq(m, it->second) << ", "; } \
+            auto it = fm->onions.find(o); \
+            if (it != fm->onions.end()) { s << sq(m, it->second.onionname) << ", "; } \
             else                            { s << "NULL, ";               } \
         }
         __temp_write(oDET);
@@ -2915,7 +2775,7 @@ add_table_update_meta(const string &q,
     mysql_query_wrapper(m, "COMMIT");
 }
 
-static int
+static void
 updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
 {
     switch (lex->sql_command) {
@@ -2931,7 +2791,7 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
         break;
     }
 
-    return adjustOnions(db, a);
+    adjustOnions(db, a);
 }
 
 static void dropF(Connect * conn, const string & func) {
@@ -2984,6 +2844,9 @@ Rewriter::Rewriter(Connect * conn, string dbname,
                    bool multi, bool encByDefault)
     : conn(conn), db(dbname), encByDefault(encByDefault)
 {
+
+    urandom u;
+    masterKey = CryptoManager::getKey(u.rand_string(AES_KEY_BYTES));
     // create mysql connection to embedded
     // server
     m = mysql_init(0);
@@ -3007,11 +2870,12 @@ Rewriter::Rewriter(Connect * conn, string dbname,
 
     loadUDFs(conn);
 
+    /* REMOVED FOR NOW
     if (multi) {
         mp = new MultiPrinc(conn);
     } else {
         this->mp = NULL;
-    }
+	} */
 }
 
 Rewriter::~Rewriter()
@@ -3066,11 +2930,11 @@ Rewriter::createMetaTablesIfNotExists()
                    "      , 'PLAIN_DET'"
                    "      , 'DETJOIN'"
                    "      , 'DET'"
-                   "      , 'SEMANTIC_DET'"
+                   "      , 'DET'"
                    "      , 'PLAIN_OPE'"
                    "      , 'OPEJOIN'"
                    "      , 'OPE'"
-                   "      , 'SEMANTIC_OPE'"
+                   "      , 'OPE'"
                    "      , 'PLAIN_AGG'"
                    "      , 'SEMANTIC_AGG'"
                    "      , 'PLAIN_SWP'"
@@ -3084,11 +2948,11 @@ Rewriter::createMetaTablesIfNotExists()
                    "      , 'PLAIN_DET'"
                    "      , 'DETJOIN'"
                    "      , 'DET'"
-                   "      , 'SEMANTIC_DET'"
+                   "      , 'DET'"
                    "      , 'PLAIN_OPE'"
                    "      , 'OPEJOIN'"
                    "      , 'OPE'"
-                   "      , 'SEMANTIC_OPE'"
+                   "      , 'OPE'"
                    "      , 'PLAIN_AGG'"
                    "      , 'SEMANTIC_AGG'"
                    "      , 'PLAIN_SWP'"
@@ -3104,6 +2968,7 @@ Rewriter::createMetaTablesIfNotExists()
 void
 Rewriter::initSchema()
 {
+    cerr << "warning: initSchema does not init enc layers correctly\n";
     createMetaTablesIfNotExists();
 
     MYSQL *m = connect();
@@ -3195,15 +3060,15 @@ Rewriter::initSchema()
                 bool has_agg = string(row[i++], l[j++]) == "1";
                 bool has_swp = string(row[i++], l[j++]) == "1";
 
-                fm->onionnames[oDET] = string(row[i++], l[j++]);
+                fm->onions[oDET].onionname = string(row[i++], l[j++]);
 
-                if (has_ope) { fm->onionnames[oOPE] = string(row[i++], l[j++]); }
+                if (has_ope) { fm->onions[oOPE].onionname = string(row[i++], l[j++]); }
                 else         { i++; j++; }
 
-                if (has_agg) { fm->onionnames[oAGG] = string(row[i++], l[j++]); }
+                if (has_agg) { fm->onions[oAGG].onionname = string(row[i++], l[j++]); }
                 else         { i++; j++; }
 
-                if (has_swp) { fm->onionnames[oSWP] = string(row[i++], l[j++]); }
+                if (has_swp) { fm->onions[oSWP].onionname = string(row[i++], l[j++]); }
                 else         { i++; j++; }
 
                 OnionLevelMap om;
@@ -3213,9 +3078,9 @@ Rewriter::initSchema()
                 if (has_ope) { om[oOPE] = string_to_sec_level(string(row[i++], l[j++])); }
                 else         { i++; j++; }
 
-                if (has_agg) { om[oAGG] = SECLEVEL::PLAIN_AGG; }
+                if (has_agg) { om[oAGG] = SECLEVEL::PLAIN; }
 
-                if (has_swp) { om[oSWP] = SECLEVEL::PLAIN_SWP; }
+                if (has_swp) { om[oSWP] = SECLEVEL::HOM; }
 
                 fm->encdesc = EncDesc(om);
 
@@ -3236,7 +3101,7 @@ Rewriter::initSchema()
 void
 Rewriter::setMasterKey(const string &mkey)
 {
-    cm = new CryptoManager(mkey);
+    masterKey = CryptoManager::getKey(mkey);
 }
 
 list<string>
@@ -3253,29 +3118,29 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
     bool numeric = IsMySQLTypeNumeric(fm->sql_field->sql_type);
 
     if (numeric) {
-        fm->encdesc = NUMERIC_EncDec;
+        fm->encdesc = NUM_initial_levels;
     } else {
-        fm->encdesc = EQ_SEARCH_EncDesc;
+        fm->encdesc = STR_initial_levels;
     }
 
     for (auto pr : fm->encdesc.olm) {
-        fm->onionnames[pr.first] = anonymizeFieldName(fm->index, pr.first, fm->fname, true);
+        fm->onions[pr.first].onionname = anonymizeFieldName(fm->index, pr.first, fm->fname, true);
         if (pr.first == oDET) {
             LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets DET onion";
             if (numeric) {
-                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onionnames[pr.first] + " " + TN_I64 + ";");
+                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onions[pr.first].onionname + " " + TN_I64 + ";");
             } else {
-                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onionnames[pr.first] + " " + TN_TEXT + ";");
+                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onions[pr.first].onionname + " " + TN_TEXT + ";");
             }
         } else if (pr.first == oOPE) {
             LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets OPE onion";
-            query_list.push_back(query + " ADD " + fm->onionnames[pr.first] + " " + TN_I64 + " AFTER " + fm->onionnames[oDET] + ";");
+            query_list.push_back(query + " ADD " + fm->onions[pr.first].onionname + " " + TN_I64 + " AFTER " + fm->onions[oDET].onionname + ";");
         } else if (pr.first == oAGG) {
             LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets AGG onion";
-            query_list.push_back(query + " ADD " + fm->onionnames[pr.first] + " " + TN_HOM + " AFTER " + fm->onionnames[oOPE] + ";");
+            query_list.push_back(query + " ADD " + fm->onions[pr.first].onionname + " " + TN_HOM + " AFTER " + fm->onions[oOPE].onionname + ";");
         } else if (pr.first == oSWP) {
             LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets SWP onion";
-            query_list.push_back(query + " ADD " + fm->onionnames[pr.first] + " " + TN_TEXT + " AFTER " + fm->onionnames[oOPE] + ";");
+            query_list.push_back(query + " ADD " + fm->onions[pr.first].onionname + " " + TN_TEXT + " AFTER " + fm->onions[oOPE].onionname + ";");
         } else {
             assert_s(false, "unknown onion type");
         }
@@ -3283,11 +3148,11 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
 
     fm->has_salt = true;
     fm->salt_name = getFieldSalt(fm->index, tm->anonTableName);
-    query_list.push_back(query + " ADD " + fm->salt_name + " " + TN_SALT + " AFTER " + fm->onionnames.rbegin()->second + ";");
+    query_list.push_back(query + " ADD " + fm->salt_name + " " + TN_SALT + " AFTER " + fm->onions.rbegin()->second.onionname + ";");
 
     return query_list;
 }
-
+/*
 void
 Rewriter::mp_init(Analysis &a) {
     //start new temp mkm
@@ -3296,6 +3161,7 @@ Rewriter::mp_init(Analysis &a) {
     a.tmkm.processingQuery = false;
     a.tmkm.returnBitMap.clear();
 }
+*/
 
 list<string>
 Rewriter::rewrite(const string & q, Analysis & analysis)
@@ -3303,8 +3169,9 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
     list<string> queries;
     query_parse p(db, q);
     //TODO: why do we have two analysis here? can't we just use a?
-    analysis = Analysis(m, schema, cm, mp, analysis.conn);
+    analysis = Analysis(m, schema, masterKey, mp, analysis.conn);
 
+    /* REMOVED FOR NOW
     //initialize multi-principal
     mp_init(analysis);
 
@@ -3316,13 +3183,19 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
         } else {
             return processAnnotation(*p.annot, analysis);
         }
-    }
+	} */
 
     LEX *lex = p.lex();
    
     //login/logout command; nothing needs to be passed on
-    if ((lex->sql_command == SQLCOM_DELETE || lex->sql_command == SQLCOM_INSERT) && analysis.mp && analysis.mp->checkPsswd(lex)) {
-        LOG(cdb_v) << "login/logout " << *lex;
+    if ((lex->sql_command == SQLCOM_DELETE || lex->sql_command == SQLCOM_INSERT) 
+
+	/*
+	  REMOVED FOR NOW
+	  && analysis.mp && analysis.mp->checkPsswd(lex)
+	*/){
+
+	LOG(cdb_v) << "login/logout " << *lex;
         return queries;
     }
 
@@ -3330,17 +3203,14 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
     query_analyze(db, q, lex, analysis, encByDefault);
 
     //update metadata about onions if it's not delete
-    int ret;
     if (lex->sql_command != SQLCOM_DROP_TABLE) {
-        ret = updateMeta(db, q, lex, analysis);
-        if (ret < 0) assert(false);
+        updateMeta(db, q, lex, analysis);
     }
 
     //rewrite query
     lex_rewrite(db, lex, analysis);
     if (lex->sql_command == SQLCOM_DROP_TABLE) {
-        ret = updateMeta(db, q, lex, analysis);
-        if (ret < 0) assert(false);
+        updateMeta(db, q, lex, analysis);
     }
     stringstream ss;
     ss << *lex;
@@ -3365,7 +3235,7 @@ string ReturnMeta::stringify() {
     }
     return res.str();
 }
-
+/* REMOVED FOR NOW
 static void
 mp_init_decrypt(MultiPrinc * mp, Analysis & a) {
     if (!mp) {return;}
@@ -3378,14 +3248,15 @@ mp_init_decrypt(MultiPrinc * mp, Analysis & a) {
         }
     }
 }
-
+*/
 ResType
 Rewriter::decryptResults(ResType & dbres,
 			 Analysis & a) {
     printRes(dbres);
 
+    /* REMOVED FOR NOW
     mp_init_decrypt(mp, a);
-
+    */
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
     unsigned int cols = dbres.names.size();
@@ -3395,7 +3266,8 @@ Rewriter::decryptResults(ResType & dbres,
     unsigned int index = 0;
     
     // un-anonymize the names
-    for (auto it = dbres.names.begin(); it != dbres.names.end(); it++) {
+    for (auto it = dbres.names.begin();
+	 it != dbres.names.end(); it++) {
         ReturnField rf = a.rmeta.rfmeta[index];
         if (!rf.is_salt) {
 	    //need to return this field
@@ -3409,9 +3281,9 @@ Rewriter::decryptResults(ResType & dbres,
     // switch types to original ones : TODO
 
     //allocate space in results for decrypted rows
-    res.rows = vector<vector<SqlItem> >(rows);
+    res.rows = vector<vector<Item*> >(rows);
     for (unsigned int i = 0; i < rows; i++) {
-        res.rows[i] = vector<SqlItem>(real_cols);
+        res.rows[i] = vector<Item*>(real_cols);
     }
 
     // decrypt rows
@@ -3419,22 +3291,18 @@ Rewriter::decryptResults(ResType & dbres,
     for (unsigned int c = 0; c < cols; c++) {
         ReturnField rf = a.rmeta.rfmeta[c];
         ItemMeta * im = rf.im;
-        if (rf.is_salt) {
-
-        } else {
+	
+        if (!rf.is_salt) {
             for (unsigned int r = 0; r < rows; r++) {
-                bool isBin = true;
-                res.rows[r][col_index] = dbres.rows[r][c];
-                string anonName = getAnonName(im);
-                //cerr << anonName << " has onions size " << im->basefield->onionnames.size() << endl;
-                if (!im->basefield->onionnames.empty() && anonName != "") {
+                if (!im->basefield->onions.empty()) {
 		    uint64_t salt = 0;
 		    if (rf.pos_salt>=0) {
-			SqlItem si = dbres.rows[r][rf.pos_salt];
-			assert(!si.null);
-			salt = valFromStr(dbres.rows[r][rf.pos_salt].data);
+			Item * salt_item = dbres.rows[r][rf.pos_salt];
+			assert_s(!salt_item->null_value, "salt item is null");
+			salt = ((Item_int *)dbres.rows[r][rf.pos_salt])->value;
 		    }
-		    res.rows[r][col_index].data = crypt(a, dbres.rows[r][c].data, getTypeForDec(im), fullName(anonName, im->basefield->tm->anonTableName), map_getAssert(im->basefield->encdesc.olm, im->o), getMin(im->o), isBin, salt, im->basefield, res.rows[r]);
+
+		    res.rows[r][col_index] = decrypt_item(im, dbres.rows[r][c], salt);
                 }
             }
             col_index++;

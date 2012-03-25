@@ -105,7 +105,7 @@ private:
     Connect*       conn;
     std::string    db;
     SchemaInfo*    schema;
-    CryptoManager* cm;
+    AES_KEY*       masterKey;
     unsigned int   totalTables;
     MYSQL*         m;
     MultiPrinc*    mp;

@@ -58,22 +58,22 @@ const EncSet ORD_EncSet = {
 //todo: there should be a map of FULL_EncSets depending on item type
 const EncSet FULL_EncSet = {
         {
-            {oDET, LevelFieldPair(SECLEVEL::SEMANTIC_DET, NULL)},
-            {oOPE, LevelFieldPair(SECLEVEL::SEMANTIC_OPE, NULL)},
-            {oAGG, LevelFieldPair(SECLEVEL::SEMANTIC_AGG, NULL)},
-            {oSWP, LevelFieldPair(SECLEVEL::SWP,          NULL)},
+            {oDET, LevelFieldPair(SECLEVEL::DET, NULL)},
+            {oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
+            {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
+            {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
         }
 };
 
 const EncSet Search_EncSet = {
         {
-            {oSWP, LevelFieldPair(SECLEVEL::SWP, NULL)},
+            {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
         }
 };
 
 const EncSet ADD_EncSet = {
         {
-            {oAGG, LevelFieldPair(SECLEVEL::SEMANTIC_AGG, NULL)},
+            {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
         }
 };
 
@@ -117,12 +117,12 @@ typedef struct ReturnMeta {
 
 class Analysis {
 public:
-    Analysis(MYSQL *m, SchemaInfo * schema, CryptoManager *cm, MultiPrinc *mp, Connect * conn)
-        : pos(0), schema(schema), cm(cm), conn(conn), m(m) {
+    Analysis(MYSQL *m, SchemaInfo * schema, AES_KEY *key, MultiPrinc *mp, Connect * conn)
+        : pos(0), schema(schema), masterKey(key), conn(conn), m(m) {
         assert(m != NULL);
         this->mp = mp;
     }
-    Analysis(Connect * conn): pos(0), schema(NULL), cm(NULL), conn(conn), m(NULL) {
+    Analysis(Connect * conn): pos(0), schema(NULL), masterKey(NULL), conn(conn), m(NULL) {
     }
     inline MYSQL* connect() {
         mysql_thread_init();
@@ -140,7 +140,7 @@ public:
     std::set<Item*>                     itemHasRewrite;
     
     SchemaInfo *                        schema;
-    CryptoManager *                     cm;
+    AES_KEY *                           masterKey;
     Connect *                           conn;
     MultiPrinc *                        mp;
     TMKM                                tmkm;

@@ -9,10 +9,11 @@
 #include <openssl/evp.h>
 #include <NTL/ZZ.h>
 
+#include <util/onions.hh>
 #include <crypto-old/OPE.hh>
 #include <crypto-old/SWPSearch.hh>
 #include <crypto-old/BasicCrypto.hh>
-#include <util/onions.hh>
+
 
 
 #define PAILLIER_LEN_BYTES 256
@@ -32,18 +33,6 @@ class CryptoManager {
  public:
     CryptoManager(const std::string &masterKey);
     ~CryptoManager();
-
-    //GENERAL FUNCTION for cryptDB
-    //unmarshall/marshalls values, deals with types, figure out if
-    // encrypt/decrypt, computes the right key, deals with onion levels
-
-    //input: mkey is the master key, the actual key to be used is generated
-    // from fullfieldname and tolevel/fromlevel
-    //assumes the two levels are one the same onion
-    // salt need only be provided for semantic encryptions
-    std::string crypt(AES_KEY * mkey, std::string data, OnionLayoutId ft,
-                 std::string fullfieldname, SECLEVEL fromlevel, SECLEVEL tolevel, bool & isBin,
-                 uint64_t salt = 0);
 
     //generates a randomness pool for Paillier
     void generateRandomPool(unsigned int randomPoolSize, std::string file);
@@ -86,12 +75,6 @@ class CryptoManager {
 
     //***************************************************************************************/
 
-    uint32_t encrypt_VAL(std::string uniqueFieldName, uint32_t value,
-                         uint64_t salt);
-    //result len is same as input len
-    std::string encrypt_VAL(std::string uniqueFieldName, std::string value, uint64_t salt);
-
-
     //SEMANTIC
     //since many values may be encrypted with same key you want to set the key
     static AES_KEY * get_key_SEM(const std::string &key);
@@ -122,7 +105,7 @@ class CryptoManager {
      * long.
      */
     std::string getKey(const std::string &uniqueFieldName, SECLEVEL sec);
-    std::string getKey(AES_KEY * mkey, const std::string &uniqueFieldName, SECLEVEL sec);
+    static std::string getKey(AES_KEY * mkey, const std::string &uniqueFieldName, SECLEVEL sec);
 
     static std::string marshallKey(const std::string &key);
     static std::string unmarshallKey(const std::string &key);

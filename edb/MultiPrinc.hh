@@ -79,7 +79,7 @@ class MultiPrinc {
     // field
     // -- the key is to be used for a result set
     std::string get_key(std::string fieldName, TMKM & tmkm,
-                   const std::vector<SqlItem> &res);
+                   const std::vector<Item> &res);
 
  private:
     Connect * conn;

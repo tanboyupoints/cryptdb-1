@@ -24,45 +24,6 @@ ItemToString(Item * i) {
     return string(s0->ptr(), s0->length());
 }
 
-//TODO: OnionTypeHandler not needed any more
-Create_field*
-OnionTypeHandler::newOnionCreateField(const char * anon_name,
-		    const Create_field *f) const {
-    THD *thd = current_thd;
-    Create_field *f0 = f->clone(thd->mem_root);
-    f0->field_name = thd->strdup(anon_name);
-    if (field_length != -1) {
-	f0->length = field_length;
-    }
-    f0->sql_type = type;
-    
-    if (charset != NULL) {
-	f0->charset = charset;
-    } else {
-	//encryption is always unsigned
-	f0->flags = f0->flags | UNSIGNED_FLAG; 
-    }
-    return f0;
-}
-
-Item*
-OnionTypeHandler::createItem(const string & data) {
-    switch (type) {
-    case MYSQL_TYPE_LONGLONG: {
-	return new Item_int((ulonglong)valFromStr(data));
-    }
-    case MYSQL_TYPE_BLOB: 
-    case MYSQL_TYPE_VARCHAR: {
-	return new Item_string(make_thd_string(data), data.length(),
-			       &my_charset_bin);
-    }
-    default: {}
-    }
-
-    cerr << "incorrect mysql_type " << type << "\n";
-    exit(-1);
-}
-
 //TODO: remove above newcreatefield
 static Create_field*
 createFieldHelper(const Create_field *f, int field_length,
@@ -84,38 +45,10 @@ createFieldHelper(const Create_field *f, int field_length,
     return f0;
 }
 
-//TODO: remove duplication of this func from cdb_rewrite
-static inline bool
-IsMySQLTypeNumeric(enum_field_types t) {
-    switch (t) {
-        case MYSQL_TYPE_DECIMAL:
-        case MYSQL_TYPE_TINY:
-        case MYSQL_TYPE_SHORT:
-        case MYSQL_TYPE_LONG:
-        case MYSQL_TYPE_FLOAT:
-        case MYSQL_TYPE_DOUBLE:
-        case MYSQL_TYPE_LONGLONG:
-        case MYSQL_TYPE_INT24:
-        case MYSQL_TYPE_NEWDECIMAL:
-
-        // numeric also includes dates for now,
-        // since it makes sense to do +/- on date types
-        case MYSQL_TYPE_TIMESTAMP:
-        case MYSQL_TYPE_DATE:
-        case MYSQL_TYPE_TIME:
-        case MYSQL_TYPE_DATETIME:
-        case MYSQL_TYPE_YEAR:
-        case MYSQL_TYPE_NEWDATE:
-            return true;
-        default: return false;
-    }
-}
-
 /****************** RND *********************/
 
-RND_int::RND_int(Create_field * f, PRNG * key) {
-    cf = f;
-    rawkey = key->rand_string(key_bytes);
+RND_int::RND_int(Create_field * f, PRNG * key): cf(f),
+						rawkey(key->rand_string(key_bytes)) {
     this->key = CryptoManager::get_key_SEM(rawkey);
 }
 
@@ -175,9 +108,8 @@ RND_int::decryptUDF(Item * col, Item * ivcol) {
 }
 
 
-RND_str::RND_str(Create_field * f, PRNG * key) {
-    cf = f;
-    rawkey = key->rand_string(key_bytes);
+RND_str::RND_str(Create_field * f, PRNG * key) : cf(f),
+                 				 rawkey(key->rand_string(key_bytes)) {
     enckey = get_AES_enc_key(rawkey);
     deckey = get_AES_dec_key(rawkey);
 }
@@ -579,8 +511,8 @@ Search::searchUDF(Item * expr) {
 EncLayer *
 EncLayerFactory::encLayer(SECLEVEL sl, Create_field * cf, PRNG * key) {
     switch (sl) {
-    case SECLEVEL::SEMANTIC_DET:
-    case SECLEVEL::SEMANTIC_OPE: {
+    case SECLEVEL::DET:
+    case SECLEVEL::OPE: {
 	if (IsMySQLTypeNumeric(cf->sql_type)) {
 	    return new RND_int(cf, key);
 	} else {

@@ -1,10 +1,3 @@
-/*
- * AccessManager.cpp
- *
- *  Created on: April 24, 2011
- *      Authors: cat_red
- */
-
 #include <iomanip>
 
 #include <edb/AccessManager.hh>
@@ -1796,9 +1789,9 @@ KeyAccess::GenerateAsymKeys(Prin prin, PrinKey prin_key)
 }
 
 PrinKey
-KeyAccess::decryptSym(const SqlItem &sql_encrypted_key,
+KeyAccess::decryptSym(const Item &sql_encrypted_key,
                       const string &key_for_decrypting,
-                      const SqlItem &sql_salt)
+                      const Item &sql_salt)
 {
     if(VERBOSE) {
         LOG(am) << "\tuse symmetric decryption";
@@ -1813,7 +1806,7 @@ KeyAccess::decryptSym(const SqlItem &sql_encrypted_key,
 }
 
 PrinKey
-KeyAccess::decryptAsym(const SqlItem &sql_encrypted_key, const string &secret_key)
+KeyAccess::decryptAsym(const Item &sql_encrypted_key, const string &secret_key)
 {
     if(VERBOSE) {
         LOG(am) << "\tuse asymmetric decryption";

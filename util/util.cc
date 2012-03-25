@@ -38,32 +38,31 @@ throw (CryptDBError)
     }
 }
 
-ParserMeta::ParserMeta() : clauseKeywords_p(), querySeparators_p()
-{
+bool
+IsMySQLTypeNumeric(enum_field_types t) {
+    switch (t) {
+        case MYSQL_TYPE_DECIMAL:
+        case MYSQL_TYPE_TINY:
+        case MYSQL_TYPE_SHORT:
+        case MYSQL_TYPE_LONG:
+        case MYSQL_TYPE_FLOAT:
+        case MYSQL_TYPE_DOUBLE:
+        case MYSQL_TYPE_LONGLONG:
+        case MYSQL_TYPE_INT24:
+        case MYSQL_TYPE_NEWDECIMAL:
 
-    const unsigned int noKeywords = 33;
-    const string clauseKeywords[] =
-    {"select", "from",  "where",  "order", "group",  "update", "set", "for",
-     "insert",
-     "into", "and",  "or",  "distinct",
-     "in", "*", "max", "min", "count", "sum", "by", "asc",
-     "desc", "limit",
-     "null",
-     "ilike", "like",
-     "integer", "bigint", "text",
-     "left", "join", "on", "is"};
-
-    const unsigned int noSeparators = 14;
-    const string querySeparators[] = {"from", "where", "left", "on", "group",
-                                      "order", "limit", "for", "values", ";", "set",
-                                      "group",  "asc", "desc"};
-
-    for (unsigned int i = 0; i < noKeywords; i++)
-        clauseKeywords_p.insert(clauseKeywords[i]);
-    for (unsigned int i = 0; i < noSeparators; i++)
-        querySeparators_p.insert(querySeparators[i]);
+        // numeric also includes dates for now,
+        // since it makes sense to do +/- on date types
+        case MYSQL_TYPE_TIMESTAMP:
+        case MYSQL_TYPE_DATE:
+        case MYSQL_TYPE_TIME:
+        case MYSQL_TYPE_DATETIME:
+        case MYSQL_TYPE_YEAR:
+        case MYSQL_TYPE_NEWDATE:
+            return true;
+        default: return false;
+    }
 }
-
 
 
 double
@@ -107,29 +106,6 @@ string
 angleBrackets(const string &s)
 {
     return "<" + s + ">";
-}
-
-string
-checkStr(list<string>::iterator & it, list<string> & words, const string &s1,
-         const string &s2)
-{
-
-    if (it == words.end()) {
-        return "";
-    }
-    if (it->compare(s1) == 0) {
-        it++;
-        return s1;
-    }
-    if (it->compare(s2) == 0) {
-        return "";
-    }
-    if (isQuerySeparator(*it)) {
-        return "";
-    }
-
-    assert_s(false, string("expected ") + s1 + " or " + s2 + " given " + *it );
-    return "";
 }
 
 string
@@ -379,8 +355,10 @@ printRes(const ResType & r) {
         stringstream ss;
         for (unsigned int j = 0; j < r.rows[i].size(); j++) {
             char buf[400];
-            cerr << r.rows[i][j].data << "\t";
-            snprintf(buf, sizeof(buf), "%-20s", r.rows[i][j].to_string().c_str());
+            cerr << r.rows[i][j] << "\t";
+	    stringstream sstr;
+	    sstr << r.rows[i][j];
+	    snprintf(buf, sizeof(buf), "%-20s", sstr.str().c_str());
             ss << buf;
         }
         cerr << endl;
@@ -856,94 +834,6 @@ throw (CryptDBError)
 }
 
 string
-getAlias(list<string>::iterator & it, list<string> & words)
-{
-
-    if (it == words.end()) {
-        return "";
-    }
-
-    if (equalsIgnoreCase(*it, "as" )) {
-        it++;
-        return *it;
-    }
-
-    if ((it->compare(",") == 0) || (isQuerySeparator(*it))) {
-        return "";
-    }
-
-    return *it;
-}
-
-string
-processAlias(list<string>::iterator & it, list<string> & words)
-{
-    string res = "";
-    const vector<string> terms = {",",")"};
-
-    if (it == words.end()) {
-        return res;
-    }
-    if (equalsIgnoreCase(*it, "as")) {
-        res = res + " as ";
-        it++;
-        assert_s(it != words.end(), "there should be field after as");
-        res = res + *it + " ";
-        it++;
-
-        if (it == words.end()) {
-            return res;
-        }
-
-        if (contains(*it, terms)) {
-            while ((it!=words.end()) && contains(*it, terms)) {
-                res = res + *it;
-                it++;
-            }
-            return res;
-        }
-        if (isQuerySeparator(*it)) {
-            return res;
-        }
-        assert_s(false, "incorrect syntax after as expression ");
-        return res;
-    }
-    if (contains(*it, terms)) {
-        while ((it!=words.end()) && contains(*it, terms)) {
-            res = res + *it;
-            it++;
-        }
-        return res;
-    }
-    if (isQuerySeparator(*it)) {
-        return res;
-    }
-
-    //you have an alias without as
-    res = res + " " + *it + " ";
-    it++;
-
-    if (it == words.end()) {
-        return res;
-    }
-    if (contains(*it, terms)) {
-        while ((it!=words.end()) && contains(*it, terms)) {
-            res = res + *it;
-            it++;
-        }
-        return res;
-    }
-    if (isQuerySeparator(*it)) {
-        return res;
-    }
-
-    assert_s(false, "syntax error around alias or comma");
-
-    return res;
-
-}
-
-string
 processParen(list<string>::iterator & it, const list<string> & words)
 {
     if (!it->compare("(") == 0) {
@@ -967,48 +857,6 @@ processParen(list<string>::iterator & it, const list<string> & words)
     return res + " ";
 }
 
-string
-mirrorUntilTerm(list<string>::iterator & it, const list<string> & words,
-                const std::set<string> & terms, bool stopAfterTerm,
-                bool skipParenBlock)
-{
-    string res = "";
-    while ((it!=words.end()) && !contains(*it, terms)) {
-        if (skipParenBlock) {
-            string paren = processParen(it, words);
-            if (paren.length() > 0) {
-                res = res + paren;
-                continue;
-            }
-        }
-
-        res = res + *it + " ";
-        it++;
-    }
-
-    if (it!=words.end()) {
-        if (stopAfterTerm) {
-            res = res + *it + " ";
-            it++;
-        }
-    }
-
-    return res;
-}
-
-list<string>::iterator
-itAtKeyword(list<string> & lst, const string &keyword)
-{
-    list<string>::iterator it = lst.begin();
-    while (it != lst.end()) {
-        if (equalsIgnoreCase(*it, keyword)) {
-            return it;
-        } else {
-            it++;
-        }
-    }
-    return it;
-}
 
 string
 getBeforeChar(const string &str, char c)
@@ -1021,18 +869,6 @@ getBeforeChar(const string &str, char c)
     }
 }
 
-bool
-isQuerySeparator(const string &st)
-{
-    return (parserMeta.querySeparators_p.find(toLowerCase(st)) !=
-            parserMeta.querySeparators_p.end());
-}
-
-bool
-isAgg(const string &value)
-{
-    return contains(value, aggregates);
-}
 
 bool
 isOnly(const string &token, const string * values, unsigned int noValues)
@@ -1052,13 +888,6 @@ isOnly(const string &token, const string * values, unsigned int noValues)
         }
     }
     return true;
-}
-
-bool
-isKeyword(const string &token)
-{
-    return (parserMeta.clauseKeywords_p.find(toLowerCase(token)) !=
-            parserMeta.clauseKeywords_p.end());
 }
 
 static bool

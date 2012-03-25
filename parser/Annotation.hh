@@ -4,6 +4,7 @@
 //for multi-princ annoation parsing                                            
 
 #include <util/util.hh>
+#include <util/onions.hh>
 
 typedef enum annoType {
     PRINCTYPE,

@@ -37,7 +37,7 @@ checkQuery(const TestConfig &tc, Connect * conn, const string &query,
      * so that we don't have to supply expected answers anyway.
      */
     for (auto i = rows.begin(); i != rows.end(); i++) {
-        vector<SqlItem> row;
+        vector<Item *> row;
         for (auto j = i->begin(); j != i->end(); j++) {
             SqlItem item;
             item.null = false;

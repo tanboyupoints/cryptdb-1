@@ -2,10 +2,12 @@
 
 #include <parser/embedmysql.hh>
 #include <parser/stringify.hh>
+#include <parser/CryptoHandlers.hh>
 
 
 #include <string>
 #include <map>
+#include <list>
 
 struct FieldMeta;
 /**
@@ -39,30 +41,34 @@ public:
 
 const EncDesc FULL_EncDesc = {
         {
-            {oDET, SECLEVEL::SEMANTIC_DET},
-            {oOPE, SECLEVEL::SEMANTIC_OPE},
-            {oAGG, SECLEVEL::SEMANTIC_AGG},
-            {oSWP, SECLEVEL::SWP         },
+            {oDET, SECLEVEL::DET},
+            {oOPE, SECLEVEL::OPE},
+            {oAGG, SECLEVEL::HOM},
+            {oSWP, SECLEVEL::SEARCH},
         }
 };
 
-const EncDesc NUMERIC_EncDec = {
+//initial onion configurations 
+const EncDesc NUM_initial_levels = {
         {
-            {oDET, SECLEVEL::SEMANTIC_DET},
-            {oOPE, SECLEVEL::SEMANTIC_OPE},
-            {oAGG, SECLEVEL::SEMANTIC_AGG},
+            {oDET, SECLEVEL::DET},
+            {oOPE, SECLEVEL::OPE},
+            {oAGG, SECLEVEL::HOM},
         }
 };
 
-const EncDesc EQ_SEARCH_EncDesc = {
+const EncDesc STR_initial_levels = {
         {
-            {oDET, SECLEVEL::SEMANTIC_DET},
-            {oOPE, SECLEVEL::SEMANTIC_OPE},
-            {oSWP, SECLEVEL::SWP         },
+            {oDET, SECLEVEL::DET},
+            {oOPE, SECLEVEL::OPE},
+            {oSWP, SECLEVEL::SEARCH},
         }
 };
 
-
+typedef struct OnionMeta {
+    std::string onionname;
+    std::list<EncLayer *> layers; //first in list is lowest layer
+} OnionMeta;
 
 struct TableMeta;
 //TODO: FieldMeta and TableMeta are partly duplicates with the original
@@ -74,8 +80,8 @@ typedef struct FieldMeta {
     Create_field * sql_field;
     int index;
 
-    OnionLayoutId ol_id; //the type of onion layout for this field
-    std::map<onion, std::string> onionnames;
+    //TODO: may want to integrate onions with encdesc for clarity
+    std::map<onion, OnionMeta> onions;
     EncDesc encdesc;
 
     bool has_salt; //whether this field has its own salt

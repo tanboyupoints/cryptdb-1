@@ -22,9 +22,9 @@
 #include <NTL/ZZ.h>
 
 #include <util/errstream.hh>
-#include <util/onions.hh>
 #include <util/params.hh>
 #include <util/util.hh>
+#include "item.h"
 
 // ==== CONSTANTS ============== //
 
@@ -97,7 +97,7 @@ typedef MYSQL_RES DBResult_native;
 typedef PGresult DBResult_native;
 #endif
 
-class SqlItem;
+
 
 typedef struct AutoInc {
     AutoInc(std::string fieldval=""):incvalue(0), field(fieldval) {}
@@ -112,18 +112,12 @@ class ResType {
     bool ok;  // query executed successfully
     std::vector<std::string> names;
     std::vector<enum_field_types> types;
-    std::vector<std::vector<SqlItem> > rows;
+    std::vector<std::vector<Item*> > rows;
     AutoInc ai;
 };
 
 void
 printRes(const ResType &r);
-
-typedef struct ParserMeta {
-    std::set<std::string> clauseKeywords_p;
-    std::set<std::string> querySeparators_p;
-    ParserMeta();
-} ParserMeta;
 
 typedef enum class cmd {
     CREATE, UPDATE, INSERT, SELECT, DROP, DELETE, BEGIN,
@@ -166,49 +160,6 @@ typedef struct QueryMeta {
 
     void cleanup();
 } QueryMeta;
-
-typedef struct ResMeta {
-
-    size_t nFields, nTuples, nTrueFields;
-
-    /* Indexes in the following std::vectors correspond to entries in the raw
-       response from the DBMS */
-
-    bool * isSalt;     //isSalt[i] = true if i-th entry is salt
-
-    //maps not anonymized full field name or anonymized table name to salt index in the results
-    std::map<std::string, int> SaltIndexes;
-
-    std::string * table;     //real table of each field
-    std::string * field;     //real name of each field
-    onion * o;     //onion of each field
-
-    std::string * namesForRes;     //this is the name of the field to be included
-                              // in result -- considering aliases -- for
-                              // aggregates, use field inside
-
-    void cleanup() {
-        if (isSalt)
-            delete[] isSalt;
-        if (table)
-            delete[] table;
-        if (field)
-            delete[] field;
-        if (o)
-            delete[] o;
-        if (namesForRes)
-            delete[] namesForRes;
-    }
-
-    ResMeta() {
-        isSalt = 0;
-        table = 0;
-        field = 0;
-        o = 0;
-        namesForRes = 0;
-    }
-
-} ResMeta;
 
 typedef struct ParseContext {
 
@@ -302,6 +253,9 @@ typedef struct TempMKM {
 
 //=============  Useful functions =========================//
 
+bool
+IsMySQLTypeNumeric(enum_field_types t);
+
 // extracts (nobytes) bytes from int by placing the most significant bits at
 // the end
 std::string BytesFromInt(uint64_t value, unsigned int noBytes);
@@ -318,9 +272,6 @@ const std::set<char> delimsStay = {'(', ')', '=', ',', '>', '<'};
 const std::set<char> delimsGo   = {';', ' ', '\t', '\n'};
 const std::set<char> keepIntact = {'\''};
 
-bool isKeyword(const std::string &token);
-bool isAgg(const std::string &token);
-
 #define NELEM(array) (sizeof((array)) / sizeof((array)[0]))
 const std::set<std::string> commands =
     { "select", "create", "insert", "update", "delete", "drop", "alter" };
@@ -331,8 +282,6 @@ const std::set<std::string> comparisons = { ">", "<", "=" };
 const std::string math[]=
 {"+","-","(",")","*","/",".","0","1","2","3","4","5","6","7","8","9"};
 const unsigned int noMath = NELEM(math);
-
-const ParserMeta parserMeta = ParserMeta();
 
 std::string randomBytes(unsigned int len);
 uint64_t randomValue();
@@ -405,9 +354,9 @@ roll(typename std::list<T>::iterator & it,  int count)
 }
 
 template<typename A, typename B>
-B map_getAssert(const std::map<A, B> & m, const A & x) {
+B getAssert(const std::map<A, B> & m, const A & x, const std::string & str = "" ) {
     auto it = m.find(x);
-    assert_s(it != m.end(), "item not present in map");
+    assert_s(it != m.end(), "item not present in map. " + str);
     return it->second;
 }
 
@@ -471,45 +420,11 @@ command getCommand(const std::string &query)
 //returns a std::string representing a value pointed to by it and advances it
 std::string getVal(std::list<std::string>::iterator & it);
 
-//checks that the value of the current iterator is s1 or s2;  if it is s1,
-// increment iterator and return s1, if it is s2, return ""; else throws
-// exception
-std::string checkStr(std::list<std::string>::iterator & it, std::list<std::string> & lst,
-                const std::string &s1, const std::string &s2);
 
 //acts only if the first field is "(";
 //returns position after matching ")" mirroring all contents
 std::string processParen(std::list<std::string>::iterator & it, const std::list<std::string> & words);
 
-bool isQuerySeparator(const std::string &st);
-
-//returns the alias that should be pointed by it or "" if there is no such
-// alias
-std::string getAlias(std::list<std::string>::iterator & it, std::list<std::string> & words);
-
-// "it" should point to item after a field
-//echos any aliases, commas or )  in the result,
-//advances it after any set of  comma or ),  stops on query separator, or end
-// of query, whichever comes first
-//also enforces that there is at most one alias
-std::string processAlias(std::list<std::string>::iterator & it, std::list<std::string> & words);
-
-//echoes in output all tokens pointed to by it up to when any of the
-// terminators are encountered or it reached end of words
-//it mirrors the terminator as well if encountered
-//ignores query separators
-//if stopAfterTerm, it leaves "it" pointing to first element after terminator,
-// else it points to terminator
-//if skipParentBlock, it looks for terminators only outside of any nested
-// parenthesis block
-std::string mirrorUntilTerm(std::list<std::string>::iterator & it, const std::list<std::string> & words,
-                       const std::set<std::string> &terms,
-                       bool stopAfterTerm = 1,
-                       bool skipParenBlock = 0);
-
-//returns the iterator that points at the first keyword in lst, or the end of
-// the lst if such keyword was not found
-std::list<std::string>::iterator itAtKeyword(std::list<std::string> & lst, const std::string &keyword);
 
 //returns the contents of str before the first encounter with c
 std::string getBeforeChar(const std::string &str, char c);
@@ -541,30 +456,6 @@ std::string toLowerCase(const std::string &token);
 
 bool equalsIgnoreCase(const std::string &s1, const std::string &s2);
 
-class SqlItem {
- public:
-    SqlItem() : null(true) {}
-
-    bool null;
-    enum_field_types type;
-    std::string data;
-
-    std::string to_string() const {
-        if (null)
-            return "NULL";
-        if (type == MYSQL_TYPE_BLOB)
-            return marshallBinary(data);
-        return data;
-    }
-
-    bool operator==(const SqlItem &other) const {
-        if (null && other.null)
-            return true;
-        return null == other.null &&
-               /* type == other.type && */  /* XXX re-enable once we get types right */
-               data == other.data;
-    }
-};
 
 /**** HELPERS FOR EVAL **************/
 

@@ -318,8 +318,8 @@ Annotation::parse() {
         return;
     case ENCFOR:
         if (word == query_list.end()) {
-            DETenclevel = SECLEVEL::SEMANTIC_DET;
-            OPEenclevel = SECLEVEL::SEMANTIC_OPE;
+            DETenclevel = SECLEVEL::DET;
+            OPEenclevel = SECLEVEL::OPE;
         }
         while (word != query_list.end()) {
             if (equalsIgnoreCase(levelnames[(int) SECLEVEL::DET], *word)) {
@@ -329,13 +329,13 @@ Annotation::parse() {
                 DETenclevel = SECLEVEL::DETJOIN;
             }
             else if (equalsIgnoreCase(levelnames[(int) SECLEVEL::OPE], *word)) {
-                DETenclevel = SECLEVEL::SEMANTIC_DET;
+                DETenclevel = SECLEVEL::DET;
                 OPEenclevel = SECLEVEL::OPE;
             }
-            else if (equalsIgnoreCase(levelnames[(int) SECLEVEL::SEMANTIC_AGG], *word)) {
+            else if (equalsIgnoreCase(levelnames[(int) SECLEVEL::HOM], *word)) {
                 AGGenclevel = true;
             }
-            else if (equalsIgnoreCase(levelnames[(int) SECLEVEL::SWP], *word)) {
+            else if (equalsIgnoreCase(levelnames[(int) SECLEVEL::SEARCH], *word)) {
                 SWPenclevel = true;
             }
             else {

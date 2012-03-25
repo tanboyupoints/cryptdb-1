@@ -175,43 +175,6 @@ getFieldsItSelect(list<string> & words, list<string>::iterator & it)
     return res;
 }
 
-
-bool
-isField(string token)
-{
-
-    if (isKeyword(token)) {
-        return false;
-    }
-    if (token.find("(") != string::npos) {
-        return false;
-    }
-    if (token.find(")") != string::npos) {
-        return false;
-    }
-
-    if (!isalpha(token[0])) {
-        return false;
-    }
-
-    bool hasPeriod = false;
-    //must contain only letters
-    for (unsigned int i = 1; i < token.length(); i++) {
-        if (token[i] == '.') {
-            if (hasPeriod) {
-                //if it has more than one period is bad
-                return false;
-            }
-            hasPeriod = true;
-        } else {
-            if ((!(isalnum(token[i])) && (token[i] != '_'))) {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
 /*
  * The following functions return field name and table name.
  * Require the data to be in the format table.field or field.

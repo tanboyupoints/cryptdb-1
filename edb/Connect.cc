@@ -162,6 +162,21 @@ DBResult::~DBResult()
 #endif
 }
 
+static Item *
+getItem(char * content, enum_field_types type, uint len) {
+    if (content == NULL) {
+	return new Item_null();
+    }
+    Item * i;
+    if (IsMySQLTypeNumeric(type)) {
+	i = new Item_int(valFromStr(string(content, len)));
+    } else {
+	i = new Item_string(content, len, &my_charset_bin);
+    }
+    
+    return i;
+}
+
 // returns the data in the last server response
 // TODO: to optimize return pointer to avoid overcopying large result sets?
 ResType
@@ -196,18 +211,11 @@ DBResult::unpack()
             break;
         unsigned long *lengths = mysql_fetch_lengths(n);
 
-        vector<SqlItem> resrow;
+        vector<Item *> resrow;
 
         for (int j = 0; j < cols; j++) {
-            SqlItem item;
-            if (row[j] == NULL) {
-                item.null = true;
-            } else {
-                item.null = false;
-                item.type = res.types[j];
-                item.data = string(row[j], lengths[j]);
-            }
-            resrow.push_back(item);
+            Item * it = getItem(row[j], res.types[j], lengths[j]);
+            resrow.push_back(it);
         }
 
         res.rows.push_back(resrow);

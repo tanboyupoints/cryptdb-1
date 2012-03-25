@@ -9,35 +9,6 @@
 
 using namespace std;
 
-//XXX
-// copied from cdb_rewrite; should probably be put is some standard location
-//  but I'm not sure where...
-static inline bool
-IsMySQLTypeNumeric(enum_field_types t) {
-    switch (t) {
-    case MYSQL_TYPE_DECIMAL:
-    case MYSQL_TYPE_TINY:
-    case MYSQL_TYPE_SHORT:
-    case MYSQL_TYPE_LONG:
-    case MYSQL_TYPE_FLOAT:
-    case MYSQL_TYPE_DOUBLE:
-    case MYSQL_TYPE_LONGLONG:
-    case MYSQL_TYPE_INT24:
-    case MYSQL_TYPE_NEWDECIMAL:
-        // numeric also includes dates for now,
-        // since it makes sense to do +/- on date types
-    case MYSQL_TYPE_TIMESTAMP:
-    case MYSQL_TYPE_DATE:
-    case MYSQL_TYPE_TIME:
-    case MYSQL_TYPE_DATETIME:
-    case MYSQL_TYPE_YEAR:
-    case MYSQL_TYPE_NEWDATE:
-        return true;
-    default: return false;
-    }
-}
-
-
 MultiPrinc::MultiPrinc(Connect * connarg)
 {
     conn = connarg;

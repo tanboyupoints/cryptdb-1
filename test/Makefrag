@@ -1,8 +1,8 @@
 OBJDIRS	+= test
 
-TEST_SRCS   := test.cc TestCrypto.cc test_utils.cc \
-	       TestAccessManager.cc TestProxy.cc \
-	       TestQueries.cc
+TEST_SRCS   :=  TestCrypto.cc test_utils.cc \
+	    	test.cc TestProxy.cc \
+		TestAccessManager.cc TestQueries.cc
 
 all:	$(OBJDIR)/test/test
 

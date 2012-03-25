@@ -1,11 +1,5 @@
 #pragma once
 
-/*
- * AccessManager.h
- *
- *
- */
-
 #include <string>
 #include <map>
 #include <set>
@@ -382,11 +376,11 @@ class KeyAccess {
     //returns: str_encrypted_key decrypted symmetrically with
     // key_for_decrypting
     //         principals_with_access is empty
-    PrinKey decryptSym(const SqlItem &sql_encrypted_key,
+    PrinKey decryptSym(const Item &sql_encrypted_key,
                        const std::string &key_for_decrypting,
-                       const SqlItem &sql_salt);
+                       const Item &sql_salt);
 
-    PrinKey decryptAsym(const SqlItem &sql_encrypted_key,
+    PrinKey decryptAsym(const Item &sql_encrypted_key,
                         const std::string &secret_key);
 
     bool isInstance(Prin prin);

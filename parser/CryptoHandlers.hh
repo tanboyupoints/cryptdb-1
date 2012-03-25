@@ -13,66 +13,37 @@
 
 
 
-class OnionTypeHandler {
-private:
-    int                   field_length;
-    enum enum_field_types type;
-    CHARSET_INFO *        charset;
-public:
-    OnionTypeHandler(enum enum_field_types t) :
-        field_length(-1), type(t), charset(NULL) {}
-    OnionTypeHandler(enum enum_field_types t, size_t f) :
-        field_length((int)f), type(t), charset(NULL) {}
-    OnionTypeHandler(enum enum_field_types t,
-                      size_t f,
-                      CHARSET_INFO *charset) :
-        field_length((int)f), type(t), charset(charset) {}
-
-    Create_field*
-    newOnionCreateField(const char * anon_name,
-                        const Create_field *f) const;
-    
-    Item*
-    createItem(const std::string & data);
-    
-};
-
-// One possible plan: an onion layer key is logically a PRNG that
-// generates a suitable key.
-//
-// In practice, the PRNG would be something like blockrng<AES> based
-// on the master AES key, or based on a multiprinc key.
-//
-// Each onion layer reads the necessary number of bytes from the
-// PRNG to generate its key (AES, blowfish, Paillier, SWP, ...)
-//
-// TODO: The naive version of this is likely inefficient (it will require
-// performing key setup each time), but it should be possible to
-// retrofit a suitable caching scheme once everything else works.
-
-
-
-//TODO: call enclayer? 
+// An enc layer encrypts and decrypts data for a certain onion layer. It also 
+// knows how to transform the data type of some plain data to the data type of
+// encrypted data in the DBMS.
 //TODO: currently, we have one such object per onion layer per field
 // optimize storage by sharing these handlers among objects with same type
-
 //TODO: need to writeup cleanup & destructors
 
 class EncLayer {
 public:
+    virtual SECLEVEL level() = 0;
     virtual Create_field * newCreateField() = 0;
     
     virtual Item * encrypt(Item * ptext, uint64_t IV = 0) = 0;
-    virtual Item * decrypt(Item * i, uint64_t IV = 0) = 0;
+    virtual Item * decrypt(Item * ctext, uint64_t IV = 0) = 0;
     virtual Item * decryptUDF(Item * col, Item * ivcol = NULL) {
         thrower() << "decryptUDF not supported";
     }
 };
 
+
+class EncLayerFactory {
+public:
+    static EncLayer * encLayer(SECLEVEL sl, Create_field * cf, PRNG * key);
+};
+
+
 class RND_int : public EncLayer {
 public:
     RND_int(Create_field *, PRNG * key);
 
+    SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField();
     
     Item * encrypt(Item * ptext, uint64_t IV);
@@ -92,6 +63,7 @@ class RND_str : public EncLayer {
 public:
     RND_str(Create_field *, PRNG * key);
 
+    SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField();
     
     Item * encrypt(Item * ptext, uint64_t IV);
@@ -110,6 +82,7 @@ class DET_int : public EncLayer {
 public:
     DET_int(Create_field *, PRNG * key);
 
+    SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField();
     
     Item * encrypt(Item * ptext, uint64_t IV = 0);
@@ -129,10 +102,11 @@ class DET_str : public EncLayer {
 public:
     DET_str(Create_field *, PRNG * key);
 
+    SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField();
     
-    Item * encrypt(Item * ptext, uint64_t IV = 0);
-    Item * decrypt(Item * ctext, uint64_t IV = 0);
+    Item * encrypt(Item * p, uint64_t IV = 0);
+    Item * decrypt(Item * c, uint64_t IV = 0);
     Item * decryptUDF(Item * col, Item * = NULL);
 
 private:
@@ -149,10 +123,11 @@ class OPE_int : public EncLayer {
 public:
     OPE_int(Create_field *, PRNG * key);
 
+    SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField();
     
-    Item * encrypt(Item * ptext, uint64_t IV);
-    Item * decrypt(Item * ctext, uint64_t IV);
+    Item * encrypt(Item * p, uint64_t IV);
+    Item * decrypt(Item * c, uint64_t IV);
 
 private:
     Create_field * cf;
@@ -168,10 +143,11 @@ class OPE_str : public EncLayer {
 public:
     OPE_str(Create_field *, PRNG * key);
 
+    SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField();
     
-    Item * encrypt(Item * ptext, uint64_t IV = 0);
-    Item * decrypt(Item * ctext, uint64_t IV = 0)__attribute__((noreturn));
+    Item * encrypt(Item * p, uint64_t IV = 0);
+    Item * decrypt(Item * c, uint64_t IV = 0)__attribute__((noreturn));
   
 private:
     Create_field * cf;
@@ -187,10 +163,11 @@ class HOM : public EncLayer {
 public:
     HOM(Create_field * cf, PRNG * key);
 
+    SECLEVEL level() {return SECLEVEL::HOM;}
     Create_field * newCreateField();
 
-    Item * encrypt(Item * ptext, uint64_t IV = 0);
-    Item * decrypt(Item * ctext, uint64_t IV = 0);
+    Item * encrypt(Item * p, uint64_t IV = 0);
+    Item * decrypt(Item * c, uint64_t IV = 0);
 
     //expr is the expression (e.g. a field) over which to sum
     Item * sumUDF(Item * expr);
@@ -204,7 +181,8 @@ private:
 class Search : public EncLayer {
 public:
     Search(Create_field * cf, PRNG * key);
-    
+
+    SECLEVEL level() {return SECLEVEL::SEARCH;}
     Create_field * newCreateField();
 
     Item * encrypt(Item * ptext, uint64_t IV = 0);
@@ -219,25 +197,3 @@ private:
     std::string rawkey;
     Binary key;
 };
-
-class EncLayerFactory {
-    static EncLayer * encLayer(SECLEVEL sl, Create_field * cf, PRNG * key);
-};
-
-/*
-
-class EncLayerSearch : public EncLayer {
-public:
-    Create_field * createField(Create_field *);
-    
-    Item * encrypt(cdb_key * key, Item * ptext, uint64_t IV);
-    Item * decrypt(cdb_key * key, Item * i, uint64_t IV);
-    Item * seachUDF(cdb_key * key, Item *columnref, std::string keyword);
-
-private:    
-    cdb_key * getKey(PRNG * prng);
-
-};
-
-    cdb_key * getKey(PRNG * prng);
-*/

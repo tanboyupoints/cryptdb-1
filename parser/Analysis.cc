@@ -37,7 +37,7 @@ EncSet::intersect(const EncSet & es2) const
 
 void
 EncSet::setFieldForOnion(onion o, FieldMeta * fm) {
-    LevelFieldPair lfp = map_getAssert(osl, o);
+    LevelFieldPair lfp = getAssert(osl, o);
 
     osl[o] = LevelFieldPair(lfp.first, fm);
 }
