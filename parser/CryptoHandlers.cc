@@ -317,13 +317,13 @@ OPE_int::newCreateField() {
 
 Item *
 OPE_int::encrypt(Item * ptext, uint64_t IV) {
-    ZZ enc = ope.encrypt(to_ZZ((uint64_t) static_cast<Item_int *>(ptext)->value));
+    ZZ enc = ope.encrypt(to_ZZ((ulong) static_cast<Item_int *>(ptext)->value));
     return new Item_int((ulonglong) trunc_long(enc, 64));
 }
 
 Item *
 OPE_int::decrypt(Item * ctext, uint64_t IV) {
-    ZZ dec = ope.decrypt(to_ZZ((uint64_t) static_cast<Item_int*>(ctext)->value));
+    ZZ dec = ope.decrypt(to_ZZ((ulong) static_cast<Item_int*>(ctext)->value));
     return new Item_int((ulonglong) trunc_long(dec, 32));
 }
 
