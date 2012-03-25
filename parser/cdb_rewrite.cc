@@ -1008,7 +1008,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
 	encrypt_item_all_onions(i, fm, salt, l);
        
         if (fm->has_salt) {
-            l.push_back(new Item_int(salt));
+            l.push_back(new Item_int((ulonglong) salt));
         }
 	
         //if no onions: grab the field, for reals

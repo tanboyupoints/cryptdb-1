@@ -169,7 +169,7 @@ getItem(char * content, enum_field_types type, uint len) {
     }
     Item * i;
     if (IsMySQLTypeNumeric(type)) {
-	i = new Item_int(valFromStr(string(content, len)));
+	i = new Item_int((ulonglong) valFromStr(string(content, len)));
     } else {
 	i = new Item_string(content, len, &my_charset_bin);
     }
