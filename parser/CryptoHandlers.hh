@@ -21,7 +21,9 @@
 //TODO: need to writeup cleanup & destructors
 
 class EncLayer {
-public:
+ public:
+    EncLayer(Create_field * f) : cf(f) {}
+
     virtual SECLEVEL level() = 0;
     virtual Create_field * newCreateField() = 0;
     
@@ -30,6 +32,9 @@ public:
     virtual Item * decryptUDF(Item * col, Item * ivcol = NULL) {
         thrower() << "decryptUDF not supported";
     }
+
+ protected:
+    Create_field *cf;
 };
 
 
@@ -51,7 +56,6 @@ public:
     Item * decryptUDF(Item * col, Item * ivcol);
 
 private:
-    Create_field * cf;
     std::string key;
     blowfish bf;
     static const int key_bytes = 16;
@@ -71,7 +75,6 @@ public:
     Item * decryptUDF(Item * col, Item * ivcol);
 
 private:
-    Create_field * cf;
     std::string rawkey;
     static const int key_bytes = 16;
     AES_KEY * enckey;
@@ -90,7 +93,6 @@ public:
     Item * decryptUDF(Item * col, Item * ivcol = NULL);
 
 private:
-    Create_field * cf;
     std::string key;
     blowfish bf;
     static const int bf_key_size = 16;
@@ -110,7 +112,6 @@ public:
     Item * decryptUDF(Item * col, Item * = NULL);
 
 private:
-    Create_field * cf;
     std::string rawkey;
     static const int key_bytes = 16;
     AES_KEY * enckey;
@@ -130,7 +131,6 @@ public:
     Item * decrypt(Item * c, uint64_t IV);
 
 private:
-    Create_field * cf;
     std::string rawkey;
     OPE * key;
     static const int key_bytes = 16;
@@ -150,7 +150,6 @@ public:
     Item * decrypt(Item * c, uint64_t IV = 0)__attribute__((noreturn));
   
 private:
-    Create_field * cf;
     std::string rawkey;
     OPE * key;
     static const int key_bytes = 16;
@@ -173,7 +172,6 @@ public:
     Item * sumUDF(Item * expr);
     
 private:
-    Create_field * cf;
     static const uint nbits = 1024;
     Paillier_priv sk;
 };
@@ -192,7 +190,6 @@ public:
     Item * searchUDF(Item * expr);
     
 private:
-    Create_field * cf;
     static const uint key_bytes = 16;
     std::string rawkey;
     Binary key;

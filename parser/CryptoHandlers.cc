@@ -48,7 +48,7 @@ createFieldHelper(const Create_field *f, int field_length,
 /****************** RND *********************/
 
 RND_int::RND_int(Create_field * f, PRNG * prng)
-    : cf(f),
+    : EncLayer(f),
       key(prng->rand_string(key_bytes)),
       bf(key)
 {
@@ -110,8 +110,10 @@ RND_int::decryptUDF(Item * col, Item * ivcol) {
 }
 
 
-RND_str::RND_str(Create_field * f, PRNG * key) : cf(f),
-                 				 rawkey(key->rand_string(key_bytes)) {
+RND_str::RND_str(Create_field * f, PRNG * key)
+    : EncLayer(f),
+      rawkey(key->rand_string(key_bytes))
+{
     enckey = get_AES_enc_key(rawkey);
     deckey = get_AES_dec_key(rawkey);
 }
@@ -178,7 +180,7 @@ RND_str::decryptUDF(Item * col, Item * ivcol) {
 
 
 DET_int::DET_int(Create_field * f, PRNG * prng)
-    : cf(f),
+    : EncLayer(f),
       key(prng->rand_string(bf_key_size)),
       bf(key)
 {
@@ -232,8 +234,9 @@ DET_int::decryptUDF(Item * col, Item * ivcol) {
     return new Item_func_udf_int(&u_decDETInt, l);	
 }
 
-DET_str::DET_str(Create_field * f, PRNG * key) {
-    cf = f;
+DET_str::DET_str(Create_field * f, PRNG * key)
+    : EncLayer(f)
+{
     rawkey = key->rand_string(key_bytes);
     enckey = get_AES_enc_key(rawkey);
     deckey = get_AES_dec_key(rawkey);
@@ -299,8 +302,9 @@ DET_str::decryptUDF(Item * col, Item * ivcol) {
 
 /**************** OPE **************************/
 
-OPE_int::OPE_int(Create_field * cf, PRNG *key) {
-    this->cf = cf;
+OPE_int::OPE_int(Create_field * f, PRNG *key)
+    : EncLayer(f)
+{
     rawkey = key->rand_string(key_bytes);
     this->key = CryptoManager::get_key_OPE(rawkey, plain_size, ciph_size);
 }
@@ -323,8 +327,9 @@ OPE_int::decrypt(Item * ctext, uint64_t IV) {
 }
 
 
-OPE_str::OPE_str(Create_field * cf, PRNG *key) {
-    this->cf = cf;
+OPE_str::OPE_str(Create_field * f, PRNG *key)
+    : EncLayer(f)
+{
     rawkey = key->rand_string(key_bytes);
     this->key = CryptoManager::get_key_OPE(rawkey, plain_size, ciph_size);
 }
@@ -347,8 +352,8 @@ OPE_str::decrypt(Item * ctext, uint64_t IV)   {
 
 /**************** HOM ***************************/
 
-HOM::HOM(Create_field *c, PRNG * key)
-    : cf(c),
+HOM::HOM(Create_field * f, PRNG * key)
+    : EncLayer(f),
       sk(Paillier_priv::keygen(key, nbits))
 {
 }
@@ -417,8 +422,9 @@ HOM::sumUDF(Item * expr) {
 
 /******* SEARCH **************************/
 
-Search::Search(Create_field * cf, PRNG * key) {
-    this->cf = cf;
+Search::Search(Create_field * f, PRNG * key)
+    : EncLayer(f)
+{
     rawkey = key->rand_string(key_bytes);
     this->key = Binary(key_bytes, (unsigned char *)rawkey.data());
 }
