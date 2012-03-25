@@ -5,6 +5,7 @@
 #include <crypto-old/BasicCrypto.hh>
 #include <crypto-old/CryptoManager.hh>
 #include <crypto/paillier.hh>
+#include <crypto/ope.hh>
 
 #include <sql_select.h>
 #include <sql_delete.h>
@@ -131,11 +132,11 @@ public:
     Item * decrypt(Item * c, uint64_t IV);
 
 private:
-    std::string rawkey;
-    OPE * key;
-    static const int key_bytes = 16;
-    static const int plain_size = 4;
-    static const int ciph_size = 8;
+    std::string key;
+    OPE ope;
+    static const size_t key_bytes = 16;
+    static const size_t plain_size = 4;
+    static const size_t ciph_size = 8;
 };
 
 
@@ -150,11 +151,11 @@ public:
     Item * decrypt(Item * c, uint64_t IV = 0)__attribute__((noreturn));
   
 private:
-    std::string rawkey;
-    OPE * key;
-    static const int key_bytes = 16;
-    static const int plain_size = 4;
-    static const int ciph_size = 8;
+    std::string key;
+    OPE ope;
+    static const size_t key_bytes = 16;
+    static const size_t plain_size = 4;
+    static const size_t ciph_size = 8;
 };
 
 

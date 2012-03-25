@@ -10,15 +10,12 @@
 #include <NTL/ZZ.h>
 
 #include <util/onions.hh>
-#include <crypto-old/OPE.hh>
 #include <crypto-old/SWPSearch.hh>
 #include <crypto-old/BasicCrypto.hh>
 
 
 
 #define PAILLIER_LEN_BYTES 256
-const unsigned int OPE_PLAINTEXT_SIZE = 32;
-const unsigned int OPE_CIPHERTEXT_SIZE = 64;
 
 // returns the highest security level lower than sl that allows equality
 SECLEVEL highestEq(SECLEVEL sl);
@@ -109,22 +106,6 @@ class CryptoManager {
     //int32_t encrypt_SEM(int32_t ptext, int salt, unsigned char * key);
     //int32_t decrypt_SEM(int32_t, const char * ctext, unsigned char * salt,
     // unsigned char * key);
-
-    //OPE
-    static OPE * get_key_OPE(const std::string &key, const unsigned int & pTextBytes = OPE_PLAINTEXT_SIZE,
-            const unsigned int & cTextBytes = OPE_CIPHERTEXT_SIZE);     //key must have
-    // OPE_KEY_SIZE
-    static uint64_t encrypt_OPE(uint32_t plaintext, OPE * ope);
-    static uint32_t decrypt_OPE(uint64_t ciphertext, OPE * ope);
-    // used to encrypt text
-    static uint64_t encrypt_OPE_text_wrapper(const std::string & plaintext,
-            OPE * ope);
-    static std::string encrypt_OPE(const std::string &plaintext, OPE * ope);
-    static std::string decrypt_OPE(const std::string &ciphertext, OPE * ope);
-
-    uint64_t encrypt_OPE(uint32_t plaintext, std::string uniqueFieldName);
-    uint64_t
-    encrypt_OPE_enctables(uint32_t val, std::string uniqueFieldName);
 
     /*
      * SEARCH

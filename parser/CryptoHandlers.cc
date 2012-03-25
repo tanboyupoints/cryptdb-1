@@ -1,4 +1,5 @@
 #include <parser/CryptoHandlers.hh>
+#include <crypto/ope.hh>
 #include <util/util.hh>
 
 using namespace std;
@@ -302,11 +303,11 @@ DET_str::decryptUDF(Item * col, Item * ivcol) {
 
 /**************** OPE **************************/
 
-OPE_int::OPE_int(Create_field * f, PRNG *key)
-    : EncLayer(f)
+OPE_int::OPE_int(Create_field * f, PRNG * prng)
+    : EncLayer(f),
+      key(prng->rand_string(key_bytes)),
+      ope(key, plain_size * 8, ciph_size * 8)
 {
-    rawkey = key->rand_string(key_bytes);
-    this->key = CryptoManager::get_key_OPE(rawkey, plain_size, ciph_size);
 }
 
 Create_field *
@@ -316,22 +317,22 @@ OPE_int::newCreateField() {
 
 Item *
 OPE_int::encrypt(Item * ptext, uint64_t IV) {
-    uint64_t enc = CryptoManager::encrypt_OPE(static_cast<Item_int *>(ptext)->value, key);
-    return new Item_int((ulonglong) enc);
+    ZZ enc = ope.encrypt(to_ZZ((uint64_t) static_cast<Item_int *>(ptext)->value));
+    return new Item_int((ulonglong) trunc_long(enc, 64));
 }
 
 Item *
 OPE_int::decrypt(Item * ctext, uint64_t IV) {
-    uint32_t dec = CryptoManager::decrypt_OPE(static_cast<Item_int*>(ctext)->value, key);
-    return new Item_int((ulonglong) dec);
+    ZZ dec = ope.decrypt(to_ZZ((uint64_t) static_cast<Item_int*>(ctext)->value));
+    return new Item_int((ulonglong) trunc_long(dec, 32));
 }
 
 
-OPE_str::OPE_str(Create_field * f, PRNG *key)
-    : EncLayer(f)
+OPE_str::OPE_str(Create_field * f, PRNG * prng)
+    : EncLayer(f),
+      key(prng->rand_string(key_bytes)),
+      ope(key, plain_size * 8, ciph_size * 8)
 {
-    rawkey = key->rand_string(key_bytes);
-    this->key = CryptoManager::get_key_OPE(rawkey, plain_size, ciph_size);
 }
 
 Create_field *
@@ -341,13 +342,18 @@ OPE_str::newCreateField() {
 
 Item *
 OPE_str::encrypt(Item * ptext, uint64_t IV) {
-    uint64_t enc = CryptoManager::encrypt_OPE_text_wrapper(ItemToString(ptext), key);
-    return new Item_int((ulonglong) enc);
+    string ps = ItemToString(ptext);
+    if (ps.size() < plain_size)
+        ps = string(plain_size - ps.size(), 0) + ps;
+    uint32_t pv;
+    memcpy(&pv, ps.data(), plain_size);
+    ZZ enc = ope.encrypt(to_ZZ(ntohl(pv)));
+    return new Item_int((ulonglong) trunc_long(enc, ciph_size));
 }
 
 Item *
-OPE_str::decrypt(Item * ctext, uint64_t IV)   {
-    thrower() << "should not decrypt string from OPE \n";
+OPE_str::decrypt(Item * ctext, uint64_t IV) {
+    thrower() << "cannot decrypt string from OPE";
 }
 
 /**************** HOM ***************************/
