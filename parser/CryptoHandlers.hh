@@ -52,9 +52,9 @@ public:
 
 private:
     Create_field * cf;
-    std::string rawkey;
+    std::string key;
+    blowfish bf;
     static const int key_bytes = 16;
-    AES_KEY * key;
     
     static const int ciph_size = 8;
 };
@@ -91,8 +91,8 @@ public:
 
 private:
     Create_field * cf;
-    std::string rawkey;
-    blowfish * key;
+    std::string key;
+    blowfish bf;
     static const int bf_key_size = 16;
     static const int ciph_size = 8;
 };

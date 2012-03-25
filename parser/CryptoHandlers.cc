@@ -47,9 +47,11 @@ createFieldHelper(const Create_field *f, int field_length,
 
 /****************** RND *********************/
 
-RND_int::RND_int(Create_field * f, PRNG * key): cf(f),
-						rawkey(key->rand_string(key_bytes)) {
-    this->key = CryptoManager::get_key_SEM(rawkey);
+RND_int::RND_int(Create_field * f, PRNG * prng)
+    : cf(f),
+      key(prng->rand_string(key_bytes)),
+      bf(key)
+{
 }
 
 
@@ -63,14 +65,14 @@ Item *
 RND_int::encrypt(Item * ptext, uint64_t IV) {
     //TODO: should have encrypt_SEM work for any length
     uint64_t p = static_cast<Item_int *>(ptext)->value;
-    uint64_t c = CryptoManager::encrypt_SEM(p, key, IV);
+    uint64_t c = bf.encrypt(p ^ IV);
     return new Item_int((ulonglong) c);
 }
 
 Item *
 RND_int::decrypt(Item * ctext, uint64_t IV) {
     uint64_t c = static_cast<Item_int*>(ctext)->value;
-    uint64_t p = CryptoManager::decrypt_SEM(c, key, IV);
+    uint64_t p = bf.decrypt(c) ^ IV;
     return new Item_int((ulonglong) p);
 }
 
@@ -101,7 +103,7 @@ RND_int::decryptUDF(Item * col, Item * ivcol) {
        
     List<Item> l;
     l.push_back(col);
-    l.push_back(new Item_string(make_thd_string(rawkey), rawkey.length(), &my_charset_bin));
+    l.push_back(new Item_string(make_thd_string(key), key.length(), &my_charset_bin));
     l.push_back(ivcol);
     
     return new Item_func_udf_int(&u_decRNDInt, l);	
@@ -175,10 +177,11 @@ RND_str::decryptUDF(Item * col, Item * ivcol) {
 
 
 
-DET_int::DET_int(Create_field * f, PRNG * key) {
-    cf = f;
-    rawkey = key->rand_string(bf_key_size);
-    this->key = new blowfish(rawkey);
+DET_int::DET_int(Create_field * f, PRNG * prng)
+    : cf(f),
+      key(prng->rand_string(bf_key_size)),
+      bf(key)
+{
 }
 
 Create_field *
@@ -189,12 +192,12 @@ DET_int::newCreateField() {
 //TODO: may want to do more specialized crypto for lengths
 Item *
 DET_int::encrypt(Item * ptext, uint64_t IV) {
-    return new Item_int((ulonglong) key->encrypt(static_cast<Item_int *>(ptext)->value));
+    return new Item_int((ulonglong) bf.encrypt(static_cast<Item_int *>(ptext)->value));
 }
 
 Item *
 DET_int::decrypt(Item * ctext, uint64_t IV) {
-    return new Item_int((ulonglong) key->decrypt(static_cast<Item_int*>(ctext)->value));
+    return new Item_int((ulonglong) bf.decrypt(static_cast<Item_int*>(ctext)->value));
 }
 
 
@@ -224,7 +227,7 @@ DET_int::decryptUDF(Item * col, Item * ivcol) {
        
     List<Item> l;
     l.push_back(col);
-    l.push_back(new Item_string(make_thd_string(rawkey), rawkey.length(), &my_charset_bin));
+    l.push_back(new Item_string(make_thd_string(key), key.length(), &my_charset_bin));
     
     return new Item_func_udf_int(&u_decDETInt, l);	
 }

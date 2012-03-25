@@ -308,50 +308,6 @@ CryptoManager::get_key_SEM(const string &key)
     return get_AES_KEY(key);
 }
 
-
-static uint64_t
-getXORValue(uint64_t salt, AES_KEY * aes_key)
-{
-    string plaintext = BytesFromInt(salt, AES_BLOCK_BYTES);
-    unsigned char ciphertext[AES_BLOCK_BYTES];
-    AES_encrypt((const uint8_t*)plaintext.c_str(), ciphertext, aes_key);
-
-
-    uint64_t v = IntFromBytes(ciphertext, AES_BLOCK_BYTES);
-
-    return v;
-}
-
-
-uint64_t
-CryptoManager::encrypt_SEM(uint64_t ptext, AES_KEY * key, uint64_t salt)
-{
-    return ptext ^ getXORValue(salt, key);
-
-}
-
-uint64_t
-CryptoManager::decrypt_SEM(uint64_t ctext, AES_KEY * key, uint64_t salt)
-{
-    uint64_t v =  ctext ^ getXORValue(salt, key);
-
-    return v;
-}
-
-uint32_t
-CryptoManager::encrypt_SEM(uint32_t ptext, AES_KEY * key, uint64_t salt)
-{
-    return ptext ^ (uint32_t) getXORValue(salt, key);
-}
-
-uint32_t
-CryptoManager::decrypt_SEM(uint32_t ctext, AES_KEY * key, uint64_t salt)
-{
-    return ctext ^ (uint32_t) getXORValue(salt, key);
-}
-
-
-
 string
 CryptoManager::encrypt_SEM(const string &ptext, AES_KEY * enckey, uint64_t salt)
 {

@@ -78,10 +78,6 @@ class CryptoManager {
     //SEMANTIC
     //since many values may be encrypted with same key you want to set the key
     static AES_KEY * get_key_SEM(const std::string &key);
-    static uint64_t encrypt_SEM(uint64_t ptext, AES_KEY * key, uint64_t salt);
-    static uint64_t decrypt_SEM(uint64_t ctext, AES_KEY * key, uint64_t salt);
-    static uint32_t encrypt_SEM(uint32_t ptext, AES_KEY * key, uint64_t salt);
-    static uint32_t decrypt_SEM(uint32_t ctext, AES_KEY * key, uint64_t salt);
 
     //output same len as input
     static std::string encrypt_SEM(const std::string &ptext, AES_KEY *key,

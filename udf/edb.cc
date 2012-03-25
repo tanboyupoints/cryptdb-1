@@ -110,36 +110,6 @@ log(string s)
     fprintf(stderr, "%s\n", s.c_str());
 }
 
-static AES_KEY *
-get_key_SEM(const string &key)
-{
-    return CryptoManager::get_key_SEM(key);
-}
-/*
-static AES_KEY *
-get_key_DET(const string &key)
-{
-    return CryptoManager::get_key_DET(key);
-}
-*/
-static uint64_t
-decrypt_SEM(uint64_t value, AES_KEY * aesKey, uint64_t salt)
-{
-    return CryptoManager::decrypt_SEM(value, aesKey, salt);
-}
-/*
-static uint64_t
-decrypt_DET(uint64_t ciph, AES_KEY* aesKey)
-{
-    return CryptoManager::decrypt_DET(ciph, aesKey);
-}
-
-static uint64_t
-encrypt_DET(uint64_t plaintext, AES_KEY * aesKey)
-{
-    return CryptoManager::encrypt_DET(plaintext, aesKey);
-}
-*/
 static string
 decrypt_SEM(unsigned char *eValueBytes, uint64_t eValueLen,
             AES_KEY * aesKey, uint64_t salt)
@@ -241,9 +211,8 @@ decrypt_int_sem(PG_FUNCTION_ARGS)
 
     uint64_t salt = getui(args, offset + AES_KEY_BYTES);
 
-    AES_KEY *aesKey = get_key_SEM(key);
-    uint64_t value = decrypt_SEM(eValue, aesKey, salt);
-    delete aesKey;
+    blowfish bf(key);
+    uint64_t value = bf.decrypt(eValue) ^ salt;
 
 #if MYSQL_S
     return (ulonglong) value;
