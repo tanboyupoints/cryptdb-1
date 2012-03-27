@@ -17,6 +17,7 @@
 #define DEBUG 1
 
 #include <crypto-old/CryptoManager.hh> /* various functions for EDB */
+#include <crypto/blowfish.hh>
 #include <util/params.hh>
 #include <util/util.hh>
 

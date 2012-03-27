@@ -6,6 +6,7 @@
 #include <crypto-old/CryptoManager.hh>
 #include <crypto/paillier.hh>
 #include <crypto/ope.hh>
+#include <crypto/blowfish.hh>
 
 #include <sql_select.h>
 #include <sql_delete.h>

@@ -1,7 +1,7 @@
 OBJDIRS	+= crypto-old
 
 CRYPTO_SRCS  := Binary.cc SWPSearch.cc BasicCrypto.cc \
-		ECJoin.cc CryptoManager.cc blowfish.cc
+		ECJoin.cc CryptoManager.cc
 
 all:	$(OBJDIR)/libedbcrypto.so
 

@@ -14,7 +14,6 @@
 #include <openssl/rand.h>
 #include <openssl/aes.h>
 #include <openssl/evp.h>
-#include <openssl/blowfish.h>
 
 
 AES_KEY * get_AES_KEY(const std::string &key);
@@ -47,24 +46,3 @@ encrypt_AES_CMC(const std::string &ptext, const AES_KEY * enckey, bool dopad = t
 std::string
 decrypt_AES_CMC(const std::string &ctext, const AES_KEY * deckey, bool dopad = true);
 
-
-/*
- * Blowfish
- */
-
-#define BF_N 16
-struct bf_ctx {
-  uint32_t P[BF_N + 2];
-  uint32_t S[4][256];
-};
-
-class blowfish {
- public:
-    blowfish(const std::string &key);
-    uint64_t encrypt(uint64_t v);
-    uint64_t decrypt(uint64_t v);
-
- private:
-    // BF_KEY k;
-    bf_ctx k;
-};
