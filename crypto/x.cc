@@ -516,7 +516,7 @@ test_padding()
 
     for (int i = 0; i < 1000; i++) {
         size_t blocksize = 1 + (u.rand<size_t>() % 32);
-        auto v = u.rand_vec<uint8_t>(u.rand<size_t>() % 8192);
+        auto v = u.rand_string(u.rand<size_t>() % 8192);
         auto v2 = v;
         pad_blocksize(&v2, blocksize);
         assert((v2.size() % blocksize) == 0);

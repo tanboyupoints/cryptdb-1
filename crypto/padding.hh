@@ -1,7 +1,7 @@
 #pragma once
 
 static inline void
-pad_blocksize(std::vector<uint8_t> *ptext, size_t blocksize)
+pad_blocksize(std::string *ptext, size_t blocksize)
 {
     size_t plen = ptext->size();
     uint8_t pad = blocksize - (plen % blocksize);
@@ -10,7 +10,7 @@ pad_blocksize(std::vector<uint8_t> *ptext, size_t blocksize)
 }
 
 static inline void
-unpad_blocksize(std::vector<uint8_t> *ptext, size_t blocksize)
+unpad_blocksize(std::string *ptext, size_t blocksize)
 {
     size_t flen = ptext->size();
     uint8_t pad = (*ptext)[flen - 1];
