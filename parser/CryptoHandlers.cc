@@ -366,7 +366,7 @@ HOM::HOM(Create_field * f, PRNG * key)
 
 Create_field *
 HOM::newCreateField() {
-    return createFieldHelper(cf, 2*nbits, MYSQL_TYPE_STRING);
+    return createFieldHelper(cf, 2*nbits/8, MYSQL_TYPE_VARCHAR, &my_charset_bin);
 }
 
 static ZZ
@@ -526,13 +526,35 @@ Search::searchUDF(Item * expr) {
 EncLayer *
 EncLayerFactory::encLayer(SECLEVEL sl, Create_field * cf, PRNG * key) {
     switch (sl) {
-    case SECLEVEL::DET:
-    case SECLEVEL::OPE: {
+    case SECLEVEL::RND: {
 	if (IsMySQLTypeNumeric(cf->sql_type)) {
 	    return new RND_int(cf, key);
 	} else {
 	    return new RND_str(cf, key);
 	}
+    }
+    case SECLEVEL::DET: {
+	if (IsMySQLTypeNumeric(cf->sql_type)) {
+	    return new DET_int(cf, key);
+	} else {
+	    return new DET_str(cf, key);
+	}
+    }
+    case SECLEVEL::DETJOIN: {
+	return new DETJOIN(cf, key);
+    }
+    case SECLEVEL::OPE: {
+	if (IsMySQLTypeNumeric(cf->sql_type)) {
+	    return new OPE_int(cf, key);
+	} else {
+	    return new OPE_str(cf, key);
+	}
+    }
+    case SECLEVEL::HOM: {
+	return new HOM(cf, key);
+    }
+    case SECLEVEL::SEARCH: {
+	return new Search(cf, key);
     }
     default:{
 	

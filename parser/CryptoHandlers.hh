@@ -100,7 +100,6 @@ private:
     static const int ciph_size = 8;
 };
 
-
 class DET_str : public EncLayer {
 public:
     DET_str(Create_field *, PRNG * key);
@@ -119,6 +118,23 @@ private:
     AES_KEY * deckey;
 };
 
+
+class DETJOIN : public EncLayer {
+    //TODO: this layer currently does not do encryption
+public:
+    DETJOIN(Create_field * cf, PRNG * key) : EncLayer(cf) {}
+
+    SECLEVEL level() {return SECLEVEL::DETJOIN;}
+    Create_field * newCreateField() {return cf;}
+    
+    Item * encrypt(Item * p, uint64_t IV = 0) {return p;}
+    Item * decrypt(Item * c, uint64_t IV = 0) {return c;}
+    Item * decryptUDF(Item * col, Item * ivcol = NULL) {
+	thrower() << "should not decrypt from joindet\n";
+    }
+
+private:
+};
 
 
 class OPE_int : public EncLayer {

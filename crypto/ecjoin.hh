@@ -15,6 +15,7 @@ class ecjoin {
 
     static ec_point adjust(const ec_point &p, const bignum &delta_k);
 
+    static const int hello = 3;
  protected:
     EC_GROUP *group;
     bignum order;

@@ -2227,6 +2227,8 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
 	    om.layers.push_back(EncLayerFactory::encLayer(l, cf, key));
 	}
 
+	fm->onions[o] = om;
+	
 	//set outer layer
 	fm->encdesc.olm[o] = it.second.back(); 
     }
@@ -2273,7 +2275,7 @@ add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
         fm->sql_field     = field->clone(current_thd->mem_root);
         fm->fname         = string(fm->sql_field->field_name);
         fm->index         = index;
-	
+
 	if (encByDefault) { 
 	    init_onions(a.masterKey, fm, index, field);
           
@@ -2299,11 +2301,14 @@ static void rewrite_create_field(const string &table_name,
                                  Analysis &a,
                                  vector<Create_field *> &l)
 {
+    LOG(cdb_v) << "in rewrite create field for " << f;
+    
     FieldMeta *fm = a.schema->getFieldMeta(table_name, f->field_name);
 
     //check if field is not encrypted
     if (fm->onions.empty()) {
         l.push_back(f);
+	cerr << "onions were empty";
         return;
     }
 
@@ -2311,7 +2316,7 @@ static void rewrite_create_field(const string &table_name,
     for (auto oit = fm->onions.begin();
          oit != fm->onions.end();
          ++oit) {
-
+	cerr << "create field from onion " << oit->second.onionname ;
 	EncLayer * last_layer = oit->second.layers.back();
 	Create_field * new_cf = last_layer->newCreateField();
 		
@@ -2391,6 +2396,7 @@ rewrite_create_lex(LEX *lex, Analysis &a)
             vector<Create_field *> l;
             rewrite_create_field(table, cf, a, l);
             for (auto it = l.begin(); it != l.end(); ++it) {
+		cerr << "create field " << (*it)->field_name ;
                 newList.push_back(*it);
             }
         }
@@ -2594,12 +2600,15 @@ do_query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysi
     // based on st_select_lex::print in mysql-server/sql/sql_select.cc
 
     if (lex->sql_command == SQLCOM_CREATE_TABLE) {
-        if (analysis.mp || !encByDefault) {
+	/* REMOVED FOR NOW
+	if (analysis.mp || !encByDefault) {
             process_create_lex(lex, analysis, false);
         } else {
-            process_create_lex(lex, analysis, true);
+            process_create_lex(lex, analysis, encByDefault);
         }
         return;
+	*/
+	process_create_lex(lex, analysis, encByDefault);
     }
 
     process_table_list(&lex->select_lex.top_join_list, analysis);
@@ -2845,6 +2854,7 @@ Rewriter::Rewriter(Connect * conn, string dbname,
     : conn(conn), db(dbname), encByDefault(encByDefault)
 {
 
+    LOG(cdb_v) << "encByDefault is " << encByDefault;
     urandom u;
     masterKey = CryptoManager::getKey(u.rand_string(AES_KEY_BYTES));
     // create mysql connection to embedded
@@ -2968,7 +2978,7 @@ Rewriter::createMetaTablesIfNotExists()
 void
 Rewriter::initSchema()
 {
-    cerr << "warning: initSchema does not init enc layers correctly\n";
+    cerr << "warning: initSchema does not init enc layers correctly from shadow db\n";
     createMetaTablesIfNotExists();
 
     MYSQL *m = connect();
@@ -3186,19 +3196,15 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
 	} */
 
     LEX *lex = p.lex();
-   
+
+    /* REMOVED FOR NOW
     //login/logout command; nothing needs to be passed on
-    if ((lex->sql_command == SQLCOM_DELETE || lex->sql_command == SQLCOM_INSERT) 
-
-	/*
-	  REMOVED FOR NOW
-	  && analysis.mp && analysis.mp->checkPsswd(lex)
-	*/){
-
+    if ((lex->sql_command == SQLCOM_DELETE || lex->sql_command == SQLCOM_INSERT)  && analysis.mp && analysis.mp->checkPsswd(lex)){
 	LOG(cdb_v) << "login/logout " << *lex;
         return queries;
     }
-
+    */
+    
     //analyze query
     query_analyze(db, q, lex, analysis, encByDefault);
 

@@ -23,6 +23,8 @@
 #include <parser/embedmysql.hh>
 #include <parser/stringify.hh>
 
+#include <crypto/ecjoin.hh>
+
 #include <util/errstream.hh>
 
 using namespace std;
@@ -48,6 +50,7 @@ static void __write_history() {
 int
 main(int ac, char **av)
 {
+    cerr << "hello is " << ecjoin::hello << "\n";
     if (ac != 3) {
         cerr << "Usage: " << av[0] << " schema-db db " << endl;
         exit(1);
