@@ -22,7 +22,7 @@ class AES {
         AES_decrypt(ctext, ptext, &dec);
     }
 
-    static const unsigned int blocksize = 16;
+    static const size_t blocksize = 16;
 
  private:
     AES_KEY enc;
