@@ -8,12 +8,12 @@ class search {
     static const size_t defsize = 16;
     search(size_t csize_arg = defsize) : csize(csize_arg) {}
 
-    bool match(const std::vector<std::vector<uint8_t>> &ctext,
-               const std::vector<uint8_t> &wordkey);
+    bool match(const std::vector<std::string> &ctext,
+               const std::string &wordkey);
 
  protected:
-    bool match(const std::vector<uint8_t> &ctext,
-               const std::vector<uint8_t> &wordkey);
+    bool match(const std::string &ctext,
+               const std::string &wordkey);
     size_t csize;
 };
 
@@ -22,13 +22,13 @@ class search_priv : public search {
     search_priv(const std::string &key, size_t csize_arg = defsize)
         : search(csize_arg), master_key(key) {}
 
-    std::vector<std::vector<uint8_t>>
+    std::vector<std::string>
         transform(const std::vector<std::string> &words);
-    std::vector<uint8_t>
+    std::string
         wordkey(const std::string &word);
 
  private:
-    std::vector<uint8_t>
+    std::string
         transform(const std::string &word);
     std::string master_key;
 };

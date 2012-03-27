@@ -42,9 +42,9 @@ class bignum {
         assert(BN_bin2bn(buf, nbytes, &b));
     }
 
-    bignum(std::vector<uint8_t> v) {
+    bignum(const std::string &v) {
         BN_init(&b);
-        assert(BN_bin2bn(&v[0], v.size(), &b));
+        assert(BN_bin2bn((uint8_t*) v.data(), v.size(), &b));
     }
 
     ~bignum() { BN_free(&b); }

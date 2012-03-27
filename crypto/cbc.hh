@@ -6,8 +6,12 @@
 
 template<class BlockCipher>
 void
-xor_block(uint8_t *dst, const uint8_t *a, const uint8_t *b)
+xor_block(void *dstv, const void *av, const void *bv)
 {
+    uint8_t *dst = (uint8_t*) dstv;
+    const uint8_t *a = (const uint8_t*) av;
+    const uint8_t *b = (const uint8_t*) bv;
+
     for (size_t j = 0; j < BlockCipher::blocksize; j++)
         dst[j] = a[j] ^ b[j];
 }
@@ -15,18 +19,18 @@ xor_block(uint8_t *dst, const uint8_t *a, const uint8_t *b)
 template<class BlockCipher>
 void
 cbc_encrypt(const BlockCipher *c,
-            const std::vector<uint8_t> &ivec,
-            const std::vector<uint8_t> &ptext,
-            std::vector<uint8_t> *ctext)
+            const std::string &ivec,
+            const std::string &ptext,
+            std::string *ctext)
 {
     assert(ivec.size() == BlockCipher::blocksize);
     size_t ptsize = ptext.size();
     assert(ptsize >= BlockCipher::blocksize);
     ctext->resize(ptsize);
 
-    const uint8_t *iv = &ivec[0];
-    const uint8_t *pt = &ptext[0];
-    uint8_t *ct = &(*ctext)[0];
+    const uint8_t *iv = (const uint8_t*) ivec.data();
+    const uint8_t *pt = (const uint8_t*) ptext.data();
+    uint8_t *ct = (uint8_t*) ctext->data();
 
     for (size_t i = 0;
          i <= ptsize - BlockCipher::blocksize;
@@ -57,18 +61,18 @@ cbc_encrypt(const BlockCipher *c,
 template<class BlockCipher>
 void
 cbc_decrypt(const BlockCipher *c,
-            const std::vector<uint8_t> &ivec,
-            const std::vector<uint8_t> &ctext,
-            std::vector<uint8_t> *ptext)
+            const std::string &ivec,
+            const std::string &ctext,
+            std::string *ptext)
 {
     assert(ivec.size() == BlockCipher::blocksize);
     size_t ctsize = ctext.size();
     assert(ctsize >= BlockCipher::blocksize);
     ptext->resize(ctsize);
 
-    const uint8_t *iv = &ivec[0];
-    const uint8_t *ct = &ctext[0];
-    uint8_t *pt = &(*ptext)[0];
+    const uint8_t *iv = (const uint8_t*) ivec.data();
+    const uint8_t *ct = (const uint8_t*) ctext.data();
+    uint8_t *pt = (uint8_t*) ptext->data();
 
     for (size_t i = 0;
          i <= ctsize - BlockCipher::blocksize;

@@ -8,8 +8,8 @@
 template<class BlockCipher>
 void
 cmc_encrypt(const BlockCipher *c,
-            const std::vector<uint8_t> &ptext,
-            std::vector<uint8_t> *ctext)
+            const std::string &ptext,
+            std::string *ctext)
 {
     assert(ptext.size() % BlockCipher::blocksize == 0);
     ctext->resize(ptext.size());
@@ -53,8 +53,8 @@ cmc_encrypt(const BlockCipher *c,
 template<class BlockCipher>
 void
 cmc_decrypt(const BlockCipher *c,
-            const std::vector<uint8_t> &ctext,
-            std::vector<uint8_t> *ptext)
+            const std::string &ctext,
+            std::string *ptext)
 {
     assert(ctext.size() % BlockCipher::blocksize == 0);
     ptext->resize(ctext.size());

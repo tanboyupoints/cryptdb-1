@@ -25,7 +25,7 @@ class OPE {
     NTL::ZZ decrypt(const NTL::ZZ &ctext);
 
  private:
-    static std::vector<uint8_t> aeskey(const std::string &key) {
+    static std::string aeskey(const std::string &key) {
         auto v = sha256::hash(key);
         v.resize(16);
         return v;

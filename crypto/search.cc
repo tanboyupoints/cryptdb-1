@@ -6,19 +6,8 @@
 
 using namespace std;
 
-static bool
-vector_compare(const vector<uint8_t> &a, const vector<uint8_t> &b)
-{
-    if (a.size() != b.size())
-        return a.size() - b.size();
-    for (size_t i = 0; i < a.size(); i++)
-        if (a[i] != b[i])
-            return a[i] - b[i];
-    return 0;
-}
-
-static vector<uint8_t>
-xor_pad(const vector<uint8_t> &word_key, size_t csize)
+static string
+xor_pad(const string &word_key, size_t csize)
 {
     auto v = sha256::hash(word_key);
     assert(v.size() >= csize);
@@ -27,29 +16,28 @@ xor_pad(const vector<uint8_t> &word_key, size_t csize)
 }
 
 bool
-search::match(const vector<uint8_t> &ctext,
-              const vector<uint8_t> &word_key)
+search::match(const string &ctext,
+              const string &word_key)
 {
     assert(ctext.size() == csize);
-    vector<uint8_t> cx;
+    string cx;
 
     auto xorpad = xor_pad(word_key, csize);
     for (size_t i = 0; i < csize; i++)
         cx.push_back(ctext[i] ^ xorpad[i]);
 
-    vector<uint8_t> salt = cx;
+    string salt = cx;
     salt.resize(csize/2);
 
-    vector<uint8_t> cf(cx.begin() + csize/2, cx.end());
+    string cf(cx.begin() + csize/2, cx.end());
     auto f = hmac<sha1>::mac(salt, word_key);
     f.resize((csize + 1) / 2);
 
-    return vector_compare(f, cf) == 0;
+    return (f == cf);
 }
 
 bool
-search::match(const vector<vector<uint8_t>> &ctexts,
-              const vector<uint8_t> &word_key)
+search::match(const vector<string> &ctexts, const string &word_key)
 {
     for (auto &c: ctexts)
         if (match(c, word_key))
@@ -57,18 +45,18 @@ search::match(const vector<vector<uint8_t>> &ctexts,
     return false;
 }
 
-vector<uint8_t>
+string
 search_priv::transform(const string &word)
 {
     auto word_key = wordkey(word);
 
     urandom r;
-    auto salt = r.rand_vec<uint8_t>(csize / 2);
+    auto salt = r.rand_string(csize / 2);
 
     auto f = hmac<sha1>::mac(salt, word_key);
     f.resize((csize + 1) / 2);
 
-    vector<uint8_t> x;
+    string x;
     x.insert(x.end(), salt.begin(), salt.end());
     x.insert(x.end(), f.begin(), f.end());
 
@@ -79,17 +67,17 @@ search_priv::transform(const string &word)
     return x;
 }
 
-vector<vector<uint8_t>>
+vector<string>
 search_priv::transform(const vector<string> &words)
 {
-    vector<vector<uint8_t>> res;
+    vector<string> res;
     for (auto &w: words)
         res.push_back(transform(w));
-    sort(res.begin(), res.end(), vector_compare);
+    sort(res.begin(), res.end());
     return res;
 }
 
-vector<uint8_t>
+string
 search_priv::wordkey(const string &word)
 {
     return hmac<sha1>::mac(word, master_key);

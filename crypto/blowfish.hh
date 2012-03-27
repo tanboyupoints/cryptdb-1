@@ -6,27 +6,27 @@
 
 class blowfish {
  public:
-    blowfish(const std::vector<uint8_t> &key) {
-        BF_set_key(&k, key.size(), &key[0]);
+    blowfish(const std::string &key) {
+        BF_set_key(&k, key.size(), (const uint8_t*) key.data());
     }
 
-    void block_encrypt(const uint8_t *ptext, uint8_t *ctext) const {
-        BF_ecb_encrypt(ptext, ctext, &k, BF_ENCRYPT);
+    void block_encrypt(const void *ptext, void *ctext) const {
+        BF_ecb_encrypt((const uint8_t*) ptext, (uint8_t*) ctext, &k, BF_ENCRYPT);
     }
 
-    void block_decrypt(const uint8_t *ctext, uint8_t *ptext) const {
-        BF_ecb_encrypt(ctext, ptext, &k, BF_DECRYPT);
+    void block_decrypt(const void *ctext, void *ptext) const {
+        BF_ecb_encrypt((const uint8_t*) ctext, (uint8_t*) ptext, &k, BF_DECRYPT);
     }
 
     uint64_t encrypt(uint64_t pt) const {
         uint64_t ct;
-        block_encrypt((const uint8_t*) &pt, (uint8_t*) &ct);
+        block_encrypt(&pt, &ct);
         return ct;
     }
 
     uint64_t decrypt(uint64_t ct) const {
         uint64_t pt;
-        block_decrypt((const uint8_t*) &ct, (uint8_t*) &pt);
+        block_decrypt(&ct, &pt);
         return pt;
     }
 

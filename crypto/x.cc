@@ -32,16 +32,17 @@ template<class T>
 void
 test_block_cipher(T *c, PRNG *u, const std::string &cname)
 {
-    auto pt = u->rand_vec<uint8_t>(c->blocksize);
-    vector<uint8_t> ct(pt.size()), pt2(pt.size());
+    auto pt = u->rand_string(c->blocksize);
+    string ct(pt.size(), 0);
+    string pt2(pt.size(), 0);
 
     c->block_encrypt(&pt[0], &ct[0]);
     c->block_decrypt(&ct[0], &pt2[0]);
     assert(pt == pt2);
 
-    auto cbc_pt = u->rand_vec<uint8_t>(c->blocksize * 32);
-    auto cbc_iv = u->rand_vec<uint8_t>(c->blocksize);
-    vector<uint8_t> cbc_ct, cbc_pt2;
+    auto cbc_pt = u->rand_string(c->blocksize * 32);
+    auto cbc_iv = u->rand_string(c->blocksize);
+    string cbc_ct, cbc_pt2;
     cbc_encrypt(c, cbc_iv, cbc_pt, &cbc_ct);
     cbc_decrypt(c, cbc_iv, cbc_ct, &cbc_pt2);
     assert(cbc_pt == cbc_pt2);
@@ -51,19 +52,19 @@ test_block_cipher(T *c, PRNG *u, const std::string &cname)
     assert(cbc_pt == cbc_pt2);
 
     for (int i = 0; i < 1000; i++) {
-        auto cts_pt = u->rand_vec<uint8_t>(c->blocksize + (u->rand<size_t>() % 1024));
-        auto cts_iv = u->rand_vec<uint8_t>(c->blocksize);
+        auto cts_pt = u->rand_string(c->blocksize + (u->rand<size_t>() % 1024));
+        auto cts_iv = u->rand_string(c->blocksize);
 
-        vector<uint8_t> cts_ct, cts_pt2;
+        string cts_ct, cts_pt2;
         cbc_encrypt(c, cts_iv, cts_pt, &cts_ct);
         cbc_decrypt(c, cts_iv, cts_ct, &cts_pt2);
         assert(cts_pt == cts_pt2);
     }
 
     enum { nperf = 1000 };
-    auto cbc_perf_pt = u->rand_vec<uint8_t>(1024);
-    auto cbc_perf_iv = u->rand_vec<uint8_t>(c->blocksize);
-    vector<uint8_t> cbc_perf_ct, cbc_perf_pt2;
+    auto cbc_perf_pt = u->rand_string(1024);
+    auto cbc_perf_iv = u->rand_string(c->blocksize);
+    string cbc_perf_ct, cbc_perf_pt2;
     timer cbc_perf;
     for (uint i = 0; i < nperf; i++) {
         cbc_encrypt(c, cbc_perf_iv, cbc_perf_pt, &cbc_perf_ct);
@@ -169,8 +170,8 @@ test_paillier()
          << ((double) sumperf.lap()) / 1000 << " usec" << endl;
 
     for (int i = 0; i < 10; i++) {
-        blockrng<AES> br(u.rand_vec<uint8_t>(16));
-        auto v = u.rand_vec<uint8_t>(AES::blocksize);
+        blockrng<AES> br(u.rand_string(16));
+        auto v = u.rand_string(AES::blocksize);
         br.set_ctr(v);
         auto sk0 = Paillier_priv::keygen(&br);
 
@@ -355,7 +356,7 @@ test_ffx()
 {
     streamrng<arc4> rnd("test seed");
 
-    AES key(rnd.rand_vec<uint8_t>(16));
+    AES key(rnd.rand_string(16));
 
     for (int i = 0; i < 1000; i++) {
         uint nbits = 8 + (rnd.rand<uint>() % 121);
@@ -400,7 +401,7 @@ test_ffx()
 
     urandom u;
     auto tweak = u.rand_vec<uint8_t>(1024);
-    blowfish bf(u.rand_vec<uint8_t>(128));
+    blowfish bf(u.rand_string(128));
 
     ffx2_block_cipher<AES, 128> fbca128(&key, tweak);
     test_block_cipher(&fbca128, &u, "ffx128-aes128");
@@ -440,7 +441,7 @@ test_online_ope()
 {
     cerr << "test online ope .. \n";
     urandom u;
-    blowfish bf(u.rand_vec<uint8_t>(128));
+    blowfish bf(u.rand_string(128));
     ffx2_block_cipher<blowfish, 16> fk(&bf, {});
 
     ope_server<uint16_t> ope_serv;
@@ -489,7 +490,7 @@ static void
 test_online_ope_rebalance()
 {
     urandom u;
-    blowfish bf(u.rand_vec<uint8_t>(128));
+    blowfish bf(u.rand_string(128));
     ffx2_block_cipher<blowfish, 16> fk(&bf, {});
 
     ope_server<uint16_t> ope_serv;
@@ -546,13 +547,13 @@ main(int ac, char **av)
     test_online_ope();
     test_ffx();
 
-    AES aes128(u.rand_vec<uint8_t>(16));
+    AES aes128(u.rand_string(16));
     test_block_cipher(&aes128, &u, "aes-128");
 
-    AES aes256(u.rand_vec<uint8_t>(32));
+    AES aes256(u.rand_string(32));
     test_block_cipher(&aes256, &u, "aes-256");
 
-    blowfish bf(u.rand_vec<uint8_t>(128));
+    blowfish bf(u.rand_string(128));
     test_block_cipher(&bf, &u, "blowfish");
 
     skip32 s32(u.rand_vec<uint8_t>(10));

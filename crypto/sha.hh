@@ -1,7 +1,7 @@
 #pragma once
 
 #include <openssl/sha.h>
-#include <vector>
+#include <string>
 
 template<class State,
          int OutBytes,
@@ -18,21 +18,16 @@ class sha {
         Final(buf, &s);
     }
 
-    std::vector<uint8_t> final() {
-        std::vector<uint8_t> v(hashsize);
-        final(&v[0]);
+    std::string final() {
+        std::string v;
+        v.resize(hashsize);
+        final((uint8_t*) v.data());
         return v;
     }
 
-    static std::vector<uint8_t> hash(const std::string &s) {
+    static std::string hash(const std::string &s) {
         sha x;
         x.update(s.data(), s.length());
-        return x.final();
-    }
-
-    static std::vector<uint8_t> hash(const std::vector<uint8_t> &v) {
-        sha x;
-        x.update(&v[0], v.size());
         return x.final();
     }
 

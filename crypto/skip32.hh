@@ -12,14 +12,14 @@ class skip32 {
         key = k;
     }
 
-    void block_encrypt(const uint8_t *ptext, uint8_t *ctext) const {
+    void block_encrypt(const void *ptext, void *ctext) const {
         memcpy(ctext, ptext, 4);
-        process(ctext, 1);
+        process((uint8_t*) ctext, 1);
     }
 
-    void block_decrypt(const uint8_t *ctext, uint8_t *ptext) const {
+    void block_decrypt(const void *ctext, void *ptext) const {
         memcpy(ptext, ctext, 4);
-        process(ptext, 0);
+        process((uint8_t*) ptext, 0);
     }
 
     static const size_t blocksize = 4;

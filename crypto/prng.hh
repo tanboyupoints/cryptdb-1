@@ -102,9 +102,9 @@ class blockrng : public PRNG {
         }
     }
 
-    void set_ctr(const std::vector<uint8_t> &v) {
+    void set_ctr(const std::string &v) {
         assert(v.size() == BlockCipher::blocksize);
-        memcpy(ctr, &v[0], BlockCipher::blocksize);
+        memcpy(ctr, v.data(), BlockCipher::blocksize);
     }
 
  private:

@@ -12,7 +12,7 @@ class cbcmac {
         mbytes = 0;
     }
 
-    cbcmac(const BlockCipher *cx, uint8_t *iv) {
+    cbcmac(const BlockCipher *cx, void *iv) {
         c = cx;
         memcpy(v, iv, BlockCipher::blocksize);
         mbytes = 0;
@@ -46,8 +46,8 @@ class cbcmac {
         }
     }
 
-    void update(const std::vector<uint8_t> &v) {
-        update(&v[0], v.size());
+    void update(const std::string &v) {
+        update(v.data(), v.size());
     }
 
     void final(uint8_t *buf) {
@@ -59,9 +59,10 @@ class cbcmac {
         memcpy(buf, v, BlockCipher::blocksize);
     }
 
-    std::vector<uint8_t> final() {
-        std::vector<uint8_t> f(BlockCipher::blocksize);
-        final(&f[0]);
+    std::string final() {
+        std::string f;
+        f.resize(BlockCipher::blocksize);
+        final((uint8_t*) f.data());
         return f;
     }
 

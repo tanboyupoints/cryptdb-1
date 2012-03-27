@@ -40,24 +40,18 @@ class hmac {
         outer.final(buf);
     }
 
-    std::vector<uint8_t> final() {
-        std::vector<uint8_t> v(Hash::hashsize);
-        final(&v[0]);
+    std::string final() {
+        std::string v;
+        v.resize(Hash::hashsize);
+        final((uint8_t*) v.data());
         return v;
     }
 
-#define mac_type(DTYPE, KTYPE)                                              \
-    static std::vector<uint8_t> mac(const DTYPE &v, const KTYPE &key) {     \
-        hmac x(&key[0], key.size());                                        \
-        x.update(&v[0], v.size());                                          \
-        return x.final();                                                   \
+    static std::string mac(const std::string &v, const std::string &key) {
+        hmac x(&key[0], key.size());
+        x.update(&v[0], v.size());
+        return x.final();
     }
-
-    mac_type(std::string, std::string)
-    mac_type(std::string, std::vector<uint8_t>)
-    mac_type(std::vector<uint8_t>, std::string)
-    mac_type(std::vector<uint8_t>, std::vector<uint8_t>)
-#undef mac_type
 
  private:
     uint8_t opad[Hash::blocksize];

@@ -118,12 +118,12 @@ class ffx2_block_cipher {
         _static_assert(nbits % 8 == 0);
     }
 
-    void block_encrypt(const uint8_t *ptext, uint8_t *ctext) const {
-        fi.encrypt(ptext, ctext);
+    void block_encrypt(const void *ptext, void *ctext) const {
+        fi.encrypt((const uint8_t*) ptext, (uint8_t*) ctext);
     }
 
-    void block_decrypt(const uint8_t *ctext, uint8_t *ptext) const {
-        fi.decrypt(ctext, ptext);
+    void block_decrypt(const void *ctext, void *ptext) const {
+        fi.decrypt((const uint8_t*) ctext, (uint8_t*) ptext);
     }
 
     static const size_t blocksize = (nbits + 7) / 8;
