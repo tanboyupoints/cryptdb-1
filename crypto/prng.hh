@@ -98,7 +98,7 @@ class blockrng : public PRNG {
             uint8_t ct[bc.blocksize];
             bc.block_encrypt(ctr, ct);
 
-            memcpy(&buf[i], ct, min(bc.blocksize, nbytes - i));
+            memcpy(&buf[i], ct, bc.blocksize < (nbytes - i) ? bc.blocksize : (nbytes - i));
         }
     }
 

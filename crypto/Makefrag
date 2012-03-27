@@ -1,5 +1,5 @@
 OBJDIRS     += crypto
-CRYPTO2SRC  := paillier.cc urandom.cc arc4.cc hgd.cc aes.cc pbkdf2.cc \
+CRYPTO2SRC  := paillier.cc urandom.cc arc4.cc hgd.cc pbkdf2.cc \
 	       ecjoin.cc search.cc skip32.cc ffx.cc online_ope.cc mont.cc \
 	       prng.cc ope.cc
 
