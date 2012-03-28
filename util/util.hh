@@ -24,27 +24,18 @@
 #include <util/errstream.hh>
 #include <util/params.hh>
 #include <util/util.hh>
-#include "item.h"
+
+#include <sql_select.h>
+#include <sql_delete.h>
+#include <sql_insert.h>
+#include <sql_update.h>
+
 
 // ==== CONSTANTS ============== //
 
 #define SVAL2(s) #s
 #define SVAL(s) SVAL2(s)
 
-#if MYSQL_S
-#define TN_I32 "integer"
-#define TN_I64 "bigint unsigned"
-#define TN_TEXT "blob"
-#define TN_HOM "varbinary(" SVAL(PAILLIER_LEN_BYTES) ")"
-#define TN_PTEXT "text"
-#define TN_SALT "bigint unsigned"
-#else
-#define TN_I32 "integer"
-#define TN_I64 "bigint"
-#define TN_TEXT "BYTEA"
-#define TN_HOM "BYTEA(" SVAL(PAILLIER_LEN_BYTES) ")"
-#define TN_PTEXT "text"
-#endif
 
 #define TN_SYM_KEY "varbinary(32)"
 #define TN_PK_KEY  "varbinary(1220)"
@@ -75,11 +66,7 @@ const unsigned int bytesOfTextForOPE = 20; //texts may be ordered
                                            // indicates how many of the first
                                            // bytes should be used for sorting
 
-// text supports search only on words separated by these separators
-const std::string wordSeparators = "; .,'-{}()";
 
-const std::string dec_first_key =
-    "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x01\x02\x03\x04\x05\x06";
 const std::string PWD_TABLE_PREFIX = "pwdcryptdb__";
 
 //maps the name of an annotation we want to process to the number of fields

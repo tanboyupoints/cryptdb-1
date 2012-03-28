@@ -214,13 +214,6 @@ addSaltToReturn(ReturnMeta & rm, int pos) {
 
 
 
-static inline string
-sq(MYSQL *m, const string &s)
-{
-    char buf[s.size() * 2 + 1];
-    size_t len = mysql_real_escape_string(m, buf, s.c_str(), s.size());
-    return string("'") + string(buf, len) + string("'");
-}
 /*
 //TODO: be consistent thruout code: stringify or print?
 static void
@@ -269,7 +262,7 @@ encrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV = 0) {
 	//need to free space for all enc
 	//except the last one
 	if (prev_enc) {
-	    free(prev_enc);
+	    delete prev_enc;
 	}
 	prev_enc = enc;
     }
@@ -543,6 +536,9 @@ rewrite(Item **i, Analysis &a) {
 template <class T>
 static Item *
 do_optimize_const_item(T *i, Analysis &a) {
+    //TODO: below code evaluates constant items using embedded DB
+    // needs some fixing
+/*
     if (i->const_item()) {
         // ask embedded DB to eval this const item,
         // then replace this item with the eval-ed constant
@@ -556,6 +552,10 @@ do_optimize_const_item(T *i, Analysis &a) {
         buf << "SELECT " << *i;
         string q(buf.str());
         LOG(cdb_v) << q;
+
+	//DBResult * dbres = NULL;
+	//a.conn->execute(q, dbres);
+	
         MYSQL *m = a.connect();
         mysql_query_wrapper(m, q);
 
@@ -641,6 +641,9 @@ do_optimize_const_item(T *i, Analysis &a) {
         }
     }
     return i;
+*/
+    UNIMPLEMENTED;
+    return NULL;
 }
 
 template <class T>
@@ -2188,22 +2191,6 @@ rewrite_table_list(List<TABLE_LIST> *tll, Analysis & a)
     }
 }
 
-//Onion layouts - initial structure of onions
-typedef map<onion, list<SECLEVEL> > onionlayout;
-
-static onionlayout NUM_ONION_LAYOUT = {
-    {oDET, list<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
-    {oOPE, list<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
-    {oAGG, list<SECLEVEL>({SECLEVEL::HOM})}
-};
-    
-static onionlayout STR_ONION_LAYOUT = {
-    {oDET, list<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
-    {oOPE, list<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
-    {oAGG, list<SECLEVEL>({SECLEVEL::SEARCH})}
-};
-
-
 static PRNG *
 getLayerKey(AES_KEY * mKey, string uniqueFieldName, SECLEVEL l) {
     string rawkey = CryptoManager::getKey(mKey, uniqueFieldName, l);
@@ -2682,15 +2669,14 @@ lex_rewrite(const string & db, LEX * lex, Analysis & analysis)
     return true;
 }
 
+
 static inline void
 drop_table_update_meta(const string &q,
                        LEX *lex,
                        Analysis &a)
 {
-    MYSQL *m = a.connect();
-
-    mysql_query_wrapper(m, "START TRANSACTION");
-
+    assert(a.e_conn->execute("START TRANSACTION;"));
+    
     TABLE_LIST *tbl = lex->select_lex.table_list.first;
     for (; tbl; tbl = tbl->next_local) {
         const string &table = tbl->table_name;
@@ -2699,16 +2685,17 @@ drop_table_update_meta(const string &q,
         s << "DELETE proxy_db.table_info, proxy_db.column_info "
           << "FROM proxy_db.table_info INNER JOIN proxy_db.column_info "
           << "WHERE proxy_db.table_info.id = proxy_db.column_info.table_id "
-          << "AND   proxy_db.table_info.name = " << sq(m, table);
-        mysql_query_wrapper(m, s.str());
+          << "AND   proxy_db.table_info.name = '" <<  table << "'";
+
+	assert(a.e_conn->execute(s.str()));
 
         a.schema->totalTables--;
         a.schema->tableMetaMap.erase(table);
 
-        mysql_query_wrapper(m, q);
+	assert(a.e_conn->execute(q));	    
     }
 
-    mysql_query_wrapper(m, "COMMIT");
+    assert(a.e_conn->execute("COMMIT"));
 }
 
 static void
@@ -2716,24 +2703,22 @@ add_table_update_meta(const string &q,
                       LEX *lex,
                       Analysis &a)
 {
-    MYSQL *m = a.connect();
-
-    mysql_query_wrapper(m, "START TRANSACTION");
+    a.conn->execute("START TRANSACTION");
 
     const string &table =
         lex->select_lex.table_list.first->table_name;
     TableMeta *tm = a.schema->tableMetaMap[table];
     assert(tm != NULL);
-
+    
     {
         ostringstream s;
         s << "INSERT INTO proxy_db.table_info VALUES ("
-          << tm->tableNo << ", "
-          << sq(m, table) << ", "
-          << sq(m, tm->anonTableName)
-          << ")";
+          << tm->tableNo << ", '"
+          << table << "' , '"
+          << tm->anonTableName
+          << "')";
 
-        mysql_query_wrapper(m, s.str());
+	a.conn->execute(s.str());
     }
 
     for (auto it = tm->fieldMetaMap.begin();
@@ -2746,13 +2731,13 @@ add_table_update_meta(const string &q,
         ostringstream s;
         s << "INSERT INTO proxy_db.column_info VALUES ("
           << "0, " /* auto assign id */
-          << tm->tableNo << ", "
-          << sq(m, fm->fname) << ", ";
+          << tm->tableNo << ", '"
+          << fm->fname << "', ";
 
 #define __temp_write(o) \
         { \
             auto it = fm->onions.find(o); \
-            if (it != fm->onions.end()) { s << sq(m, it->second.onionname) << ", "; } \
+            if (it != fm->onions.end()) { s << "'" << it->second.onionname << "' , "; } \
             else                            { s << "NULL, ";               } \
         }
         __temp_write(oDET);
@@ -2761,7 +2746,7 @@ add_table_update_meta(const string &q,
         __temp_write(oSWP);
 #undef __temp_write
 
-        s << sq(m, fm->salt_name) << ", "
+        s << "'" << fm->salt_name << "' , "
           << "1, " /* is_encrypted */
           << "1, " /* can_be_null  */
           << (fm->hasOnion(oOPE) ? "1" : "0") << ", "
@@ -2771,17 +2756,17 @@ add_table_update_meta(const string &q,
           << (fm->hasOnion(oOPE) ? "1" : "0") << ", " /* ope_used? */
           << (fm->hasOnion(oAGG) ? "1" : "0") << ", " /* agg_used? */
           << (fm->hasOnion(oSWP) ? "1" : "0") << ", " /* search_used? */
-          << sq(m, fm->hasOnion(oOPE) ? levelnames[(int)fm->getOnionLevel(oOPE)] : "INVALID") << ", "
-          << sq(m, levelnames[(int)fm->getOnionLevel(oDET)])
+          << "'" << (fm->hasOnion(oOPE) ? levelnames[(int)fm->getOnionLevel(oOPE)] : "INVALID") << "' , "
+	  << "'" << levelnames[(int)fm->getOnionLevel(oDET)] << "'"
           << ")";
 
-        mysql_query_wrapper(m, s.str());
+	a.conn->execute(s.str());
     }
 
     //need to update embedded schema with the new table
-    mysql_query_wrapper(m, q);
+    a.conn->execute(q);
 
-    mysql_query_wrapper(m, "COMMIT");
+    a.conn->execute("COMMIT");
 }
 
 static void
@@ -2849,35 +2834,72 @@ loadUDFs(Connect * conn) {
     LOG(cdb_v) << "Loaded CryptDB's UDFs.";
 }
 
-Rewriter::Rewriter(Connect * conn, string dbname,
-                   bool multi, bool encByDefault)
-    : conn(conn), db(dbname), encByDefault(encByDefault)
-{
+//this must be called before we can use any Mysql API
+static void
+init_mysql(const string & embed_db) {
+      char dir_arg[1024];
+      snprintf(dir_arg, sizeof(dir_arg), "--datadir=%s", "/var/lib/shadow-mysql");
 
-    LOG(cdb_v) << "encByDefault is " << encByDefault;
-    urandom u;
-    masterKey = CryptoManager::getKey(u.rand_string(AES_KEY_BYTES));
-    // create mysql connection to embedded
-    // server
-    m = mysql_init(0);
+    const char *mysql_av[] =
+    { "progname",
+            "--skip-grant-tables",
+            dir_arg,
+            /* "--skip-innodb", */
+            /* "--default-storage-engine=MEMORY", */
+            "--character-set-server=utf8",
+            "--language=" MYSQL_BUILD_DIR "/sql/share/"
+    };
+
+    cerr << "mysql_av" << mysql_av[4] << "\n";
+  
+    cerr << "dir arg is " << dir_arg << "\n";
+    assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
+            (char**) mysql_av, 0));
+    assert(0 == mysql_thread_init());
+
+    MYSQL * m = mysql_init(0);
     assert(m);
     mysql_options(m, MYSQL_OPT_USE_EMBEDDED_CONNECTION, 0);
     if (!mysql_real_connect(m, 0, 0, 0, 0, 0, 0, CLIENT_MULTI_STATEMENTS)) {
         mysql_close(m);
         cryptdb_err() << "mysql_real_connect: " << mysql_error(m);
     }
-    //mysql_query_wrapper(m, "show databases;");
-
+  
     // HACK: create this DB if it doesn't exist, for now
+    cerr << "trying to create using m \n";
+    string dbname = "cryptdbtest";
     string create_q = "CREATE DATABASE IF NOT EXISTS " + dbname;
     string use_q    = "USE " + dbname + ";";
     mysql_query_wrapper(m, create_q);
     mysql_query_wrapper(m, use_q);
 
+    cerr << "the queries have now succeeded \n";
+ 
+}
+Rewriter::Rewriter(ConnectionInfo ci, 
+                   bool multi,
+		   bool encByDefault)
+    : ci(ci), encByDefault(encByDefault)
+{
+
+    init_mysql(ci.embed_db);
+
+    urandom u;
+    masterKey = CryptoManager::getKey(u.rand_string(AES_KEY_BYTES));
+
+    e_conn = Connect::getEmbedded();
+    conn = new Connect(ci.server, ci.user, ci.passwd, ci.db, ci.port);
+
+    // HACK: create this DB if it doesn't exist, for now
+    string create_q = "CREATE DATABASE IF NOT EXISTS " + ci.db;
+    string use_q    = "USE " + ci.db + ";";
+    assert(e_conn->execute(create_q));
+    assert(e_conn->execute(use_q));
+
     schema = new SchemaInfo();
     totalTables = 0;
     initSchema();
-
+  
     loadUDFs(conn);
 
     /* REMOVED FOR NOW
@@ -2890,7 +2912,10 @@ Rewriter::Rewriter(Connect * conn, string dbname,
 
 Rewriter::~Rewriter()
 {
-    mysql_close(m);
+    if (e_conn) {
+	delete e_conn;
+	e_conn = NULL;
+    }
     if (conn) {
         delete conn;
         conn = NULL;
@@ -2904,18 +2929,17 @@ Rewriter::~Rewriter()
 void
 Rewriter::createMetaTablesIfNotExists()
 {
-    MYSQL *m = connect();
-    mysql_query_wrapper(m, "CREATE DATABASE IF NOT EXISTS proxy_db");
+    assert(e_conn->execute("CREATE DATABASE IF NOT EXISTS proxy_db"));
 
-    mysql_query_wrapper(m,
+    assert(e_conn->execute(
                    "CREATE TABLE IF NOT EXISTS proxy_db.table_info"
                    "( id bigint NOT NULL PRIMARY KEY"
                    ", name varchar(64) NOT NULL"
                    ", anon_name varchar(64) NOT NULL"
                    ", UNIQUE INDEX idx_table_name( name )"
-                   ") ENGINE=InnoDB;");
+                   ") ENGINE=InnoDB;"));
 
-    mysql_query_wrapper(m,
+    assert(e_conn->execute(
                    "CREATE TABLE IF NOT EXISTS proxy_db.column_info"
                    "( id bigint NOT NULL auto_increment PRIMARY KEY"
                    ", table_id bigint NOT NULL"
@@ -2972,7 +2996,7 @@ Rewriter::createMetaTablesIfNotExists()
                    "      ) NOT NULL DEFAULT 'INVALID'"
                    ", INDEX idx_column_name( name )"
                    ", FOREIGN KEY( table_id ) REFERENCES table_info( id ) ON DELETE CASCADE"
-                   ") ENGINE=InnoDB;");
+                   ") ENGINE=InnoDB;"));
 }
 
 void
@@ -2981,12 +3005,12 @@ Rewriter::initSchema()
     cerr << "warning: initSchema does not init enc layers correctly from shadow db\n";
     createMetaTablesIfNotExists();
 
-    MYSQL *m = connect();
     vector<string> tablelist;
 
     {
-        mysql_query_wrapper(m, "SELECT id, name, anon_name FROM proxy_db.table_info");
-        ScopedMySQLRes r(mysql_store_result(m));
+	DBResult * dbres;
+	assert(e_conn->execute("SELECT id, name, anon_name FROM proxy_db.table_info", dbres));
+	ScopedMySQLRes r(dbres->n);
         MYSQL_ROW row;
         while ((row = mysql_fetch_row(r.res()))) {
             unsigned long *l = mysql_fetch_lengths(r.res());
@@ -3010,8 +3034,9 @@ Rewriter::initSchema()
         string create_table_query;
         {
             string q = "SHOW CREATE TABLE " + origTableName;
-            mysql_query_wrapper(m, q);
-            ScopedMySQLRes r(mysql_store_result(m));
+	    DBResult * dbres = NULL;
+	    assert(e_conn->execute(q, dbres));
+            ScopedMySQLRes r(dbres->n);
             assert(mysql_num_rows(r.res()) == 1);
             assert(mysql_num_fields(r.res()) == 2);
             MYSQL_ROW row = mysql_fetch_row(r.res());
@@ -3019,7 +3044,7 @@ Rewriter::initSchema()
             create_table_query = string(row[1], lengths[1]);
         }
 
-        query_parse parser(db, create_table_query);
+        query_parse parser(ci.db, create_table_query);
         LEX *lex = parser.lex();
         assert(lex->sql_command == SQLCOM_CREATE_TABLE);
 
@@ -3053,8 +3078,11 @@ Rewriter::initSchema()
 
                        "FROM proxy_db.column_info c, proxy_db.table_info t "
                        "WHERE t.name = '" + origTableName + "' AND c.table_id = t.id";
-            mysql_query_wrapper(m, q);
-            ScopedMySQLRes r(mysql_store_result(m));
+
+	    DBResult * dbres;
+	    assert(e_conn->execute(q, dbres));
+	    	    
+            ScopedMySQLRes r(dbres->n);
             MYSQL_ROW row;
             while ((row = mysql_fetch_row(r.res()))) {
                 unsigned long *l = mysql_fetch_lengths(r.res());
@@ -3117,11 +3145,14 @@ Rewriter::setMasterKey(const string &mkey)
 list<string>
 Rewriter::processAnnotation(Annotation annot, Analysis &a)
 {
+  /*REMOVED FOR NOW TODO not sure what some of this code is doing
+    
     assert_s(annot.getPrimitive() != "", "enc annotation has no primitive");
     LOG(cdb_v) << "table is " << annot.getPrimitiveTableName() << "; field is " << annot.getPrimitiveFieldName();
     TableMeta *tm = schema->tableMetaMap[annot.getPrimitiveTableName()];
     FieldMeta *fm = tm->fieldMetaMap[annot.getPrimitiveFieldName()];
-    
+
+  
     list<string> query_list;
     string query = "ALTER TABLE " + tm->anonTableName;
 
@@ -3161,6 +3192,8 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
     query_list.push_back(query + " ADD " + fm->salt_name + " " + TN_SALT + " AFTER " + fm->onions.rbegin()->second.onionname + ";");
 
     return query_list;
+    */
+    return list<string>();
 }
 /*
 void
@@ -3177,9 +3210,8 @@ list<string>
 Rewriter::rewrite(const string & q, Analysis & analysis)
 {
     list<string> queries;
-    query_parse p(db, q);
-    //TODO: why do we have two analysis here? can't we just use a?
-    analysis = Analysis(m, schema, masterKey, mp, analysis.conn);
+    query_parse p(ci.db, q);
+    analysis = Analysis(e_conn, conn, schema, masterKey, mp);
 
     /* REMOVED FOR NOW
     //initialize multi-principal
@@ -3204,19 +3236,22 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
         return queries;
     }
     */
-    
+
+    //TODO: is db neededs as param in all these funcs?
     //analyze query
-    query_analyze(db, q, lex, analysis, encByDefault);
+    query_analyze(ci.db, q, lex, analysis, encByDefault);
 
     //update metadata about onions if it's not delete
     if (lex->sql_command != SQLCOM_DROP_TABLE) {
-        updateMeta(db, q, lex, analysis);
+        updateMeta(ci.db, q, lex, analysis);
     }
-
+    //TODO:these two invokations of updateMeta are confusing:
+    //one is for adjust onions, and other for dropping table
+    
     //rewrite query
-    lex_rewrite(db, lex, analysis);
+    lex_rewrite(ci.db, lex, analysis);
     if (lex->sql_command == SQLCOM_DROP_TABLE) {
-        updateMeta(db, q, lex, analysis);
+        updateMeta(ci.db, q, lex, analysis);
     }
     stringstream ss;
     ss << *lex;

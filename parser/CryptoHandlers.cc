@@ -377,7 +377,8 @@ ItemToZZ(Item * ptext) {
 
 static Item *
 ZZToItem(const ZZ & val) {
-    return new Item_int(to_int(val));
+    string str = StringFromZZ(val);
+    return new Item_string(str.c_str(), str.length(), &my_charset_bin);
 }
 
 Item *

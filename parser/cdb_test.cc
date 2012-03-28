@@ -50,43 +50,27 @@ static void __write_history() {
 int
 main(int ac, char **av)
 {
-    if (ac != 3) {
-        cerr << "Usage: " << av[0] << " schema-db db " << endl;
+    if (ac != 2) {
+        cerr << "Usage: " << av[0] << " embed-db " << endl;
         exit(1);
     }
-
-    char dir_arg[1024];
-    snprintf(dir_arg, sizeof(dir_arg), "--datadir=%s", av[1]);
-
-    const char *mysql_av[] =
-    { "progname",
-            "--skip-grant-tables",
-            dir_arg,
-            /* "--skip-innodb", */
-            /* "--default-storage-engine=MEMORY", */
-            "--character-set-server=utf8",
-            "--language=" MYSQL_BUILD_DIR "/sql/share/"
-    };
-    cerr << dir_arg << endl;
-    assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
-            (char**) mysql_av, 0));
-    assert(0 == mysql_thread_init());
 
     using_history();
     read_history(user_histfile().c_str());
     atexit(__write_history);
+    
 
-    string db(av[2]);
-    cerr << "connecting to localhost db cryptdbtest user root pass letmein" << "\n";
-    Connect *  conn = new Connect("localhost", "root", "letmein", "cryptdbtest");
-    Rewriter r(conn, db, Multi, encByDefault);
+    ConnectionInfo ci("localhost", "root", "letmein", "cryptdbtest", string(av[1]));
+
+    Rewriter r(ci, Multi, encByDefault);
+    //TODO: conn creation has to occur after rewriter creation
+    //because rewriter inits mysql library; fix this
+    Connect conn("localhost", "root", "letmein", "cryptdbtest");
 
     r.setMasterKey("2392834");
 
     DBResult * dbres;
 
-
-    //TODO: are connect and Mysql * m redundant?
     for (;;) {
         char *input = readline("CryptDB=# ");
 
@@ -101,19 +85,31 @@ main(int ac, char **av)
         }
         add_history(input);
         string new_q;
+	Analysis analysis;
         try {
-            Analysis analysis(conn);
+
             list<string> new_queries = r.rewrite(q, analysis);
             //only last query should return anything
             for (auto new_q = new_queries.begin(); new_q != new_queries.end(); new_q++) {
                 cerr << "SUCCESS: " << *new_q << endl;
-                conn->execute(*new_q, dbres);
+                assert(conn.execute(*new_q, dbres));
             }
             if (!dbres) {
                 continue;
             }
+
+	    cerr << "can create Item A? ";
+	    Item * dbg = new Item_int((long long)4);
+	    cerr << "created? " << (dbg!=NULL) << "\n";
+
+	    
             ResType res = dbres->unpack();
-            if (!res.ok) {
+
+	    cerr << "can create the bloody Item B? ";
+	    Item * dbgb = new Item_int((long long)4);
+	    cerr << "created? " << (dbgb!=NULL) << "\n";
+
+	    if (!res.ok) {
                 cerr << "issue with query \n";
                 continue;
             }

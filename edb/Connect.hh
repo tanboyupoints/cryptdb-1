@@ -3,14 +3,13 @@
 /*
  * Connect.h
  *
- *  Created on: Dec 1, 2010
- *      Author: raluca
  */
 
 #include <vector>
 #include <string>
 #include <util/util.hh>
 
+extern "C" void *create_embedded_thd(int client_flag);
 
 class DBResult {
  private:
@@ -20,7 +19,7 @@ class DBResult {
     ~DBResult();
     DBResult_native *n;
 
-    // returns the data in the last server response
+    //returns data from this db result
     ResType unpack();
 
     static DBResult *wrap(DBResult_native *);
@@ -34,6 +33,9 @@ class Connect {
 
     Connect(MYSQL* _conn) : conn(_conn), close_on_destroy(false) { }
 
+    //returns Connect for the embedded server
+    static Connect * getEmbedded();
+    
     // returns true if execution was ok; caller must delete DBResult
     bool execute(const std::string &query, DBResult *&);
     bool execute(const std::string &query);
@@ -46,10 +48,8 @@ class Connect {
     ~Connect();
 
  private:
-#if MYSQL_S
+
     MYSQL *  conn;
-#else
-    PGconn * conn;     //connection
-#endif
     bool  close_on_destroy;
+   
 };

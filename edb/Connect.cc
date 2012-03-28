@@ -67,41 +67,55 @@ Connect::Connect(string server, string user, string passwd,
 
 }
 
+Connect * Connect::getEmbedded() {
+    MYSQL * m = mysql_init(0);
+    assert(m);
+    
+    mysql_options(m, MYSQL_OPT_USE_EMBEDDED_CONNECTION, 0);
+    
+    if (!mysql_real_connect(m, 0, 0, 0, 0, 0, 0, CLIENT_MULTI_STATEMENTS)) {
+        mysql_close(m);
+        cryptdb_err() << "mysql_real_connect: " << mysql_error(m);
+    }
+
+    Connect * conn = new Connect(m);
+    conn->close_on_destroy = true;
+
+    return conn;
+}
+
 bool
 Connect::execute(const string &query, DBResult * & res)
 {
-#if MYSQL_S
     //silently ignore empty queries
     if (query.length() == 0) {
         LOG(warn) << "empty query";
         res = 0;
         return true;
     }
+    bool success = true;
     if (mysql_query(conn, query.c_str())) {
         LOG(warn) << "mysql_query: " << mysql_error(conn);
         LOG(warn) << "on query: " << query;
         res = 0;
-        return false;
+        success = false;
     } else {
         res = DBResult::wrap(mysql_store_result(conn));
-        return true;
     }
-#else /* postgres */
-    *res = PQexec(conn, query.c_str());
 
-    ExecStatusType status = PQresultStatus(res->n);
-    if ((status == PGRES_COMMAND_OK) || (status == PGRES_TUPLES_OK)) {
-        return true;
-    } else {
-        cerr << "problem with " << query <<
-        " error msg: " << PQerrorMessage(conn) <<
-        " status " << status << "\n";
-        delete *res;
-        *res = 0;
-        return false;
-    }
-#endif
+    // HACK taken from stephentu:
+    // Calling mysql_query seems to have destructive effects
+    // on the current_thd. Thus, we must call create_embedded_thd
+    // again.
+    // TODO: mysql examples for embed server do not need to recreate thd,
+    // what are we doing different?
+    void* ret = create_embedded_thd(0);
+    if (!ret) assert(false);
+
+    
+    return success;
 }
+
 
 bool
 Connect::execute(const string &query)
@@ -169,7 +183,13 @@ getItem(char * content, enum_field_types type, uint len) {
     }
     Item * i;
     if (IsMySQLTypeNumeric(type)) {
-	i = new Item_int((ulonglong) valFromStr(string(content, len)));
+	cerr << "can create j?\n";
+	Item * j = new Item_int(1);
+	cerr << "Created j " << (j!=NULL) << "\n";
+	cerr << "len is " << len << "\n content receives is " << string(content, len) << "\n";
+	ulonglong val = valFromStr(string(content, len));
+	cerr << "val is " << val << "\n";
+	i = new Item_int(val);
     } else {
 	i = new Item_string(content, len, &my_charset_bin);
     }

@@ -58,8 +58,8 @@ const EncSet ORD_EncSet = {
 //todo: there should be a map of FULL_EncSets depending on item type
 const EncSet FULL_EncSet = {
         {
-            {oDET, LevelFieldPair(SECLEVEL::DET, NULL)},
-            {oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
+            {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
+            {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
             {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
             {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
         }
@@ -117,22 +117,14 @@ typedef struct ReturnMeta {
 
 class Analysis {
 public:
-    Analysis(MYSQL *m, SchemaInfo * schema, AES_KEY *key, MultiPrinc *mp, Connect * conn)
-        : pos(0), schema(schema), masterKey(key), conn(conn), m(m) {
-        assert(m != NULL);
-        this->mp = mp;
-    }
-    Analysis(Connect * conn): pos(0), schema(NULL), masterKey(NULL), conn(conn), m(NULL) {
-    }
-    inline MYSQL* connect() {
-        mysql_thread_init();
-        return m;
-    }
+    Analysis(Connect * e_conn, Connect * conn, SchemaInfo * schema, AES_KEY *key, MultiPrinc *mp)
+        : pos(0), schema(schema), masterKey(key), conn(conn), e_conn(e_conn), mp(mp) {}
+    
+    Analysis(): pos(0), schema(NULL), masterKey(NULL), conn(NULL), e_conn(NULL), mp(NULL) {}
+ 
 
     unsigned int pos; //a counter indicating how many projection fields have been analyzed so far                                                                    
-    std::map<std::string, FieldAMeta *> fieldToAMeta;//TODO: currently
-						     //fieldAMeta is not used
-						     //for smth useful: remove?
+    std::map<std::string, FieldAMeta *> fieldToAMeta;						     
 
     //maps an Item to metadata about that item
     std::map<Item*, ItemMeta *>         itemToMeta;
@@ -141,7 +133,10 @@ public:
     
     SchemaInfo *                        schema;
     AES_KEY *                           masterKey;
+    
     Connect *                           conn;
+    Connect *                           e_conn;
+
     MultiPrinc *                        mp;
     TMKM                                tmkm;
 

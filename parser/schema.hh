@@ -36,6 +36,7 @@ public:
     bool restrict(onion o, SECLEVEL maxl);
 
     OnionLevelMap olm;
+    onionlayout * layout; 
 };
 
 

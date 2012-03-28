@@ -109,27 +109,9 @@ class CryptoManager {
 
     /*
      * SEARCH
-     *
-     * Two methods:
-     * 1. faster and less secure: encrypt each word with DET separately
-     * 2. slower and more secure: use SWP method
+
      */
 
-    /* Method 1 */
-    // was integrated in older versions, not in current version
-
-    //encrypts a std::string such that it can support search, ciph need not be
-    // initialized
-    // input len must be set to the sum of the lengths of the words and it
-    // will be updated to the length of the ciphertext
-    static std::string encrypt_DET_search(std::list<std::string> * words, AES_KEY * key);
-    static std::list<std::string> * decrypt_DET_search(const std::string &ctext,
-                                             AES_KEY * key);
-
-    static std::string encrypt_DET_wrapper(const std::string &ptext, AES_KEY * key);
-    static std::string decrypt_DET_wrapper(const std::string &ctext, AES_KEY * key);
-
-    /* Method 2 */
     static Binary encryptSWP(const Binary & key, const std::list<Binary> & words);
     static std::list<Binary> * decryptSWP(const Binary & key,
                                      const Binary & overall_ciph);

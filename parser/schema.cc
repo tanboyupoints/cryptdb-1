@@ -55,6 +55,8 @@ EncDesc::restrict(onion o, SECLEVEL maxl)
     assert(it != olm.end());
 
     if (it->second > maxl) {
+	cerr << "restricting: got level "<< levelnames[(int)maxl] << "current level "
+	     << levelnames[(int)it->second] << ";";
         it->second = maxl;
         return true;
     }

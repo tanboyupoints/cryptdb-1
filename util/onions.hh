@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <map>
+#include <list>
 
 
 typedef enum onion {
@@ -11,16 +13,20 @@ typedef enum onion {
     oINVALID,
 } onion;
 
+//Sec levels ordered such that
+// if a is less secure than b.
+// a appears before b
+// (note, this is not "iff")
 #define SECLEVELS(m)    \
     m(INVALID)          \
     m(PLAIN)            \
-    m(DET)              \
+    m(OPEJOIN)     	\
+    m(OPE)		\
     m(DETJOIN)          \
-    m(RND)              \
-    m(OPE)              \
-    m(OPEJOIN)          \
-    m(HOM)   	        \
+    m(DET)              \
     m(SEARCH)           \
+    m(HOM)              \
+    m(RND) 		\
     m(SECLEVEL_LAST)
 
 typedef enum class SECLEVEL {
@@ -46,6 +52,20 @@ SECLEVELS(__temp_m)
     return SECLEVEL::INVALID;
 }
 
+//Onion layouts - initial structure of onions
+typedef std::map<onion, std::list<SECLEVEL> > onionlayout;
+
+static onionlayout NUM_ONION_LAYOUT = {
+    {oDET, std::list<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
+    {oOPE, std::list<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
+    {oAGG, std::list<SECLEVEL>({SECLEVEL::HOM})}
+};
+    
+static onionlayout STR_ONION_LAYOUT = {
+    {oDET, std::list<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
+    {oOPE, std::list<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
+    {oAGG, std::list<SECLEVEL>({SECLEVEL::SEARCH})}
+};
 
 
 

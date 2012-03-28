@@ -78,12 +78,24 @@ public:
     const constraints *parent;
 };
 
+typedef class ConnectionInfo {
+public:
+    std::string server;
+    uint port;
+    std::string user;
+    std::string passwd;
+    std::string db;
+    std::string embed_db;
+   
+    ConnectionInfo(std::string s, std::string u, std::string p, std::string d, string e, uint port = 0) :
+	server(s), port(port), user(u), passwd(p), db(d), embed_db(e) {}
+    
+} ConnectionInfo;
+
 
 class Rewriter {
 public:
-    //Rewriter(const std::string & db);
-    Rewriter(Connect *conn,
-             std::string dbname,
+    Rewriter(ConnectionInfo ci, 
              bool MultiPrinc = false,
              bool encByDefault = true);
     ~Rewriter();
@@ -91,10 +103,7 @@ public:
     void setMasterKey(const std::string &mkey);
     list<std::string> rewrite(const std::string &q, Analysis & a);
     ResType decryptResults(ResType & dbres, Analysis & a);
-    inline MYSQL* connect() {
-        mysql_thread_init();
-        return m;
-    }
+
 private:
     void initSchema();
     void createMetaTablesIfNotExists();
@@ -102,15 +111,20 @@ private:
     //initialize multi-principal data structures
     void mp_init(Analysis &a);
 
+    ConnectionInfo ci;
+    //connection to remote and embedded server
     Connect*       conn;
-    std::string    db;
-    SchemaInfo*    schema;
+    Connect*       e_conn;
+
+    bool           encByDefault;
     AES_KEY*       masterKey;
+    
+    SchemaInfo*    schema;
     unsigned int   totalTables;
-    MYSQL*         m;
+
     MultiPrinc*    mp;
     TMKM           tmkm;
-    bool           encByDefault;
+
 };
 
 class ScopedMySQLRes {
