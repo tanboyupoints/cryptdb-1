@@ -2703,7 +2703,7 @@ add_table_update_meta(const string &q,
                       LEX *lex,
                       Analysis &a)
 {
-    a.conn->execute("START TRANSACTION");
+    a.e_conn->execute("START TRANSACTION");
 
     const string &table =
         lex->select_lex.table_list.first->table_name;
@@ -2718,7 +2718,7 @@ add_table_update_meta(const string &q,
           << tm->anonTableName
           << "')";
 
-	a.conn->execute(s.str());
+	a.e_conn->execute(s.str());
     }
 
     for (auto it = tm->fieldMetaMap.begin();
@@ -2760,13 +2760,13 @@ add_table_update_meta(const string &q,
 	  << "'" << levelnames[(int)fm->getOnionLevel(oDET)] << "'"
           << ")";
 
-	a.conn->execute(s.str());
+	a.e_conn->execute(s.str());
     }
 
     //need to update embedded schema with the new table
-    a.conn->execute(q);
+    a.e_conn->execute(q);
 
-    a.conn->execute("COMMIT");
+    a.e_conn->execute("COMMIT");
 }
 
 static void
@@ -2938,7 +2938,7 @@ Rewriter::createMetaTablesIfNotExists()
                    ", anon_name varchar(64) NOT NULL"
                    ", UNIQUE INDEX idx_table_name( name )"
                    ") ENGINE=InnoDB;"));
-
+	
     assert(e_conn->execute(
                    "CREATE TABLE IF NOT EXISTS proxy_db.column_info"
                    "( id bigint NOT NULL auto_increment PRIMARY KEY"
@@ -2997,6 +2997,8 @@ Rewriter::createMetaTablesIfNotExists()
                    ", INDEX idx_column_name( name )"
                    ", FOREIGN KEY( table_id ) REFERENCES table_info( id ) ON DELETE CASCADE"
                    ") ENGINE=InnoDB;"));
+
+    cerr << "CREATED meta tables \n";
 }
 
 void
@@ -3004,7 +3006,7 @@ Rewriter::initSchema()
 {
     cerr << "warning: initSchema does not init enc layers correctly from shadow db\n";
     createMetaTablesIfNotExists();
-
+        
     vector<string> tablelist;
 
     {

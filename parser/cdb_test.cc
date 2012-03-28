@@ -98,16 +98,7 @@ main(int ac, char **av)
                 continue;
             }
 
-	    cerr << "can create Item A? ";
-	    Item * dbg = new Item_int((long long)4);
-	    cerr << "created? " << (dbg!=NULL) << "\n";
-
-	    
             ResType res = dbres->unpack();
-
-	    cerr << "can create the bloody Item B? ";
-	    Item * dbgb = new Item_int((long long)4);
-	    cerr << "created? " << (dbgb!=NULL) << "\n";
 
 	    if (!res.ok) {
                 cerr << "issue with query \n";
