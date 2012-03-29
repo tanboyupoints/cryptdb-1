@@ -335,55 +335,6 @@ marshallBinary(const string &s)
     return r;
 }
 
-void
-printRes(const ResType & r) {
-
-    //if (!cryptdb_logger::enabled(log_group::log_edb_v))
-    //return;
-
-    stringstream ssn;
-    for (unsigned int i = 0; i < r.names.size(); i++) {
-        char buf[400];
-        snprintf(buf, sizeof(buf), "%-20s", r.names[i].c_str());
-        ssn << buf;
-    }
-    cerr << ssn.str() << endl;
-    LOG(edb_v) << ssn.str();
-
-    /* next, print out the rows */
-    for (unsigned int i = 0; i < r.rows.size(); i++) {
-        stringstream ss;
-        for (unsigned int j = 0; j < r.rows[i].size(); j++) {
-            char buf[400];
-            cerr << r.rows[i][j] << "\t";
-	    stringstream sstr;
-	    sstr << r.rows[i][j];
-	    snprintf(buf, sizeof(buf), "%-20s", sstr.str().c_str());
-            ss << buf;
-        }
-        cerr << endl;
-        LOG(edb_v) << ss.str();
-    }
-}
-
-
-/*
-string
-marshallSalt(const string &s) {
-    assert_s(s.length() == SALT_LEN_BYTES, "salt for marshall does not have right len");
-
-    return strFromVal(IntFromBytes((const unsigned  char *)s.data(), s.length()));
-}
-
-string
-unmarshallSalt(const string & s) {
-    uint64_t val = valFromStr(s);
-
-    return string(BytesFromInt(val, SALT_LEN_BYTES), SALT_LEN_BYTES);
-
-}
-
-*/
 
 #else
 

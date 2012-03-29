@@ -18,6 +18,7 @@
 
 #include <parser/Analysis.hh>
 #include <parser/Annotation.hh>
+#include <parser/stringify.hh>
 
 #include <util/errstream.hh>
 #include <util/cleanup.hh>
@@ -36,6 +37,8 @@ public:
     std::string nameForReturn;
 };
 
+void
+printRes(const ResType & r);
 
 class constraints {
 public:

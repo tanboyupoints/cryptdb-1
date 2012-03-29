@@ -7,6 +7,7 @@
 #include <iostream>
 
 
+
 template<class T>
 std::string stringify_ptr(T * x) {
     if (x == NULL ) {
@@ -15,8 +16,28 @@ std::string stringify_ptr(T * x) {
 	return x->stringify();
     }
 }
+/*
+static std::string
+stringify(Item_int * i) {
+    if (i == NULL) {
+	return "NULL";
+    }
+    std::stringstream s;
+    s << i->value;
+    return s.str();
+}
 
-
+static std::string
+stringify(Item_string * i) {
+    if (i == NULL) {
+	return "NULL";
+    }
+    String s;
+    String *s0 = i->val_str(&s);
+    assert(s0 != NULL);
+    return std::string(s0->ptr(), s0->length());
+}
+*/
 static inline std::ostream&
 operator<<(std::ostream &out, String &s)
 {
@@ -28,12 +49,25 @@ operator<<(std::ostream &out, Item &i)
 {
     String s;
     i.print(&s, QT_ORDINARY);
+    
     return out << s;
+}
+
+
+static inline std::ostream&
+operator<<(std::ostream &out, Item * i) {
+    if (i == NULL) {
+	return out << "NULL";
+    } else {
+	 String s;
+	 i->print(&s, QT_ORDINARY);
+    
+	 return out << s;
+    }
 }
 
 template<class T>
 class List_noparen: public List<T> {};
-
 template<class T>
 static inline List_noparen<T>&
 noparen(List<T> &l)
@@ -635,3 +669,4 @@ operator<<(std::ostream &out, LEX &lex)
 
     return out;
 }
+

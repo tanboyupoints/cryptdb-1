@@ -1,6 +1,7 @@
 #include <parser/CryptoHandlers.hh>
 #include <crypto/ope.hh>
 #include <util/util.hh>
+#include <util/cryptdb_log.hh>
 
 using namespace std;
 using namespace NTL;
@@ -67,6 +68,7 @@ RND_int::encrypt(Item * ptext, uint64_t IV) {
     //TODO: should have encrypt_SEM work for any length
     uint64_t p = static_cast<Item_int *>(ptext)->value;
     uint64_t c = bf.encrypt(p ^ IV);
+    LOG(encl) << "RND_int encrypt " << p << " IV " << IV << "-->" << c;
     return new Item_int((ulonglong) c);
 }
 
@@ -74,6 +76,7 @@ Item *
 RND_int::decrypt(Item * ctext, uint64_t IV) {
     uint64_t c = static_cast<Item_int*>(ctext)->value;
     uint64_t p = bf.decrypt(c) ^ IV;
+    LOG(encl) << "RND_int decrypt " << c << " IV " << IV << " --> " << p;
     return new Item_int((ulonglong) p);
 }
 
@@ -130,6 +133,7 @@ RND_str::encrypt(Item * ptext, uint64_t IV) {
     string enc = CryptoManager::encrypt_SEM(
 	ItemToString(static_cast<Item_string *>(ptext)),
 	enckey, IV);
+    LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV " << IV << "--->" << enc;
     return new Item_string(make_thd_string(enc), enc.length(), &my_charset_bin);
 }
 
@@ -138,6 +142,7 @@ RND_str::decrypt(Item * ctext, uint64_t IV) {
     string dec = CryptoManager::decrypt_SEM(
 	ItemToString(static_cast<Item_string *>(ctext)),
 	deckey, IV);
+    LOG(encl) << "RND_str decrypt " << ItemToString(ctext) << " IV " << IV << "-->" << dec;
     return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
 }
 
@@ -195,12 +200,18 @@ DET_int::newCreateField() {
 //TODO: may want to do more specialized crypto for lengths
 Item *
 DET_int::encrypt(Item * ptext, uint64_t IV) {
-    return new Item_int((ulonglong) bf.encrypt(static_cast<Item_int *>(ptext)->value));
+    ulonglong val = static_cast<Item_int *>(ptext)->value;
+    ulonglong res = (ulonglong) bf.encrypt(val);
+    LOG(encl) << "DET_int encrypt " << val << "--->" << res;
+    return new Item_int(res);
 }
 
 Item *
 DET_int::decrypt(Item * ctext, uint64_t IV) {
-    return new Item_int((ulonglong) bf.decrypt(static_cast<Item_int*>(ctext)->value));
+    ulonglong val = static_cast<Item_int*>(ctext)->value;
+    ulonglong res = (ulonglong) bf.decrypt(val);
+    LOG(encl) << "DET_int decrypt " << val << "-->" << res;
+    return new Item_int(res);
 }
 
 

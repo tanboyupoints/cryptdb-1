@@ -183,12 +183,7 @@ getItem(char * content, enum_field_types type, uint len) {
     }
     Item * i;
     if (IsMySQLTypeNumeric(type)) {
-	cerr << "can create j?\n";
-	Item * j = new Item_int(1);
-	cerr << "Created j " << (j!=NULL) << "\n";
-	cerr << "len is " << len << "\n content receives is " << string(content, len) << "\n";
 	ulonglong val = valFromStr(string(content, len));
-	cerr << "val is " << val << "\n";
 	i = new Item_int(val);
     } else {
 	i = new Item_string(content, len, &my_charset_bin);

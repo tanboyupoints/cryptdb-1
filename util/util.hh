@@ -103,9 +103,6 @@ class ResType {
     AutoInc ai;
 };
 
-void
-printRes(const ResType &r);
-
 typedef enum class cmd {
     CREATE, UPDATE, INSERT, SELECT, DROP, DELETE, BEGIN,
     COMMIT, ALTER, TRAIN, OTHER

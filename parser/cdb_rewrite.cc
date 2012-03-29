@@ -536,9 +536,8 @@ rewrite(Item **i, Analysis &a) {
 template <class T>
 static Item *
 do_optimize_const_item(T *i, Analysis &a) {
-    //TODO: below code evaluates constant items using embedded DB
-    // needs some fixing
-/*
+   
+
     if (i->const_item()) {
         // ask embedded DB to eval this const item,
         // then replace this item with the eval-ed constant
@@ -553,16 +552,13 @@ do_optimize_const_item(T *i, Analysis &a) {
         string q(buf.str());
         LOG(cdb_v) << q;
 
-	//DBResult * dbres = NULL;
-	//a.conn->execute(q, dbres);
+	DBResult * dbres = NULL;
+	assert(a.e_conn->execute(q, dbres));
 	
-        MYSQL *m = a.connect();
-        mysql_query_wrapper(m, q);
-
         THD *thd = current_thd;
         assert(thd != NULL);
 
-        MYSQL_RES *r = mysql_store_result(m);
+        MYSQL_RES *r = dbres->n;
         if (r) {
             Item *rep = NULL;
 
@@ -641,9 +637,6 @@ do_optimize_const_item(T *i, Analysis &a) {
         }
     }
     return i;
-*/
-    UNIMPLEMENTED;
-    return NULL;
 }
 
 template <class T>
@@ -3356,4 +3349,32 @@ Rewriter::decryptResults(ResType & dbres,
 }
 
 
+void
+printRes(const ResType & r) {
 
+    //if (!cryptdb_logger::enabled(log_group::log_edb_v))
+    //return;
+
+    std::stringstream ssn;
+    for (unsigned int i = 0; i < r.names.size(); i++) {
+        char buf[400];
+        snprintf(buf, sizeof(buf), "%-20s", r.names[i].c_str());
+        ssn << buf;
+    }
+    std::cerr << ssn.str() << std::endl;
+    LOG(edb_v) << ssn.str();
+
+    /* next, print out the rows */
+    for (unsigned int i = 0; i < r.rows.size(); i++) {
+	std::stringstream ss;
+        for (unsigned int j = 0; j < r.rows[i].size(); j++) {
+            char buf[400];
+	    std::stringstream sstr;
+	    sstr << r.rows[i][j];
+	    snprintf(buf, sizeof(buf), "%-20s", sstr.str().c_str());
+            ss << buf;
+        }
+	std::cerr << std::endl;
+        LOG(edb_v) << ss.str();
+    }
+}

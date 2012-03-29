@@ -26,6 +26,7 @@
 #include <crypto/ecjoin.hh>
 
 #include <util/errstream.hh>
+#include <util/cryptdb_log.hh>
 
 using namespace std;
 
@@ -46,6 +47,8 @@ static inline string user_histfile() {
 static void __write_history() {
     write_history(user_histfile().c_str());
 }
+
+
 
 int
 main(int ac, char **av)
