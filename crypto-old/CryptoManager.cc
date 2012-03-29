@@ -271,36 +271,6 @@ CryptoManager::marshallKey(const string &key)
     return res;
 }
 
-string
-CryptoManager::unmarshallKey(const string &key)
-{
-    static const std::set<char> myDelimsStay = {};
-    static const std::set<char> myDelimsGo   = {',', ' ', ')', ';'};
-    static const std::set<char> myKeepIntact = {};
-
-    list<string> words = parse(key, myDelimsStay, myDelimsGo, myKeepIntact);
-
-    myassert(
-        words.size() == AES_KEY_BYTES, "the given key string " + key +
-        " is invalid");
-
-    string reskey;
-    reskey.resize(AES_KEY_BYTES);
-
-    int i = 0;
-    list<string>::iterator wordsIt = words.begin();
-
-    while (wordsIt != words.end()) {
-        uint64_t val = valFromStr(*wordsIt);
-        myassert(val < 256,
-                 "invalid key -- some elements are bigger than bytes " + key);
-        reskey[i] = (unsigned char) (val % 256);
-        wordsIt++; i++;
-    }
-
-    return reskey;
-}
-
 AES_KEY *
 CryptoManager::get_key_SEM(const string &key)
 {

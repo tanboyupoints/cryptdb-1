@@ -103,38 +103,7 @@ class ResType {
     AutoInc ai;
 };
 
-typedef enum class cmd {
-    CREATE, UPDATE, INSERT, SELECT, DROP, DELETE, BEGIN,
-    COMMIT, ALTER, TRAIN, OTHER
-} command;
-
 const std::string BASE_SALT_NAME = "cdb_salt";
-
-
-
-typedef struct FieldsToDecrypt {
-    std::list<std::string> OPEJoinFields;
-    std::list<std::string> OPEFields;
-    std::list<std::string> DETFields;
-    std::list<std::string> DETJoinFields;
-} FieldsToDecrypt;
-
-class Operation {
- public:
-    static bool isOp(const std::string &op);
-    static bool isDET(const std::string &op);
-    static bool isOPE(const std::string &op);
-    static bool isILIKE(const std::string &op);
-    static bool isIN(const std::string &op);
-
- private:
-};
-
-typedef struct OPESpec {
-   std::string fieldname;
-   unsigned int minv;
-   unsigned int maxv;
-} OPESpec;
 
 
 typedef struct QueryMeta {
@@ -144,14 +113,6 @@ typedef struct QueryMeta {
 
     void cleanup();
 } QueryMeta;
-
-typedef struct ParseContext {
-
-} ParseContext;
-
-typedef struct Result {
-    std::vector<std::vector<std::string> > a;
-} Result;
 
 typedef struct Predicate {
     std::string name;
@@ -379,27 +340,10 @@ std::string unmarshallBinary(const std::string &s);
 
 void consolidate(std::list<std::string> & words);
 
-/********* SQL QUERY PARSING ******/
 
-// splits query in a std::list of std::string tokens; the tokens are obtained by
-// splitting query at every character contained in delimsStay or delimsGo; the
-// tokens will include the characters
-// from delimsStay encountered
-std::list<std::string> getSQLWords(const std::string &query);
+std::list<std::string>
+split(std::string s, const char * separators);
 
-//parses a given std::string str, by splitting it according to the delimiters in
-// delimsStay, delimsGo ; if a piece of std::string
-// is included in two keepIntact delimiters, it is not broken into pieces even
-// if this std::string
-//contains delimiters; delimsStay are kept in the result, delimsGo are
-// discarded
-std::list<std::string> parse(const std::string &str,
-                   const std::set<char> &delimsStay,
-                   const std::set<char> &delimsGo,
-                   const std::set<char> &keepIntact);
-
-command getCommand(const std::string &query)
-    throw (CryptDBError);
 
 //returns a std::string representing a value pointed to by it and advances it
 std::string getVal(std::list<std::string>::iterator & it);

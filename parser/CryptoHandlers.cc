@@ -460,11 +460,8 @@ Search::newCreateField() {
 static list<Binary> *
 tokenize(string text)
 {
-    static const std::set<char> myDelimsStay = {};
-    static const std::set<char> myDelimsGo   = {' ', ',', ';', ':', '.'};
-    static const std::set<char> myKeepIntact = {};
 
-    list<string> tokens = parse(text, myDelimsStay, myDelimsGo, myKeepIntact);
+    list<string> tokens = split(text, " ,;:.");
 
     std::set<string> search_tokens;
 

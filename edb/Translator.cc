@@ -131,32 +131,6 @@ getTableOfSalt(string salt_name) {
     return salt_name.substr(BASE_SALT_NAME.length() + 3, salt_name.length() - 3 - BASE_SALT_NAME.length());
 }
 
-bool
-isNested(const string &query)
-{
-    list<string> queryS = getSQLWords(query);
-
-    for (list<string>::iterator it = queryS.begin(); it != queryS.end();
-         it++) {
-        if (equalsIgnoreCase(*it, "in")) {
-            if (equalsIgnoreCase (*it, "(")) {
-                it++;
-            }
-            if (isCommand(*it)) {
-                assert_s(false, "nested query\n");
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-bool
-isCommand(string str)
-{
-    return contains(str, commands);
-}
 
 
 string
