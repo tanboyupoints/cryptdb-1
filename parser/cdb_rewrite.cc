@@ -14,6 +14,8 @@
 #include <util/cryptdb_log.hh>
 #include <parser/CryptoHandlers.hh>
 
+#include <edb/MultiPrinc.hh>
+
 //TODO: so far, do_enforce methods don't seem to do what analyze cannot do
 // needed? maybe we can define it only for needed cases
 
@@ -2195,22 +2197,21 @@ getLayerKey(AES_KEY * mKey, string uniqueFieldName, SECLEVEL l) {
 static void
 init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf, onionlayout ol) {
     for (auto it: ol) {
-	onion o = it.first;
-	OnionMeta om = OnionMeta();
+        onion o = it.first;
+        OnionMeta om = OnionMeta();
 
         //anonymize onion name
-	om.onionname = anonymizeFieldName(index, o, fm->fname, false);
+        om.onionname = anonymizeFieldName(index, o, fm->fname, false);
 
-	//generate enclayers
-	for (auto l: it.second) {
-	    PRNG * key = getLayerKey(mKey, fullName(om.onionname, fm->tm->anonTableName), l);	    
-	    om.layers.push_back(EncLayerFactory::encLayer(l, cf, key));
-	}
-
-	fm->onions[o] = om;
+        //generate enclayers
+        for (auto l: it.second) {
+            PRNG * key = getLayerKey(mKey, fullName(om.onionname, fm->tm->anonTableName), l);	    
+            om.layers.push_back(EncLayerFactory::encLayer(l, cf, key));
+        }
+        fm->onions[o] = om;
 	
-	//set outer layer
-	fm->encdesc.olm[o] = it.second.back(); 
+        //set outer layer
+        fm->encdesc.olm[o] = it.second.back(); 
     }
 }
 
@@ -3190,7 +3191,7 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
     */
     return list<string>();
 }
-/*
+
 void
 Rewriter::mp_init(Analysis &a) {
     //start new temp mkm
@@ -3199,7 +3200,6 @@ Rewriter::mp_init(Analysis &a) {
     a.tmkm.processingQuery = false;
     a.tmkm.returnBitMap.clear();
 }
-*/
 
 list<string>
 Rewriter::rewrite(const string & q, Analysis & analysis)
@@ -3208,7 +3208,6 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
     query_parse p(ci.db, q);
     analysis = Analysis(e_conn, conn, schema, masterKey, mp);
 
-    /* REMOVED FOR NOW
     //initialize multi-principal
     mp_init(analysis);
 
@@ -3220,7 +3219,7 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
         } else {
             return processAnnotation(*p.annot, analysis);
         }
-	} */
+	}
 
     LEX *lex = p.lex();
 

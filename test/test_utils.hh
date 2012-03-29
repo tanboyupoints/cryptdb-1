@@ -21,7 +21,7 @@ class TestConfig {
         db   = "cryptdbtest";
         shadowdb_dir = "/home/cat/shadow-db";
         port = 3306;
-        stop_if_fail = false;
+        stop_if_fail = true;
 
         // hack to find current dir
         char buf[1024];

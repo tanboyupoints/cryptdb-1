@@ -13,8 +13,8 @@
 #include <time.h>
 #include <sys/wait.h>
 
-#include <crypto-old/OPE.hh>
-#include <crypto-old/HGD.hh>
+//#include <crypto-old/OPE.hh>
+//#include <crypto-old/HGD.hh>
 #include <crypto-old/CryptoManager.hh>
 
 //#include <edb/EDBProxy.hh>
@@ -28,17 +28,17 @@
 #include <test/test_utils.hh>
 //#include <test/TestSinglePrinc.hh>
 //#include <test/TestMultiPrinc.hh>
-#include <test/TestCrypto.hh>
+//#include <test/TestCrypto.hh>
 #include <test/TestAccessManager.hh>
-#include <test/TestProxy.hh>
-#include <test/TestQueries.hh>
+//#include <test/TestProxy.hh>
+//#include <test/TestQueries.hh>
 //#include <test/TestNotConsider.hh>
 
 
 using namespace std;
 using namespace NTL;
 
-static string __attribute__((unused))
+/*static string __attribute__((unused))
 padPasswd(const string &s)
 {
     string r = s;
@@ -205,7 +205,7 @@ test_HGD()
 
     cerr << "average milliseconds per test is " <<
             ((double) totalTime * 1000.0) / ((double) tests * CLOCKS_PER_SEC) << "\n";
-}
+}*/
 /*
    void test_EDBProxy_noSecurity() {
     EDBProxy  e =  EDBProxy((char *)"dbname = postgres", false);
@@ -464,6 +464,7 @@ tester::testClientParser()
     
 }
 */
+/*
 static void __attribute__((unused))
 testCryptoManager()
 {
@@ -517,7 +518,7 @@ testCryptoManager()
 
     cerr << "TEST CRYPTO MANAGER PASSED \n";
 
-}
+}*/
 
 static void
 testTrain(const TestConfig &tc, int ac, char **a) {
@@ -1232,6 +1233,7 @@ testEDBProxy(const TestConfig &tc)
     cout << "\n------------------- \n Integration test succeeded \n\n";
 }
 */
+  /*
 static void
 testPaillier(const TestConfig &tc, int ac, char **av)
 {
@@ -1286,7 +1288,7 @@ testPaillier(const TestConfig &tc, int ac, char **av)
     res = readTimer();
     cerr << "decryption takes " << res/noTests << " ms \n";
 }
-
+  
 static void
 testUtils(const TestConfig &tc, int ac, char **av)
 {
@@ -1295,7 +1297,7 @@ testUtils(const TestConfig &tc, int ac, char **av)
 
     LOG(test) << toString(parse(query, delimsStay, delimsGo, keepIntact), id_op);
 }
-/*
+
 static void __attribute__((unused))
 createTables(string file, EDBProxy * cl)
 {
@@ -4732,23 +4734,23 @@ static struct {
 } tests[] = {
         { "access",         "",                             &TestAccessManager::run },
         { "access_old",     "",                             &accessManagerTest },
-        { "aes",            "",                             &evaluate_AES },
+        //{ "aes",            "",                             &evaluate_AES },
         { "autoinc",        "",                             &autoIncTest },
         //{ "consider",       "consider queries (or not)",    &TestNotConsider::run },
-        { "crypto",         "crypto functions",             &TestCrypto::run },
+        //{ "crypto",         "crypto functions",             &TestCrypto::run },
         //{ "multi",          "integration multi principal",  &TestMultiPrinc::run },
-        { "paillier",       "",                             &testPaillier },
+        //{ "paillier",       "",                             &testPaillier },
         { "parseaccess",    "",                             &testParseAccess },
         { "pkcs",           "",                             &test_PKCS },
-        { "proxy",          "proxy",                        &TestProxy::run },
-        { "queries",        "queries",                      &TestQueries::run },
+        //{ "proxy",          "proxy",                        &TestProxy::run },
+        //{ "queries",        "queries",                      &TestQueries::run },
         { "shell",          "interactive shell",            &interactiveTest },
         //{ "single",         "integration - single principal",&TestSinglePrinc::run },
         { "gen_enc_tables", "",                             &generateEncTables },
         { "test_enc_tables","",                             &testEncTables },
         { "trace",          "trace eval",                   &testTrace },
         { "bench",          "TPC-C benchmark eval",         &testBench },
-        { "utils",          "",                             &testUtils },
+        //{ "utils",          "",                             &testUtils },
         { "train",          "",                             &testTrain },
 
         { "help",             "",                           &help },

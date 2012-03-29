@@ -17,6 +17,7 @@
     m(edb_query)            \
     m(edb_query_plain)      \
     m(edb_perf)             \
+    m(encl)                 \
     m(test)                 \
     m(am)                   \
     m(am_v)                 \

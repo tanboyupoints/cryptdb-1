@@ -381,7 +381,7 @@ class KeyAccess {
                        const Item &sql_salt);
 
     PrinKey decryptAsym(const Item &sql_encrypted_key,
-                        const std::string &secret_key);
+    const std::string &secret_key);
 
     bool isInstance(Prin prin);
     bool isOrphan(Prin prin);

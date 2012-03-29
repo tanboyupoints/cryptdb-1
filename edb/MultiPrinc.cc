@@ -89,51 +89,51 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
         bool first = true;
         //there will always be a DET onion
         if (annot.getDETLevel() != SECLEVEL::INVALID) {
-            if (fm->onionnames.find(oDET) == fm->onionnames.end()) {
-                fm->onionnames[oDET] = anonymizeFieldName(0, oDET, fm->fname, true);
+            if (fm->onions.find(oDET) == fm->onions.end()) {
+                fm->onions[oDET].onionname = anonymizeFieldName(0, oDET, fm->fname, true);
             }
             if (annot.getDETLevel() != SECLEVEL::INVALID) {
                 fm->setOnionLevel(oDET, annot.getDETLevel());
             }
-            //mkm.encForMap[fullName(fm->onionnames[oDET], annot.getPrimitiveTableName())] = annot.getRight().column;
-            //cerr << "process annotations mkm " << fullName(fm->onionnames[oDET], annot.getPrimitiveTableName()) << "->" << annot.getRight().column << endl;
+            //mkm.encForMap[fullName(fm->onions[oDET], annot.getPrimitiveTableName())] = annot.getRight().column;
+            //cerr << "process annotations mkm " << fullName(fm->onions[oDET], annot.getPrimitiveTableName()) << "->" << annot.getRight().column << endl;
             if (IsMySQLTypeNumeric(fm->sql_field->sql_type)) {
-                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onionnames[oDET] + " " + TN_I64 + ";");
+                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onions[oDET].onionname + " " + TN_I64 + ";");
             } else {
-                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onionnames[oDET] + " " + TN_TEXT + ";");
+                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onions[oDET].onionname + " " + TN_TEXT + ";");
             }
             fm->setOnionLevel(oDET, annot.getDETLevel());
             first = false;
         }
         if (annot.getOPELevel() != SECLEVEL::INVALID) {
-            if (fm->onionnames.find(oOPE) == fm->onionnames.end()) {
-                fm->onionnames[oOPE] = anonymizeFieldName(0, oOPE, fm->fname, true);
+            if (fm->onions.find(oOPE) == fm->onions.end()) {
+                fm->onions[oOPE].onionname = anonymizeFieldName(0, oOPE, fm->fname, true);
             }
             fm->setOnionLevel(oOPE, annot.getOPELevel());
             if (!first) {
-                //mkm.encForMap[fullName(fm->onionnames[oOPE], annot.getPrimitiveTableName())] = annot.getRight().column;
-                //cerr << "process annotations mkm " << fullName(fm->onionnames[oOPE], annot.getPrimitiveTableName()) << "->" << annot.getRight().column << endl;
-                query_list.push_back(query + " ADD " + fm->onionnames[oOPE] + " " + TN_I64 + ";");
+                //mkm.encForMap[fullName(fm->onions[oOPE], annot.getPrimitiveTableName())] = annot.getRight().column;
+                //cerr << "process annotations mkm " << fullName(fm->onions[oOPE], annot.getPrimitiveTableName()) << "->" << annot.getRight().column << endl;
+                query_list.push_back(query + " ADD " + fm->onions[oOPE].onionname + " " + TN_I64 + ";");
             } else {
-                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onionnames[oOPE] + " " + TN_I64 + ";");
+                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onions[oOPE].onionname + " " + TN_I64 + ";");
             }
             first = false;
         }
         if (annot.getAGGLevel()) {
-            if (fm->onionnames.find(oAGG) == fm->onionnames.end()) {
-                fm->onionnames[oAGG] = anonymizeFieldName(0, oAGG, fm->fname, true);
+            if (fm->onions.find(oAGG) == fm->onions.end()) {
+                fm->onions[oAGG].onionname = anonymizeFieldName(0, oAGG, fm->fname, true);
             }
-            fm->setOnionLevel(oAGG, SECLEVEL::SEMANTIC_AGG);
-            //mkm.encForMap[fullName(fm->onionnames[oAGG], annot.getPrimitiveTableName())] = annot.getRight().column;
-            query_list.push_back(query + " ADD " + fm->onionnames[oAGG] + " " + TN_HOM + ";");
+            fm->setOnionLevel(oAGG, SECLEVEL::HOM);
+            //mkm.encForMap[fullName(fm->onions[oAGG], annot.getPrimitiveTableName())] = annot.getRight().column;
+            query_list.push_back(query + " ADD " + fm->onions[oAGG].onionname + " " + TN_HOM + ";");
         }
         if (annot.getSWPLevel()) {
-            if (fm->onionnames.find(oSWP) == fm->onionnames.end()) {
-                fm->onionnames[oSWP] = anonymizeFieldName(0, oSWP, fm->fname, true);
+            if (fm->onions.find(oSWP) == fm->onions.end()) {
+                fm->onions[oSWP].onionname = anonymizeFieldName(0, oSWP, fm->fname, true);
             }
-            fm->setOnionLevel(oSWP, SECLEVEL::SWP);
-            //mkm.encForMap[fullName(fm->onionnames[oSWP], annot.getPrimitiveTableName())] = annot.getRight().column;
-            query_list.push_back(query + " ADD " + fm->onionnames[oSWP] + " " + TN_TEXT + ";");
+            fm->setOnionLevel(oSWP, SECLEVEL::SEARCH);
+            //mkm.encForMap[fullName(fm->onion[oSWP], annot.getPrimitiveTableName())] = annot.getRight().column;
+            query_list.push_back(query + " ADD " + fm->onions[oSWP].onionname + " " + TN_TEXT + ";");
         }
         break;
     }
@@ -360,7 +360,7 @@ MultiPrinc::processReturnedField(unsigned int index, bool nextIsSalt, string ful
 
     ignore = false;
 
-    if (o != oNONE) {
+    if (o != oINVALID) {
         //figure out where is the principal we want
         string princ = mkm.encForMap[fullname];
         if (tmkm.principalsSeen.find(princ) == tmkm.principalsSeen.end()) {
@@ -572,13 +572,15 @@ MultiPrinc::checkPredicate(const AccessRelation & accRel, map<string, string> & 
                      dbres), "failure while executing query " + query);
         ResType result = dbres->unpack();
         delete dbres;
-        if (result.rows[0][0].data == "1") {
+        //TODO: not sure how to deal with new ResType
+        return false;
+        /*if (result.rows[0][0] == "1") {
             LOG(mp) << "pred OK\n";
             return true;
         } else {
             LOG(mp) << "pred NO\n";
             return false;
-        }
+            }*/
     }
 
     //no predicate
@@ -737,7 +739,7 @@ MultiPrinc::isPrincipal(string princ) {
     return accMan->isType(princ);
 }
 
-bool
+/*bool
 MultiPrinc::isActiveUsers(const string &query)
 {
     list<string> words = getSQLWords(query);
@@ -759,7 +761,7 @@ MultiPrinc::isActiveUsers(const string &query)
     }
     return false;
 
-}
+}*/
 
 string
 MultiPrinc::get_key(string fieldName, TempMKM & tmkm)
@@ -791,7 +793,7 @@ MultiPrinc::get_key(string fieldName, TempMKM & tmkm)
 }
 
 string
-MultiPrinc::get_key(string fieldName, TMKM & tmkm, const vector<SqlItem> &res)
+MultiPrinc::get_key(string fieldName, TMKM & tmkm, const vector<Item> &res)
 {
     //ANON_REGION(__func__, &perf_cg);
 
@@ -817,7 +819,8 @@ MultiPrinc::get_key(string fieldName, TMKM & tmkm, const vector<SqlItem> &res)
     }
     cerr << "not encForVal; use encForReturned size " << tmkm.encForReturned.size() << endl;
     if (tmkm.encForReturned.find(encForField) != tmkm.encForReturned.end()) {
-        string val = res[tmkm.encForReturned[encForField]].data;
+        String val_str = res[tmkm.encForReturned[encForField]].str_value;
+        string val = string(val_str.ptr(), val_str.length());
         string key = accMan->getKey(Prin(encForField, removeApostrophe(val)));
         LOG(mp) << "-- key from accman is " <<
         CryptoManager::marshallKey(key) << "\n";
