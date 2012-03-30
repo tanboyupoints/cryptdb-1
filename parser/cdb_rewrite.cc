@@ -343,6 +343,7 @@ operator<<(ostream &out, const OnionLevelFieldPair &p)
     return out;
 }
 
+/* moved to util/util -- it's needed lots of places
 static char *
 make_thd_string(const string &s, size_t *lenp = 0)
 {
@@ -352,7 +353,7 @@ make_thd_string(const string &s, size_t *lenp = 0)
     if (lenp)
         *lenp = s.size();
     return thd->strmake(s.data(), s.size());
-}
+    }*/
 
 // anonymizes table name based on the information in a.schema
 static string
@@ -3368,12 +3369,12 @@ printRes(const ResType & r) {
 	std::stringstream ss;
         for (unsigned int j = 0; j < r.rows[i].size(); j++) {
             char buf[400];
-	    std::stringstream sstr;
-	    sstr << r.rows[i][j];
-	    snprintf(buf, sizeof(buf), "%-20s", sstr.str().c_str());
+            std::stringstream sstr;
+            sstr << r.rows[i][j];
+            snprintf(buf, sizeof(buf), "%-20s", sstr.str().c_str());
             ss << buf;
         }
-	std::cerr << std::endl;
+        std::cerr << std::endl;
         LOG(edb_v) << ss.str();
     }
 }

@@ -239,6 +239,9 @@ const unsigned int noMath = NELEM(math);
 std::string randomBytes(unsigned int len);
 uint64_t randomValue();
 
+char * make_thd_string(const std::string &s, size_t *lenp = 0);
+std::string ItemToString(Item *i);
+
 std::string stringToByteInts(const std::string &s);
 std::string angleBrackets(const std::string &s);
 static inline std::string id_op(const std::string &x) { return x; }

@@ -34,29 +34,17 @@ inList(list<Prin> &ls, Prin e)
     return false;
 }
 
-static char *
-make_thd_string(const string &s, size_t *lenp = 0)
-{
-    THD *thd = current_thd;
-    assert(thd);
-
-    if (lenp)
-        *lenp = s.size();
-    return thd->strmake(s.data(), s.size());
-}
-
-
 static string
 ItemToStr(Item *i) {
-    size_t l = i->str_value.length();
-    return make_thd_string(string(i->str_value.ptr(), i->str_value.length()), &l);
+    String s;
+    String *s0 = i->val_str(&s);
+    if (s0 == NULL) {
+        cerr << "problem " << i->print() << endl;
+        assert(false);
+    }
+    return string(s0->ptr(), s0->length());
 }
 
-static string
-ItemToStr(const Item &i) {
-    size_t l = i.str_value.length();
-    return make_thd_string(string(i.str_value.ptr(), i.str_value.length()), &l);
-}
 
 //------------------------------------------------------------------------------------------
 
@@ -651,18 +639,18 @@ KeyAccess::addToPrinc(string prin1, string prin2)
             std::set<Prin> prin1_hasaccess;
             std::set<Prin> prin2_hasaccess;
             for(auto it = res.rows.begin(); it != res.rows.end(); it++) {
-                if (ItemToStr(it->at(0)) == gen1) {
-                    if (prin2_values.find(ItemToStr(it->at(1))) != prin2_values.end()) {
+                if (ItemToString(it->at(0)) == gen1) {
+                    if (prin2_values.find(ItemToString(it->at(1))) != prin2_values.end()) {
                         LOG(am) << "addEquals failed: the new equals would alter the currently exist key links";
                         return -1;
                     }
-                    prin1_values.insert(ItemToStr(it->at(1)));
-                } else if (ItemToStr(it->at(0)) == gen2) {
-                    if (prin1_values.find(ItemToStr(it->at(1))) != prin1_values.end()) {
+                    prin1_values.insert(ItemToString(it->at(1)));
+                } else if (ItemToString(it->at(0)) == gen2) {
+                    if (prin1_values.find(ItemToString(it->at(1))) != prin1_values.end()) {
                         LOG(am) << "addEquals failed: the new equals would alter the currently exist key links";
                         return -1;
                     }
-                    prin2_values.insert(ItemToStr(it->at(1)));
+                    prin2_values.insert(ItemToString(it->at(1)));
                 }
             }
         }
@@ -877,7 +865,7 @@ KeyAccess::insert(Prin hasAccess, Prin accessTo)
     //check that we're not trying to generate a givespassword
     assert_s(!(meta->isGives(hasAccess.type) &&
                (getKey(hasAccess).length() > 0) && !isInstance(
-                   hasAccess)), "cannot create a givesPsswd key");
+                   hasAccess)), "cannot create a givesPsswd key for " + hasAccess.gen + "=" + hasAccess.value);
 
     hasAccess.gen = meta->getGeneric(hasAccess.type);
     accessTo.gen = meta->getGeneric(accessTo.type);
@@ -918,12 +906,12 @@ KeyAccess::insert(Prin hasAccess, Prin accessTo)
             Prin this_row;
             this_row.type = hasAccess.type;
             this_row.gen = hasAccess.gen;
-            this_row.value = ItemToStr(it->at(1));
+            this_row.value = ItemToString(it->at(1));
             string key_for_decryption = getKey(this_row);
             if (key_for_decryption.length() > 0) {
-                PrinKey accessToPrinKey = decryptSym(*it->at(4),
+                PrinKey accessToPrinKey = decryptSym(it->at(4),
                                                      key_for_decryption,
-                                                     *it->at(5));
+                                                     it->at(5));
                 accessToKey = accessToPrinKey.key;
                 break;
             }
@@ -952,6 +940,7 @@ KeyAccess::insert(Prin hasAccess, Prin accessTo)
         uint64_t salt = randomValue();
         AES_KEY * aes = get_AES_enc_key(hasAccessKey);
         encrypted_accessToKey = encrypt_AES_CBC(accessToKey, aes, BytesFromInt(salt, SALT_LEN_BYTES));
+        LOG(am_v) << "ENC encrypted_key " << encrypted_accessToKey << "(length " << encrypted_accessToKey.size() << ")";
         string string_salt = strFromVal(salt);
         string_encrypted_accessToKey = marshallBinary(encrypted_accessToKey);
         sql = "INSERT INTO " + table + "(hasAccessType, hasAccessValue, " + 
@@ -1276,7 +1265,7 @@ KeyAccess::getPublicKey(Prin prin)
         return NULL;
     }
 
-    string key = ItemToStr(res.rows[0][2]);
+    string key = ItemToString(res.rows[0][2]);
     return crypt_man->unmarshallKey(key, true);
 }
 
@@ -1300,7 +1289,7 @@ KeyAccess::getSecretKey(Prin prin)
         return error;
     }
 
-    return decryptSym(*res.rows[0][3], getKey(prin), *res.rows[0][4]);
+    return decryptSym(res.rows[0][3], getKey(prin), res.rows[0][4]);
 }
 
 int
@@ -1404,8 +1393,8 @@ KeyAccess::insertPsswd(Prin gives, const string &psswd)
                         //remember to check this Prin on the next level
                         Prin new_prin;
                         //accessTo prin
-                        new_prin.gen = ItemToStr(row->at(2));
-                        new_prin.value = ItemToStr(row->at(3));
+                        new_prin.gen = ItemToString(row->at(2));
+                        new_prin.value = ItemToString(row->at(3));
                         //cerr << "  new_prin: " << new_prin.gen << "=" << new_prin.value << endl;
                         accessible_values.insert(new_prin);
                         string new_key = getKey(new_prin);
@@ -1418,15 +1407,15 @@ KeyAccess::insertPsswd(Prin gives, const string &psswd)
                                      "there is a logical issue with insertPsswd: getKey should have the key for hasAccess");
                             //cerr << row->at(0).data << "=" << row->at(1).data << " ---> " << row->at(2).data << "=" << row->at(3).data << endl;
                             //if (row->at(6) == Item_null() || ItemToStr(row->at(6)).size() == 0) {
-                            if (ItemToStr(row->at(6)).size() == 0) {
+                            if (ItemToStr(row->at(6)).size() == 0 || (ItemToStr(row->at(6)) == "NULL")) {
                                 // symmetric key okay
                                 new_prin_key =
-                                    decryptSym(*row->at(4), getKey(
-                                                   hasAccess_prin), *row->at(5));
+                                    decryptSym(row->at(4), getKey(
+                                                                  hasAccess_prin), row->at(5));
                             } else {
                                 // use asymmetric
                                 PrinKey sec_key = getSecretKey(hasAccess_prin);
-                                new_prin_key = decryptAsym(*row->at(6),
+                                new_prin_key = decryptAsym(row->at(6),
                                                            sec_key.key);
                             }
                             //cerr << "\t got key: " << new_prin_key.key << endl;
@@ -1598,7 +1587,7 @@ KeyAccess::removeFromKeys(Prin prin)
             ResType res = SelectAccess(prin, empty);
             bool erase = true;
             for (auto row = res.rows.begin(); row != res.rows.end(); row++) {
-                if (ItemToStr(row->at(0)) != set_it->first) {
+                if (ItemToString(row->at(0)) != set_it->first) {
                     erase = false;
                 }
             }
@@ -1719,7 +1708,7 @@ int
 KeyAccess::SelectAccessCount(Prin hasAccess, Prin accessTo)
 {
     auto res = SelectAccessCol(hasAccess, accessTo, "COUNT(*)");
-    return (int) valFromStr(ItemToStr(res.rows[0][0]));
+    return (int) valFromStr(ItemToString(res.rows[0][0]));
 }
 
 ResType
@@ -1732,7 +1721,7 @@ int
 KeyAccess::SelectPublicCount(Prin prin)
 {
     auto res = SelectPublicCol(prin, "COUNT(*)");
-    return (int) valFromStr(ItemToStr(res.rows[0][0]));
+    return (int) valFromStr(ItemToString(res.rows[0][0]));
 }
 
 ResType
@@ -1798,6 +1787,7 @@ KeyAccess::GenerateAsymKeys(Prin prin, PrinKey prin_key)
         string pub_key = crypt_man->marshallKey(rsa_pub_key,true);
         string sec_key = crypt_man->marshallKey(rsa_sec_key,false);
         string encrypted_sec_key = encrypt_AES_CBC(sec_key, aes, BytesFromInt(salt, SALT_LEN_BYTES));
+        //LOG(am_v) << "ENC encrypted_key " << encrypted_sec_key << "(length " << encrypted_sec_key.size() << ")";
         salt_string = strFromVal(salt);
         encrypted_sec_key_string = marshallBinary(encrypted_sec_key);
         pub_key_string = marshallBinary(pub_key);
@@ -1814,15 +1804,16 @@ KeyAccess::GenerateAsymKeys(Prin prin, PrinKey prin_key)
 }
 
 PrinKey
-KeyAccess::decryptSym(const Item &sql_encrypted_key,
+KeyAccess::decryptSym(Item *sql_encrypted_key,
                       const string &key_for_decrypting,
-                      const Item &sql_salt)
+                      Item *sql_salt)
 {
     if(VERBOSE) {
-        LOG(am) << "\tuse symmetric decryption";
+        LOG(am_v) << "\tuse symmetric decryption";
     }
-    string encrypted_key = ItemToStr(sql_encrypted_key);
-    uint64_t salt = valFromStr(ItemToStr(sql_salt));
+    string encrypted_key = ItemToString(sql_encrypted_key);
+    uint64_t salt = valFromStr(ItemToString(sql_salt));
+    cerr << "encrypted key is " << encrypted_key << " (length " << encrypted_key.size() << ") with salt " << salt << endl;
     AES_KEY * aes = get_AES_dec_key(key_for_decrypting);
     string key = decrypt_AES_CBC(encrypted_key, aes, BytesFromInt(salt, SALT_LEN_BYTES));
     PrinKey result;
@@ -1831,13 +1822,13 @@ KeyAccess::decryptSym(const Item &sql_encrypted_key,
 }
 
 PrinKey
-KeyAccess::decryptAsym(const Item &sql_encrypted_key, const string &secret_key)
+KeyAccess::decryptAsym(Item *sql_encrypted_key, const string &secret_key)
 {
     if(VERBOSE) {
         LOG(am) << "\tuse asymmetric decryption";
     }
     PKCS * pk_sec_key = crypt_man->unmarshallKey(secret_key, false);
-    string encrypted_key = ItemToStr(sql_encrypted_key);
+    string encrypted_key = ItemToString(sql_encrypted_key);
     string key = crypt_man->decrypt(pk_sec_key, encrypted_key);
     assert_s(
         key.length() == (unsigned int) AES_KEY_BYTES,
@@ -1903,17 +1894,17 @@ KeyAccess::getUncached(Prin prin)
         for (auto row = res.rows.begin(); row != res.rows.end(); row++) {
             Prin hasAccess;
             hasAccess.gen = set_it->first;
-            hasAccess.value = ItemToStr(row->at(1));
+            hasAccess.value = ItemToString(row->at(1));
             if (keys.find(hasAccess) != keys.end()) {
                 PrinKey new_prin_key;
                 //if (row->at(6).null || row->at(6).data.size() == 0) {
-                if (ItemToStr(row->at(6)).size() == 0) {
+                if (ItemToStr(row->at(6)).size() == 0 || (ItemToStr(row->at(6)) == "NULL")) {
                     // symmetric key okay
-                    new_prin_key = decryptSym(*row->at(4), getKey(hasAccess), *row->at(5));
+                    new_prin_key = decryptSym(row->at(4), getKey(hasAccess), row->at(5));
                 } else {
                     // use asymmetric
                     PrinKey sec_key = getSecretKey(hasAccess);
-                    new_prin_key = decryptAsym(*row->at(6), sec_key.key);
+                    new_prin_key = decryptAsym(row->at(6), sec_key.key);
                 }
                 return new_prin_key;
             }
