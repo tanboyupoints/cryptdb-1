@@ -39,8 +39,7 @@ ItemToStr(Item *i) {
     String s;
     String *s0 = i->val_str(&s);
     if (s0 == NULL) {
-        cerr << "problem " << i->print() << endl;
-        assert(false);
+        return "";
     }
     return string(s0->ptr(), s0->length());
 }

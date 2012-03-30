@@ -14,7 +14,6 @@
 #include <sql_update.h>
 
 
-
 // An enc layer encrypts and decrypts data for a certain onion layer. It also 
 // knows how to transform the data type of some plain data to the data type of
 // encrypted data in the DBMS.
@@ -128,8 +127,8 @@ public:
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
     Create_field * newCreateField() {return cf;}
     
-    Item * encrypt(Item * p, uint64_t IV = 0) {return p;}
-    Item * decrypt(Item * c, uint64_t IV = 0) {return c;}
+    Item * encrypt(Item * p, uint64_t IV = 0);
+    Item * decrypt(Item * c, uint64_t IV = 0);
     Item * decryptUDF(Item * col, Item * ivcol = NULL) {
 	thrower() << "should not decrypt from joindet\n";
     }

@@ -9,7 +9,9 @@
 #include <assert.h>
 #include <edb/Connect.hh>
 #include <util/cryptdb_log.hh>
-
+#include <string>
+#include <iostream>
+#include <sstream>
 
 using namespace std;
 
@@ -230,7 +232,7 @@ DBResult::unpack()
 
         for (int j = 0; j < cols; j++) {
             Item * it = getItem(row[j], res.types[j], lengths[j]);
-            resrow.push_back(it);
+	    resrow.push_back(it);
         }
 
         res.rows.push_back(resrow);
