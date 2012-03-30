@@ -3,6 +3,7 @@
 #include <util/util.hh>
 #include <util/cryptdb_log.hh>
 
+
 using namespace std;
 using namespace NTL;
 
@@ -211,7 +212,9 @@ DET_int::decrypt(Item * ctext, uint64_t IV) {
     ulonglong val = static_cast<Item_int*>(ctext)->value;
     ulonglong res = (ulonglong) bf.decrypt(val);
     LOG(encl) << "DET_int decrypt " << val << "-->" << res;
-    return new Item_int(res);
+    Item * ni = new Item_int(res);
+    cerr << "det int " << ni << "\n";
+    return ni;
 }
 
 
@@ -311,6 +314,21 @@ DET_str::decryptUDF(Item * col, Item * ivcol) {
     return new Item_func_udf_str(&u_decDETStr, l);
 
 }
+
+/*************** DETJOIN *********************/
+
+Item *
+DETJOIN::encrypt(Item * p, uint64_t IV) {
+    ulonglong val = static_cast<Item_int *>(p)->value;
+    return new Item_int(val);
+}
+
+Item *
+DETJOIN::decrypt(Item * c, uint64_t IV) {
+    ulonglong val = static_cast<Item_int *>(c)->value;
+    return new Item_int(val);
+}
+  
 
 /**************** OPE **************************/
 

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <iostream>
 #include <string>
 #include <sstream>
 #include <stdexcept>
@@ -59,10 +58,9 @@ operator<<(std::ostream &out, Item * i) {
     if (i == NULL) {
 	return out << "NULL";
     } else {
-	 String s;
-	 i->print(&s, QT_ORDINARY);
-    
-	 return out << s;
+	String s, s1;
+	s = *(i->val_str(&s1));	 
+	return out << s;
     }
 }
 

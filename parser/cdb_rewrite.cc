@@ -9,6 +9,7 @@
 #include <list>
 #include <algorithm>
 #include <stdio.h>
+#include <typeinfo>
 
 #include <parser/cdb_rewrite.hh>
 #include <util/cryptdb_log.hh>
@@ -272,11 +273,12 @@ encrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV = 0) {
 
 static Item *
 decrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV) {
-    Item * prev_dec = NULL;
     Item * dec = i;
+    Item * prev_dec = NULL;
     
     for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
 	dec = (*it)->decrypt(dec, IV);
+	//need to free space for all decs except last
 	if (prev_dec) {
 	    delete prev_dec;
 	}
@@ -2850,24 +2852,6 @@ init_mysql(const string & embed_db) {
             (char**) mysql_av, 0));
     assert(0 == mysql_thread_init());
 
-    MYSQL * m = mysql_init(0);
-    assert(m);
-    mysql_options(m, MYSQL_OPT_USE_EMBEDDED_CONNECTION, 0);
-    if (!mysql_real_connect(m, 0, 0, 0, 0, 0, 0, CLIENT_MULTI_STATEMENTS)) {
-        mysql_close(m);
-        cryptdb_err() << "mysql_real_connect: " << mysql_error(m);
-    }
-  
-    // HACK: create this DB if it doesn't exist, for now
-    cerr << "trying to create using m \n";
-    string dbname = "cryptdbtest";
-    string create_q = "CREATE DATABASE IF NOT EXISTS " + dbname;
-    string use_q    = "USE " + dbname + ";";
-    mysql_query_wrapper(m, create_q);
-    mysql_query_wrapper(m, use_q);
-
-    cerr << "the queries have now succeeded \n";
- 
 }
 Rewriter::Rewriter(ConnectionInfo ci, 
                    bool multi,
@@ -3337,8 +3321,8 @@ Rewriter::decryptResults(ResType & dbres,
 			assert_s(!salt_item->null_value, "salt item is null");
 			salt = ((Item_int *)dbres.rows[r][rf.pos_salt])->value;
 		    }
-
 		    res.rows[r][col_index] = decrypt_item(im, dbres.rows[r][c], salt);
+		   
                 }
             }
             col_index++;
@@ -3366,10 +3350,10 @@ printRes(const ResType & r) {
 
     /* next, print out the rows */
     for (unsigned int i = 0; i < r.rows.size(); i++) {
-	std::stringstream ss;
+	stringstream ss;
         for (unsigned int j = 0; j < r.rows[i].size(); j++) {
             char buf[400];
-	    std::stringstream sstr;
+	    stringstream sstr;
 	    sstr << r.rows[i][j];
 	    snprintf(buf, sizeof(buf), "%-20s", sstr.str().c_str());
             ss << buf;

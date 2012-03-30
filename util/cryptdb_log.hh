@@ -12,6 +12,7 @@
     m(crypto)               \
     m(crypto_v)             \
     m(crypto_data)          \
+    m(encl)	    \
     m(edb)                  \
     m(edb_v)                \
     m(edb_query)            \
