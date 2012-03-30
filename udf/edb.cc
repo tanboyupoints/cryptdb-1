@@ -143,12 +143,6 @@ getui(UDF_ARGS * args, int i)
     return (uint64_t) (*((longlong *) args->args[i]));
 }
 
-static unsigned char
-getb(UDF_ARGS * args, int i)
-{
-    return (unsigned char)(*((longlong *) args->args[i]));
-}
-
 static unsigned char *
 getba(UDF_ARGS * args, int i, uint64_t &len)
 {
@@ -203,14 +197,11 @@ decrypt_int_sem(PG_FUNCTION_ARGS)
 {
     uint64_t eValue = getui(ARGS, 0);
 
-    string key;
-    key.resize(AES_KEY_BYTES);
-    int offset = 1;
-
-    for (unsigned int i = 0; i < AES_KEY_BYTES; i++)
-        key[i] = getb(ARGS, offset+i);
-
-    uint64_t salt = getui(args, offset + AES_KEY_BYTES);
+    uint64_t keyLen;
+    unsigned char * keyBytes = getba(args, 1, keyLen);
+    string key = string((char *)keyBytes, keyLen);
+    
+    uint64_t salt = getui(args, 2);
 
     blowfish bf(key);
     uint64_t value = bf.decrypt(eValue) ^ salt;
@@ -238,13 +229,10 @@ decrypt_int_det(PG_FUNCTION_ARGS)
 {
     uint64_t eValue = getui(ARGS, 0);
 
-    string key;
-    key.resize(AES_KEY_BYTES);
-    int offset = 1;
-
-    for (unsigned int i = 0; i < AES_KEY_BYTES; i++)
-        key[i] = getb(ARGS, offset+i);
-
+    uint64_t keyLen;
+    unsigned char * keyBytes = getba(args, 1, keyLen);
+    string key = string((char *)keyBytes, keyLen);
+   
     blowfish bf(key);
     uint64_t value = bf.decrypt(eValue);
 
@@ -272,13 +260,10 @@ decrypt_int_det(PG_FUNCTION_ARGS)
 {
     uint64_t eValue = getui(ARGS, 0);
 
-    string key;
-    key.resize(AES_KEY_BYTES);
-    int offset = 1;
-
-    for (unsigned int i = 0; i < AES_KEY_BYTES; i++)
-        key[i] = getb(ARGS, offset+i);
-
+    uint64_t keyLen;
+    unsigned char * keyBytes = getba(args, 1, keyLen);
+    string key = string((char *)keyBytes, keyLen);
+   
     blowfish bf(key);
     uint64_t value = bf.encrypt(eValue);
 
@@ -320,19 +305,15 @@ decrypt_text_sem(PG_FUNCTION_ARGS)
     uint64_t eValueLen;
     unsigned char *eValueBytes = getba(args, 0, eValueLen);
 
-    string key;
-    key.resize(AES_KEY_BYTES);
-    int offset = 1;
+    uint64_t keyLen;
+    unsigned char * keyBytes = getba(args, 1, keyLen);
+    string key = string((char *)keyBytes, keyLen);
+    
+     uint64_t salt = getui(ARGS, 2);
 
-    for (unsigned int i = 0; i < AES_KEY_BYTES; i++) {
-        key[i] = getb(ARGS,offset+i);
-    }
-
-     uint64_t salt = getui(ARGS, offset + AES_KEY_BYTES);
-
-    AES_KEY *aesKey = get_AES_dec_key(key);
-    string value = decrypt_SEM(eValueBytes, eValueLen, aesKey, salt);
-    delete aesKey;
+     AES_KEY *aesKey = get_AES_dec_key(key);
+     string value = decrypt_SEM(eValueBytes, eValueLen, aesKey, salt);
+     delete aesKey;
 
 #if MYSQL_S
     unsigned char * res = new unsigned char[value.length()];
@@ -379,14 +360,10 @@ decrypt_text_det(PG_FUNCTION_ARGS)
     uint64_t eValueLen;
     unsigned char *eValueBytes = getba(args, 0, eValueLen);
 
-    string key;
-    key.resize(AES_KEY_BYTES);
-    int offset = 1;
-
-    for (unsigned int i = 0; i < AES_KEY_BYTES; i++) {
-        key[i] = getb(ARGS,offset+i);
-    }
-
+    uint64_t keyLen;
+    unsigned char *keyBytes = getba(args, 1, keyLen);
+    string key = string((char *)keyBytes, keyLen);
+    
     AES_KEY * aesKey = get_AES_dec_key(key);
     string value = decrypt_AES_CMC(string((char *)eValueBytes, (unsigned int)eValueLen), aesKey, false);
     delete aesKey;

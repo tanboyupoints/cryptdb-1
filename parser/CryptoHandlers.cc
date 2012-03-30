@@ -104,8 +104,6 @@ static udf_func u_decRNDInt = {
 
 Item * 
 RND_int::decryptUDF(Item * col, Item * ivcol) {
-    cerr << "udf expects key represented in different manner, fix udf";
-       
     List<Item> l;
     l.push_back(col);
     l.push_back(new Item_string(make_thd_string(key), key.length(), &my_charset_bin));
@@ -171,8 +169,6 @@ static udf_func u_decRNDString = {
 
 Item *
 RND_str::decryptUDF(Item * col, Item * ivcol) {
-    cerr << "udf expects key represented in different manner, fix udf";
-       
     List<Item> l;
     l.push_back(col);
     l.push_back(new Item_string(make_thd_string(rawkey), rawkey.length(), &my_charset_bin));
@@ -240,8 +236,6 @@ static udf_func u_decDETInt = {
 
 Item *
 DET_int::decryptUDF(Item * col, Item * ivcol) {
-    cerr << "udf expects key represented in different manner, fix udf";
-       
     List<Item> l;
     l.push_back(col);
     l.push_back(new Item_string(make_thd_string(key), key.length(), &my_charset_bin));
@@ -305,8 +299,6 @@ static udf_func u_decDETStr = {
 
 Item *
 DET_str::decryptUDF(Item * col, Item * ivcol) {
-    cerr << "udf expects key represented in different manner, fix udf";
-       
     List<Item> l;
     l.push_back(col);
     l.push_back(new Item_string(make_thd_string(rawkey), rawkey.length(), &my_charset_bin));
@@ -445,8 +437,7 @@ static udf_func u_sum = {
 
 Item *
 HOM::sumUDF(Item * expr) {
-    cerr << "udf expects key represented in different manner, fix udf";
-       
+         
     List<Item> l;
     l.push_back(expr);
     for (ZZ i: sk.pubkey()) {
