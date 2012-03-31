@@ -114,6 +114,13 @@ typedef struct ReturnMeta {
     string stringify();
 } ReturnMeta;
 
+typedef struct AdjustInfo {
+    SECLEVEL l;
+    Item_field * itf;
+    AdjustInfo() : l(SECLEVEL::INVALID), itf(NULL) {}
+    AdjustInfo(SECLEVEL _l, Item_field * _itf) : l(_l), itf(_itf) {}
+    AdjustInfo(const AdjustInfo &  ai): l(ai.l), itf(ai.itf) {}
+} AdjustInfo;
 
 class Analysis {
 public:
@@ -141,7 +148,7 @@ public:
     TMKM                                tmkm;
 
     //fields that needs onions adjusted
-    std::map<onion, std::map<FieldMeta *, SECLEVEL> > onionAdjust;
+    std::map<onion, std::map<FieldMeta *, AdjustInfo> > onionAdjust;
    
     ReturnMeta rmeta;
 

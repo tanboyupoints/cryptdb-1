@@ -264,6 +264,7 @@ toString(const C &l, T op)
 std::string StringFromVal(uint64_t value, unsigned int padLen = 0);
 
 NTL::ZZ UInt64_tToZZ (uint64_t value);
+uint64_t uint64FromZZ(NTL::ZZ val);
 
 std::string StringFromZZ(const NTL::ZZ &x);
 NTL::ZZ ZZFromString(const std::string &s);

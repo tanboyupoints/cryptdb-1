@@ -106,10 +106,17 @@ Item *
 RND_int::decryptUDF(Item * col, Item * ivcol) {
     List<Item> l;
     l.push_back(col);
-    l.push_back(new Item_string(make_thd_string(key), key.length(), &my_charset_bin));
+    
+    Item * keyI = new Item_string(make_thd_string(key),
+				  key.length(), &my_charset_bin);
+    keyI->name = NULL;
+    l.push_back(keyI);
+    
     l.push_back(ivcol);
     
-    return new Item_func_udf_int(&u_decRNDInt, l);	
+    Item * udfI = new Item_func_udf_int(&u_decRNDInt, l);
+    udfI->name = NULL;
+    return udfI;
 }
 
 
@@ -338,14 +345,18 @@ OPE_int::newCreateField() {
 
 Item *
 OPE_int::encrypt(Item * ptext, uint64_t IV) {
-    ZZ enc = ope.encrypt(to_ZZ((ulong) static_cast<Item_int *>(ptext)->value));
-    return new Item_int((ulonglong) trunc_long(enc, 64));
+    ulong pval =  (ulong)static_cast<Item_int *>(ptext)->value;
+    ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ(pval)));
+    LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV << "--->" << enc;
+    return new Item_int(enc);
 }
 
 Item *
 OPE_int::decrypt(Item * ctext, uint64_t IV) {
-    ZZ dec = ope.decrypt(to_ZZ((ulong) static_cast<Item_int*>(ctext)->value));
-    return new Item_int((ulonglong) trunc_long(dec, 32));
+    ulong cval = (ulong) static_cast<Item_int*>(ctext)->value;
+    ulonglong dec = uint64FromZZ(ope.decrypt(to_ZZ(cval)));
+    LOG(encl) << "OPE_int decrypt " << cval << " IV " << IV << "--->" << dec; 
+    return new Item_int(dec);
 }
 
 

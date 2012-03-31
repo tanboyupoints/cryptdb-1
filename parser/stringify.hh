@@ -15,28 +15,7 @@ std::string stringify_ptr(T * x) {
 	return x->stringify();
     }
 }
-/*
-static std::string
-stringify(Item_int * i) {
-    if (i == NULL) {
-	return "NULL";
-    }
-    std::stringstream s;
-    s << i->value;
-    return s.str();
-}
 
-static std::string
-stringify(Item_string * i) {
-    if (i == NULL) {
-	return "NULL";
-    }
-    String s;
-    String *s0 = i->val_str(&s);
-    assert(s0 != NULL);
-    return std::string(s0->ptr(), s0->length());
-}
-*/
 static inline std::ostream&
 operator<<(std::ostream &out, String &s)
 {
@@ -397,7 +376,6 @@ do_create_table(std::ostream &out, LEX &lex)
         }
 
         out << tl->table_name << " ";
-	std::cerr << "in stringiffy, table name is " << tl->table_name << "\n";
     }
 
     if (lex.create_info.options & HA_LEX_CREATE_TABLE_LIKE) {
@@ -532,7 +510,6 @@ operator<<(std::ostream &out, LEX &lex)
             }
 
             lex.query_tables->print(t, &s, QT_ORDINARY);
-	    std::cerr << "s is " << s << "\n";
             out << "into " << s;
             if (lex.field_list.head())
                 out << " " << lex.field_list;

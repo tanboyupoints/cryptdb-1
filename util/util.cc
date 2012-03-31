@@ -135,6 +135,20 @@ IntFromBytes(const unsigned char * bytes, unsigned int noBytes)
     return value;
 }
 
+uint64_t
+uint64FromZZ(ZZ val)
+{
+    uint64_t res = 0;
+    uint64_t mul = 1;
+    while (val > 0) {
+        res = res + mul*(to_int(val % 10));
+        mul = mul * 10;
+        val = val / 10;
+    }
+    return res;
+}
+
+
 string
 StringFromZZ(const ZZ &x)
 {

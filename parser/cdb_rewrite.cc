@@ -15,6 +15,8 @@
 #include <util/cryptdb_log.hh>
 #include <parser/CryptoHandlers.hh>
 
+#include "field.h"
+
 //TODO: so far, do_enforce methods don't seem to do what analyze cannot do
 // needed? maybe we can define it only for needed cases
 
@@ -27,12 +29,36 @@ using namespace std;
                         string(__PRETTY_FUNCTION__))
 
 
-/********  parser utils; TODO: put in util **/
+/********  parser utils; TODO: put some in util **/
+
+
+static char *
+make_thd_string(const string &s, size_t *lenp = 0)
+{
+    THD *thd = current_thd;
+    assert(thd);
+
+    if (lenp)
+        *lenp = s.size();
+    return thd->strmake(s.data(), s.size());
+}
 
 static Item *
-stringToItem(string s) {
-    return new Item_string(s.c_str(), s.length(), &my_charset_bin);
+stringToItemField(string field, string table, Item_field * itf) {
+    Item_field * res = new Item_field(current_thd, itf);
+    res->name = NULL; //no alias
+    res->field_name = current_thd->strdup(field.c_str());
+    res->table_name = make_thd_string(table);
+
+    return res;
 }
+/*
+static Item *
+stringToItem(string s) {
+    Item * it = new Item_string(s.c_str(), s.length(), &my_charset_bin);
+    it->name = NULL; //no alias
+    return it;
+    }*/
 /*
 static string
 ItemToString(Item * i) {
@@ -95,66 +121,67 @@ operator<<(ostream &out, const EncDesc & ed)
 //records what onions need to be adjusted at the server for a query with
 //information in a
 static void
-recordAdjustments(FieldMeta * fm, onion o, SECLEVEL l, Analysis & a) {
+recordAdjustments(FieldMeta * fm, Item_field * it_f, onion o, SECLEVEL l, Analysis & a) {
+
     auto ito = a.onionAdjust.find(o);
     if (ito == a.onionAdjust.end()) {
-	a.onionAdjust[o]= map<FieldMeta *, SECLEVEL>();
-	a.onionAdjust[o][fm] = l;
+	a.onionAdjust[o]= map<FieldMeta *, AdjustInfo>();
+	a.onionAdjust[o][fm] = AdjustInfo(l, it_f);
     } else {
 	auto itf = ito->second.find(fm);
 	if (itf == ito->second.end()) {
-	    ito->second[fm] = l;
+	    ito->second[fm] = AdjustInfo(l, it_f);
 	} else {
-	    itf->second = min(l, itf->second);
+	    itf->second = AdjustInfo(min(l, itf->second.l), it_f);
 	}
     }
 }
 
 //l gets updated to the new level
 static void
-removeOnionLayer(FieldMeta * fm, Analysis & a, onion o, SECLEVEL & l) {
+removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEVEL & l) {
 
-    OnionMeta om      = getAssert(fm->onions, o);
-    string fieldanon  = om.onionname;
+    OnionMeta * om    = getAssert(fm->onions, o);
+    string fieldanon  = om->onionname;
     string tableanon  = fm->tm->anonTableName;
 
     //removes onion layer at the DB 
     stringstream query;
-    query << "UPDATE " << tableanon << " SET " << fieldanon  << " = ";
+    query << "UPDATE " << tableanon << " SET " << fieldanon  << " = CAST( ";
+    
+    Item * decUDF = om->layers.back()->decryptUDF(stringToItemField(fieldanon,     tableanon, itf),
+		  				  stringToItemField(fm->salt_name, tableanon, itf));
 
-    Item * decUDF = om.layers.back()->decryptUDF(stringToItem(fieldanon), stringToItem(fm->salt_name));
-
-    query << decUDF << ";";
+    query << *decUDF << " AS UNSIGNED);";
     
     //execute decryption query
     assert_s(a.conn->execute(query.str()), "failed to execute onion decryption query");
-
-    LOG(cdb_v) << "adjust onions: \n" << query.str() << " ... success! \n";
+        
+    LOG(cdb_v) << "adjust onions: \n" << query.str() << "\n";
 
     //remove onion layer in schema
-    om.layers.pop_back();
-    l = om.layers.back()->level();
-    fm->encdesc.olm[o] = l;   //todo:we do not need olm
-						    //any more; then, do we need level
-						    //in Enclayer?
+    om->layers.pop_back();
+    l = om->layers.back()->level();
+    fm->encdesc.olm[o] = l;
+    //todo:we do not need olm any more; then, do we need level in Enclayer?
 }
 
 /*
  * Same as adjustOnions but for one specific field and onion.
  */
 static void
-adjustOnion(onion o, FieldMeta * fm, SECLEVEL levelto, Analysis & a) {
+adjustOnion(onion o, FieldMeta * fm, AdjustInfo ai, Analysis & a) {
 
     //TODO: use getAssert in more places
     SECLEVEL newlevel = getAssert(fm->encdesc.olm, o);
 
-    while (newlevel > levelto) {
-	removeOnionLayer(fm, a, o, newlevel);
+    while (newlevel > ai.l) {
+	removeOnionLayer(fm, ai.itf, a, o, newlevel);
     }
 }
 
 
-    //TODO: propagate these adjustments in the embedded database?
+//TODO: propagate these adjustments in the embedded database?
 
 /*
  * Examines the current onion levels of fields and the encryption levels
@@ -298,14 +325,14 @@ encrypt_item(Item * i, Analysis & a){
     FieldMeta * fm = im->basefield;
     onion o        = im->o;
     
-    return encrypt_item_layers(i, fm->onions[o].layers);
+    return encrypt_item_layers(i, fm->onions[o]->layers);
 }
 
 static void
 encrypt_item_all_onions(Item * i, FieldMeta * fm,
 			uint64_t IV, vector<Item*> & l) {
     for (auto it : fm->onions) {
-	l.push_back(encrypt_item_layers(i, it.second.layers, IV));
+	l.push_back(encrypt_item_layers(i, it.second->layers, IV));
     }
 }
 
@@ -314,7 +341,7 @@ decrypt_item(ItemMeta * im, Item * i, uint64_t IV) {
     FieldMeta * fm       = im->basefield;
     onion o              = im->o;
 
-    return decrypt_item_layers(i, fm->onions[o].layers, IV);
+    return decrypt_item_layers(i, fm->onions[o]->layers, IV);
 }
 
 /***********end of parser utils *****************/
@@ -343,17 +370,6 @@ operator<<(ostream &out, const OnionLevelFieldPair &p)
     return out;
 }
 
-static char *
-make_thd_string(const string &s, size_t *lenp = 0)
-{
-    THD *thd = current_thd;
-    assert(thd);
-
-    if (lenp)
-        *lenp = s.size();
-    return thd->strmake(s.data(), s.size());
-}
-
 // anonymizes table name based on the information in a.schema
 static string
 anonymize_table_name(const string &tname,
@@ -378,7 +394,7 @@ get_column_name(const string & table,
         thrower() << "field " << field << "unknown \n";
     }
     if (fit->second->onions.find(o) != fit->second->onions.end()) {
-        return fit->second->onions[o].onionname;
+        return fit->second->onions[o]->onionname;
     }
     return field;
 }
@@ -862,7 +878,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         bool restricted = it->second->exposedLevels.restrict(encpair.first,
                                            encpair.second.first);
 	if (restricted) {
-	    recordAdjustments(fm, encpair.first, encpair.second.first, a);
+	    recordAdjustments(fm, i, encpair.first, encpair.second.first, a);
 	}
 
         LOG(cdb_v) << "ENCSET FOR FIELD " << fieldname << " is " << a.fieldToAMeta[fieldname]->exposedLevels;
@@ -943,7 +959,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         for (auto it = fm->onions.begin();
              it != fm->onions.end();
              ++it) {
-            const string &name = it->second.onionname;
+            const string &name = it->second->onionname;
             l.push_back(make_from_template(i, name.c_str()));
         }
         if (fm->has_salt) {
@@ -1063,7 +1079,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
 
 	//encrypt for each onion
         for (auto it = fm->onions.begin(); it != fm->onions.end();it++) {
-	    l.push_back(encrypt_item_layers(i, it->second.layers, salt));
+	    l.push_back(encrypt_item_layers(i, it->second->layers, salt));
         }
 	
         if (fm->has_salt) {
@@ -1892,7 +1908,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
 		    false, i->name);
 
 	FieldMeta * fm = im->basefield;
-	EncLayer * el = getAssert(fm->onions, oAGG).layers.back();
+	EncLayer * el = getAssert(fm->onions, oAGG)->layers.back();
 	assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
 	return ((HOM *)el)->sumUDF(i->get_arg(0));
     }
@@ -2198,15 +2214,15 @@ static void
 init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf, onionlayout ol) {
     for (auto it: ol) {
 	onion o = it.first;
-	OnionMeta om = OnionMeta();
+	OnionMeta * om = new OnionMeta();
 
         //anonymize onion name
-	om.onionname = anonymizeFieldName(index, o, fm->fname, false);
+	om->onionname = anonymizeFieldName(index, o, fm->fname, false);
 
 	//generate enclayers
 	for (auto l: it.second) {
-	    PRNG * key = getLayerKey(mKey, fullName(om.onionname, fm->tm->anonTableName), l);	    
-	    om.layers.push_back(EncLayerFactory::encLayer(l, cf, key));
+	    PRNG * key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);	    
+	    om->layers.push_back(EncLayerFactory::encLayer(l, cf, key));
 	}
 
 	fm->onions[o] = om;
@@ -2298,12 +2314,11 @@ static void rewrite_create_field(const string &table_name,
     for (auto oit = fm->onions.begin();
          oit != fm->onions.end();
          ++oit) {
-	cerr << "create field from onion " << oit->second.onionname ;
-	EncLayer * last_layer = oit->second.layers.back();
+	EncLayer * last_layer = oit->second->layers.back();
 	Create_field * new_cf = last_layer->newCreateField();
 		
 	//use anonymous onionname
-	new_cf->field_name = oit->second.onionname.c_str();
+	new_cf->field_name = oit->second->onionname.c_str();
         l.push_back(new_cf);
     }
 
@@ -2378,7 +2393,6 @@ rewrite_create_lex(LEX *lex, Analysis &a)
             vector<Create_field *> l;
             rewrite_create_field(table, cf, a, l);
             for (auto it = l.begin(); it != l.end(); ++it) {
-		cerr << "create field " << (*it)->field_name ;
                 newList.push_back(*it);
             }
         }
@@ -2732,7 +2746,7 @@ add_table_update_meta(const string &q,
 #define __temp_write(o) \
         { \
             auto it = fm->onions.find(o); \
-            if (it != fm->onions.end()) { s << "'" << it->second.onionname << "' , "; } \
+            if (it != fm->onions.end()) { s << "'" << it->second->onionname << "' , "; } \
             else                            { s << "NULL, ";               } \
         }
         __temp_write(oDET);
@@ -2784,7 +2798,7 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
 }
 
 static void dropF(Connect * conn, const string & func) {
-    myassert(conn->execute("DROP FUNCTION IF EXISTS " + func + "; "),
+    assert_s(conn->execute("DROP FUNCTION IF EXISTS " + func + "; "),
              "cannot drop " + func + ");");    
 }
 
@@ -2806,7 +2820,7 @@ createF(Connect * conn, const string & func, const string & ret, bool isAggregat
     if (isAggregate) {
 	functype = "AGGREGATE";
     }
-    myassert(conn->execute(
+    assert_s(conn->execute(
                  "CREATE  " + functype + " FUNCTION " + func + " RETURNS " + ret + " SONAME 'edb.so'; "),
              "failed to create udf " + func);    
 }
@@ -2974,8 +2988,6 @@ Rewriter::createMetaTablesIfNotExists()
                    ", INDEX idx_column_name( name )"
                    ", FOREIGN KEY( table_id ) REFERENCES table_info( id ) ON DELETE CASCADE"
                    ") ENGINE=InnoDB;"));
-
-    cerr << "CREATED meta tables \n";
 }
 
 void
@@ -3077,15 +3089,15 @@ Rewriter::initSchema()
                 bool has_agg = string(row[i++], l[j++]) == "1";
                 bool has_swp = string(row[i++], l[j++]) == "1";
 
-                fm->onions[oDET].onionname = string(row[i++], l[j++]);
+                fm->onions[oDET]->onionname = string(row[i++], l[j++]);
 
-                if (has_ope) { fm->onions[oOPE].onionname = string(row[i++], l[j++]); }
+                if (has_ope) { fm->onions[oOPE]->onionname = string(row[i++], l[j++]); }
                 else         { i++; j++; }
 
-                if (has_agg) { fm->onions[oAGG].onionname = string(row[i++], l[j++]); }
+                if (has_agg) { fm->onions[oAGG]->onionname = string(row[i++], l[j++]); }
                 else         { i++; j++; }
 
-                if (has_swp) { fm->onions[oSWP].onionname = string(row[i++], l[j++]); }
+                if (has_swp) { fm->onions[oSWP]->onionname = string(row[i++], l[j++]); }
                 else         { i++; j++; }
 
                 OnionLevelMap om;

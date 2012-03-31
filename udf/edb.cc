@@ -140,14 +140,14 @@ search(const Token & token, const Binary & overall_ciph)
 static uint64_t
 getui(UDF_ARGS * args, int i)
 {
-    return (uint64_t) (*((longlong *) args->args[i]));
+    return (uint64_t) (*((ulonglong *) args->args[i]));
 }
 
-static unsigned char *
+static char *
 getba(UDF_ARGS * args, int i, uint64_t &len)
 {
     len = args->lengths[i];
-    return (unsigned char*) (args->args[i]);
+    return args->args[i];
 }
 
 #else
@@ -198,16 +198,19 @@ decrypt_int_sem(PG_FUNCTION_ARGS)
     uint64_t eValue = getui(ARGS, 0);
 
     uint64_t keyLen;
-    unsigned char * keyBytes = getba(args, 1, keyLen);
-    string key = string((char *)keyBytes, keyLen);
+    char * keyBytes = getba(args, 1, keyLen);
+    string key = string(keyBytes, keyLen);
     
     uint64_t salt = getui(args, 2);
 
     blowfish bf(key);
     uint64_t value = bf.decrypt(eValue) ^ salt;
 
+    cerr << "udf: encVal " << eValue << " key " << (int)key[0] << " " << (int)key[1] << " " << (int) key[3]  << " salt " << salt  << " obtains: " << value << " and cast to ulonglong " << (ulonglong) value << "\n";
+
+   
 #if MYSQL_S
-    return (ulonglong) value;
+     return (ulonglong) value;
 #else /* postgres */
     PG_RETURN_INT64(value);
 #endif
@@ -230,8 +233,8 @@ decrypt_int_det(PG_FUNCTION_ARGS)
     uint64_t eValue = getui(ARGS, 0);
 
     uint64_t keyLen;
-    unsigned char * keyBytes = getba(args, 1, keyLen);
-    string key = string((char *)keyBytes, keyLen);
+    char * keyBytes = getba(args, 1, keyLen);
+    string key = string(keyBytes, keyLen);
    
     blowfish bf(key);
     uint64_t value = bf.decrypt(eValue);
@@ -261,8 +264,8 @@ decrypt_int_det(PG_FUNCTION_ARGS)
     uint64_t eValue = getui(ARGS, 0);
 
     uint64_t keyLen;
-    unsigned char * keyBytes = getba(args, 1, keyLen);
-    string key = string((char *)keyBytes, keyLen);
+    char * keyBytes = getba(args, 1, keyLen);
+    string key = string(keyBytes, keyLen);
    
     blowfish bf(key);
     uint64_t value = bf.encrypt(eValue);
@@ -303,21 +306,21 @@ decrypt_text_sem(PG_FUNCTION_ARGS)
 #endif
 {
     uint64_t eValueLen;
-    unsigned char *eValueBytes = getba(args, 0, eValueLen);
+    char *eValueBytes = getba(args, 0, eValueLen);
 
     uint64_t keyLen;
-    unsigned char * keyBytes = getba(args, 1, keyLen);
-    string key = string((char *)keyBytes, keyLen);
+    char * keyBytes = getba(args, 1, keyLen);
+    string key = string(keyBytes, keyLen);
     
      uint64_t salt = getui(ARGS, 2);
 
      AES_KEY *aesKey = get_AES_dec_key(key);
-     string value = decrypt_SEM(eValueBytes, eValueLen, aesKey, salt);
+     string value = decrypt_SEM((unsigned char *)eValueBytes, eValueLen, aesKey, salt);
      delete aesKey;
 
 #if MYSQL_S
-    unsigned char * res = new unsigned char[value.length()];
-    initid->ptr = (char *) res;
+    char * res = new char[value.length()];
+    initid->ptr = res;
     memcpy(res, value.data(), value.length());
     *length =  value.length();
     return (char*) initid->ptr;
@@ -358,19 +361,19 @@ decrypt_text_det(PG_FUNCTION_ARGS)
 #endif
 {
     uint64_t eValueLen;
-    unsigned char *eValueBytes = getba(args, 0, eValueLen);
+    char *eValueBytes = getba(args, 0, eValueLen);
 
     uint64_t keyLen;
-    unsigned char *keyBytes = getba(args, 1, keyLen);
-    string key = string((char *)keyBytes, keyLen);
+    char *keyBytes = getba(args, 1, keyLen);
+    string key = string(keyBytes, keyLen);
     
     AES_KEY * aesKey = get_AES_dec_key(key);
-    string value = decrypt_AES_CMC(string((char *)eValueBytes, (unsigned int)eValueLen), aesKey, false);
+    string value = decrypt_AES_CMC(string(eValueBytes, (unsigned int)eValueLen), aesKey, false);
     delete aesKey;
 
 #if MYSQL_S
-    unsigned char * res = new unsigned char[value.length()];
-    initid->ptr = (char *) res;
+    char * res = new char[value.length()];
+    initid->ptr = res;
     memcpy(res, value.data(), value.length());
     *length =  value.length();
     return (char*) initid->ptr;
@@ -462,13 +465,13 @@ searchSWP_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
     Token * t = new Token();
 
     uint64_t ciphLen;
-    unsigned char *ciph = getba(args, 0, ciphLen);
+    char *ciph = getba(args, 0, ciphLen);
 
     uint64_t wordKeyLen;
-    unsigned char *wordKey = getba(args, 1, wordKeyLen);
+    char *wordKey = getba(args, 1, wordKeyLen);
 
-    t->ciph = Binary((unsigned int) ciphLen, ciph);
-    t->wordKey = Binary((unsigned int)wordKeyLen, wordKey);
+    t->ciph = Binary((unsigned int) ciphLen, (unsigned char *)ciph);
+    t->wordKey = Binary((unsigned int)wordKeyLen, (unsigned char*)wordKey);
 
     initid->ptr = (char *) t;
 
@@ -486,8 +489,8 @@ ulonglong
 searchSWP(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
 {
     uint64_t allciphLen;
-    unsigned char * allciph = getba(ARGS, 2, allciphLen);
-    Binary overallciph = Binary((unsigned int)allciphLen, allciph);
+    char * allciph = getba(ARGS, 2, allciphLen);
+    Binary overallciph = Binary((unsigned int)allciphLen, (unsigned char *)allciph);
 
     Token * t = (Token *) initid->ptr;
 
