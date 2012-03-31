@@ -139,12 +139,12 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
 
     //removes onion layer at the DB 
     stringstream query;
-    query << "UPDATE " << tableanon << " SET " << fieldanon  << " = CAST( ";
+    query << "UPDATE " << tableanon << " SET " << fieldanon  << " = ";
     
     Item * decUDF = om->layers.back()->decryptUDF(stringToItemField(fieldanon,     tableanon, itf),
 		  				  stringToItemField(fm->salt_name, tableanon, itf));
 
-    query << *decUDF << " AS UNSIGNED);";
+    query << *decUDF << ";";
     
     //execute decryption query
     assert_s(a.conn->execute(query.str()), "failed to execute onion decryption query");
@@ -1882,7 +1882,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
 					 getAssert<Item_field*, FieldMeta*>(a.itemToFieldMeta,
 										(Item_field *)child_item));
 	
-	cerr << "CONSTRAINTS after gathers in item_sum_sum: " << new_tr << "\n";
+	LOG(cdb_v) << "CONSTRAINTS after gathers in item_sum_sum: " << new_tr << "\n";
 	return new_tr.encset;
     }
     virtual void do_enforce_type(Item_sum_sum *i, const constraints &tr, Analysis & a) const
@@ -1894,6 +1894,12 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
     virtual Item * do_rewrite_type(Item_sum_sum * i, Analysis & a) const {
 	LOG(cdb_v) << "rewrite in CItemAdditive ";
 
+	assert_s(i->get_arg_count() == 1, "support for sum with number of arguments != 1 not currently implemented in CryptDB");
+	Item * child_item = i->get_arg(0);
+	rewrite(&child_item, a);
+	i->set_arg(0, current_thd, child_item);
+	
+	
 	ItemMeta * im = getAssert(a.itemToMeta, (Item *)i);
 	
 	//record information for decrypting results

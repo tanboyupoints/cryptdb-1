@@ -115,9 +115,14 @@ RND_int::decryptUDF(Item * col, Item * ivcol) {
     
     l.push_back(ivcol);
     
-    Item * udfI = new Item_func_udf_int(&u_decRNDInt, l);
-    udfI->name = NULL;
-    return udfI;
+    Item * udfsum = new Item_func_udf_int(&u_decRNDInt, l);
+    udfsum->name = NULL; //no alias
+
+    //add encompassing CAST for unsigned
+    Item * udf = new Item_func_unsigned(udfsum);
+    udf->name = NULL;
+
+    return udf;
 }
 
 
@@ -411,7 +416,10 @@ ItemToZZ(Item * ptext) {
 static Item *
 ZZToItem(const ZZ & val) {
     string str = StringFromZZ(val);
-    return new Item_string(str.c_str(), str.length(), &my_charset_bin);
+    Item * newit = new Item_string(str.c_str(), str.length(), &my_charset_bin);
+    newit->name = NULL; //no alias
+
+    return newit;
 }
 
 Item *
@@ -428,8 +436,8 @@ HOM::decrypt(Item * ctext, uint64_t IV) {
 
 
 static LEX_STRING n_sum = {
-    (char*)"agg_add",
-    sizeof("agg_add"),
+    (char*)"agg",
+    sizeof("agg"),
 };
 
 static udf_func u_sum = {
