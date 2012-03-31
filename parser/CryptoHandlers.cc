@@ -115,11 +115,11 @@ RND_int::decryptUDF(Item * col, Item * ivcol) {
     
     l.push_back(ivcol);
     
-    Item * udfsum = new Item_func_udf_int(&u_decRNDInt, l);
-    udfsum->name = NULL; //no alias
+    Item * udfdec = new Item_func_udf_int(&u_decRNDInt, l);
+    udfdec->name = NULL; //no alias
 
     //add encompassing CAST for unsigned
-    Item * udf = new Item_func_unsigned(udfsum);
+    Item * udf = new Item_func_unsigned(udfdec);
     udf->name = NULL;
 
     return udf;
@@ -251,9 +251,19 @@ Item *
 DET_int::decryptUDF(Item * col, Item * ivcol) {
     List<Item> l;
     l.push_back(col);
-    l.push_back(new Item_string(make_thd_string(key), key.length(), &my_charset_bin));
+
+    Item * keyI = new Item_string(make_thd_string(key), key.length(), &my_charset_bin);
+    keyI->name = NULL;
+    l.push_back(keyI);
     
-    return new Item_func_udf_int(&u_decDETInt, l);	
+    Item * udfdec = new Item_func_udf_int(&u_decDETInt, l);
+    udfdec->name = NULL;
+    
+    //add encompassing CAST for unsigned
+    Item * udf = new Item_func_unsigned(udfdec);
+    udf->name = NULL;
+
+    return udf;
 }
 
 DET_str::DET_str(Create_field * f, PRNG * key)
