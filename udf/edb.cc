@@ -206,7 +206,7 @@ decrypt_int_sem(PG_FUNCTION_ARGS)
     blowfish bf(key);
     uint64_t value = bf.decrypt(eValue) ^ salt;
 
-    cerr << "udf: encVal " << eValue << " key " << (int)key[0] << " " << (int)key[1] << " " << (int) key[3]  << " salt " << salt  << " obtains: " << value << " and cast to ulonglong " << (ulonglong) value << "\n";
+    //cerr << "udf: encVal " << eValue << " key " << (int)key[0] << " " << (int)key[1] << " " << (int) key[3]  << " salt " << salt  << " obtains: " << value << " and cast to ulonglong " << (ulonglong) value << "\n";
 
    
 #if MYSQL_S
