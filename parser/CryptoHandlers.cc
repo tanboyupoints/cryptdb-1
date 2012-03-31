@@ -8,7 +8,8 @@ using namespace std;
 using namespace NTL;
 
 //TODO: this is duplicated in cdb_rewrite
-static char *
+//moved to util/util
+/*static char *
 make_thd_string(const string &s, size_t *lenp = 0)
 {
     THD *thd = current_thd;
@@ -25,7 +26,7 @@ ItemToString(Item * i) {
     String *s0 = i->val_str(&s);
     assert(s0 != NULL);
     return string(s0->ptr(), s0->length());
-}
+    }*/
 
 //TODO: remove above newcreatefield
 static Create_field*

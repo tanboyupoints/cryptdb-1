@@ -12,12 +12,12 @@
     m(crypto)               \
     m(crypto_v)             \
     m(crypto_data)          \
-    m(encl)	    \
     m(edb)                  \
     m(edb_v)                \
     m(edb_query)            \
     m(edb_query_plain)      \
     m(edb_perf)             \
+    m(encl)                 \
     m(test)                 \
     m(am)                   \
     m(am_v)                 \

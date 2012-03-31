@@ -269,10 +269,6 @@ testMeta(const TestConfig &tc, KeyAccess * am) {
     
     list<Prin> bfs = am->BFS_hasAccess(alice);
     list<string> dfs = am->DFS_hasAccess(alice);
-    
-    //XXX write new tests for bfs, dfs
-    //record(tc, bfs.size() == dfs.size(), test + "bfs and dfs have different sizes");
-    
 }
 
 static void
@@ -291,7 +287,9 @@ testSingleUser(const TestConfig &tc, KeyAccess * am) {
     record(tc, am->getKey(u1).length() == 0, test + "u1's key accesible with no one logged on");
     record(tc, am->getKey(g5).length() == 0, test + "g5's key accesible with no one logged on");
     record(tc, am->getKey(f2).length() == 0, test + "f2's key accesible with no one logged on");
+    cerr << "ABOUT TO INSERT ALICE" << endl;
     am->insertPsswd(alice,secretA);
+    cerr << "DONE INSERTING ALICE" << endl;
     string f2_key2 = marshallBinary(am->getKey(f2));
     record(tc, f2_key2.length() > 0, test + "alice cannot access forumkey");
     record(tc, f2_key1.compare(f2_key2) == 0, test + "forum keys are not equal for alice");

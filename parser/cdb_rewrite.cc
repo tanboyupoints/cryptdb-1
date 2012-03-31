@@ -15,7 +15,11 @@
 #include <util/cryptdb_log.hh>
 #include <parser/CryptoHandlers.hh>
 
+
 #include "field.h"
+
+#include <edb/MultiPrinc.hh>
+
 
 //TODO: so far, do_enforce methods don't seem to do what analyze cannot do
 // needed? maybe we can define it only for needed cases
@@ -30,18 +34,6 @@ using namespace std;
 
 
 /********  parser utils; TODO: put some in util **/
-
-
-static char *
-make_thd_string(const string &s, size_t *lenp = 0)
-{
-    THD *thd = current_thd;
-    assert(thd);
-
-    if (lenp)
-        *lenp = s.size();
-    return thd->strmake(s.data(), s.size());
-}
 
 static Item *
 stringToItemField(string field, string table, Item_field * itf) {
@@ -369,6 +361,7 @@ operator<<(ostream &out, const OnionLevelFieldPair &p)
         << ")";
     return out;
 }
+
 
 // anonymizes table name based on the information in a.schema
 static string
@@ -2224,11 +2217,10 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
 	    PRNG * key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);	    
 	    om->layers.push_back(EncLayerFactory::encLayer(l, cf, key));
 	}
-
-	fm->onions[o] = om;
+        fm->onions[o] = om;
 	
-	//set outer layer
-	fm->encdesc.olm[o] = it.second.back(); 
+        //set outer layer
+        fm->encdesc.olm[o] = it.second.back(); 
     }
 }
 
@@ -3186,7 +3178,7 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
     */
     return list<string>();
 }
-/*
+
 void
 Rewriter::mp_init(Analysis &a) {
     //start new temp mkm
@@ -3195,7 +3187,6 @@ Rewriter::mp_init(Analysis &a) {
     a.tmkm.processingQuery = false;
     a.tmkm.returnBitMap.clear();
 }
-*/
 
 list<string>
 Rewriter::rewrite(const string & q, Analysis & analysis)
@@ -3204,7 +3195,6 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
     query_parse p(ci.db, q);
     analysis = Analysis(e_conn, conn, schema, masterKey, mp);
 
-    /* REMOVED FOR NOW
     //initialize multi-principal
     mp_init(analysis);
 
@@ -3216,7 +3206,7 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
         } else {
             return processAnnotation(*p.annot, analysis);
         }
-	} */
+	}
 
     LEX *lex = p.lex();
 
@@ -3365,12 +3355,12 @@ printRes(const ResType & r) {
 	stringstream ss;
         for (unsigned int j = 0; j < r.rows[i].size(); j++) {
             char buf[400];
-	    stringstream sstr;
-	    sstr << r.rows[i][j];
-	    snprintf(buf, sizeof(buf), "%-20s", sstr.str().c_str());
+            std::stringstream sstr;
+            sstr << r.rows[i][j];
+            snprintf(buf, sizeof(buf), "%-20s", sstr.str().c_str());
             ss << buf;
         }
-	std::cerr << std::endl;
+        std::cerr << std::endl;
         LOG(edb_v) << ss.str();
     }
 }
