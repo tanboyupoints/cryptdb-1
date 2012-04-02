@@ -8,10 +8,9 @@
 #include <signal.h>
 #include <stdlib.h>
 
-#include <edb/Connect.hh>
-#include <test/test_utils.hh>
-
 #include <parser/cdb_rewrite.hh>
+
+#include <test/test_utils.hh>
 
 typedef enum test_mode {
     UNENCRYPTED, SINGLE, MULTI,

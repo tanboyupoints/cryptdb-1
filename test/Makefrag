@@ -5,7 +5,7 @@ OBJDIRS	+= test
 #		TestAccessManager.cc TestQueries.cc
 TEST_SRCS   :=  test_utils.cc \
 	    	    test.cc \
-		        TestAccessManager.cc
+		        TestAccessManager.cc TestQueries.cc
         
 all:	$(OBJDIR)/test/test
 

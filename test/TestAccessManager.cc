@@ -342,9 +342,7 @@ testMultiBasic(const TestConfig &tc, KeyAccess * am) {
     am->insert(g5,mlwork);
     record(tc, am->getKey(mlwork).length() == 0,
        test+"can access mailing list work key with no one logged in");
-    cerr << "a" << endl;
     record(tc, am->insertPsswd(alice, secretA) == 0, "insert alice failed (4)");
-    cerr << "d" << endl;
     string work_key1 = marshallBinary(am->getKey(mlwork));
     record(tc, work_key1.length() > 0,
        test+"mailing list work key inaccessible when alice is logged on");

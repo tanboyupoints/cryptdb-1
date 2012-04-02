@@ -914,7 +914,7 @@ KeyAccess::insert(Prin hasAccess, Prin accessTo)
             if (key_for_decryption.length() > 0) {
                 PrinKey accessToPrinKey = decryptSym(ItemToStr(it->at(4)),
                                                      key_for_decryption,
-                                                     ItemToString(it->at(5)));
+                                                     ItemToStr(it->at(5)));
                 accessToKey = accessToPrinKey.key;
                 break;
             }
@@ -1290,7 +1290,7 @@ KeyAccess::getSecretKey(Prin prin)
         return error;
     }
 
-    return decryptSym(ItemToStr(res.rows[0][3]), getKey(prin), ItemToString(res.rows[0][4]));
+    return decryptSym(ItemToStr(res.rows[0][3]), getKey(prin), ItemToStr(res.rows[0][4]));
 }
 
 int
@@ -1396,9 +1396,10 @@ KeyAccess::insertPsswd(Prin gives, const string &psswd)
                     accessible_values.insert(new_prin);
                     string new_key = getKey(new_prin);
                     //cerr << "  new_key: " << new_key << endl;
-                    string sym = ItemToStr(row->at(4));
+                    string sym, asym;
+                    sym = ItemToStr(row->at(4));
                     string salt = ItemToStr(row->at(5));
-                    string asym = ItemToStr(row->at(6));
+                    asym = ItemToStr(row->at(6));
                     PrinKey new_prin_key;
                     //if key is not currently held by anyone
                     if (new_key.length() == 0) {
