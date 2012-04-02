@@ -45,8 +45,10 @@
 #define TN_SALT "bigint unsigned"
 #endif
 
-#define TN_SYM_KEY "varbinary(32)"
-#define TN_PK_KEY  "varbinary(1220)"
+#define TN_SYM_KEY "varchar(32)"
+#define TN_PK_KEY "varchar(1220)"
+//#define TN_SYM_KEY "varbinary(32)"
+//#define TN_PK_KEY  "varbinary(1220)"
 
 #define psswdtable "activeusers"
 
