@@ -541,6 +541,7 @@ agg_add(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
     if (!as->n2_set) {
         ZZFromBytes(as->n2, (const uint8_t *) args->args[1],
                         args->lengths[1]);
+	cerr << "n2 is " << as->n2 << "\n";
         as->n2_set = 1;
     }
   
