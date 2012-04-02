@@ -105,8 +105,7 @@ ItemToString(Item * i) {
     String *s0 = i->val_str(&s);
     assert(s0 != NULL);
     string ret = string(s0->ptr(), s0->length());
-    size_t len = (size_t) ret.size();
-    return make_thd_string(ret, &len);
+    return ret;
 }
 
 string
