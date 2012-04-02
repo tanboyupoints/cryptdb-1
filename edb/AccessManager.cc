@@ -41,7 +41,13 @@ ItemToStr(Item *i) {
     if (s0 == NULL) {
         return "";
     }
-    return string(s0->ptr(), s0->length());
+    string ret = string(s0->ptr(), s0->length());
+    size_t len = (size_t) ret.size();
+    string ret2 = make_thd_string(ret, &len);
+    if (ret2.size() != len) {
+        cerr << "thd_string changed size from " << ret.size() << " to " << ret2.size() << endl;
+    }
+    return ret2;
 }
 
 
@@ -939,7 +945,7 @@ KeyAccess::insert(Prin hasAccess, Prin accessTo)
         uint64_t salt = randomValue();
         AES_KEY * aes = get_AES_enc_key(hasAccessKey);
         encrypted_accessToKey = encrypt_AES_CBC(accessToKey, aes, BytesFromInt(salt, SALT_LEN_BYTES));
-        //cerr << "encrypted to encrypted_key " << encrypted_accessToKey << "(length " << encrypted_accessToKey.size() << ") with " << hasAccessKey << endl;;
+        cerr << "encrypted to encrypted_key " << encrypted_accessToKey << "(length " << encrypted_accessToKey.size() << ") with " << hasAccessKey << endl;;
         string string_salt = strFromVal(salt);
         string_encrypted_accessToKey = marshallBinary(encrypted_accessToKey);
         sql = "INSERT INTO " + table + "(hasAccessType, hasAccessValue, " + 
@@ -1386,52 +1392,46 @@ KeyAccess::insertPsswd(Prin gives, const string &psswd)
                 }
                 ResType res = SelectAccess(hasAccess_prin, empty);
                 //cerr << "res okay " << res.rows.size() << " for " << hasAccess_prin.gen << "=" << hasAccess_prin.value << endl;
-                if (res.rows.size() > 0) {
-                    auto row = res.rows.begin();
-                    while (row != res.rows.end()) {
-                        string sym = ItemToStr(row->at(4));
-                        string salt = ItemToString(row->at(5));
-                        string asym = ItemToStr(row->at(6));
-                        //cerr << "ROW! " << ItemToString(row->at(0)) << " | " << ItemToString(row->at(1)) << " | " << ItemToString(row->at(2)) << " | " << ItemToString(row->at(3)) << " | " << sym << " | " << salt << " | " << asym << endl;
-                        //remember to check this Prin on the next level
-                        Prin new_prin;
-                        //accessTo prin
-                        new_prin.gen = ItemToString(row->at(2));
-                        new_prin.value = ItemToString(row->at(3));
-                        //cerr << "  new_prin: " << new_prin.gen << "=" << new_prin.value << endl;
-                        accessible_values.insert(new_prin);
-                        string new_key = getKey(new_prin);
-                        //cerr << "  new_key: " << new_key << endl;
-                        PrinKey new_prin_key;
-                        //if key is not currently held by anyone
-                        if (new_key.length() == 0) {
-                            assert_s(getKey(
-                                         hasAccess_prin).length() > 0,
-                                     "there is a logical issue with insertPsswd: getKey should have the key for hasAccess");
-                            if (asym.size() == 0 || asym == "NULL") {
-                                // symmetric key okay
-                                new_prin_key =
-                                    decryptSym(sym, getKey(hasAccess_prin), salt);
-                            } else {
-                                // use asymmetric
-                                PrinKey sec_key = getSecretKey(hasAccess_prin);
-                                new_prin_key = decryptAsym(asym,
-                                                           sec_key.key);
-                            }
-                            //cerr << "\t got key: " << new_prin_key.key << endl;
+                for (auto row = res.rows.begin(); row != res.rows.end(); row++) {
+                    string sym = ItemToStr(row->at(4));
+                    string salt = ItemToString(row->at(5));
+                    string asym = ItemToStr(row->at(6));
+                    cerr << "ROW! " << ItemToString(row->at(0)) << " | " << ItemToString(row->at(1)) << " | " << ItemToString(row->at(2)) << " | " << ItemToString(row->at(3)) << " | " << sym << " | " << salt << " | " << asym << endl;
+                    //remember to check this Prin on the next level
+                    Prin new_prin;
+                    //accessTo prin
+                    new_prin.gen = ItemToString(row->at(2));
+                    new_prin.value = ItemToString(row->at(3));
+                    cerr << "  new_prin: " << new_prin.gen << "=" << new_prin.value << endl;
+                    accessible_values.insert(new_prin);
+                    string new_key = getKey(new_prin);
+                    //cerr << "  new_key: " << new_key << endl;
+                    PrinKey new_prin_key;
+                    //if key is not currently held by anyone
+                    if (new_key.length() == 0) {
+                        assert_s(getKey(
+                                        hasAccess_prin).length() > 0,
+                                 "there is a logical issue with insertPsswd: getKey should have the key for hasAccess");
+                        if (asym.size() == 0 || asym == "NULL") {
+                            // symmetric key okay
+                            new_prin_key =
+                                decryptSym(sym, getKey(hasAccess_prin), salt);
+                        } else {
+                            // use asymmetric
+                            PrinKey sec_key = getSecretKey(hasAccess_prin);
+                            new_prin_key = decryptAsym(asym,
+                                                       sec_key.key);
                         }
-                        //if key is currently held by someone else...
-                        else {
-                            new_prin_key = buildKey(new_prin, new_key);
-                        }
-                        //cerr << "\t   c" << endl;
-                        new_prin_key.principals_with_access.insert(new_prin);
-                        new_prin_key.principals_with_access.insert(
-                            hasAccess_prin);
-                        if (addToKeys(new_prin, new_prin_key) < 0) {
-                            ret--;
-                        }
-                        row++;
+                        //cerr << "\t got key: " << new_prin_key.key << endl;
+                    }
+                    //if key is currently held by someone else...
+                    else {
+                        new_prin_key = buildKey(new_prin, new_key);
+                    }
+                    new_prin_key.principals_with_access.insert(new_prin);
+                    new_prin_key.principals_with_access.insert(hasAccess_prin);
+                    if (addToKeys(new_prin, new_prin_key) < 0) {
+                        ret--;
                     }
                 }
             }
@@ -1742,6 +1742,7 @@ KeyAccess::SelectAccessCol(Prin hasAccess, Prin accessTo, string column)
     }
     sql += ";";
     LOG(am_v) << sql;
+    cerr << sql << endl;
     return execute(sql);
 }
 
@@ -1804,9 +1805,6 @@ KeyAccess::GenerateAsymKeys(Prin prin, PrinKey prin_key)
 }
 
 PrinKey
-/*KeyAccess::decryptSym(Item *sql_encrypted_key,
-                      const string &key_for_decrypting,
-                      Item *sql_salt)*/
 KeyAccess::decryptSym(const string &sql_encrypted_key,
                       const string &key_for_decrypting,
                       const string &sql_salt)
@@ -1816,7 +1814,8 @@ KeyAccess::decryptSym(const string &sql_encrypted_key,
     }
     string encrypted_key = sql_encrypted_key;
     uint64_t salt = valFromStr(sql_salt);
-    //cerr << "decrypt " << encrypted_key << "(length " << encrypted_key.size() << ") with " << key_for_decrypting << endl;
+    cerr << "decrypt " << encrypted_key << "(length " << encrypted_key.size() << ") with " << key_for_decrypting << endl;
+    assert_s(encrypted_key.size() == 32, "encrypted key trunacted -- should be 32");
     AES_KEY * aes = get_AES_dec_key(key_for_decrypting);
     string key = decrypt_AES_CBC(encrypted_key, aes, BytesFromInt(salt, SALT_LEN_BYTES));
     PrinKey result;
