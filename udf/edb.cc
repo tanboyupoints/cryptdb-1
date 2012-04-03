@@ -539,22 +539,23 @@ agg_clear(UDF_INIT *initid, char *is_null, char *error)
 my_bool
 agg_add(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
 {
-    cerr << "in agg_add \n";
+    //cerr << "in agg_add \n";
     agg_state *as = (agg_state *) initid->ptr;
     if (!as->n2_set) {
-	cerr << "args I get are " << CryptoManager::marshallKey(string((const char *)args->args[1], args->lengths[1]))
-	     << "\n";
-        ZZFromBytes(as->n2, (const uint8_t *) args->args[1],
+	//cerr << "n2 length is " << args->lengths[1] << "\n";
+	//cerr << "n2 first byte is " << (int)args->args[1][0] << "\n";
+	ZZFromBytes(as->n2, (const uint8_t *) args->args[1],
                         args->lengths[1]);
-	cerr << "n2 is " << as->n2 << "\n";
+	//cerr << "n2 is " << as->n2 << "\n";
         as->n2_set = 1;
     }
   
     ZZ e;
     ZZFromBytes(e, (const uint8_t *) args->args[0], args->lengths[0]);
 
+    //cerr << "element to add " << e << "\n";
     MulMod(as->sum, as->sum, e, as->n2);
-    cerr << "sum so far " << as->sum << "\n";
+    //cerr << "sum so far " << as->sum << "\n";
     return true;
 }
 

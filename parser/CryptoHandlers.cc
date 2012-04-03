@@ -418,32 +418,45 @@ HOM::newCreateField() {
 }
 
 static ZZ
-ItemToZZ(Item * ptext) {
+ItemIntToZZ(Item * ptext) {
     ulonglong val = ((Item_int*) ptext)->value;
     return to_ZZ((unsigned long)val);
 }
 
 static Item *
-ZZToItem(const ZZ & val) {
+ZZToItemInt(const ZZ & val) {
+    ulonglong v = to_ulong(val);
+    return new Item_int(v);
+}
+
+static Item *
+ZZToItemStr(const ZZ & val) {
     string str = StringFromZZ(val);
-    Item * newit = new Item_string(str.c_str(), str.length(), &my_charset_bin);
+    cerr << "n2 len is " << str.length() << " first byte " << (int)str[0] << "\n";
+    Item * newit = new Item_string(make_thd_string(str), str.length(), &my_charset_bin);
     newit->name = NULL; //no alias
 
     return newit;
 }
 
+static ZZ
+ItemStrToZZ(Item* i) {
+    string res = ItemToString(i);
+    return ZZFromString(res);
+}
+
 Item *
 HOM::encrypt(Item * ptext, uint64_t IV) {
-    ZZ enc = sk.encrypt(ItemToZZ(ptext));
-    return ZZToItem(enc);
+    ZZ enc = sk.encrypt(ItemIntToZZ(ptext));
+    return ZZToItemStr(enc);
 }
 
 Item *
 HOM::decrypt(Item * ctext, uint64_t IV) {
-    ZZ enc = ItemToZZ(ctext);
+    ZZ enc = ItemStrToZZ(ctext);
     ZZ dec = sk.decrypt(enc);
     LOG(encl) << "HOM ciph " << enc << "---->" << dec; 
-    return ZZToItem(dec);
+    return ZZToItemInt(dec);
 }
 
 
@@ -472,7 +485,7 @@ HOM::sumUDF(Item * expr) {
          
     List<Item> l;
     l.push_back(expr);
-    l.push_back(ZZToItem(sk.hompubkey()));
+    l.push_back(ZZToItemStr(sk.hompubkey()));
         
     return new Item_func_udf_str(&u_sum, l);
 }
