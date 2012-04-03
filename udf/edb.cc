@@ -511,9 +511,11 @@ struct agg_state {
 my_bool
 agg_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
 {
+    cerr << "in agg_init \n";
     agg_state *as = new agg_state();
     as->rbuf = malloc(CryptoManager::Paillier_len_bytes);
     initid->ptr = (char *) as;
+    cerr << "returning from agg_init \n";
     return 0;
 }
 
@@ -537,8 +539,11 @@ agg_clear(UDF_INIT *initid, char *is_null, char *error)
 my_bool
 agg_add(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
 {
+    cerr << "in agg_add \n";
     agg_state *as = (agg_state *) initid->ptr;
     if (!as->n2_set) {
+	cerr << "args I get are " << CryptoManager::marshallKey(string((const char *)args->args[1], args->lengths[1]))
+	     << "\n";
         ZZFromBytes(as->n2, (const uint8_t *) args->args[1],
                         args->lengths[1]);
 	cerr << "n2 is " << as->n2 << "\n";
@@ -549,6 +554,7 @@ agg_add(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
     ZZFromBytes(e, (const uint8_t *) args->args[0], args->lengths[0]);
 
     MulMod(as->sum, as->sum, e, as->n2);
+    cerr << "sum so far " << as->sum << "\n";
     return true;
 }
 

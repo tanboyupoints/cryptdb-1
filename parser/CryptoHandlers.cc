@@ -440,7 +440,9 @@ HOM::encrypt(Item * ptext, uint64_t IV) {
 
 Item *
 HOM::decrypt(Item * ctext, uint64_t IV) {
-    ZZ dec = sk.decrypt(ItemToZZ(ctext));
+    ZZ enc = ItemToZZ(ctext);
+    ZZ dec = sk.decrypt(enc);
+    LOG(encl) << "HOM ciph " << enc << "---->" << dec; 
     return ZZToItem(dec);
 }
 
@@ -470,10 +472,8 @@ HOM::sumUDF(Item * expr) {
          
     List<Item> l;
     l.push_back(expr);
-    for (ZZ i: sk.pubkey()) {
-	l.push_back(ZZToItem(i));
-    }
-    
+    l.push_back(ZZToItem(sk.hompubkey()));
+        
     return new Item_func_udf_str(&u_sum, l);
 }
 
