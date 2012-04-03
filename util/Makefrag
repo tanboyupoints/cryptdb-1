@@ -1,7 +1,5 @@
 OBJDIRS += util
-UTILSRC := onions.cc cryptdb_log.cc ctr.cc util.cc
-
-
+UTILSRC := onions.cc cryptdb_log.cc ctr.cc util.cc mysqld-filler.cc
 
 all:    $(OBJDIR)/libedbutil.so
 $(OBJDIR)/libedbutil.so: $(patsubst %.cc,$(OBJDIR)/util/%.o,$(UTILSRC))
@@ -9,12 +7,10 @@ $(OBJDIR)/libedbutil.so: $(patsubst %.cc,$(OBJDIR)/util/%.o,$(UTILSRC))
 	       -Wl,--whole-archive -L$(MYBUILD)/libmysqld -lmysqld \
 	       -Wl,--no-whole-archive $(LDFLAGS)
 
-
 install: install_util
 
 .PHONY: install_util
 install_util: $(OBJDIR)/libedbutil.so
 	install -m 644 $(OBJDIR)/libedbutil.so /usr/lib
-
 
 # vim: set noexpandtab:
