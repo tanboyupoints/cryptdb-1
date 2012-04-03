@@ -376,11 +376,11 @@ class KeyAccess {
     //returns: str_encrypted_key decrypted symmetrically with
     // key_for_decrypting
     //         principals_with_access is empty
-    PrinKey decryptSym(Item *sql_encrypted_key,
+    PrinKey decryptSym(const std::string &sql_encrypted_key,
                        const std::string &key_for_decrypting,
-                       Item *sql_salt);
+                       const std::string &sql_salt);
 
-    PrinKey decryptAsym(Item *sql_encrypted_key,
+    PrinKey decryptAsym(const std::string &sql_encrypted_key,
                         const std::string &secret_key);
 
     bool isInstance(Prin prin);

@@ -181,14 +181,15 @@ DBResult::~DBResult()
 static Item *
 getItem(char * content, enum_field_types type, uint len) {
     if (content == NULL) {
-	return new Item_null();
+        return new Item_null();
     }
     Item * i;
+    string content_str = string(content, len);
     if (IsMySQLTypeNumeric(type)) {
-	ulonglong val = valFromStr(string(content, len));
-	i = new Item_int(val);
+        ulonglong val = valFromStr(content_str);
+        i = new Item_int(val);
     } else {
-	i = new Item_string(content, len, &my_charset_bin);
+        i = new Item_string(make_thd_string(content_str), len, &my_charset_bin);
     }
     
     return i;
@@ -232,7 +233,7 @@ DBResult::unpack()
 
         for (int j = 0; j < cols; j++) {
             Item * it = getItem(row[j], res.types[j], lengths[j]);
-	    resrow.push_back(it);
+            resrow.push_back(it);
         }
 
         res.rows.push_back(resrow);

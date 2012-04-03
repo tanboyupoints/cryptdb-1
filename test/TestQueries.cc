@@ -11,6 +11,7 @@
 #include <util/errstream.hh>
 #include <util/cleanup.hh>
 #include <util/cryptdb_log.hh>
+
 #include <test/TestQueries.hh>
 
 
@@ -732,7 +733,8 @@ Connection::start() {
         Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db);
         conn_set.insert(c);
         this->conn = conn_set.begin();
-        re = new Rewriter(c, tc.db, (type == MULTI), false);
+        ConnectionInfo ci = ConnectionInfo(tc.host, tc.user, tc.pass, tc.db, tc.shadowdb_dir, tc.port);
+        re = new Rewriter(ci, (type == MULTI), false);
         re->setMasterKey("2392834");
         break;
     }
@@ -887,7 +889,7 @@ Connection::executeRewriter(string query) {
     if (conn == conn_set.end()) {
         conn = conn_set.begin();
     }
-    Analysis analysis(*conn);
+    Analysis analysis;
     list<string> enc_queries = re->rewrite(query, analysis);
     
     //execute

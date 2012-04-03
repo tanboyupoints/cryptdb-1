@@ -800,11 +800,10 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
         string fieldname = i->field_name;
         string table = i->table_name;
-/* REMOVED FOR NOW
         if (a.mp && a.mp->hasEncFor(fullName(fieldname, table))) {
             a.tmkm.encForVal[fullName(fieldname, table)] = "";
         }
-*/
+
         FieldMeta * fm = a.schema->getFieldMeta(table, fieldname);
 
         // check compatibility for each of the constraints given
@@ -2412,7 +2411,7 @@ rewrite_create_lex(LEX *lex, Analysis &a)
         lex->alter_info.key_list = newList0;
     }
 }
-/* REMOVED FOR NOW
+
 static void
 mp_update_init(LEX *lex, Analysis &a)
 {
@@ -2429,15 +2428,14 @@ mp_update_init(LEX *lex, Analysis &a)
 	    } 
     }
 }
-*/
+
 static void
 rewrite_update_lex(LEX *lex, Analysis &a)
 {
     assert_s(lex->select_lex.item_list.head(), "update needs to have item_list");
 
-    /* REMOVED FOR NOW
-       mp_update_init(lex, a);
-    */
+    mp_update_init(lex, a);
+
     //rewrite table name
     rewrite_table_list(lex->select_lex.table_list.first, a);
 
@@ -2501,7 +2499,7 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     if (lex->select_lex.having)
         rewrite(&lex->select_lex.having, a);
 }
-/* REMOVED FOR NOW
+
 static void
 mp_insert_init(LEX *lex, Analysis &a)
 {
@@ -2510,13 +2508,12 @@ mp_insert_init(LEX *lex, Analysis &a)
     a.tmkm.processingQuery = true;
     a.mp->insertLex(lex, a.schema, a.tmkm);
 }
-*/
+
 static void
 rewrite_insert_lex(LEX *lex, Analysis &a)
 {
-    /* REMOVED FOR NOW
     mp_insert_init(lex, a);
-    */
+
     const string &table =
             lex->select_lex.table_list.first->table_name;
 
@@ -2595,15 +2592,12 @@ do_query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysi
     // based on st_select_lex::print in mysql-server/sql/sql_select.cc
 
     if (lex->sql_command == SQLCOM_CREATE_TABLE) {
-	/* REMOVED FOR NOW
-	if (analysis.mp || !encByDefault) {
+        if (analysis.mp || !encByDefault) {
             process_create_lex(lex, analysis, false);
         } else {
             process_create_lex(lex, analysis, encByDefault);
         }
         return;
-	*/
-	process_create_lex(lex, analysis, encByDefault);
     }
 
     process_table_list(&lex->select_lex.top_join_list, analysis);
@@ -2892,12 +2886,11 @@ Rewriter::Rewriter(ConnectionInfo ci,
   
     loadUDFs(conn);
 
-    /* REMOVED FOR NOW
     if (multi) {
         mp = new MultiPrinc(conn);
     } else {
         this->mp = NULL;
-	} */
+	}
 }
 
 Rewriter::~Rewriter()
@@ -3135,8 +3128,6 @@ Rewriter::setMasterKey(const string &mkey)
 list<string>
 Rewriter::processAnnotation(Annotation annot, Analysis &a)
 {
-  /*REMOVED FOR NOW TODO not sure what some of this code is doing
-    
     assert_s(annot.getPrimitive() != "", "enc annotation has no primitive");
     LOG(cdb_v) << "table is " << annot.getPrimitiveTableName() << "; field is " << annot.getPrimitiveFieldName();
     TableMeta *tm = schema->tableMetaMap[annot.getPrimitiveTableName()];
@@ -3155,23 +3146,23 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
     }
 
     for (auto pr : fm->encdesc.olm) {
-        fm->onions[pr.first].onionname = anonymizeFieldName(fm->index, pr.first, fm->fname, true);
+        fm->onions[pr.first]->onionname = anonymizeFieldName(fm->index, pr.first, fm->fname, true);
         if (pr.first == oDET) {
             LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets DET onion";
             if (numeric) {
-                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onions[pr.first].onionname + " " + TN_I64 + ";");
+                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onions[pr.first]->onionname + " " + TN_I64 + ";");
             } else {
-                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onions[pr.first].onionname + " " + TN_TEXT + ";");
+                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onions[pr.first]->onionname + " " + TN_TEXT + ";");
             }
         } else if (pr.first == oOPE) {
             LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets OPE onion";
-            query_list.push_back(query + " ADD " + fm->onions[pr.first].onionname + " " + TN_I64 + " AFTER " + fm->onions[oDET].onionname + ";");
+            query_list.push_back(query + " ADD " + fm->onions[pr.first]->onionname + " " + TN_I64 + " AFTER " + fm->onions[oDET]->onionname + ";");
         } else if (pr.first == oAGG) {
             LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets AGG onion";
-            query_list.push_back(query + " ADD " + fm->onions[pr.first].onionname + " " + TN_HOM + " AFTER " + fm->onions[oOPE].onionname + ";");
+            query_list.push_back(query + " ADD " + fm->onions[pr.first]->onionname + " " + TN_HOM + " AFTER " + fm->onions[oOPE]->onionname + ";");
         } else if (pr.first == oSWP) {
             LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets SWP onion";
-            query_list.push_back(query + " ADD " + fm->onions[pr.first].onionname + " " + TN_TEXT + " AFTER " + fm->onions[oOPE].onionname + ";");
+            query_list.push_back(query + " ADD " + fm->onions[pr.first]->onionname + " " + TN_TEXT + " AFTER " + fm->onions[oOPE]->onionname + ";");
         } else {
             assert_s(false, "unknown onion type");
         }
@@ -3179,10 +3170,9 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
 
     fm->has_salt = true;
     fm->salt_name = getFieldSalt(fm->index, tm->anonTableName);
-    query_list.push_back(query + " ADD " + fm->salt_name + " " + TN_SALT + " AFTER " + fm->onions.rbegin()->second.onionname + ";");
+    query_list.push_back(query + " ADD " + fm->salt_name + " " + TN_SALT + " AFTER " + fm->onions.rbegin()->second->onionname + ";");
 
     return query_list;
-    */
     return list<string>();
 }
 
@@ -3217,13 +3207,11 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
 
     LEX *lex = p.lex();
 
-    /* REMOVED FOR NOW
     //login/logout command; nothing needs to be passed on
     if ((lex->sql_command == SQLCOM_DELETE || lex->sql_command == SQLCOM_INSERT)  && analysis.mp && analysis.mp->checkPsswd(lex)){
 	LOG(cdb_v) << "login/logout " << *lex;
         return queries;
     }
-    */
 
     //TODO: is db neededs as param in all these funcs?
     //analyze query
@@ -3264,7 +3252,6 @@ string ReturnMeta::stringify() {
     }
     return res.str();
 }
-/* REMOVED FOR NOW
 static void
 mp_init_decrypt(MultiPrinc * mp, Analysis & a) {
     if (!mp) {return;}
@@ -3277,15 +3264,13 @@ mp_init_decrypt(MultiPrinc * mp, Analysis & a) {
         }
     }
 }
-*/
+
 ResType
 Rewriter::decryptResults(ResType & dbres,
 			 Analysis & a) {
     printRes(dbres);
 
-    /* REMOVED FOR NOW
     mp_init_decrypt(mp, a);
-    */
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
     unsigned int cols = dbres.names.size();

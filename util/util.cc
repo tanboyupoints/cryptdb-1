@@ -104,7 +104,8 @@ ItemToString(Item * i) {
     String s;
     String *s0 = i->val_str(&s);
     assert(s0 != NULL);
-    return string(s0->ptr(), s0->length());
+    string ret = string(s0->ptr(), s0->length());
+    return ret;
 }
 
 string

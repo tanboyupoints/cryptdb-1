@@ -31,7 +31,7 @@
 //#include <test/TestCrypto.hh>
 #include <test/TestAccessManager.hh>
 //#include <test/TestProxy.hh>
-//#include <test/TestQueries.hh>
+#include <test/TestQueries.hh>
 //#include <test/TestNotConsider.hh>
 
 
@@ -4743,7 +4743,7 @@ static struct {
         { "parseaccess",    "",                             &testParseAccess },
         { "pkcs",           "",                             &test_PKCS },
         //{ "proxy",          "proxy",                        &TestProxy::run },
-        //{ "queries",        "queries",                      &TestQueries::run },
+        { "queries",        "queries",                      &TestQueries::run },
         { "shell",          "interactive shell",            &interactiveTest },
         //{ "single",         "integration - single principal",&TestSinglePrinc::run },
         { "gen_enc_tables", "",                             &generateEncTables },
