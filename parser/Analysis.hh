@@ -31,7 +31,7 @@ public:
     inline bool singleton() const { return osl.size() == 1; }
 
     inline OnionLevelFieldPair extract_singleton() const {
-        assert(singleton());
+        assert_s(singleton(), string("encset has size ") + StringFromVal(osl.size()));
         auto it = osl.begin();
         return OnionLevelFieldPair(it->first, it->second);
     }
@@ -41,7 +41,6 @@ public:
     OnionLevelFieldMap osl; //max level on each onion
 };
 
-
 const EncSet EQ_EncSet = {
         {
             {oDET, LevelFieldPair(SECLEVEL::DET, NULL)},
@@ -50,9 +49,15 @@ const EncSet EQ_EncSet = {
 };
 
 const EncSet ORD_EncSet = {
-        {
-            {oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
-        }
+    {
+	{oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
+    }
+};
+
+const EncSet PLAIN_EncSet = {
+    {
+	{oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+    }
 };
 
 //todo: there should be a map of FULL_EncSets depending on item type

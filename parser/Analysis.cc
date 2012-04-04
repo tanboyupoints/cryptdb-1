@@ -52,6 +52,7 @@ EncSet::chooseOne() const
         oOPE,
         oAGG,
         oSWP,
+	oPLAIN, 
     };
     static size_t onion_size = sizeof(onion_order) / sizeof(onion_order[0]);
     for (size_t i = 0; i < onion_size; i++) {

@@ -15,7 +15,7 @@
  */
 
 #define DEBUG 1
-#define MYDEBUG 0
+#define MYDEBUG 1
 
 #include <crypto-old/CryptoManager.hh> /* various functions for EDB */
 #include <crypto/blowfish.hh>

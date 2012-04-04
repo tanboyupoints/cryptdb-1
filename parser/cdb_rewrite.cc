@@ -233,43 +233,6 @@ addSaltToReturn(ReturnMeta & rm, int pos) {
     rm.rfmeta[pos] = rf;
 }
 
-
-
-/*
-//TODO: be consistent thruout code: stringify or print?
-static void
-printOnion(onion level) {
-    if (level == oDET) {
-        LOG(cdb_v) << "oDET";
-    } else if (level == oOPE) {
-        LOG(cdb_v) << "oOPE";
-    } else if (level == oAGG) {
-        LOG(cdb_v) << "oAGG";
-    } else if (level == oSWP) {
-        LOG(cdb_v) << "oSWP";
-    } else {
-        LOG(cdb_v) << "NOT A KNOWN ONION";
-    }
-}
-
-static void
-printSecLevel(SECLEVEL l) {
-    map<SECLEVEL, string> seclevel_map = {
-        {SECLEVEL::PLAIN, "PLAIN"},
-	{SECLEVEL::DETJOIN, "DETJOIN"},
-        {SECLEVEL::DET, "DET"},
-        {SECLEVEL::RND, "RND"},
-	{SECLEVEL::OPE, "OPE"},
-	{SECLEVEL::SEARCH, "SEARCH"},
-        {SECLEVEL::HOM, "HOM"},
-        {SECLEVEL::SECLEVEL_LAST, "SECLEVEL_LAST"} };
-    if (seclevel_map.find(l) != seclevel_map.end()) {
-        LOG(cdb_v) << seclevel_map[l];
-        return;
-    }
-    LOG(cdb_v) << "[not a valid seclevel]";
-}
-*/
 //TODO: which encrypt/decrypt should handle null?
 static Item *
 encrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV = 0) {
@@ -318,8 +281,12 @@ encrypt_item(Item * i, Analysis & a){
 			"there is no meta for item in analysis");
     FieldMeta * fm = im->basefield;
     onion o        = im->o;
-    
-    return encrypt_item_layers(i, fm->onions[o]->layers);
+
+    if (o == oPLAIN) {
+	return i;
+    } else {
+	return encrypt_item_layers(i, fm->onions[o]->layers);
+    }
 }
 
 static void
@@ -335,7 +302,11 @@ decrypt_item(ItemMeta * im, Item * i, uint64_t IV) {
     FieldMeta * fm       = im->basefield;
     onion o              = im->o;
 
-    return decrypt_item_layers(i, fm->onions[o]->layers, IV);
+    if (o == oPLAIN) {
+	return i;
+    } else {
+	return decrypt_item_layers(i, fm->onions[o]->layers, IV);
+    }
 }
 
 /***********end of parser utils *****************/
@@ -513,8 +484,12 @@ enforce(Item *i, const constraints &tr, Analysis & a)
 static inline void
 analyze(Item *i, const constraints &tr, Analysis & a)
 {
+    cerr << "before analyze \n";
+    LOG(cdb_v) << "calling gather for item " << i << " tr " << tr << "\n";
     EncSet e(gather(i, tr, a));
+    LOG(cdb_v) << "choosing one for item " << i << " out of encset " << e << "\n";
     e = e.chooseOne();
+    LOG(cdb_v) << "calling enforce for item " << i << " tr " << tr.clone_with(e) << "\n";
     enforce(i, tr.clone_with(e), a);
 }
 
@@ -686,7 +661,7 @@ record_item_meta_for_constraints(Item *i,
     }
     im->o         = c.first;
     im->basefield = c.second.second;
-    assert_s(im->basefield, "NULL basefield");
+    assert_s((im->o == oPLAIN) || im->basefield, "NULL basefield");
 }
 
 template <class T>
@@ -1841,21 +1816,6 @@ static class ANON : public CItemSubtypeFN<Item_func_strcmp, str_strcmp> {
     }
 } ANON;
 
-template<Item_sum::Sumfunctype SFT>
-class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
-    virtual EncSet do_gather_type(Item_sum_count *i, const constraints &tr, Analysis & a) const {
-        //cerr << "do_a_t Item_sum_count reason " << tr << "\n";
-        if (i->has_with_distinct())
-            analyze(i->get_arg(0), constraints(EQ_EncSet, "count distinct", i, &tr, false), a);
-        return tr.encset;
-    }
-    virtual void do_enforce_type(Item_sum_count *i, const constraints &tr, Analysis & a) const
-    {}
-};
-
-static CItemCount<Item_sum::Sumfunctype::COUNT_FUNC> ANON;
-static CItemCount<Item_sum::Sumfunctype::COUNT_DISTINCT_FUNC> ANON;
-
 
 // rewrites the arguments of aggregators
 // no_args specifies a certain number of arguments that i must have
@@ -1878,10 +1838,40 @@ rewrite_agg_args(Item_sum * i, Analysis & a, int no_args = -1) {
 }
 
 template<Item_sum::Sumfunctype SFT>
+class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
+    virtual EncSet do_gather_type(Item_sum_count *i, const constraints &tr, Analysis & a) const {
+        LOG(cdb_v) << "do_a_t Item_sum_count reason " << tr << "\n";
+        if (i->has_with_distinct()) {
+	    constraints new_tr = constraints(tr.encset.intersect(EQ_EncSet), "count distinct", i, &tr, false);
+            analyze(i->get_arg(0), new_tr, a);
+	} 
+	return PLAIN_EncSet;
+        
+    }
+    virtual void do_enforce_type(Item_sum_count *i, const constraints &tr, Analysis & a) const
+	{
+	    LOG(cdb_v) << "enforce Item_sum_count " << tr << "\n"; 
+	    record_item_meta_for_constraints(i, tr, a);
+	}
+    virtual Item * do_rewrite_type(Item_sum_count *i, Analysis & a) const {
+	if (i->has_with_distinct()) {
+	    rewrite_agg_args(i, a);
+	}
+	ItemMeta *im = getAssert(a.itemToMeta, (Item *)i);
+
+	addToReturn(a.rmeta, a.pos++, im, false, i->name);
+	
+	return i;
+    }
+};
+
+static CItemCount<Item_sum::Sumfunctype::COUNT_FUNC> ANON;
+static CItemCount<Item_sum::Sumfunctype::COUNT_DISTINCT_FUNC> ANON;
+
+
+template<Item_sum::Sumfunctype SFT>
 class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
     virtual EncSet do_gather_type(Item_sum_hybrid *i, const constraints &tr, Analysis & a) const {
-        cerr << "!!!!! do_a_t Item_sum_hybrid reason " << tr << "\n";
-	
 	constraints new_tr = constraints(tr.encset.intersect(ORD_EncSet), "min/max agg", i, &tr, false);
 
 	Item * child_item = i->get_arg(0);
@@ -3145,9 +3135,9 @@ Rewriter::initSchema()
                     if (has_ope) { om[oOPE] = string_to_sec_level(string(row[i++], l[j++])); }
                     else         { i++; j++; }
                     
-                    if (has_agg) { om[oAGG] = SECLEVEL::PLAIN; }
+                    if (has_agg) { om[oAGG] = SECLEVEL::HOM; }
                     
-                    if (has_swp) { om[oSWP] = SECLEVEL::HOM; }
+                    if (has_swp) { om[oSWP] = SECLEVEL::SEARCH; }
 
                     fm->encdesc = EncDesc(om);
 
@@ -3356,7 +3346,10 @@ Rewriter::decryptResults(ResType & dbres,
 	
         if (!rf.is_salt) {
             for (unsigned int r = 0; r < rows; r++) {
-                if (!im->basefield->onions.empty()) {
+		//TODO: there is some redundancy in this condition, cleanup
+		if ((im->o == oPLAIN) || im->basefield->onions.empty()) {
+		    res.rows[r][col_index] = dbres.rows[r][c];
+		} else {
 		    uint64_t salt = 0;
 		    if (rf.pos_salt>=0) {
 			Item * salt_item = dbres.rows[r][rf.pos_salt];

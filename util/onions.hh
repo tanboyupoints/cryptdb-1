@@ -11,6 +11,7 @@ typedef enum onion {
     oAGG,
     oSWP,
     oINVALID,
+    oPLAIN, 
 } onion;
 
 //Sec levels ordered such that
@@ -19,7 +20,7 @@ typedef enum onion {
 // (note, this is not "iff")
 #define SECLEVELS(m)    \
     m(INVALID)          \
-    m(PLAIN)            \
+    m(PLAINVAL)            \
     m(OPEJOIN)     	\
     m(OPE)		\
     m(DETJOIN)          \
