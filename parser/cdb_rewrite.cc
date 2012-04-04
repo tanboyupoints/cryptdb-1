@@ -2304,7 +2304,7 @@ static void rewrite_create_field(const string &table_name,
     //check if field is not encrypted
     if (fm->onions.empty()) {
         l.push_back(f);
-	cerr << "onions were empty";
+        //cerr << "onions were empty" << endl;
         return;
     }
 
@@ -2987,7 +2987,7 @@ Rewriter::initSchema()
 {
     cerr << "warning: initSchema does not init enc layers correctly from shadow db\n";
     createMetaTablesIfNotExists();
-        
+
     vector<string> tablelist;
 
     {
@@ -3017,8 +3017,8 @@ Rewriter::initSchema()
         string create_table_query;
         {
             string q = "SHOW CREATE TABLE " + origTableName;
-	    DBResult * dbres = NULL;
-	    assert(e_conn->execute(q, dbres));
+            DBResult * dbres = NULL;
+            assert(e_conn->execute(q, dbres));
             ScopedMySQLRes r(dbres->n);
             assert(mysql_num_rows(r.res()) == 1);
             assert(mysql_num_fields(r.res()) == 2);
@@ -3062,9 +3062,9 @@ Rewriter::initSchema()
                        "FROM proxy_db.column_info c, proxy_db.table_info t "
                        "WHERE t.name = '" + origTableName + "' AND c.table_id = t.id";
 
-	    DBResult * dbres;
-	    assert(e_conn->execute(q, dbres));
-	    	    
+            DBResult * dbres;
+            assert(e_conn->execute(q, dbres));
+
             ScopedMySQLRes r(dbres->n);
             MYSQL_ROW row;
             while ((row = mysql_fetch_row(r.res()))) {
@@ -3081,31 +3081,33 @@ Rewriter::initSchema()
                 bool has_agg = string(row[i++], l[j++]) == "1";
                 bool has_swp = string(row[i++], l[j++]) == "1";
 
-                fm->onions[oDET]->onionname = string(row[i++], l[j++]);
+                if (fm->onions.size() > 0) {
+                    fm->onions[oDET]->onionname = string(row[i++], l[j++]);
+                    
+                    if (has_ope) { fm->onions[oOPE]->onionname = string(row[i++], l[j++]); }
+                    else         { i++; j++; }
+                    
+                    if (has_agg) { fm->onions[oAGG]->onionname = string(row[i++], l[j++]); }
+                    else         { i++; j++; }
 
-                if (has_ope) { fm->onions[oOPE]->onionname = string(row[i++], l[j++]); }
-                else         { i++; j++; }
+                    if (has_swp) { fm->onions[oSWP]->onionname = string(row[i++], l[j++]); }
+                    else         { i++; j++; }
+                    
+                    OnionLevelMap om;
 
-                if (has_agg) { fm->onions[oAGG]->onionname = string(row[i++], l[j++]); }
-                else         { i++; j++; }
+                    om[oDET] = string_to_sec_level(string(row[i++], l[j++]));
 
-                if (has_swp) { fm->onions[oSWP]->onionname = string(row[i++], l[j++]); }
-                else         { i++; j++; }
+                    if (has_ope) { om[oOPE] = string_to_sec_level(string(row[i++], l[j++])); }
+                    else         { i++; j++; }
+                    
+                    if (has_agg) { om[oAGG] = SECLEVEL::PLAIN; }
+                    
+                    if (has_swp) { om[oSWP] = SECLEVEL::HOM; }
 
-                OnionLevelMap om;
+                    fm->encdesc = EncDesc(om);
 
-                om[oDET] = string_to_sec_level(string(row[i++], l[j++]));
-
-                if (has_ope) { om[oOPE] = string_to_sec_level(string(row[i++], l[j++])); }
-                else         { i++; j++; }
-
-                if (has_agg) { om[oAGG] = SECLEVEL::PLAIN; }
-
-                if (has_swp) { om[oSWP] = SECLEVEL::HOM; }
-
-                fm->encdesc = EncDesc(om);
-
-                fm->salt_name = string(row[i++], l[j++]);
+                    fm->salt_name = string(row[i++], l[j++]);
+                }
 
                 i++; j++; // is_encrypted
                 i++; j++; // can_be_null
@@ -3188,6 +3190,7 @@ Rewriter::mp_init(Analysis &a) {
 list<string>
 Rewriter::rewrite(const string & q, Analysis & analysis)
 {
+
     list<string> queries;
     query_parse p(ci.db, q);
     analysis = Analysis(e_conn, conn, schema, masterKey, mp);
@@ -3223,7 +3226,7 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
     }
     //TODO:these two invokations of updateMeta are confusing:
     //one is for adjust onions, and other for dropping table
-    
+
     //rewrite query
     lex_rewrite(ci.db, lex, analysis);
     if (lex->sql_command == SQLCOM_DROP_TABLE) {
