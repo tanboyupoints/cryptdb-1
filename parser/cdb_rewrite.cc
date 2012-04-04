@@ -2846,10 +2846,10 @@ dropAll(Connect * conn)
     dropF(conn, "decrypt_int_sem");
     dropF(conn, "decrypt_int_det");
     dropF(conn, "decrypt_text_sem");
-    dropF(conn, "decrypt_text_det");
+    /*dropF(conn, "decrypt_text_det");
     dropF(conn, "searchSWP");
     dropF(conn, "agg");
-    dropF(conn, "func_add_set");   
+    dropF(conn, "func_add_set");   */
 }
 
 static void
@@ -2868,10 +2868,10 @@ createAll(Connect * conn)
     createF(conn, "decrypt_int_sem", "INTEGER");
     createF(conn, "decrypt_int_det", "INTEGER");
     createF(conn, "decrypt_text_sem", "STRING");
-    createF(conn, "decrypt_text_det", "STRING");
+    /*createF(conn, "decrypt_text_det", "STRING");
     createF(conn, "searchSWP", "INTEGER");
     createF(conn, "agg", "STRING", true);
-    createF(conn, "func_add_set", "STRING");
+    createF(conn, "func_add_set", "STRING");*/
 }
 
 static void

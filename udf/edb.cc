@@ -15,6 +15,7 @@
  */
 
 #define DEBUG 1
+#define MYDEBUG 0
 
 #include <crypto-old/CryptoManager.hh> /* various functions for EDB */
 #include <crypto/blowfish.hh>
@@ -25,7 +26,7 @@ using namespace std;
 using namespace NTL;
 
 extern "C" {
-#if MYSQL_S
+
 
 typedef unsigned long long ulonglong;
 typedef long long longlong;
@@ -36,6 +37,7 @@ my_bool  decrypt_int_sem_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
 ulonglong decrypt_int_sem(UDF_INIT *initid, UDF_ARGS *args, char *is_null,
                          char *error);
 
+    
 my_bool  decrypt_int_det_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
 ulonglong decrypt_int_det(UDF_INIT *initid, UDF_ARGS *args, char *is_null,
                          char *error);
@@ -45,7 +47,7 @@ my_bool  decrypt_text_sem_init(UDF_INIT *initid, UDF_ARGS *args,
 void     decrypt_text_sem_deinit(UDF_INIT *initid);
 char *   decrypt_text_sem(UDF_INIT *initid, UDF_ARGS *args, char *result,
                           unsigned long *length, char *is_null, char *error);
-
+#if (MYDEBUG)    
 my_bool  encrypt_int_det_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
 ulonglong encrypt_int_det(UDF_INIT *initid, UDF_ARGS *args, char *is_null,
                          char *error);
@@ -59,6 +61,12 @@ char *   decrypt_text_det(UDF_INIT *initid, UDF_ARGS *args, char *result,
 my_bool  search_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
 ulonglong search(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error);
 
+my_bool  searchSWP_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
+void     searchSWP_deinit(UDF_INIT *initid);
+ulonglong searchSWP(UDF_INIT *initid, UDF_ARGS *args, char *is_null,
+                   char *error);
+
+
 my_bool  agg_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
 void     agg_deinit(UDF_INIT *initid);
 void     agg_clear(UDF_INIT *initid, char *is_null, char *error);
@@ -69,39 +77,7 @@ char *   agg(UDF_INIT *initid, UDF_ARGS *args, char *result,
 void     func_add_set_deinit(UDF_INIT *initid);
 char *   func_add_set(UDF_INIT *initid, UDF_ARGS *args, char *result,
                       unsigned long *length, char *is_null, char *error);
-
-my_bool  searchSWP_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
-void     searchSWP_deinit(UDF_INIT *initid);
-ulonglong searchSWP(UDF_INIT *initid, UDF_ARGS *args, char *is_null,
-                   char *error);
-
-#else /* Postgres */
-
-#include "postgres.h"                   /* general Postgres declarations */
-#include "utils/array.h"
-#include "executor/executor.h"  /* for GetAttributeByName() */
-
-PG_MODULE_MAGIC;
-
-Datum decrypt_int_sem(PG_FUNCTION_ARGS);
-Datum decrypt_int_det(PG_FUNCTION_ARGS);
-Datum decrypt_text_sem(PG_FUNCTION_ARGS);
-Datum decrypt_text_det(PG_FUNCTION_ARGS);
-Datum search(PG_FUNCTION_ARGS);
-Datum func_add(PG_FUNCTION_ARGS);
-Datum func_add_final(PG_FUNCTION_ARGS);
-Datum func_add_set(PG_FUNCTION_ARGS);
-
-PG_FUNCTION_INFO_V1(decrypt_int_sem);
-PG_FUNCTION_INFO_V1(decrypt_int_det);
-PG_FUNCTION_INFO_V1(decrypt_text_sem);
-PG_FUNCTION_INFO_V1(decrypt_text_det);
-PG_FUNCTION_INFO_V1(search);
-PG_FUNCTION_INFO_V1(func_add);
-PG_FUNCTION_INFO_V1(func_add_final);
-PG_FUNCTION_INFO_V1(func_add_set);
-
-#endif
+#endif /*MYDEBUG*/
 }
 
 static void __attribute__((unused))
@@ -110,6 +86,8 @@ log(string s)
     /* Writes to the server's error log */
     fprintf(stderr, "%s\n", s.c_str());
 }
+
+
 
 static string
 decrypt_SEM(unsigned char *eValueBytes, uint64_t eValueLen,
@@ -126,6 +104,7 @@ decrypt_DET(unsigned char *eValueBytes, uint64_t eValueLen, AES_KEY * key)
     return CryptoManager::decrypt_DET(c, key);
 }
 */
+#if MYDEBUG
 static bool
 search(const Token & token, const Binary & overall_ciph)
 {
@@ -133,6 +112,7 @@ search(const Token & token, const Binary & overall_ciph)
    return CryptoManager::searchExists(token, overall_ciph);
 
 }
+#endif /*MYDEBUG*/
 
 #if MYSQL_S
 #define ARGS args
@@ -216,6 +196,8 @@ decrypt_int_sem(PG_FUNCTION_ARGS)
 #endif
 }
 
+
+    
 #if MYSQL_S
 my_bool
 decrypt_int_det_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
@@ -246,7 +228,53 @@ decrypt_int_det(PG_FUNCTION_ARGS)
 #endif
 
 }
+    
 
+my_bool
+decrypt_text_sem_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
+{
+    return 0;
+}
+
+void
+decrypt_text_sem_deinit(UDF_INIT *initid)
+{
+    /*
+     * in mysql-server/sql/item_func.cc, udf_handler::fix_fields
+     * initializes initid.ptr=0 for us.
+     */
+    if (initid->ptr)
+        delete[] initid->ptr;
+}
+
+char *
+decrypt_text_sem(UDF_INIT *initid, UDF_ARGS *args,
+                 char *result, unsigned long *length,
+                 char *is_null, char *error) {
+    uint64_t eValueLen;
+    char *eValueBytes = getba(args, 0, eValueLen);
+
+    uint64_t keyLen;
+    char * keyBytes = getba(args, 1, keyLen);
+    string key = string(keyBytes, keyLen);
+    
+     uint64_t salt = getui(ARGS, 2);
+
+     AES_KEY *aesKey = get_AES_dec_key(key);
+     string value = decrypt_SEM((unsigned char *)eValueBytes, eValueLen, aesKey, salt);
+     delete aesKey;
+
+    char * res = new char[value.length()];
+    initid->ptr = res;
+    memcpy(res, value.data(), value.length());
+    *length =  value.length();
+    return (char*) initid->ptr;
+    
+    //return (char *)"alice";
+}
+    
+#if MYDEBUG
+    
 #if MYSQL_S
 my_bool
 encrypt_int_det_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
@@ -278,60 +306,6 @@ decrypt_int_det(PG_FUNCTION_ARGS)
 
 }
 
-#if MYSQL_S
-my_bool
-decrypt_text_sem_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
-{
-    return 0;
-}
-
-void
-decrypt_text_sem_deinit(UDF_INIT *initid)
-{
-    /*
-     * in mysql-server/sql/item_func.cc, udf_handler::fix_fields
-     * initializes initid.ptr=0 for us.
-     */
-    if (initid->ptr)
-        delete[] initid->ptr;
-}
-
-char *
-decrypt_text_sem(UDF_INIT *initid, UDF_ARGS *args,
-                 char *result, unsigned long *length,
-                 char *is_null, char *error)
-#else /* postgres */
-Datum
-decrypt_text_sem(PG_FUNCTION_ARGS)
-#endif
-{
-    uint64_t eValueLen;
-    char *eValueBytes = getba(args, 0, eValueLen);
-
-    uint64_t keyLen;
-    char * keyBytes = getba(args, 1, keyLen);
-    string key = string(keyBytes, keyLen);
-    
-     uint64_t salt = getui(ARGS, 2);
-
-     AES_KEY *aesKey = get_AES_dec_key(key);
-     string value = decrypt_SEM((unsigned char *)eValueBytes, eValueLen, aesKey, salt);
-     delete aesKey;
-
-#if MYSQL_S
-    char * res = new char[value.length()];
-    initid->ptr = res;
-    memcpy(res, value.data(), value.length());
-    *length =  value.length();
-    return (char*) initid->ptr;
-#else
-    bytea * res = (bytea *) palloc(eValueLen+VARHDRSZ);
-    SET_VARSIZE(res, eValueLen+VARHDRSZ);
-    memcpy(VARDATA(res), value, eValueLen);
-    PG_RETURN_BYTEA_P(res);
-#endif
-
-}
 
 #if MYSQL_S
 my_bool
@@ -392,13 +366,15 @@ decrypt_text_det(PG_FUNCTION_ARGS)
  * search for word which is of the form len word_body where len is
  * the length of the word body
  */
+
+    
 #if MYSQL_S
 my_bool
 search_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
 {
-
     return 0;
 }
+
 
 ulonglong
 search(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
@@ -499,8 +475,10 @@ searchSWP(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
 
 #endif
 
-#if MYSQL_S
 
+    
+#if MYSQL_S
+    
 struct agg_state {
     ZZ sum;
     ZZ n2;
@@ -619,7 +597,7 @@ func_add_final(PG_FUNCTION_ARGS)
     PG_RETURN_BYTEA_P(res);
 }
 
-#endif
+#endif /*MYSQL_S*/
 
 // for update with increment
 #if MYSQL_S
@@ -680,6 +658,7 @@ func_add_set(PG_FUNCTION_ARGS)
     PG_RETURN_BYTEA_P(resBytea);
 }
 
-#endif
-
+#endif /*MYSQL_S*/
+    
+#endif /*MYDEBUG*/
 } /* extern "C" */
