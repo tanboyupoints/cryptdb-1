@@ -279,6 +279,7 @@ encrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV = 0) {
     Item * enc = i;
     Item * prev_enc = NULL;
     for (auto layer : layers) {
+	LOG(encl) << "encrypt layer " << levelnames[(int)layer->level()] << "\n";
 	enc = layer->encrypt(enc, IV);
 	//need to free space for all enc
 	//except the last one
@@ -295,10 +296,10 @@ static Item *
 decrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV) {
     Item * dec = i;
     Item * prev_dec = NULL;
-    
+
     for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
 	dec = (*it)->decrypt(dec, IV);
-	//need to free space for all decs except last
+        //need to free space for all decs except last
 	if (prev_dec) {
 	    delete prev_dec;
 	}
@@ -691,6 +692,7 @@ record_item_meta_for_constraints(Item *i,
 template <class T>
 static Item *
 do_rewrite_type_args(T *i, Analysis &a) {
+    cerr << "rewriting arguments for " << i << "\n";
     Item **args = i->arguments();
     for (uint x = 0; x < i->argument_count(); x++) {
         rewrite(&args[x], a);
@@ -1811,6 +1813,9 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
     virtual Item * do_optimize_type(Item_func_min_max *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
+    virtual Item * do_rewrite_type(Item_func_min_max *i, Analysis & a) const {
+	return do_rewrite_type_args(i, a);
+    }
 };
 
 extern const char str_greatest[] = "greatest";
@@ -1818,6 +1823,7 @@ static CItemMinMax<str_greatest> ANON;
 
 extern const char str_least[] = "least";
 static CItemMinMax<str_least> ANON;
+
 
 extern const char str_strcmp[] = "strcmp";
 static class ANON : public CItemSubtypeFN<Item_func_strcmp, str_strcmp> {
@@ -1850,15 +1856,59 @@ class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
 static CItemCount<Item_sum::Sumfunctype::COUNT_FUNC> ANON;
 static CItemCount<Item_sum::Sumfunctype::COUNT_DISTINCT_FUNC> ANON;
 
+
+// rewrites the arguments of aggregators
+// no_args specifies a certain number of arguments that i must have
+// if negative, i can have any no. of arguments
+static void
+rewrite_agg_args(Item_sum * i, Analysis & a, int no_args = -1) {
+    if (no_args >= 0) {
+	assert_s(i->get_arg_count() == (uint)no_args,
+		 "support for aggregation with this number of arguments not currently implemented");
+    } else {
+	no_args = i->get_arg_count();
+    }
+
+    for (int j = 0; j < no_args; j++) {
+	Item * child_item = i->get_arg(j);
+	rewrite(&child_item, a);
+	i->set_arg(j, current_thd, child_item);
+    }
+	
+}
+
 template<Item_sum::Sumfunctype SFT>
 class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
     virtual EncSet do_gather_type(Item_sum_hybrid *i, const constraints &tr, Analysis & a) const {
-        //cerr << "do_a_t Item_sum_hybrid reason " << tr << "\n";
-        analyze(i->get_arg(0), constraints(ORD_EncSet, "min/max_agg", i, &tr, false), a);
-        return tr.encset;
+        cerr << "!!!!! do_a_t Item_sum_hybrid reason " << tr << "\n";
+	
+	constraints new_tr = constraints(tr.encset.intersect(ORD_EncSet), "min/max agg", i, &tr, false);
+
+	Item * child_item = i->get_arg(0);
+	
+        analyze(child_item, new_tr, a);
+
+	new_tr.encset.setFieldForOnion(oOPE, getAssert(a.itemToFieldMeta, (Item_field *)child_item));
+	
+        return new_tr.encset;
     }
-    virtual void do_enforce_type(Item_sum_hybrid *i, const constraints &tr, Analysis & a) const
-    {}
+    virtual void do_enforce_type(Item_sum_hybrid *i, const constraints &tr, Analysis & a) const {
+	record_item_meta_for_constraints(i, tr, a);
+    }
+    virtual Item * do_rewrite_type(Item_sum_hybrid *i, Analysis & a) const {
+	cerr << "hybrid rewrite! \n";
+	rewrite_agg_args(i, a);
+
+	ItemMeta * im = getAssert(a.itemToMeta, (Item *)i);
+	
+	//record information for decrypting results
+	addToReturn(a.rmeta, a.pos++, im,
+		    false, i->name);
+
+	cerr << "rewrite max/min item meta is " << im->stringify() << "\n";
+
+	return i;
+    }
 };
 
 static CItemChooseOrder<Item_sum::Sumfunctype::MIN_FUNC> ANON;
@@ -1879,8 +1929,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
 	analyze(child_item, new_tr, a);
 
 	new_tr.encset.setFieldForOnion(oAGG,
-					 getAssert<Item_field*, FieldMeta*>(a.itemToFieldMeta,
-										(Item_field *)child_item));
+				       getAssert(a.itemToFieldMeta, (Item_field *)child_item));
 	
 	LOG(cdb_v) << "CONSTRAINTS after gathers in item_sum_sum: " << new_tr << "\n";
 	return new_tr.encset;
@@ -1894,11 +1943,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
     virtual Item * do_rewrite_type(Item_sum_sum * i, Analysis & a) const {
 	LOG(cdb_v) << "rewrite in CItemAdditive ";
 
-	assert_s(i->get_arg_count() == 1, "support for sum with number of arguments != 1 not currently implemented in CryptDB");
-	Item * child_item = i->get_arg(0);
-	rewrite(&child_item, a);
-	i->set_arg(0, current_thd, child_item);
-	
+	rewrite_agg_args(i, a, 1);
 	
 	ItemMeta * im = getAssert(a.itemToMeta, (Item *)i);
 	

@@ -271,8 +271,11 @@ toString(const C &l, T op)
 // tries to represent value in minimum no of bytes, avoiding the \0 character
 std::string StringFromVal(uint64_t value, unsigned int padLen = 0);
 
-NTL::ZZ UInt64_tToZZ (uint64_t value);
+
 uint64_t uint64FromZZ(NTL::ZZ val);
+//to_ZZ func may not work for 64 bits
+NTL::ZZ ZZFromUint64(uint64_t val);
+
 
 std::string StringFromZZ(const NTL::ZZ &x);
 NTL::ZZ ZZFromString(const std::string &s);

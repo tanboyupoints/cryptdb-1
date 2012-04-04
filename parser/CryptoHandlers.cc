@@ -369,8 +369,8 @@ OPE_int::encrypt(Item * ptext, uint64_t IV) {
 
 Item *
 OPE_int::decrypt(Item * ctext, uint64_t IV) {
-    ulong cval = (ulong) static_cast<Item_int*>(ctext)->value;
-    ulonglong dec = uint64FromZZ(ope.decrypt(to_ZZ(cval)));
+    ulonglong cval = (ulonglong) static_cast<Item_int*>(ctext)->value;
+    ulonglong dec = uint64FromZZ(ope.decrypt(ZZFromUint64(cval)));
     LOG(encl) << "OPE_int decrypt " << cval << " IV " << IV << "--->" << dec; 
     return new Item_int(dec);
 }
@@ -419,13 +419,13 @@ HOM::newCreateField() {
 
 static ZZ
 ItemIntToZZ(Item * ptext) {
-    ulonglong val = ((Item_int*) ptext)->value;
-    return to_ZZ((unsigned long)val);
+    ulonglong val = static_cast<Item_int *>(ptext)->value;
+    return ZZFromUint64(val);
 }
 
 static Item *
 ZZToItemInt(const ZZ & val) {
-    ulonglong v = to_ulong(val);
+    ulonglong v = uint64FromZZ(val);
     return new Item_int(v);
 }
 
