@@ -169,6 +169,8 @@ uint64FromZZ(ZZ val)
 }
 
 
+
+
 string
 StringFromZZ(const ZZ &x)
 {
@@ -270,7 +272,7 @@ void ZZFromBytesFast(ZZ& x, const unsigned char *p, long n) {
 }
 
 ZZ
-UInt64_tToZZ (uint64_t value)
+ZZFromUint64 (uint64_t value)
 {
     unsigned int unit = 256;
     ZZ power;
