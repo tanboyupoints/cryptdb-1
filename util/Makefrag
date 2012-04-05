@@ -1,12 +1,10 @@
 OBJDIRS += util
-UTILSRC := onions.cc cryptdb_log.cc ctr.cc util.cc mysqld-filler.cc
+UTILSRC := onions.cc cryptdb_log.cc ctr.cc util.cc
 
 all:    $(OBJDIR)/libedbutil.so
 $(OBJDIR)/libedbutil.so: $(patsubst %.cc,$(OBJDIR)/util/%.o,$(UTILSRC))
-	$(CXX) -shared -o $@ $^ $(LDFLAGS) \
-	       -Wl,--whole-archive -L$(MYBUILD)/libmysqld -lmysqld \
-	       -Wl,--no-whole-archive $(LDFLAGS)
-
+	$(CXX) -shared -o $@ $^ $(LDFLAGS) 
+	 
 install: install_util
 
 .PHONY: install_util

@@ -8,6 +8,8 @@
 #include <vector>
 #include <string>
 #include <util/util.hh>
+#include <edb/sql_utils.hh>
+
 
 extern "C" void *create_embedded_thd(int client_flag);
 
@@ -48,8 +50,9 @@ class Connect {
     ~Connect();
 
  private:
+    
 
     MYSQL *  conn;
-    bool  close_on_destroy;
+    bool     close_on_destroy;
    
 };

@@ -87,7 +87,7 @@ log(string s)
     fprintf(stderr, "%s\n", s.c_str());
 }
 
-
+#if MYDEBUG
 
 static string
 decrypt_SEM(unsigned char *eValueBytes, uint64_t eValueLen,
@@ -104,7 +104,7 @@ decrypt_DET(unsigned char *eValueBytes, uint64_t eValueLen, AES_KEY * key)
     return CryptoManager::decrypt_DET(c, key);
 }
 */
-#if MYDEBUG
+
 static bool
 search(const Token & token, const Binary & overall_ciph)
 {
@@ -228,7 +228,8 @@ decrypt_int_det(PG_FUNCTION_ARGS)
 #endif
 
 }
-    
+
+
 
 my_bool
 decrypt_text_sem_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
@@ -258,19 +259,19 @@ decrypt_text_sem(UDF_INIT *initid, UDF_ARGS *args,
     char * keyBytes = getba(args, 1, keyLen);
     string key = string(keyBytes, keyLen);
     
-     uint64_t salt = getui(ARGS, 2);
+    uint64_t salt = getui(ARGS, 2);
 
-     AES_KEY *aesKey = get_AES_dec_key(key);
-     string value = decrypt_SEM((unsigned char *)eValueBytes, eValueLen, aesKey, salt);
-     delete aesKey;
-
+    AES_KEY *aesKey = get_AES_dec_key(key);
+          
+   string value = decrypt_SEM((unsigned char *)eValueBytes, eValueLen, aesKey, salt);
+   delete aesKey;
+    
     char * res = new char[value.length()];
     initid->ptr = res;
     memcpy(res, value.data(), value.length());
     *length =  value.length();
+  
     return (char*) initid->ptr;
-    
-    //return (char *)"alice";
 }
     
 #if MYDEBUG
@@ -334,14 +335,21 @@ Datum
 decrypt_text_det(PG_FUNCTION_ARGS)
 #endif
 {
-    uint64_t eValueLen;
+    /*  uint64_t eValueLen;
     char *eValueBytes = getba(args, 0, eValueLen);
 
     uint64_t keyLen;
     char *keyBytes = getba(args, 1, keyLen);
     string key = string(keyBytes, keyLen);
     
-    AES_KEY * aesKey = get_AES_dec_key(key);
+    // AES_KEY * aesKey = NULL;
+
+    if (!eValueBytes || key.size()) {
+	cerr << "hi \n";
+	}*/
+    
+/*
+    get_AES_dec_key(key);
     string value = decrypt_AES_CMC(string(eValueBytes, (unsigned int)eValueLen), aesKey, false);
     delete aesKey;
 
@@ -357,7 +365,8 @@ decrypt_text_det(PG_FUNCTION_ARGS)
     memcpy(VARDATA(res), value, eValueLen);
     PG_RETURN_BYTEA_P(res);
 #endif
-
+*/
+    return (char*)"alice";
 }
 
 /*

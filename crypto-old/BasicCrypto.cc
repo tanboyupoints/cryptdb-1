@@ -38,15 +38,17 @@ get_AES_enc_key(const string &key)
 AES_KEY *
 get_AES_dec_key(const string &key)
 {
-    ANON_REGION(__func__, &perf_cg);
+    //ANON_REGION(__func__, &perf_cg);
 
     AES_KEY * aes_key = new AES_KEY();
 
-    if (AES_set_decrypt_key((const uint8_t*) key.c_str(), AES_KEY_SIZE,
+    assert_s(key.size() == AES_KEY_SIZE/8, "key size is not AES_KEY_SIZE");
+    
+    if (AES_set_decrypt_key((const unsigned char*)key.c_str(), AES_KEY_SIZE,
                             aes_key) <0) {
         myassert(false, "problem with AES set encrypt ");
     }
-
+    
     return aes_key;
 
 }

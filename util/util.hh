@@ -23,13 +23,6 @@
 
 #include <util/errstream.hh>
 #include <util/params.hh>
-#include <util/util.hh>
-
-#include <sql_select.h>
-#include <sql_delete.h>
-#include <sql_insert.h>
-#include <sql_update.h>
-
 
 // ==== CONSTANTS ============== //
 
@@ -99,17 +92,6 @@ typedef struct AutoInc {
     my_ulonglong incvalue;
     std::string field;
 } AutoInc;
-
-class ResType {
- public:
-    explicit ResType(bool okflag = true) : ok(okflag) {}
-
-    bool ok;  // query executed successfully
-    std::vector<std::string> names;
-    std::vector<enum_field_types> types;
-    std::vector<std::vector<Item*> > rows;
-    AutoInc ai;
-};
 
 const std::string BASE_SALT_NAME = "cdb_salt";
 
@@ -431,7 +413,3 @@ class Timer {
 
     uint64_t start;
 };
-
-char * make_thd_string(const std::string &s, size_t *lenp = 0);
-
-std::string ItemToString(Item * i);
