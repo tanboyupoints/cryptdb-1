@@ -11,6 +11,7 @@
 
 using namespace std;
 
+/* moved to edb/sql_utils
 string
 fullName(string field, string table)
 {
@@ -32,7 +33,7 @@ isTableField(string token)
         return true;
     }
 }
-
+*/
 
 string
 anonymizeTableName(unsigned int tableNo, string tableName, bool multiPrinc)

@@ -29,14 +29,17 @@ class EncLayer {
     virtual SECLEVEL level() = 0;
     virtual Create_field * newCreateField() = 0;
     
-    virtual Item * encrypt(Item * ptext, uint64_t IV = 0) = 0;
-    virtual Item * decrypt(Item * ctext, uint64_t IV = 0) = 0;
+    virtual Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = 0) = 0;
+    virtual Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = 0) = 0;
     virtual Item * decryptUDF(Item * col, Item * ivcol = NULL) {
         thrower() << "decryptUDF not supported";
     }
 
  protected:
     Create_field *cf;
+
+    virtual void setKey(const std::string &k) = 0;
+    virtual void unSetKey(const std::string &k) = 0;
 };
 
 
@@ -53,16 +56,18 @@ public:
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField();
     
-    Item * encrypt(Item * ptext, uint64_t IV);
-    Item * decrypt(Item * ctext, uint64_t IV);
+    Item * encrypt(Item * ptext, uint64_t IV, const std::string &k);
+    Item * decrypt(Item * ctext, uint64_t IV, const std::string &k);
     Item * decryptUDF(Item * col, Item * ivcol);
 
 private:
     std::string key;
     blowfish bf;
-    static const int key_bytes = 16;
-    
+    static const int key_bytes = 16;    
     static const int ciph_size = 8;
+
+    void setKey(const std::string &key);
+    void unSetKey(const std::string &key);    
 };
 
 class RND_str : public EncLayer {
@@ -72,8 +77,8 @@ public:
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField();
     
-    Item * encrypt(Item * ptext, uint64_t IV);
-    Item * decrypt(Item * ctext, uint64_t IV);
+    Item * encrypt(Item * ptext, uint64_t IV, const std::string &k);
+    Item * decrypt(Item * ctext, uint64_t IV, const std::string &k);
     Item * decryptUDF(Item * col, Item * ivcol);
 
 private:
@@ -81,6 +86,9 @@ private:
     static const int key_bytes = 16;
     AES_KEY * enckey;
     AES_KEY * deckey;
+
+    void setKey(const std::string &key);
+    void unSetKey(const std::string &key);    
 };
 
 class DET_int : public EncLayer {
@@ -89,9 +97,9 @@ public:
 
     SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField();
-    
-    Item * encrypt(Item * ptext, uint64_t IV = 0);
-    Item * decrypt(Item * ctext, uint64_t IV = 0);
+
+    Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = 0);
     Item * decryptUDF(Item * col, Item * ivcol = NULL);
 
 private:
@@ -99,6 +107,9 @@ private:
     blowfish bf;
     static const int bf_key_size = 16;
     static const int ciph_size = 8;
+
+    void setKey(const std::string &key);
+    void unSetKey(const std::string &key);    
 };
 
 class DET_str : public EncLayer {
@@ -108,8 +119,8 @@ public:
     SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField();
     
-    Item * encrypt(Item * p, uint64_t IV = 0);
-    Item * decrypt(Item * c, uint64_t IV = 0);
+    Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = 0);
     Item * decryptUDF(Item * col, Item * = NULL);
 
 private:
@@ -117,6 +128,9 @@ private:
     static const int key_bytes = 16;
     AES_KEY * enckey;
     AES_KEY * deckey;
+
+    void setKey(const std::string &key);
+    void unSetKey(const std::string &key);    
 };
 
 
@@ -128,13 +142,16 @@ public:
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
     Create_field * newCreateField() {return cf;}
     
-    Item * encrypt(Item * p, uint64_t IV = 0);
-    Item * decrypt(Item * c, uint64_t IV = 0);
+    //TODO: DETJOIN for multi
+    Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = 0);
+    Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = 0);
     Item * decryptUDF(Item * col, Item * ivcol = NULL) {
-	thrower() << "should not decrypt from joindet\n";
+        thrower() << "should not decrypt from joindet\n";
     }
 
 private:
+    void setKey(const std::string &k) {};
+    void unSetKey(const std::string &k) {};
 };
 
 
@@ -144,9 +161,9 @@ public:
 
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField();
-    
-    Item * encrypt(Item * p, uint64_t IV);
-    Item * decrypt(Item * c, uint64_t IV);
+
+    Item * encrypt(Item * p, uint64_t IV, const std::string &k);
+    Item * decrypt(Item * c, uint64_t IV, const std::string &k);
 
 private:
     std::string key;
@@ -154,6 +171,9 @@ private:
     static const size_t key_bytes = 16;
     static const size_t plain_size = 4;
     static const size_t ciph_size = 8;
+
+    void setKey(const std::string &key);
+    void unSetKey(const std::string &key);    
 };
 
 
@@ -163,9 +183,9 @@ public:
 
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField();
-    
-    Item * encrypt(Item * p, uint64_t IV = 0);
-    Item * decrypt(Item * c, uint64_t IV = 0)__attribute__((noreturn));
+
+    Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = 0);
+    Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = 0)__attribute__((noreturn));
   
 private:
     std::string key;
@@ -173,6 +193,9 @@ private:
     static const size_t key_bytes = 16;
     static const size_t plain_size = 4;
     static const size_t ciph_size = 8;
+
+    void setKey(const std::string &key);
+    void unSetKey(const std::string &key);    
 };
 
 
@@ -183,15 +206,19 @@ public:
     SECLEVEL level() {return SECLEVEL::HOM;}
     Create_field * newCreateField();
 
-    Item * encrypt(Item * p, uint64_t IV = 0);
-    Item * decrypt(Item * c, uint64_t IV = 0);
+    //TODO needs multi encrypt and decrypt
+    Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = 0);
+    Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = 0);
 
     //expr is the expression (e.g. a field) over which to sum
-    Item * sumUDF(Item * expr);
+    Item * sumUDF(Item * expr, const std::string &k = 0);
     
 private:
     static const uint nbits = 1024;
     Paillier_priv sk;
+
+    void setKey(const std::string &key);
+    void unSetKey(const std::string &key);
 };
 
 class Search : public EncLayer {
@@ -201,8 +228,8 @@ public:
     SECLEVEL level() {return SECLEVEL::SEARCH;}
     Create_field * newCreateField();
 
-    Item * encrypt(Item * ptext, uint64_t IV = 0);
-    Item * decrypt(Item * ctext, uint64_t IV = 0)__attribute__((noreturn));
+    Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = 0)__attribute__((noreturn));
 
     //expr is the expression (e.g. a field) over which to sum
     Item * searchUDF(Item * expr);
@@ -211,4 +238,7 @@ private:
     static const uint key_bytes = 16;
     std::string rawkey;
     Binary key;
+
+    void setKey(const std::string &key);
+    void unSetKey(const std::string &key);
 };

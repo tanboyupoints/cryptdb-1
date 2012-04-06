@@ -56,6 +56,7 @@ RND_int::RND_int(Create_field * f, PRNG * prng)
       key(prng->rand_string(key_bytes)),
       bf(key)
 {
+    setKey(prng->rand_string(key_bytes));
 }
 
 
@@ -64,24 +65,46 @@ RND_int::newCreateField() {
     return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG);
 }
 
+void
+RND_int::setKey(const string &k) {
+    if (k.empty()) {
+        return;
+    }
+    key = k;
+    bf = blowfish(k);
+}
+
+//if we're using MultiPrinc, we don't want to keep a copy of a key around
+void
+RND_int::unSetKey(const string &k) {
+    if (k.empty()) {
+        return;
+    }
+    memset(&key, 0, sizeof(key));
+    memset(&bf, 0, sizeof(bf));
+}
+
 //TODO: may want to do more specialized crypto for lengths
 Item *
-RND_int::encrypt(Item * ptext, uint64_t IV) {
+RND_int::encrypt(Item * ptext, uint64_t IV, const string &k) {
+    setKey(k);
     //TODO: should have encrypt_SEM work for any length
     uint64_t p = static_cast<Item_int *>(ptext)->value;
     uint64_t c = bf.encrypt(p ^ IV);
     LOG(encl) << "RND_int encrypt " << p << " IV " << IV << "-->" << c;
+    unSetKey(k);
     return new Item_int((ulonglong) c);
 }
 
 Item *
-RND_int::decrypt(Item * ctext, uint64_t IV) {
+RND_int::decrypt(Item * ctext, uint64_t IV, const string &k) {
+    setKey(k);
     uint64_t c = static_cast<Item_int*>(ctext)->value;
     uint64_t p = bf.decrypt(c) ^ IV;
     LOG(encl) << "RND_int decrypt " << c << " IV " << IV << " --> " << p;
+    unSetKey(k);
     return new Item_int((ulonglong) p);
 }
-
 
 static LEX_STRING n_decRNDInt = {
     (char *) "decrypt_int_sem",
@@ -127,11 +150,9 @@ RND_int::decryptUDF(Item * col, Item * ivcol) {
 
 
 RND_str::RND_str(Create_field * f, PRNG * key)
-    : EncLayer(f),
-      rawkey(key->rand_string(key_bytes))
+    : EncLayer(f)
 {
-    enckey = get_AES_enc_key(rawkey);
-    deckey = get_AES_dec_key(rawkey);
+    setKey(key->rand_string(key_bytes));
 }
 
 Create_field *
@@ -140,21 +161,45 @@ RND_str::newCreateField() {
     return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB);
 }
 
+void
+RND_str::setKey(const string &k) {
+    if (k.empty()) {
+        return;
+    }
+    rawkey = k;
+    enckey = get_AES_enc_key(rawkey);
+    deckey = get_AES_dec_key(rawkey);
+}
+
+void
+RND_str::unSetKey(const string &k) {
+    if (k.empty()) {
+        return;
+    }
+    memset(&rawkey, 0, sizeof(rawkey));
+    enckey = NULL;
+    deckey = NULL;
+}
+
 Item *
-RND_str::encrypt(Item * ptext, uint64_t IV) {
+RND_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
+    setKey(k);
     string enc = CryptoManager::encrypt_SEM(
 	ItemToString(static_cast<Item_string *>(ptext)),
 	enckey, IV);
     LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV " << IV << "--->" << enc;
+    unSetKey(k);
     return new Item_string(make_thd_string(enc), enc.length(), &my_charset_bin);
 }
 
 Item *
-RND_str::decrypt(Item * ctext, uint64_t IV) {
+RND_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
+    setKey(k);
     string dec = CryptoManager::decrypt_SEM(
-	ItemToString(static_cast<Item_string *>(ctext)),
+    ItemToString(static_cast<Item_string *>(ctext)),
 	deckey, IV);
     LOG(encl) << "RND_str decrypt " << ItemToString(ctext) << " IV " << IV << "-->" << dec;
+    unSetKey(k);
     return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
 }
 
@@ -200,6 +245,7 @@ DET_int::DET_int(Create_field * f, PRNG * prng)
       key(prng->rand_string(bf_key_size)),
       bf(key)
 {
+    setKey(prng->rand_string(bf_key_size));
 }
 
 Create_field *
@@ -207,22 +253,44 @@ DET_int::newCreateField() {
     return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG);
 }
 
+void
+DET_int::setKey(const string &k) {
+    if (k.empty()) {
+        return;
+    }
+    key = k;
+    bf = k;
+}
+
+void
+DET_int::unSetKey(const string &k) {
+    if (k.empty()) {
+        return;
+    }
+    memset(&key, 0, sizeof(key));
+    memset(&bf, 0, sizeof(bf));
+}
+
 //TODO: may want to do more specialized crypto for lengths
 Item *
-DET_int::encrypt(Item * ptext, uint64_t IV) {
+DET_int::encrypt(Item * ptext, uint64_t IV, const string &k) {
+    setKey(k);
     ulonglong val = static_cast<Item_int *>(ptext)->value;
     ulonglong res = (ulonglong) bf.encrypt(val);
     LOG(encl) << "DET_int encrypt " << val << "--->" << res;
+    unSetKey(k);
     return new Item_int(res);
 }
 
 Item *
-DET_int::decrypt(Item * ctext, uint64_t IV) {
+DET_int::decrypt(Item * ctext, uint64_t IV, const string &k) {
+    setKey(k);
     ulonglong val = static_cast<Item_int*>(ctext)->value;
     ulonglong res = (ulonglong) bf.decrypt(val);
     LOG(encl) << "DET_int decrypt " << val << "-->" << res;
     Item * ni = new Item_int(res);
     cerr << "det int " << ni << "\n";
+    unSetKey(k);
     return ni;
 }
 
@@ -269,9 +337,7 @@ DET_int::decryptUDF(Item * col, Item * ivcol) {
 DET_str::DET_str(Create_field * f, PRNG * key)
     : EncLayer(f)
 {
-    rawkey = key->rand_string(key_bytes);
-    enckey = get_AES_enc_key(rawkey);
-    deckey = get_AES_dec_key(rawkey);
+    setKey(key->rand_string(key_bytes));
 }
 
 
@@ -281,23 +347,45 @@ DET_str::newCreateField() {
     return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB);
 }
 
+void
+DET_str::setKey(const string &k) {
+    if (k.empty()) {
+        return;
+    }
+    rawkey = k;
+    enckey = get_AES_enc_key(rawkey);
+    deckey = get_AES_dec_key(rawkey);
+}
+
+void
+DET_str::unSetKey(const string &k) {
+    if (k.empty()) {
+        return;
+    }
+    memset(&rawkey, 0, sizeof(rawkey));
+    enckey = NULL;
+    deckey = NULL;
+}
+
 Item *
-DET_str::encrypt(Item * ptext, uint64_t IV) {
+DET_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
+    setKey(k);
     string enc = encrypt_AES_CMC(
 	ItemToString(static_cast<Item_string *>(ptext)),
 	enckey, false);
+    unSetKey(k);
     return new Item_string(make_thd_string(enc), enc.length(), &my_charset_bin);
 }
 
 Item *
-DET_str::decrypt(Item * ctext, uint64_t IV) {
+DET_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
+    setKey(k);
     string dec = decrypt_AES_CMC(
 	ItemToString(static_cast<Item_string *>(ctext)),
 	deckey, false);
+    unSetKey(k);
     return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
 }
-
-
 
 static LEX_STRING n_decDETStr = {
     (char *) "decrypt_text_det",
@@ -333,25 +421,25 @@ DET_str::decryptUDF(Item * col, Item * ivcol) {
 /*************** DETJOIN *********************/
 
 Item *
-DETJOIN::encrypt(Item * p, uint64_t IV) {
+DETJOIN::encrypt(Item * p, uint64_t IV, const string &k) {
     ulonglong val = static_cast<Item_int *>(p)->value;
     return new Item_int(val);
 }
 
 Item *
-DETJOIN::decrypt(Item * c, uint64_t IV) {
+DETJOIN::decrypt(Item * c, uint64_t IV, const string &k) {
     ulonglong val = static_cast<Item_int *>(c)->value;
     return new Item_int(val);
 }
-  
 
 /**************** OPE **************************/
 
 OPE_int::OPE_int(Create_field * f, PRNG * prng)
     : EncLayer(f),
       key(prng->rand_string(key_bytes)),
-      ope(key, plain_size * 8, ciph_size * 8)
+      ope(key, plain_size*8, ciph_size*8)
 {
+    setKey(prng->rand_string(key_bytes));
 }
 
 Create_field *
@@ -359,19 +447,41 @@ OPE_int::newCreateField() {
     return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG);
 }
 
+void
+OPE_int::setKey(const string &k) {
+    if (k.empty()) {
+        return;
+    }
+    key = k;
+    ope = OPE(key, plain_size * 8, ciph_size * 8);
+}
+
+void
+OPE_int::unSetKey(const string &k) {
+    if (k.empty()) {
+        return;
+    }
+    memset(&key, 0, sizeof(key));
+    ope = OPE("", plain_size*8, ciph_size*8);
+}
+
 Item *
-OPE_int::encrypt(Item * ptext, uint64_t IV) {
+OPE_int::encrypt(Item * ptext, uint64_t IV, const string &k) {
+    setKey(k);
     ulong pval =  (ulong)static_cast<Item_int *>(ptext)->value;
     ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ(pval)));
     LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV << "--->" << enc;
+    unSetKey(k);
     return new Item_int(enc);
 }
 
 Item *
-OPE_int::decrypt(Item * ctext, uint64_t IV) {
+OPE_int::decrypt(Item * ctext, uint64_t IV, const string &k) {
+    setKey(k);
     ulonglong cval = (ulonglong) static_cast<Item_int*>(ctext)->value;
     ulonglong dec = uint64FromZZ(ope.decrypt(ZZFromUint64(cval)));
     LOG(encl) << "OPE_int decrypt " << cval << " IV " << IV << "--->" << dec; 
+    unSetKey(k);
     return new Item_int(dec);
 }
 
@@ -379,8 +489,9 @@ OPE_int::decrypt(Item * ctext, uint64_t IV) {
 OPE_str::OPE_str(Create_field * f, PRNG * prng)
     : EncLayer(f),
       key(prng->rand_string(key_bytes)),
-      ope(key, plain_size * 8, ciph_size * 8)
+      ope(key, plain_size*8, ciph_size*8)
 {
+    setKey(prng->rand_string(key_bytes));
 }
 
 Create_field *
@@ -388,21 +499,43 @@ OPE_str::newCreateField() {
     return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG);
 }
 
+void
+OPE_str::setKey(const string &k) {
+    if (k.empty()) {
+        return;
+    }
+    key = k;
+    ope = OPE(key, plain_size * 8, ciph_size * 8);
+}
+
+void
+OPE_str::unSetKey(const string &k) {
+    if (k.empty()) {
+        return;
+    }
+    memset(&key, 0, sizeof(key));
+    ope = OPE("", plain_size*8, ciph_size*8);
+}
+
 Item *
-OPE_str::encrypt(Item * ptext, uint64_t IV) {
+OPE_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
+    setKey(k);
     string ps = ItemToString(ptext);
     if (ps.size() < plain_size)
         ps = string(plain_size - ps.size(), 0) + ps;
     uint32_t pv;
     memcpy(&pv, ps.data(), plain_size);
     ZZ enc = ope.encrypt(to_ZZ(ntohl(pv)));
+    unSetKey(k);
     return new Item_int((ulonglong) trunc_long(enc, ciph_size));
 }
 
 Item *
-OPE_str::decrypt(Item * ctext, uint64_t IV) {
+OPE_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
     thrower() << "cannot decrypt string from OPE";
 }
+
+
 
 /**************** HOM ***************************/
 
@@ -445,20 +578,42 @@ ItemStrToZZ(Item* i) {
     return ZZFromString(res);
 }
 
+void
+HOM::setKey(const string &k) {
+    if(k.empty()) {
+        return;
+    }
+    //TODO: figure out how to make this work
+    //PRNG *key = getLayerKey(get_AES_KEY(k), fullName(cf->onions[oAGG]->onionname, cf->tm->anonTableName), SECLEVEL::HOM);
+    //sk = Paillier_priv::keygen(key, nbits);
+    thrower() << "HOM setKey not implemented";
+}
+
+void
+HOM::unSetKey(const string &k) {
+    if (k.empty()) {
+        return;
+    }
+    //TODO: set sk to 0
+}
+
 Item *
-HOM::encrypt(Item * ptext, uint64_t IV) {
+HOM::encrypt(Item * ptext, uint64_t IV, const string &k) {
+    setKey(k);
     ZZ enc = sk.encrypt(ItemIntToZZ(ptext));
+    unSetKey(k);
     return ZZToItemStr(enc);
 }
 
 Item *
-HOM::decrypt(Item * ctext, uint64_t IV) {
+HOM::decrypt(Item * ctext, uint64_t IV, const string &k) {
+    setKey(k);
     ZZ enc = ItemStrToZZ(ctext);
     ZZ dec = sk.decrypt(enc);
     LOG(encl) << "HOM ciph " << enc << "---->" << dec; 
+    unSetKey(k);
     return ZZToItemInt(dec);
 }
-
 
 static LEX_STRING n_sum = {
     (char*)"agg",
@@ -481,12 +636,12 @@ static udf_func u_sum = {
 
 
 Item *
-HOM::sumUDF(Item * expr) {
-         
+HOM::sumUDF(Item * expr, const string &k) {
+    setKey(k);
     List<Item> l;
     l.push_back(expr);
     l.push_back(ZZToItemStr(sk.hompubkey()));
-        
+    unSetKey(k);
     return new Item_func_udf_str(&u_sum, l);
 }
 
@@ -495,8 +650,7 @@ HOM::sumUDF(Item * expr) {
 Search::Search(Create_field * f, PRNG * key)
     : EncLayer(f)
 {
-    rawkey = key->rand_string(key_bytes);
-    this->key = Binary(key_bytes, (unsigned char *)rawkey.data());
+    setKey(key->rand_string(key_bytes));
 }
 
 Create_field *
@@ -504,6 +658,24 @@ Search::newCreateField() {
     return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB);
 }
 
+
+void
+Search::setKey(const string &k) {
+    if (k.empty()) {
+        return;
+    }
+    rawkey = k;
+    key = Binary(key_bytes, (unsigned char *)rawkey.data());
+}
+
+void
+Search::unSetKey(const string &k) {
+    if (k.empty()) {
+        return;
+    }
+    memset(&rawkey, 0, sizeof(rawkey));
+    //TODO: zero key
+}
 
 //this function should in fact be provided by the programmer
 //currently, we split by whitespaces
@@ -536,20 +708,21 @@ tokenize(string text)
 }
 
 Item *
-Search::encrypt(Item * ptext, uint64_t IV) {
+Search::encrypt(Item * ptext, uint64_t IV, const std::string &k) {
+    setKey(k);
     string plainstr = ItemToString(ptext);
     //TODO: remove Binary, string serves this purpose now..
     list<Binary> * tokens = tokenize(plainstr);
     Binary ciph = CryptoManager::encryptSWP(key, *tokens);
-    
+
+    unSetKey(k);
     return new Item_string((const char *)ciph.content, ciph.len, &my_charset_bin);
 }
 
 Item *
-Search::decrypt(Item * ctext, uint64_t IV) {
+Search::decrypt(Item * ctext, uint64_t IV, const std::string &k) {
     thrower() << "decryption from SWP not supported \n";
 }
-
 
 static LEX_STRING n_search = {
     (char*)"searchSWP",
@@ -602,7 +775,7 @@ EncLayerFactory::encLayer(SECLEVEL sl, Create_field * cf, PRNG * key) {
 	}
     }
     case SECLEVEL::DETJOIN: {
-	return new DETJOIN(cf, key);
+        return new DETJOIN(cf, key);
     }
     case SECLEVEL::OPE: {
 	if (IsMySQLTypeNumeric(cf->sql_type)) {
@@ -612,10 +785,10 @@ EncLayerFactory::encLayer(SECLEVEL sl, Create_field * cf, PRNG * key) {
 	}
     }
     case SECLEVEL::HOM: {
-	return new HOM(cf, key);
+        return new HOM(cf, key);
     }
     case SECLEVEL::SEARCH: {
-	return new Search(cf, key);
+        return new Search(cf, key);
     }
     default:{
 	

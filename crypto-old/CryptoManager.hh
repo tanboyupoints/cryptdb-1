@@ -12,13 +12,15 @@
 #include <util/onions.hh>
 #include <crypto-old/SWPSearch.hh>
 #include <crypto-old/BasicCrypto.hh>
-
+#include <crypto/prng.hh>
 
 
 #define PAILLIER_LEN_BYTES 256
 
 // returns the highest security level lower than sl that allows equality
 SECLEVEL highestEq(SECLEVEL sl);
+
+PRNG * getLayerKey(AES_KEY * mKey, std::string uniqueFieldName, SECLEVEL l);
 
 typedef RSA PKCS;
 

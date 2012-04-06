@@ -235,21 +235,26 @@ addSaltToReturn(ReturnMeta & rm, int pos) {
 
 //TODO: which encrypt/decrypt should handle null?
 static Item *
-encrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV = 0) {
+encrypt_item_layers(Item * i, list<EncLayer *> & layers, Analysis &a, uint64_t IV = 0) {
 
     assert_s(layers.size() > 0, "field must have at least one layer");
 
     Item * enc = i;
     Item * prev_enc = NULL;
     for (auto layer : layers) {
-	LOG(encl) << "encrypt layer " << levelnames[(int)layer->level()] << "\n";
-	enc = layer->encrypt(enc, IV);
-	//need to free space for all enc
-	//except the last one
-	if (prev_enc) {
-	    delete prev_enc;
-	}
-	prev_enc = enc;
+        LOG(encl) << "encrypt layer " << levelnames[(int)layer->level()] << "\n";
+        string key = "";
+        if (a.mp) {
+            FieldMeta * fm = a.itemToMeta[i]->basefield;
+            key = a.mp->get_key(fullName(fm->fname, fm->tm->anonTableName), a.tmkm);
+        }
+        enc = layer->encrypt(enc, IV, key);
+        //need to free space for all enc
+        //except the last one
+        if (prev_enc) {
+            delete prev_enc;
+        }
+        prev_enc = enc;
     }
 
     return enc;
@@ -283,17 +288,17 @@ encrypt_item(Item * i, Analysis & a){
     onion o        = im->o;
 
     if (o == oPLAIN) {
-	return i;
+        return i;
     } else {
-	return encrypt_item_layers(i, fm->onions[o]->layers);
+        return encrypt_item_layers(i, fm->onions[o]->layers, a);
     }
 }
 
 static void
 encrypt_item_all_onions(Item * i, FieldMeta * fm,
-			uint64_t IV, vector<Item*> & l) {
+                        uint64_t IV, vector<Item*> & l, Analysis &a) {
     for (auto it : fm->onions) {
-	l.push_back(encrypt_item_layers(i, it.second->layers, IV));
+        l.push_back(encrypt_item_layers(i, it.second->layers, a, IV));
     }
 }
 
@@ -487,6 +492,8 @@ analyze(Item *i, const constraints &tr, Analysis & a)
     cerr << "before analyze \n";
     if (i == NULL) {
         LOG(cdb_v) << "item is null which sucks";
+    } else {
+        LOG(cdb_v) << "item is not null which should not seg fault";
     }
     LOG(cdb_v) << "calling gather for item " << i << " tr " << tr << "\n";
     EncSet e(gather(i, tr, a));
@@ -992,7 +999,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
             //TODO: need to use table salt in this case
         }
 
-	encrypt_item_all_onions(i, fm, salt, l);
+        encrypt_item_all_onions(i, fm, salt, l, a);
        
         if (fm->has_salt) {
             l.push_back(new Item_int((ulonglong) salt));
@@ -1052,7 +1059,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
 
 	//encrypt for each onion
         for (auto it = fm->onions.begin(); it != fm->onions.end();it++) {
-	    l.push_back(encrypt_item_layers(i, it->second->layers, salt));
+            l.push_back(encrypt_item_layers(i, it->second->layers, a, salt));
         }
 	
         if (fm->has_salt) {
@@ -2239,6 +2246,7 @@ rewrite_table_list(List<TABLE_LIST> *tll, Analysis & a)
     }
 }
 
+/* Moved to CryptoManager
 static PRNG *
 getLayerKey(AES_KEY * mKey, string uniqueFieldName, SECLEVEL l) {
     string rawkey = CryptoManager::getKey(mKey, uniqueFieldName, l);
@@ -2246,6 +2254,7 @@ getLayerKey(AES_KEY * mKey, string uniqueFieldName, SECLEVEL l) {
     key->seed_bytes(rawkey.length(), (uint8_t*)rawkey.data());
     return key;
 }
+*/
 
 static void
 init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf, onionlayout ol) {
@@ -2258,7 +2267,7 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
 
         //generate enclayers
         for (auto l: it.second) {
-            PRNG * key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);	    
+            PRNG * key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);
             om->layers.push_back(EncLayerFactory::encLayer(l, cf, key));
         }
         fm->onions[o] = om;
@@ -2878,7 +2887,7 @@ loadUDFs(Connect * conn) {
 static void
 init_mysql(const string & embed_db) {
       char dir_arg[1024];
-      snprintf(dir_arg, sizeof(dir_arg), "--datadir=%s", "/var/lib/shadow-mysql");
+      snprintf(dir_arg, sizeof(dir_arg), "--datadir=%s", embed_db.c_str());
 
     const char *mysql_av[] =
     { "progname",
