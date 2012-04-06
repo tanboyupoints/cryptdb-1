@@ -485,6 +485,9 @@ static inline void
 analyze(Item *i, const constraints &tr, Analysis & a)
 {
     cerr << "before analyze \n";
+    if (i == NULL) {
+        LOG(cdb_v) << "item is null which sucks";
+    }
     LOG(cdb_v) << "calling gather for item " << i << " tr " << tr << "\n";
     EncSet e(gather(i, tr, a));
     LOG(cdb_v) << "choosing one for item " << i << " out of encset " << e << "\n";
