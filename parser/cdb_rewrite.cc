@@ -3382,7 +3382,7 @@ printRes(const ResType & r) {
         ssn << buf;
     }
     std::cerr << ssn.str() << std::endl;
-    LOG(edb_v) << ssn.str();
+    //LOG(edb_v) << ssn.str();
 
     /* next, print out the rows */
     for (unsigned int i = 0; i < r.rows.size(); i++) {
@@ -3390,11 +3390,11 @@ printRes(const ResType & r) {
         for (unsigned int j = 0; j < r.rows[i].size(); j++) {
             char buf[400];
             std::stringstream sstr;
-            sstr << r.rows[i][j];
+            sstr << *r.rows[i][j];
             snprintf(buf, sizeof(buf), "%-20s", sstr.str().c_str());
             ss << buf;
         }
-        std::cerr << std::endl;
-        LOG(edb_v) << ss.str();
+        std::cerr << ss.str() << std::endl;
+        //LOG(edb_v) << ss.str();
     }
 }
