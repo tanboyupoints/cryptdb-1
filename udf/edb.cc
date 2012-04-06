@@ -15,7 +15,6 @@
  */
 
 #define DEBUG 1
-#define MYDEBUG 1
 
 #include <crypto-old/CryptoManager.hh> /* various functions for EDB */
 #include <crypto/blowfish.hh>
@@ -47,7 +46,7 @@ my_bool  decrypt_text_sem_init(UDF_INIT *initid, UDF_ARGS *args,
 void     decrypt_text_sem_deinit(UDF_INIT *initid);
 char *   decrypt_text_sem(UDF_INIT *initid, UDF_ARGS *args, char *result,
                           unsigned long *length, char *is_null, char *error);
-#if (MYDEBUG)    
+
 my_bool  encrypt_int_det_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
 ulonglong encrypt_int_det(UDF_INIT *initid, UDF_ARGS *args, char *is_null,
                          char *error);
@@ -77,7 +76,6 @@ char *   agg(UDF_INIT *initid, UDF_ARGS *args, char *result,
 void     func_add_set_deinit(UDF_INIT *initid);
 char *   func_add_set(UDF_INIT *initid, UDF_ARGS *args, char *result,
                       unsigned long *length, char *is_null, char *error);
-#endif /*MYDEBUG*/
 }
 
 static void __attribute__((unused))
@@ -87,7 +85,6 @@ log(string s)
     fprintf(stderr, "%s\n", s.c_str());
 }
 
-#if MYDEBUG
 
 static string
 decrypt_SEM(unsigned char *eValueBytes, uint64_t eValueLen,
@@ -96,14 +93,6 @@ decrypt_SEM(unsigned char *eValueBytes, uint64_t eValueLen,
     string c((char *) eValueBytes, (unsigned int) eValueLen);
     return CryptoManager::decrypt_SEM(c, aesKey, salt);
 }
-/*
-static string
-decrypt_DET(unsigned char *eValueBytes, uint64_t eValueLen, AES_KEY * key)
-{
-    string c((char *) eValueBytes, (unsigned int) eValueLen);
-    return CryptoManager::decrypt_DET(c, key);
-}
-*/
 
 static bool
 search(const Token & token, const Binary & overall_ciph)
@@ -112,7 +101,7 @@ search(const Token & token, const Binary & overall_ciph)
    return CryptoManager::searchExists(token, overall_ciph);
 
 }
-#endif /*MYDEBUG*/
+
 
 #if MYSQL_S
 #define ARGS args
@@ -274,7 +263,7 @@ decrypt_text_sem(UDF_INIT *initid, UDF_ARGS *args,
     return (char*) initid->ptr;
 }
     
-#if MYDEBUG
+
     
 #if MYSQL_S
 my_bool
@@ -335,21 +324,14 @@ Datum
 decrypt_text_det(PG_FUNCTION_ARGS)
 #endif
 {
-    /*  uint64_t eValueLen;
+     uint64_t eValueLen;
     char *eValueBytes = getba(args, 0, eValueLen);
 
     uint64_t keyLen;
     char *keyBytes = getba(args, 1, keyLen);
     string key = string(keyBytes, keyLen);
     
-    // AES_KEY * aesKey = NULL;
-
-    if (!eValueBytes || key.size()) {
-	cerr << "hi \n";
-	}*/
-    
-/*
-    get_AES_dec_key(key);
+    AES_KEY * aesKey = get_AES_dec_key(key);
     string value = decrypt_AES_CMC(string(eValueBytes, (unsigned int)eValueLen), aesKey, false);
     delete aesKey;
 
@@ -365,8 +347,7 @@ decrypt_text_det(PG_FUNCTION_ARGS)
     memcpy(VARDATA(res), value, eValueLen);
     PG_RETURN_BYTEA_P(res);
 #endif
-*/
-    return (char*)"alice";
+
 }
 
 /*
@@ -669,5 +650,4 @@ func_add_set(PG_FUNCTION_ARGS)
 
 #endif /*MYSQL_S*/
     
-#endif /*MYDEBUG*/
 } /* extern "C" */

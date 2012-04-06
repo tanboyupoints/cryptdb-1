@@ -34,7 +34,7 @@ operator<<(std::ostream &out, Item &i)
 
 static inline std::ostream&
 operator<<(std::ostream &out, Item * i) {
-    if (i == NULL) {
+    if (i == NULL || i->null_value) {
 	return out << "NULL";
     } else {
 	String s, s1;

@@ -2826,14 +2826,14 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
 }
 
 static void dropF(Connect * conn, const string & func) {
-/*    assert_s(conn->execute("DROP FUNCTION IF EXISTS " + func + "; "),
-      "cannot drop " + func + ");");    */
+    assert_s(conn->execute("DROP FUNCTION IF EXISTS " + func + "; "),
+      "cannot drop " + func + ");");    
 }
 
 static void
 dropAll(Connect * conn)
 {
-     dropF(conn, "decrypt_int_sem");
+    dropF(conn, "decrypt_int_sem");
     dropF(conn, "decrypt_int_det");
     dropF(conn, "decrypt_text_sem");
     dropF(conn, "decrypt_text_det");
@@ -2844,13 +2844,13 @@ dropAll(Connect * conn)
 
 static void
 createF(Connect * conn, const string & func, const string & ret, bool isAggregate = false){
-    /*   string functype = "";
+    string functype = "";
     if (isAggregate) {
 	functype = "AGGREGATE";
     }
     assert_s(conn->execute(
                  "CREATE  " + functype + " FUNCTION " + func + " RETURNS " + ret + " SONAME 'edb.so'; "),
-		 "failed to create udf " + func);   */ 
+		 "failed to create udf " + func);   
 }
 static void
 createAll(Connect * conn)
