@@ -3177,6 +3177,12 @@ Rewriter::setMasterKey(const string &mkey)
 list<string>
 Rewriter::processAnnotation(Annotation annot, Analysis &a)
 {
+    if (a.mp && annot.type != ENCFOR) {
+        bool encryptField;
+        return a.mp->processAnnotation(annot, encryptField, a.schema);
+    }
+    
+    //TODO: use EncLayer CreateField information
     assert_s(annot.getPrimitive() != "", "enc annotation has no primitive");
     LOG(cdb_v) << "table is " << annot.getPrimitiveTableName() << "; field is " << annot.getPrimitiveFieldName();
     TableMeta *tm = schema->tableMetaMap[annot.getPrimitiveTableName()];
@@ -3195,6 +3201,11 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
     }
     
     init_onions(a.masterKey, fm, fm->index, fm->sql_field);
+
+    if (a.mp) {
+        bool encryptField;
+        return a.mp->processAnnotation(annot, encryptField, a.schema);
+    }
     
     for (auto pr : fm->encdesc.olm) {
         fm->onions[pr.first]->onionname = anonymizeFieldName(fm->index, pr.first, fm->fname, true);
@@ -3238,7 +3249,6 @@ Rewriter::mp_init(Analysis &a) {
 list<string>
 Rewriter::rewrite(const string & q, Analysis & analysis)
 {
-
     list<string> queries;
     query_parse p(ci.db, q);
     analysis = Analysis(e_conn, conn, schema, masterKey, mp);
@@ -3247,13 +3257,7 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
     mp_init(analysis);
 
     if (p.annot) {
-        if (analysis.mp) {
-            bool encryptField;
-            //what if anything do we want to do with encryptField?
-            return analysis.mp->processAnnotation(*p.annot, encryptField, analysis.schema);
-        } else {
-            return processAnnotation(*p.annot, analysis);
-        }
+        return processAnnotation(*p.annot, analysis);
 	}
 
     LEX *lex = p.lex();

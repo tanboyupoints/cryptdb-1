@@ -79,7 +79,7 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
 
         assert_s(setSensitive(schema, annot.getPrimitiveTableName(), annot.getPrimitiveFieldName()), "could not set primitive encfor table as sensitive");
         assert_s(setSensitive(schema, annot.getRightTableName(), annot.getRightFieldName()), "could not set right encfor table as sensitive");
-        cerr << "sensitive done" << endl;
+        //cerr << "sensitive done" << endl;
         FieldMeta *fm = schema->tableMetaMap[annot.getPrimitiveTableName()]->fieldMetaMap[annot.getPrimitiveFieldName()];
         assert_s(fm, "ENCFOR received primitive that does not exist; please put CREATE TABLE query before ENCFOR annotation\n");
         mkm.encForMap[fullName(fm->fname, annot.getPrimitiveTableName())] = annot.getRight().column;
