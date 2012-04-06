@@ -2247,17 +2247,17 @@ getLayerKey(AES_KEY * mKey, string uniqueFieldName, SECLEVEL l) {
 static void
 init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf, onionlayout ol) {
     for (auto it: ol) {
-	onion o = it.first;
-	OnionMeta * om = new OnionMeta();
+        onion o = it.first;
+        OnionMeta * om = new OnionMeta();
 
         //anonymize onion name
-	om->onionname = anonymizeFieldName(index, o, fm->fname, false);
+        om->onionname = anonymizeFieldName(index, o, fm->fname, false);
 
-	//generate enclayers
-	for (auto l: it.second) {
-	    PRNG * key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);	    
-	    om->layers.push_back(EncLayerFactory::encLayer(l, cf, key));
-	}
+        //generate enclayers
+        for (auto l: it.second) {
+            PRNG * key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);	    
+            om->layers.push_back(EncLayerFactory::encLayer(l, cf, key));
+        }
         fm->onions[o] = om;
 	
         //set outer layer
@@ -2268,9 +2268,9 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
 static void
 init_onions(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf) {
     if (IsMySQLTypeNumeric(cf->sql_type)) {
-	init_onions_layout(mKey, fm, index, cf, NUM_ONION_LAYOUT);
+        init_onions_layout(mKey, fm, index, cf, NUM_ONION_LAYOUT);
     } else {
-	init_onions_layout(mKey, fm, index, cf, STR_ONION_LAYOUT);
+        init_onions_layout(mKey, fm, index, cf, STR_ONION_LAYOUT);
     }
 }
 
@@ -2307,22 +2307,22 @@ add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
         fm->fname         = string(fm->sql_field->field_name);
         fm->index         = index;
 
-	if (encByDefault) { 
-	    init_onions(a.masterKey, fm, index, field);
-          
+        if (encByDefault) { 
+            init_onions(a.masterKey, fm, index, field);
+            
             fm->has_salt = true;
             fm->salt_name = getFieldSalt(index, tm->anonTableName);
         } else {
             fm->has_salt = false;
         }
 
-
+        
         assert(tm->fieldMetaMap.find(fm->fname) == tm->fieldMetaMap.end());
         tm->fieldMetaMap[fm->fname] = fm;
         tm->fieldNames.push_back(fm->fname);
 
         index++;
-
+        
     }
 }
 
@@ -3181,7 +3181,9 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
     } else {
         fm->encdesc = STR_initial_levels;
     }
-
+    
+    init_onions(a.masterKey, fm, fm->index, fm->sql_field);
+    
     for (auto pr : fm->encdesc.olm) {
         fm->onions[pr.first]->onionname = anonymizeFieldName(fm->index, pr.first, fm->fname, true);
         if (pr.first == oDET) {
@@ -3210,7 +3212,6 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
     query_list.push_back(query + " ADD " + fm->salt_name + " " + TN_SALT + " AFTER " + fm->onions.rbegin()->second->onionname + ";");
 
     return query_list;
-    return list<string>();
 }
 
 void
