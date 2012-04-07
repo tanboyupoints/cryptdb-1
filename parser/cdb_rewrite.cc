@@ -3343,7 +3343,7 @@ Rewriter::decryptResults(ResType & dbres,
         index++;
     }
 
-    unsigned int real_cols = dbres.names.size();
+    unsigned int real_cols = res.names.size();
     // switch types to original ones : TODO
 
     //allocate space in results for decrypted rows
