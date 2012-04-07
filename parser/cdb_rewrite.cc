@@ -341,8 +341,7 @@ static string
 anonymize_table_name(const string &tname,
                      Analysis & a)
 {
-    assert(a.schema->tableMetaMap.find(tname) != a.schema->tableMetaMap.end());
-    return a.schema->tableMetaMap[tname]->anonTableName;
+    return getAssert(a.schema->tableMetaMap, tname)->anonTableName;
 }
 
 static string
@@ -2203,6 +2202,7 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
 static inline void
 rewrite_table_list(TABLE_LIST *t, Analysis &a)
 {
+    cerr << "rewriting table \n";
     string anon_name = anonymize_table_name(string(t->table_name,
                                                    t->table_name_length), a);
     t->table_name = make_thd_string(anon_name, &t->table_name_length);
@@ -2214,10 +2214,15 @@ static void
 rewrite_table_list(List<TABLE_LIST> *tll, Analysis & a)
 {
     List_iterator<TABLE_LIST> join_it(*tll);
+
     for (;;) {
         TABLE_LIST *t = join_it++;
-        if (!t)
-            break;
+	cerr << "list of tables is " << t << "\n"; 
+        if (!t) {
+	    cerr << "no more tables\n";
+	    break;
+	    
+	}
 
         rewrite_table_list(t, a);
 
@@ -2684,6 +2689,7 @@ query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis &
 static int
 lex_rewrite(const string & db, LEX * lex, Analysis & analysis)
 {
+    cerr << "lex is " << *lex << "\n";
     switch (lex->sql_command) {
     case SQLCOM_CREATE_TABLE:
         rewrite_create_lex(lex, analysis);
@@ -2698,6 +2704,10 @@ lex_rewrite(const string & db, LEX * lex, Analysis & analysis)
     case SQLCOM_UPDATE:
         rewrite_update_lex(lex, analysis);
         break;
+    case SQLCOM_DELETE:
+	rewrite_table_list(lex->query_tables, analysis);
+	rewrite_select_lex(&lex->select_lex, analysis);
+	break;
     default:
         rewrite_table_list(&lex->select_lex.top_join_list, analysis);
         rewrite_select_lex(&lex->select_lex, analysis);

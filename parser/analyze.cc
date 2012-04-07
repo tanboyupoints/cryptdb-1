@@ -784,9 +784,10 @@ process_select_lex(st_select_lex *select_lex, const cipher_type_reason &tr)
         analyze(item, tr);
     }
 
-    if (select_lex->where)
+    if (select_lex->where) {
+	cerr << "going in where! \n";
         analyze(select_lex->where, cipher_type_reason(cipher_type::plain, "where", select_lex->where, 0));
-
+    }
     if (select_lex->having)
         analyze(select_lex->having, cipher_type_reason(cipher_type::plain, "having", select_lex->having, 0));
 
