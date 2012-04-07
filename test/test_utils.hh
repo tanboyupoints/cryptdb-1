@@ -82,6 +82,16 @@ assert_res(const ResType &r, const char *msg)
 static inline bool
 match(const ResType &res, const ResType &expected)
 {
-    return res.names == expected.names && res.rows == expected.rows;
+    if (res.names != expected.names || res.rows.size() != expected.rows.size()) {
+        return false;
+    }
+    for (unsigned int i = 0; i < res.rows.size(); i++) {
+        for (unsigned int j = 0; j < res.rows.at(i).size(); j++) {
+            if (ItemToString(res.rows.at(i).at(j)) != ItemToString(res.rows.at(i).at(j))) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 

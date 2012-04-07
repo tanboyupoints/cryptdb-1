@@ -988,9 +988,9 @@ CheckAnnotatedQuery(const TestConfig &tc, string control_query, string test_quer
     } else if (!match(test_res, control_res)) {
         LOG(warn) << "result mismatch for query: " << test_query;
         LOG(warn) << "control is:";
-        PrintRes(control_res);
+        printRes(control_res);
         LOG(warn) << "test is:";
-        PrintRes(test_res);
+        printRes(test_res);
 
         if (tc.stop_if_fail) {
             LOG(warn) << "RESULT: " << npass << "/" << ntest;

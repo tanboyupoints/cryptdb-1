@@ -65,7 +65,7 @@ static onionlayout NUM_ONION_LAYOUT = {
 static onionlayout STR_ONION_LAYOUT = {
     {oDET, std::list<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
     {oOPE, std::list<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
-    {oAGG, std::list<SECLEVEL>({SECLEVEL::SEARCH})}
+    {oSWP, std::list<SECLEVEL>({SECLEVEL::SEARCH})}
 };
 
 
