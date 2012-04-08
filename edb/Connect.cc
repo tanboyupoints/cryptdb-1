@@ -16,18 +16,33 @@
 using namespace std;
 
 Connect::Connect(const string &server, const string &user, const string &passwd,
+                 uint port)
+    : conn(nullptr), close_on_destroy(true)
+{
+    do_connect(server, user, passwd, port);
+}
+
+Connect::Connect(const string &server, const string &user, const string &passwd,
                  const string &dbname, uint port)
     : conn(nullptr), close_on_destroy(true)
 {
-    const char *dummy_argv[] =
-        {
-            "progname",
-            "--skip-grant-tables",
-            "--skip-innodb",
-            "--default-storage-engine=MEMORY",
-            "--character-set-server=utf8",
-            "--language=" MYSQL_BUILD_DIR "/sql/share/"
-        };
+    do_connect(server, user, passwd, port);
+    if (!select_db(dbname))
+        thrower() << "cannot select dbname " << dbname;
+}
+
+void
+Connect::do_connect(const string &server, const string &user,
+                    const string &passwd, uint port)
+{
+    const char *dummy_argv[] = {
+        "progname",
+        "--skip-grant-tables",
+        "--skip-innodb",
+        "--default-storage-engine=MEMORY",
+        "--character-set-server=utf8",
+        "--language=" MYSQL_BUILD_DIR "/sql/share/"
+    };
     assert(0 == mysql_server_init(sizeof(dummy_argv) / sizeof(*dummy_argv),
                                   (char**) dummy_argv, 0));
 
@@ -42,15 +57,20 @@ Connect::Connect(const string &server, const string &user, const string &passwd,
 
     /* Connect to database */
     if (!mysql_real_connect(conn, server.c_str(), user.c_str(),
-                            passwd.c_str(), dbname.c_str(), port, 0, 0)) {
+                            passwd.c_str(), 0, port, 0, 0)) {
         LOG(warn) << "connecting to server " << server
                   << " user " << user
                   << " pwd " << passwd
-                  << " dbname " << dbname
                   << " port " << port;
         LOG(warn) << "mysql_real_connect: " << mysql_error(conn);
         throw runtime_error("cannot connect");
     }
+}
+
+bool
+Connect::select_db(const std::string &dbname)
+{
+    return mysql_select_db(conn, dbname.c_str()) ? false : true;
 }
 
 Connect * Connect::getEmbedded() {
