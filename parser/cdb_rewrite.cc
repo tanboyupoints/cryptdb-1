@@ -2250,6 +2250,9 @@ add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
     LOG(cdb_v) << "adding " << table << " to schema->tableMetaMap";
     a.schema->tableMetaMap[table] = tm;
 
+    // XXX this seems disasterous: if tables A and B are created, A is dropped,
+    // and C is created, C will use the same tableNo as B.  we should just use
+    // an auto_increment field in proxy_db.table_info.
     tm->tableNo = a.schema->totalTables++;
     tm->anonTableName = anonymizeTableName(tm->tableNo, table, !encByDefault);
 
