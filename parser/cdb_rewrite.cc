@@ -2985,36 +2985,26 @@ Rewriter::initSchema()
 
     vector<string> tablelist;
 
-    {
-	DBResult * dbres;
-	assert(e_conn->execute("SELECT id, dbname, name, anon_name FROM proxy_db.table_info", dbres));
-	ScopedMySQLRes r(dbres->n);
-        MYSQL_ROW row;
-        while ((row = mysql_fetch_row(r.res()))) {
-            unsigned long *l = mysql_fetch_lengths(r.res());
-            assert(l != NULL);
-            TableMeta *tm = new TableMeta;
-            tm->tableNo = (unsigned int) atoi(string(row[0], l[0]).c_str());
-            tm->anonTableName = string(row[3], l[3]);
-            tm->has_salt = false;
-            string dbname(row[1], l[1]);
-            string tablename(row[2], l[2]);
-            // tableMetaMap keys should include dbname: make_pair(dbname, tablename)?
-            schema->tableMetaMap[tablename] = tm;
-            schema->totalTables++;
-        }
-    }
-
-    for (auto it = schema->tableMetaMap.begin();
-         it != schema->tableMetaMap.end();
-         ++it) {
-
-        const string &origTableName = it->first;
-        TableMeta *tm = it->second;
+    DBResult * dbres;
+    assert(e_conn->execute("SELECT id, dbname, name, anon_name FROM proxy_db.table_info", dbres));
+    ScopedMySQLRes r(dbres->n);
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(r.res()))) {
+        unsigned long *l = mysql_fetch_lengths(r.res());
+        assert(l != NULL);
+        TableMeta *tm = new TableMeta;
+        tm->tableNo = (unsigned int) atoi(string(row[0], l[0]).c_str());
+        tm->anonTableName = string(row[3], l[3]);
+        tm->has_salt = false;
+        string dbname(row[1], l[1]);
+        string origTableName(row[2], l[2]);
+        // tableMetaMap keys should include dbname: make_pair(dbname, origTableName)?
+        schema->tableMetaMap[origTableName] = tm;
+        schema->totalTables++;
 
         string create_table_query;
         {
-            string q = "SHOW CREATE TABLE " + origTableName;
+            string q = "SHOW CREATE TABLE `" + dbname + "`.`" + origTableName + "`";
             DBResult * dbres = NULL;
             assert(e_conn->execute(q, dbres));
             ScopedMySQLRes r(dbres->n);
@@ -3058,8 +3048,9 @@ Rewriter::initSchema()
                        //"c.search_used, "
 
                        "FROM proxy_db.column_info c, proxy_db.table_info t "
-                       "WHERE t.name = '" + origTableName + "' AND c.table_id = t.id";
-                       // XXX also t.dbname=...
+                       "WHERE t.name = '" + origTableName + "'"
+                            " AND t.dbname = '" + dbname + "'"
+                            " AND c.table_id = t.id";
 
             DBResult * dbres;
             assert(e_conn->execute(q, dbres));
