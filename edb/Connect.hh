@@ -30,8 +30,8 @@ class DBResult {
 class Connect {
  public:
     // dbname is the name of the local db
-    Connect(std::string server, std::string user, std::string passwd,
-            std::string dbname, uint port = 0);
+    Connect(const std::string &server, const std::string &user,
+            const std::string &passwd, const std::string &dbname, uint port = 0);
 
     Connect(MYSQL* _conn) : conn(_conn), close_on_destroy(false) { }
 

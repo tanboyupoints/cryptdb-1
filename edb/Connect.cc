@@ -15,8 +15,8 @@
 
 using namespace std;
 
-Connect::Connect(string server, string user, string passwd,
-                 string dbname, uint port)
+Connect::Connect(const string &server, const string &user, const string &passwd,
+                 const string &dbname, uint port)
     : conn(nullptr), close_on_destroy(true)
 {
     const char *dummy_argv[] =
