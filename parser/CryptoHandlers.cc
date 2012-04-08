@@ -701,7 +701,7 @@ Search::decrypt(Item * ctext, uint64_t IV, const std::string &k) {
     thrower() << "decryption from SWP not supported \n";
 }
 
-static udf_func u_search __attribute__((unused)) = {
+static udf_func u_search = {
     LEXSTRING("searchSWP"),
     INT_RESULT,
     UDFTYPE_FUNCTION,
@@ -768,3 +768,12 @@ EncLayerFactory::encLayer(SECLEVEL sl, Create_field * cf, PRNG * key) {
     }
     thrower() << "unknown or unimplemented security level \n";
 }
+
+const std::vector<udf_func*> udf_list = {
+    &u_decRNDInt,
+    &u_decRNDString,
+    &u_decDETInt,
+    &u_decDETStr,
+    &u_sum,
+    &u_search
+};

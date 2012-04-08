@@ -2847,43 +2847,32 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
     adjustOnions(db, a);
 }
 
-static void dropF(Connect * conn, const string & func) {
-    assert_s(conn->execute("DROP FUNCTION IF EXISTS " + func + "; "),
-      "cannot drop " + func + ");");    
-}
-
 static void
 dropAll(Connect * conn)
 {
-    dropF(conn, "decrypt_int_sem");
-    dropF(conn, "decrypt_int_det");
-    dropF(conn, "decrypt_text_sem");
-    dropF(conn, "decrypt_text_det");
-    dropF(conn, "searchSWP");
-    dropF(conn, "agg");
-    dropF(conn, "func_add_set");  
+    for (udf_func* u: udf_list) {
+        stringstream ss;
+        ss << "DROP FUNCTION IF EXISTS " << convert_lex_str(u->name) << ";";
+        assert_s(conn->execute(ss.str()), ss.str());
+    }
 }
 
 static void
-createF(Connect * conn, const string & func, const string & ret, bool isAggregate = false){
-    string functype = "";
-    if (isAggregate) {
-	functype = "AGGREGATE";
-    }
-    assert_s(conn->execute(
-                 "CREATE  " + functype + " FUNCTION " + func + " RETURNS " + ret + " SONAME 'edb.so'; "),
-		 "failed to create udf " + func);   
-}
-static void
 createAll(Connect * conn)
 {
-    createF(conn, "decrypt_int_sem", "INTEGER");
-    createF(conn, "decrypt_int_det", "INTEGER");
-    createF(conn, "decrypt_text_sem", "STRING");
-    createF(conn, "decrypt_text_det", "STRING");
-    createF(conn, "searchSWP", "INTEGER");
-    createF(conn, "agg", "STRING", true);
-    createF(conn, "func_add_set", "STRING");
+    for (udf_func* u: udf_list) {
+        stringstream ss;
+        ss << "CREATE ";
+        if (u->type == UDFTYPE_AGGREGATE) ss << "AGGREGATE ";
+        ss << "FUNCTION " << u->name.str << " RETURNS ";
+        switch (u->returns) {
+            case INT_RESULT:    ss << "INTEGER"; break;
+            case STRING_RESULT: ss << "STRING";  break;
+            default:            thrower() << "unknown return " << u->returns;
+        }
+        ss << " SONAME 'edb.so';";
+        assert_s(conn->execute(ss.str()), ss.str());
+    }
 }
 
 static void

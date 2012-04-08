@@ -242,3 +242,6 @@ private:
     void setKey(const std::string &key);
     void unSetKey(const std::string &key);
 };
+
+extern const std::vector<udf_func*> udf_list;
+
