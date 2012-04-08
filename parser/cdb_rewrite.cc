@@ -2883,17 +2883,17 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
 Rewriter::~Rewriter()
 {
-    if (e_conn) {
-	delete e_conn;
-	e_conn = NULL;
+    if (mp) {
+        delete mp;
+        mp = NULL;
     }
     if (conn) {
         delete conn;
         conn = NULL;
     }
-    if (mp) {
-        delete mp;
-        mp = NULL;
+    if (e_conn) {
+	delete e_conn;
+	e_conn = NULL;
     }
 }
 
