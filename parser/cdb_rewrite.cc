@@ -1305,28 +1305,9 @@ static class ANON : public CItemSubtypeFT<Item_func_get_system_var, Item_func::F
 // probably pull the udf_func object out of the embedded db.
 
 
-static LEX_STRING s_HomSum = {
-    (char*)"agg_add",
-    sizeof("agg_add"),
-};
-
-static udf_func s_HomSumUdfFunc = {
-    s_HomSum,
-    STRING_RESULT,
-    UDFTYPE_AGGREGATE,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    0L,
-};
-
 static LEX_STRING s_HomAdd = {
-        (char*)"agg",
-        sizeof("agg"),
+        (char*)"agg_add",
+        sizeof("agg_add"),
 	
     };
 
