@@ -21,6 +21,8 @@ class ResType {
     AutoInc ai;
 };
 
+bool isTableField(std::string token);
+std::string fullName(std::string field, std::string name);
 
 char * make_thd_string(const std::string &s, size_t *lenp = 0);
 

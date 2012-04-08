@@ -31,8 +31,8 @@ std::string getFieldsItSelect(std::list<std::string> & words, std::list<std::str
 bool isNested(const std::string &query);
 
 //returns true if token is of the form 'string.string"
-bool isTableField(std::string token);
-std::string fullName(std::string field, std::string name);
+//bool isTableField(std::string token);
+//std::string fullName(std::string field, std::string name);
 
 bool isField(std::string token);
 //given table.field, the following two return the appropriate part

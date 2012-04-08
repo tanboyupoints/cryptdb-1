@@ -235,21 +235,26 @@ addSaltToReturn(ReturnMeta & rm, int pos) {
 
 //TODO: which encrypt/decrypt should handle null?
 static Item *
-encrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV = 0) {
+encrypt_item_layers(Item * i, list<EncLayer *> & layers, Analysis &a, uint64_t IV = 0) {
 
     assert_s(layers.size() > 0, "field must have at least one layer");
 
     Item * enc = i;
     Item * prev_enc = NULL;
     for (auto layer : layers) {
-	LOG(encl) << "encrypt layer " << levelnames[(int)layer->level()] << "\n";
-	enc = layer->encrypt(enc, IV);
-	//need to free space for all enc
-	//except the last one
-	if (prev_enc) {
-	    delete prev_enc;
-	}
-	prev_enc = enc;
+        LOG(encl) << "encrypt layer " << levelnames[(int)layer->level()] << "\n";
+        string key = "";
+        if (a.mp) {
+            FieldMeta * fm = a.itemToMeta[i]->basefield;
+            key = a.mp->get_key(fullName(fm->fname, fm->tm->anonTableName), a.tmkm);
+        }
+        enc = layer->encrypt(enc, IV, key);
+        //need to free space for all enc
+        //except the last one
+        if (prev_enc) {
+            delete prev_enc;
+        }
+        prev_enc = enc;
     }
 
     return enc;
@@ -283,17 +288,17 @@ encrypt_item(Item * i, Analysis & a){
     onion o        = im->o;
 
     if (o == oPLAIN) {
-	return i;
+        return i;
     } else {
-	return encrypt_item_layers(i, fm->onions[o]->layers);
+        return encrypt_item_layers(i, fm->onions[o]->layers, a);
     }
 }
 
 static void
 encrypt_item_all_onions(Item * i, FieldMeta * fm,
-			uint64_t IV, vector<Item*> & l) {
+                        uint64_t IV, vector<Item*> & l, Analysis &a) {
     for (auto it : fm->onions) {
-	l.push_back(encrypt_item_layers(i, it.second->layers, IV));
+        l.push_back(encrypt_item_layers(i, it.second->layers, a, IV));
     }
 }
 
@@ -486,6 +491,8 @@ analyze(Item *i, const constraints &tr, Analysis & a)
     cerr << "before analyze \n";
     if (i == NULL) {
         LOG(cdb_v) << "item is null which sucks";
+    } else {
+        LOG(cdb_v) << "item is not null which should not seg fault";
     }
     LOG(cdb_v) << "calling gather for item " << i << " tr " << tr << "\n";
     EncSet e(gather(i, tr, a));
@@ -991,7 +998,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
             //TODO: need to use table salt in this case
         }
 
-	encrypt_item_all_onions(i, fm, salt, l);
+        encrypt_item_all_onions(i, fm, salt, l, a);
        
         if (fm->has_salt) {
             l.push_back(new Item_int((ulonglong) salt));
@@ -1051,7 +1058,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
 
 	//encrypt for each onion
         for (auto it = fm->onions.begin(); it != fm->onions.end();it++) {
-	    l.push_back(encrypt_item_layers(i, it->second->layers, salt));
+            l.push_back(encrypt_item_layers(i, it->second->layers, a, salt));
         }
 	
         if (fm->has_salt) {
@@ -1161,7 +1168,7 @@ static class ANON : public CItemSubtypeFN<Item_in_optimizer, str_in_optimizer> {
 
 static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
     virtual EncSet do_gather_type(Item_cache *i, const constraints &tr, Analysis & a) const {
-        Item *example = (*i).*rob<Item_cache, Item*, &Item_cache::example>::ptr();
+        Item *example = i->*rob<Item_cache, Item*, &Item_cache::example>::ptr();
         if (example)
             return gather(example, tr, a);
         return tr.encset;
@@ -1297,64 +1304,6 @@ static class ANON : public CItemSubtypeFT<Item_func_get_system_var, Item_func::F
 // hom-add, then we will just lie about its existence. Eventually we could
 // probably pull the udf_func object out of the embedded db.
 
-
-static LEX_STRING s_HomSum = {
-    (char*)"agg_add",
-    sizeof("agg_add"),
-};
-
-static udf_func s_HomSumUdfFunc = {
-    s_HomSum,
-    STRING_RESULT,
-    UDFTYPE_AGGREGATE,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    0L,
-};
-
-static LEX_STRING s_HomAdd = {
-        (char*)"agg",
-        sizeof("agg"),
-	
-    };
-
-static udf_func s_HomAddUdfFunc = {
-        s_HomAdd,
-        STRING_RESULT,
-        UDFTYPE_FUNCTION,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        0L,
-    };
-
-static LEX_STRING s_HomSub = {
-        (char*)"hom_sub",
-        sizeof("hom_sub"),
-    };
-
-static udf_func s_HomSubUdfFunc = {
-        s_HomSub,
-        STRING_RESULT,
-        UDFTYPE_FUNCTION,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        0L,
-    };
 
 template<const char *NAME>
 class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
@@ -1501,11 +1450,11 @@ extern const char str_case[] = "case";
 static class ANON : public CItemSubtypeFN<Item_func_case, str_case> {
     virtual EncSet do_gather_type(Item_func_case *i, const constraints &tr, Analysis & a) const {
         Item **args = i->arguments();
-        int first_expr_num = (*i).*rob<Item_func_case, int,
+        int first_expr_num = i->*rob<Item_func_case, int,
                 &Item_func_case::first_expr_num>::ptr();
-        int else_expr_num = (*i).*rob<Item_func_case, int,
+        int else_expr_num = i->*rob<Item_func_case, int,
                 &Item_func_case::else_expr_num>::ptr();
-        uint ncases = (*i).*rob<Item_func_case, uint,
+        uint ncases = i->*rob<Item_func_case, uint,
                 &Item_func_case::ncases>::ptr();
 
         if (first_expr_num >= 0)
@@ -1970,7 +1919,7 @@ static class ANON : public CItemSubtypeST<Item_sum_bit, Item_sum::Sumfunctype::S
 static class ANON : public CItemSubtypeST<Item_func_group_concat, Item_sum::Sumfunctype::GROUP_CONCAT_FUNC> {
     virtual EncSet do_gather_type(Item_func_group_concat *i, const constraints &tr, Analysis & a) const {
         LOG(cdb_v) << "do_a_t Item_func_group reason " << tr;
-        uint arg_count_field = (*i).*rob<Item_func_group_concat, uint,
+        uint arg_count_field = i->*rob<Item_func_group_concat, uint,
                 &Item_func_group_concat::arg_count_field>::ptr();
         for (uint x = 0; x < arg_count_field; x++) {
             /* XXX could perform in the proxy.. */
@@ -2244,6 +2193,7 @@ rewrite_table_list(List<TABLE_LIST> *tll, Analysis & a)
     }
 }
 
+/* Moved to CryptoManager
 static PRNG *
 getLayerKey(AES_KEY * mKey, string uniqueFieldName, SECLEVEL l) {
     string rawkey = CryptoManager::getKey(mKey, uniqueFieldName, l);
@@ -2251,6 +2201,7 @@ getLayerKey(AES_KEY * mKey, string uniqueFieldName, SECLEVEL l) {
     key->seed_bytes(rawkey.length(), (uint8_t*)rawkey.data());
     return key;
 }
+*/
 
 static void
 init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf, onionlayout ol) {
@@ -2263,7 +2214,7 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
 
         //generate enclayers
         for (auto l: it.second) {
-            PRNG * key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);	    
+            PRNG * key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);
             om->layers.push_back(EncLayerFactory::encLayer(l, cf, key));
         }
         fm->onions[o] = om;
@@ -2840,43 +2791,32 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
     adjustOnions(db, a);
 }
 
-static void dropF(Connect * conn, const string & func) {
-    assert_s(conn->execute("DROP FUNCTION IF EXISTS " + func + "; "),
-      "cannot drop " + func + ");");    
-}
-
 static void
 dropAll(Connect * conn)
 {
-    dropF(conn, "decrypt_int_sem");
-    dropF(conn, "decrypt_int_det");
-    dropF(conn, "decrypt_text_sem");
-    dropF(conn, "decrypt_text_det");
-    dropF(conn, "searchSWP");
-    dropF(conn, "agg");
-    dropF(conn, "func_add_set");  
+    for (udf_func* u: udf_list) {
+        stringstream ss;
+        ss << "DROP FUNCTION IF EXISTS " << convert_lex_str(u->name) << ";";
+        assert_s(conn->execute(ss.str()), ss.str());
+    }
 }
 
 static void
-createF(Connect * conn, const string & func, const string & ret, bool isAggregate = false){
-    string functype = "";
-    if (isAggregate) {
-	functype = "AGGREGATE";
-    }
-    assert_s(conn->execute(
-                 "CREATE  " + functype + " FUNCTION " + func + " RETURNS " + ret + " SONAME 'edb.so'; "),
-		 "failed to create udf " + func);   
-}
-static void
 createAll(Connect * conn)
 {
-    createF(conn, "decrypt_int_sem", "INTEGER");
-    createF(conn, "decrypt_int_det", "INTEGER");
-    createF(conn, "decrypt_text_sem", "STRING");
-    createF(conn, "decrypt_text_det", "STRING");
-    createF(conn, "searchSWP", "INTEGER");
-    createF(conn, "agg", "STRING", true);
-    createF(conn, "func_add_set", "STRING");
+    for (udf_func* u: udf_list) {
+        stringstream ss;
+        ss << "CREATE ";
+        if (u->type == UDFTYPE_AGGREGATE) ss << "AGGREGATE ";
+        ss << "FUNCTION " << u->name.str << " RETURNS ";
+        switch (u->returns) {
+            case INT_RESULT:    ss << "INTEGER"; break;
+            case STRING_RESULT: ss << "STRING";  break;
+            default:            thrower() << "unknown return " << u->returns;
+        }
+        ss << " SONAME 'edb.so';";
+        assert_s(conn->execute(ss.str()), ss.str());
+    }
 }
 
 static void
@@ -2890,7 +2830,7 @@ loadUDFs(Connect * conn) {
 static void
 init_mysql(const string & embed_db) {
       char dir_arg[1024];
-      snprintf(dir_arg, sizeof(dir_arg), "--datadir=%s", "/var/lib/shadow-mysql");
+      snprintf(dir_arg, sizeof(dir_arg), "--datadir=%s", embed_db.c_str());
 
     const char *mysql_av[] =
     { "progname",
@@ -3180,6 +3120,12 @@ Rewriter::setMasterKey(const string &mkey)
 list<string>
 Rewriter::processAnnotation(Annotation annot, Analysis &a)
 {
+    if (a.mp && annot.type != ENCFOR) {
+        bool encryptField;
+        return a.mp->processAnnotation(annot, encryptField, a.schema);
+    }
+    
+    //TODO: use EncLayer CreateField information
     assert_s(annot.getPrimitive() != "", "enc annotation has no primitive");
     LOG(cdb_v) << "table is " << annot.getPrimitiveTableName() << "; field is " << annot.getPrimitiveFieldName();
     TableMeta *tm = schema->tableMetaMap[annot.getPrimitiveTableName()];
@@ -3198,6 +3144,11 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
     }
     
     init_onions(a.masterKey, fm, fm->index, fm->sql_field);
+
+    if (a.mp) {
+        bool encryptField;
+        return a.mp->processAnnotation(annot, encryptField, a.schema);
+    }
     
     for (auto pr : fm->encdesc.olm) {
         fm->onions[pr.first]->onionname = anonymizeFieldName(fm->index, pr.first, fm->fname, true);
@@ -3241,7 +3192,6 @@ Rewriter::mp_init(Analysis &a) {
 list<string>
 Rewriter::rewrite(const string & q, Analysis & analysis)
 {
-
     list<string> queries;
     query_parse p(ci.db, q);
     analysis = Analysis(e_conn, conn, schema, masterKey, mp);
@@ -3250,13 +3200,7 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
     mp_init(analysis);
 
     if (p.annot) {
-        if (analysis.mp) {
-            bool encryptField;
-            //what if anything do we want to do with encryptField?
-            return analysis.mp->processAnnotation(*p.annot, encryptField, analysis.schema);
-        } else {
-            return processAnnotation(*p.annot, analysis);
-        }
+        return processAnnotation(*p.annot, analysis);
 	}
 
     LEX *lex = p.lex();

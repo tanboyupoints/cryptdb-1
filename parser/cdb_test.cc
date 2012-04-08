@@ -31,7 +31,7 @@
 using namespace std;
 
 // if true, uses MultiPrinc mode
-static bool Multi = false;
+static bool Multi = true;
 
 static bool encByDefault = true;
 

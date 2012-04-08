@@ -2,6 +2,28 @@
 
 using namespace std;
 
+bool
+isTableField(string token)
+{
+    size_t pos = token.find(".");
+
+    if (pos == string::npos) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+string
+fullName(string field, string table)
+{
+    if (isTableField(field)) {
+        return field;
+    } else {
+        return table + "." + field;
+    }
+}
+
 char *
 make_thd_string(const string &s, size_t *lenp)
 {
