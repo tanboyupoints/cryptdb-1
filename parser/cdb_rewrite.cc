@@ -187,7 +187,7 @@ adjustOnion(onion o, FieldMeta * fm, AdjustInfo ai, Analysis & a) {
  *
  */
 static void
-adjustOnions(const std::string &db, Analysis & a)
+adjustOnions(Analysis & a)
 {
     for (auto it : a.onionAdjust) {
 	for (auto itt : it.second) {
@@ -2584,7 +2584,7 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
 }
 
 static void
-do_query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault) {
+do_query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault) {
     // iterate over the entire select statement..
     // based on st_select_lex::print in mysql-server/sql/sql_select.cc
 
@@ -2622,13 +2622,13 @@ do_query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysi
  * Results are set in analysis.
  */
 static void
-query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault)
+query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault)
 {
     // optimize the query first
     optimize_table_list(&lex->select_lex.top_join_list, analysis);
     optimize_select_lex(&lex->select_lex, analysis);
 
-    do_query_analyze(db, q, lex, analysis, encByDefault);
+    do_query_analyze(q, lex, analysis, encByDefault);
     //print(analysis.schema->tableMetaMap);
     for (auto it = analysis.tmkm.encForVal.begin(); it != analysis.tmkm.encForVal.end(); it++) {
         if (it->first == "" || it->second == "") {
@@ -2644,7 +2644,7 @@ query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis &
  * Fills rmeta with information about how to decrypt fields returned.
  */
 static int
-lex_rewrite(const string & db, LEX * lex, Analysis & analysis)
+lex_rewrite(LEX * lex, Analysis & analysis)
 {
     cerr << "lex is " << *lex << "\n";
     switch (lex->sql_command) {
@@ -2777,7 +2777,7 @@ add_table_update_meta(const string &q,
 }
 
 static void
-updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
+updateMeta(const string & q, LEX * lex, Analysis & a)
 {
     switch (lex->sql_command) {
     // TODO: alter tables will need to modify the embedded DB schema
@@ -2792,7 +2792,7 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
         break;
     }
 
-    adjustOnions(db, a);
+    adjustOnions(a);
 }
 
 static void
@@ -3210,19 +3210,19 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
 
     //TODO: is db neededs as param in all these funcs?
     //analyze query
-    query_analyze(cur_db, q, lex, analysis, encByDefault);
+    query_analyze(q, lex, analysis, encByDefault);
 
     //update metadata about onions if it's not delete
     if (lex->sql_command != SQLCOM_DROP_TABLE) {
-        updateMeta(cur_db, q, lex, analysis);
+        updateMeta(q, lex, analysis);
     }
     //TODO:these two invokations of updateMeta are confusing:
     //one is for adjust onions, and other for dropping table
 
     //rewrite query
-    lex_rewrite(cur_db, lex, analysis);
+    lex_rewrite(lex, analysis);
     if (lex->sql_command == SQLCOM_DROP_TABLE) {
-        updateMeta(cur_db, q, lex, analysis);
+        updateMeta(q, lex, analysis);
     }
     stringstream ss;
     ss << *lex;
