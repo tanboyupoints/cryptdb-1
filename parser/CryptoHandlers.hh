@@ -243,5 +243,9 @@ private:
     void unSetKey(const std::string &key);
 };
 
+// XXX these should probably be special methods in HOM above.
+extern udf_func s_HomAddUdfFunc;
+extern udf_func s_HomSubUdfFunc;
+
 extern const std::vector<udf_func*> udf_list;
 

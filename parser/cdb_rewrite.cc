@@ -1305,45 +1305,6 @@ static class ANON : public CItemSubtypeFT<Item_func_get_system_var, Item_func::F
 // probably pull the udf_func object out of the embedded db.
 
 
-static LEX_STRING s_HomAdd = {
-        (char*)"agg_add",
-        sizeof("agg_add"),
-	
-    };
-
-static udf_func s_HomAddUdfFunc = {
-        s_HomAdd,
-        STRING_RESULT,
-        UDFTYPE_FUNCTION,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        0L,
-    };
-
-static LEX_STRING s_HomSub = {
-        (char*)"hom_sub",
-        sizeof("hom_sub"),
-    };
-
-static udf_func s_HomSubUdfFunc = {
-        s_HomSub,
-        STRING_RESULT,
-        UDFTYPE_FUNCTION,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        0L,
-    };
-
 template<const char *NAME>
 class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
     virtual EncSet do_gather_type(Item_func_additive_op *i, const constraints &tr, Analysis & a) const {

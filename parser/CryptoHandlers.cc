@@ -611,6 +611,34 @@ static udf_func u_sum = {
     0L,
 };
 
+udf_func s_HomAddUdfFunc = {
+    LEXSTRING("agg_add"),
+    STRING_RESULT,
+    UDFTYPE_FUNCTION,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0L,
+};
+
+udf_func s_HomSubUdfFunc = {
+    LEXSTRING("hom_sub"),
+    STRING_RESULT,
+    UDFTYPE_FUNCTION,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0L,
+};
+
 
 Item *
 HOM::sumUDF(Item * expr, const string &k) {
@@ -775,5 +803,7 @@ const std::vector<udf_func*> udf_list = {
     &u_decDETInt,
     &u_decDETStr,
     &u_sum,
+    // &s_HomAddUdfFunc,
+    // &s_HomSubUdfFunc,
     &u_search
 };
