@@ -2680,13 +2680,15 @@ drop_table_update_meta(const string &q,
     
     TABLE_LIST *tbl = lex->select_lex.table_list.first;
     for (; tbl; tbl = tbl->next_local) {
-        const string &table = tbl->table_name;
+        char* dbname = tbl->db;
+        char* table  = tbl->table_name;
 
         ostringstream s;
         s << "DELETE proxy_db.table_info, proxy_db.column_info "
           << "FROM proxy_db.table_info INNER JOIN proxy_db.column_info "
           << "WHERE proxy_db.table_info.id = proxy_db.column_info.table_id "
-          << "AND   proxy_db.table_info.name = '" <<  table << "'";
+          << "AND   proxy_db.table_info.name = '" << table << "'"
+          << "AND   proxy_db.table_info.dbname = '" << dbname << "'";
 
 	assert(a.e_conn->execute(s.str()));
 
@@ -2706,18 +2708,19 @@ add_table_update_meta(const string &q,
 {
     a.e_conn->execute("START TRANSACTION");
 
-    const string &table =
-        lex->select_lex.table_list.first->table_name;
+    char* dbname = lex->select_lex.table_list.first->db;
+    char* table  = lex->select_lex.table_list.first->table_name;
     TableMeta *tm = a.schema->tableMetaMap[table];
     assert(tm != NULL);
     
     {
         ostringstream s;
         s << "INSERT INTO proxy_db.table_info VALUES ("
-          << tm->tableNo << ", '"
-          << table << "' , '"
-          << tm->anonTableName
-          << "')";
+          << tm->tableNo << ", "
+          << "'" << dbname << "'" << ", "
+          << "'" << table << "'" << ", "
+          << "'" << tm->anonTableName << "'"
+          << ")";
 
 	a.e_conn->execute(s.str());
     }
@@ -2905,9 +2908,10 @@ Rewriter::createMetaTablesIfNotExists()
     assert(e_conn->execute(
                    "CREATE TABLE IF NOT EXISTS proxy_db.table_info"
                    "( id bigint NOT NULL PRIMARY KEY"
+                   ", dbname varchar(64) NOT NULL"
                    ", name varchar(64) NOT NULL"
                    ", anon_name varchar(64) NOT NULL"
-                   ", UNIQUE INDEX idx_table_name( name )"
+                   ", UNIQUE INDEX idx_table_name( dbname, name )"
                    ") ENGINE=InnoDB;"));
 	
     assert(e_conn->execute(
@@ -2980,7 +2984,7 @@ Rewriter::initSchema()
 
     {
 	DBResult * dbres;
-	assert(e_conn->execute("SELECT id, name, anon_name FROM proxy_db.table_info", dbres));
+	assert(e_conn->execute("SELECT id, dbname, name, anon_name FROM proxy_db.table_info", dbres));
 	ScopedMySQLRes r(dbres->n);
         MYSQL_ROW row;
         while ((row = mysql_fetch_row(r.res()))) {
@@ -2988,9 +2992,11 @@ Rewriter::initSchema()
             assert(l != NULL);
             TableMeta *tm = new TableMeta;
             tm->tableNo = (unsigned int) atoi(string(row[0], l[0]).c_str());
-            tm->anonTableName = string(row[2], l[2]);
+            tm->anonTableName = string(row[3], l[3]);
             tm->has_salt = false;
-            schema->tableMetaMap[string(row[1], l[1])] = tm;
+            string dbname(row[1], l[1]);
+            string tablename(row[2], l[2]);
+            schema->tableMetaMap[tablename] = tm;
             schema->totalTables++;
         }
     }
