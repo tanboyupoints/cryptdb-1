@@ -733,7 +733,7 @@ Connection::start() {
         Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db);
         conn_set.insert(c);
         this->conn = conn_set.begin();
-        ConnectionInfo ci = ConnectionInfo(tc.host, tc.user, tc.pass, tc.db, tc.port);
+        ConnectionInfo ci = ConnectionInfo(tc.host, tc.user, tc.pass, tc.port);
         re = new Rewriter(ci, tc.shadowdb_dir, (type == MULTI), false);
         re->setMasterKey("2392834");
         break;

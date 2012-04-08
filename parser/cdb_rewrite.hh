@@ -87,10 +87,9 @@ public:
     uint port;
     std::string user;
     std::string passwd;
-    std::string db;
    
-    ConnectionInfo(std::string s, std::string u, std::string p, std::string d, uint port = 0) :
-	server(s), port(port), user(u), passwd(p), db(d) {}
+    ConnectionInfo(std::string s, std::string u, std::string p, uint port = 0) :
+	server(s), port(port), user(u), passwd(p) {}
     
 } ConnectionInfo;
 
@@ -115,7 +114,9 @@ private:
     void mp_init(Analysis &a);
 
     ConnectionInfo ci;
-    //connection to remote and embedded server
+    // current database name -- wrong place for it, must be per-connection!
+    std::string    cur_db;
+    // connection to remote and embedded server
     Connect*       conn;
     Connect*       e_conn;
 

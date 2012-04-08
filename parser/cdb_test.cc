@@ -63,12 +63,12 @@ main(int ac, char **av)
     atexit(__write_history);
     
 
-    ConnectionInfo ci("localhost", "root", "letmein", "cryptdbtest");
+    ConnectionInfo ci("localhost", "root", "letmein");
 
     Rewriter r(ci, av[1], Multi, encByDefault);
     //TODO: conn creation has to occur after rewriter creation
     //because rewriter inits mysql library; fix this
-    Connect conn("localhost", "root", "letmein", "cryptdbtest");
+    Connect conn("localhost", "root", "letmein");
 
     r.setMasterKey("2392834");
 

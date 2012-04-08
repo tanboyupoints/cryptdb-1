@@ -2860,19 +2860,16 @@ Rewriter::Rewriter(ConnectionInfo ci,
 		   bool encByDefault)
     : ci(ci), encByDefault(encByDefault)
 {
+    // XXX need a per-connection place to store this.
+    cur_db = "cryptdbtest";
+
     init_mysql(embed_dir);
 
     urandom u;
     masterKey = CryptoManager::getKey(u.rand_string(AES_KEY_BYTES));
 
     e_conn = Connect::getEmbedded();
-    conn = new Connect(ci.server, ci.user, ci.passwd, ci.db, ci.port);
-
-    // HACK: create this DB if it doesn't exist, for now
-    string create_q = "CREATE DATABASE IF NOT EXISTS " + ci.db;
-    string use_q    = "USE " + ci.db + ";";
-    assert(e_conn->execute(create_q));
-    assert(e_conn->execute(use_q));
+    conn = new Connect(ci.server, ci.user, ci.passwd, ci.port);
 
     schema = new SchemaInfo();
     totalTables = 0;
@@ -2883,8 +2880,8 @@ Rewriter::Rewriter(ConnectionInfo ci,
     if (multi) {
         mp = new MultiPrinc(conn);
     } else {
-        this->mp = NULL;
-	}
+        mp = NULL;
+    }
 }
 
 Rewriter::~Rewriter()
@@ -3015,7 +3012,7 @@ Rewriter::initSchema()
             create_table_query = string(row[1], lengths[1]);
         }
 
-        query_parse parser(ci.db, create_table_query);
+        query_parse parser(cur_db, create_table_query);
         LEX *lex = parser.lex();
         assert(lex->sql_command == SQLCOM_CREATE_TABLE);
 
@@ -3193,7 +3190,7 @@ list<string>
 Rewriter::rewrite(const string & q, Analysis & analysis)
 {
     list<string> queries;
-    query_parse p(ci.db, q);
+    query_parse p(cur_db, q);
     analysis = Analysis(e_conn, conn, schema, masterKey, mp);
 
     //initialize multi-principal
@@ -3213,19 +3210,19 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
 
     //TODO: is db neededs as param in all these funcs?
     //analyze query
-    query_analyze(ci.db, q, lex, analysis, encByDefault);
+    query_analyze(cur_db, q, lex, analysis, encByDefault);
 
     //update metadata about onions if it's not delete
     if (lex->sql_command != SQLCOM_DROP_TABLE) {
-        updateMeta(ci.db, q, lex, analysis);
+        updateMeta(cur_db, q, lex, analysis);
     }
     //TODO:these two invokations of updateMeta are confusing:
     //one is for adjust onions, and other for dropping table
 
     //rewrite query
-    lex_rewrite(ci.db, lex, analysis);
+    lex_rewrite(cur_db, lex, analysis);
     if (lex->sql_command == SQLCOM_DROP_TABLE) {
-        updateMeta(ci.db, q, lex, analysis);
+        updateMeta(cur_db, q, lex, analysis);
     }
     stringstream ss;
     ss << *lex;
