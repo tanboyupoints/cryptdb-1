@@ -2999,6 +2999,7 @@ Rewriter::initSchema()
             tm->has_salt = false;
             string dbname(row[1], l[1]);
             string tablename(row[2], l[2]);
+            // tableMetaMap keys should include dbname: make_pair(dbname, tablename)?
             schema->tableMetaMap[tablename] = tm;
             schema->totalTables++;
         }
@@ -3058,6 +3059,7 @@ Rewriter::initSchema()
 
                        "FROM proxy_db.column_info c, proxy_db.table_info t "
                        "WHERE t.name = '" + origTableName + "' AND c.table_id = t.id";
+                       // XXX also t.dbname=...
 
             DBResult * dbres;
             assert(e_conn->execute(q, dbres));
