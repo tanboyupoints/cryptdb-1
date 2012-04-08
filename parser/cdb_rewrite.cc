@@ -1168,7 +1168,7 @@ static class ANON : public CItemSubtypeFN<Item_in_optimizer, str_in_optimizer> {
 
 static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
     virtual EncSet do_gather_type(Item_cache *i, const constraints &tr, Analysis & a) const {
-        Item *example = (*i).*rob<Item_cache, Item*, &Item_cache::example>::ptr();
+        Item *example = i->*rob<Item_cache, Item*, &Item_cache::example>::ptr();
         if (example)
             return gather(example, tr, a);
         return tr.encset;
@@ -1508,11 +1508,11 @@ extern const char str_case[] = "case";
 static class ANON : public CItemSubtypeFN<Item_func_case, str_case> {
     virtual EncSet do_gather_type(Item_func_case *i, const constraints &tr, Analysis & a) const {
         Item **args = i->arguments();
-        int first_expr_num = (*i).*rob<Item_func_case, int,
+        int first_expr_num = i->*rob<Item_func_case, int,
                 &Item_func_case::first_expr_num>::ptr();
-        int else_expr_num = (*i).*rob<Item_func_case, int,
+        int else_expr_num = i->*rob<Item_func_case, int,
                 &Item_func_case::else_expr_num>::ptr();
-        uint ncases = (*i).*rob<Item_func_case, uint,
+        uint ncases = i->*rob<Item_func_case, uint,
                 &Item_func_case::ncases>::ptr();
 
         if (first_expr_num >= 0)
@@ -1977,7 +1977,7 @@ static class ANON : public CItemSubtypeST<Item_sum_bit, Item_sum::Sumfunctype::S
 static class ANON : public CItemSubtypeST<Item_func_group_concat, Item_sum::Sumfunctype::GROUP_CONCAT_FUNC> {
     virtual EncSet do_gather_type(Item_func_group_concat *i, const constraints &tr, Analysis & a) const {
         LOG(cdb_v) << "do_a_t Item_func_group reason " << tr;
-        uint arg_count_field = (*i).*rob<Item_func_group_concat, uint,
+        uint arg_count_field = i->*rob<Item_func_group_concat, uint,
                 &Item_func_group_concat::arg_count_field>::ptr();
         for (uint x = 0; x < arg_count_field; x++) {
             /* XXX could perform in the proxy.. */
