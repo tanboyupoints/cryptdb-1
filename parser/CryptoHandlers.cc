@@ -3,6 +3,8 @@
 #include <util/util.hh>
 #include <util/cryptdb_log.hh>
 
+#define LEXSTRING(cstr) { (char*) cstr, sizeof(cstr) }
+
 
 using namespace std;
 using namespace NTL;
@@ -106,13 +108,8 @@ RND_int::decrypt(Item * ctext, uint64_t IV, const string &k) {
     return new Item_int((ulonglong) p);
 }
 
-static LEX_STRING n_decRNDInt = {
-    (char *) "decrypt_int_sem",
-    sizeof("decrypt_int_sem"),
-};
-
 static udf_func u_decRNDInt = {
-    n_decRNDInt,
+    LEXSTRING("decrypt_int_sem"),
     INT_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -205,13 +202,8 @@ RND_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
 
 
 //TODO; make edb.cc udf naming consistent with these handlers
-static LEX_STRING n_decRNDString = {
-    (char *) "decrypt_text_sem",
-    sizeof("decrypt_text_sem"),
-};
-
 static udf_func u_decRNDString = {
-    n_decRNDString,
+    LEXSTRING("decrypt_text_sem"),
     STRING_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -295,13 +287,8 @@ DET_int::decrypt(Item * ctext, uint64_t IV, const string &k) {
 }
 
 
-static LEX_STRING n_decDETInt = {
-    (char *) "decrypt_int_det",
-    sizeof("decrypt_int_det"),
-};
-
 static udf_func u_decDETInt = {
-    n_decDETInt,
+    LEXSTRING("decrypt_int_det"),
     INT_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -387,13 +374,8 @@ DET_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
     return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
 }
 
-static LEX_STRING n_decDETStr = {
-    (char *) "decrypt_text_det",
-    sizeof("decrypt_text_det"),
-};
-
 static udf_func u_decDETStr = {
-    n_decDETStr,
+    LEXSTRING("decrypt_text_det"),
     STRING_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -615,13 +597,8 @@ HOM::decrypt(Item * ctext, uint64_t IV, const string &k) {
     return ZZToItemInt(dec);
 }
 
-static LEX_STRING n_sum = {
-    (char*)"agg",
-    sizeof("agg"),
-};
-
 static udf_func u_sum = {
-    n_sum,
+    LEXSTRING("agg"),
     STRING_RESULT,
     UDFTYPE_AGGREGATE,
     NULL,
@@ -724,13 +701,8 @@ Search::decrypt(Item * ctext, uint64_t IV, const std::string &k) {
     thrower() << "decryption from SWP not supported \n";
 }
 
-static LEX_STRING n_search = {
-    (char*)"searchSWP",
-    sizeof("searchSWP"),
-};
-
-static udf_func u_search = {
-    n_search,
+static udf_func u_search __attribute__((unused)) = {
+    LEXSTRING("searchSWP"),
     INT_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
