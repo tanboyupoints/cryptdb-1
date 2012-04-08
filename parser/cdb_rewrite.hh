@@ -88,10 +88,9 @@ public:
     std::string user;
     std::string passwd;
     std::string db;
-    std::string embed_db;
    
-    ConnectionInfo(std::string s, std::string u, std::string p, std::string d, string e, uint port = 0) :
-	server(s), port(port), user(u), passwd(p), db(d), embed_db(e) {}
+    ConnectionInfo(std::string s, std::string u, std::string p, std::string d, uint port = 0) :
+	server(s), port(port), user(u), passwd(p), db(d) {}
     
 } ConnectionInfo;
 
@@ -99,6 +98,7 @@ public:
 class Rewriter {
 public:
     Rewriter(ConnectionInfo ci, 
+             const std::string &embed_dir,
              bool MultiPrinc = false,
              bool encByDefault = true);
     ~Rewriter();

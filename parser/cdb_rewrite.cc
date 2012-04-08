@@ -2849,12 +2849,12 @@ init_mysql(const string & embed_db) {
 
 }
 Rewriter::Rewriter(ConnectionInfo ci, 
+                   const std::string &embed_dir,
                    bool multi,
 		   bool encByDefault)
     : ci(ci), encByDefault(encByDefault)
 {
-
-    init_mysql(ci.embed_db);
+    init_mysql(embed_dir);
 
     urandom u;
     masterKey = CryptoManager::getKey(u.rand_string(AES_KEY_BYTES));
