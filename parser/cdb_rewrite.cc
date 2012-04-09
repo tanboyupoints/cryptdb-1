@@ -187,7 +187,7 @@ adjustOnion(onion o, FieldMeta * fm, AdjustInfo ai, Analysis & a) {
  *
  */
 static void
-adjustOnions(const std::string &db, Analysis & a)
+adjustOnions(Analysis & a)
 {
     for (auto it : a.onionAdjust) {
 	for (auto itt : it.second) {
@@ -1166,7 +1166,7 @@ static class ANON : public CItemSubtypeFN<Item_in_optimizer, str_in_optimizer> {
 
 static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
     virtual EncSet do_gather_type(Item_cache *i, const constraints &tr, Analysis & a) const {
-        Item *example = (*i).*rob<Item_cache, Item*, &Item_cache::example>::ptr();
+        Item *example = i->*rob<Item_cache, Item*, &Item_cache::example>::ptr();
         if (example)
             return gather(example, tr, a);
         return tr.encset;
@@ -1302,64 +1302,6 @@ static class ANON : public CItemSubtypeFT<Item_func_get_system_var, Item_func::F
 // hom-add, then we will just lie about its existence. Eventually we could
 // probably pull the udf_func object out of the embedded db.
 
-
-static LEX_STRING s_HomSum = {
-    (char*)"agg_add",
-    sizeof("agg_add"),
-};
-
-static udf_func s_HomSumUdfFunc = {
-    s_HomSum,
-    STRING_RESULT,
-    UDFTYPE_AGGREGATE,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    0L,
-};
-
-static LEX_STRING s_HomAdd = {
-        (char*)"agg",
-        sizeof("agg"),
-	
-    };
-
-static udf_func s_HomAddUdfFunc = {
-        s_HomAdd,
-        STRING_RESULT,
-        UDFTYPE_FUNCTION,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        0L,
-    };
-
-static LEX_STRING s_HomSub = {
-        (char*)"hom_sub",
-        sizeof("hom_sub"),
-    };
-
-static udf_func s_HomSubUdfFunc = {
-        s_HomSub,
-        STRING_RESULT,
-        UDFTYPE_FUNCTION,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        0L,
-    };
 
 template<const char *NAME>
 class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
@@ -1506,11 +1448,11 @@ extern const char str_case[] = "case";
 static class ANON : public CItemSubtypeFN<Item_func_case, str_case> {
     virtual EncSet do_gather_type(Item_func_case *i, const constraints &tr, Analysis & a) const {
         Item **args = i->arguments();
-        int first_expr_num = (*i).*rob<Item_func_case, int,
+        int first_expr_num = i->*rob<Item_func_case, int,
                 &Item_func_case::first_expr_num>::ptr();
-        int else_expr_num = (*i).*rob<Item_func_case, int,
+        int else_expr_num = i->*rob<Item_func_case, int,
                 &Item_func_case::else_expr_num>::ptr();
-        uint ncases = (*i).*rob<Item_func_case, uint,
+        uint ncases = i->*rob<Item_func_case, uint,
                 &Item_func_case::ncases>::ptr();
 
         if (first_expr_num >= 0)
@@ -1975,7 +1917,7 @@ static class ANON : public CItemSubtypeST<Item_sum_bit, Item_sum::Sumfunctype::S
 static class ANON : public CItemSubtypeST<Item_func_group_concat, Item_sum::Sumfunctype::GROUP_CONCAT_FUNC> {
     virtual EncSet do_gather_type(Item_func_group_concat *i, const constraints &tr, Analysis & a) const {
         LOG(cdb_v) << "do_a_t Item_func_group reason " << tr;
-        uint arg_count_field = (*i).*rob<Item_func_group_concat, uint,
+        uint arg_count_field = i->*rob<Item_func_group_concat, uint,
                 &Item_func_group_concat::arg_count_field>::ptr();
         for (uint x = 0; x < arg_count_field; x++) {
             /* XXX could perform in the proxy.. */
@@ -2306,6 +2248,9 @@ add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
     LOG(cdb_v) << "adding " << table << " to schema->tableMetaMap";
     a.schema->tableMetaMap[table] = tm;
 
+    // XXX this seems disasterous: if tables A and B are created, A is dropped,
+    // and C is created, C will use the same tableNo as B.  we should just use
+    // an auto_increment field in proxy_db.table_info.
     tm->tableNo = a.schema->totalTables++;
     tm->anonTableName = anonymizeTableName(tm->tableNo, table, !encByDefault);
 
@@ -2637,7 +2582,7 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
 }
 
 static void
-do_query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault) {
+do_query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault) {
     // iterate over the entire select statement..
     // based on st_select_lex::print in mysql-server/sql/sql_select.cc
 
@@ -2675,13 +2620,13 @@ do_query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysi
  * Results are set in analysis.
  */
 static void
-query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault)
+query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault)
 {
     // optimize the query first
     optimize_table_list(&lex->select_lex.top_join_list, analysis);
     optimize_select_lex(&lex->select_lex, analysis);
 
-    do_query_analyze(db, q, lex, analysis, encByDefault);
+    do_query_analyze(q, lex, analysis, encByDefault);
     //print(analysis.schema->tableMetaMap);
     for (auto it = analysis.tmkm.encForVal.begin(); it != analysis.tmkm.encForVal.end(); it++) {
         if (it->first == "" || it->second == "") {
@@ -2697,7 +2642,7 @@ query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis &
  * Fills rmeta with information about how to decrypt fields returned.
  */
 static int
-lex_rewrite(const string & db, LEX * lex, Analysis & analysis)
+lex_rewrite(LEX * lex, Analysis & analysis)
 {
     cerr << "lex is " << *lex << "\n";
     switch (lex->sql_command) {
@@ -2736,13 +2681,15 @@ drop_table_update_meta(const string &q,
     
     TABLE_LIST *tbl = lex->select_lex.table_list.first;
     for (; tbl; tbl = tbl->next_local) {
-        const string &table = tbl->table_name;
+        char* dbname = tbl->db;
+        char* table  = tbl->table_name;
 
         ostringstream s;
         s << "DELETE proxy_db.table_info, proxy_db.column_info "
           << "FROM proxy_db.table_info INNER JOIN proxy_db.column_info "
           << "WHERE proxy_db.table_info.id = proxy_db.column_info.table_id "
-          << "AND   proxy_db.table_info.name = '" <<  table << "'";
+          << "AND   proxy_db.table_info.name = '" << table << "'"
+          << "AND   proxy_db.table_info.dbname = '" << dbname << "'";
 
 	assert(a.e_conn->execute(s.str()));
 
@@ -2762,18 +2709,19 @@ add_table_update_meta(const string &q,
 {
     a.e_conn->execute("START TRANSACTION");
 
-    const string &table =
-        lex->select_lex.table_list.first->table_name;
+    char* dbname = lex->select_lex.table_list.first->db;
+    char* table  = lex->select_lex.table_list.first->table_name;
     TableMeta *tm = a.schema->tableMetaMap[table];
     assert(tm != NULL);
     
     {
         ostringstream s;
         s << "INSERT INTO proxy_db.table_info VALUES ("
-          << tm->tableNo << ", '"
-          << table << "' , '"
-          << tm->anonTableName
-          << "')";
+          << tm->tableNo << ", "
+          << "'" << dbname << "'" << ", "
+          << "'" << table << "'" << ", "
+          << "'" << tm->anonTableName << "'"
+          << ")";
 
 	a.e_conn->execute(s.str());
     }
@@ -2827,7 +2775,7 @@ add_table_update_meta(const string &q,
 }
 
 static void
-updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
+updateMeta(const string & q, LEX * lex, Analysis & a)
 {
     switch (lex->sql_command) {
     // TODO: alter tables will need to modify the embedded DB schema
@@ -2842,46 +2790,35 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
         break;
     }
 
-    adjustOnions(db, a);
-}
-
-static void dropF(Connect * conn, const string & func) {
-    assert_s(conn->execute("DROP FUNCTION IF EXISTS " + func + "; "),
-      "cannot drop " + func + ");");    
+    adjustOnions(a);
 }
 
 static void
 dropAll(Connect * conn)
 {
-    dropF(conn, "decrypt_int_sem");
-    dropF(conn, "decrypt_int_det");
-    dropF(conn, "decrypt_text_sem");
-    dropF(conn, "decrypt_text_det");
-    dropF(conn, "searchSWP");
-    dropF(conn, "agg");
-    dropF(conn, "func_add_set");  
+    for (udf_func* u: udf_list) {
+        stringstream ss;
+        ss << "DROP FUNCTION IF EXISTS " << convert_lex_str(u->name) << ";";
+        assert_s(conn->execute(ss.str()), ss.str());
+    }
 }
 
 static void
-createF(Connect * conn, const string & func, const string & ret, bool isAggregate = false){
-    string functype = "";
-    if (isAggregate) {
-	functype = "AGGREGATE";
-    }
-    assert_s(conn->execute(
-                 "CREATE  " + functype + " FUNCTION " + func + " RETURNS " + ret + " SONAME 'edb.so'; "),
-		 "failed to create udf " + func);   
-}
-static void
 createAll(Connect * conn)
 {
-    createF(conn, "decrypt_int_sem", "INTEGER");
-    createF(conn, "decrypt_int_det", "INTEGER");
-    createF(conn, "decrypt_text_sem", "STRING");
-    createF(conn, "decrypt_text_det", "STRING");
-    createF(conn, "searchSWP", "INTEGER");
-    createF(conn, "agg", "STRING", true);
-    createF(conn, "func_add_set", "STRING");
+    for (udf_func* u: udf_list) {
+        stringstream ss;
+        ss << "CREATE ";
+        if (u->type == UDFTYPE_AGGREGATE) ss << "AGGREGATE ";
+        ss << "FUNCTION " << u->name.str << " RETURNS ";
+        switch (u->returns) {
+            case INT_RESULT:    ss << "INTEGER"; break;
+            case STRING_RESULT: ss << "STRING";  break;
+            default:            thrower() << "unknown return " << u->returns;
+        }
+        ss << " SONAME 'edb.so';";
+        assert_s(conn->execute(ss.str()), ss.str());
+    }
 }
 
 static void
@@ -2916,24 +2853,21 @@ init_mysql(const string & embed_db) {
 
 }
 Rewriter::Rewriter(ConnectionInfo ci, 
+                   const std::string &embed_dir,
                    bool multi,
 		   bool encByDefault)
     : ci(ci), encByDefault(encByDefault)
 {
+    // XXX need a per-connection place to store this.
+    cur_db = "cryptdbtest";
 
-    init_mysql(ci.embed_db);
+    init_mysql(embed_dir);
 
     urandom u;
     masterKey = CryptoManager::getKey(u.rand_string(AES_KEY_BYTES));
 
     e_conn = Connect::getEmbedded();
-    conn = new Connect(ci.server, ci.user, ci.passwd, ci.db, ci.port);
-
-    // HACK: create this DB if it doesn't exist, for now
-    string create_q = "CREATE DATABASE IF NOT EXISTS " + ci.db;
-    string use_q    = "USE " + ci.db + ";";
-    assert(e_conn->execute(create_q));
-    assert(e_conn->execute(use_q));
+    conn = new Connect(ci.server, ci.user, ci.passwd, ci.port);
 
     schema = new SchemaInfo();
     totalTables = 0;
@@ -2944,23 +2878,23 @@ Rewriter::Rewriter(ConnectionInfo ci,
     if (multi) {
         mp = new MultiPrinc(conn);
     } else {
-        this->mp = NULL;
-	}
+        mp = NULL;
+    }
 }
 
 Rewriter::~Rewriter()
 {
-    if (e_conn) {
-	delete e_conn;
-	e_conn = NULL;
+    if (mp) {
+        delete mp;
+        mp = NULL;
     }
     if (conn) {
         delete conn;
         conn = NULL;
     }
-    if (mp) {
-        delete mp;
-        mp = NULL;
+    if (e_conn) {
+	delete e_conn;
+	e_conn = NULL;
     }
 }
 
@@ -2972,9 +2906,10 @@ Rewriter::createMetaTablesIfNotExists()
     assert(e_conn->execute(
                    "CREATE TABLE IF NOT EXISTS proxy_db.table_info"
                    "( id bigint NOT NULL PRIMARY KEY"
+                   ", dbname varchar(64) NOT NULL"
                    ", name varchar(64) NOT NULL"
                    ", anon_name varchar(64) NOT NULL"
-                   ", UNIQUE INDEX idx_table_name( name )"
+                   ", UNIQUE INDEX idx_table_name( dbname, name )"
                    ") ENGINE=InnoDB;"));
 	
     assert(e_conn->execute(
@@ -3045,33 +2980,26 @@ Rewriter::initSchema()
 
     vector<string> tablelist;
 
-    {
-	DBResult * dbres;
-	assert(e_conn->execute("SELECT id, name, anon_name FROM proxy_db.table_info", dbres));
-	ScopedMySQLRes r(dbres->n);
-        MYSQL_ROW row;
-        while ((row = mysql_fetch_row(r.res()))) {
-            unsigned long *l = mysql_fetch_lengths(r.res());
-            assert(l != NULL);
-            TableMeta *tm = new TableMeta;
-            tm->tableNo = (unsigned int) atoi(string(row[0], l[0]).c_str());
-            tm->anonTableName = string(row[2], l[2]);
-            tm->has_salt = false;
-            schema->tableMetaMap[string(row[1], l[1])] = tm;
-            schema->totalTables++;
-        }
-    }
-
-    for (auto it = schema->tableMetaMap.begin();
-         it != schema->tableMetaMap.end();
-         ++it) {
-
-        const string &origTableName = it->first;
-        TableMeta *tm = it->second;
+    DBResult * dbres;
+    assert(e_conn->execute("SELECT id, dbname, name, anon_name FROM proxy_db.table_info", dbres));
+    ScopedMySQLRes r(dbres->n);
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(r.res()))) {
+        unsigned long *l = mysql_fetch_lengths(r.res());
+        assert(l != NULL);
+        TableMeta *tm = new TableMeta;
+        tm->tableNo = (unsigned int) atoi(string(row[0], l[0]).c_str());
+        tm->anonTableName = string(row[3], l[3]);
+        tm->has_salt = false;
+        string dbname(row[1], l[1]);
+        string origTableName(row[2], l[2]);
+        // tableMetaMap keys should include dbname: make_pair(dbname, origTableName)?
+        schema->tableMetaMap[origTableName] = tm;
+        schema->totalTables++;
 
         string create_table_query;
         {
-            string q = "SHOW CREATE TABLE " + origTableName;
+            string q = "SHOW CREATE TABLE `" + dbname + "`.`" + origTableName + "`";
             DBResult * dbres = NULL;
             assert(e_conn->execute(q, dbres));
             ScopedMySQLRes r(dbres->n);
@@ -3082,7 +3010,7 @@ Rewriter::initSchema()
             create_table_query = string(row[1], lengths[1]);
         }
 
-        query_parse parser(ci.db, create_table_query);
+        query_parse parser(cur_db, create_table_query);
         LEX *lex = parser.lex();
         assert(lex->sql_command == SQLCOM_CREATE_TABLE);
 
@@ -3115,7 +3043,9 @@ Rewriter::initSchema()
                        //"c.search_used, "
 
                        "FROM proxy_db.column_info c, proxy_db.table_info t "
-                       "WHERE t.name = '" + origTableName + "' AND c.table_id = t.id";
+                       "WHERE t.name = '" + origTableName + "'"
+                            " AND t.dbname = '" + dbname + "'"
+                            " AND c.table_id = t.id";
 
             DBResult * dbres;
             assert(e_conn->execute(q, dbres));
@@ -3258,7 +3188,7 @@ list<string>
 Rewriter::rewrite(const string & q, Analysis & analysis)
 {
     list<string> queries;
-    query_parse p(ci.db, q);
+    query_parse p(cur_db, q);
     analysis = Analysis(e_conn, conn, schema, masterKey, mp);
 
     //initialize multi-principal
@@ -3278,19 +3208,19 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
 
     //TODO: is db neededs as param in all these funcs?
     //analyze query
-    query_analyze(ci.db, q, lex, analysis, encByDefault);
+    query_analyze(q, lex, analysis, encByDefault);
 
     //update metadata about onions if it's not delete
     if (lex->sql_command != SQLCOM_DROP_TABLE) {
-        updateMeta(ci.db, q, lex, analysis);
+        updateMeta(q, lex, analysis);
     }
     //TODO:these two invokations of updateMeta are confusing:
     //one is for adjust onions, and other for dropping table
 
     //rewrite query
-    lex_rewrite(ci.db, lex, analysis);
+    lex_rewrite(lex, analysis);
     if (lex->sql_command == SQLCOM_DROP_TABLE) {
-        updateMeta(ci.db, q, lex, analysis);
+        updateMeta(q, lex, analysis);
     }
     stringstream ss;
     ss << *lex;
