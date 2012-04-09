@@ -235,18 +235,17 @@ addSaltToReturn(ReturnMeta & rm, int pos) {
 
 //TODO: which encrypt/decrypt should handle null?
 static Item *
-encrypt_item_layers(Item * i, list<EncLayer *> & layers, Analysis &a, uint64_t IV = 0) {
-
+encrypt_item_layers(Item * i, list<EncLayer *> & layers, Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0) {
     assert_s(layers.size() > 0, "field must have at least one layer");
-
+    cerr << "crypt: " << *i << endl;
     Item * enc = i;
     Item * prev_enc = NULL;
     for (auto layer : layers) {
         LOG(encl) << "encrypt layer " << levelnames[(int)layer->level()] << "\n";
         string key = "";
         if (a.mp) {
-            FieldMeta * fm = a.itemToMeta[i]->basefield;
             key = a.mp->get_key(fullName(fm->fname, fm->tm->anonTableName), a.tmkm);
+            cerr << "mp key " << key << endl;
         }
         enc = layer->encrypt(enc, IV, key);
         //need to free space for all enc
@@ -266,19 +265,18 @@ decrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV) {
     Item * prev_dec = NULL;
 
     for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
-	dec = (*it)->decrypt(dec, IV);
+        dec = (*it)->decrypt(dec, IV);
         //need to free space for all decs except last
-	if (prev_dec) {
-	    delete prev_dec;
-	}
-	prev_dec = dec;
+        if (prev_dec) {
+            delete prev_dec;
+        }
+        prev_dec = dec;
     }
 
     return dec;
 }
 
 // encrypts a constant item based on the information in a
-//TODO cat_red fix for mp
 static Item *
 encrypt_item(Item * i, Analysis & a){
 
@@ -290,7 +288,7 @@ encrypt_item(Item * i, Analysis & a){
     if (o == oPLAIN) {
         return i;
     } else {
-        return encrypt_item_layers(i, fm->onions[o]->layers, a);
+        return encrypt_item_layers(i, fm->onions[o]->layers, a, fm);
     }
 }
 
@@ -298,7 +296,7 @@ static void
 encrypt_item_all_onions(Item * i, FieldMeta * fm,
                         uint64_t IV, vector<Item*> & l, Analysis &a) {
     for (auto it : fm->onions) {
-        l.push_back(encrypt_item_layers(i, it.second->layers, a, IV));
+        l.push_back(encrypt_item_layers(i, it.second->layers, a, fm, IV));
     }
 }
 
@@ -984,13 +982,13 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     do_rewrite_insert_type(Item_string *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
         LOG(cdb_v) << "do_rewrite_insert_type L880 " << *i;
+        
+        if (fm->onions.size() == 0) {//field is not encrypted
+            l.push_back(i);
+            return;
+        }
 
-	if (fm->onions.size() == 0) {//field is not encrypted
-	    l.push_back(i);
-	    return;
-	}
-
-	//field is encrypted
+        //field is encrypted
         uint64_t salt = 0;
         if (fm->has_salt) {
             salt = randomValue();
@@ -1058,7 +1056,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
 
 	//encrypt for each onion
         for (auto it = fm->onions.begin(); it != fm->onions.end();it++) {
-            l.push_back(encrypt_item_layers(i, it->second->layers, a, salt));
+            l.push_back(encrypt_item_layers(i, it->second->layers, a, fm, salt));
         }
 	
         if (fm->has_salt) {
