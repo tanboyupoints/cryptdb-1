@@ -187,7 +187,7 @@ adjustOnion(onion o, FieldMeta * fm, AdjustInfo ai, Analysis & a) {
  *
  */
 static void
-adjustOnions(const std::string &db, Analysis & a)
+adjustOnions(Analysis & a)
 {
     for (auto it : a.onionAdjust) {
 	for (auto itt : it.second) {
@@ -235,18 +235,17 @@ addSaltToReturn(ReturnMeta & rm, int pos) {
 
 //TODO: which encrypt/decrypt should handle null?
 static Item *
-encrypt_item_layers(Item * i, list<EncLayer *> & layers, Analysis &a, uint64_t IV = 0) {
-
+encrypt_item_layers(Item * i, list<EncLayer *> & layers, Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0) {
     assert_s(layers.size() > 0, "field must have at least one layer");
-
+    cerr << "crypt: " << *i << endl;
     Item * enc = i;
     Item * prev_enc = NULL;
     for (auto layer : layers) {
         LOG(encl) << "encrypt layer " << levelnames[(int)layer->level()] << "\n";
         string key = "";
         if (a.mp) {
-            FieldMeta * fm = a.itemToMeta[i]->basefield;
             key = a.mp->get_key(fullName(fm->fname, fm->tm->anonTableName), a.tmkm);
+            cerr << "mp key " << key << endl;
         }
         enc = layer->encrypt(enc, IV, key);
         //need to free space for all enc
@@ -266,19 +265,18 @@ decrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV) {
     Item * prev_dec = NULL;
 
     for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
-	dec = (*it)->decrypt(dec, IV);
+        dec = (*it)->decrypt(dec, IV);
         //need to free space for all decs except last
-	if (prev_dec) {
-	    delete prev_dec;
-	}
-	prev_dec = dec;
+        if (prev_dec) {
+            delete prev_dec;
+        }
+        prev_dec = dec;
     }
 
     return dec;
 }
 
 // encrypts a constant item based on the information in a
-//TODO cat_red fix for mp
 static Item *
 encrypt_item(Item * i, Analysis & a){
 
@@ -290,7 +288,7 @@ encrypt_item(Item * i, Analysis & a){
     if (o == oPLAIN) {
         return i;
     } else {
-        return encrypt_item_layers(i, fm->onions[o]->layers, a);
+        return encrypt_item_layers(i, fm->onions[o]->layers, a, fm);
     }
 }
 
@@ -298,7 +296,7 @@ static void
 encrypt_item_all_onions(Item * i, FieldMeta * fm,
                         uint64_t IV, vector<Item*> & l, Analysis &a) {
     for (auto it : fm->onions) {
-        l.push_back(encrypt_item_layers(i, it.second->layers, a, IV));
+        l.push_back(encrypt_item_layers(i, it.second->layers, a, fm, IV));
     }
 }
 
@@ -984,13 +982,13 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     do_rewrite_insert_type(Item_string *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
         LOG(cdb_v) << "do_rewrite_insert_type L880 " << *i;
+        
+        if (fm->onions.size() == 0) {//field is not encrypted
+            l.push_back(i);
+            return;
+        }
 
-	if (fm->onions.size() == 0) {//field is not encrypted
-	    l.push_back(i);
-	    return;
-	}
-
-	//field is encrypted
+        //field is encrypted
         uint64_t salt = 0;
         if (fm->has_salt) {
             salt = randomValue();
@@ -1058,7 +1056,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
 
 	//encrypt for each onion
         for (auto it = fm->onions.begin(); it != fm->onions.end();it++) {
-            l.push_back(encrypt_item_layers(i, it->second->layers, a, salt));
+            l.push_back(encrypt_item_layers(i, it->second->layers, a, fm, salt));
         }
 	
         if (fm->has_salt) {
@@ -2250,6 +2248,9 @@ add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
     LOG(cdb_v) << "adding " << table << " to schema->tableMetaMap";
     a.schema->tableMetaMap[table] = tm;
 
+    // XXX this seems disasterous: if tables A and B are created, A is dropped,
+    // and C is created, C will use the same tableNo as B.  we should just use
+    // an auto_increment field in proxy_db.table_info.
     tm->tableNo = a.schema->totalTables++;
     tm->anonTableName = anonymizeTableName(tm->tableNo, table, !encByDefault);
 
@@ -2582,7 +2583,7 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
 }
 
 static void
-do_query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault) {
+do_query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault) {
     // iterate over the entire select statement..
     // based on st_select_lex::print in mysql-server/sql/sql_select.cc
 
@@ -2620,13 +2621,13 @@ do_query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysi
  * Results are set in analysis.
  */
 static void
-query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault)
+query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault)
 {
     // optimize the query first
     optimize_table_list(&lex->select_lex.top_join_list, analysis);
     optimize_select_lex(&lex->select_lex, analysis);
 
-    do_query_analyze(db, q, lex, analysis, encByDefault);
+    do_query_analyze(q, lex, analysis, encByDefault);
     //print(analysis.schema->tableMetaMap);
     for (auto it = analysis.tmkm.encForVal.begin(); it != analysis.tmkm.encForVal.end(); it++) {
         if (it->first == "" || it->second == "") {
@@ -2642,7 +2643,7 @@ query_analyze(const std::string &db, const std::string &q, LEX * lex, Analysis &
  * Fills rmeta with information about how to decrypt fields returned.
  */
 static int
-lex_rewrite(const string & db, LEX * lex, Analysis & analysis)
+lex_rewrite(LEX * lex, Analysis & analysis)
 {
     cerr << "lex is " << *lex << "\n";
     switch (lex->sql_command) {
@@ -2682,13 +2683,15 @@ drop_table_update_meta(const string &q,
     
     TABLE_LIST *tbl = lex->select_lex.table_list.first;
     for (; tbl; tbl = tbl->next_local) {
-        const string &table = tbl->table_name;
+        char* dbname = tbl->db;
+        char* table  = tbl->table_name;
 
         ostringstream s;
         s << "DELETE proxy_db.table_info, proxy_db.column_info "
           << "FROM proxy_db.table_info INNER JOIN proxy_db.column_info "
           << "WHERE proxy_db.table_info.id = proxy_db.column_info.table_id "
-          << "AND   proxy_db.table_info.name = '" <<  table << "'";
+          << "AND   proxy_db.table_info.name = '" << table << "'"
+          << "AND   proxy_db.table_info.dbname = '" << dbname << "'";
 
 	assert(a.e_conn->execute(s.str()));
 
@@ -2708,18 +2711,19 @@ add_table_update_meta(const string &q,
 {
     a.e_conn->execute("START TRANSACTION");
 
-    const string &table =
-        lex->select_lex.table_list.first->table_name;
+    char* dbname = lex->select_lex.table_list.first->db;
+    char* table  = lex->select_lex.table_list.first->table_name;
     TableMeta *tm = a.schema->tableMetaMap[table];
     assert(tm != NULL);
     
     {
         ostringstream s;
         s << "INSERT INTO proxy_db.table_info VALUES ("
-          << tm->tableNo << ", '"
-          << table << "' , '"
-          << tm->anonTableName
-          << "')";
+          << tm->tableNo << ", "
+          << "'" << dbname << "'" << ", "
+          << "'" << table << "'" << ", "
+          << "'" << tm->anonTableName << "'"
+          << ")";
 
 	a.e_conn->execute(s.str());
     }
@@ -2773,7 +2777,7 @@ add_table_update_meta(const string &q,
 }
 
 static void
-updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
+updateMeta(const string & q, LEX * lex, Analysis & a)
 {
     switch (lex->sql_command) {
     // TODO: alter tables will need to modify the embedded DB schema
@@ -2788,7 +2792,7 @@ updateMeta(const string & db, const string & q, LEX * lex, Analysis & a)
         break;
     }
 
-    adjustOnions(db, a);
+    adjustOnions(a);
 }
 
 static void
@@ -2851,24 +2855,21 @@ init_mysql(const string & embed_db) {
 
 }
 Rewriter::Rewriter(ConnectionInfo ci, 
+                   const std::string &embed_dir,
                    bool multi,
 		   bool encByDefault)
     : ci(ci), encByDefault(encByDefault)
 {
+    // XXX need a per-connection place to store this.
+    cur_db = "cryptdbtest";
 
-    init_mysql(ci.embed_db);
+    init_mysql(embed_dir);
 
     urandom u;
     masterKey = CryptoManager::getKey(u.rand_string(AES_KEY_BYTES));
 
     e_conn = Connect::getEmbedded();
-    conn = new Connect(ci.server, ci.user, ci.passwd, ci.db, ci.port);
-
-    // HACK: create this DB if it doesn't exist, for now
-    string create_q = "CREATE DATABASE IF NOT EXISTS " + ci.db;
-    string use_q    = "USE " + ci.db + ";";
-    assert(e_conn->execute(create_q));
-    assert(e_conn->execute(use_q));
+    conn = new Connect(ci.server, ci.user, ci.passwd, ci.port);
 
     schema = new SchemaInfo();
     totalTables = 0;
@@ -2879,23 +2880,23 @@ Rewriter::Rewriter(ConnectionInfo ci,
     if (multi) {
         mp = new MultiPrinc(conn);
     } else {
-        this->mp = NULL;
-	}
+        mp = NULL;
+    }
 }
 
 Rewriter::~Rewriter()
 {
-    if (e_conn) {
-	delete e_conn;
-	e_conn = NULL;
+    if (mp) {
+        delete mp;
+        mp = NULL;
     }
     if (conn) {
         delete conn;
         conn = NULL;
     }
-    if (mp) {
-        delete mp;
-        mp = NULL;
+    if (e_conn) {
+	delete e_conn;
+	e_conn = NULL;
     }
 }
 
@@ -2907,9 +2908,10 @@ Rewriter::createMetaTablesIfNotExists()
     assert(e_conn->execute(
                    "CREATE TABLE IF NOT EXISTS proxy_db.table_info"
                    "( id bigint NOT NULL PRIMARY KEY"
+                   ", dbname varchar(64) NOT NULL"
                    ", name varchar(64) NOT NULL"
                    ", anon_name varchar(64) NOT NULL"
-                   ", UNIQUE INDEX idx_table_name( name )"
+                   ", UNIQUE INDEX idx_table_name( dbname, name )"
                    ") ENGINE=InnoDB;"));
 	
     assert(e_conn->execute(
@@ -2980,33 +2982,26 @@ Rewriter::initSchema()
 
     vector<string> tablelist;
 
-    {
-	DBResult * dbres;
-	assert(e_conn->execute("SELECT id, name, anon_name FROM proxy_db.table_info", dbres));
-	ScopedMySQLRes r(dbres->n);
-        MYSQL_ROW row;
-        while ((row = mysql_fetch_row(r.res()))) {
-            unsigned long *l = mysql_fetch_lengths(r.res());
-            assert(l != NULL);
-            TableMeta *tm = new TableMeta;
-            tm->tableNo = (unsigned int) atoi(string(row[0], l[0]).c_str());
-            tm->anonTableName = string(row[2], l[2]);
-            tm->has_salt = false;
-            schema->tableMetaMap[string(row[1], l[1])] = tm;
-            schema->totalTables++;
-        }
-    }
-
-    for (auto it = schema->tableMetaMap.begin();
-         it != schema->tableMetaMap.end();
-         ++it) {
-
-        const string &origTableName = it->first;
-        TableMeta *tm = it->second;
+    DBResult * dbres;
+    assert(e_conn->execute("SELECT id, dbname, name, anon_name FROM proxy_db.table_info", dbres));
+    ScopedMySQLRes r(dbres->n);
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(r.res()))) {
+        unsigned long *l = mysql_fetch_lengths(r.res());
+        assert(l != NULL);
+        TableMeta *tm = new TableMeta;
+        tm->tableNo = (unsigned int) atoi(string(row[0], l[0]).c_str());
+        tm->anonTableName = string(row[3], l[3]);
+        tm->has_salt = false;
+        string dbname(row[1], l[1]);
+        string origTableName(row[2], l[2]);
+        // tableMetaMap keys should include dbname: make_pair(dbname, origTableName)?
+        schema->tableMetaMap[origTableName] = tm;
+        schema->totalTables++;
 
         string create_table_query;
         {
-            string q = "SHOW CREATE TABLE " + origTableName;
+            string q = "SHOW CREATE TABLE `" + dbname + "`.`" + origTableName + "`";
             DBResult * dbres = NULL;
             assert(e_conn->execute(q, dbres));
             ScopedMySQLRes r(dbres->n);
@@ -3017,7 +3012,7 @@ Rewriter::initSchema()
             create_table_query = string(row[1], lengths[1]);
         }
 
-        query_parse parser(ci.db, create_table_query);
+        query_parse parser(cur_db, create_table_query);
         LEX *lex = parser.lex();
         assert(lex->sql_command == SQLCOM_CREATE_TABLE);
 
@@ -3050,7 +3045,9 @@ Rewriter::initSchema()
                        //"c.search_used, "
 
                        "FROM proxy_db.column_info c, proxy_db.table_info t "
-                       "WHERE t.name = '" + origTableName + "' AND c.table_id = t.id";
+                       "WHERE t.name = '" + origTableName + "'"
+                            " AND t.dbname = '" + dbname + "'"
+                            " AND c.table_id = t.id";
 
             DBResult * dbres;
             assert(e_conn->execute(q, dbres));
@@ -3193,7 +3190,7 @@ list<string>
 Rewriter::rewrite(const string & q, Analysis & analysis)
 {
     list<string> queries;
-    query_parse p(ci.db, q);
+    query_parse p(cur_db, q);
     analysis = Analysis(e_conn, conn, schema, masterKey, mp);
 
     //initialize multi-principal
@@ -3213,19 +3210,19 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
 
     //TODO: is db neededs as param in all these funcs?
     //analyze query
-    query_analyze(ci.db, q, lex, analysis, encByDefault);
+    query_analyze(q, lex, analysis, encByDefault);
 
     //update metadata about onions if it's not delete
     if (lex->sql_command != SQLCOM_DROP_TABLE) {
-        updateMeta(ci.db, q, lex, analysis);
+        updateMeta(q, lex, analysis);
     }
     //TODO:these two invokations of updateMeta are confusing:
     //one is for adjust onions, and other for dropping table
 
     //rewrite query
-    lex_rewrite(ci.db, lex, analysis);
+    lex_rewrite(lex, analysis);
     if (lex->sql_command == SQLCOM_DROP_TABLE) {
-        updateMeta(ci.db, q, lex, analysis);
+        updateMeta(q, lex, analysis);
     }
     stringstream ss;
     ss << *lex;

@@ -15,21 +15,34 @@
 
 using namespace std;
 
-Connect::Connect(string server, string user, string passwd,
-                 string dbname, uint port)
-  : conn( nullptr)
-  , close_on_destroy( true )
+Connect::Connect(const string &server, const string &user, const string &passwd,
+                 uint port)
+    : conn(nullptr), close_on_destroy(true)
 {
-#if MYSQL_S
-    const char *dummy_argv[] =
-        {
-            "progname",
-            "--skip-grant-tables",
-            "--skip-innodb",
-            "--default-storage-engine=MEMORY",
-            "--character-set-server=utf8",
-            "--language=" MYSQL_BUILD_DIR "/sql/share/"
-        };
+    do_connect(server, user, passwd, port);
+}
+
+Connect::Connect(const string &server, const string &user, const string &passwd,
+                 const string &dbname, uint port)
+    : conn(nullptr), close_on_destroy(true)
+{
+    do_connect(server, user, passwd, port);
+    if (!select_db(dbname))
+        thrower() << "cannot select dbname " << dbname;
+}
+
+void
+Connect::do_connect(const string &server, const string &user,
+                    const string &passwd, uint port)
+{
+    const char *dummy_argv[] = {
+        "progname",
+        "--skip-grant-tables",
+        "--skip-innodb",
+        "--default-storage-engine=MEMORY",
+        "--character-set-server=utf8",
+        "--language=" MYSQL_BUILD_DIR "/sql/share/"
+    };
     assert(0 == mysql_server_init(sizeof(dummy_argv) / sizeof(*dummy_argv),
                                   (char**) dummy_argv, 0));
 
@@ -44,29 +57,20 @@ Connect::Connect(string server, string user, string passwd,
 
     /* Connect to database */
     if (!mysql_real_connect(conn, server.c_str(), user.c_str(),
-                            passwd.c_str(), dbname.c_str(), port, 0, 0)) {
+                            passwd.c_str(), 0, port, 0, 0)) {
         LOG(warn) << "connecting to server " << server
                   << " user " << user
                   << " pwd " << passwd
-                  << " dbname " << dbname
                   << " port " << port;
         LOG(warn) << "mysql_real_connect: " << mysql_error(conn);
         throw runtime_error("cannot connect");
     }
+}
 
-#else /* postgres */
-    string conninfo = " dbname = " + dbname;
-    conn = PQconnectdb(conninfo.c_str());
-
-    /* Check to see that the backend connection was successfully made */
-    if (PQstatus(conn) != CONNECTION_OK)
-    {
-        fprintf(stderr, "Connection to database failed: %s",
-                PQerrorMessage(conn));
-        exit(1);
-    }
-#endif
-
+bool
+Connect::select_db(const std::string &dbname)
+{
+    return mysql_select_db(conn, dbname.c_str()) ? false : true;
 }
 
 Connect * Connect::getEmbedded() {
@@ -132,11 +136,7 @@ Connect::execute(const string &query)
 string
 Connect::getError()
 {
-#if MYSQL_S
     return mysql_error(conn);
-#else
-    return PQerrorMessage(conn);
-#endif
 }
 
 
@@ -149,11 +149,7 @@ Connect::last_insert_id()
 Connect::~Connect()
 {
     if (close_on_destroy) {
-#if MYSQL_S
         mysql_close(conn);
-#else /*postgres */
-        PQfinish(conn);
-#endif
     }
 }
 
@@ -171,11 +167,7 @@ DBResult::wrap(DBResult_native *n)
 
 DBResult::~DBResult()
 {
-#if MYSQL_S
     mysql_free_result(n);
-#else
-    PQclear(n);
-#endif
 }
 
 static Item *
@@ -200,7 +192,6 @@ getItem(char * content, enum_field_types type, uint len) {
 ResType
 DBResult::unpack()
 {
-#if MYSQL_S
     if (n == NULL)
         return ResType();
 
@@ -240,26 +231,4 @@ DBResult::unpack()
     }
 
     return res;
-
-#else /* postgres */
-
-    unsigned int cols = PQnfields(n);
-    unsigned int rows = PQntuples(n);
-
-    ResType *res = new vector<vector<string> >[rows+1];
-
-    // first, fill up first row with names
-    (*res)[0] = new vector<string>[cols];
-    for (uint i = 0; i < cols; i++)
-        (*res)[0][i] = string(PQfname(dbAnswer, i));
-
-    // fill up values
-    for (uint i = 0; i < rows; i++)
-        for (uint j = 0; j < cols; j++)
-            (*res)[i+1][j] = string(PQgetvalue(n, i, j));
-
-    return res;
-#endif
-
 }
-

@@ -33,7 +33,7 @@ using namespace std;
 // if true, uses MultiPrinc mode
 static bool Multi = true;
 
-static bool encByDefault = true;
+static bool encByDefault = false;
 
 
 static inline string user_homedir() {
@@ -63,16 +63,14 @@ main(int ac, char **av)
     atexit(__write_history);
     
 
-    ConnectionInfo ci("localhost", "root", "letmein", "cryptdbtest", string(av[1]));
+    ConnectionInfo ci("localhost", "root", "letmein");
 
-    Rewriter r(ci, Multi, encByDefault);
+    Rewriter r(ci, av[1], Multi, encByDefault);
     //TODO: conn creation has to occur after rewriter creation
     //because rewriter inits mysql library; fix this
     Connect conn("localhost", "root", "letmein", "cryptdbtest");
 
     r.setMasterKey("2392834");
-
-    DBResult * dbres;
 
     for (;;) {
         char *input = readline("CryptDB=# ");
@@ -87,12 +85,14 @@ main(int ac, char **av)
             break;
         }
         add_history(input);
-        string new_q;
-	Analysis analysis;
+        Analysis analysis;
+        DBResult * dbres;
         try {
-
             list<string> new_queries = r.rewrite(q, analysis);
             //only last query should return anything
+            if (new_queries.size() == 0) {
+                continue;
+            }
             for (auto new_q = new_queries.begin(); new_q != new_queries.end(); new_q++) {
                 cerr << "SUCCESS: " << *new_q << endl;
                 assert(conn.execute(*new_q, dbres));
@@ -100,10 +100,10 @@ main(int ac, char **av)
             if (!dbres) {
                 continue;
             }
-
+            cerr << "got res" << endl;
             ResType res = dbres->unpack();
 
-	    if (!res.ok) {
+            if (!res.ok) {
                 cerr << "issue with query \n";
                 continue;
             }

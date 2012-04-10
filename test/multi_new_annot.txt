@@ -1,7 +1,3 @@
-drop table privmsg;
-drop table msgs;
-drop table users;
-
 cryptdb princtype msg;
 cryptdb princtype user;
 cryptdb princtype username external;
