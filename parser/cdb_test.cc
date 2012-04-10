@@ -68,9 +68,8 @@ main(int ac, char **av)
     Rewriter r(ci, av[1], Multi, encByDefault);
     //TODO: conn creation has to occur after rewriter creation
     //because rewriter inits mysql library; fix this
-    Connect conn("localhost", "root", "letmein");
-    //XXX need some way for execute to specify db
-    conn.execute("use cryptdbtest");
+    Connect conn("localhost", "root", "letmein", "cryptdbtest");
+
     r.setMasterKey("2392834");
 
     for (;;) {
