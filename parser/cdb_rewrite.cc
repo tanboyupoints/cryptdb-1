@@ -2867,7 +2867,7 @@ Rewriter::Rewriter(ConnectionInfo ci,
     masterKey = CryptoManager::getKey(u.rand_string(AES_KEY_BYTES));
 
     e_conn = Connect::getEmbedded();
-    conn = new Connect(ci.server, ci.user, ci.passwd, ci.port);
+    conn = new Connect(ci.server, ci.user, ci.passwd, cur_db, ci.port);
 
     schema = new SchemaInfo();
     totalTables = 0;
