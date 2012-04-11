@@ -2406,7 +2406,7 @@ rewrite_create_lex(LEX *lex, Analysis &a)
         lex->alter_info.key_list = newList0;
     }
 }
-
+/*
 static void
 mp_update_init(LEX *lex, Analysis &a)
 {
@@ -2423,7 +2423,8 @@ mp_update_init(LEX *lex, Analysis &a)
 	    } 
     }
 }
-
+*/
+/*
 static void
 rewrite_update_lex(LEX *lex, Analysis &a)
 {
@@ -2494,7 +2495,7 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     if (lex->select_lex.having)
         rewrite(&lex->select_lex.having, a);
 }
-
+*/
 static void
 mp_insert_init(LEX *lex, Analysis &a)
 {
@@ -2656,9 +2657,10 @@ lex_rewrite(LEX * lex, Analysis & analysis)
     case SQLCOM_DROP_TABLE:
         rewrite_table_list(&lex->select_lex.table_list, analysis);
         break;
-    case SQLCOM_UPDATE:
+/*    case SQLCOM_UPDATE:
         rewrite_update_lex(lex, analysis);
-        break;
+	break;
+	*/
     case SQLCOM_DELETE:
 	rewrite_table_list(lex->query_tables, analysis);
 	rewrite_select_lex(&lex->select_lex, analysis);
