@@ -2869,6 +2869,9 @@ Rewriter::Rewriter(ConnectionInfo ci,
     masterKey = CryptoManager::getKey(u.rand_string(AES_KEY_BYTES));
 
     e_conn = Connect::getEmbedded();
+    //XXX hack
+    assert (e_conn->execute("CREATE DATABASE IF NOT EXISTS " + cur_db));
+    assert (e_conn->execute("use " + cur_db));
     conn = new Connect(ci.server, ci.user, ci.passwd, cur_db, ci.port);
 
     schema = new SchemaInfo();
