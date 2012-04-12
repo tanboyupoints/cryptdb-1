@@ -2874,11 +2874,15 @@ Rewriter::Rewriter(ConnectionInfo ci,
     }
     
     e_conn = Connect::getEmbedded();
-    conn = new Connect(ci.server, ci.user, ci.passwd, ci.port);
+
     // TODO XXX need a per-connection place to store this.
     cur_db = "cryptdbtest";
-    assert(e_conn->execute("create database cryptdbtest;"));
     
+    //XXX hack
+    assert (e_conn->execute("CREATE DATABASE IF NOT EXISTS " + cur_db));
+    assert (e_conn->execute("use " + cur_db));
+    conn = new Connect(ci.server, ci.user, ci.passwd, cur_db, ci.port);
+
     schema = new SchemaInfo();
     totalTables = 0;
     initSchema();
