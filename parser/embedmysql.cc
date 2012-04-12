@@ -207,6 +207,7 @@ query_parse::query_parse(const std::string &db, const std::string &q)
         if (t->fill_derived_tables())
             mysql_thrower() << "fill_derived_tables";
 
+	cerr << "opening query tables " << lex->query_tables << "\n";
         if (open_normal_and_derived_tables(t, lex->query_tables, 0))
             mysql_thrower() << "open_normal_and_derived_tables";
 

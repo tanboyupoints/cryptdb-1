@@ -29,8 +29,8 @@ class EncLayer {
     virtual SECLEVEL level() = 0;
     virtual Create_field * newCreateField() = 0;
     
-    virtual Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = 0) = 0;
-    virtual Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = 0) = 0;
+    virtual Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "") = 0;
+    virtual Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "") = 0;
     virtual Item * decryptUDF(Item * col, Item * ivcol = NULL) {
         thrower() << "decryptUDF not supported";
     }
@@ -56,8 +56,8 @@ public:
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField();
     
-    Item * encrypt(Item * ptext, uint64_t IV, const std::string &k);
-    Item * decrypt(Item * ctext, uint64_t IV, const std::string &k);
+    Item * encrypt(Item * ptext, uint64_t IV, const std::string &k = "");
+    Item * decrypt(Item * ctext, uint64_t IV, const std::string &k = "");
     Item * decryptUDF(Item * col, Item * ivcol);
 
 private:
@@ -77,8 +77,8 @@ public:
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField();
     
-    Item * encrypt(Item * ptext, uint64_t IV, const std::string &k);
-    Item * decrypt(Item * ctext, uint64_t IV, const std::string &k);
+    Item * encrypt(Item * ptext, uint64_t IV, const std::string &k = "");
+    Item * decrypt(Item * ctext, uint64_t IV, const std::string &k = "");
     Item * decryptUDF(Item * col, Item * ivcol);
 
 private:
@@ -98,8 +98,8 @@ public:
     SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField();
 
-    Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = 0);
-    Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = 0);
+    Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "");
+    Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "");
     Item * decryptUDF(Item * col, Item * ivcol = NULL);
 
 private:
@@ -143,8 +143,8 @@ public:
     Create_field * newCreateField() {return cf;}
     
     //TODO: DETJOIN for multi
-    Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = 0);
-    Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = 0);
+    Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
+    Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = "");
     Item * decryptUDF(Item * col, Item * ivcol = NULL) {
         thrower() << "should not decrypt from joindet\n";
     }
@@ -162,8 +162,8 @@ public:
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField();
 
-    Item * encrypt(Item * p, uint64_t IV, const std::string &k);
-    Item * decrypt(Item * c, uint64_t IV, const std::string &k);
+    Item * encrypt(Item * p, uint64_t IV, const std::string &k = "");
+    Item * decrypt(Item * c, uint64_t IV, const std::string &k = "");
 
 private:
     std::string key;
@@ -184,8 +184,8 @@ public:
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField();
 
-    Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = 0);
-    Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = 0)__attribute__((noreturn));
+    Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
+    Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = "")__attribute__((noreturn));
   
 private:
     std::string key;
@@ -207,8 +207,8 @@ public:
     Create_field * newCreateField();
 
     //TODO needs multi encrypt and decrypt
-    Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = 0);
-    Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = 0);
+    Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
+    Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = "");
 
     //expr is the expression (e.g. a field) over which to sum
     Item * sumUDF(Item * expr, const std::string &k = 0);
@@ -228,8 +228,8 @@ public:
     SECLEVEL level() {return SECLEVEL::SEARCH;}
     Create_field * newCreateField();
 
-    Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = 0);
-    Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = 0)__attribute__((noreturn));
+    Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "");
+    Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "")__attribute__((noreturn));
 
     //expr is the expression (e.g. a field) over which to sum
     Item * searchUDF(Item * expr);

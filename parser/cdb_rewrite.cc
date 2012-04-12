@@ -265,7 +265,7 @@ decrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV) {
     Item * prev_dec = NULL;
 
     for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
-        dec = (*it)->decrypt(dec, IV);
+	dec = (*it)->decrypt(dec, IV);
         //need to free space for all decs except last
         if (prev_dec) {
             delete prev_dec;
@@ -2348,6 +2348,13 @@ process_create_lex(LEX * lex, Analysis & a, bool encByDefault)
 {
     const string &table =
         lex->select_lex.table_list.first->table_name;
+    //create table in embedded db
+    //TODO: temporary hack!
+    assert(a.e_conn->execute("use cryptdbtest;"));
+    stringstream q;
+    q << *lex;
+    cerr << "sending to embedded db query " << q.str() << "\n";
+    assert(a.e_conn->execute(q.str()));
     LOG(cdb_v) << "table is " << table << " and encByDefault is " << encByDefault << " and true is " << true;
     add_table(a, table, lex, encByDefault);
 }
@@ -2588,11 +2595,8 @@ do_query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encB
     // based on st_select_lex::print in mysql-server/sql/sql_select.cc
 
     if (lex->sql_command == SQLCOM_CREATE_TABLE) {
-        if (analysis.mp || !encByDefault) {
-            process_create_lex(lex, analysis, false);
-        } else {
-            process_create_lex(lex, analysis, encByDefault);
-        }
+	process_create_lex(lex, analysis, encByDefault);
+        
         return;
     }
 
@@ -2859,18 +2863,22 @@ Rewriter::Rewriter(ConnectionInfo ci,
                    bool multi,
 		   bool encByDefault)
     : ci(ci), encByDefault(encByDefault)
-{
-    // XXX need a per-connection place to store this.
-    cur_db = "cryptdbtest";
-
+{   
     init_mysql(embed_dir);
 
     urandom u;
     masterKey = CryptoManager::getKey(u.rand_string(AES_KEY_BYTES));
 
+    if (multi) {
+	encByDefault = false;
+    }
+    
     e_conn = Connect::getEmbedded();
     conn = new Connect(ci.server, ci.user, ci.passwd, ci.port);
-
+    // TODO XXX need a per-connection place to store this.
+    cur_db = "cryptdbtest";
+    assert(e_conn->execute("create database cryptdbtest;"));
+    
     schema = new SchemaInfo();
     totalTables = 0;
     initSchema();
@@ -3198,7 +3206,7 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
 
     if (p.annot) {
         return processAnnotation(*p.annot, analysis);
-	}
+    }
 
     LEX *lex = p.lex();
 
@@ -3313,13 +3321,16 @@ Rewriter::decryptResults(ResType & dbres,
 			assert_s(!salt_item->null_value, "salt item is null");
 			salt = ((Item_int *)dbres.rows[r][rf.pos_salt])->value;
 		    }
+		    cerr << "col_index " << col_index << "\n";
+		    cerr << "to decrypt " << dbres.rows[r][c] << "\n";
 		    res.rows[r][col_index] = decrypt_item(im, dbres.rows[r][c], salt);
-		   
+
                 }
             }
             col_index++;
         }
     }
+    
 
     return res;
 }
