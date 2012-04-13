@@ -237,7 +237,6 @@ addSaltToReturn(ReturnMeta & rm, int pos) {
 static Item *
 encrypt_item_layers(Item * i, list<EncLayer *> & layers, Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0) {
     assert_s(layers.size() > 0, "field must have at least one layer");
-    cerr << "crypt: " << *i << endl;
     Item * enc = i;
     Item * prev_enc = NULL;
     for (auto layer : layers) {
@@ -260,12 +259,22 @@ encrypt_item_layers(Item * i, list<EncLayer *> & layers, Analysis &a, FieldMeta 
 }
 
 static Item *
-decrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV) {
+decrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV, Analysis &a, FieldMeta *fm, const vector<Item *> &res) {
     Item * dec = i;
     Item * prev_dec = NULL;
 
     for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
-	dec = (*it)->decrypt(dec, IV);
+        string key = "";
+        if (a.mp) {
+            if (a.tmkm.processingQuery) {
+                key = a.mp->get_key(fullName(fm->fname, fm->tm->anonTableName), a.tmkm);
+            } else {
+                key = a.mp->get_key(fullName(fm->fname, fm->tm->anonTableName), a.tmkm, res);
+            }
+            cerr << "mp decrypt key " << key << endl;
+        }
+        dec = (*it)->decrypt(dec, IV, key);
+        LOG(cdb_v) << "dec okay";
         //need to free space for all decs except last
         if (prev_dec) {
             delete prev_dec;
@@ -301,14 +310,14 @@ encrypt_item_all_onions(Item * i, FieldMeta * fm,
 }
 
 static Item *
-decrypt_item(ItemMeta * im, Item * i, uint64_t IV) {
+decrypt_item(ItemMeta * im, Item * i, uint64_t IV, Analysis &a, vector<Item *> &res) {
     FieldMeta * fm       = im->basefield;
     onion o              = im->o;
 
     if (o == oPLAIN) {
-	return i;
+        return i;
     } else {
-	return decrypt_item_layers(i, fm->onions[o]->layers, IV);
+        return decrypt_item_layers(i, fm->onions[o]->layers, IV, a, fm, res);
     }
 }
 
@@ -2209,6 +2218,7 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
 
         //anonymize onion name
         om->onionname = anonymizeFieldName(index, o, fm->fname, false);
+        LOG(cdb_v) << "adding onion layer " << om->onionname << " for " << fm->fname;
 
         //generate enclayers
         for (auto l: it.second) {
@@ -3135,6 +3145,7 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
     }
     
     //TODO: use EncLayer CreateField information
+    assert_s(annot.type == SINGLE_ENC || annot.type == ENCFOR, "parser is in single principal mode, but annotations are for multiple principals");
     assert_s(annot.getPrimitive() != "", "enc annotation has no primitive");
     LOG(cdb_v) << "table is " << annot.getPrimitiveTableName() << "; field is " << annot.getPrimitiveFieldName();
     TableMeta *tm = schema->tableMetaMap[annot.getPrimitiveTableName()];
@@ -3315,20 +3326,19 @@ Rewriter::decryptResults(ResType & dbres,
 	
         if (!rf.is_salt) {
             for (unsigned int r = 0; r < rows; r++) {
-		//TODO: there is some redundancy in this condition, cleanup
-		if ((im->o == oPLAIN) || im->basefield->onions.empty()) {
-		    res.rows[r][col_index] = dbres.rows[r][c];
-		} else {
-		    uint64_t salt = 0;
-		    if (rf.pos_salt>=0) {
-			Item * salt_item = dbres.rows[r][rf.pos_salt];
-			assert_s(!salt_item->null_value, "salt item is null");
-			salt = ((Item_int *)dbres.rows[r][rf.pos_salt])->value;
-		    }
-		    cerr << "col_index " << col_index << "\n";
-		    cerr << "to decrypt " << dbres.rows[r][c] << "\n";
-		    res.rows[r][col_index] = decrypt_item(im, dbres.rows[r][c], salt);
-
+                //TODO: there is some redundancy in this condition, cleanup
+                if ((im->o == oPLAIN) || im->basefield->onions.empty()) {
+                    res.rows[r][col_index] = dbres.rows[r][c];
+                } else {
+                    uint64_t salt = 0;
+                    if (rf.pos_salt>=0) {
+                        Item * salt_item = dbres.rows[r][rf.pos_salt];
+                        assert_s(!salt_item->null_value, "salt item is null");
+                        salt = ((Item_int *)dbres.rows[r][rf.pos_salt])->value;
+                    }
+                    cerr << "col_index " << col_index << "\n";
+                    cerr << "to decrypt " << dbres.rows[r][c] << "\n";
+                    res.rows[r][col_index] = decrypt_item(im, dbres.rows[r][c], salt, a, res.rows[r]);
                 }
             }
             col_index++;

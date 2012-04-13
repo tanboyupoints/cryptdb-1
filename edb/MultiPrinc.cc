@@ -119,7 +119,7 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
             }
             first = false;
         }
-        if (annot.getAGGLevel()) {
+        if (annot.getAGGLevel() || fm->onions.find(oAGG) != fm->onions.end()) {
             if (fm->onions.find(oAGG) == fm->onions.end()) {
                 fm->onions[oAGG]->onionname = anonymizeFieldName(0, oAGG, fm->fname, true);
             }
@@ -127,7 +127,7 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
             //mkm.encForMap[fullName(fm->onions[oAGG], annot.getPrimitiveTableName())] = annot.getRight().column;
             query_list.push_back(query + " ADD " + fm->onions[oAGG]->onionname + " " + TN_HOM + ";");
         }
-        if (annot.getSWPLevel()) {
+        if (annot.getSWPLevel() || fm->onions.find(oSWP) != fm->onions.end()) {
             if (fm->onions.find(oSWP) == fm->onions.end()) {
                 fm->onions[oSWP]->onionname = anonymizeFieldName(0, oSWP, fm->fname, true);
             }
@@ -793,7 +793,7 @@ MultiPrinc::get_key(string fieldName, TempMKM & tmkm)
 }
 
 string
-MultiPrinc::get_key(string fieldName, TMKM & tmkm, const vector<Item> &res)
+MultiPrinc::get_key(string fieldName, TMKM & tmkm, const vector<Item *> &res)
 {
     //ANON_REGION(__func__, &perf_cg);
 
@@ -819,8 +819,7 @@ MultiPrinc::get_key(string fieldName, TMKM & tmkm, const vector<Item> &res)
     }
     cerr << "not encForVal; use encForReturned size " << tmkm.encForReturned.size() << endl;
     if (tmkm.encForReturned.find(encForField) != tmkm.encForReturned.end()) {
-        String val_str = res[tmkm.encForReturned[encForField]].str_value;
-        string val = string(val_str.ptr(), val_str.length());
+        string val = ItemToString(res[tmkm.encForReturned[encForField]]);
         string key = accMan->getKey(Prin(encForField, removeApostrophe(val)));
         LOG(mp) << "-- key from accman is " <<
         CryptoManager::marshallKey(key) << "\n";
