@@ -350,7 +350,7 @@ DET_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
     setKey(k);
     string enc = encrypt_AES_CMC(
                  ItemToString(static_cast<Item_string *>(ptext)),
-                 enckey, false);
+                 enckey, true);
     unSetKey(k);
     return new Item_string(make_thd_string(enc), enc.length(), &my_charset_bin);
 }
@@ -360,7 +360,7 @@ DET_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
     setKey(k);
     string dec = decrypt_AES_CMC(
 	ItemToString(static_cast<Item_string *>(ctext)),
-	deckey, false);
+	deckey, true);
     unSetKey(k);
     return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
 }
