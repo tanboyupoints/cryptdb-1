@@ -7,7 +7,7 @@ string FieldMeta::stringify() {
     return res;
 }
 
-FieldMeta::FieldMeta():encdesc(FULL_EncDesc)
+FieldMeta::FieldMeta()
 {
     fname = "";
     sql_field = NULL;
@@ -64,3 +64,14 @@ EncDesc::restrict(onion o, SECLEVEL maxl)
     return false;
 }
 
+EncDesc
+EncDesc::intersect(EncDesc & ed) {
+    OnionLevelMap new_olm = OnionLevelMap();
+    for (auto it: ed.olm) {
+	auto jt = olm.find(it.first);
+	if (jt != olm.end()) {
+	    new_olm[it.first] = min(it.second, jt->second);
+	}
+    }
+    return EncDesc(new_olm);
+}

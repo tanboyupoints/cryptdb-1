@@ -94,7 +94,7 @@ typedef struct AutoInc {
 } AutoInc;
 
 const std::string BASE_SALT_NAME = "cdb_salt";
-
+typedef uint64_t salt_type;
 
 typedef struct QueryMeta {
     std::map<std::string, std::string> tabToAlias, aliasToTab;

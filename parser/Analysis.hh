@@ -18,7 +18,7 @@ class EncSet {
 public:
     EncSet(OnionLevelFieldMap input) : osl(input) {}
     EncSet(); // TODO(stephentu): move ctor here
-
+   
     /**
      * decides which encryption scheme to use out of multiple in a set
      */
@@ -30,6 +30,8 @@ public:
 
     inline bool singleton() const { return osl.size() == 1; }
 
+    EncDesc encdesc();
+    
     inline OnionLevelFieldPair extract_singleton() const {
         assert_s(singleton(), string("encset has size ") + StringFromVal(osl.size()));
         auto it = osl.begin();
@@ -136,12 +138,13 @@ public:
  
 
     unsigned int pos; //a counter indicating how many projection fields have been analyzed so far                                                                    
-    std::map<std::string, FieldAMeta *> fieldToAMeta;						     
+    std::map<FieldMeta *, FieldAMeta *> fieldToAMeta;						     
 
     //maps an Item to metadata about that item
     std::map<Item*, ItemMeta *>         itemToMeta;
     std::map<Item_field*, FieldMeta*>   itemToFieldMeta;
     std::set<Item*>                     itemHasRewrite;
+    std::map<FieldMeta *, salt_type>    salts;
     
     SchemaInfo *                        schema;
     AES_KEY *                           masterKey;

@@ -73,6 +73,49 @@ static onionlayout STR_ONION_LAYOUT = {
     {oSWP, std::list<SECLEVEL>({SECLEVEL::SEARCH})}
 };
 
+typedef std::map<onion, SECLEVEL>  OnionLevelMap;
+
+/**
+ * Use to keep track of a field's encryption onions.
+ */
+class EncDesc {
+public:
+    EncDesc() : layout(NULL) {}
+    EncDesc(OnionLevelMap input) : olm(input) {}
+    EncDesc(const EncDesc & ed) : olm(ed.olm) {}
+    /**
+     * Returns true if something was changed, false otherwise.
+     */
+    bool restrict(onion o, SECLEVEL maxl);
+    EncDesc intersect(EncDesc & ed);
+
+    OnionLevelMap olm;
+    onionlayout * layout; 
+};
 
 
+const EncDesc FULL_EncDesc = {
+        {
+            {oDET, SECLEVEL::DET},
+            {oOPE, SECLEVEL::OPE},
+            {oAGG, SECLEVEL::HOM},
+            {oSWP, SECLEVEL::SEARCH},
+        }
+};
 
+//initial onion configurations 
+const EncDesc NUM_initial_levels = {
+        {
+            {oDET, SECLEVEL::DET},
+            {oOPE, SECLEVEL::OPE},
+            {oAGG, SECLEVEL::HOM},
+        }
+};
+
+const EncDesc STR_initial_levels = {
+        {
+            {oDET, SECLEVEL::DET},
+            {oOPE, SECLEVEL::OPE},
+            {oSWP, SECLEVEL::SEARCH},
+        }
+};

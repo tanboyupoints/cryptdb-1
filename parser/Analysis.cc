@@ -35,6 +35,15 @@ EncSet::intersect(const EncSet & es2) const
     return EncSet(m);
 }
 
+EncDesc
+EncSet::encdesc() {
+    OnionLevelMap olm = OnionLevelMap();
+    for (auto it : osl) {
+	olm[it.first] = it.second.first;
+    }
+    return EncDesc(olm);
+}
+
 void
 EncSet::setFieldForOnion(onion o, FieldMeta * fm) {
     LevelFieldPair lfp = getAssert(osl, o);

@@ -20,7 +20,8 @@
 // encrypted data in the DBMS.
 //TODO: currently, we have one such object per onion layer per field
 // optimize storage by sharing these handlers among objects with same type
-//TODO: need to writeup cleanup & destructors
+//TODO: need to implement cleanup & destructors
+
 
 class EncLayer {
  public:
@@ -48,6 +49,10 @@ public:
     static EncLayer * encLayer(SECLEVEL sl, Create_field * cf, PRNG * key);
 };
 
+// returns true if any of the layers in ed
+// need salt
+bool
+needsSalt(EncDesc ed);
 
 class RND_int : public EncLayer {
 public:
@@ -119,8 +124,8 @@ public:
     SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField();
     
-    Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = 0);
-    Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = 0);
+    Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "");
+    Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "");
     Item * decryptUDF(Item * col, Item * = NULL);
 
 private:
@@ -211,8 +216,8 @@ public:
     Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = "");
 
     //expr is the expression (e.g. a field) over which to sum
-    Item * sumUDF(Item * expr, const std::string &k = 0);
-    
+    Item * sumUDA(Item * expr, const std::string &k = "");
+    Item * sumUDF(Item * i1, Item * i2, const std::string &k = "");
 private:
     static const uint nbits = 1024;
     Paillier_priv sk;
