@@ -9,27 +9,6 @@
 using namespace std;
 using namespace NTL;
 
-//TODO: this is duplicated in cdb_rewrite
-//moved to util/util
-/*static char *
-make_thd_string(const string &s, size_t *lenp = 0)
-{
-    THD *thd = current_thd;
-    assert(thd);
-
-    if (lenp)
-        *lenp = s.size();
-    return thd->strmake(s.data(), s.size());
-}
-
-static string
-ItemToString(Item * i) {
-    String s;
-    String *s0 = i->val_str(&s);
-    assert(s0 != NULL);
-    return string(s0->ptr(), s0->length());
-    }*/
-
 //TODO: remove above newcreatefield
 static Create_field*
 createFieldHelper(const Create_field *f, int field_length,
@@ -49,6 +28,18 @@ createFieldHelper(const Create_field *f, int field_length,
 	f0->flags = f0->flags | UNSIGNED_FLAG; 
     }
     return f0;
+}
+
+
+bool
+needsSalt(EncDesc ed) {
+    for (auto pair : ed.olm) {
+	if (pair.second == SECLEVEL::RND) {
+	    return true;
+	}
+    }
+
+    return false;
 }
 
 /****************** RND *********************/
@@ -547,7 +538,6 @@ ZZToItemInt(const ZZ & val) {
 static Item *
 ZZToItemStr(const ZZ & val) {
     string str = StringFromZZ(val);
-    cerr << "n2 len is " << str.length() << " first byte " << (int)str[0] << "\n";
     Item * newit = new Item_string(make_thd_string(str), str.length(), &my_charset_bin);
     newit->name = NULL; //no alias
 
@@ -597,7 +587,7 @@ HOM::decrypt(Item * ctext, uint64_t IV, const string &k) {
     return ZZToItemInt(dec);
 }
 
-static udf_func u_sum = {
+static udf_func u_sum_a = {
     LEXSTRING("agg"),
     STRING_RESULT,
     UDFTYPE_AGGREGATE,
@@ -611,8 +601,8 @@ static udf_func u_sum = {
     0L,
 };
 
-udf_func s_HomAddUdfFunc = {
-    LEXSTRING("agg_add"),
+static udf_func u_sum_f = {
+    LEXSTRING("func_add_set"),
     STRING_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -624,21 +614,6 @@ udf_func s_HomAddUdfFunc = {
     NULL,
     0L,
 };
-
-udf_func s_HomSubUdfFunc = {
-    LEXSTRING("hom_sub"),
-    STRING_RESULT,
-    UDFTYPE_FUNCTION,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    0L,
-};
-
 
 Item *
 HOM::sumUDA(Item * expr, const string &k) {
@@ -647,13 +622,19 @@ HOM::sumUDA(Item * expr, const string &k) {
     l.push_back(expr);
     l.push_back(ZZToItemStr(sk.hompubkey()));
     unSetKey(k);
-    return new Item_func_udf_str(&u_sum, l);
+    return new Item_func_udf_str(&u_sum_a, l);
 }
 
 Item *
-HOM::sumUDF(Item * expr, const string &k) {
-    cerr << "sum udf not implemented\n";
-    return NULL;
+HOM::sumUDF(Item * i1, Item * i2, const string &k) {
+    setKey(k);
+    List<Item> l;
+    l.push_back(i1);
+    l.push_back(i2);
+    l.push_back(ZZToItemStr(sk.hompubkey()));
+    unSetKey(k);
+
+    return new Item_func_udf_str(&u_sum_f, l);
 }
 
 /******* SEARCH **************************/
@@ -758,7 +739,7 @@ Search::searchUDF(Item * expr) {
     l.push_back(new Item_string((const char *)t.ciph.content, t.ciph.len, &my_charset_bin));
     l.push_back(new Item_string((const char *)t.wordKey.content, t.wordKey.len, & my_charset_bin));
     
-    return new Item_func_udf_int(&u_sum, l);
+    return new Item_func_udf_int(&u_search, l);
 }
 
 /************ EncLayer factory creation  ********/
@@ -808,8 +789,7 @@ const std::vector<udf_func*> udf_list = {
     &u_decRNDString,
     &u_decDETInt,
     &u_decDETStr,
-    &u_sum,
-    // &s_HomAddUdfFunc,
-    // &s_HomSubUdfFunc,
+    &u_sum_f,
+    &u_sum_a,
     &u_search
 };

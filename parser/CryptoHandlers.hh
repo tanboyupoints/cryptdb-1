@@ -22,6 +22,7 @@
 // optimize storage by sharing these handlers among objects with same type
 //TODO: need to implement cleanup & destructors
 
+
 class EncLayer {
  public:
     EncLayer(Create_field * f) : cf(f) {}
@@ -48,6 +49,10 @@ public:
     static EncLayer * encLayer(SECLEVEL sl, Create_field * cf, PRNG * key);
 };
 
+// returns true if any of the layers in ed
+// need salt
+bool
+needsSalt(EncDesc ed);
 
 class RND_int : public EncLayer {
 public:
@@ -212,7 +217,7 @@ public:
 
     //expr is the expression (e.g. a field) over which to sum
     Item * sumUDA(Item * expr, const std::string &k = "");
-    Item * sumUDF(Item * expr, const std::string &k = "");
+    Item * sumUDF(Item * i1, Item * i2, const std::string &k = "");
 private:
     static const uint nbits = 1024;
     Paillier_priv sk;

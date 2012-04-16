@@ -559,17 +559,13 @@ analyze_update(Item_field * field, Item * val, Analysis & a) {
     //updates fieldAMeta to contain onions that can be updated and their levels
     EncDesc ed = e.encdesc();
 
-    cerr << "encdesc gathered is " << ed << "\n";
-
     auto it = a.fieldToAMeta.find(fm); 
     if (it == a.fieldToAMeta.end()) {
 	a.fieldToAMeta[fm] = new FieldAMeta(ed.intersect(fm->encdesc));
-	cerr << "after intersection with " << fm->encdesc << ": " << a.fieldToAMeta[fm]->exposedLevels << "\n";
     } else {
 	it->second->exposedLevels = it->second->exposedLevels.intersect(ed);
 	assert_s(it->second->exposedLevels.olm.size() > 0,
 		 "CryptDB's encryption schemes cannot support such update");
-	cerr << "intersecting with already exposed levels to " << it->second->exposedLevels << "\n";
     }
 
     //TODO: an optimization could be performed here to support more updates
@@ -580,7 +576,6 @@ analyze_update(Item_field * field, Item * val, Analysis & a) {
 static inline void
 analyze(Item *i, const constraints &tr, Analysis & a)
 {
-    cerr << "before analyze \n";
     assert(i != NULL);
     LOG(cdb_v) << "calling gather for item " << i << " tr " << tr << "\n";
     EncSet e(gather(i, tr, a));
@@ -763,7 +758,7 @@ record_item_meta_for_constraints(Item *i,
 template <class T>
 static Item *
 do_rewrite_type_args(T *i, Analysis &a) {
-    cerr << "rewriting arguments for " << i << "\n";
+
     Item **args = i->arguments();
     for (uint x = 0; x < i->argument_count(); x++) {
         rewrite(&args[x], a);
@@ -847,6 +842,25 @@ class CItemSubtypeFN : public CItemSubtype<T> {
     CItemSubtypeFN() { funcNames.reg(std::string(TYPE), this); }
 };
 
+// returns the intersection of the es and fm.encdesc
+// by also taking into account what onions are stale
+// on fm
+static OnionLevelFieldMap
+intersect(const EncSet & es, FieldMeta * fm) {
+    OnionLevelFieldMap res;
+
+    for (auto it : es.osl) {
+	onion o = it.first;
+	auto ed_it = fm->encdesc.olm.find(o);
+	
+	if ((ed_it != fm->encdesc.olm.end()) && (!fm->onions[o]->stale)) {
+	    //a onion to keep
+	    res[o] = LevelFieldPair(min(it.second.first, ed_it->second), fm);
+	} 
+    }
+
+    return res;
+}
 
 /*
  * Actual item handlers.
@@ -882,8 +896,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
             // if the field is a wildcard, then replace it with this field
             // (or if it's the same field
             if (FieldQualifies(it->second.second, fm)) {
-                m[it->first] = it->second;
-                m[it->first].second = fm;
+		m = intersect(tr.encset, fm);
             } else {
                 // in the case of DET_JOIN/OPE_JOIN,
                 // we take the constraint regardless of
@@ -1384,26 +1397,27 @@ class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
         Item **args = i->arguments();
         enforce(args[0], constraints(tr.encset, "additive", i, &tr), a);
         enforce(args[1], constraints(tr.encset, "additive", i, &tr), a);
+
+	record_item_meta_for_constraints(i, tr, a);
     }
     virtual Item * do_optimize_type(Item_func_additive_op *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
     virtual Item * do_rewrite_type(Item_func_additive_op *i, Analysis & a) const {
         LOG(cdb_v) << "do_rewrite_type Item_func_additive_op";
-;
+
         // rewrite children
         do_rewrite_type_args(i, a);
 
-        List<Item> l;
-        Item **args = i->arguments();
-        for (uint x = 0; x < i->argument_count(); x++) {
-            l.push_back(args[x]);
-        }
+	assert_s(i->argument_count() == 2, " expecting two arguments for additive operator ");
+	Item **args = i->arguments();
+	
+	ItemMeta * im  = getAssert(a.itemToMeta, (Item *)i);
+	FieldMeta * fm = im->basefield;
+	EncLayer *el   = getAssert(fm->onions, oAGG)->layers.back();
+	assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
 
-        // replace with hom_(add/sub)
-        return strcmp(NAME, "+") == 0 ?
-            new Item_func_udf_str(&s_HomAddUdfFunc, l) :
-            new Item_func_udf_str(&s_HomSubUdfFunc, l) ;
+	return ((HOM*)el)->sumUDF(args[0], args[1]);
     }
 };
 
@@ -2232,7 +2246,7 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
 static inline void
 rewrite_table_list(TABLE_LIST *t, Analysis &a)
 {
-    cerr << "rewriting table \n";
+
     string anon_name = anonymize_table_name(string(t->table_name,
                                                    t->table_name_length), a);
     t->table_name = make_thd_string(anon_name, &t->table_name_length);
@@ -2247,11 +2261,8 @@ rewrite_table_list(List<TABLE_LIST> *tll, Analysis & a)
 
     for (;;) {
         TABLE_LIST *t = join_it++;
-	cerr << "list of tables is " << t << "\n"; 
         if (!t) {
-	    cerr << "no more tables\n";
 	    break;
-	    
 	}
 
         rewrite_table_list(t, a);
@@ -2285,7 +2296,6 @@ static void
 init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf, onionlayout ol) {
     for (auto it: ol) {
         onion o = it.first;
-	cerr << "create onion " << o << "\n";
         OnionMeta * om = new OnionMeta();
 
         //anonymize onion name
@@ -2436,7 +2446,6 @@ process_create_lex(LEX * lex, Analysis & a, bool encByDefault)
     assert(a.e_conn->execute("use cryptdbtest;"));
     stringstream q;
     q << *lex;
-    cerr << "sending to embedded db query " << q.str() << "\n";
     assert(a.e_conn->execute(q.str()));
     LOG(cdb_v) << "table is " << table << " and encByDefault is " << encByDefault << " and true is " << true;
     add_table(a, table, lex, encByDefault);
@@ -2515,6 +2524,16 @@ mp_update_init(LEX *lex, Analysis &a)
 }
 
 static void
+stalefy(FieldMeta * fm, EncDesc  ed) {
+    for (auto o_l : fm->encdesc.olm) {
+	onion o = o_l.first;
+	if (ed.olm.find(o) == ed.olm.end()) {
+	    fm->onions[o]->stale = true;
+	}
+    }
+}
+
+static void
 rewrite_update_lex(LEX *lex, Analysis &a)
 {
     LOG(cdb_v) << "rewriting update \n";
@@ -2524,11 +2543,12 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     mp_update_init(lex, a);
 
     // Rewrite table name
-
     rewrite_table_list(lex->select_lex.table_list.first, a);
 
+    // Rewrite filters
+    rewrite_filters_lex(&lex->select_lex, a);
+ 
     // Rewrite SET values
-    
     assert(lex->select_lex.item_list.head());
     assert(lex->value_list.head());
 
@@ -2536,6 +2556,9 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     
     auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
     auto val_it = List_iterator<Item>(lex->value_list);
+
+    //TODO: need to make stale certain onions and not allow operations
+    // to those onions any more; reset this after an update set
 
     // Look through all pairs in set: fd = val
     for (;;) {
@@ -2549,26 +2572,21 @@ rewrite_update_lex(LEX *lex, Analysis &a)
 	Item * val = val_it++;
 	assert(val != NULL);
 
-	cerr << "fd->table and field " << fd->table_name << fd->field_name << "\n";
 	FieldMeta * fm = a.schema->getFieldMeta(fd->table_name, fd->field_name);
 	assert(fm);
 	FieldAMeta * fam = getAssert(a.fieldToAMeta, fm);
 	assert(fam);
 
+	EncDesc ed = fam->exposedLevels;
 
 	// Determine salt for field
 	if (fm->has_salt) {
 	    auto it_salt = a.salts.find(fm);
-	    if (it_salt == a.salts.end()) {
+	    if ((it_salt == a.salts.end()) && needsSalt(ed)) {
 		salt_type salt = randomValue(); 
 		a.salts[fm] = salt;
 	    } 
 	}
-
-	
-	EncDesc ed = fam->exposedLevels;
-
-	cerr << "will encrypt " << val << " with encdesc " << ed << "\n";
 
 	Item * new_fd, * new_val;
 
@@ -2584,8 +2602,16 @@ rewrite_update_lex(LEX *lex, Analysis &a)
 
 	    //make copies of original to avoid changing original
 	    new_fd = new Item_field(current_thd, fd);
-	    new_val = val->clone_item();
-	    assert_s(new_val, "cannot clone item because it is not a constant item");
+
+	    //TODO: we should just clone the val here, but not sure how to clone
+	    //it deeply when it is not a constant -- could implement it, but
+	    // it should already exist in some form
+	    if (ed.olm.size() > 1) {
+		new_val = val->clone_item();
+		assert_s(new_val, "cannot clone item because it is not a constant item");
+	    } else {
+		new_val = val;
+	    }
 	    
 	    enforce(new_fd, constraints(e, "update", new_fd, 0, false), a);
 	    enforce(new_val, constraints(e, "update", new_val, 0, false), a);
@@ -2595,6 +2621,9 @@ rewrite_update_lex(LEX *lex, Analysis &a)
 	    rewrite(&new_val, a);
 	    res_vals.push_back(new_val);
 	}
+
+	// Make stale all onions that were not updated
+	stalefy(fm, ed);
 
         // Add the salt field
 	if (fm->has_salt) {
@@ -2610,8 +2639,6 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     lex->select_lex.item_list = res_items;
     lex->value_list = res_vals;
 
-    // Rewrite filters
-    rewrite_filters_lex(&lex->select_lex, a);
     
 }
 
@@ -2703,7 +2730,6 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
 
 static void
 process_update_lex(LEX * lex, Analysis & a) {
-    cerr << "do_query_analyze UPDATE \n";
   
     if (lex->select_lex.item_list.head()) {
 	assert(lex->value_list.head());
@@ -2719,9 +2745,7 @@ process_update_lex(LEX * lex, Analysis & a) {
 	    assert(val != NULL);
 	    assert(i->type() == Item::FIELD_ITEM);
 	    Item_field *ifd = static_cast<Item_field*>(i);
-	    cerr << "before analyze encdesc is " << a.schema->getFieldMeta(ifd->table_name, ifd->field_name)->encdesc << "\n";
 	    analyze_update(ifd, val, a);
-	    cerr << "field name " << ifd->field_name << "\n";
 	}
     }
 
@@ -2788,7 +2812,6 @@ query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDe
 static int
 lex_rewrite(LEX * lex, Analysis & analysis)
 {
-    cerr << "lex is " << *lex << "\n";
     switch (lex->sql_command) {
     case SQLCOM_CREATE_TABLE:
         rewrite_create_lex(lex, analysis);
@@ -3466,9 +3489,7 @@ Rewriter::decryptResults(ResType & dbres,
                         assert_s(!salt_item->null_value, "salt item is null");
                         salt = ((Item_int *)dbres.rows[r][rf.pos_salt])->value;
                     }
-                    cerr << "col_index " << col_index << "\n";
-                    cerr << "to decrypt " << dbres.rows[r][c] << "\n";
-                    res.rows[r][col_index] = decrypt_item(im, dbres.rows[r][c], salt, a, res.rows[r]);
+		    res.rows[r][col_index] = decrypt_item(im, dbres.rows[r][c], salt, a, res.rows[r]);
                 }
             }
             col_index++;

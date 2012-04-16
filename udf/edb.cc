@@ -466,8 +466,7 @@ searchSWP(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
 #endif
 
 
-    
-#if MYSQL_S
+   
     
 struct agg_state {
     ZZ sum;
@@ -538,59 +537,8 @@ agg(UDF_INIT *initid, UDF_ARGS *args, char *result,
     return (char *) as->rbuf;
 }
 
-#else
-
-Datum
-func_add(PG_FUNCTION_ARGS)
-{
-    int lenN2, lenB;
-    unsigned char * bytesN2;
-    unsigned char * bytesA;
-    unsigned char * bytesB;
-
-    bytea * input = PG_GETARG_BYTEA_P(0);
-    lenN2 = (VARSIZE(input)- VARHDRSZ)/2;
-    //cerr << "lenN2 " << lenN2 << "\n";
-    bytesA = (unsigned char *)VARDATA(input);
-    bytesN2 = bytesA+lenN2;
-
-    bytea * inputB = PG_GETARG_BYTEA_P(1);
-    lenB = VARSIZE(inputB) - VARHDRSZ;
-    //cerr << "lenB " << lenB << "\n";
-    bytesB = (unsigned char *)VARDATA(inputB);
-
-    if (lenB != lenN2) {
-        cerr << "error: lenB != lenN2 \n";
-        cerr << "lenB is " << lenB << " lenN2 is " << lenN2 << "\n";
-        PG_RETURN_BYTEA_P(NULL);
-    }
-
-    if (DEBUG) { cerr << stringToByteInts(string(bytesA, lenN2)) << "\n"; }
-
-    unsigned char * bytesRes = homomorphicAdd(bytesA, bytesB, bytesN2, lenN2);
-    //cerr << "product "; myPrint(bytesRes, lenN2); cerr << " ";
-
-    memcpy(VARDATA(input), bytesRes, lenN2);
-    PG_RETURN_BYTEA_P(input);
-}
-
-Datum
-func_add_final(PG_FUNCTION_ARGS)
-{
-    bytea * input = PG_GETARG_BYTEA_P(0);
-    int lenN2 = (VARSIZE(input) - VARHDRSZ) / 2;
-
-    bytea * res = (bytea *) palloc(lenN2 + VARHDRSZ);
-
-    SET_VARSIZE(res, lenN2+VARHDRSZ);
-    memcpy(VARDATA(res), VARDATA(input), lenN2);
-    PG_RETURN_BYTEA_P(res);
-}
-
-#endif /*MYSQL_S*/
-
 // for update with increment
-#if MYSQL_S
+
 void
 func_add_set_deinit(UDF_INIT *initid)
 {
@@ -608,9 +556,9 @@ func_add_set(UDF_INIT *initid, UDF_ARGS *args,
 
     uint64_t n2len = args->lengths[2];
     ZZ field, val, n2;
-    ZZFromBytesFast(field, (const uint8_t *) args->args[0], args->lengths[0]);
-    ZZFromBytesFast(val, (const uint8_t *) args->args[1], args->lengths[1]);
-    ZZFromBytesFast(n2, (const uint8_t *) args->args[2], args->lengths[2]);
+    ZZFromBytes(field, (const uint8_t *) args->args[0], args->lengths[0]);
+    ZZFromBytes(val, (const uint8_t *) args->args[1], args->lengths[1]);
+    ZZFromBytes(n2, (const uint8_t *) args->args[2], args->lengths[2]);
 
     ZZ res;
     MulMod(res, field, val, n2);
@@ -623,31 +571,6 @@ func_add_set(UDF_INIT *initid, UDF_ARGS *args,
     return initid->ptr;
 }
 
-#else
 
-Datum
-func_add_set(PG_FUNCTION_ARGS)
-{
-    unsigned char * val;
-    unsigned char * N2;
-    unsigned char * field;
-    unsigned int valLen, fieldLen, N2Len;
-
-    field = getba(ARGS, 0, fieldLen);
-    val = getba(ARGS, 1, valLen);
-    N2 = getba(ARGS, 2, N2Len);
-
-    myassert(fieldLen == N2Len, "length of the field differs from N2 len");
-    myassert(valLen == N2Len, "length of val differs from N2 len");
-
-    unsigned char * res = homomorphicAdd(field, val, N2, N2Len);
-
-    bytea * resBytea = (bytea *) palloc(N2Len + VARHDRSZ);
-    SET_VARSIZE(resBytea, N2Len + VARHDRSZ);
-    memcpy(VARDATA(resBytea), res, N2Len);
-    PG_RETURN_BYTEA_P(resBytea);
-}
-
-#endif /*MYSQL_S*/
     
 } /* extern "C" */
