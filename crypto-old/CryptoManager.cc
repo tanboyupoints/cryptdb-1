@@ -289,7 +289,7 @@ CryptoManager::get_key_SEM(const string &key)
 string
 CryptoManager::encrypt_SEM(const string &ptext, AES_KEY * enckey, uint64_t salt)
 {
-   return encrypt_AES_CBC(ptext, enckey, BytesFromInt(salt, SALT_LEN_BYTES), false);
+    return encrypt_AES_CBC(ptext, enckey, BytesFromInt(salt, SALT_LEN_BYTES), false);
 }
 
 string

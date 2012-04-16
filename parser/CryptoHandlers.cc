@@ -182,8 +182,8 @@ Item *
 RND_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
     setKey(k);
     string enc = CryptoManager::encrypt_SEM(
-	ItemToString(static_cast<Item_string *>(ptext)),
-	enckey, IV);
+                 ItemToString(static_cast<Item_string *>(ptext)),
+                 enckey, IV);
     LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV " << IV << "--->" << enc;
     unSetKey(k);
     return new Item_string(make_thd_string(enc), enc.length(), &my_charset_bin);
@@ -358,8 +358,8 @@ Item *
 DET_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
     setKey(k);
     string enc = encrypt_AES_CMC(
-	ItemToString(static_cast<Item_string *>(ptext)),
-	enckey, false);
+                 ItemToString(static_cast<Item_string *>(ptext)),
+                 enckey, false);
     unSetKey(k);
     return new Item_string(make_thd_string(enc), enc.length(), &my_charset_bin);
 }
