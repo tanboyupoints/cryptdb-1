@@ -858,7 +858,6 @@ query_analyze(const std::string &db, const std::string &q)
             Item *item = item_it++;
             if (!item)
                 break;
-
             analyze(item, cipher_type_reason(cipher_type::any, "update", item, 0, false));
         }
     }

@@ -34,7 +34,7 @@ using namespace std;
                         string(__PRETTY_FUNCTION__))
 
 
-/********  parser utils; TODO: put some in util **/
+/******** static helper functions  *******************/
 
 static Item *
 stringToItemField(string field, string table, Item_field * itf) {
@@ -45,6 +45,28 @@ stringToItemField(string field, string table, Item_field * itf) {
 
     return res;
 }
+
+static inline string
+extract_fieldname(Item_field *i)
+{
+    stringstream fieldtemp;
+    fieldtemp << *i;
+    return fieldtemp.str();
+}
+
+static inline
+Item_field * make_from_template(Item_field *t, const char *name)
+{
+    THD *thd = current_thd;
+    assert(thd);
+    // bootstrap i0 from t
+    Item_field *i0 = new Item_field(thd, t);
+    // clear out alias
+    i0->name = NULL;
+    i0->field_name = thd->strdup(name);
+    return i0;
+}
+
 /*
 static Item *
 stringToItem(string s) {
@@ -59,6 +81,14 @@ ItemToString(Item * i) {
     String *s0 = i->val_str(&s);
     assert(s0 != NULL);
     return string(s0->ptr(), s0->length());
+}
+*/
+/*
+static void addToList(List<Item> & lst, vector<Item *> & vec) {
+    for (Item * it : vec) {
+	assert(it != NULL);
+	lst.push_back(it);
+    }
 }
 */
 /******************************************************/
@@ -288,7 +318,12 @@ encrypt_item(Item * i, Analysis & a){
     if (o == oPLAIN) {
         return i;
     } else {
-        return encrypt_item_layers(i, fm->onions[o]->layers, a, fm);
+	auto it = a.salts.find(fm);
+	salt_type IV = 0;
+	if (it != a.salts.end()) {
+	    IV = it->second;
+	}
+        return encrypt_item_layers(i, fm->onions[o]->layers, a, fm, IV);
     }
 }
 
@@ -414,6 +449,7 @@ class CItemTypeDir : public CItemType {
         lookup(i)->do_rewrite_insert(i, a, l, fm);
     }
 
+
  protected:
     virtual CItemType *lookup(Item *i) const = 0;
 
@@ -483,15 +519,60 @@ enforce(Item *i, const constraints &tr, Analysis & a)
     return itemTypes.do_enforce(i, tr, a);
 }
 
+static EncSet
+fieldEncSet(FieldMeta * fm) {
+    OnionLevelFieldMap osl = map<onion, LevelFieldPair>();
+
+    for (auto it: fm->encdesc.olm) {
+	osl[it.first] = LevelFieldPair(it.second, fm);
+    }
+    return EncSet(osl);
+}
+
+
+//TODO:
+//should be able to support general updates such as
+// UPDATE table SET x = 2, y = y + 1, z = y+2, z =z +1, w = y, l = x
+// this has a few corner cases, since y can only use HOM
+// onion so does w, but not l
+
+//analyzes an expression of the form field = val expression from
+// an UPDATE
+static inline void
+analyze_update(Item_field * field, Item * val, Analysis & a) {
+
+    string tname = field->table_name;
+    string fname = field->field_name;
+    FieldMeta * fm = a.schema->getFieldMeta(tname, fname);
+    	
+    EncSet e(gather(val, constraints(fieldEncSet(fm), "update", val, 0, false), a));
+
+    //updates fieldAMeta to contain onions that can be updated and their levels
+    EncDesc ed = e.encdesc();
+
+    cerr << "encdesc gathered is " << ed << "\n";
+
+    auto it = a.fieldToAMeta.find(fm); 
+    if (it == a.fieldToAMeta.end()) {
+	a.fieldToAMeta[fm] = new FieldAMeta(ed.intersect(fm->encdesc));
+	cerr << "after intersection with " << fm->encdesc << ": " << a.fieldToAMeta[fm]->exposedLevels << "\n";
+    } else {
+	it->second->exposedLevels = it->second->exposedLevels.intersect(ed);
+	assert_s(it->second->exposedLevels.olm.size() > 0,
+		 "CryptDB's encryption schemes cannot support such update");
+	cerr << "intersecting with already exposed levels to " << it->second->exposedLevels << "\n";
+    }
+
+    //TODO: an optimization could be performed here to support more updates
+    // For example: SET x = x+1, x = 2 --> no need to invalidate DET and OPE
+    // onions because first SET does not matter
+}
+
 static inline void
 analyze(Item *i, const constraints &tr, Analysis & a)
 {
     cerr << "before analyze \n";
-    if (i == NULL) {
-        LOG(cdb_v) << "item is null which sucks";
-    } else {
-        LOG(cdb_v) << "item is not null which should not seg fault";
-    }
+    assert(i != NULL);
     LOG(cdb_v) << "calling gather for item " << i << " tr " << tr << "\n";
     EncSet e(gather(i, tr, a));
     LOG(cdb_v) << "choosing one for item " << i << " out of encset " << e << "\n";
@@ -532,7 +613,6 @@ template <class T>
 static Item *
 do_optimize_const_item(T *i, Analysis &a) {
    
-
     if (i->const_item()) {
         // ask embedded DB to eval this const item,
         // then replace this item with the eval-ed constant
@@ -770,13 +850,6 @@ static void rewrite_select_lex(st_select_lex *select_lex, Analysis & a);
 
 static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
-    inline string extract_fieldname(Item_field *i) const
-    {
-        stringstream fieldtemp;
-        fieldtemp << *i;
-        return fieldtemp.str();
-    }
-
     virtual EncSet do_gather_type(Item_field *i, const constraints &tr, Analysis & a) const {
         LOG(cdb_v) << "CItemSubtypeIT (L730) do_gather " << *i;
 
@@ -840,16 +913,14 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         }
         auto encpair = tr.encset.extract_singleton();
 
-        string fieldname = extract_fieldname(i);
-        auto it = a.fieldToAMeta.find(fieldname);
-
 	FieldMeta *fm = a.schema->getFieldMeta(i->table_name, i->field_name);
+        auto it = a.fieldToAMeta.find(fm);
 	
 	if (it == a.fieldToAMeta.end()) {
 	    // bootstrap a new FieldAMeta from the FieldMeta's encdesc
-	    a.fieldToAMeta[fieldname] = new FieldAMeta(fm->encdesc);
+	    a.fieldToAMeta[fm] = new FieldAMeta(fm->encdesc);
 	    a.itemToFieldMeta[i]      = fm;
-	    it = a.fieldToAMeta.find(fieldname);
+	    it = a.fieldToAMeta.find(fm);
         }
 	
         bool restricted = it->second->exposedLevels.restrict(encpair.first,
@@ -858,7 +929,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 	    recordAdjustments(fm, i, encpair.first, encpair.second.first, a);
 	}
 
-        LOG(cdb_v) << "ENCSET FOR FIELD " << fieldname << " is " << a.fieldToAMeta[fieldname]->exposedLevels;
+        LOG(cdb_v) << "ENCSET FOR FIELD " << i->field << " is " << a.fieldToAMeta[fm]->exposedLevels;
         record_item_meta_for_constraints(i, tr, a);
     }
 
@@ -886,18 +957,6 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
             a.itemHasRewrite.insert(i);
         }
         return i;
-    }
-
-    inline Item_field * make_from_template(Item_field *t, const char *name) const
-    {
-        THD *thd = current_thd;
-        assert(thd);
-        // bootstrap i0 from t
-        Item_field *i0 = new Item_field(thd, t);
-        // clear out alias
-        i0->name = NULL;
-        i0->field_name = thd->strdup(name);
-        return i0;
     }
 
     virtual void
@@ -1893,7 +1952,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
 	FieldMeta * fm = im->basefield;
 	EncLayer * el = getAssert(fm->onions, oAGG)->layers.back();
 	assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
-	return ((HOM *)el)->sumUDF(i->get_arg(0));
+	return ((HOM *)el)->sumUDA(i->get_arg(0));
     }
 };
 
@@ -2003,19 +2062,9 @@ optimize_select_lex(st_select_lex *select_lex, Analysis & a)
         optimize(o->item, a);
 }
 
+//TODO: not clear how these process_*_lex and rewrite_*_lex overlap, cleanup
 static void
-process_select_lex(st_select_lex *select_lex, const constraints &tr, Analysis & a)
-{
-    //select clause
-    auto item_it = List_iterator<Item>(select_lex->item_list);
-    for (;;) {
-        Item *item = item_it++;
-        if (!item)
-            break;
-
-        analyze(item, tr, a);
-    }
-
+process_filters_lex(st_select_lex * select_lex, const constraints & tr, Analysis & a) {
     if (select_lex->where)
         analyze(select_lex->where, constraints(FULL_EncSet, "where", select_lex->where, 0), a);
 
@@ -2043,6 +2092,44 @@ process_select_lex(st_select_lex *select_lex, const constraints &tr, Analysis & 
                                       "order", *o->item, 0, select_lex->select_limit ? false : true), a);
 }
 
+
+static void
+process_select_lex(st_select_lex *select_lex, const constraints &tr, Analysis & a)
+{
+    //select clause
+    auto item_it = List_iterator<Item>(select_lex->item_list);
+    for (;;) {
+        Item *item = item_it++;
+        if (!item)
+            break;
+
+        analyze(item, tr, a);
+    }
+
+    process_filters_lex(select_lex, tr, a);
+}
+
+
+static void
+rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
+    if (select_lex->where)
+        rewrite(&select_lex->where, a);
+
+    if (select_lex->join &&
+        select_lex->join->conds &&
+        select_lex->where != select_lex->join->conds)
+        rewrite(&select_lex->join->conds, a);
+
+    if (select_lex->having)
+        rewrite(&select_lex->having, a);
+
+    for (ORDER *o = select_lex->group_list.first; o; o = o->next)
+        rewrite(o->item, a);
+
+    for (ORDER *o = select_lex->order_list.first; o; o = o->next)
+        rewrite(o->item, a);  
+}
+
 // TODO: template this
 static void
 rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
@@ -2067,23 +2154,7 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
     // TODO(stephentu): investigate whether or not this is a memory leak
     select_lex->item_list = newList;
 
-    if (select_lex->where)
-        rewrite(&select_lex->where, a);
-
-    if (select_lex->join &&
-        select_lex->join->conds &&
-        select_lex->where != select_lex->join->conds)
-        rewrite(&select_lex->join->conds, a);
-
-    if (select_lex->having)
-        rewrite(&select_lex->having, a);
-
-    for (ORDER *o = select_lex->group_list.first; o; o = o->next)
-        rewrite(o->item, a);
-
-    for (ORDER *o = select_lex->order_list.first; o; o = o->next)
-        rewrite(o->item, a);
-
+    rewrite_filters_lex(select_lex, a);
 }
 
 static void
@@ -2205,6 +2276,7 @@ static void
 init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf, onionlayout ol) {
     for (auto it: ol) {
         onion o = it.first;
+	cerr << "create onion " << o << "\n";
         OnionMeta * om = new OnionMeta();
 
         //anonymize onion name
@@ -2220,6 +2292,7 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
         //set outer layer
         fm->encdesc.olm[o] = it.second.back(); 
     }
+    cerr << "fm has encdesc after create: " << fm->encdesc << "\n";
 }
 
 static void
@@ -2413,7 +2486,7 @@ rewrite_create_lex(LEX *lex, Analysis &a)
         lex->alter_info.key_list = newList0;
     }
 }
-/*
+
 static void
 mp_update_init(LEX *lex, Analysis &a)
 {
@@ -2430,79 +2503,108 @@ mp_update_init(LEX *lex, Analysis &a)
 	    } 
     }
 }
-*/
-/*
+
 static void
 rewrite_update_lex(LEX *lex, Analysis &a)
 {
+    LOG(cdb_v) << "rewriting update \n";
+    
     assert_s(lex->select_lex.item_list.head(), "update needs to have item_list");
 
     mp_update_init(lex, a);
 
-    //rewrite table name
+    // Rewrite table name
+
     rewrite_table_list(lex->select_lex.table_list.first, a);
 
-    // fields
-    vector<FieldMeta *> fmVec;
-    if (lex->select_lex.item_list.head()) {
-        auto it = List_iterator<Item>(lex->select_lex.item_list);
-        List<Item> newList;
-        for (;;) {
-            Item *i = it++;
-            if (!i)
-                break;
-            assert(i->type() == Item::FIELD_ITEM);
-            Item_field *ifd = static_cast<Item_field*>(i);
-            fmVec.push_back(a.schema->getFieldMeta(ifd->table_name, ifd->field_name));
-            vector<Item *> l;
-            itemTypes.do_rewrite_insert(i, a, l, NULL);
-            LOG(cdb_v) << "fields";
-            for (auto it0 = l.begin(); it0 != l.end(); ++it0) {
-                //LOG(cdb_v) << **it0;
-                newList.push_back(*it0);
-            }
-        }
-        lex->select_lex.item_list = newList;
+    // Rewrite SET values
+    
+    assert(lex->select_lex.item_list.head());
+    assert(lex->value_list.head());
+
+    List<Item> res_items, res_vals;
+    
+    auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
+    auto val_it = List_iterator<Item>(lex->value_list);
+
+    // Look through all pairs in set: fd = val
+    for (;;) {
+	Item * i = fd_it++;
+	if (!i) {
+	    break;
+	}
+	assert(i->type() == Item::FIELD_ITEM);
+	Item_field * fd = static_cast<Item_field*>(i);
+	
+	Item * val = val_it++;
+	assert(val != NULL);
+
+	cerr << "fd->table and field " << fd->table_name << fd->field_name << "\n";
+	FieldMeta * fm = a.schema->getFieldMeta(fd->table_name, fd->field_name);
+	assert(fm);
+	FieldAMeta * fam = getAssert(a.fieldToAMeta, fm);
+	assert(fam);
+
+
+	// Determine salt for field
+	if (fm->has_salt) {
+	    auto it_salt = a.salts.find(fm);
+	    if (it_salt == a.salts.end()) {
+		salt_type salt = randomValue(); 
+		a.salts[fm] = salt;
+	    } 
+	}
+
+	
+	EncDesc ed = fam->exposedLevels;
+
+	cerr << "will encrypt " << val << " with encdesc " << ed << "\n";
+
+	Item * new_fd, * new_val;
+
+	assert(ed.olm.size() > 0);
+	
+	// Rewrite field-value pair for every onion possible
+	for (auto ed_it : ed.olm) {
+	    EncSet e = {
+		{
+		    {ed_it.first, LevelFieldPair(ed_it.second, fm)}
+		}  
+	    };
+
+	    //make copies of original to avoid changing original
+	    new_fd = new Item_field(current_thd, fd);
+	    new_val = val->clone_item();
+	    assert_s(new_val, "cannot clone item because it is not a constant item");
+	    
+	    enforce(new_fd, constraints(e, "update", new_fd, 0, false), a);
+	    enforce(new_val, constraints(e, "update", new_val, 0, false), a);
+
+	    rewrite(&new_fd, a);
+	    res_items.push_back(new_fd);
+	    rewrite(&new_val, a);
+	    res_vals.push_back(new_val);
+	}
+
+        // Add the salt field
+	if (fm->has_salt) {
+	    salt_type salt = a.salts[fm];
+	    res_items.push_back(make_from_template((Item_field *)new_fd, fm->salt_name.c_str()));
+	    res_vals.push_back(new Item_int((ulonglong) salt));
+	} 
+    	
     }
 
-    if (fmVec.empty()) {
-        LOG(warn) << "NO FIELDS TO UPDATE IN UPDATE";
-        return;
-    }
+    //TODO: cleanup old item and value list
+    
+    lex->select_lex.item_list = res_items;
+    lex->value_list = res_vals;
 
-    // values
-    if (lex->value_list.head()) {
-        auto it = List_iterator<Item>(lex->value_list);
-        List<Item> newList;
-        auto fmVecIt = fmVec.begin();
-        for (;;) {
-            Item *i = it++;
-            if (!i)
-                break;
-            vector<Item *> l;
-            itemTypes.do_rewrite_insert(i, a, l, *fmVecIt);
-            LOG(cdb_v) << "values";
-            for (auto it1 = l.begin(); it1 != l.end(); ++it1) {
-                newList.push_back(*it1);
-                //LOG(cdb_v) << **it1;
-            }
-            ++fmVecIt;
-        }
-        lex->value_list = newList;
-    }
-
-    if (lex->select_lex.where)
-        rewrite(&lex->select_lex.where, a);
-
-    if (lex->select_lex.join &&
-        lex->select_lex.join->conds &&
-        lex->select_lex.where != lex->select_lex.join->conds)
-        rewrite(&lex->select_lex.join->conds, a);
-
-    if (lex->select_lex.having)
-        rewrite(&lex->select_lex.having, a);
+    // Rewrite filters
+    rewrite_filters_lex(&lex->select_lex, a);
+    
 }
-*/
+
 static void
 mp_insert_init(LEX *lex, Analysis &a)
 {
@@ -2590,6 +2692,36 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
 }
 
 static void
+process_update_lex(LEX * lex, Analysis & a) {
+    cerr << "do_query_analyze UPDATE \n";
+  
+    if (lex->select_lex.item_list.head()) {
+	assert(lex->value_list.head());
+	
+	auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
+	auto val_it = List_iterator<Item>(lex->value_list);
+	
+        for (;;) {
+            Item *i = fd_it++;
+	    Item * val = val_it++;
+	    if (!i)
+                break;
+	    assert(val != NULL);
+	    assert(i->type() == Item::FIELD_ITEM);
+	    Item_field *ifd = static_cast<Item_field*>(i);
+	    cerr << "before analyze encdesc is " << a.schema->getFieldMeta(ifd->table_name, ifd->field_name)->encdesc << "\n";
+	    analyze_update(ifd, val, a);
+	    cerr << "field name " << ifd->field_name << "\n";
+	}
+    }
+
+    process_filters_lex(&lex->select_lex,
+			constraints(FULL_EncSet,"update", 0, 0),
+			a);
+
+
+}
+static void
 do_query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault) {
     // iterate over the entire select statement..
     // based on st_select_lex::print in mysql-server/sql/sql_select.cc
@@ -2602,23 +2734,20 @@ do_query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encB
 
     process_table_list(&lex->select_lex.top_join_list, analysis);
 
+    if (lex->sql_command == SQLCOM_UPDATE) {
+	process_update_lex(lex, analysis);
+	return;
+    }
+    
     process_select_lex(&lex->select_lex,
             constraints(
                     lex->sql_command == SQLCOM_SELECT ? FULL_EncSet
                     : EMPTY_EncSet,
                     "select", 0, 0, true), analysis);
 
-    if (lex->sql_command == SQLCOM_UPDATE) {
-        auto item_it = List_iterator<Item>(lex->value_list);
-        for (;;) {
-            Item *item = item_it++;
-            if (!item)
-                break;
-
-            analyze(item, constraints(FULL_EncSet, "update", item, 0, false), analysis);
-        }
-    }
+    
 }
+
 
 /*
  * Analyzes how to encrypt and rewrite items in a query.
@@ -2661,10 +2790,9 @@ lex_rewrite(LEX * lex, Analysis & analysis)
     case SQLCOM_DROP_TABLE:
         rewrite_table_list(&lex->select_lex.table_list, analysis);
         break;
-/*    case SQLCOM_UPDATE:
+    case SQLCOM_UPDATE:
         rewrite_update_lex(lex, analysis);
 	break;
-	*/
     case SQLCOM_DELETE:
 	rewrite_table_list(lex->query_tables, analysis);
 	rewrite_select_lex(&lex->select_lex, analysis);
@@ -2780,6 +2908,8 @@ add_table_update_meta(const string &q,
     a.e_conn->execute("COMMIT");
 }
 
+//TODO: potential inconsistency problem because we update state,
+//but only the proxy is responsible for 
 static void
 updateMeta(const string & q, LEX * lex, Analysis & a)
 {

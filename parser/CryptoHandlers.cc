@@ -641,13 +641,19 @@ udf_func s_HomSubUdfFunc = {
 
 
 Item *
-HOM::sumUDF(Item * expr, const string &k) {
+HOM::sumUDA(Item * expr, const string &k) {
     setKey(k);
     List<Item> l;
     l.push_back(expr);
     l.push_back(ZZToItemStr(sk.hompubkey()));
     unSetKey(k);
     return new Item_func_udf_str(&u_sum, l);
+}
+
+Item *
+HOM::sumUDF(Item * expr, const string &k) {
+    cerr << "sum udf not implemented\n";
+    return NULL;
 }
 
 /******* SEARCH **************************/

@@ -113,7 +113,7 @@ main(int ac, char **av)
         } catch (std::runtime_error &e) {
             cout << "Unexpected Error: " << e.what() << " in query " << q << endl;
         } catch (CryptDBError &e) {
-            cout << "Interal Error: " << e.msg << " in query " << q << endl;
+            cout << "Internal Error: " << e.msg << " in query " << q << endl;
         }
     }
 }

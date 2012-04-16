@@ -28,12 +28,14 @@ typedef std::map<onion, SECLEVEL>        OnionLevelMap;
  */
 class EncDesc {
 public:
+    EncDesc() : layout(NULL) {}
     EncDesc(OnionLevelMap input) : olm(input) {}
     EncDesc(const EncDesc & ed) : olm(ed.olm) {}
     /**
      * Returns true if something was changed, false otherwise.
      */
     bool restrict(onion o, SECLEVEL maxl);
+    EncDesc intersect(EncDesc & ed);
 
     OnionLevelMap olm;
     onionlayout * layout; 
