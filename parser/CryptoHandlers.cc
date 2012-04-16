@@ -12,7 +12,7 @@ using namespace NTL;
 //TODO: remove above newcreatefield
 static Create_field*
 createFieldHelper(const Create_field *f, int field_length,
-		  enum enum_field_types type,
+		  enum enum_field_types type, string anonname = "",
 		  CHARSET_INFO * charset = NULL) {
     THD *thd = current_thd;
     Create_field *f0 = f->clone(thd->mem_root);
@@ -27,6 +27,11 @@ createFieldHelper(const Create_field *f, int field_length,
 	//encryption is always unsigned
 	f0->flags = f0->flags | UNSIGNED_FLAG; 
     }
+
+    if (anonname.size() > 0) {
+	f0->field_name = make_thd_string(anonname);
+    }
+    
     return f0;
 }
 
@@ -54,8 +59,8 @@ RND_int::RND_int(Create_field * f, PRNG * prng)
 
 
 Create_field *
-RND_int::newCreateField() {
-    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG);
+RND_int::newCreateField(string anonname) {
+    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
 }
 
 void
@@ -144,9 +149,9 @@ RND_str::RND_str(Create_field * f, PRNG * key)
 }
 
 Create_field *
-RND_str::newCreateField() {
+RND_str::newCreateField(string anonname) {
 //TODO: use more precise sizes and types
-    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB);
+    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname);
 }
 
 void
@@ -232,8 +237,8 @@ DET_int::DET_int(Create_field * f, PRNG * prng)
 }
 
 Create_field *
-DET_int::newCreateField() {
-    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG);
+DET_int::newCreateField(string anonname) {
+    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
 }
 
 void
@@ -320,9 +325,9 @@ DET_str::DET_str(Create_field * f, PRNG * key)
 
 
 Create_field *
-DET_str::newCreateField() {
+DET_str::newCreateField(string anonname) {
 //TODO: use more precise sizes and types
-    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB);
+    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname);
 }
 
 void
@@ -416,8 +421,8 @@ OPE_int::OPE_int(Create_field * f, PRNG * prng)
 }
 
 Create_field *
-OPE_int::newCreateField() {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG);
+OPE_int::newCreateField(string anonname) {
+    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname);
 }
 
 void
@@ -468,8 +473,8 @@ OPE_str::OPE_str(Create_field * f, PRNG * prng)
 }
 
 Create_field *
-OPE_str::newCreateField() {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG);
+OPE_str::newCreateField(string anonname) {
+    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname);
 }
 
 void
@@ -519,8 +524,8 @@ HOM::HOM(Create_field * f, PRNG * key)
 }
 
 Create_field *
-HOM::newCreateField() {
-    return createFieldHelper(cf, 2*nbits/8, MYSQL_TYPE_VARCHAR, &my_charset_bin);
+HOM::newCreateField(string anonname) {
+    return createFieldHelper(cf, 2*nbits/8, MYSQL_TYPE_VARCHAR, anonname, &my_charset_bin);
 }
 
 static ZZ
@@ -646,8 +651,8 @@ Search::Search(Create_field * f, PRNG * key)
 }
 
 Create_field *
-Search::newCreateField() {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB);
+Search::newCreateField(string anonname) {
+    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname);
 }
 
 

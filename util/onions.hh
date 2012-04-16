@@ -56,6 +56,10 @@ SECLEVELS(__temp_m)
 //Onion layouts - initial structure of onions
 typedef std::map<onion, std::list<SECLEVEL> > onionlayout;
 
+static onionlayout PLAIN_ONION_LAYOUT = {
+    {oPLAIN, std::list<SECLEVEL>({SECLEVEL::PLAINVAL})}
+};
+
 static onionlayout NUM_ONION_LAYOUT = {
     {oDET, std::list<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
     {oOPE, std::list<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
@@ -80,7 +84,7 @@ typedef std::map<onion, SECLEVEL>  OnionLevelMap;
  */
 class EncDesc {
 public:
-    EncDesc() : layout(NULL) {}
+    EncDesc() {}
     EncDesc(OnionLevelMap input) : olm(input) {}
     EncDesc(const EncDesc & ed) : olm(ed.olm) {}
     /**
@@ -88,9 +92,9 @@ public:
      */
     bool restrict(onion o, SECLEVEL maxl);
     EncDesc intersect(EncDesc & ed);
-
+    void clear() {olm.clear();};
+    
     OnionLevelMap olm;
-    onionlayout * layout; 
 };
 
 

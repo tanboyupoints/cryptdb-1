@@ -65,7 +65,10 @@ typedef struct FieldMeta {
     }
 
     std::string stringify();
-    
+
+    inline bool isEncrypted() {
+	return ((onions.size() != 1) ||  (onions.find(oPLAIN) == onions.end()));
+    }
 } FieldMeta;
 
 

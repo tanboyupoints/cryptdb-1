@@ -63,12 +63,15 @@ EncSet::chooseOne() const
         oSWP,
 	oPLAIN, 
     };
+
     static size_t onion_size = sizeof(onion_order) / sizeof(onion_order[0]);
     for (size_t i = 0; i < onion_size; i++) {
         auto it = osl.find(onion_order[i]);
         if (it != osl.end()) {
             OnionLevelFieldMap m;
+	    onion o = onion_order[i];
             m[onion_order[i]] = it->second;
+	    LOG(cdb_v) << "choosing one from " << this << " : onion " << o << " level " << levelnames[(int)m[o].first];
             return EncSet(m);
         }
     }

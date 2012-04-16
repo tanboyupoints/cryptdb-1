@@ -28,7 +28,7 @@ class EncLayer {
     EncLayer(Create_field * f) : cf(f) {}
 
     virtual SECLEVEL level() = 0;
-    virtual Create_field * newCreateField() = 0;
+    virtual Create_field * newCreateField(std::string anonname = "") = 0;
     
     virtual Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "") = 0;
     virtual Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "") = 0;
@@ -59,7 +59,7 @@ public:
     RND_int(Create_field *, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::RND;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
     
     Item * encrypt(Item * ptext, uint64_t IV, const std::string &k = "");
     Item * decrypt(Item * ctext, uint64_t IV, const std::string &k = "");
@@ -80,7 +80,7 @@ public:
     RND_str(Create_field *, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::RND;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
     
     Item * encrypt(Item * ptext, uint64_t IV, const std::string &k = "");
     Item * decrypt(Item * ctext, uint64_t IV, const std::string &k = "");
@@ -101,7 +101,7 @@ public:
     DET_int(Create_field *, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::DET;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "");
     Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "");
@@ -122,7 +122,7 @@ public:
     DET_str(Create_field *, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::DET;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
     
     Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "");
     Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "");
@@ -145,7 +145,7 @@ public:
     DETJOIN(Create_field * cf, PRNG * key) : EncLayer(cf) {}
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
-    Create_field * newCreateField() {return cf;}
+    Create_field * newCreateField(std::string anonname = "") {return cf;}
     
     //TODO: DETJOIN for multi
     Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
@@ -165,7 +165,7 @@ public:
     OPE_int(Create_field *, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::OPE;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
 
     Item * encrypt(Item * p, uint64_t IV, const std::string &k = "");
     Item * decrypt(Item * c, uint64_t IV, const std::string &k = "");
@@ -187,7 +187,7 @@ public:
     OPE_str(Create_field *, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::OPE;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
 
     Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
     Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = "")__attribute__((noreturn));
@@ -209,7 +209,7 @@ public:
     HOM(Create_field * cf, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::HOM;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
 
     //TODO needs multi encrypt and decrypt
     Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
@@ -231,7 +231,7 @@ public:
     Search(Create_field * cf, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::SEARCH;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "");
     Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "")__attribute__((noreturn));

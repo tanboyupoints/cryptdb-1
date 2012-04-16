@@ -7,6 +7,7 @@
 #include <parser/stringify.hh>
 #include <edb/MultiPrinc.hh>
 //#include <util/schema.hh>
+#include <util/cryptdb_log.hh>
 
 using namespace std;
 
@@ -45,13 +46,15 @@ public:
 
 const EncSet EQ_EncSet = {
         {
-            {oDET, LevelFieldPair(SECLEVEL::DET, NULL)},
-            {oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
+	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+            {oDET,   LevelFieldPair(SECLEVEL::DET, NULL)},
+            {oOPE,   LevelFieldPair(SECLEVEL::OPE, NULL)},
         }
 };
 
 const EncSet ORD_EncSet = {
     {
+	{oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
 	{oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
     }
 };
@@ -65,6 +68,7 @@ const EncSet PLAIN_EncSet = {
 //todo: there should be a map of FULL_EncSets depending on item type
 const EncSet FULL_EncSet = {
         {
+	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
             {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
             {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
             {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
@@ -74,12 +78,14 @@ const EncSet FULL_EncSet = {
 
 const EncSet Search_EncSet = {
         {
+	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
             {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
         }
 };
 
 const EncSet ADD_EncSet = {
         {
+	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
             {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
         }
 };

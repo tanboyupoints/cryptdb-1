@@ -36,13 +36,9 @@ isTableField(string token)
 */
 
 string
-anonymizeTableName(unsigned int tableNo, string tableName, bool multiPrinc)
+anonymizeTableName(unsigned int tableNo, string tableName)
 {
-    if (!multiPrinc) {
-        return string("table") + strFromVal((uint32_t)tableNo);
-    } else {
-        return tableName;
-    }
+    return string("table") + strFromVal((uint32_t)tableNo);
 }
 
 string
@@ -50,6 +46,8 @@ anonymizeFieldName(unsigned int index, onion o, string origname, bool multiPrinc
 {
     
     switch (o) {
+    case oPLAIN:
+	return origname;
     case oDET: {
         if (multiPrinc) {
             return origname + "DET";

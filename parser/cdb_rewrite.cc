@@ -265,7 +265,13 @@ addSaltToReturn(ReturnMeta & rm, int pos) {
 
 //TODO: which encrypt/decrypt should handle null?
 static Item *
-encrypt_item_layers(Item * i, list<EncLayer *> & layers, Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0) {
+encrypt_item_layers(Item * i, onion o, list<EncLayer *> & layers, Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0) {
+    if (o == oPLAIN) {//Unencrypted item
+	return i;
+    }
+
+    // Encrypted item
+
     assert_s(layers.size() > 0, "field must have at least one layer");
     Item * enc = i;
     Item * prev_enc = NULL;
@@ -289,7 +295,14 @@ encrypt_item_layers(Item * i, list<EncLayer *> & layers, Analysis &a, FieldMeta 
 }
 
 static Item *
-decrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV, Analysis &a, FieldMeta *fm, const vector<Item *> &res) {
+decrypt_item_layers(Item * i, onion o,  list<EncLayer *> & layers, uint64_t IV, Analysis &a, FieldMeta *fm, const vector<Item *> &res) {
+
+    if (o == oPLAIN) {// Unencrypted item
+	return i;
+    }
+
+    // Encrypted item
+    
     Item * dec = i;
     Item * prev_dec = NULL;
 
@@ -318,29 +331,26 @@ decrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV, Analysis &
 // encrypts a constant item based on the information in a
 static Item *
 encrypt_item(Item * i, Analysis & a){
-    ItemMeta * im = getAssert(a.itemToMeta, i,
+   ItemMeta * im = getAssert(a.itemToMeta, i,
 			"there is no meta for item in analysis");
     FieldMeta * fm = im->basefield;
     onion o        = im->o;
     LOG(cdb_v) << fm->fname << " " << fm->onions.size();
 
-    if (o == oPLAIN || fm->onions.size() == 0) {
-        return i;
-    } else {
-        auto it = a.salts.find(fm);
-        salt_type IV = 0;
-        if (it != a.salts.end()) {
-            IV = it->second;
-        }
-        return encrypt_item_layers(i, fm->onions[o]->layers, a, fm, IV);
+    auto it = a.salts.find(fm);
+    salt_type IV = 0;
+    if (it != a.salts.end()) {
+	IV = it->second;
     }
+    return encrypt_item_layers(i, im->o, fm->onions[o]->layers, a, fm, IV);
 }
 
 static void
 encrypt_item_all_onions(Item * i, FieldMeta * fm,
                         uint64_t IV, vector<Item*> & l, Analysis &a) {
+    
     for (auto it : fm->onions) {
-        l.push_back(encrypt_item_layers(i, it.second->layers, a, fm, IV));
+        l.push_back(encrypt_item_layers(i, it.first, it.second->layers, a, fm, IV));
     }
 }
 
@@ -348,12 +358,7 @@ static Item *
 decrypt_item(ItemMeta * im, Item * i, uint64_t IV, Analysis &a, vector<Item *> &res) {
     FieldMeta * fm       = im->basefield;
     onion o              = im->o;
-
-    if (o == oPLAIN || fm->onions.size() == 0) {
-        return i;
-    } else {
-        return decrypt_item_layers(i, fm->onions[o]->layers, IV, a, fm, res);
-    }
+    return decrypt_item_layers(i, o, fm->onions[o]->layers, IV, a, fm, res);
 }
 
 /***********end of parser utils *****************/
@@ -577,11 +582,11 @@ static inline void
 analyze(Item *i, const constraints &tr, Analysis & a)
 {
     assert(i != NULL);
-    LOG(cdb_v) << "calling gather for item " << i << " tr " << tr << "\n";
+    LOG(cdb_v) << "calling gather for item " << *i << " tr " << tr << "\n";
     EncSet e(gather(i, tr, a));
-    LOG(cdb_v) << "choosing one for item " << i << " out of encset " << e << "\n";
+    LOG(cdb_v) << "choosing one for item " << *i << " out of encset " << e << "\n";
     e = e.chooseOne();
-    LOG(cdb_v) << "calling enforce for item " << i << " tr " << tr.clone_with(e) << "\n";
+    LOG(cdb_v) << "calling enforce for item " << *i << " tr " << tr.clone_with(e) << "\n";
     enforce(i, tr.clone_with(e), a);
 }
 
@@ -932,9 +937,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         FieldMeta *fm = a.schema->getFieldMeta(i->table_name, i->field_name);
 
         assert(tr.encset.empty() || tr.encset.singleton());
-        if (!fm->onions.size()) {
-            return;
-        }
+
         if (tr.encset.empty()) {
             throw runtime_error("bail out");
         }
@@ -963,14 +966,17 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     virtual Item *
     do_rewrite_type(Item_field *i, Analysis & a) const
     {
-        //TODO: easier to have a PLAIN onion than all these checks
-        FieldMeta * fm = a.schema->getFieldMeta(i->table_name, i->field_name);
-        if (!fm->onions.size()) {
-            return i;
-        }
         LOG(cdb_v) << "do_rewrite_type L806 " << *i;
         auto it = a.itemHasRewrite.find(i);
         if (it == a.itemHasRewrite.end()) {
+
+	    FieldMeta * fm = a.schema->getFieldMeta(i->table_name, i->field_name);
+	    if (!fm->isEncrypted()) {
+		return i;
+	    }
+	    
+	    // Encrypted item
+	    
             // fix table name
             const char * table = i->table_name;
             i->table_name = make_thd_string(anonymize_table_name(i->table_name, a));
@@ -1012,8 +1018,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
             addSaltToReturn(a.rmeta, a.pos++);
         }
     }
-    //TODO: maybe have plain onion for unencrypted field for cleanliness
-    // rather than ifs checking if onions.size() == 0
+
     virtual void
     do_rewrite_insert_type(Item_field *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
@@ -1074,13 +1079,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     do_rewrite_insert_type(Item_string *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
         LOG(cdb_v) << "do_rewrite_insert_type L880 " << *i;
-        
-        if (fm->onions.size() == 0) {//field is not encrypted
-            l.push_back(i);
-            return;
-        }
-
-        //field is encrypted
+       
         uint64_t salt = 0;
         if (fm->has_salt) {
             salt = randomValue();
@@ -1148,7 +1147,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
 
 	//encrypt for each onion
         for (auto it = fm->onions.begin(); it != fm->onions.end();it++) {
-            l.push_back(encrypt_item_layers(i, it->second->layers, a, fm, salt));
+            l.push_back(encrypt_item_layers(i, it->first, it->second->layers, a, fm, salt));
         }
 	
         if (fm->has_salt) {
@@ -2257,7 +2256,6 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
 static inline void
 rewrite_table_list(TABLE_LIST *t, Analysis &a)
 {
-
     string anon_name = anonymize_table_name(string(t->table_name,
                                                    t->table_name_length), a);
     t->table_name = make_thd_string(anon_name, &t->table_name_length);
@@ -2293,41 +2291,49 @@ rewrite_table_list(List<TABLE_LIST> *tll, Analysis & a)
     }
 }
 
-/* Moved to CryptoManager
-static PRNG *
-getLayerKey(AES_KEY * mKey, string uniqueFieldName, SECLEVEL l) {
-    string rawkey = CryptoManager::getKey(mKey, uniqueFieldName, l);
-    urandom * key = new urandom();
-    key->seed_bytes(rawkey.length(), (uint8_t*)rawkey.data());
-    return key;
-}
-*/
-
+// If mkey == NULL, the field is not encrypted
 static void
 init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf, onionlayout ol) {
+
+    fm->onions.clear();
+    fm->encdesc.clear();
+    
     for (auto it: ol) {
         onion o = it.first;
         OnionMeta * om = new OnionMeta();
-
-        //anonymize onion name
-        om->onionname = anonymizeFieldName(index, o, fm->fname, false);
-        LOG(cdb_v) << "adding onion layer " << om->onionname << " for " << fm->fname;
-
-        //generate enclayers
-        for (auto l: it.second) {
-            PRNG * key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);
-            om->layers.push_back(EncLayerFactory::encLayer(l, cf, key));
-        }
         fm->onions[o] = om;
+	
+	om->onionname = anonymizeFieldName(index, o, fm->fname, false);
+	
+        if (mKey) { 
+	    //generate enclayers for encrypted field
+	    for (auto l: it.second) {
+		PRNG * key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);
+		om->layers.push_back(EncLayerFactory::encLayer(l, cf, key));
+	    }
+	}
+	
+        LOG(cdb_v) << "adding onion layer " << om->onionname << " for " << fm->fname;
 	
         //set outer layer
         fm->encdesc.olm[o] = it.second.back(); 
     }
-    cerr << "fm has encdesc after create: " << fm->encdesc << "\n";
 }
 
 static void
-init_onions(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf) {
+init_onions(AES_KEY * mKey, FieldMeta * fm, Create_field * cf, uint index = 0) {
+    if (!mKey) {
+	// unencrypted field
+	init_onions_layout(NULL, fm, 0, cf, PLAIN_ONION_LAYOUT);
+	fm->has_salt = false;
+	return;
+    }
+
+    // Encrypted field
+
+    fm->has_salt = true;
+    fm->salt_name = getFieldSalt(index, fm->tm->anonTableName);
+	    
     if (IsMySQLTypeNumeric(cf->sql_type)) {
         init_onions_layout(mKey, fm, index, cf, NUM_ONION_LAYOUT);
     } else {
@@ -2337,7 +2343,7 @@ init_onions(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf) {
 
 //XXX temporary hack until I've worked out how to set the AGG key in mp
 static void
-init_onions_mp(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf) {
+init_onions_mp(AES_KEY * mKey, FieldMeta * fm, Create_field * cf, uint index) {
     if (IsMySQLTypeNumeric(cf->sql_type)) {
         init_onions_layout(mKey, fm, index, cf, MP_NUM_ONION_LAYOUT);
     } else {
@@ -2346,35 +2352,43 @@ init_onions_mp(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf) {
 }
 
 static void
-add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
-    assert(lex->sql_command == SQLCOM_CREATE_TABLE);
-
+check_table_not_exists(Analysis & a, LEX * lex, string table) {
     auto it = a.schema->tableMetaMap.find(table);
     if (it != a.schema->tableMetaMap.end()) {
         if (!(lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS)) {
             LOG(warn) << "ERROR: Table exists. Embedded DB possibly"
-                    "out of sync with regular DB (or, just programmer error)";
+		"out of sync with regular DB (or, just programmer error)";
         }
         return;
     }
+}
+
+static void
+add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
+    assert(lex->sql_command == SQLCOM_CREATE_TABLE);
+
+    check_table_not_exists(a, lex, table);
 
     TableMeta *tm = new TableMeta();
-    LOG(cdb_v) << "adding " << table << " to schema->tableMetaMap";
     a.schema->tableMetaMap[table] = tm;
 
-    // XXX this seems disasterous: if tables A and B are created, A is dropped,
-    // and C is created, C will use the same tableNo as B.  we should just use
-    // an auto_increment field in proxy_db.table_info.
-    tm->tableNo = a.schema->totalTables++;
-    tm->anonTableName = anonymizeTableName(tm->tableNo, table, !encByDefault);
-
+    if (encByDefault) { //anonymize name
+	// such increment may cause problem with multiple proxies
+	tm->tableNo = a.schema->totalTables++;
+	tm->anonTableName = anonymizeTableName(tm->tableNo, table);
+    } else {
+	tm->anonTableName = table;
+    }
+    
     uint index =  0;
     for (auto it = List_iterator<Create_field>(lex->alter_info.create_list);;) {
         Create_field * field = it++;
+
         if (!field) {
             break;
         }
-        FieldMeta * fm = new FieldMeta();
+
+	FieldMeta * fm = new FieldMeta();
 
         fm->tm            = tm;
         fm->sql_field     = field->clone(current_thd->mem_root);
@@ -2382,22 +2396,19 @@ add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
         fm->index         = index;
 
         if (encByDefault) { 
-            init_onions(a.masterKey, fm, index, field);
-            
-            fm->has_salt = true;
-            fm->salt_name = getFieldSalt(index, tm->anonTableName);
+            init_onions(a.masterKey, fm, field, index);            
         } else {
-            fm->has_salt = false;
+	    init_onions(NULL, fm, field);
         }
-
         
         assert(tm->fieldMetaMap.find(fm->fname) == tm->fieldMetaMap.end());
         tm->fieldMetaMap[fm->fname] = fm;
-        tm->fieldNames.push_back(fm->fname);
+        tm->fieldNames.push_back(fm->fname);//TODO: do we need fieldNames?
 
         index++;
         
     }
+
 }
 
 //TODO: no need to pass create_field to this
@@ -2410,6 +2421,14 @@ static void rewrite_create_field(const string &table_name,
     
     FieldMeta *fm = a.schema->getFieldMeta(table_name, f->field_name);
 
+    if (!fm->isEncrypted()) {
+	// Unencrypted field
+	l.push_back(f);
+	return;
+    }
+
+    // Encrypted field
+    
     //check if field is not encrypted
     if (fm->onions.empty()) {
         l.push_back(f);
@@ -2422,10 +2441,9 @@ static void rewrite_create_field(const string &table_name,
          oit != fm->onions.end();
          ++oit) {
 	EncLayer * last_layer = oit->second->layers.back();
-	Create_field * new_cf = last_layer->newCreateField();
+	//create field with anonymous name
+	Create_field * new_cf = last_layer->newCreateField(oit->second->onionname.c_str());
 		
-	//use anonymous onionname
-	new_cf->field_name = oit->second->onionname.c_str();
         l.push_back(new_cf);
     }
 
@@ -3323,28 +3341,18 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
     }
     
     //TODO: use EncLayer CreateField information
-    assert_s(annot.type == SINGLE_ENC || annot.type == ENCFOR, "parser is in single principal mode, but annotations are for multiple principals");
-    assert_s(annot.getPrimitive() != "", "enc annotation has no primitive");
+    assert_s(annot.type == SINGLE_ENC || annot.type == ENCFOR,
+	     "parser is in single principal mode, but annotations are for multiple principals");
+    assert_s(annot.getPrimitive() != "",
+	     "enc annotation has no primitive");
     LOG(cdb_v) << "table is " << annot.getPrimitiveTableName() << "; field is " << annot.getPrimitiveFieldName();
-    TableMeta *tm = schema->tableMetaMap[annot.getPrimitiveTableName()];
-    FieldMeta *fm = tm->fieldMetaMap[annot.getPrimitiveFieldName()];
 
+    FieldMeta * fm = schema->getFieldMeta(annot.getPrimitiveTableName(), annot.getPrimitiveFieldName());
   
-    list<string> query_list;
-    string query = "ALTER TABLE " + tm->anonTableName;
-
-    bool numeric = IsMySQLTypeNumeric(fm->sql_field->sql_type);
-
-    if (numeric) {
-        fm->encdesc = NUM_initial_levels;
-    } else {
-        fm->encdesc = STR_initial_levels;
-    }
-    
     if (mp) {
-        init_onions_mp(a.masterKey, fm, fm->index, fm->sql_field);
+        init_onions_mp(a.masterKey, fm, fm->sql_field, fm->index);
     } else {
-        init_onions(a.masterKey, fm, fm->index, fm->sql_field);
+        init_onions(a.masterKey, fm, fm->sql_field, fm->index);
     }
 
     if (a.mp) {
@@ -3352,32 +3360,44 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
         return a.mp->processAnnotation(annot, encryptField, a.schema);
     }
     
+    list<string> query_list;
+    string onionname = "";
+
     for (auto pr : fm->encdesc.olm) {
-        fm->onions[pr.first]->onionname = anonymizeFieldName(fm->index, pr.first, fm->fname, true);
-        if (pr.first == oDET) {
-            LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets DET onion";
-            if (numeric) {
-                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onions[pr.first]->onionname + " " + TN_I64 + ";");
-            } else {
-                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onions[pr.first]->onionname + " " + TN_TEXT + ";");
-            }
-        } else if (pr.first == oOPE) {
-            LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets OPE onion";
-            query_list.push_back(query + " ADD " + fm->onions[pr.first]->onionname + " " + TN_I64 + " AFTER " + fm->onions[oDET]->onionname + ";");
-        } else if (pr.first == oAGG) {
-            LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets AGG onion";
-            query_list.push_back(query + " ADD " + fm->onions[pr.first]->onionname + " " + TN_HOM + " AFTER " + fm->onions[oOPE]->onionname + ";");
-        } else if (pr.first == oSWP) {
-            LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets SWP onion";
-            query_list.push_back(query + " ADD " + fm->onions[pr.first]->onionname + " " + TN_TEXT + " AFTER " + fm->onions[oOPE]->onionname + ";");
-        } else {
-            assert_s(false, "unknown onion type");
-        }
+	onion o = pr.first;
+	onionname = fm->onions[o]->onionname;
+	Create_field * cf = fm->onions[o]->layers.back()->newCreateField(onionname);
+		
+	stringstream query;
+	query << "ALTER TABLE " << fm->tm->anonTableName;
+	
+	switch (o) {
+	case oDET:
+	    LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets DET onion";
+	    query << " CHANGE " << fm->fname << " " <<  *cf << ";";
+	    break;
+	case oOPE:
+	    LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets OPE onion";
+            query << " ADD " << *cf << " AFTER " << fm->onions[oDET]->onionname << ";";
+	    break;
+	case oAGG: 
+	    LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets AGG onion";
+            query << " ADD " << *cf <<  " AFTER " << fm->onions[oOPE]->onionname << ";";
+	    break;
+	case oSWP:
+	    LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets SWP onion";
+            query << " ADD " << *cf << " AFTER " << fm->onions[oOPE]->onionname << ";";
+	    break;
+	default:
+	    assert_s(false, "unknown onion type");
+	}
+
+	query_list.push_back(query.str());
     }
 
-    fm->has_salt = true;
-    fm->salt_name = getFieldSalt(fm->index, tm->anonTableName);
-    query_list.push_back(query + " ADD " + fm->salt_name + " " + TN_SALT + " AFTER " + fm->onions.rbegin()->second->onionname + ";");
+    query_list.push_back("ALTER TABLE " + fm->tm->anonTableName  +
+			 " ADD " + fm->salt_name + " " + TN_SALT +
+			 " AFTER " + onionname + ";");
 
     return query_list;
 }
@@ -3408,7 +3428,8 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
     LEX *lex = p.lex();
 
     //login/logout command; nothing needs to be passed on
-    if ((lex->sql_command == SQLCOM_DELETE || lex->sql_command == SQLCOM_INSERT)  && analysis.mp && analysis.mp->checkPsswd(lex)){
+    if ((lex->sql_command == SQLCOM_DELETE || lex->sql_command == SQLCOM_INSERT)
+	&& analysis.mp && analysis.mp->checkPsswd(lex)){
 	LOG(cdb_v) << "login/logout " << *lex;
         return queries;
     }
