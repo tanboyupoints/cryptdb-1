@@ -288,13 +288,13 @@ decrypt_item_layers(Item * i, list<EncLayer *> & layers, uint64_t IV, Analysis &
 // encrypts a constant item based on the information in a
 static Item *
 encrypt_item(Item * i, Analysis & a){
-
     ItemMeta * im = getAssert(a.itemToMeta, i,
 			"there is no meta for item in analysis");
     FieldMeta * fm = im->basefield;
     onion o        = im->o;
+    LOG(cdb_v) << fm->fname << " " << fm->onions.size();
 
-    if (o == oPLAIN) {
+    if (o == oPLAIN || fm->onions.size() == 0) {
         return i;
     } else {
         return encrypt_item_layers(i, fm->onions[o]->layers, a, fm);
@@ -314,7 +314,7 @@ decrypt_item(ItemMeta * im, Item * i, uint64_t IV, Analysis &a, vector<Item *> &
     FieldMeta * fm       = im->basefield;
     onion o              = im->o;
 
-    if (o == oPLAIN) {
+    if (o == oPLAIN || fm->onions.size() == 0) {
         return i;
     } else {
         return decrypt_item_layers(i, fm->onions[o]->layers, IV, a, fm, res);
@@ -912,7 +912,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     virtual void
     do_rewrite_proj_type(Item_field *i, Analysis & a, vector<Item *> &l) const
     {
-        LOG(cdb_v) << "do_rewrite_proj_type (L855)";
+        LOG(cdb_v) << "do_rewrite_proj_type";
         //rewrite current projection field
         l.push_back(do_rewrite_type(i, a));
 
@@ -2241,6 +2241,16 @@ init_onions(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf) {
     }
 }
 
+//XXX temporary hack until I've worked out how to set the AGG key in mp
+static void
+init_onions_mp(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf) {
+    if (IsMySQLTypeNumeric(cf->sql_type)) {
+        init_onions_layout(mKey, fm, index, cf, MP_NUM_ONION_LAYOUT);
+    } else {
+        init_onions_layout(mKey, fm, index, cf, STR_ONION_LAYOUT);
+    }
+}
+
 static void
 add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
     assert(lex->sql_command == SQLCOM_CREATE_TABLE);
@@ -3163,7 +3173,11 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
         fm->encdesc = STR_initial_levels;
     }
     
-    init_onions(a.masterKey, fm, fm->index, fm->sql_field);
+    if (mp) {
+        init_onions_mp(a.masterKey, fm, fm->index, fm->sql_field);
+    } else {
+        init_onions(a.masterKey, fm, fm->index, fm->sql_field);
+    }
 
     if (a.mp) {
         bool encryptField;

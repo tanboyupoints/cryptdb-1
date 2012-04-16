@@ -73,7 +73,7 @@ RND_int::setKey(const string &k) {
         return;
     }
     key = k;
-    bf = blowfish(k);
+    bf = blowfish(key);
 }
 
 //if we're using MultiPrinc, we don't want to keep a copy of a key around
@@ -82,8 +82,8 @@ RND_int::unSetKey(const string &k) {
     if (k.empty()) {
         return;
     }
-    memset(&key, 0, sizeof(key));
-    memset(&bf, 0, sizeof(bf));
+    key = "";
+    //TODO: unset blowfish
 }
 
 //TODO: may want to do more specialized crypto for lengths
@@ -173,7 +173,7 @@ RND_str::unSetKey(const string &k) {
     if (k.empty()) {
         return;
     }
-    memset(&rawkey, 0, sizeof(rawkey));
+    rawkey = "";
     enckey = NULL;
     deckey = NULL;
 }
@@ -251,7 +251,7 @@ DET_int::setKey(const string &k) {
         return;
     }
     key = k;
-    bf = k;
+    bf = blowfish(key);
 }
 
 void
@@ -259,8 +259,8 @@ DET_int::unSetKey(const string &k) {
     if (k.empty()) {
         return;
     }
-    memset(&key, 0, sizeof(key));
-    memset(&bf, 0, sizeof(bf));
+    key = "";
+    //TODO: unset blowfish
 }
 
 //TODO: may want to do more specialized crypto for lengths
@@ -349,7 +349,7 @@ DET_str::unSetKey(const string &k) {
     if (k.empty()) {
         return;
     }
-    memset(&rawkey, 0, sizeof(rawkey));
+    rawkey = "";
     enckey = NULL;
     deckey = NULL;
 }
@@ -443,7 +443,7 @@ OPE_int::unSetKey(const string &k) {
     if (k.empty()) {
         return;
     }
-    memset(&key, 0, sizeof(key));
+    key = "";
     ope = OPE("", plain_size*8, ciph_size*8);
 }
 
@@ -495,7 +495,7 @@ OPE_str::unSetKey(const string &k) {
     if (k.empty()) {
         return;
     }
-    memset(&key, 0, sizeof(key));
+    key = "";
     ope = OPE("", plain_size*8, ciph_size*8);
 }
 
@@ -678,7 +678,7 @@ Search::unSetKey(const string &k) {
     if (k.empty()) {
         return;
     }
-    memset(&rawkey, 0, sizeof(rawkey));
+    rawkey = "";
     //TODO: zero key
 }
 
