@@ -2082,10 +2082,11 @@ optimize_select_lex(st_select_lex *select_lex, Analysis & a)
 
     for (ORDER *o = select_lex->group_list.first; o; o = o->next)
         optimize(o->item, a);
-
     for (ORDER *o = select_lex->order_list.first; o; o = o->next)
         optimize(o->item, a);
 }
+
+
 
 //TODO: not clear how these process_*_lex and rewrite_*_lex overlap, cleanup
 static void
@@ -2112,9 +2113,10 @@ process_filters_lex(st_select_lex * select_lex, const constraints & tr, Analysis
     for (ORDER *o = select_lex->group_list.first; o; o = o->next)
         analyze(*o->item, constraints(EQ_EncSet, "group", *o->item, 0), a);
 
-    for (ORDER *o = select_lex->order_list.first; o; o = o->next)
-        analyze(*o->item, constraints(ORD_EncSet,
+    for (ORDER *o = select_lex->order_list.first; o; o = o->next) {
+	analyze(*o->item, constraints(ORD_EncSet,
                                       "order", *o->item, 0, select_lex->select_limit ? false : true), a);
+    }
 }
 
 

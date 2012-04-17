@@ -106,6 +106,15 @@ query_parse::lex()
     return t->lex;
 }
 
+static void
+cloneItemInOrder(ORDER * o) {
+    assert_s((*o->item)->type() == Item::Type::FIELD_ITEM, " support for order by/group by non-field not currently implemented" );
+    Item ** tmp = (Item **)malloc(sizeof(Item *));
+    *tmp = new  Item_field(current_thd, static_cast<Item_field *>(*o->item));
+    assert_s(*tmp, "clone item failed on order by element, elements perhaps non constant which is not currently implemented");
+    o->item = tmp;
+}
+
 query_parse::query_parse(const std::string &db, const std::string &q)
 {
     assert(create_embedded_thd(0));
@@ -301,4 +310,18 @@ query_parse::query_parse(const std::string &db, const std::string &q)
         cleanup();
         throw;
     }
+
+    // Need to uniquefy order by and group by items
+    LEX * lex = t->lex;
+
+    cerr << "group list \n";
+    for (ORDER * o = lex->select_lex.group_list.first; o; o=o->next) {
+	cloneItemInOrder(o);
+    }
+
+    cerr << "order list \n";
+    for (ORDER * o = lex->select_lex.order_list.first; o; o=o->next) {
+	cloneItemInOrder(o);
+    }
 }
+
