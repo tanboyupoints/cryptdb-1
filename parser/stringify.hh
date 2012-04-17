@@ -621,12 +621,31 @@ operator<<(std::ostream &out, LEX &lex)
         break;
 
     case SQLCOM_CHANGE_DB:
-        out << "use " << lex.select_lex.db;
+        out << "USE " << lex.select_lex.db;
         break;
 
     case SQLCOM_BEGIN:
+        out << "START TRANSACTION";
+        if (lex.start_transaction_opt & MYSQL_START_TRANS_OPT_WITH_CONS_SNAPSHOT)
+            out << " WITH CONSISTENT SNAPSHOT";
+        break;
+
     case SQLCOM_COMMIT:
+        out << "COMMIT";
+        if (lex.tx_chain != TVL_UNKNOWN)
+            out << " AND" << (lex.tx_chain == TVL_NO ? " NO" : "") << " CHAIN";
+        if (lex.tx_release != TVL_UNKNOWN)
+            out << (lex.tx_release == TVL_NO ? " NO" : "") << " RELEASE";
+        break;
+
     case SQLCOM_ROLLBACK:
+        out << "ROLLBACK";
+        if (lex.tx_chain != TVL_UNKNOWN)
+            out << " AND" << (lex.tx_chain == TVL_NO ? " NO" : "") << " CHAIN";
+        if (lex.tx_release != TVL_UNKNOWN)
+            out << (lex.tx_release == TVL_NO ? " NO" : "") << " RELEASE";
+        break;
+
     case SQLCOM_SET_OPTION:
     case SQLCOM_SHOW_DATABASES:
     case SQLCOM_SHOW_TABLES:
