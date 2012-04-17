@@ -11,4 +11,10 @@ all:	$(OBJDIR)/crypto/x
 $(OBJDIR)/crypto/x: $(OBJDIR)/crypto/x.o $(OBJDIR)/libedbcrypto2.so
 	$(CXX) $< -o $@ $(LDFLAGS) -ledbcrypto2
 
+install: install_crypto
+
+.PHONY: install_crypto
+install_crypto: $(OBJDIR)/libedbcrypto2.so
+	install -m 644 $(OBJDIR)/libedbcrypto2.so /usr/lib
+
 # vim: set noexpandtab:

@@ -9,9 +9,8 @@ class Paillier {
  public:
     Paillier(const std::vector<NTL::ZZ> &pk);
     std::vector<NTL::ZZ> pubkey() const { return { n, g }; }
-    //returns part of pub key needed for homomorphic operations
-    NTL::ZZ hompubkey() const { std::cerr << "hompubkey " << n2 << "\n"; return n2; }
-    
+    NTL::ZZ hompubkey() const { return n2; }
+
     NTL::ZZ encrypt(const NTL::ZZ &plaintext);
     NTL::ZZ add(const NTL::ZZ &c0, const NTL::ZZ &c1) const;
     NTL::ZZ mul(const NTL::ZZ &ciphertext, const NTL::ZZ &constval) const;

@@ -415,7 +415,6 @@ operator<<(std::ostream &out, LEX &lex)
 
     switch (lex.sql_command) {
     case SQLCOM_SELECT:
-        // out << lex.select_lex;
         out << lex.unit;
         break;
 
@@ -592,6 +591,7 @@ operator<<(std::ostream &out, LEX &lex)
     case SQLCOM_CREATE_TABLE:
         do_create_table(out, lex);
         break;
+
     case SQLCOM_DROP_TABLE:
         out << "drop ";
         if (lex.drop_temporary) {
@@ -616,9 +616,33 @@ operator<<(std::ostream &out, LEX &lex)
           out << " cascade";
         }
         break;
+
+    case SQLCOM_CHANGE_DB:
+        out << "USE " << lex.select_lex.db;
+        break;
+
     case SQLCOM_BEGIN:
+        out << "START TRANSACTION";
+        if (lex.start_transaction_opt & MYSQL_START_TRANS_OPT_WITH_CONS_SNAPSHOT)
+            out << " WITH CONSISTENT SNAPSHOT";
+        break;
+
     case SQLCOM_COMMIT:
+        out << "COMMIT";
+        if (lex.tx_chain != TVL_UNKNOWN)
+            out << " AND" << (lex.tx_chain == TVL_NO ? " NO" : "") << " CHAIN";
+        if (lex.tx_release != TVL_UNKNOWN)
+            out << (lex.tx_release == TVL_NO ? " NO" : "") << " RELEASE";
+        break;
+
     case SQLCOM_ROLLBACK:
+        out << "ROLLBACK";
+        if (lex.tx_chain != TVL_UNKNOWN)
+            out << " AND" << (lex.tx_chain == TVL_NO ? " NO" : "") << " CHAIN";
+        if (lex.tx_release != TVL_UNKNOWN)
+            out << (lex.tx_release == TVL_NO ? " NO" : "") << " RELEASE";
+        break;
+
     case SQLCOM_SET_OPTION:
     case SQLCOM_SHOW_DATABASES:
     case SQLCOM_SHOW_TABLES:
@@ -627,7 +651,6 @@ operator<<(std::ostream &out, LEX &lex)
     case SQLCOM_SHOW_VARIABLES:
     case SQLCOM_SHOW_STATUS:
     case SQLCOM_SHOW_COLLATIONS:
-    case SQLCOM_CHANGE_DB:  /* for analysis, assume we never change DB? */
         /* placeholders to make analysis work.. */
         out << ".. type " << lex.sql_command << " query ..";
         break;
