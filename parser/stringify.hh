@@ -34,13 +34,10 @@ operator<<(std::ostream &out, Item &i)
 
 static inline std::ostream&
 operator<<(std::ostream &out, Item * i) {
-    if (i == NULL || i->null_value) {
-	return out << "NULL";
-    } else {
-	String s, s1;
-	s = *(i->val_str(&s1));	 
-	return out << s;
-    }
+    assert(i);
+    String s, s1;
+    s = *(i->val_str(&s1));	 
+    return out << s;
 }
 
 template<class T>

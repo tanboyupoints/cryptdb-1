@@ -74,15 +74,7 @@ stringToItem(string s) {
     it->name = NULL; //no alias
     return it;
     }*/
-/*
-static string
-ItemToString(Item * i) {
-    String s;
-    String *s0 = i->val_str(&s);
-    assert(s0 != NULL);
-    return string(s0->ptr(), s0->length());
-}
-*/
+
 /*
 static void addToList(List<Item> & lst, vector<Item *> & vec) {
     for (Item * it : vec) {
@@ -2309,7 +2301,7 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
 	    //generate enclayers for encrypted field
 	    for (auto l: it.second) {
 		PRNG * key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);
-		om->layers.push_back(EncLayerFactory::encLayer(l, cf, key));
+		om->layers.push_back(EncLayerFactory::encLayer(o, l, cf, key));
 	    }
 	}
 	

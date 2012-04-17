@@ -178,9 +178,10 @@ Item *
 RND_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
     setKey(k);
     string enc = CryptoManager::encrypt_SEM(
-                 ItemToString(static_cast<Item_string *>(ptext)),
+                 ItemToString(ptext),
                  enckey, IV);
-    LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV " << IV << "--->" << enc;
+    LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV " << IV << "--->"
+	      << "len of enc " << enc.length() << " enc " << enc;
     unSetKey(k);
     return new Item_string(make_thd_string(enc), enc.length(), &my_charset_bin);
 }
@@ -189,9 +190,10 @@ Item *
 RND_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
     setKey(k);
     string dec = CryptoManager::decrypt_SEM(
-    ItemToString(static_cast<Item_string *>(ctext)),
+	ItemToString(ctext),
 	deckey, IV);
-    LOG(encl) << "RND_str decrypt " << ItemToString(ctext) << " IV " << IV << "-->" << dec;
+    LOG(encl) << "RND_str decrypt " << ItemToString(ctext) << " IV " << IV << "-->"
+	      << "len of dec " << dec.length() << " dec: " << dec;
     unSetKey(k);
     return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
 }
@@ -353,9 +355,10 @@ DET_str::unSetKey(const string &k) {
 Item *
 DET_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
     setKey(k);
-    string enc = encrypt_AES_CMC(
-                 ItemToString(static_cast<Item_string *>(ptext)),
-                 enckey, true);
+    string plain =  ItemToString(ptext);
+    string enc = encrypt_AES_CMC(plain,enckey, true);
+    LOG(encl) << " DET_str encrypt " << plain  << " IV " << IV << " ---> "
+	      << " enc len " << enc.length() << " enc " << enc;
     unSetKey(k);
     return new Item_string(make_thd_string(enc), enc.length(), &my_charset_bin);
 }
@@ -363,9 +366,10 @@ DET_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
 Item *
 DET_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
     setKey(k);
-    string dec = decrypt_AES_CMC(
-	ItemToString(static_cast<Item_string *>(ctext)),
-	deckey, true);
+    string enc = ItemToString(ctext);
+    string dec = decrypt_AES_CMC(enc, deckey, true);
+    LOG(encl) << " DET_str decrypt enc len " << enc.length() << " enc " << enc
+	      << " IV " << IV << " ---> " << " dec len " << dec.length() << " dec " << dec;
     unSetKey(k);
     return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
 }
@@ -400,14 +404,12 @@ DET_str::decryptUDF(Item * col, Item * ivcol) {
 
 Item *
 DETJOIN::encrypt(Item * p, uint64_t IV, const string &k) {
-    ulonglong val = static_cast<Item_int *>(p)->value;
-    return new Item_int(val);
+    return p->clone_item();
 }
 
 Item *
 DETJOIN::decrypt(Item * c, uint64_t IV, const string &k) {
-    ulonglong val = static_cast<Item_int *>(c)->value;
-    return new Item_int(val);
+    return c->clone_item();
 }
 
 /**************** OPE **************************/
@@ -750,10 +752,10 @@ Search::searchUDF(Item * expr) {
 /************ EncLayer factory creation  ********/
 
 EncLayer *
-EncLayerFactory::encLayer(SECLEVEL sl, Create_field * cf, PRNG * key) {
+EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf, PRNG * key) {
     switch (sl) {
     case SECLEVEL::RND: {
-	if (IsMySQLTypeNumeric(cf->sql_type)) {
+	if (IsMySQLTypeNumeric(cf->sql_type) || (o == oOPE)) {
 	    return new RND_int(cf, key);
 	} else {
 	    return new RND_str(cf, key);

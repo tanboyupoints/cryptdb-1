@@ -33,7 +33,7 @@ using namespace std;
 // if true, uses MultiPrinc mode
 static bool Multi = false;
 
-static bool encByDefault = false;
+static bool encByDefault = true;
 
 
 static inline string user_homedir() {

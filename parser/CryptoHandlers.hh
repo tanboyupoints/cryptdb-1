@@ -46,7 +46,7 @@ class EncLayer {
 
 class EncLayerFactory {
 public:
-    static EncLayer * encLayer(SECLEVEL sl, Create_field * cf, PRNG * key);
+    static EncLayer * encLayer(onion o, SECLEVEL sl, Create_field * cf, PRNG * key);
 };
 
 // returns true if any of the layers in ed
