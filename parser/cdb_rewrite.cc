@@ -3364,40 +3364,40 @@ Rewriter::processAnnotation(Annotation annot, Analysis &a)
     string onionname = "";
 
     for (auto pr : fm->encdesc.olm) {
-	onion o = pr.first;
-	onionname = fm->onions[o]->onionname;
-	Create_field * cf = fm->onions[o]->layers.back()->newCreateField(onionname);
+        onion o = pr.first;
+        onionname = fm->onions[o]->onionname;
+        Create_field * cf = fm->onions[o]->layers.back()->newCreateField(onionname);
 		
-	stringstream query;
-	query << "ALTER TABLE " << fm->tm->anonTableName;
-	
-	switch (o) {
-	case oDET:
-	    LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets DET onion";
-	    query << " CHANGE " << fm->fname << " " <<  *cf << ";";
-	    break;
-	case oOPE:
-	    LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets OPE onion";
+        stringstream query;
+        query << "ALTER TABLE " << fm->tm->anonTableName;
+        
+        switch (o) {
+        case oDET:
+            LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets DET onion";
+            query << " CHANGE " << fm->fname << " " <<  *cf << ";";
+            break;
+        case oOPE:
+            LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets OPE onion";
             query << " ADD " << *cf << " AFTER " << fm->onions[oDET]->onionname << ";";
-	    break;
-	case oAGG: 
-	    LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets AGG onion";
+            break;
+        case oAGG: 
+            LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets AGG onion";
             query << " ADD " << *cf <<  " AFTER " << fm->onions[oOPE]->onionname << ";";
-	    break;
-	case oSWP:
-	    LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets SWP onion";
+            break;
+        case oSWP:
+            LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets SWP onion";
             query << " ADD " << *cf << " AFTER " << fm->onions[oOPE]->onionname << ";";
-	    break;
-	default:
-	    assert_s(false, "unknown onion type");
-	}
-
-	query_list.push_back(query.str());
+            break;
+        default:
+            assert_s(false, "unknown onion type");
+        }
+        
+        query_list.push_back(query.str());
     }
-
+    
     query_list.push_back("ALTER TABLE " + fm->tm->anonTableName  +
-			 " ADD " + fm->salt_name + " " + TN_SALT +
-			 " AFTER " + onionname + ";");
+                         " ADD " + fm->salt_name + " " + TN_SALT +
+                         " AFTER " + onionname + ";");
 
     return query_list;
 }

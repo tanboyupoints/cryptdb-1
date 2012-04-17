@@ -160,41 +160,30 @@ Annotation::getPrimitiveFieldName() {
 }
 
 SECLEVEL
-Annotation::getDETLevel() {
+Annotation::hasOnion(onion o) {
     if (type != ENCFOR) {
-        //LOG(error) << "Annotation asked for DETLevel when not ENCFOR";
-        //XXX is INVALID an error SECLEVEL?
         return SECLEVEL::INVALID;
     }
-    return DETenclevel;
-}
 
-SECLEVEL
-Annotation::getOPELevel() {
-    if (type != ENCFOR) {
-        //LOG(error) << "Annotation asked for DETLevel when not ENCFOR";
-        //XXX is INVALID an error SECLEVEL?
+    switch (o) {
+    case oDET:
+        return DETenclevel; 
+    case oOPE:
+        return OPEenclevel;
+    case oAGG:
+        if (AGGenclevel) {
+            return SECLEVEL::HOM;
+        }
+        return SECLEVEL::INVALID;
+    case oSWP:
+        if (SWPenclevel) {
+            return SECLEVEL::SEARCH;
+        }
+        return SECLEVEL::INVALID;
+    default:
+        //LOG(error) << "unknown onion";
         return SECLEVEL::INVALID;
     }
-    return OPEenclevel;
-}
-
-bool
-Annotation::getAGGLevel() {
-    if (type != ENCFOR) {
-        //LOG(error) << "Annotation asked for DETLevel when not ENCFOR";
-        return false;
-    }
-    return AGGenclevel;
-}
-
-bool
-Annotation::getSWPLevel() {
-    if (type != ENCFOR) {
-        //LOG(error) << "Annotation asked for DETLevel when not ENCFOR";
-        return false;
-    }
-    return SWPenclevel;
 }
 
 Predicate *
