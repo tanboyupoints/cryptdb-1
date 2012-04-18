@@ -3,11 +3,7 @@
 #include <edb/AccessManager.hh>
 #include <util/cryptdb_log.hh>
 
-
 using namespace std;
-
-
-
 
 #define NODIGITS 4
 
