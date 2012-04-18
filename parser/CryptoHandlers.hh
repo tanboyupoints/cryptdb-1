@@ -237,7 +237,7 @@ public:
     Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "")__attribute__((noreturn));
 
     //expr is the expression (e.g. a field) over which to sum
-    Item * searchUDF(Item * expr);
+    Item * searchUDF(Item * field, Item * expr);
     
 private:
     static const uint key_bytes = 16;
@@ -248,9 +248,6 @@ private:
     void unSetKey(const std::string &key);
 };
 
-// XXX these should probably be special methods in HOM above.
-extern udf_func s_HomAddUdfFunc;
-extern udf_func s_HomSubUdfFunc;
 
 extern const std::vector<udf_func*> udf_list;
 

@@ -502,12 +502,18 @@ OPE_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
     setKey(k);
     string ps = ItemToString(ptext);
     if (ps.size() < plain_size)
-        ps = string(plain_size - ps.size(), 0) + ps;
-    uint32_t pv;
-    memcpy(&pv, ps.data(), plain_size);
-    ZZ enc = ope.encrypt(to_ZZ(ntohl(pv)));
+        ps = ps + string(plain_size - ps.size(), 0);
+
+    uint32_t pv = 0;
+
+    for (uint i = 0; i < plain_size; i++) {
+	pv = pv * 256 + (int)ps[i];
+    }
+    
+    cerr << "VALUE associated with " << ps << " is " << pv << "\n";
+    ZZ enc = ope.encrypt(to_ZZ(pv));
     unSetKey(k);
-    return new Item_int((ulonglong) trunc_long(enc, ciph_size));
+    return new Item_int(uint64FromZZ(enc));
 }
 
 Item *
@@ -738,11 +744,11 @@ static udf_func u_search = {
 };
 
 Item *
-Search::searchUDF(Item * expr) {
+Search::searchUDF(Item * field, Item * expr) {
     Token t = CryptoManager::token(key, Binary(ItemToString(expr)));
     
     List<Item> l;
-    l.push_back(expr);
+    l.push_back(field);
     l.push_back(new Item_string((const char *)t.ciph.content, t.ciph.len, &my_charset_bin));
     l.push_back(new Item_string((const char *)t.wordKey.content, t.wordKey.len, & my_charset_bin));
     

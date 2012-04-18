@@ -314,12 +314,10 @@ query_parse::query_parse(const std::string &db, const std::string &q)
     // Need to uniquefy order by and group by items
     LEX * lex = t->lex;
 
-    cerr << "group list \n";
     for (ORDER * o = lex->select_lex.group_list.first; o; o=o->next) {
 	cloneItemInOrder(o);
     }
 
-    cerr << "order list \n";
     for (ORDER * o = lex->select_lex.order_list.first; o; o=o->next) {
 	cloneItemInOrder(o);
     }
