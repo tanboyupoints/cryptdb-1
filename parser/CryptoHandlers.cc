@@ -513,7 +513,7 @@ OPE_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
     cerr << "VALUE associated with " << ps << " is " << pv << "\n";
     ZZ enc = ope.encrypt(to_ZZ(pv));
     unSetKey(k);
-    return new Item_int(uint64FromZZ(enc));
+    return new Item_int((ulonglong) uint64FromZZ(enc));
 }
 
 Item *
