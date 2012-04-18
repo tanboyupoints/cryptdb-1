@@ -47,8 +47,8 @@ Annotation::Annotation(const string &q) {
     query = q;
     DETenclevel = SECLEVEL::INVALID;
     OPEenclevel = SECLEVEL::INVALID;
-    AGGenclevel = false;
-    SWPenclevel = false;
+    AGGenclevel = SECLEVEL::INVALID;
+    SWPenclevel = SECLEVEL::INVALID;
     pred = NULL;
     parse();
     return;
@@ -167,19 +167,13 @@ Annotation::hasOnion(onion o) {
 
     switch (o) {
     case oDET:
-        return DETenclevel; 
+        return DETenclevel;
     case oOPE:
         return OPEenclevel;
     case oAGG:
-        if (AGGenclevel) {
-            return SECLEVEL::HOM;
-        }
-        return SECLEVEL::INVALID;
+        return AGGenclevel;
     case oSWP:
-        if (SWPenclevel) {
-            return SECLEVEL::SEARCH;
-        }
-        return SECLEVEL::INVALID;
+        return SWPenclevel;
     default:
         //LOG(error) << "unknown onion";
         return SECLEVEL::INVALID;
@@ -307,28 +301,28 @@ Annotation::parse() {
         return;
     case ENCFOR:
         if (word == query_list.end()) {
-            DETenclevel = SECLEVEL::DET;
-            OPEenclevel = SECLEVEL::OPE;
+            DETenclevel = SECLEVEL::RND;
+            OPEenclevel = SECLEVEL::RND;
         }
         while (word != query_list.end()) {
-            if (equalsIgnoreCase(levelnames[(int) SECLEVEL::DET], *word)) {
-                DETenclevel = SECLEVEL::DET;
-            }
-            else if (equalsIgnoreCase(levelnames[(int) SECLEVEL::DETJOIN], *word)) {
-                DETenclevel = SECLEVEL::DETJOIN;
-            }
-            else if (equalsIgnoreCase(levelnames[(int) SECLEVEL::OPE], *word)) {
-                DETenclevel = SECLEVEL::DET;
-                OPEenclevel = SECLEVEL::OPE;
-            }
-            else if (equalsIgnoreCase(levelnames[(int) SECLEVEL::HOM], *word)) {
-                AGGenclevel = true;
-            }
-            else if (equalsIgnoreCase(levelnames[(int) SECLEVEL::SEARCH], *word)) {
-                SWPenclevel = true;
-            }
-            else {
-                assert_s(false, "ENCFOR annotation followed by a word that does not specify an encryption level");
+            SECLEVEL enclevel = string_to_sec_level(toUpperCase(*word));
+            switch (enclevel) {
+            case SECLEVEL::DETJOIN:
+            case SECLEVEL::DET:
+                DETenclevel = enclevel;
+                break;
+            case SECLEVEL::OPEJOIN:
+            case SECLEVEL::OPE:
+                OPEenclevel = enclevel;
+                break;
+            case SECLEVEL::SEARCH:
+                SWPenclevel = enclevel;
+                break;
+            case SECLEVEL::HOM:
+                AGGenclevel = enclevel;
+                break;
+            default:
+                assert_s(false, "unknown onion level annotation on ENC_FOR");
             }
             word++;
         }

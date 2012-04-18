@@ -118,7 +118,7 @@ operator<<(ostream &out, const EncSet & es)
     return out;
 }
 
-static ostream&
+/*static ostream&
 operator<<(ostream &out, const EncDesc & ed)
 {
     if (ed.olm.size() == 0) {
@@ -130,7 +130,7 @@ operator<<(ostream &out, const EncDesc & ed)
             << ") ";
     }
     return out;
-}
+    }*/
 
 
 //records what onions need to be adjusted at the server for a query with
@@ -847,13 +847,12 @@ intersect(const EncSet & es, FieldMeta * fm) {
     OnionLevelFieldMap res;
 
     for (auto it : es.osl) {
-	onion o = it.first;
-	auto ed_it = fm->encdesc.olm.find(o);
-	
-	if ((ed_it != fm->encdesc.olm.end()) && (!fm->onions[o]->stale)) {
-	    //a onion to keep
-	    res[o] = LevelFieldPair(min(it.second.first, ed_it->second), fm);
-	} 
+        onion o = it.first;
+        auto ed_it = fm->encdesc.olm.find(o);
+        if ((ed_it != fm->encdesc.olm.end()) && (!fm->onions[o]->stale)) {
+            //an onion to keep
+            res[o] = LevelFieldPair(min(it.second.first, ed_it->second), fm);
+        } 
     }
 
     return res;
@@ -2576,8 +2575,8 @@ mp_update_init(LEX *lex, Analysis &a)
         if (!i) {
             break;
         }
-        string fname = a.itemToFieldMeta[i]->tm->anonTableName + "." + a.itemToFieldMeta[i]->fname;
-          if (a.mp->hasEncFor(fname)) {
+        string fname = fullName(i->table_name, i->field_name);
+        if (a.mp->hasEncFor(fname)) {
             assert_s(false, "cannot update changes to access tree");
 	    } 
     }
@@ -2586,10 +2585,10 @@ mp_update_init(LEX *lex, Analysis &a)
 static void
 stalefy(FieldMeta * fm, EncDesc  ed) {
     for (auto o_l : fm->encdesc.olm) {
-	onion o = o_l.first;
-	if (ed.olm.find(o) == ed.olm.end()) {
-	    fm->onions[o]->stale = true;
-	}
+        onion o = o_l.first;
+        if (ed.olm.find(o) == ed.olm.end()) {
+            fm->onions[o]->stale = true;
+        }
     }
 }
 

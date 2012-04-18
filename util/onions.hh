@@ -3,6 +3,7 @@
 #include <string>
 #include <map>
 #include <list>
+#include <iostream>
 
 
 typedef enum onion {
@@ -97,6 +98,7 @@ public:
     OnionLevelMap olm;
 };
 
+std::ostream& operator<<(std::ostream &out, const EncDesc & ed);
 
 const EncDesc FULL_EncDesc = {
         {

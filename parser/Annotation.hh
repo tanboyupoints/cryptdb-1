@@ -96,6 +96,6 @@ private:
     Predicate *pred;
     SECLEVEL DETenclevel;
     SECLEVEL OPEenclevel;
-    bool AGGenclevel;
-    bool SWPenclevel;
+    SECLEVEL AGGenclevel;
+    SECLEVEL SWPenclevel;
 };
