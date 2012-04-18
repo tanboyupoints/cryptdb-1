@@ -95,7 +95,7 @@ operator<<(std::ostream &out, SELECT_LEX_UNIT &select_lex_unit)
 }
 
 static const char *
-sql_type_to_string(enum_field_types tpe)
+sql_type_to_string(enum_field_types tpe, CHARSET_INFO *charset)
 {
 #define ASSERT_NOT_REACHED() \
     do { \
@@ -127,7 +127,12 @@ sql_type_to_string(enum_field_types tpe)
     case MYSQL_TYPE_TINY_BLOB   : return "TINYBLOB";
     case MYSQL_TYPE_MEDIUM_BLOB : return "MEDIUMBLOB";
     case MYSQL_TYPE_LONG_BLOB   : return "LONGBLOB";
-    case MYSQL_TYPE_BLOB        : return "BLOB";
+    case MYSQL_TYPE_BLOB        : 
+        if (charset == &my_charset_bin) {
+            return "BLOB";
+        } else {
+            return "TEXT";
+        }
     case MYSQL_TYPE_VAR_STRING  : ASSERT_NOT_REACHED();
     case MYSQL_TYPE_STRING      : return "CHAR";
 
@@ -141,8 +146,9 @@ sql_type_to_string(enum_field_types tpe)
 static std::ostream&
 operator<<(std::ostream &out, Create_field &f)
 {
+    
     // emit field name + type definition
-    out << f.field_name << " " << sql_type_to_string(f.sql_type);
+    out << f.field_name << " " << sql_type_to_string(f.sql_type, f.charset);
 
     // emit extra length info if necessary
     switch (f.sql_type) {
