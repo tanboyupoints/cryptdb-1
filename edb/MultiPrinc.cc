@@ -93,13 +93,19 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
         mkm.encForMap[fullName(fm->fname, prim_table)] = right_col;
 
         string prev_onion = "";
-        for (auto pr : fm->encdesc.olm) {
+        OnionLevelMap olm = fm->encdesc.olm;
+
+        for (auto pr : olm) {
             onion o = pr.first;
+            SECLEVEL level = annot.hasOnion(o);
+            cerr << o << " " << levelnames[(int) level] << endl;
             //if level not specified, it will be SECLEVEL::INVALID
-            if (annot.hasOnion(o) == SECLEVEL::INVALID) {
-                fm->onions.erase(o);
+            if (level == SECLEVEL::INVALID) {
+                fm->removeOnion(o);
                 continue;
             }
+
+            assert_s(fm->setOnionLevel(o, level), "cannot set onion to requested level");
 
             string onionname = fm->onions[o]->onionname;
             Create_field * cf = fm->onions[o]->layers.back()->newCreateField(onionname);
