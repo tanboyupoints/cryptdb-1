@@ -957,6 +957,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     virtual Item *
     do_rewrite_type(Item_field *i, Analysis & a) const
     {
+	//TODO: no need for HasRewrite any more due to uniqueness of items
         LOG(cdb_v) << "do_rewrite_type L806 " << *i;
         auto it = a.itemHasRewrite.find(i);
         if (it == a.itemHasRewrite.end()) {
@@ -1762,9 +1763,35 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
         return tr.encset;
     }
     virtual void do_enforce_type(Item_func_like *i, const constraints &tr, Analysis & a) const
-    {}
+    {
+	LOG(cdb_v) << "enforce Item_func_like " << *i;
+	record_item_meta_for_constraints(i, tr, a); //TODO: does all enforce do the
+						    //same things?
+    }
     virtual Item * do_optimize_type(Item_func_like *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
+    }
+    virtual Item * do_rewrite_type(Item_func_like *i, Analysis & a) const {
+	LOG(cdb_v) << "do_rewrite_type " << *i;
+
+	do_rewrite_type_args(i, a);
+
+	ItemMeta * im = getAssert(a.itemToMeta, (Item *)i);
+
+	//record information for decrypting results
+	addToReturn(a.rmeta, a.pos++, im, false, i->name);
+
+	Item **args = i->arguments();
+	assert_s(i->argument_count() == 2, "LIKE has more than two arguments");
+
+	Item * field = args[0];
+	Item * expr = args[1];
+	
+	FieldMeta * fm = im->basefield;
+	EncLayer * el = getAssert(fm->onions, oSWP)->layers.back();
+	assert_s(el->level() == SECLEVEL::SEARCH, "incorrect onion  level on onion oSWP");
+	return ((Search *) el)->searchUDF(field, expr);
+	
     }
 } ANON;
 

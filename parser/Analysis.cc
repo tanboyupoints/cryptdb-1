@@ -70,8 +70,7 @@ EncSet::chooseOne() const
         if (it != osl.end()) {
             OnionLevelFieldMap m;
 	    onion o = onion_order[i];
-            m[onion_order[i]] = it->second;
-	    LOG(cdb_v) << "choosing one from " << this << " : onion " << o << " level " << levelnames[(int)m[o].first];
+            m[o] = it->second;
             return EncSet(m);
         }
     }
