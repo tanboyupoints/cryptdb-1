@@ -8,6 +8,7 @@
 #include <string>
 #include <map>
 #include <list>
+#include <iostream>
 
 struct FieldMeta;
 /**
@@ -20,6 +21,10 @@ typedef std::pair<SECLEVEL, FieldMeta *> LevelFieldPair;
 typedef std::map<onion, LevelFieldPair>  OnionLevelFieldMap;
 
 typedef std::pair<onion, LevelFieldPair> OnionLevelFieldPair;
+
+
+std::ostream&
+operator<<(std::ostream &out, const OnionLevelFieldPair &p);
 
 
 typedef struct OnionMeta {

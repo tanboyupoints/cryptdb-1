@@ -2,6 +2,18 @@
 
 using namespace std;
 
+
+ostream&
+operator<<(ostream &out, const OnionLevelFieldPair &p)
+{
+    out << "(onion " << p.first
+        << ", level " << levelnames[(int)p.second.first]
+        << ", field `" << (p.second.second == NULL ? "*" : p.second.second->fname) << "`"
+        << ")";
+    return out;
+}
+
+
 string FieldMeta::stringify() {
     string res = " [FieldMeta " + fname + "]";
     return res;

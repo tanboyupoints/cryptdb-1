@@ -44,6 +44,10 @@ public:
     OnionLevelFieldMap osl; //max level on each onion
 };
 
+
+ostream&
+operator<<(ostream &out, const EncSet & es);
+
 const EncSet EQ_EncSet = {
         {
 	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},

@@ -505,7 +505,7 @@ operator<<(std::ostream &out, LEX &lex)
                 out << "ignore ";
             }
 
-            lex.query_tables->print(t, &s, QT_ORDINARY);
+            lex.select_lex.table_list.first->print(t, &s, QT_ORDINARY);
             out << "into " << s;
             if (lex.field_list.head())
                 out << " " << lex.field_list;

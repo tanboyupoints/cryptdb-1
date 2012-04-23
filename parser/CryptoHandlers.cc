@@ -712,6 +712,13 @@ tokenize(string text)
 
 }
 
+static char *
+newmem(unsigned char * a, uint len) {
+    char * res = new char[len];
+    memcpy(res, a, len);
+    return res;
+}
+
 Item *
 Search::encrypt(Item * ptext, uint64_t IV, const std::string &k) {
     setKey(k);
@@ -721,7 +728,10 @@ Search::encrypt(Item * ptext, uint64_t IV, const std::string &k) {
     Binary ciph = CryptoManager::encryptSWP(key, *tokens);
 
     unSetKey(k);
-    return new Item_string((const char *)ciph.content, ciph.len, &my_charset_bin);
+
+    LOG(encl) << "SEARCH encrypt " << plainstr << " --> " << string((const char*)ciph.content, ciph.len);
+  
+    return new Item_string(newmem(ciph.content, ciph.len), ciph.len, &my_charset_bin);	
 }
 
 Item *
@@ -743,14 +753,40 @@ static udf_func u_search = {
     0L,
 };
 
+
+static string
+searchstrip(string s) {
+    cerr << "searchstrip input " << s << "\n";
+
+    if (s[0] == '%') {
+	s = s.substr(1, s.length() - 1);
+    }
+    uint len = s.length();
+    if (s[len-1] == '%') {
+	s = s.substr(0, len-1);
+    }
+    cerr << "searchstrip output " << s << "\n";
+    return s;
+}
+
 Item *
 Search::searchUDF(Item * field, Item * expr) {
-    Token t = CryptoManager::token(key, Binary(ItemToString(expr)));
-    
-    List<Item> l;
+    List<Item> l = List<Item>();
+
     l.push_back(field);
-    l.push_back(new Item_string((const char *)t.ciph.content, t.ciph.len, &my_charset_bin));
-    l.push_back(new Item_string((const char *)t.wordKey.content, t.wordKey.len, & my_charset_bin));
+
+    // Add token
+    
+    Token t = CryptoManager::token(key, Binary(searchstrip(ItemToString(expr))));
+    Item_string * t1 =  new Item_string(newmem(t.ciph.content, t.ciph.len),
+		    t.ciph.len, &my_charset_bin);
+    t1->name = NULL; //no alias
+    l.push_back(t1);
+    
+    Item_string * t2 = new Item_string(newmem(t.wordKey.content, t.wordKey.len),
+				       t.wordKey.len, &my_charset_bin);
+    t2->name = NULL;
+    l.push_back(t2);
     
     return new Item_func_udf_int(&u_search, l);
 }

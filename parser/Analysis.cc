@@ -35,6 +35,22 @@ EncSet::intersect(const EncSet & es2) const
     return EncSet(m);
 }
 
+ostream&
+operator<<(ostream &out, const EncSet & es)
+{
+    if (es.osl.size() == 0) {
+        out << "empty encset";
+    }
+    for (auto it : es.osl) {
+        out << "(onion " << it.first
+            << ", level " << levelnames[(int)it.second.first]
+            << ", field `" << (it.second.second == NULL ? "*" : it.second.second->fname) << "`"
+            << ") ";
+    }
+    return out;
+}
+
+
 EncDesc
 EncSet::encdesc() {
     OnionLevelMap olm = OnionLevelMap();
