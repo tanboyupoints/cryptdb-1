@@ -2372,15 +2372,15 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
         OnionMeta * om = new OnionMeta();
         fm->onions[o] = om;
 	
-	om->onionname = anonymizeFieldName(index, o, fm->fname, false);
+        om->onionname = anonymizeFieldName(index, o, fm->fname, false);
 	
         if (mKey) { 
-	    //generate enclayers for encrypted field
-	    for (auto l: it.second) {
-		PRNG * key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);
-		om->layers.push_back(EncLayerFactory::encLayer(o, l, cf, key));
-	    }
-	}
+            //generate enclayers for encrypted field
+            for (auto l: it.second) {
+                PRNG * key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);
+                om->layers.push_back(EncLayerFactory::encLayer(o, l, cf, key));
+            }
+        }
 	
         LOG(cdb_v) << "adding onion layer " << om->onionname << " for " << fm->fname;
 	
@@ -2392,17 +2392,17 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
 static void
 init_onions(AES_KEY * mKey, FieldMeta * fm, Create_field * cf, uint index = 0) {
     if (!mKey) {
-	// unencrypted field
-	init_onions_layout(NULL, fm, 0, cf, PLAIN_ONION_LAYOUT);
-	fm->has_salt = false;
-	return;
+        // unencrypted field
+        init_onions_layout(NULL, fm, 0, cf, PLAIN_ONION_LAYOUT);
+        fm->has_salt = false;
+        return;
     }
 
     // Encrypted field
 
     fm->has_salt = true;
     fm->salt_name = getFieldSalt(index, fm->tm->anonTableName);
-	    
+    
     if (IsMySQLTypeNumeric(cf->sql_type)) {
         init_onions_layout(mKey, fm, index, cf, NUM_ONION_LAYOUT);
     } else {
@@ -2443,12 +2443,12 @@ add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
 
     if (encByDefault) { //anonymize name
 	// such increment may cause problem with multiple proxies
-	tm->tableNo = a.schema->totalTables++;
-	tm->anonTableName = anonymizeTableName(tm->tableNo, table);
+        tm->tableNo = a.schema->totalTables++;
+        tm->anonTableName = anonymizeTableName(tm->tableNo, table);
     } else {
-	tm->anonTableName = table;
+        tm->anonTableName = table;
     }
-    
+
     uint index =  0;
     for (auto it = List_iterator<Create_field>(lex->alter_info.create_list);;) {
         Create_field * field = it++;
@@ -2457,7 +2457,7 @@ add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
             break;
         }
 
-	FieldMeta * fm = new FieldMeta();
+        FieldMeta * fm = new FieldMeta();
 
         fm->tm            = tm;
         fm->sql_field     = field->clone(current_thd->mem_root);
@@ -2467,7 +2467,7 @@ add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
         if (encByDefault) { 
             init_onions(a.masterKey, fm, field, index);            
         } else {
-	    init_onions(NULL, fm, field);
+            init_onions(NULL, fm, field);
         }
         
         assert(tm->fieldMetaMap.find(fm->fname) == tm->fieldMetaMap.end());
@@ -2486,14 +2486,14 @@ static void rewrite_create_field(const string &table_name,
                                  Analysis &a,
                                  vector<Create_field *> &l)
 {
-    LOG(cdb_v) << "in rewrite create field for " << f;
+    LOG(cdb_v) << "in rewrite create field for " << *f;
     
     FieldMeta *fm = a.schema->getFieldMeta(table_name, f->field_name);
 
     if (!fm->isEncrypted()) {
-	// Unencrypted field
-	l.push_back(f);
-	return;
+        // Unencrypted field
+        l.push_back(f);
+        return;
     }
 
     // Encrypted field
@@ -3493,6 +3493,7 @@ Rewriter::mp_init(Analysis &a) {
 list<string>
 Rewriter::rewrite(const string & q, Analysis & analysis)
 {
+    LOG(cdb_v) << "q " << q;
     list<string> queries;
     query_parse p(cur_db, q);
     analysis = Analysis(e_conn, conn, schema, masterKey, mp);
@@ -3505,14 +3506,14 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
     }
 
     LEX *lex = p.lex();
-
+    
     //login/logout command; nothing needs to be passed on
     if ((lex->sql_command == SQLCOM_DELETE || lex->sql_command == SQLCOM_INSERT)
-	&& analysis.mp && analysis.mp->checkPsswd(lex)){
+        && analysis.mp && analysis.mp->checkPsswd(lex)){
 	LOG(cdb_v) << "login/logout " << *lex;
         return queries;
     }
-    LOG(cdb_v) << "pre-analyze";
+    LOG(cdb_v) << "pre-analyze " << *lex;
     //TODO: is db neededs as param in all these funcs?
     //analyze query
     query_analyze(q, lex, analysis, encByDefault);

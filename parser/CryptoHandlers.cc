@@ -17,19 +17,19 @@ createFieldHelper(const Create_field *f, int field_length,
     THD *thd = current_thd;
     Create_field *f0 = f->clone(thd->mem_root);
     if (field_length != -1) {
-	f0->length = field_length;
+        f0->length = field_length;
     }
     f0->sql_type = type;
     
     if (charset != NULL) {
-	f0->charset = charset;
+        f0->charset = charset;
     } else {
-	//encryption is always unsigned
-	f0->flags = f0->flags | UNSIGNED_FLAG; 
+        //encryption is always unsigned
+        f0->flags = f0->flags | UNSIGNED_FLAG; 
     }
 
     if (anonname.size() > 0) {
-	f0->field_name = make_thd_string(anonname);
+        f0->field_name = make_thd_string(anonname);
     }
     
     return f0;
@@ -513,7 +513,7 @@ OPE_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
     cerr << "VALUE associated with " << ps << " is " << pv << "\n";
     ZZ enc = ope.encrypt(to_ZZ(pv));
     unSetKey(k);
-    return new Item_int(uint64FromZZ(enc));
+    return new Item_int((ulonglong) uint64FromZZ(enc));
 }
 
 Item *
