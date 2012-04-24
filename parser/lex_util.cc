@@ -57,5 +57,7 @@ set_select_lex(LEX * lex, SELECT_LEX * select_lex) {
 void
 set_where(st_select_lex * sl, Item * where) {
     sl->where = where;
-    sl->join->conds = where;
+    if (sl->join) {
+	sl->join->conds = where;
+    }
 }
