@@ -1246,14 +1246,19 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
         return do_optimize_type_self_and_args(i, a);
     }
     virtual Item * do_rewrite_type(Item_cond *i, Analysis & a) const {
-        LOG(cdb_v) << "do_rewrite_type L1207";
-	Item ** args = i->arguments();
-	List<Item> lst = List<Item>();
-	for (uint j = 0; j < i->argument_count(); j++) {
-	    lst.push_back(args[j]);
+        LOG(cdb_v) << "do_rewrite_type  Item_cond i " << *i << " no of args " << i->argument_count();
+
+	List<Item> newlist;
+	auto it = List_iterator<Item>(*i->argument_list());
+	for (;;) {
+	    Item *argitem = it++;
+	    if (!argitem) {
+		break;
+	    }
+	    newlist.push_back(rewrite(argitem, a));	    
 	}
-	IT * res = new IT(lst);
-	do_rewrite_type_args(res, a); //TODO: template this out
+	
+	IT * res = new IT(newlist);
 	return res;
     }
 };
