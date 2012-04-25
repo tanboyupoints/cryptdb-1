@@ -526,7 +526,7 @@ optimize(Item **i, Analysis &a) {
 static inline Item *
 rewrite(Item *i, Analysis &a) {
     Item *i0 = itemTypes.do_rewrite(i, a);
-    assert(i0 != i);
+    //assert(i0 != i);
     return i0;
 }
 
