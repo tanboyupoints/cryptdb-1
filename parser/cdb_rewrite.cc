@@ -3545,7 +3545,7 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
 
 string ReturnField::stringify() {
     stringstream res;
-    res << " is_salt: " << is_salt << " filed_called " << field_called;
+    res << " is_salt: " << is_salt << " field_called " << field_called;
     res <<" im  ";
     string ss = stringify_ptr<ItemMeta>(im);
     res << ss << " pos_salt " << pos_salt;
@@ -3566,7 +3566,7 @@ mp_init_decrypt(MultiPrinc * mp, Analysis & a) {
     a.tmkm.processingQuery = false;
     LOG(cdb_v) << a.rmeta.stringify() << "\n";
     for (auto i = a.rmeta.rfmeta.begin(); i != a.rmeta.rfmeta.end(); i++) {
-        if (!i->second.is_salt) {
+        if (!i->second.is_salt && i->second.im->basefield) {
             a.tmkm.encForReturned[fullName(i->second.im->basefield->fname, i->second.im->basefield->tm->anonTableName)] = i->first;
         }
     }
@@ -3616,7 +3616,7 @@ Rewriter::decryptResults(ResType & dbres,
         if (!rf.is_salt) {
             for (unsigned int r = 0; r < rows; r++) {
                 //TODO: there is some redundancy in this condition, cleanup
-                if ((im->o == oPLAIN) || im->basefield->onions.empty()) {
+                if (im->o == oPLAIN) {
                     res.rows[r][col_index] = dbres.rows[r][c];
                 } else {
                     uint64_t salt = 0;
@@ -3625,7 +3625,7 @@ Rewriter::decryptResults(ResType & dbres,
                         assert_s(!salt_item->null_value, "salt item is null");
                         salt = ((Item_int *)dbres.rows[r][rf.pos_salt])->value;
                     }
-		    res.rows[r][col_index] = decrypt_item(im, dbres.rows[r][c], salt, a, res.rows[r]);
+                    res.rows[r][col_index] = decrypt_item(im, dbres.rows[r][c], salt, a, res.rows[r]);
                 }
             }
             col_index++;

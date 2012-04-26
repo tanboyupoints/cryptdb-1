@@ -33,27 +33,22 @@ static QueryList Insert = QueryList("SingleInsert",
       "CRYPTDB test_insert.salary ENC",
       "CRYPTDB test_insert.address ENC" },
                                     // TODO parser currently has no KEY functionality
-    { "CREATE TABLE test_insert (id integer primary key auto_increment, age integer, salary integer, address text, name text)", 
+    { "CREATE TABLE test_insert (id integer auto_increment, age integer, salary integer, address text, name text, PRIMARY KEY (id))", 
       "", "", "" },
-                                    //{ "CREATE TABLE test_insert (id integer, age integer, salary integer, address text, name text)" },
-    { Query("INSERT INTO test_insert VALUES (1, 21, 100, '24 Rosedale, Toronto, ONT', 'Pat Carlson')", false),
+      { Query("INSERT INTO test_insert VALUES (1, 21, 100, '24 Rosedale, Toronto, ONT', 'Pat Carlson')", false),
       Query("SELECT * FROM test_insert", false),
       Query("INSERT INTO test_insert (id, age, salary, address, name) VALUES (2, 23, 101, '25 Rosedale, Toronto, ONT', 'Pat Carlson2')", false),
       Query("SELECT * FROM test_insert", false),
       Query("INSERT INTO test_insert (age, address, salary, name, id) VALUES (25, '26 Rosedale, Toronto, ONT', 102, 'Pat2 Carlson', 3)", false),
       Query("SELECT * FROM test_insert", false),
-            //TODO: fails this due to lack of KEY rewriting
       Query("INSERT INTO test_insert (age, address, salary, name) VALUES (26, 'test address', 30, 'test name')", false),
       Query("SELECT * FROM test_insert", false),
       Query("INSERT INTO test_insert (age, address, salary, name) VALUES (27, 'test address2', 31, 'test name')", false),
-            //TODO segfaults new parser
-      //Query("select last_insert_id()", false),
+      Query("select last_insert_id()", false),
       Query("INSERT INTO test_insert (id) VALUES (7)", false),
-            //TODO segfaults new parser
-      //Query("select sum(id) from test_insert", false),
+      Query("select sum(id) from test_insert", false),
       Query("INSERT INTO test_insert (age) VALUES (40)", false),
-      //TODO: proxy has issues with this one...?
-      //Query("SELECT age FROM test_insert", false),
+      Query("SELECT age FROM test_insert", false),
       Query("INSERT INTO test_insert (name) VALUES ('Wendy')", false),
       Query("SELECT name FROM test_insert WHERE id=10", false),
       Query("INSERT INTO test_insert (name, address, id, age) VALUES ('Peter Pan', 'first star to the right and straight on till morning', 42, 10)", false),
@@ -81,9 +76,9 @@ static QueryList Select = QueryList("SingleSelect",
             //TODO: aborts on new parser
       //Query("SELECT max(id) FROM test_select", false),
       //Query("SELECT max(salary) FROM test_select", false),
-      //Query("SELECT COUNT(*) FROM test_select", false),
-      //Query("SELECT COUNT(DISTINCT age) FROM test_select", false),
-      //Query("SELECT COUNT(DISTINCT(address)) FROM test_select", false),
+      Query("SELECT COUNT(*) FROM test_select", false),
+      Query("SELECT COUNT(DISTINCT age) FROM test_select", false),
+      Query("SELECT COUNT(DISTINCT(address)) FROM test_select", false),
       Query("SELECT name FROM test_select", false),
       Query("SELECT address FROM test_select", false),
       Query("SELECT * FROM test_select WHERE id>3", false),
@@ -101,7 +96,7 @@ static QueryList Select = QueryList("SingleSelect",
       Query("SELECT * FROM test_select ORDER BY salary", false),
       Query("SELECT * FROM test_select ORDER BY name", false),
       Query("SELECT * FROM test_select ORDER BY address", false),
-            //TODO: aborts on new parser
+            //TODO: problems on new parser
       //Query("SELECT sum(age) FROM test_select GROUP BY address ORDER BY address", false),
       //Query("SELECT salary, max(id) FROM test_select GROUP BY salary ORDER BY salary", false),
       Query("SELECT * FROM test_select GROUP BY age ORDER BY age", false),
@@ -1134,7 +1129,7 @@ static void
 RunTest(const TestConfig &tc) {
     //CheckQueryList(tc, Insert);
     CheckQueryList(tc, Select);
-    //CheckQueryList(tc, Join);
+    CheckQueryList(tc, Join);
     CheckQueryList(tc, Update);
     CheckQueryList(tc, Delete);
     //CheckQueryList(tc, Search);
