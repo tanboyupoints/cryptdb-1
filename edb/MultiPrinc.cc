@@ -153,7 +153,10 @@ typedef struct equalOp {
 bool
 MultiPrinc::hasEncFor(string field)
 {
-    return mkm.reverseEncFor.find(field) != mkm.reverseEncFor.end();
+    if (mkm.reverseEncFor.find(field) != mkm.reverseEncFor.end()) {
+        return mkm.reverseEncFor[field];
+    }
+    return false;
 }
 
 

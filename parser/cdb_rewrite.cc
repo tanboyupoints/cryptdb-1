@@ -2626,10 +2626,11 @@ mp_update_init(LEX *lex, Analysis &a)
         if (!i) {
             break;
         }
-        string fname = fullName(i->table_name, i->field_name);
+        string fname = fullName(i->field_name, i->table_name);
+        LOG(cdb_v) << fname;
         if (a.mp->hasEncFor(fname)) {
             assert_s(false, "cannot update changes to access tree");
-	    } 
+	    }
     }
 }
 

@@ -57,6 +57,7 @@ insert into msgs values (1, 100);
 insert into msgs values (2, 200);
 select * from msgs;
 
+
 update msgs set msgtext = 7, msgid = 2 where msgid = 1;
 select * from msgs;
 
