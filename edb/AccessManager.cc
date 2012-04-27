@@ -3,13 +3,14 @@
 #include <edb/AccessManager.hh>
 #include <util/cryptdb_log.hh>
 
-
 #include <iostream>
 
 #include <RCF/Idl.hpp>
 #include <RCF/IpServerTransport.hpp>
 #include <RCF/RcfServer.hpp>
 #include <RCF/TcpEndpoint.hpp>
+
+using namespace std;
 
 RCF_BEGIN(I_X, "I_X")
 RCF_METHOD_R2(int, add, int, int)
@@ -46,13 +47,6 @@ int test_rpc()
 
     return 0;
 }
-
-
-
-
-using namespace std;
-
-
 
 
 #define NODIGITS 4
@@ -510,6 +504,7 @@ MetaAccess::CheckAccess()
 
     if (results.size() != genToPrin.size()) {
         if(VERBOSE) { LOG(am_v) << "wrong number of results"; }
+        PrintMaps();
         return false;
     }
 

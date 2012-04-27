@@ -35,108 +35,97 @@ const bool VERBOSE = true;
 list<string>
 MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
                               SchemaInfo * schema) {
-    int accres;
     list<string> query_list;
+
     switch (annot.type) {
+        //MultiPrinc shouldn't get the single princ annotations
     case SINGLE_ENC:
         assert_s(false, "mp received SINGLE type annotation");
+
+
     case PRINCTYPE:
-        accres = accMan->startPrinc(annot.getPrimitive());
-        assert_s(accres >= 0, "access manager could not start principal " + annot.getPrimitive());
+        assert_s(accMan->startPrinc(annot.getPrimitive()) >= 0, "access manager could not start principal " + annot.getPrimitive());
         encryptfield = false;
         break;
+
+
     case PRINCTYPE_EXTERNAL:
-        accres = accMan->startPrinc(annot.getPrimitive());
-        assert_s(accres >= 0, "access manager could not start principal " + annot.getPrimitive());
-        accres = accMan->addGives(annot.getPrimitive());
-        assert_s(accres >= 0, "access manager could not make principal external " + annot.getPrimitive());
+        assert_s(accMan->startPrinc(annot.getPrimitive()) >= 0, "access manager could not start principal " + annot.getPrimitive());
+        assert_s(accMan->addGives(annot.getPrimitive()) >= 0, "access manager could not make principal external " + annot.getPrimitive());
         encryptfield = false;
         break;
+
+
     case SPEAKSFOR: {
         assert_s(setSensitive(schema, annot.getLeftTableName(), annot.getLeftFieldName()), "could not set left speaksfor table as sensitive");
         assert_s(setSensitive(schema, annot.getRightTableName(), annot.getRightFieldName()), "could not set right speaksfor table as sensitive");
 
-        accres = accMan->addToPrinc(annot.getLeft().column, annot.getLeft().princtype);
-        assert_s(accres >= 0, "access manager could not add to princ " + annot.getLeftStr());
-        accres = accMan->addToPrinc(annot.getRight().column, annot.getRight().princtype);
-        assert_s(accres >= 0, "access manager could not add to princ " + annot.getRightStr());
+        assert_s(accMan->addToPrinc(annot.getLeft().column, annot.getLeft().princtype) >= 0, "access manager could not add to princ " + annot.getLeftStr());
+        assert_s(accMan->addToPrinc(annot.getRight().column, annot.getRight().princtype) >= 0, "access manager could not add to princ " + annot.getRightStr());
 
-        accres = accMan->addSpeaksFor(annot.getLeft().princtype, annot.getRight().princtype);
-        assert_s(accres >= 0, "access manager could not add " + annot.getLeftStr() + " speaks for " + annot.getRightStr());
+        assert_s(accMan->addSpeaksFor(annot.getLeft().princtype, annot.getRight().princtype) >= 0, "access manager could not add " + annot.getLeftStr() + " speaks for " + annot.getRightStr());
         encryptfield = false;
+        
         Predicate *pred = annot.getPredicate();
         if(pred) {
             mkm.condAccess[AccessRelation(annot.getLeft().column, annot.getRight().column)] = pred;
         }
         break;
     }
+
+
     case ENCFOR:
-        accres = accMan->addToPrinc(annot.getRight().column, annot.getRight().princtype);
-        assert_s(accres >= 0, "access manager could not add to princ " + annot.getRightStr());
+        string right_col = annot.getRight().column;
+        string right_type = annot.getRight().princtype;
+        string right_table = annot.getRightTableName();
+        string right_field = annot.getRightFieldName();
+        string prim_table = annot.getPrimitiveTableName();
+        string prim_field = annot.getPrimitiveFieldName();
 
-        mkm.reverseEncFor[annot.getRight().column] = true;
+        assert_s(accMan->addToPrinc(right_col, right_type) >= 0, "access manager could not add to princ " + annot.getRightStr());
+        mkm.reverseEncFor[right_col] = true;
         encryptfield = true;
+        assert_s(setSensitive(schema, prim_table, prim_field), "could not set primitive encfor table as sensitive");
+        assert_s(setSensitive(schema, right_table, right_field), "could not set right encfor table as sensitive");
 
-        assert_s(setSensitive(schema, annot.getPrimitiveTableName(), annot.getPrimitiveFieldName()), "could not set primitive encfor table as sensitive");
-        assert_s(setSensitive(schema, annot.getRightTableName(), annot.getRightFieldName()), "could not set right encfor table as sensitive");
-        //cerr << "sensitive done" << endl;
-        FieldMeta *fm = schema->tableMetaMap[annot.getPrimitiveTableName()]->fieldMetaMap[annot.getPrimitiveFieldName()];
+        FieldMeta *fm = schema->tableMetaMap[prim_table]->fieldMetaMap[prim_field];
         assert_s(fm, "ENCFOR received primitive that does not exist; please put CREATE TABLE query before ENCFOR annotation\n");
-        mkm.encForMap[fullName(fm->fname, annot.getPrimitiveTableName())] = annot.getRight().column;
-        cerr << "process annotations mkm " << fullName(fm->fname, annot.getPrimitiveTableName()) << "->" << annot.getRight().column << endl;
-        //if level not specified, it will be SECLEVEL::INVALID
-        string query = "ALTER TABLE " + annot.getPrimitiveTableName();
-        bool first = true;
-        //there will always be a DET onion
-        if (annot.getDETLevel() != SECLEVEL::INVALID) {
-            if (fm->onions.find(oDET) == fm->onions.end()) {
-                fm->onions[oDET]->onionname = anonymizeFieldName(0, oDET, fm->fname, true);
+        mkm.encForMap[fullName(fm->fname, prim_table)] = right_col;
+
+        string prev_onion = "";
+        OnionLevelMap olm = fm->encdesc.olm;
+
+        for (auto pr : olm) {
+            onion o = pr.first;
+            SECLEVEL level = annot.hasOnion(o);
+            cerr << o << " " << levelnames[(int) level] << endl;
+            //if level not specified, it will be SECLEVEL::INVALID
+            if (level == SECLEVEL::INVALID) {
+                fm->removeOnion(o);
+                continue;
             }
-            if (annot.getDETLevel() != SECLEVEL::INVALID) {
-                fm->setOnionLevel(oDET, annot.getDETLevel());
+
+            if (level != SECLEVEL::RND) {
+                assert_s(fm->setOnionLevel(o, level), "cannot set onion to requested level");
             }
-            //mkm.encForMap[fullName(fm->onions[oDET], annot.getPrimitiveTableName())] = annot.getRight().column;
-            //cerr << "process annotations mkm " << fullName(fm->onions[oDET], annot.getPrimitiveTableName()) << "->" << annot.getRight().column << endl;
-            if (IsMySQLTypeNumeric(fm->sql_field->sql_type)) {
-                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onions[oDET]->onionname + " " + TN_I64 + ";");
+
+            string onionname = fm->onions[o]->onionname;
+            Create_field * cf = fm->onions[o]->layers.back()->newCreateField(onionname);
+
+            stringstream query;
+            query << "ALTER TABLE " + prim_table;
+        
+            if (prev_onion == "") {
+                query << " CHANGE " << fm->fname << " " << *cf << ";";
             } else {
-                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onions[oDET]->onionname + " " + TN_TEXT + ";");
+                query << " ADD " << *cf << " AFTER " << prev_onion << ";";
             }
-            fm->setOnionLevel(oDET, annot.getDETLevel());
-            first = false;
+
+            prev_onion = fm->onions[o]->onionname;
+            query_list.push_back(query.str());
         }
-        if (annot.getOPELevel() != SECLEVEL::INVALID) {
-            if (fm->onions.find(oOPE) == fm->onions.end()) {
-                fm->onions[oOPE]->onionname = anonymizeFieldName(0, oOPE, fm->fname, true);
-            }
-            fm->setOnionLevel(oOPE, annot.getOPELevel());
-            if (!first) {
-                //mkm.encForMap[fullName(fm->onions[oOPE], annot.getPrimitiveTableName())] = annot.getRight().column;
-                //cerr << "process annotations mkm " << fullName(fm->onions[oOPE], annot.getPrimitiveTableName()) << "->" << annot.getRight().column << endl;
-                query_list.push_back(query + " ADD " + fm->onions[oOPE]->onionname + " " + TN_I64 + ";");
-            } else {
-                query_list.push_back(query + " CHANGE " + fm->fname + " " + fm->onions[oOPE]->onionname + " " + TN_I64 + ";");
-            }
-            first = false;
-        }
-        if (annot.getAGGLevel() || fm->onions.find(oAGG) != fm->onions.end()) {
-            if (fm->onions.find(oAGG) == fm->onions.end()) {
-                fm->onions[oAGG]->onionname = anonymizeFieldName(0, oAGG, fm->fname, true);
-            }
-            fm->setOnionLevel(oAGG, SECLEVEL::HOM);
-            //mkm.encForMap[fullName(fm->onions[oAGG], annot.getPrimitiveTableName())] = annot.getRight().column;
-            query_list.push_back(query + " ADD " + fm->onions[oAGG]->onionname + " " + TN_HOM + ";");
-        }
-        if (annot.getSWPLevel() || fm->onions.find(oSWP) != fm->onions.end()) {
-            if (fm->onions.find(oSWP) == fm->onions.end()) {
-                fm->onions[oSWP]->onionname = anonymizeFieldName(0, oSWP, fm->fname, true);
-            }
-            fm->setOnionLevel(oSWP, SECLEVEL::SEARCH);
-            //mkm.encForMap[fullName(fm->onion[oSWP], annot.getPrimitiveTableName())] = annot.getRight().column;
-            query_list.push_back(query + " ADD " + fm->onions[oSWP]->onionname + " " + TN_TEXT + ";");
-        }
-        break;
-    }
+     }
+
     return query_list;
 }
 
@@ -150,185 +139,6 @@ MultiPrinc::setSensitive(SchemaInfo *schema, string table_name, string field) {
     schema->tableMetaMap[table_name]->hasSensitive = true;
     return true;
 }
-
-/*void
-MultiPrinc::processAnnotation(list<string>::iterator & wordsIt,
-                              list<string> & words, string tablename,
-                              string currentField,
-                              bool & encryptfield, map<string,
-                                                       TableMetadata *> & tm)
-{
-    //cerr << "in process ann in mp\n";
-
-    if (equalsIgnoreCase(*wordsIt, "encfor")) {
-        tm[tablename]->hasSensitive = true;
-        LOG(mp) << "encfor";
-        wordsIt++;
-        //cerr << "b\n";
-        string field2 = *wordsIt;
-        //cerr << "c\n";
-        wordsIt++;
-        //cerr << "before assign " << fullName(currentField, tablename) << " " << fullName(field2,
-        //        tablename) << "\n";
-
-        //cerr << "size of encfor map " << (mkm.encForMap.size()) << "\n";
-        mkm.encForMap[fullName(currentField, tablename)] = fullName(field2,
-                                                                    tablename);
-        //cerr << "e\n";
-        LOG(mp) << "==> "
-                << fullName(currentField, tablename) << " "
-                << fullName(field2, tablename);
-        mkm.reverseEncFor[fullName(field2, tablename)] = true;
-        encryptfield = true;
-
-        FieldMetadata * fm = tm[tablename]->fieldMetaMap[currentField];
-
-        // in multi-princ mode, these are false by default, unless explicitly requested
-        fm->has_ope = false;
-        fm->has_agg = false;
-
-        //check if there is any annotation for security level
-        std::set<string> secAnns =
-            { levelnames[(int) SECLEVEL::DET],
-              levelnames[(int) SECLEVEL::DETJOIN],
-              levelnames[(int) SECLEVEL::OPE],
-              levelnames[(int) SECLEVEL::SEMANTIC_AGG]
-            };
-        while ((wordsIt != words.end()) &&
-               contains(*wordsIt, secAnns)) {
-
-
-            if (equalsIgnoreCase(levelnames[(int) SECLEVEL::DET], *wordsIt)) {
-                if (VERBOSE_G) { LOG(mp) << "at det"; }
-                fm->secLevelDET = SECLEVEL::DET;
-                wordsIt++;
-                continue;
-            }
-
-            if (equalsIgnoreCase(levelnames[(int) SECLEVEL::DETJOIN], *wordsIt)) {
-                fm->secLevelDET = SECLEVEL::DETJOIN;
-                wordsIt++;
-                continue;
-            }
-
-            if (equalsIgnoreCase(levelnames[(int) SECLEVEL::OPE], *wordsIt)) {
-                if (VERBOSE_G) { LOG(mp) << "at det and opeself"; }
-                fm->secLevelOPE = SECLEVEL::OPE;
-                fm->secLevelDET = SECLEVEL::DET;
-                fm->has_ope = true;
-                wordsIt++;
-                continue;
-            }
-
-            if (equalsIgnoreCase(levelnames[(int) SECLEVEL::SEMANTIC_AGG], *wordsIt)) {
-                fm->agg_used = true;
-                wordsIt++;
-                continue;
-            }
-            assert_s(false, "invalid control path");
-        }
-
-        return;
-    }
-
-    if (equalsIgnoreCase(*wordsIt, "givespsswd")) {
-        wordsIt++;
-        string field2 = *wordsIt;
-        wordsIt++;
-        string curFieldPrincType = accMan->getPrincType(fullName(currentField, tablename));
-        if (curFieldPrincType == "") {
-            accMan->startPrinc("gen_" + fullName(currentField, tablename));
-            accMan->addToPrinc(fullName(currentField, tablename), "gen_" + fullName(currentField, tablename));
-            curFieldPrincType = accMan->getPrincType(fullName(currentField, tablename));
-        }
-        string field2PrincType = accMan->getPrincType(fullName(field2, tablename));
-        if (field2PrincType == "") {
-            accMan->startPrinc("gen_" + fullName(field2, tablename));
-            accMan->addToPrinc(fullName(field2, tablename), "gen_" + fullName(field2, tablename));
-            field2PrincType = accMan->getPrincType(fullName(field2, tablename));
-        }
-        int resacc = accMan->addGives(curFieldPrincType);
-        assert_s(resacc >=0, "access manager gives psswd failed");
-        resacc = accMan->addSpeaksFor(curFieldPrincType, field2PrincType);
-        assert_s(resacc >=0, "access manager addaccessto failed");
-        tm[tablename]->hasSensitive = true;
-        encryptfield = false;
-        return;
-    }
-
-    int countaccessto = 0;
-    while (true) {
-        if (equalsIgnoreCase(*wordsIt,"speaksfor")) {
-            //if (equalsIgnoreCase(*wordsIt,"hasaccessto")) {
-            tm[tablename]->hasSensitive = true;
-            wordsIt++;
-            if (countaccessto > 0) {
-                assert_s(
-                    false,
-                    "multiple speaksfor annotations on same field, need to add this in insert relations");
-            }
-            countaccessto++;
-            string field2 = *wordsIt;
-            wordsIt++;
-            string hasAccess = fullName(currentField, tablename);
-            string accessto = fullName(field2, tablename);
-            string genHasAccess;
-            if ((genHasAccess = accMan->getPrincType(hasAccess)) == "") {
-                genHasAccess = "gen_" + hasAccess;
-                accMan->startPrinc(genHasAccess);
-                accMan->addToPrinc(hasAccess,genHasAccess);
-            }
-            string genAccessTo;
-            if ((genAccessTo = accMan->getPrincType(accessto)) == "") {
-                genAccessTo = "gen_" + accMan->getPrincType(accessto);
-                accMan->startPrinc(genAccessTo);
-                accMan->addToPrinc(accessto,genAccessTo);
-            }
-            int resacc = accMan->addSpeaksFor(genHasAccess, genAccessTo);
-            assert_s(resacc >=0, "access manager addSpeaksFor failed");
-            encryptfield = false;
-            if (equalsIgnoreCase(*wordsIt, "if")) {             //predicate
-                LOG(mp) << "has predicate";
-                wordsIt++;                 // go over "if"
-                Predicate * pred = new Predicate();
-                pred->name = *wordsIt;
-                roll<string>(wordsIt, 2);                 //go over name and (
-                while ((wordsIt != words.end()) && (wordsIt->compare(")"))) {
-                    pred->fields.push_back(*wordsIt);
-                    wordsIt++;
-                    checkStr(wordsIt, words, ",", ")");
-                }
-                wordsIt++;
-                mkm.condAccess[AccessRelation(hasAccess, accessto)] = pred;
-                LOG(mp) << hasAccess << " speaks for " << accessto << " IF " << pred->name << "\n";
-            }
-            continue;
-        }
-
-        if (equalsIgnoreCase(*wordsIt, "equals")) {
-            tm[tablename]->hasSensitive = true;
-            wordsIt++;
-            string field2 = *wordsIt;
-            wordsIt++;
-            string gen;
-            //neither of these have a gen
-            if (((gen = accMan->getPrincType(fullName(currentField,tablename))) == "") && ((gen = accMan->getPrincType(fullName(field2,tablename))) == "")) {
-                gen = "gen_" + fullName(currentField,tablename);
-                accMan->startPrinc(gen);
-            }
-            int resacc;
-            resacc = accMan->addToPrinc(fullName(currentField,tablename), gen);
-            assert_s(resacc >=0, "access manager addToPrinc failed");
-            resacc = accMan->addToPrinc(fullName(field2, tablename), gen);
-            encryptfield = false;
-            continue;
-        }
-        return;
-    }
-
-    encryptfield = false;
-
-}*/
 
 int
 MultiPrinc::commitAnnotations()
@@ -345,7 +155,10 @@ typedef struct equalOp {
 bool
 MultiPrinc::hasEncFor(string field)
 {
-    return mkm.reverseEncFor.find(field) != mkm.reverseEncFor.end();
+    if (mkm.reverseEncFor.find(field) != mkm.reverseEncFor.end()) {
+        return mkm.reverseEncFor[field];
+    }
+    return false;
 }
 
 

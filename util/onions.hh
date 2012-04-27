@@ -3,6 +3,7 @@
 #include <string>
 #include <map>
 #include <list>
+#include <iostream>
 
 
 typedef enum onion {
@@ -10,8 +11,8 @@ typedef enum onion {
     oOPE,
     oAGG,
     oSWP,
-    oINVALID,
     oPLAIN, 
+    oINVALID,
 } onion;
 
 //Sec levels ordered such that
@@ -56,10 +57,19 @@ SECLEVELS(__temp_m)
 //Onion layouts - initial structure of onions
 typedef std::map<onion, std::list<SECLEVEL> > onionlayout;
 
+static onionlayout PLAIN_ONION_LAYOUT = {
+    {oPLAIN, std::list<SECLEVEL>({SECLEVEL::PLAINVAL})}
+};
+
 static onionlayout NUM_ONION_LAYOUT = {
     {oDET, std::list<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
     {oOPE, std::list<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
     {oAGG, std::list<SECLEVEL>({SECLEVEL::HOM})}
+};
+
+static onionlayout MP_NUM_ONION_LAYOUT = {
+    {oDET, std::list<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
+    {oOPE, std::list<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})}
 };
     
 static onionlayout STR_ONION_LAYOUT = {
@@ -68,6 +78,50 @@ static onionlayout STR_ONION_LAYOUT = {
     {oSWP, std::list<SECLEVEL>({SECLEVEL::SEARCH})}
 };
 
+typedef std::map<onion, SECLEVEL>  OnionLevelMap;
 
+/**
+ * Use to keep track of a field's encryption onions.
+ */
+class EncDesc {
+public:
+    EncDesc() {}
+    EncDesc(OnionLevelMap input) : olm(input) {}
+    EncDesc(const EncDesc & ed) : olm(ed.olm) {}
+    /**
+     * Returns true if something was changed, false otherwise.
+     */
+    bool restrict(onion o, SECLEVEL maxl);
+    EncDesc intersect(EncDesc & ed);
+    void clear() {olm.clear();};
+    
+    OnionLevelMap olm;
+};
 
+std::ostream& operator<<(std::ostream &out, const EncDesc & ed);
 
+const EncDesc FULL_EncDesc = {
+        {
+            {oDET, SECLEVEL::DET},
+            {oOPE, SECLEVEL::OPE},
+            {oAGG, SECLEVEL::HOM},
+            {oSWP, SECLEVEL::SEARCH},
+        }
+};
+
+//initial onion configurations 
+const EncDesc NUM_initial_levels = {
+        {
+            {oDET, SECLEVEL::DET},
+            {oOPE, SECLEVEL::OPE},
+            {oAGG, SECLEVEL::HOM},
+        }
+};
+
+const EncDesc STR_initial_levels = {
+        {
+            {oDET, SECLEVEL::DET},
+            {oOPE, SECLEVEL::OPE},
+            {oSWP, SECLEVEL::SEARCH},
+        }
+};

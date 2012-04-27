@@ -76,10 +76,7 @@ public:
 
     //returns the encryption level for primitive
     //requires: type to be ENCFOR
-    SECLEVEL getDETLevel();
-    SECLEVEL getOPELevel();
-    bool getAGGLevel();
-    bool getSWPLevel();
+    SECLEVEL hasOnion(onion o);
 
     //return the predicate, if it exists
     //requires: type to be SPEAKSFOR
@@ -99,6 +96,6 @@ private:
     Predicate *pred;
     SECLEVEL DETenclevel;
     SECLEVEL OPEenclevel;
-    bool AGGenclevel;
-    bool SWPenclevel;
+    SECLEVEL AGGenclevel;
+    SECLEVEL SWPenclevel;
 };

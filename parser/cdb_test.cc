@@ -31,9 +31,9 @@
 using namespace std;
 
 // if true, uses MultiPrinc mode
-static bool Multi = true;
+static bool Multi = false;
 
-static bool encByDefault = false;
+static bool encByDefault = true;
 
 
 static inline string user_homedir() {
@@ -100,11 +100,10 @@ main(int ac, char **av)
             if (!dbres) {
                 continue;
             }
-            cerr << "got res" << endl;
+
             ResType res = dbres->unpack();
 
             if (!res.ok) {
-                cerr << "issue with query \n";
                 continue;
             }
             ResType dec_res = r.decryptResults(res, analysis);
@@ -113,7 +112,7 @@ main(int ac, char **av)
         } catch (std::runtime_error &e) {
             cout << "Unexpected Error: " << e.what() << " in query " << q << endl;
         } catch (CryptDBError &e) {
-            cout << "Interal Error: " << e.msg << " in query " << q << endl;
+            cout << "Internal Error: " << e.msg << " in query " << q << endl;
         }
     }
 }

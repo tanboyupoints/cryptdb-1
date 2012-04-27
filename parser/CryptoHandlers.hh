@@ -20,14 +20,15 @@
 // encrypted data in the DBMS.
 //TODO: currently, we have one such object per onion layer per field
 // optimize storage by sharing these handlers among objects with same type
-//TODO: need to writeup cleanup & destructors
+//TODO: need to implement cleanup & destructors
+
 
 class EncLayer {
  public:
     EncLayer(Create_field * f) : cf(f) {}
 
     virtual SECLEVEL level() = 0;
-    virtual Create_field * newCreateField() = 0;
+    virtual Create_field * newCreateField(std::string anonname = "") = 0;
     
     virtual Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "") = 0;
     virtual Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "") = 0;
@@ -45,16 +46,20 @@ class EncLayer {
 
 class EncLayerFactory {
 public:
-    static EncLayer * encLayer(SECLEVEL sl, Create_field * cf, PRNG * key);
+    static EncLayer * encLayer(onion o, SECLEVEL sl, Create_field * cf, PRNG * key);
 };
 
+// returns true if any of the layers in ed
+// need salt
+bool
+needsSalt(EncDesc ed);
 
 class RND_int : public EncLayer {
 public:
     RND_int(Create_field *, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::RND;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
     
     Item * encrypt(Item * ptext, uint64_t IV, const std::string &k = "");
     Item * decrypt(Item * ctext, uint64_t IV, const std::string &k = "");
@@ -75,7 +80,7 @@ public:
     RND_str(Create_field *, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::RND;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
     
     Item * encrypt(Item * ptext, uint64_t IV, const std::string &k = "");
     Item * decrypt(Item * ctext, uint64_t IV, const std::string &k = "");
@@ -96,7 +101,7 @@ public:
     DET_int(Create_field *, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::DET;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "");
     Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "");
@@ -117,10 +122,10 @@ public:
     DET_str(Create_field *, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::DET;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
     
-    Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = 0);
-    Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = 0);
+    Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "");
+    Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "");
     Item * decryptUDF(Item * col, Item * = NULL);
 
 private:
@@ -140,7 +145,7 @@ public:
     DETJOIN(Create_field * cf, PRNG * key) : EncLayer(cf) {}
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
-    Create_field * newCreateField() {return cf;}
+    Create_field * newCreateField(std::string anonname = "") {return cf;}
     
     //TODO: DETJOIN for multi
     Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
@@ -160,7 +165,7 @@ public:
     OPE_int(Create_field *, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::OPE;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
 
     Item * encrypt(Item * p, uint64_t IV, const std::string &k = "");
     Item * decrypt(Item * c, uint64_t IV, const std::string &k = "");
@@ -182,7 +187,7 @@ public:
     OPE_str(Create_field *, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::OPE;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
 
     Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
     Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = "")__attribute__((noreturn));
@@ -204,15 +209,15 @@ public:
     HOM(Create_field * cf, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::HOM;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
 
     //TODO needs multi encrypt and decrypt
     Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
     Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = "");
 
     //expr is the expression (e.g. a field) over which to sum
-    Item * sumUDF(Item * expr, const std::string &k = 0);
-    
+    Item * sumUDA(Item * expr, const std::string &k = "");
+    Item * sumUDF(Item * i1, Item * i2, const std::string &k = "");
 private:
     static const uint nbits = 1024;
     Paillier_priv sk;
@@ -226,13 +231,13 @@ public:
     Search(Create_field * cf, PRNG * key);
 
     SECLEVEL level() {return SECLEVEL::SEARCH;}
-    Create_field * newCreateField();
+    Create_field * newCreateField(std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "");
     Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "")__attribute__((noreturn));
 
     //expr is the expression (e.g. a field) over which to sum
-    Item * searchUDF(Item * expr);
+    Item * searchUDF(Item * field, Item * expr);
     
 private:
     static const uint key_bytes = 16;
@@ -243,9 +248,6 @@ private:
     void unSetKey(const std::string &key);
 };
 
-// XXX these should probably be special methods in HOM above.
-extern udf_func s_HomAddUdfFunc;
-extern udf_func s_HomSubUdfFunc;
 
 extern const std::vector<udf_func*> udf_list;
 

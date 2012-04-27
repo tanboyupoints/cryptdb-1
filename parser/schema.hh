@@ -8,6 +8,7 @@
 #include <string>
 #include <map>
 #include <list>
+#include <iostream>
 
 struct FieldMeta;
 /**
@@ -20,55 +21,18 @@ typedef std::pair<SECLEVEL, FieldMeta *> LevelFieldPair;
 typedef std::map<onion, LevelFieldPair>  OnionLevelFieldMap;
 
 typedef std::pair<onion, LevelFieldPair> OnionLevelFieldPair;
-typedef std::map<onion, SECLEVEL>        OnionLevelMap;
 
 
-/**
- * Use to keep track of a field's encryption onions.
- */
-class EncDesc {
-public:
-    EncDesc(OnionLevelMap input) : olm(input) {}
-    EncDesc(const EncDesc & ed) : olm(ed.olm) {}
-    /**
-     * Returns true if something was changed, false otherwise.
-     */
-    bool restrict(onion o, SECLEVEL maxl);
+std::ostream&
+operator<<(std::ostream &out, const OnionLevelFieldPair &p);
 
-    OnionLevelMap olm;
-    onionlayout * layout; 
-};
-
-
-const EncDesc FULL_EncDesc = {
-        {
-            {oDET, SECLEVEL::DET},
-            {oOPE, SECLEVEL::OPE},
-            {oAGG, SECLEVEL::HOM},
-            {oSWP, SECLEVEL::SEARCH},
-        }
-};
-
-//initial onion configurations 
-const EncDesc NUM_initial_levels = {
-        {
-            {oDET, SECLEVEL::DET},
-            {oOPE, SECLEVEL::OPE},
-            {oAGG, SECLEVEL::HOM},
-        }
-};
-
-const EncDesc STR_initial_levels = {
-        {
-            {oDET, SECLEVEL::DET},
-            {oOPE, SECLEVEL::OPE},
-            {oSWP, SECLEVEL::SEARCH},
-        }
-};
 
 typedef struct OnionMeta {
     std::string onionname;
+    bool stale;
     std::list<EncLayer *> layers; //first in list is lowest layer
+
+    OnionMeta(): onionname(""), stale(false) {};
 } OnionMeta;
 
 struct TableMeta;
@@ -102,11 +66,26 @@ typedef struct FieldMeta {
     }
 
     inline bool setOnionLevel(onion o, SECLEVEL maxl) {
-        return encdesc.restrict(o, maxl);
+        if (encdesc.restrict(o, maxl)) {
+            while (onions[o]->layers.size() != 0 && onions[o]->layers.back()->level() != maxl) {
+                onions[o]->layers.pop_back();
+            }
+            return true;
+        }
+        return false;
+    }
+
+    inline void removeOnion(onion o) {
+        onions.erase(o);
+        encdesc.olm.erase(o);
+        std::cerr << fname << " encdesc is " << encdesc << std::endl;
     }
 
     std::string stringify();
     
+    inline bool isEncrypted() {
+        return ((onions.size() != 1) ||  (onions.find(oPLAIN) == onions.end()));
+    }
 } FieldMeta;
 
 

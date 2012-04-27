@@ -2,12 +2,24 @@
 
 using namespace std;
 
+
+ostream&
+operator<<(ostream &out, const OnionLevelFieldPair &p)
+{
+    out << "(onion " << p.first
+        << ", level " << levelnames[(int)p.second.first]
+        << ", field `" << (p.second.second == NULL ? "*" : p.second.second->fname) << "`"
+        << ")";
+    return out;
+}
+
+
 string FieldMeta::stringify() {
     string res = " [FieldMeta " + fname + "]";
     return res;
 }
 
-FieldMeta::FieldMeta():encdesc(FULL_EncDesc)
+FieldMeta::FieldMeta()
 {
     fname = "";
     sql_field = NULL;
@@ -55,8 +67,6 @@ EncDesc::restrict(onion o, SECLEVEL maxl)
     assert(it != olm.end());
 
     if (it->second > maxl) {
-	cerr << "restricting: got level "<< levelnames[(int)maxl] << " current level "
-	     << levelnames[(int)it->second] << ";\n";
         it->second = maxl;
         return true;
     }
@@ -64,3 +74,14 @@ EncDesc::restrict(onion o, SECLEVEL maxl)
     return false;
 }
 
+EncDesc
+EncDesc::intersect(EncDesc & ed) {
+    OnionLevelMap new_olm = OnionLevelMap();
+    for (auto it: ed.olm) {
+	auto jt = olm.find(it.first);
+	if (jt != olm.end()) {
+	    new_olm[it.first] = min(it.second, jt->second);
+	}
+    }
+    return EncDesc(new_olm);
+}

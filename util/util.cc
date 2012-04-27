@@ -499,6 +499,14 @@ toLowerCase(const string &token)
     return s;
 }
 
+string
+toUpperCase(const string &token)
+{
+    string s = token;
+    transform(s.begin(), s.end(), s.begin(), ::toupper);
+    return s;
+}
+
 bool
 equalsIgnoreCase(const string &s1, const string &s2)
 {

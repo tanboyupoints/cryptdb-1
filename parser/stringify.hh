@@ -34,13 +34,10 @@ operator<<(std::ostream &out, Item &i)
 
 static inline std::ostream&
 operator<<(std::ostream &out, Item * i) {
-    if (i == NULL || i->null_value) {
-	return out << "NULL";
-    } else {
-	String s, s1;
-	s = *(i->val_str(&s1));	 
-	return out << s;
-    }
+    assert(i);
+    String s, s1;
+    s = *(i->val_str(&s1));	 
+    return out << s;
 }
 
 template<class T>
@@ -98,7 +95,7 @@ operator<<(std::ostream &out, SELECT_LEX_UNIT &select_lex_unit)
 }
 
 static const char *
-sql_type_to_string(enum_field_types tpe)
+sql_type_to_string(enum_field_types tpe, CHARSET_INFO *charset)
 {
 #define ASSERT_NOT_REACHED() \
     do { \
@@ -130,7 +127,12 @@ sql_type_to_string(enum_field_types tpe)
     case MYSQL_TYPE_TINY_BLOB   : return "TINYBLOB";
     case MYSQL_TYPE_MEDIUM_BLOB : return "MEDIUMBLOB";
     case MYSQL_TYPE_LONG_BLOB   : return "LONGBLOB";
-    case MYSQL_TYPE_BLOB        : return "BLOB";
+    case MYSQL_TYPE_BLOB        : 
+        if (charset == &my_charset_bin) {
+            return "BLOB";
+        } else {
+            return "TEXT";
+        }
     case MYSQL_TYPE_VAR_STRING  : ASSERT_NOT_REACHED();
     case MYSQL_TYPE_STRING      : return "CHAR";
 
@@ -144,8 +146,9 @@ sql_type_to_string(enum_field_types tpe)
 static std::ostream&
 operator<<(std::ostream &out, Create_field &f)
 {
+    
     // emit field name + type definition
-    out << f.field_name << " " << sql_type_to_string(f.sql_type);
+    out << f.field_name << " " << sql_type_to_string(f.sql_type, f.charset);
 
     // emit extra length info if necessary
     switch (f.sql_type) {
@@ -418,7 +421,6 @@ operator<<(std::ostream &out, LEX &lex)
 
     switch (lex.sql_command) {
     case SQLCOM_SELECT:
-        // out << lex.select_lex;
         out << lex.unit;
         break;
 
@@ -509,7 +511,7 @@ operator<<(std::ostream &out, LEX &lex)
                 out << "ignore ";
             }
 
-            lex.query_tables->print(t, &s, QT_ORDINARY);
+            lex.select_lex.table_list.first->print(t, &s, QT_ORDINARY);
             out << "into " << s;
             if (lex.field_list.head())
                 out << " " << lex.field_list;
@@ -595,6 +597,7 @@ operator<<(std::ostream &out, LEX &lex)
     case SQLCOM_CREATE_TABLE:
         do_create_table(out, lex);
         break;
+
     case SQLCOM_DROP_TABLE:
         out << "drop ";
         if (lex.drop_temporary) {
@@ -619,9 +622,33 @@ operator<<(std::ostream &out, LEX &lex)
           out << " cascade";
         }
         break;
+
+    case SQLCOM_CHANGE_DB:
+        out << "USE " << lex.select_lex.db;
+        break;
+
     case SQLCOM_BEGIN:
+        out << "START TRANSACTION";
+        if (lex.start_transaction_opt & MYSQL_START_TRANS_OPT_WITH_CONS_SNAPSHOT)
+            out << " WITH CONSISTENT SNAPSHOT";
+        break;
+
     case SQLCOM_COMMIT:
+        out << "COMMIT";
+        if (lex.tx_chain != TVL_UNKNOWN)
+            out << " AND" << (lex.tx_chain == TVL_NO ? " NO" : "") << " CHAIN";
+        if (lex.tx_release != TVL_UNKNOWN)
+            out << (lex.tx_release == TVL_NO ? " NO" : "") << " RELEASE";
+        break;
+
     case SQLCOM_ROLLBACK:
+        out << "ROLLBACK";
+        if (lex.tx_chain != TVL_UNKNOWN)
+            out << " AND" << (lex.tx_chain == TVL_NO ? " NO" : "") << " CHAIN";
+        if (lex.tx_release != TVL_UNKNOWN)
+            out << (lex.tx_release == TVL_NO ? " NO" : "") << " RELEASE";
+        break;
+
     case SQLCOM_SET_OPTION:
     case SQLCOM_SHOW_DATABASES:
     case SQLCOM_SHOW_TABLES:
@@ -630,7 +657,6 @@ operator<<(std::ostream &out, LEX &lex)
     case SQLCOM_SHOW_VARIABLES:
     case SQLCOM_SHOW_STATUS:
     case SQLCOM_SHOW_COLLATIONS:
-    case SQLCOM_CHANGE_DB:  /* for analysis, assume we never change DB? */
         /* placeholders to make analysis work.. */
         out << ".. type " << lex.sql_command << " query ..";
         break;

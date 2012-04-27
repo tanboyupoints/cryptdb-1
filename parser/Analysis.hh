@@ -7,6 +7,7 @@
 #include <parser/stringify.hh>
 #include <edb/MultiPrinc.hh>
 //#include <util/schema.hh>
+#include <util/cryptdb_log.hh>
 
 using namespace std;
 
@@ -18,7 +19,7 @@ class EncSet {
 public:
     EncSet(OnionLevelFieldMap input) : osl(input) {}
     EncSet(); // TODO(stephentu): move ctor here
-
+   
     /**
      * decides which encryption scheme to use out of multiple in a set
      */
@@ -30,6 +31,8 @@ public:
 
     inline bool singleton() const { return osl.size() == 1; }
 
+    EncDesc encdesc();
+    
     inline OnionLevelFieldPair extract_singleton() const {
         assert_s(singleton(), string("encset has size ") + StringFromVal(osl.size()));
         auto it = osl.begin();
@@ -41,15 +44,21 @@ public:
     OnionLevelFieldMap osl; //max level on each onion
 };
 
+
+ostream&
+operator<<(ostream &out, const EncSet & es);
+
 const EncSet EQ_EncSet = {
         {
-            {oDET, LevelFieldPair(SECLEVEL::DET, NULL)},
-            {oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
+	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+            {oDET,   LevelFieldPair(SECLEVEL::DET, NULL)},
+            {oOPE,   LevelFieldPair(SECLEVEL::OPE, NULL)},
         }
 };
 
 const EncSet ORD_EncSet = {
     {
+	{oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
 	{oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
     }
 };
@@ -63,6 +72,7 @@ const EncSet PLAIN_EncSet = {
 //todo: there should be a map of FULL_EncSets depending on item type
 const EncSet FULL_EncSet = {
         {
+	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
             {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
             {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
             {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
@@ -72,12 +82,14 @@ const EncSet FULL_EncSet = {
 
 const EncSet Search_EncSet = {
         {
+	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
             {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
         }
 };
 
 const EncSet ADD_EncSet = {
         {
+	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
             {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
         }
 };
@@ -136,12 +148,13 @@ public:
  
 
     unsigned int pos; //a counter indicating how many projection fields have been analyzed so far                                                                    
-    std::map<std::string, FieldAMeta *> fieldToAMeta;						     
+    std::map<FieldMeta *, FieldAMeta *> fieldToAMeta;						     
 
     //maps an Item to metadata about that item
     std::map<Item*, ItemMeta *>         itemToMeta;
     std::map<Item_field*, FieldMeta*>   itemToFieldMeta;
     std::set<Item*>                     itemHasRewrite;
+    std::map<FieldMeta *, salt_type>    salts;
     
     SchemaInfo *                        schema;
     AES_KEY *                           masterKey;

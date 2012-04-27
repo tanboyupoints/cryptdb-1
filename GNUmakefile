@@ -1,7 +1,7 @@
 OBJDIR	 := obj
 TOP	 := $(shell echo $${PWD-`pwd`})
 CXX	 := g++
-CXXFLAGS := -O2 -fno-strict-aliasing -fno-rtti -fwrapv -fPIC \
+CXXFLAGS := -g -O0 -fno-strict-aliasing -fno-rtti -fwrapv -fPIC \
 	    -Wall -Werror -Wpointer-arith -Wendif-labels -Wformat=2  \
 	    -Wextra -Wmissing-noreturn -Wwrite-strings -Wno-unused-parameter \
 	    -Wmissing-declarations -Woverloaded-virtual  \
@@ -54,7 +54,7 @@ include parser/Makefrag
 include test/Makefrag
 include util/Makefrag
 include udf/Makefrag
-#include mysqlproxy/Makefrag
+include mysqlproxy/Makefrag
 
 $(OBJDIR)/.deps: $(foreach dir, $(OBJDIRS), $(wildcard $(OBJDIR)/$(dir)/*.d))
 	@mkdir -p $(@D)

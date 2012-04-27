@@ -9,46 +9,42 @@
 using namespace std;
 using namespace NTL;
 
-//TODO: this is duplicated in cdb_rewrite
-//moved to util/util
-/*static char *
-make_thd_string(const string &s, size_t *lenp = 0)
-{
-    THD *thd = current_thd;
-    assert(thd);
-
-    if (lenp)
-        *lenp = s.size();
-    return thd->strmake(s.data(), s.size());
-}
-
-static string
-ItemToString(Item * i) {
-    String s;
-    String *s0 = i->val_str(&s);
-    assert(s0 != NULL);
-    return string(s0->ptr(), s0->length());
-    }*/
-
 //TODO: remove above newcreatefield
 static Create_field*
 createFieldHelper(const Create_field *f, int field_length,
-		  enum enum_field_types type,
+		  enum enum_field_types type, string anonname = "",
 		  CHARSET_INFO * charset = NULL) {
     THD *thd = current_thd;
     Create_field *f0 = f->clone(thd->mem_root);
     if (field_length != -1) {
-	f0->length = field_length;
+        f0->length = field_length;
     }
     f0->sql_type = type;
     
     if (charset != NULL) {
-	f0->charset = charset;
+        f0->charset = charset;
     } else {
-	//encryption is always unsigned
-	f0->flags = f0->flags | UNSIGNED_FLAG; 
+        //encryption is always unsigned
+        f0->flags = f0->flags | UNSIGNED_FLAG; 
     }
+
+    if (anonname.size() > 0) {
+        f0->field_name = make_thd_string(anonname);
+    }
+    
     return f0;
+}
+
+
+bool
+needsSalt(EncDesc ed) {
+    for (auto pair : ed.olm) {
+	if (pair.second == SECLEVEL::RND) {
+	    return true;
+	}
+    }
+
+    return false;
 }
 
 /****************** RND *********************/
@@ -63,8 +59,8 @@ RND_int::RND_int(Create_field * f, PRNG * prng)
 
 
 Create_field *
-RND_int::newCreateField() {
-    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG);
+RND_int::newCreateField(string anonname) {
+    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
 }
 
 void
@@ -73,7 +69,7 @@ RND_int::setKey(const string &k) {
         return;
     }
     key = k;
-    bf = blowfish(k);
+    bf = blowfish(key);
 }
 
 //if we're using MultiPrinc, we don't want to keep a copy of a key around
@@ -82,8 +78,8 @@ RND_int::unSetKey(const string &k) {
     if (k.empty()) {
         return;
     }
-    memset(&key, 0, sizeof(key));
-    memset(&bf, 0, sizeof(bf));
+    key = "";
+    //TODO: unset blowfish
 }
 
 //TODO: may want to do more specialized crypto for lengths
@@ -153,9 +149,9 @@ RND_str::RND_str(Create_field * f, PRNG * key)
 }
 
 Create_field *
-RND_str::newCreateField() {
+RND_str::newCreateField(string anonname) {
 //TODO: use more precise sizes and types
-    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB);
+    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname);
 }
 
 void
@@ -173,7 +169,7 @@ RND_str::unSetKey(const string &k) {
     if (k.empty()) {
         return;
     }
-    memset(&rawkey, 0, sizeof(rawkey));
+    rawkey = "";
     enckey = NULL;
     deckey = NULL;
 }
@@ -182,9 +178,10 @@ Item *
 RND_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
     setKey(k);
     string enc = CryptoManager::encrypt_SEM(
-                 ItemToString(static_cast<Item_string *>(ptext)),
+                 ItemToString(ptext),
                  enckey, IV);
-    LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV " << IV << "--->" << enc;
+    LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV " << IV << "--->"
+	      << "len of enc " << enc.length() << " enc " << enc;
     unSetKey(k);
     return new Item_string(make_thd_string(enc), enc.length(), &my_charset_bin);
 }
@@ -193,9 +190,10 @@ Item *
 RND_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
     setKey(k);
     string dec = CryptoManager::decrypt_SEM(
-    ItemToString(static_cast<Item_string *>(ctext)),
+	ItemToString(ctext),
 	deckey, IV);
-    LOG(encl) << "RND_str decrypt " << ItemToString(ctext) << " IV " << IV << "-->" << dec;
+    LOG(encl) << "RND_str decrypt " << ItemToString(ctext) << " IV " << IV << "-->"
+	      << "len of dec " << dec.length() << " dec: " << dec;
     unSetKey(k);
     return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
 }
@@ -241,8 +239,8 @@ DET_int::DET_int(Create_field * f, PRNG * prng)
 }
 
 Create_field *
-DET_int::newCreateField() {
-    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG);
+DET_int::newCreateField(string anonname) {
+    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
 }
 
 void
@@ -251,7 +249,7 @@ DET_int::setKey(const string &k) {
         return;
     }
     key = k;
-    bf = k;
+    bf = blowfish(key);
 }
 
 void
@@ -259,8 +257,8 @@ DET_int::unSetKey(const string &k) {
     if (k.empty()) {
         return;
     }
-    memset(&key, 0, sizeof(key));
-    memset(&bf, 0, sizeof(bf));
+    key = "";
+    //TODO: unset blowfish
 }
 
 //TODO: may want to do more specialized crypto for lengths
@@ -329,9 +327,9 @@ DET_str::DET_str(Create_field * f, PRNG * key)
 
 
 Create_field *
-DET_str::newCreateField() {
+DET_str::newCreateField(string anonname) {
 //TODO: use more precise sizes and types
-    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB);
+    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname);
 }
 
 void
@@ -349,7 +347,7 @@ DET_str::unSetKey(const string &k) {
     if (k.empty()) {
         return;
     }
-    memset(&rawkey, 0, sizeof(rawkey));
+    rawkey = "";
     enckey = NULL;
     deckey = NULL;
 }
@@ -357,9 +355,10 @@ DET_str::unSetKey(const string &k) {
 Item *
 DET_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
     setKey(k);
-    string enc = encrypt_AES_CMC(
-                 ItemToString(static_cast<Item_string *>(ptext)),
-                 enckey, false);
+    string plain =  ItemToString(ptext);
+    string enc = encrypt_AES_CMC(plain,enckey, true);
+    LOG(encl) << " DET_str encrypt " << plain  << " IV " << IV << " ---> "
+	      << " enc len " << enc.length() << " enc " << enc;
     unSetKey(k);
     return new Item_string(make_thd_string(enc), enc.length(), &my_charset_bin);
 }
@@ -367,9 +366,10 @@ DET_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
 Item *
 DET_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
     setKey(k);
-    string dec = decrypt_AES_CMC(
-	ItemToString(static_cast<Item_string *>(ctext)),
-	deckey, false);
+    string enc = ItemToString(ctext);
+    string dec = decrypt_AES_CMC(enc, deckey, true);
+    LOG(encl) << " DET_str decrypt enc len " << enc.length() << " enc " << enc
+	      << " IV " << IV << " ---> " << " dec len " << dec.length() << " dec " << dec;
     unSetKey(k);
     return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
 }
@@ -404,14 +404,12 @@ DET_str::decryptUDF(Item * col, Item * ivcol) {
 
 Item *
 DETJOIN::encrypt(Item * p, uint64_t IV, const string &k) {
-    ulonglong val = static_cast<Item_int *>(p)->value;
-    return new Item_int(val);
+    return p->clone_item();
 }
 
 Item *
 DETJOIN::decrypt(Item * c, uint64_t IV, const string &k) {
-    ulonglong val = static_cast<Item_int *>(c)->value;
-    return new Item_int(val);
+    return c->clone_item();
 }
 
 /**************** OPE **************************/
@@ -425,8 +423,8 @@ OPE_int::OPE_int(Create_field * f, PRNG * prng)
 }
 
 Create_field *
-OPE_int::newCreateField() {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG);
+OPE_int::newCreateField(string anonname) {
+    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname);
 }
 
 void
@@ -443,7 +441,7 @@ OPE_int::unSetKey(const string &k) {
     if (k.empty()) {
         return;
     }
-    memset(&key, 0, sizeof(key));
+    key = "";
     ope = OPE("", plain_size*8, ciph_size*8);
 }
 
@@ -477,8 +475,8 @@ OPE_str::OPE_str(Create_field * f, PRNG * prng)
 }
 
 Create_field *
-OPE_str::newCreateField() {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG);
+OPE_str::newCreateField(string anonname) {
+    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname);
 }
 
 void
@@ -495,7 +493,7 @@ OPE_str::unSetKey(const string &k) {
     if (k.empty()) {
         return;
     }
-    memset(&key, 0, sizeof(key));
+    key = "";
     ope = OPE("", plain_size*8, ciph_size*8);
 }
 
@@ -504,12 +502,18 @@ OPE_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
     setKey(k);
     string ps = ItemToString(ptext);
     if (ps.size() < plain_size)
-        ps = string(plain_size - ps.size(), 0) + ps;
-    uint32_t pv;
-    memcpy(&pv, ps.data(), plain_size);
-    ZZ enc = ope.encrypt(to_ZZ(ntohl(pv)));
+        ps = ps + string(plain_size - ps.size(), 0);
+
+    uint32_t pv = 0;
+
+    for (uint i = 0; i < plain_size; i++) {
+	pv = pv * 256 + (int)ps[i];
+    }
+    
+    cerr << "VALUE associated with " << ps << " is " << pv << "\n";
+    ZZ enc = ope.encrypt(to_ZZ(pv));
     unSetKey(k);
-    return new Item_int((ulonglong) trunc_long(enc, ciph_size));
+    return new Item_int((ulonglong) uint64FromZZ(enc));
 }
 
 Item *
@@ -528,8 +532,8 @@ HOM::HOM(Create_field * f, PRNG * key)
 }
 
 Create_field *
-HOM::newCreateField() {
-    return createFieldHelper(cf, 2*nbits/8, MYSQL_TYPE_VARCHAR, &my_charset_bin);
+HOM::newCreateField(string anonname) {
+    return createFieldHelper(cf, 2*nbits/8, MYSQL_TYPE_VARCHAR, anonname, &my_charset_bin);
 }
 
 static ZZ
@@ -547,7 +551,6 @@ ZZToItemInt(const ZZ & val) {
 static Item *
 ZZToItemStr(const ZZ & val) {
     string str = StringFromZZ(val);
-    cerr << "n2 len is " << str.length() << " first byte " << (int)str[0] << "\n";
     Item * newit = new Item_string(make_thd_string(str), str.length(), &my_charset_bin);
     newit->name = NULL; //no alias
 
@@ -597,7 +600,7 @@ HOM::decrypt(Item * ctext, uint64_t IV, const string &k) {
     return ZZToItemInt(dec);
 }
 
-static udf_func u_sum = {
+static udf_func u_sum_a = {
     LEXSTRING("agg"),
     STRING_RESULT,
     UDFTYPE_AGGREGATE,
@@ -611,8 +614,8 @@ static udf_func u_sum = {
     0L,
 };
 
-udf_func s_HomAddUdfFunc = {
-    LEXSTRING("agg_add"),
+static udf_func u_sum_f = {
+    LEXSTRING("func_add_set"),
     STRING_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -624,30 +627,27 @@ udf_func s_HomAddUdfFunc = {
     NULL,
     0L,
 };
-
-udf_func s_HomSubUdfFunc = {
-    LEXSTRING("hom_sub"),
-    STRING_RESULT,
-    UDFTYPE_FUNCTION,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    0L,
-};
-
 
 Item *
-HOM::sumUDF(Item * expr, const string &k) {
+HOM::sumUDA(Item * expr, const string &k) {
     setKey(k);
     List<Item> l;
     l.push_back(expr);
     l.push_back(ZZToItemStr(sk.hompubkey()));
     unSetKey(k);
-    return new Item_func_udf_str(&u_sum, l);
+    return new Item_func_udf_str(&u_sum_a, l);
+}
+
+Item *
+HOM::sumUDF(Item * i1, Item * i2, const string &k) {
+    setKey(k);
+    List<Item> l;
+    l.push_back(i1);
+    l.push_back(i2);
+    l.push_back(ZZToItemStr(sk.hompubkey()));
+    unSetKey(k);
+
+    return new Item_func_udf_str(&u_sum_f, l);
 }
 
 /******* SEARCH **************************/
@@ -659,8 +659,8 @@ Search::Search(Create_field * f, PRNG * key)
 }
 
 Create_field *
-Search::newCreateField() {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB);
+Search::newCreateField(string anonname) {
+    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname);
 }
 
 
@@ -678,7 +678,7 @@ Search::unSetKey(const string &k) {
     if (k.empty()) {
         return;
     }
-    memset(&rawkey, 0, sizeof(rawkey));
+    rawkey = "";
     //TODO: zero key
 }
 
@@ -712,6 +712,13 @@ tokenize(string text)
 
 }
 
+static char *
+newmem(unsigned char * a, uint len) {
+    char * res = new char[len];
+    memcpy(res, a, len);
+    return res;
+}
+
 Item *
 Search::encrypt(Item * ptext, uint64_t IV, const std::string &k) {
     setKey(k);
@@ -721,7 +728,10 @@ Search::encrypt(Item * ptext, uint64_t IV, const std::string &k) {
     Binary ciph = CryptoManager::encryptSWP(key, *tokens);
 
     unSetKey(k);
-    return new Item_string((const char *)ciph.content, ciph.len, &my_charset_bin);
+
+    LOG(encl) << "SEARCH encrypt " << plainstr << " --> " << string((const char*)ciph.content, ciph.len);
+  
+    return new Item_string(newmem(ciph.content, ciph.len), ciph.len, &my_charset_bin);	
 }
 
 Item *
@@ -743,25 +753,51 @@ static udf_func u_search = {
     0L,
 };
 
+
+static string
+searchstrip(string s) {
+    cerr << "searchstrip input " << s << "\n";
+
+    if (s[0] == '%') {
+	s = s.substr(1, s.length() - 1);
+    }
+    uint len = s.length();
+    if (s[len-1] == '%') {
+	s = s.substr(0, len-1);
+    }
+    cerr << "searchstrip output " << s << "\n";
+    return s;
+}
+
 Item *
-Search::searchUDF(Item * expr) {
-    Token t = CryptoManager::token(key, Binary(ItemToString(expr)));
+Search::searchUDF(Item * field, Item * expr) {
+    List<Item> l = List<Item>();
+
+    l.push_back(field);
+
+    // Add token
     
-    List<Item> l;
-    l.push_back(expr);
-    l.push_back(new Item_string((const char *)t.ciph.content, t.ciph.len, &my_charset_bin));
-    l.push_back(new Item_string((const char *)t.wordKey.content, t.wordKey.len, & my_charset_bin));
+    Token t = CryptoManager::token(key, Binary(searchstrip(ItemToString(expr))));
+    Item_string * t1 =  new Item_string(newmem(t.ciph.content, t.ciph.len),
+		    t.ciph.len, &my_charset_bin);
+    t1->name = NULL; //no alias
+    l.push_back(t1);
     
-    return new Item_func_udf_int(&u_sum, l);
+    Item_string * t2 = new Item_string(newmem(t.wordKey.content, t.wordKey.len),
+				       t.wordKey.len, &my_charset_bin);
+    t2->name = NULL;
+    l.push_back(t2);
+    
+    return new Item_func_udf_int(&u_search, l);
 }
 
 /************ EncLayer factory creation  ********/
 
 EncLayer *
-EncLayerFactory::encLayer(SECLEVEL sl, Create_field * cf, PRNG * key) {
+EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf, PRNG * key) {
     switch (sl) {
     case SECLEVEL::RND: {
-	if (IsMySQLTypeNumeric(cf->sql_type)) {
+	if (IsMySQLTypeNumeric(cf->sql_type) || (o == oOPE)) {
 	    return new RND_int(cf, key);
 	} else {
 	    return new RND_str(cf, key);
@@ -802,8 +838,7 @@ const std::vector<udf_func*> udf_list = {
     &u_decRNDString,
     &u_decDETInt,
     &u_decDETStr,
-    &u_sum,
-    // &s_HomAddUdfFunc,
-    // &s_HomSubUdfFunc,
+    &u_sum_f,
+    &u_sum_a,
     &u_search
 };

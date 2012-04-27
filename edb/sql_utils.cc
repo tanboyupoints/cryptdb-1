@@ -1,5 +1,7 @@
 #include <edb/sql_utils.hh>
 
+
+
 using namespace std;
 
 bool
@@ -37,8 +39,10 @@ make_thd_string(const string &s, size_t *lenp)
 
 string
 ItemToString(Item * i) {
+    assert(i);
     String s;
     String *s0 = i->val_str(&s);
+    cerr << "value of item " << (char *)s0->ptr() << "\n";
     assert(s0 != NULL);
     string ret = string(s0->ptr(), s0->length());
     return ret;

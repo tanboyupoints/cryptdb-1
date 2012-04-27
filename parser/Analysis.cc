@@ -35,6 +35,31 @@ EncSet::intersect(const EncSet & es2) const
     return EncSet(m);
 }
 
+ostream&
+operator<<(ostream &out, const EncSet & es)
+{
+    if (es.osl.size() == 0) {
+        out << "empty encset";
+    }
+    for (auto it : es.osl) {
+        out << "(onion " << it.first
+            << ", level " << levelnames[(int)it.second.first]
+            << ", field `" << (it.second.second == NULL ? "*" : it.second.second->fname) << "`"
+            << ") ";
+    }
+    return out;
+}
+
+
+EncDesc
+EncSet::encdesc() {
+    OnionLevelMap olm = OnionLevelMap();
+    for (auto it : osl) {
+	olm[it.first] = it.second.first;
+    }
+    return EncDesc(olm);
+}
+
 void
 EncSet::setFieldForOnion(onion o, FieldMeta * fm) {
     LevelFieldPair lfp = getAssert(osl, o);
@@ -54,12 +79,14 @@ EncSet::chooseOne() const
         oSWP,
 	oPLAIN, 
     };
+
     static size_t onion_size = sizeof(onion_order) / sizeof(onion_order[0]);
     for (size_t i = 0; i < onion_size; i++) {
         auto it = osl.find(onion_order[i]);
         if (it != osl.end()) {
             OnionLevelFieldMap m;
-            m[onion_order[i]] = it->second;
+	    onion o = onion_order[i];
+            m[o] = it->second;
             return EncSet(m);
         }
     }
