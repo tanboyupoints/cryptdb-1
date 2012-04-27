@@ -4,6 +4,8 @@ Packages needed for Ubuntu:
                     libssl-dev libbsd-dev libevent-dev libglib2.0-dev \
                     libgmp-dev
 
+To run distributed AccessManager, use also need boost installed
+
 You will need to install mysql-proxy from source, because
 versions prior to 0.9.0 have various bugs that break CryptDB:
 
