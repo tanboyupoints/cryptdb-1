@@ -15,8 +15,7 @@ function read_auth()
                     proxy.connection.server.dst.port,
                     os.getenv("CRYPTDB_USER") or "root",
                     os.getenv("CRYPTDB_PASS") or "letmein",
-                    os.getenv("CRYPTDB_DB") or "cryptdbtest",
-                    os.getenv("CRYPTDB_SHADOW") or "~/shadow-db")
+                    os.getenv("CRYPTDB_DB") or "cryptdbtest")
     -- EDBClient uses its own connection to the SQL server to set up UDFs
     -- and to manipulate multi-principal state.  (And, in the future, to
     -- store its schema state for single- and multi-principal operation.)
