@@ -18,7 +18,6 @@
 #include <stdlib.h>
 
 #include <edb/Connect.hh>
-//#include <edb/AM_client.hh>
 #include <edb/AccessManager.hh>
 #include <crypto-old/CryptoManager.hh>
 

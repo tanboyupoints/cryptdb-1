@@ -143,8 +143,7 @@ MultiPrinc::setSensitive(SchemaInfo *schema, string table_name, string field) {
 int
 MultiPrinc::commitAnnotations()
 {
-    //return accMan->CreateTables();
-    return 0;
+    return accMan->CreateTables();
 }
 
 
