@@ -7,8 +7,7 @@
  *  Author: cat_red
  */
 
-//#include <edb/AccessManager.hh>
-#include <edb/AM_client.hh>
+#include <edb/AccessManager.hh>
 #include <test/test_utils.hh>
 
 

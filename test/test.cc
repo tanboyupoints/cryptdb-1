@@ -18,8 +18,7 @@
 #include <crypto-old/CryptoManager.hh>
 
 //#include <edb/EDBProxy.hh>
-//#include <edb/AccessManager.hh>
-#include <edb/AM_client.hh>
+#include <edb/AccessManager.hh>
 #include <edb/Connect.hh>
 
 #include <util/util.hh>

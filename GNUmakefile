@@ -1,11 +1,10 @@
 OBJDIR	 := obj
 TOP	 := $(shell echo $${PWD-`pwd`})
 CXX	 := g++
-CXXFLAGS := -g -O0 -fno-strict-aliasing -fwrapv -fPIC \
-	    -Wall -Wpointer-arith -Wendif-labels -Wformat=2  \
+CXXFLAGS := -g -O0 -fno-strict-aliasing -fno-rtti -fwrapv -fPIC \
+	    -Wall -Werror -Wpointer-arith -Wendif-labels -Wformat=2  \
 	    -Wextra -Wmissing-noreturn -Wwrite-strings -Wno-unused-parameter \
 	    -Wmissing-declarations -Woverloaded-virtual  \
-		-Wno-deprecated \
 	    -Wunreachable-code -D_GNU_SOURCE -std=c++0x -I$(TOP)
 LDFLAGS	 := -lz -llua5.1 -lcrypto -lntl \
 	    -L$(TOP)/$(OBJDIR) -Wl,-rpath=$(TOP)/$(OBJDIR) -Wl,-rpath=$(TOP)
@@ -18,10 +17,9 @@ CXXFLAGS += -I$(MYBUILD)/include \
 	    -I$(MYSRC)/sql \
 	    -I$(MYSRC)/regex \
 	    -I$(MYBUILD)/sql \
-		-I$(TOP)/RCF/include \
 	    -DHAVE_CONFIG_H -DMYSQL_SERVER -DEMBEDDED_LIBRARY -DDBUG_OFF \
 	    -DMYSQL_BUILD_DIR=\"$(MYBUILD)\"
-LDFLAGS	 += -lpthread -lrt -ldl -lcrypt -lreadline -lRCF
+LDFLAGS	 += -lpthread -lrt -ldl -lcrypt -lreadline
 
 ## To be populated by Makefrag files
 OBJDIRS	:=
@@ -47,13 +45,13 @@ clean:
 
 $(OBJDIR)/%.o: %.cc
 	@mkdir -p $(@D)
-	$(CXX) -MD $(CXXFLAGS) -fno-rtti -c $< -o $@
+	$(CXX) -MD $(CXXFLAGS) -c $< -o $@
 
 include crypto/Makefrag
 include crypto-old/Makefrag
 include edb/Makefrag
 include parser/Makefrag
-#include test/Makefrag
+include test/Makefrag
 include util/Makefrag
 include udf/Makefrag
 include mysqlproxy/Makefrag
