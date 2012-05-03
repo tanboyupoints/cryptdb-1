@@ -1,26 +1,12 @@
 OBJDIRS	+= edb
 
-CRYPTDB_SRCS := AM_client.cc Translator.cc EDBProxy.cc Connect.cc MultiPrinc.cc
+CRYPTDB_SRCS := AccessManager.cc Translator.cc EDBProxy.cc Connect.cc MultiPrinc.cc
 
-AM_SERVER := AM_server.cc
-
-all:	$(OBJDIR)/libcryptdb.so $(OBJDIR)/AM_server
+all:	$(OBJDIR)/libcryptdb.so
 
 CRYPTDB_OBJS := $(patsubst %.cc,$(OBJDIR)/edb/%.o,$(CRYPTDB_SRCS))
 $(OBJDIR)/libcryptdb.so: $(CRYPTDB_OBJS) \
 			 $(OBJDIR)/libedbcrypto.so 
-	$(CXX) -shared -o $@ $(CRYPTDB_OBJS) $(LDFLAGS) -ledbcrypto \
-	      -Wl,--whole-archive -L$(MYBUILD)/libmysqld -lmysqld \
-	      -Wl,--no-whole-archive $(LDFLAGS)
-
-AM_OBJ := $(patsubst %.cc,$(OBJDIR)/edb/%.o,$(AM_SERVER))
-$(OBJDIR)/AM_server: $(AM_OBJ)
-	$(CXX) $< -o $@ $(AM_OBJ) $(CXXFLAGS) $(LDFLAGS) -c edb/$(AM_SERVER)
-
-install: install_edb
-
-.PHONY: install_edb
-install_edb: $(OBJDIR)/libcryptdb.so
-	install -m 644 $(OBJDIR)/libcryptdb.so /usr/lib
+	$(CXX) -shared -o $@ $(CRYPTDB_OBJS) $(LDFLAGS) -ledbcrypto
 
 # vim: set noexpandtab:

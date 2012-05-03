@@ -10,58 +10,9 @@
 #include <edb/AccessManager.hh>
 #include <util/cryptdb_log.hh>
 
-<<<<<<< Updated upstream
 
 using namespace std;
 
-=======
-#include <iostream>
-
-/*#include <RCF/Idl.hpp>
-#include <RCF/IpServerTransport.hpp>
-#include <RCF/RcfServer.hpp>
-#include <RCF/TcpEndpoint.hpp>*/
-
-using namespace std;
-
-/*RCF_BEGIN(I_X, "I_X")
-RCF_METHOD_R2(int, add, int, int)
-RCF_END(I_X)
-
-class X
-{
-public:
-    int add(int a, int b)
-    {
-        std::cout << "Server: adding " << a << " and " << b << std::endl;
-        return a+b;
-    }
-};
-
-int test_rpc()
-{
-    X x;
-    RCF::RcfServer server( RCF::TcpEndpoint(0));
-    server.bind<I_X>(x);
-    server.start();
-
-    int port = server.getIpServerTransport().getPort();
-
-    int a = 2;
-    int b = 3;
-    std::cout 
-        << "Client: requesting addition of " 
-        << a << " and " << b << std::endl;
-
-    int sum = RcfClient<I_X>( RCF::TcpEndpoint(port)).add(a,b);
-    
-    std::cout << "Client: server responded with " << sum << std::endl;
-
-    return 0;
-}*/
-
-
->>>>>>> Stashed changes
 #define NODIGITS 4
 
 //------------------------------------------------------------------------------------------
