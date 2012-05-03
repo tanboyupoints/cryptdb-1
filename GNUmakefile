@@ -56,7 +56,7 @@ include parser/Makefrag
 #include test/Makefrag
 include util/Makefrag
 include udf/Makefrag
-#include mysqlproxy/Makefrag
+include mysqlproxy/Makefrag
 
 $(OBJDIR)/.deps: $(foreach dir, $(OBJDIRS), $(wildcard $(OBJDIR)/$(dir)/*.d))
 	@mkdir -p $(@D)
