@@ -1,7 +1,5 @@
 #include <edb/sql_utils.hh>
 
-
-
 using namespace std;
 
 bool
