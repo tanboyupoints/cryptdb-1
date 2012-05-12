@@ -33,18 +33,7 @@ createFieldHelper(const Create_field *f, int field_length,
     }
     
     return f0;
-}
-
-
-bool
-needsSalt(EncDesc ed) {
-    for (auto pair : ed.olm) {
-	if (pair.second == SECLEVEL::RND) {
-	    return true;
-	}
-    }
-
-    return false;
+    
 }
 
 /****************** RND *********************/
@@ -151,7 +140,7 @@ RND_str::RND_str(Create_field * f, PRNG * key)
 Create_field *
 RND_str::newCreateField(string anonname) {
 //TODO: use more precise sizes and types
-    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname);
+    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname, &my_charset_bin);
 }
 
 void
@@ -329,7 +318,7 @@ DET_str::DET_str(Create_field * f, PRNG * key)
 Create_field *
 DET_str::newCreateField(string anonname) {
 //TODO: use more precise sizes and types
-    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname);
+    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname, &my_charset_bin);
 }
 
 void
@@ -476,7 +465,7 @@ OPE_str::OPE_str(Create_field * f, PRNG * prng)
 
 Create_field *
 OPE_str::newCreateField(string anonname) {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname);
+    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname, &my_charset_bin);
 }
 
 void
@@ -660,7 +649,7 @@ Search::Search(Create_field * f, PRNG * key)
 
 Create_field *
 Search::newCreateField(string anonname) {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname);
+    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname, &my_charset_bin);
 }
 
 

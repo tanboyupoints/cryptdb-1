@@ -21,11 +21,6 @@
 
 #include <edb/MultiPrinc.hh>
 
-
-
-//TODO: so far, do_enforce methods don't seem to do what analyze cannot do
-// needed? maybe we can define it only for needed cases
-
 using namespace std;
 
 //TODO: replace table/field with FieldMeta * for speed and conciseness
@@ -34,12 +29,18 @@ using namespace std;
         throw runtime_error(string("Unimplemented: ") + \
                         string(__PRETTY_FUNCTION__))
 
+//TODO: rewrite_proj may not need to be part of each class;
+// it just does gather, choose and then rewrite
 
 static Item *
 stringToItemField(string field, string table, Item_field * itf) {
-    Item_field * res = new Item_field(current_thd, itf);
+    cerr << "stringtoItemF current thread " << (int)current_thd << " memroot " << (int)current_thd->mem_root << "\n";
+    THD * thd = current_thd;
+    assert(thd);
+    Item_field * res = new Item_field(thd, itf);
+    cerr << "B current thread " << (int)current_thd << " memroot " << (int)current_thd->mem_root << "\n";
     res->name = NULL; //no alias
-    res->field_name = current_thd->strdup(field.c_str());
+    res->field_name = make_thd_string(field);
     res->table_name = make_thd_string(table);
 
     return res;
@@ -71,29 +72,11 @@ mysql_query_wrapper(MYSQL *m, const string &q)
     if (!ret) assert(false);
 }
 
-//records what onions need to be adjusted at the server for a query with
-//information in a
-static void
-recordAdjustments(FieldMeta * fm, Item_field * it_f, onion o, SECLEVEL l, Analysis & a) {
-
-    auto ito = a.onionAdjust.find(o);
-    if (ito == a.onionAdjust.end()) {
-	a.onionAdjust[o]= map<FieldMeta *, AdjustInfo>();
-	a.onionAdjust[o][fm] = AdjustInfo(l, it_f);
-    } else {
-	auto itf = ito->second.find(fm);
-	if (itf == ito->second.end()) {
-	    ito->second[fm] = AdjustInfo(l, it_f);
-	} else {
-	    itf->second = AdjustInfo(min(l, itf->second.l), it_f);
-	}
-    }
-}
-
 //l gets updated to the new level
 static void
 removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEVEL & l) {
 
+    cerr << " rem o layer current thread " << (int)current_thd << " memroot " << (int)current_thd->mem_root << "\n";
     OnionMeta * om    = getAssert(fm->onions, o);
     string fieldanon  = om->onionname;
     string tableanon  = fm->tm->anonTableName;
@@ -120,25 +103,7 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
 }
 
 /*
- * Same as adjustOnions but for one specific field and onion.
- */
-static void
-adjustOnion(onion o, FieldMeta * fm, AdjustInfo ai, Analysis & a) {
-
-    //TODO: use getAssert in more places
-    SECLEVEL newlevel = getAssert(fm->encdesc.olm, o);
-
-    while (newlevel > ai.l) {
-	removeOnionLayer(fm, ai.itf, a, o, newlevel);
-    }
-}
-
-
-//TODO: propagate these adjustments in the embedded database?
-
-/*
- * Examines the current onion levels of fields and the encryption levels
- * needed for a query (as given by analysis).
+ * Adjusts the onion for a field fm/itf to level: tolevel. 
  *
  * Issues queries for decryption to the DBMS.
  *
@@ -147,14 +112,18 @@ adjustOnion(onion o, FieldMeta * fm, AdjustInfo ai, Analysis & a) {
  *
  */
 static void
-adjustOnions(Analysis & a)
-{
-    for (auto it : a.onionAdjust) {
-	for (auto itt : it.second) {
-	    adjustOnion(it.first, itt.first, itt.second, a);
-	}
+adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf, Analysis & a) {
+
+    cerr << "current thread " << (int)current_thd << " memroot " << (int)current_thd->mem_root << "\n";
+    //TODO: use getAssert in more places
+    SECLEVEL newlevel = getAssert(fm->encdesc.olm, o);
+
+    while (newlevel > tolevel) {
+	removeOnionLayer(fm, itf, a, o, newlevel);
     }
+    assert(newlevel == tolevel);
 }
+//TODO: propagate these adjustments in the embedded database?
 
 static inline bool
 FieldQualifies(const FieldMeta * restriction,
@@ -165,10 +134,10 @@ FieldQualifies(const FieldMeta * restriction,
 
 
 static void
-addToReturn(ReturnMeta & rm, int pos, ItemMeta * im, bool has_salt) {
+addToReturn(ReturnMeta & rm, int pos, const OLK & constr,  bool has_salt) {
     ReturnField rf = ReturnField();
     rf.is_salt = false;
-    rf.im = im;
+    rf.olk = constr;
     if (has_salt) {
         rf.pos_salt = pos+1;
     } else {
@@ -178,17 +147,16 @@ addToReturn(ReturnMeta & rm, int pos, ItemMeta * im, bool has_salt) {
 }
 
 static void
-addToReturn(ReturnMeta &rm, int pos, ItemMeta * im, bool has_salt, string name) {
-    addToReturn(rm, pos, im, has_salt);
+addToReturn(ReturnMeta &rm, int pos, const OLK & constr, bool has_salt, string name) {
+    addToReturn(rm, pos, constr, has_salt);
     rm.rfmeta[pos].field_called = name;
 }
-
 
 static void
 addSaltToReturn(ReturnMeta & rm, int pos) {
     ReturnField rf = ReturnField();
     rf.is_salt = true;
-    rf.im = NULL;
+    rf.olk = OLK();
     rf.pos_salt = -1;
     rm.rfmeta[pos] = rf;
 }
@@ -260,11 +228,10 @@ decrypt_item_layers(Item * i, onion o,  list<EncLayer *> & layers, uint64_t IV, 
 
 // encrypts a constant item based on the information in a
 static Item *
-encrypt_item(Item * i, Analysis & a){
-   ItemMeta * im = getAssert(a.itemToMeta, i,
-			"there is no meta for item in analysis");
-    FieldMeta * fm = im->basefield;
-    onion o        = im->o;
+encrypt_item(Item * i, const OLK & olk, Analysis & a){
+ 
+    FieldMeta * fm = olk.key;
+    onion o        = olk.o;
     LOG(cdb_v) << fm->fname << " " << fm->onions.size();
 
     auto it = a.salts.find(fm);
@@ -272,7 +239,7 @@ encrypt_item(Item * i, Analysis & a){
     if (it != a.salts.end()) {
 	IV = it->second;
     }
-    return encrypt_item_layers(i, im->o, fm->onions[o]->layers, a, fm, IV);
+    return encrypt_item_layers(i, o, fm->onions[o]->layers, a, fm, IV);
 }
 
 static void
@@ -285,24 +252,8 @@ encrypt_item_all_onions(Item * i, FieldMeta * fm,
 }
 
 static Item *
-decrypt_item(ItemMeta * im, Item * i, uint64_t IV, Analysis &a, vector<Item *> &res) {
-    FieldMeta * fm       = im->basefield;
-    onion o              = im->o;
+decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV, Analysis &a, vector<Item *> &res) {
     return decrypt_item_layers(i, o, fm->onions[o]->layers, IV, a, fm, res);
-}
-
-static ostream&
-operator<<(ostream &out, const constraints &r)
-{
-    out << r.encset;
-    if (r.soft)
-        out << "(soft)";
-    out << " NEEDED FOR " << r.why_t;
-    if (r.why_t_item)
-        out << " in " << *r.why_t_item;
-    if (r.parent)
-        out << " BECAUSE " << *r.parent;
-    return out;
 }
 
 
@@ -314,35 +265,16 @@ anonymize_table_name(const string &tname,
     return getAssert(a.schema->tableMetaMap, tname)->anonTableName;
 }
 
-static string
-get_column_name(const string & table,
-                const string & field,
-                onion o,
-                Analysis   &a)
-{
-    auto it = a.schema->tableMetaMap.find(table);
-    if (it == a.schema->tableMetaMap.end()) {
-        thrower() << "table " << table << "unknown \n";
-    }
-    auto fit = it->second->fieldMetaMap.find(field);
-    if (fit == it->second->fieldMetaMap.end()) {
-        thrower() << "field " << field << "unknown \n";
-    }
-    if (fit->second->onions.find(o) != fit->second->onions.end()) {
-        return fit->second->onions[o]->onionname;
-    }
-    return field;
-}
-
 class CItemType {
  public:
-    virtual EncSet do_gather(Item *, const constraints&, Analysis &) const = 0;
-    virtual void   do_enforce(Item *, const constraints&, Analysis &) const = 0;
+    virtual EncSet do_gather(Item *, reason&, Analysis &) const = 0;
     virtual Item * do_optimize(Item *, Analysis &) const = 0;
-    virtual Item * do_rewrite(Item *, Analysis &) const = 0;
-    virtual void   do_rewrite_proj(Item *, Analysis &, vector<Item *> &) const = 0;
+    virtual Item * do_rewrite(Item *, const OLK & constr, Analysis &) const = 0;
+    virtual void   do_rewrite_proj(Item *, const OLK & constr, Analysis &,
+				   vector<Item *> &) const = 0;
     virtual void   do_rewrite_insert(Item *, Analysis &, vector<Item *> &, FieldMeta *fm) const = 0;
 };
+
 
 /*
  * Directories for locating an appropriate CItemType for a given Item.
@@ -357,24 +289,20 @@ class CItemTypeDir : public CItemType {
         types[t] = ct;
     }
 
-    EncSet do_gather(Item *i, const constraints &tr, Analysis &a) const {
+    EncSet do_gather(Item *i, reason &tr, Analysis &a) const {
         return lookup(i)->do_gather(i, tr, a);
-    }
-
-    void do_enforce(Item *i, const constraints &tr, Analysis &a) const {
-        lookup(i)->do_enforce(i, tr, a);
     }
 
     Item* do_optimize(Item *i, Analysis &a) const {
         return lookup(i)->do_optimize(i, a);
     }
 
-    Item* do_rewrite(Item *i, Analysis &a) const {
-        return lookup(i)->do_rewrite(i, a);
+    Item* do_rewrite(Item *i, const OLK & constr, Analysis &a) const {
+        return lookup(i)->do_rewrite(i, constr, a);
     }
 
-    void do_rewrite_proj(Item *i, Analysis &a, vector<Item *> &l) const {
-        lookup(i)->do_rewrite_proj(i, a, l);
+    void do_rewrite_proj(Item *i, const OLK & constr, Analysis &a, vector<Item *> &l) const {
+        lookup(i)->do_rewrite_proj(i, constr, a, l);
     }
 
     void do_rewrite_insert(Item *i, Analysis &a, vector<Item *> &l, FieldMeta *fm) const {
@@ -440,30 +368,60 @@ static class CItemFuncNameDir : public CItemTypeDir<std::string> {
  * Helper functions to look up via directory & invoke method.
  */
 static inline EncSet
-gather(Item *i, const constraints &tr, Analysis & a)
+gather(Item *i, reason &tr, Analysis & a)
 {
     return itemTypes.do_gather(i, tr, a);
 }
 
-static inline void
-enforce(Item *i, const constraints &tr, Analysis & a)
-{
-    return itemTypes.do_enforce(i, tr, a);
-}
 
+// An implementation of gather for the common case
+// Works for Item_func with two arguments, solution encset is intersect of
+// children and my_es
+// Only works with nodes with one outgoing encset, which could be other_encset
+// if encset_from_intersection is false, or else is the intersection with the children
 static EncSet
-fieldEncSet(FieldMeta * fm) {
-    OnionLevelFieldMap osl = map<onion, LevelFieldPair>();
+typical_gather(Analysis & a, Item_func * i,
+	     const EncSet & my_es, string why, reason & my_r,
+	     bool encset_from_intersection, const EncSet & other_encset = PLAIN_EncSet) {
 
-    for (auto it: fm->encdesc.olm) {
-	osl[it.first] = LevelFieldPair(it.second, fm);
+    Item **args = i->arguments();
+    assert(i->argument_count() == 2);
+
+    reason r1, r2;
+    EncSet es1 = gather(args[0], r1, a);
+    EncSet es2 = gather(args[1], r2, a);
+
+    EncSet solution = my_es.intersect(es1).intersect(es2);
+
+    if (solution.empty()) {
+	cerr << "crypto schemes does not support this query BECAUSE " << i << "NEEDS " << my_es << "\n" \
+	     << " BECAUSE " << why << "\n" \
+	     << " AND children have:  " << r1 << r2 << "\n";
+	assert(false);
     }
-    return EncSet(osl);
+
+    EncSet out_es;
+    if (encset_from_intersection) {
+	assert_s(solution.singleton(), "cannot use basic_gather with more outgoing encsets");
+	out_es = solution;
+    } else {
+	out_es = PLAIN_EncSet;
+    }
+    
+    my_r = reason(out_es, why, i);
+    my_r.add_child(r1);
+    my_r.add_child(r2);
+
+    a.itemRewritePlans[i] = new RewritePlan(out_es.extract_singleton(),
+					    solution.chooseOne(), args, 2, my_r);
+
+    return out_es;
 }
 
 
-//TODO:
-//should be able to support general updates such as
+
+// TODO:
+// should be able to support general updates such as
 // UPDATE table SET x = 2, y = y + 1, z = y+2, z =z +1, w = y, l = x
 // this has a few corner cases, since y can only use HOM
 // onion so does w, but not l
@@ -473,39 +431,22 @@ fieldEncSet(FieldMeta * fm) {
 static inline void
 analyze_update(Item_field * field, Item * val, Analysis & a) {
 
-    string tname = field->table_name;
-    string fname = field->field_name;
-    FieldMeta * fm = a.schema->getFieldMeta(tname, fname);
-    	
-    EncSet e(gather(val, constraints(fieldEncSet(fm), "update", val, 0, false), a));
-
-    //updates fieldAMeta to contain onions that can be updated and their levels
-    EncDesc ed = e.encdesc();
-
-    auto it = a.fieldToAMeta.find(fm); 
-    if (it == a.fieldToAMeta.end()) {
-        a.fieldToAMeta[fm] = new FieldAMeta(ed.intersect(fm->encdesc));
-    } else {
-        it->second->exposedLevels = it->second->exposedLevels.intersect(ed);
-        assert_s(it->second->exposedLevels.olm.size() > 0,
-                 "CryptDB's encryption schemes cannot support such update");
-    }
+    reason r;
+    gather(val, r, a);
 
     //TODO: an optimization could be performed here to support more updates
     // For example: SET x = x+1, x = 2 --> no need to invalidate DET and OPE
     // onions because first SET does not matter
 }
 
+//TODO: need to check somewhere that plain is returned
 static inline void
-analyze(Item *i, const constraints &tr, Analysis & a)
+analyze(Item *i, Analysis & a)
 {
     assert(i != NULL);
-    LOG(cdb_v) << "calling gather for item " << *i << " tr " << tr << "\n";
-    EncSet e(gather(i, tr, a));
-    LOG(cdb_v) << "choosing one for item " << *i << " out of encset " << e << "\n";
-    e = e.chooseOne();
-    LOG(cdb_v) << "calling enforce for item " << *i << " tr " << tr.clone_with(e) << "\n";
-    enforce(i, tr.clone_with(e), a);
+    LOG(cdb_v) << "calling gather for item " << *i;
+    reason r;
+    gather(i, r, a);
 }
 
 static inline void
@@ -522,10 +463,21 @@ optimize(Item **i, Analysis &a) {
     }
 }
 
-// TODO: template this with optimize()
+// this function should be called at the root of a tree of items
+// that should be rewritten
 static inline Item *
-rewrite(Item *i, Analysis &a) {
-    Item *i0 = itemTypes.do_rewrite(i, a);
+rewrite(Item *i, const OLK & constr, Analysis &a, string context = "") {
+    if (context.size()) {
+	context = " for " + context;
+    }
+    RewritePlan * rp = getAssert(a.itemRewritePlans, i);
+    assert(rp);
+    if (!rp->es_out.contains(constr)) {
+	cerr << "query cannot be supported because " << i << " needs to return " << constr << context << "\n" \
+	     << "BUT it can only return " << rp->es_out << " BECAUSE " << rp->r << "\n";
+	assert(false);
+    }
+    Item *i0 = itemTypes.do_rewrite(i, constr, a);
     assert(i0 != i);
     return i0;
 }
@@ -630,84 +582,84 @@ do_optimize_type_self_and_args(T *i, Analysis &a) {
         return i0;
     }
 }
-//recording information required to rewrite an item
-static void
-record_item_meta_for_constraints(Item *i,
-                                 const constraints &tr,
-                                 Analysis &a)
-{
-    auto c = tr.encset.extract_singleton();
-    LOG(cdb_v) << "Need to rewrite " << *i << " with: " << c;
-    auto it = a.itemToMeta.find(i);
-    ItemMeta *im;
-    if (it == a.itemToMeta.end()) {
-        im = new ItemMeta;
-        a.itemToMeta[i] = im;
-    } else {
-        im = it->second;
-    }
-    im->o         = c.first;
-    im->basefield = c.second.second;
-    assert_s((im->o == oPLAIN) || im->basefield, "NULL basefield");
-}
 
 // in place rewriting of arguments
 template <class T>
 static void
-do_rewrite_type_args(T *i, Analysis &a) {
+do_rewrite_type_args(T * old, T * i, const OLK & constr, Analysis &a) {
+
+    RewritePlan * plan = getAssert(a.itemRewritePlans, (Item *)old);
+    auto childr_plan = getAssert(plan->plan, constr);
 
     Item **args = i->arguments();
-    for (uint x = 0; x < i->argument_count(); x++) {
-        args[x] = rewrite(args[x], a);
+    uint count = i->argument_count();
+    for (uint x = 0; x < count; x++) {
+        args[x] = itemTypes.do_rewrite(args[x], getAssert(childr_plan, args[x]), a);
         args[x]->name = NULL; // args should never have aliases...
     }
 }
+
+// rewrites the arguments of aggregators
+// no_args specifies a certain number of arguments that I must have
+// if negative, i can have any no. of arguments
+static list<Item *>
+rewrite_agg_args(Item_sum * oldi, const OLK & constr, Analysis & a, int no_args = -1) {
+    if (no_args >= 0) {
+	assert_s(oldi->get_arg_count() == (uint)no_args,
+		 "support for aggregation with this number of arguments not currently implemented");
+    } else {
+	no_args = oldi->get_arg_count();
+    }
+
+    RewritePlan * plan = getAssert(a.itemRewritePlans, (Item *) oldi, " no rewrite plan ");
+    auto childr_plan = getAssert(plan->plan, constr);
+
+    list<Item *> res = list<Item *>();
+    for (int j = 0; j < no_args; j++) {
+	Item * child_item = oldi->get_arg(j);
+	child_item = itemTypes.do_rewrite(child_item, getAssert(childr_plan, child_item), a);
+	res.push_back(child_item);
+    }
+
+    return res;
+}
+
 
 /*
  * CItemType classes for supported Items: supporting machinery.
  */
 template<class T>
 class CItemSubtype : public CItemType {
-    virtual EncSet do_gather(Item *i, const constraints &tr, Analysis & a) const {
-        LOG(cdb_v) << "CItemSubtype do_gather (L659)" << *i << " encset " << tr.encset;
+    virtual EncSet do_gather(Item *i, reason &tr, Analysis & a) const {
+        LOG(cdb_v) << "CItemSubtype do_gather (L659)" << *i;
         return do_gather_type((T*) i, tr, a);
-    }
-    virtual void do_enforce(Item *i, const constraints &tr, Analysis & a) const {
-        LOG(cdb_v) << "CItemSubtype do_enforce " << *i << " encset " << tr.encset;
-        do_enforce_type((T*) i, tr, a);
     }
     virtual Item* do_optimize(Item *i, Analysis & a) const {
         return do_optimize_type((T*) i, a);
     }
-    virtual Item* do_rewrite(Item *i, Analysis & a) const {
-        return do_rewrite_type((T*) i, a);
+    virtual Item* do_rewrite(Item *i, const OLK & constr, Analysis & a) const {
+        return do_rewrite_type((T*) i, constr, a);
     }
-    virtual void  do_rewrite_proj(Item *i, Analysis & a, vector<Item *> &l) const {
-        do_rewrite_proj_type((T*) i, a, l);
+    virtual void  do_rewrite_proj(Item *i, const OLK & constr, Analysis & a, vector<Item *> &l) const {
+        do_rewrite_proj_type((T*) i, constr, a, l);
     }
     virtual void  do_rewrite_insert(Item *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const {
         do_rewrite_insert_type((T*) i, a, l, fm);
     }
  private:
-    virtual EncSet do_gather_type(T *, const constraints&, Analysis & a) const = 0;
-    virtual void   do_enforce_type(T *, const constraints&, Analysis & a) const = 0;
+    virtual EncSet do_gather_type(T *, reason&, Analysis & a) const = 0;
     virtual Item * do_optimize_type(T *i, Analysis & a) const {
         return do_optimize_const_item(i, a);
     }
-    virtual Item * do_rewrite_type(T *i, Analysis & a) const { 
+    virtual Item * do_rewrite_type(T *i, const OLK & constr, Analysis & a) const { 
         LOG(cdb_v) << "do_rewrite_type L676 " << *i;
-        if (a.itemToMeta.find(i) != a.itemToMeta.end()) {
-            //cerr << "itemtometa exists" << endl;
-            addToReturn(a.rmeta, 0, a.itemToMeta[i], false, i->name);
-        } else {
-            //cerr << "nothing in itemtometa" << endl;
-            addToReturn(a.rmeta, 0, NULL, false, i->name);
-        }
 	assert_s(false, "why is this rewrite called?");
         return i;
     }
-    virtual void   do_rewrite_proj_type(T *i, Analysis & a, vector<Item *> &l) const {
-        l.push_back(do_rewrite_type(i, a));
+    virtual void do_rewrite_proj_type(T *i, const OLK & constr, Analysis & a, vector<Item *> &l) const {
+	cerr << "rewrite proj " << *i << "\n";
+	assert_s(false, "this function should not be called -- should be overloaded in children");
+	UNIMPLEMENTED;
     }
     virtual void   do_rewrite_insert_type(T *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const {
         // default is un-implemented. we'll implement these as they come
@@ -742,7 +694,7 @@ class CItemSubtypeFN : public CItemSubtype<T> {
 // returns the intersection of the es and fm.encdesc
 // by also taking into account what onions are stale
 // on fm
-static OnionLevelFieldMap
+/*static OnionLevelFieldMap
 intersect(const EncSet & es, FieldMeta * fm) {
     OnionLevelFieldMap res;
 
@@ -757,11 +709,11 @@ intersect(const EncSet & es, FieldMeta * fm) {
 
     return res;
 }
-
+*/
 /*
  * Actual item handlers.
  */
-static void process_select_lex(st_select_lex *select_lex, const constraints &tr, Analysis & a);
+static void process_select_lex(st_select_lex *select_lex, Analysis & a);
 
 static void optimize_select_lex(st_select_lex *select_lex, Analysis & a);
 
@@ -769,179 +721,128 @@ static st_select_lex * rewrite_select_lex(st_select_lex *select_lex, Analysis & 
 
 static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
-    virtual EncSet do_gather_type(Item_field *i, const constraints &tr, Analysis & a) const {
-        LOG(cdb_v) << "CItemSubtypeIT (L730) do_gather " << *i;
-
-        string fullfieldname = extract_fieldname(i);
+    virtual EncSet do_gather_type(Item_field *i, reason &tr, Analysis & a) const {
+        LOG(cdb_v) << "FIELD_ITEM do_gather " << *i;
 
         string fieldname = i->field_name;
         string table = i->table_name;
-        if (a.mp && a.mp->hasEncFor(fullName(fieldname, table))) {
-            a.tmkm.encForVal[fullName(fieldname, table)] = "";
+	string fullname = fullName(fieldname, table);
+        if (a.mp && a.mp->hasEncFor(fullname)) {
+	    a.tmkm.encForVal[fullname] = "";
         }
 
         FieldMeta * fm = a.schema->getFieldMeta(table, fieldname);
 
-        // check compatibility for each of the constraints given
-        // in the incoming enc set, either filtering them out, or
-        // by modification
-        OnionLevelFieldMap m;
-        for (auto it = tr.encset.osl.begin();
-             it != tr.encset.osl.end();
-             ++it) {
-            // if the field is a wildcard, then replace it with this field
-            // (or if it's the same field
-            if (FieldQualifies(it->second.second, fm)) {
-		m = intersect(tr.encset, fm);
-            } else {
-                // in the case of DET_JOIN/OPE_JOIN,
-                // we take the constraint regardless of
-                // field (since we can convert), and we update the
-                // field to *this* field if we are lexicographically
-                // ahead
-                if (it->first == oDET || it->first == oOPE) {
-                    m[it->first] = LevelFieldPair(
-                            it->first == oDET ?
-                                SECLEVEL::DETJOIN : SECLEVEL::OPEJOIN,
-                            it->second.second->fname < fieldname ?
-                                it->second.second : fm);
-                }
-            }
-        }
-        //TODO: figure out how to gather over more than one level of the tree
+	EncSet es  = EncSet(fm);
 
-        //cat_red: this is dealt with in Annotation, actually
-        //if create, there will be speaks_for, enc_for, equals, external notations
-        //if not, there will be information about required keys
-        //        (how, what, where from?)
-        //if a field is marked enc_for, then we need to get all the keys to
-        // encrypt or decrypt this part
-        //if a field is marked speaks_for, that actually doesn't need to be recorded
-        //if we have an insert or delete to an external, then we to log people in
-
-        return EncSet(m);
-    }
-
-    virtual void
-    do_enforce_type(Item_field *i, const constraints &tr, Analysis & a) const
-    {
-        FieldMeta *fm = a.schema->getFieldMeta(i->table_name, i->field_name);
-
-        assert(tr.encset.empty() || tr.encset.singleton());
-
-        if (tr.encset.empty()) {
-            throw runtime_error("bail out");
-        }
-        auto encpair = tr.encset.extract_singleton();
-
-        auto it = a.fieldToAMeta.find(fm);
+	tr = reason(es, "is a field", i);
 	
-        if (it == a.fieldToAMeta.end()) {
-            // bootstrap a new FieldAMeta from the FieldMeta's encdesc
-            a.fieldToAMeta[fm] = new FieldAMeta(fm->encdesc);
-            a.itemToFieldMeta[i]      = fm;
-            it = a.fieldToAMeta.find(fm);
-        }
-	
-        bool restricted = it->second->exposedLevels.restrict(encpair.first,
-                                           encpair.second.first);
-	if (restricted) {
-	    recordAdjustments(fm, i, encpair.first, encpair.second.first, a);
-	}
+	a.itemRewritePlans[i] = new RewritePlan(es, tr);
 
-        LOG(cdb_v) << "ENCSET FOR FIELD " << i->field << " is " << a.fieldToAMeta[fm]->exposedLevels;
-        record_item_meta_for_constraints(i, tr, a);
+	return es;
     }
 
     virtual Item *
-    do_rewrite_type(Item_field *i, Analysis & a) const
+    do_rewrite_type(Item_field *i, const OLK & constr, Analysis & a) const
     {
-	//TODO: no need for HasRewrite any more due to uniqueness of items
-        LOG(cdb_v) << "do_rewrite_type L806 " << *i;
-        auto it = a.itemHasRewrite.find(i);
+        LOG(cdb_v) << "do_rewrite_type FIELD_ITEM " << *i;
+        
+	FieldMeta *fm = a.schema->getFieldMeta(i->table_name, i->field_name);
+	assert(constr.key == fm);
+
+	//check if we need onion adjustment
+	if (constr.l < fm->encdesc.olm[constr.o]) {
+	    //need adjustment, throw exception
+	    throw OnionAdjustExcept(constr.o, fm, constr.l, i);
+	}
 
 	Item_field * res = make_item(i);
 	
-        if (it == a.itemHasRewrite.end()) {
-
-	    FieldMeta * fm = a.schema->getFieldMeta(i->table_name, i->field_name);
-	    if (!fm->isEncrypted()) {
-		return res;
-	    }
+	if (!fm->isEncrypted()) { // Not encrypted
+	    return res;
+	}
 	    
-	    // Encrypted item
+	// Encrypted item
 	    
-            // fix table name
-            const char * table = i->table_name;
-            res->table_name = make_thd_string(anonymize_table_name(i->table_name, a));
-            // pick the column corresponding to the onion we want
-            auto it = a.itemToMeta.find(i);
-            if (it == a.itemToMeta.end()) {
-                // this is a bug, we should have recorded this in enforce()
-                cryptdb_err() << "should have recorded item meta object in enforce()";
-            }
-            ItemMeta *im = it->second;
-            res->field_name = make_thd_string(get_column_name(string(table), string(i->field_name), im->o,  a));
-
-            a.itemHasRewrite.insert(i);
-        }
+	res->table_name = make_thd_string(anonymize_table_name(i->table_name, a));
+	res->field_name = make_thd_string(fm->onions[constr.o]->onionname);
+	
         return res;
     }
-
+/*
+    static OLK
+    chooseProj(FieldMeta * fm) {
+	SECLEVEL l;
+	if (contains_get(fm->encdesc.olm, oDET, l)) {
+	    return OLK(oDET, l, fm);
+	}
+	if (contains_get(fm->encdesc.olm, oOPE, l)) {
+	    return OLK(oOPE, l, fm);
+	}
+	if (contains_get(fm->encdesc.olm, oAGG, l)) {
+	    return OLK(oAGG, l, fm);
+	}
+	assert_s(false, "field " + fm->fname + " does not have any decryptable onions for projection");
+	return OLK();
+    }
+*/  
+    //TODO: why do we need a different rewrite proj type from the one above?
     virtual void
-    do_rewrite_proj_type(Item_field *i, Analysis & a, vector<Item *> &l) const
+    do_rewrite_proj_type(Item_field *i, const OLK & olk, Analysis & a, vector<Item *> &l) const
     {
         LOG(cdb_v) << "do_rewrite_proj_type";
-        //rewrite current projection field
-        l.push_back(do_rewrite_type(i, a));
 
-        // if there is a salt for the onion, then also fetch the onion from the server
-        auto it = a.itemToFieldMeta.find(i);
-        assert(it != a.itemToFieldMeta.end());
-        FieldMeta *fm = it->second;
-        if (i->name) {
-            addToReturn(a.rmeta, a.pos++, a.itemToMeta[i], fm->has_salt, i->name);
-        }
-
+	FieldMeta *fm = olk.key;
+       
+        // rewrite current projection field
+	Item_field * new_item = (Item_field*)do_rewrite_type(i, olk, a);
+	l.push_back(new_item);
+	// record for results
+        addToReturn(a.rmeta, a.pos++, olk, fm->has_salt, i->name);
+        
+        // fetch salt as well if needed
         if (fm->has_salt) {
-            assert(!fm->salt_name.empty());
-	    Item_field * itf_salt = make_item((Item_field*)l[0], fm->salt_name);
+	    Item_field * itf_salt = make_item(new_item, fm->salt_name);
             l.push_back(itf_salt);
             addSaltToReturn(a.rmeta, a.pos++);
         }
     }
 
+    //do we need do_rewrite_insert? 
     virtual void
     do_rewrite_insert_type(Item_field *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
         LOG(cdb_v) << "do_rewrite_insert_type L701 (IT)";
 
-        assert(fm == NULL);
-        // need to map this one field into all of its onions
-        // TODO: this is kind of a duplicate of rewrite_create_field(),
-        // but not quite. see if we can somehow reconcile these two
-        // pieces of code
+	assert(fm==NULL);
         fm = a.schema->getFieldMeta(i->table_name, i->field_name);
+
+	if (!fm->isEncrypted()) {
+	    l.push_back(make_item(i, fm->fname));
+	    return;
+	}
+
+	// Encrypted field
+	
+	Item_field * new_field = NULL;
         for (auto it = fm->onions.begin();
-             it != fm->onions.end();
-             ++it) {
-            const string &name = it->second->onionname;
-            l.push_back(make_item(i, name));
+             it != fm->onions.end(); ++it) {
+            string name = it->second->onionname;
+	    new_field = make_item(i, name);
+            l.push_back(new_field);
         }
         if (fm->has_salt) {
             assert(!fm->salt_name.empty());
-            l.push_back(make_item(i, fm->salt_name));
-        }
-        //if no onions: grab the field, for reals
-        if (l.empty()) {
-            l.push_back(make_item(i, fm->fname));
+	    assert(new_field); //need an anonymized field as template to create
+			       //salt item
+            l.push_back(make_item(new_field, fm->salt_name));
         }
     }
 
 } ANON;
 
 static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> {
-    virtual EncSet do_gather_type(Item_string *i, const constraints &tr, Analysis & a) const {
+    virtual EncSet do_gather_type(Item_string *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << " String item do_gather " << *i;
         /* constant strings are always ok */
         for (auto it = a.tmkm.encForVal.begin(); it != a.tmkm.encForVal.end(); it++) {
@@ -951,20 +852,20 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
                 it->second = temp.str();
             }
         }
-        return tr.encset;
-    }
-    virtual void do_enforce_type(Item_string *i, const constraints &tr, Analysis & a) const
-    {
-        record_item_meta_for_constraints(i, tr, a);
+
+	tr = reason(FULL_EncSet, "is a constant", i);
+	a.itemRewritePlans[i] = new RewritePlan(FULL_EncSet_Str, tr);
+	
+        return FULL_EncSet;
     }
     virtual Item * do_optimize_type(Item_string *i, Analysis & a) const {
         return i;
     }
 
-    virtual Item * do_rewrite_type(Item_string *i, Analysis & a) const {
+    virtual Item * do_rewrite_type(Item_string *i, const OLK & constr,  Analysis & a) const {
         LOG(cdb_v) << "do_rewrite_type String item " << *i;
         
-        return encrypt_item(i,  a);
+        return encrypt_item(i, constr, a);
     }
 
     virtual void
@@ -972,8 +873,16 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     {
         LOG(cdb_v) << "do_rewrite_insert_type L880 " << *i;
        
-        uint64_t salt = 0;
-        if (fm->has_salt) {
+	if (!fm->isEncrypted()) {
+	    l.push_back(make_item(i));
+	    return;
+	}
+
+	// Encrypted
+	
+	uint64_t salt = 0;
+
+	if (fm->has_salt) {
             salt = randomValue();
         } else {
             //TODO: need to use table salt in this case
@@ -983,18 +892,13 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
        
         if (fm->has_salt) {
             l.push_back(new Item_int((ulonglong) salt));
-        }
-	
-        //if no onions: grab the field, for reals
-        if (l.empty()) {
-            l.push_back(make_item(i));
-        }
+        }	
     }
 } ANON;
 
 static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
-    virtual EncSet do_gather_type(Item_num *i, const constraints &tr, Analysis & a) const {
-        LOG(cdb_v) << "CItemSubtypeIT (L966) num do_gather " << *i << "\n";
+    virtual EncSet do_gather_type(Item_num *i, reason &tr, Analysis & a) const {
+        LOG(cdb_v) << "CItemSubtypeIT (L966) num do_gather " << *i;
         /* constant ints are always ok */
         for (auto it = a.tmkm.encForVal.begin(); it != a.tmkm.encForVal.end(); it++) {
             if (it->second == "") {
@@ -1003,19 +907,20 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
                 it->second = temp.str();
             }
         }
-        return tr.encset;
+
+	tr = reason(FULL_EncSet, "is a constant", i);
+	a.itemRewritePlans[i] = new RewritePlan(FULL_EncSet_Int, tr);
+
+	return FULL_EncSet;
     }
-    virtual void do_enforce_type(Item_num *i, const constraints &tr, Analysis & a) const
-    {
-        record_item_meta_for_constraints(i, tr, a);
-    }
+    
     virtual Item * do_optimize_type(Item_num *i, Analysis & a) const {
         return i;
     }
 
-    virtual Item * do_rewrite_type(Item_num *i, Analysis & a) const {
+    virtual Item * do_rewrite_type(Item_num *i, const OLK & constr,  Analysis & a) const {
         LOG(cdb_v) << "do_rewrite_type " << *i << endl;
-        return encrypt_item(i, a);	
+        return encrypt_item(i, constr, a);	
     }
  
     virtual void
@@ -1023,6 +928,13 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     {
         LOG(cdb_v) << "do_rewrite_insert_type L942 " << *i << endl;
 
+	if (!fm->isEncrypted()) {
+	    l.push_back(make_item((Item_int*)i));
+	     return;
+	}
+
+	//Encrypted
+	
         uint64_t salt = 0;
         if (fm->has_salt) {
             salt = randomValue();
@@ -1031,37 +943,28 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
             //need to use table salt in this case
         }
 
-	//check if not encrypted
-	if (!fm->onions.size()) {
-	    l.push_back(make_item((Item_int*)i));
-	    return;
-	}
-
-	//encrypt for each onion
+      	//encrypt for each onion
         for (auto it = fm->onions.begin(); it != fm->onions.end();it++) {
             l.push_back(encrypt_item_layers(i, it->first, it->second->layers, a, fm, salt));
         }
 	
         if (fm->has_salt) {
-            l.push_back(new Item_int((ulonglong) salt));
+             l.push_back(new Item_int((ulonglong) salt));
         }
     }
 } ANON;
 
 static class ANON : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITEM> {
-    virtual EncSet do_gather_type(Item_decimal *i, const constraints &tr, Analysis & a) const {
+    virtual EncSet do_gather_type(Item_decimal *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << "CItemSubtypeIT (L1024) decimal do_gather " << *i;
+	UNIMPLEMENTED;
         /* constant decimals are always ok */
         return tr.encset;
     }
-    virtual void do_enforce_type(Item_decimal *i, const constraints &tr, Analysis & a) const
-    {
-        record_item_meta_for_constraints(i, tr, a);
-    }
-    virtual Item * do_optimize_type(Item_decimal *i, Analysis & a) const {
+        virtual Item * do_optimize_type(Item_decimal *i, Analysis & a) const {
         return i;
     }
-    virtual Item * do_rewrite_type(Item_decimal *i, Analysis & a) const {
+    virtual Item * do_rewrite_type(Item_decimal *i, const OLK & constr, Analysis & a) const {
         LOG(cdb_v) << "do_rewrite_type L1028";
         double n = i->val_real();
         char buf[sizeof(double) * 2];
@@ -1093,11 +996,8 @@ static class ANON : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITEM
 } ANON;
 
 static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NEG_FUNC> {
-    virtual EncSet do_gather_type(Item_func_neg *i, const constraints &tr, Analysis & a) const {
+    virtual EncSet do_gather_type(Item_func_neg *i, reason &tr, Analysis & a) const {
         return gather(i->arguments()[0], tr, a);
-    }
-    virtual void do_enforce_type(Item_func_neg *i, const constraints &tr, Analysis & a) const {
-        enforce(i->arguments()[0], tr, a);
     }
     virtual Item * do_optimize_type(Item_func_neg *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
@@ -1105,11 +1005,8 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
 } ANON;
 
 static class ANON : public CItemSubtypeFT<Item_func_not, Item_func::Functype::NOT_FUNC> {
-    virtual EncSet do_gather_type(Item_func_not *i, const constraints &tr, Analysis & a) const {
+    virtual EncSet do_gather_type(Item_func_not *i, reason &tr, Analysis & a) const {
         return gather(i->arguments()[0], tr, a);
-    }
-    virtual void do_enforce_type(Item_func_not *i, const constraints &tr, Analysis & a) const {
-        enforce(i->arguments()[0], tr, a);
     }
     virtual Item * do_optimize_type(Item_func_not *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
@@ -1117,13 +1014,11 @@ static class ANON : public CItemSubtypeFT<Item_func_not, Item_func::Functype::NO
 } ANON;
 
 static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_ITEM> {
-    virtual EncSet do_gather_type(Item_subselect *i, const constraints &tr, Analysis & a) const {
+    virtual EncSet do_gather_type(Item_subselect *i, reason &tr, Analysis & a) const {
         st_select_lex *select_lex = i->get_select_lex();
-        process_select_lex(select_lex, tr, a);
+        process_select_lex(select_lex, a);
         return tr.encset;
     }
-    virtual void do_enforce_type(Item_subselect *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_subselect *i, Analysis & a) const {
         optimize_select_lex(i->get_select_lex(), a);
         return i;
@@ -1132,30 +1027,27 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
 
 extern const char str_in_optimizer[] = "<in_optimizer>";
 static class ANON : public CItemSubtypeFN<Item_in_optimizer, str_in_optimizer> {
-    virtual EncSet do_gather_type(Item_in_optimizer *i, const constraints &tr, Analysis & a) const {
+    virtual EncSet do_gather_type(Item_in_optimizer *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << "CItemSubtypeFN (L1107) do_gather " << *i;
 
-        Item **args = i->arguments();
-        analyze(args[0], constraints(EMPTY_EncSet, "in_opt", i, &tr), a);
-        analyze(args[1], constraints(EMPTY_EncSet, "in_opt", i, &tr), a);
+	UNIMPLEMENTED;
+        //Item **args = i->arguments();
+        //analyze(args[0], reason(EMPTY_EncSet, "in_opt", i, &tr), a);
+        //analyze(args[1], reason(EMPTY_EncSet, "in_opt", i, &tr), a);
         return tr.encset;
     }
-    virtual void do_enforce_type(Item_in_optimizer *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_in_optimizer *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
 } ANON;
 
 static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
-    virtual EncSet do_gather_type(Item_cache *i, const constraints &tr, Analysis & a) const {
+    virtual EncSet do_gather_type(Item_cache *i, reason &tr, Analysis & a) const {
         Item *example = i->*rob<Item_cache, Item*, &Item_cache::example>::ptr();
         if (example)
             return gather(example, tr, a);
         return tr.encset;
     }
-    virtual void do_enforce_type(Item_cache *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_cache *i, Analysis & a) const {
         // TODO(stephentu): figure out how to use rob here
         return i;
@@ -1165,53 +1057,45 @@ static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
     
 template<Item_func::Functype FT, class IT>
 class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
-    virtual EncSet do_gather_type(Item_func *i, const constraints &tr, Analysis & a) const {
-        LOG(cdb_v) << "CItemCompare (L1139) do_gather func " << *i;
+    virtual EncSet do_gather_type(Item_func *i, reason &tr, Analysis & a) const {
+	LOG(cdb_v) << "CItemCompare (L1139) do_gather func " << *i;
 
-        EncSet t2;
+        EncSet my_es;
+	string why = "";
 
         if (FT == Item_func::Functype::EQ_FUNC ||
             FT == Item_func::Functype::EQUAL_FUNC ||
             FT == Item_func::Functype::NE_FUNC) {
-            t2 = EQ_EncSet;
+            my_es = EQ_EncSet;
+	    why = "compare equality";
         } else {
-            t2 = ORD_EncSet;
+            my_es = ORD_EncSet;
+	    why = "compare order";
         }
 
-        Item **args = i->arguments();
-        const char *reason = "compare_func";
-        if (!args[0]->const_item() && !args[1]->const_item())
-            reason = "compare_func_join";
+	Item ** args = i->arguments();
+	assert_s(i->argument_count() == 2, "expected two arguments for comparison");
+        if (!args[0]->const_item() && !args[1]->const_item()) {
+            why = why + "; join";
+	    cerr << "join";
+	    UNIMPLEMENTED;
+	}
 
-        EncSet new_encset = tr.encset.intersect(t2);
-        //cerr << "intersect " << tr << " with " << t2 << " result is " << new_encset << " \n";
+	return typical_gather(a, i, my_es, why, tr, false, PLAIN_EncSet);
 
-        if (new_encset.osl.size() == 0) {
-            LOG(warn) << "query not supported because " << reason << " and " << tr;
-            exit(-1);//TODO: throw some exception
-        }
-
-        new_encset = gather(args[0], constraints(new_encset, reason, i, &tr), a);
-        return gather(args[1], constraints(new_encset, reason, i, &tr), a);
     }
-    virtual void do_enforce_type(Item_func *i, const constraints &tr, Analysis & a) const {
-        Item **args = i->arguments();
-        const char *reason = "compare_func";
-        if (!args[0]->const_item() && !args[1]->const_item())
-            reason = "compare_func_join";
-        enforce(args[0], constraints(tr.encset, reason, i, &tr), a);
-        enforce(args[1], constraints(tr.encset, reason, i, &tr), a);
-    }
+
     virtual Item * do_optimize_type(Item_func *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
 
-    virtual Item * do_rewrite_type(Item_func *i, Analysis & a) const {
-        LOG(cdb_v) << "do_rewrite_type L1171 " << *i;
+    virtual Item * do_rewrite_type(Item_func *i, const OLK & constr, Analysis & a) const {
+        LOG(cdb_v) << "do_rewrite_type Item_func " << *i << " constr " << constr;
+	
 	Item ** args = i->arguments();
 	assert_s(i->argument_count() == 2, "compare function does not have two arguments as expected");
 	IT *res = new IT(args[0], args[1]);
-	do_rewrite_type_args(res, a);
+	do_rewrite_type_args((IT*)i, res, constr, a);
         LOG(cdb_v) << "return 1171 " << *res;
         return res;
     }
@@ -1227,8 +1111,8 @@ static CItemCompare<Item_func::Functype::LE_FUNC,    Item_func_le>    ANON;
 
 template<Item_func::Functype FT, class IT>
 class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
-    virtual EncSet do_gather_type(Item_cond *i, const constraints &tr, Analysis & a) const {
-        LOG(cdb_v) << "CItemCond (L1195) do_gather " << *i;
+    virtual EncSet do_gather_type(Item_cond *i, reason &tr, Analysis & a) const {
+	/* LOG(cdb_v) << "CItemCond (L1195) do_gather " << *i;
         //cerr << "do_a_t item_cond reason " << tr << "\n";
         auto it = List_iterator<Item>(*i->argument_list());
         //we split the current item in the different subexpressions
@@ -1236,17 +1120,16 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
             Item *argitem = it++;
             if (!argitem)
                 break;
-            analyze(argitem, constraints(tr.encset, "cond", i, &tr), a);
+            analyze(argitem, a);
         }
-        return tr.encset;
+        return tr.encset;*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_cond *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_cond *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-    virtual Item * do_rewrite_type(Item_cond *i, Analysis & a) const {
-        LOG(cdb_v) << "do_rewrite_type  Item_cond i " << *i << " no of args " << i->argument_count();
+    virtual Item * do_rewrite_type(Item_cond *i, const OLK & olk, Analysis & a) const {
+	/* LOG(cdb_v) << "do_rewrite_type  Item_cond i " << *i << " no of args " << i->argument_count();
 
 	List<Item> newlist;
 	auto it = List_iterator<Item>(*i->argument_list());
@@ -1255,11 +1138,13 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
 	    if (!argitem) {
 		break;
 	    }
-	    newlist.push_back(rewrite(argitem, a));	    
+	    newlist.push_back(rewrite(argitem, olk, a));	    
 	}
 	
 	IT * res = new IT(newlist);
 	return res;
+	*/
+	UNIMPLEMENTED;
     }
 };
 
@@ -1268,14 +1153,13 @@ static CItemCond<Item_func::Functype::COND_OR_FUNC,  Item_cond_or>  ANON;
 
 template<Item_func::Functype FT>
 class CItemNullcheck : public CItemSubtypeFT<Item_bool_func, FT> {
-    virtual EncSet do_gather_type(Item_bool_func *i, const constraints &tr, Analysis & a) const {
-        Item **args = i->arguments();
+    virtual EncSet do_gather_type(Item_bool_func *i, reason &tr, Analysis & a) const {
+	/*  Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++)
-            analyze(args[x], constraints(EMPTY_EncSet,  "nullcheck", i, &tr), a);
-        return tr.encset;
+            analyze(args[x], reason(EMPTY_EncSet,  "nullcheck", i, &tr), a);
+	    return tr.encset;*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_bool_func *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_bool_func *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
@@ -1285,52 +1169,38 @@ static CItemNullcheck<Item_func::Functype::ISNULL_FUNC> ANON;
 static CItemNullcheck<Item_func::Functype::ISNOTNULL_FUNC> ANON;
 
 static class ANON : public CItemSubtypeFT<Item_func_get_system_var, Item_func::Functype::GSYSVAR_FUNC> {
-    virtual EncSet do_gather_type(Item_func_get_system_var *i, const constraints &tr, Analysis & a) const {
+    virtual EncSet do_gather_type(Item_func_get_system_var *i, reason &tr, Analysis & a) const {
         return tr.encset;
     }
-    virtual void do_enforce_type(Item_func_get_system_var *i, const constraints &tr, Analysis & a) const
-    {}
 } ANON;
-
-// This is a bit of a hack: until our embedded DB actually has these UDFs for
-// hom-add, then we will just lie about its existence. Eventually we could
-// probably pull the udf_func object out of the embedded db.
-
 
 template<const char *NAME>
 class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
-    virtual EncSet do_gather_type(Item_func_additive_op *i, const constraints &tr, Analysis & a) const {
-        Item **args = i->arguments();
-        assert(i->argument_count() == 2);
-        EncSet cur = tr.encset.intersect(ADD_EncSet);
-        cur = gather(args[0], constraints(cur, "additive", i, &tr), a);
-        return gather(args[1], constraints(cur, "additive", i, &tr), a);
-    }
-    virtual void do_enforce_type(Item_func_additive_op *i, const constraints &tr, Analysis & a) const {
-        Item **args = i->arguments();
-        enforce(args[0], constraints(tr.encset, "additive", i, &tr), a);
-        enforce(args[1], constraints(tr.encset, "additive", i, &tr), a);
-
-	record_item_meta_for_constraints(i, tr, a);
+    virtual EncSet do_gather_type(Item_func_additive_op *i, reason &tr, Analysis & a) const {
+	return typical_gather(a, i, ADD_EncSet, "additive", tr, true);
     }
     virtual Item * do_optimize_type(Item_func_additive_op *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-    virtual Item * do_rewrite_type(Item_func_additive_op *i, Analysis & a) const {
-        LOG(cdb_v) << "do_rewrite_type Item_func_additive_op";
+    virtual Item * do_rewrite_type(Item_func_additive_op *i, const OLK & constr, Analysis & a) const {
+        LOG(cdb_v) << "do_rewrite_type Item_func_additive_op" << *i << " with constr " << constr;
 
 	//rewrite children
 	assert_s(i->argument_count() == 2, " expecting two arguments for additive operator ");
 	Item **args = i->arguments();
-	Item * arg0 = rewrite(args[0], a);
-	Item * arg1 = rewrite(args[1], a);
+
+	RewritePlan * plan = getAssert(a.itemRewritePlans, (Item *)i, "itemRewritePlans");
+        cerr << "Rewrite plan is " << plan << "\n";
+	auto childr_plan = getAssert(plan->plan, constr, "plan");
+
+	Item * arg0 = itemTypes.do_rewrite(args[0], getAssert(childr_plan, args[0]), a);
+	Item * arg1 = itemTypes.do_rewrite(args[1], getAssert(childr_plan, args[1]), a);
 	
-	ItemMeta * im  = getAssert(a.itemToMeta, (Item *)i);
-	FieldMeta * fm = im->basefield;
-	EncLayer *el   = getAssert(fm->onions, oAGG)->layers.back();
+	EncLayer *el   = getAssert(constr.key->onions, oAGG)->layers.back();
 	assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
 	return ((HOM*)el)->sumUDF(arg0, arg1);
-    }
+
+	}
 };
 
 extern const char str_plus[] = "+";
@@ -1341,14 +1211,13 @@ static CItemAdditive<str_minus> ANON;
 
 template<const char *NAME>
 class CItemMath : public CItemSubtypeFN<Item_func, NAME> {
-    virtual EncSet do_gather_type(Item_func *i, const constraints &tr, Analysis & a) const {
-        Item **args = i->arguments();
+    virtual EncSet do_gather_type(Item_func *i, reason &tr, Analysis & a) const {
+	/* Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++)
-            analyze(args[x], constraints(EMPTY_EncSet, "math", i, &tr), a);
-        return tr.encset;
+            analyze(args[x], reason(EMPTY_EncSet, "math", i, &tr), a);
+	    return tr.encset;*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_func *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_func *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
@@ -1389,16 +1258,16 @@ static CItemMath<str_radians> ANON;
 
 extern const char str_if[] = "if";
 static class ANON : public CItemSubtypeFN<Item_func_if, str_if> {
-    virtual EncSet do_gather_type(Item_func_if *i, const constraints &tr, Analysis & a) const {
-        Item **args = i->arguments();
+    virtual EncSet do_gather_type(Item_func_if *i, reason &tr, Analysis & a) const {
+/*
+	Item **args = i->arguments();
         assert(i->argument_count() == 3);
-        analyze(args[0], constraints(tr.encset, "if_cond", i, &tr), a);
-        analyze(args[1], constraints(tr.encset, "true_branch", i, &tr), a);
-        analyze(args[2], constraints(tr.encset, "false_branch", i, &tr), a);
-        return tr.encset;
+        analyze(args[0], reason(tr.encset, "if_cond", i, &tr), a);
+        analyze(args[1], reason(tr.encset, "true_branch", i, &tr), a);
+        analyze(args[2], reason(tr.encset, "false_branch", i, &tr), a);
+        return tr.encset;*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_func_if *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_func_if *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
@@ -1406,17 +1275,14 @@ static class ANON : public CItemSubtypeFN<Item_func_if, str_if> {
 
 extern const char str_nullif[] = "nullif";
 static class ANON : public CItemSubtypeFN<Item_func_nullif, str_nullif> {
-    virtual EncSet do_gather_type(Item_func_nullif *i, const constraints &tr, Analysis & a) const {
-        Item **args = i->arguments();
+    virtual EncSet do_gather_type(Item_func_nullif *i, reason &tr, Analysis & a) const {
+	/*    Item **args = i->arguments();
         EncSet cur = EQ_EncSet;
         for (uint x = 0; x < i->argument_count(); x++)
-            cur = gather(args[x], constraints(cur, "nullif", i, &tr), a);
+            cur = gather(args[x], reason(cur, "nullif", i, &tr), a);
         return cur;
-    }
-    virtual void do_enforce_type(Item_func_nullif *i, const constraints &tr, Analysis & a) const {
-        Item **args = i->arguments();
-        for (uint x = 0; x < i->argument_count(); x++)
-            enforce(args[x], constraints(tr.encset, "nullif", i, &tr), a);
+	*/
+	UNIMPLEMENTED;
     }
     virtual Item * do_optimize_type(Item_func_nullif *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
@@ -1425,14 +1291,13 @@ static class ANON : public CItemSubtypeFN<Item_func_nullif, str_nullif> {
 
 extern const char str_coalesce[] = "coalesce";
 static class ANON : public CItemSubtypeFN<Item_func_coalesce, str_coalesce> {
-    virtual EncSet do_gather_type(Item_func_coalesce *i, const constraints &tr, Analysis & a) const {
-        Item **args = i->arguments();
+    virtual EncSet do_gather_type(Item_func_coalesce *i, reason &tr, Analysis & a) const {
+	/* Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++)
             analyze(args[x], tr, a);
-        return tr.encset;
+	    return tr.encset;*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_func_coalesce *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_func_coalesce *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
@@ -1440,8 +1305,8 @@ static class ANON : public CItemSubtypeFN<Item_func_coalesce, str_coalesce> {
 
 extern const char str_case[] = "case";
 static class ANON : public CItemSubtypeFN<Item_func_case, str_case> {
-    virtual EncSet do_gather_type(Item_func_case *i, const constraints &tr, Analysis & a) const {
-        Item **args = i->arguments();
+    virtual EncSet do_gather_type(Item_func_case *i, reason &tr, Analysis & a) const {
+	/*     Item **args = i->arguments();
         int first_expr_num = i->*rob<Item_func_case, int,
                 &Item_func_case::first_expr_num>::ptr();
         int else_expr_num = i->*rob<Item_func_case, int,
@@ -1451,23 +1316,23 @@ static class ANON : public CItemSubtypeFN<Item_func_case, str_case> {
 
         if (first_expr_num >= 0)
             analyze(args[first_expr_num],
-                    constraints(EQ_EncSet, "case_first", i, &tr), a);
+                    reason(EQ_EncSet, "case_first", i, &tr), a);
         if (else_expr_num >= 0)
             analyze(args[else_expr_num], tr, a);
 
         for (uint x = 0; x < ncases; x += 2) {
             if (first_expr_num < 0)
             analyze(args[x],
-                    constraints(EMPTY_EncSet, "case_nofirst", i, &tr), a);
+                    reason(EMPTY_EncSet, "case_nofirst", i, &tr), a);
             else
             analyze(args[x],
-                    constraints(EQ_EncSet, "case_w/first", i, &tr), a);
+                    reason(EQ_EncSet, "case_w/first", i, &tr), a);
             analyze(args[x+1], tr, a);
         }
         return tr.encset;
+	*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_func_case *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_func_case *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
@@ -1475,14 +1340,14 @@ static class ANON : public CItemSubtypeFN<Item_func_case, str_case> {
 
 template<const char *NAME>
 class CItemStrconv : public CItemSubtypeFN<Item_str_conv, NAME> {
-    virtual EncSet do_gather_type(Item_str_conv *i, const constraints & tr, Analysis & a) const {
-        Item **args = i->arguments();
+    virtual EncSet do_gather_type(Item_str_conv *i, reason & tr, Analysis & a) const {
+	/* Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++)
-            analyze(args[x], constraints(EMPTY_EncSet, "strconv", i, &tr), a);
+            analyze(args[x], reason(EMPTY_EncSet, "strconv", i, &tr), a);
         return tr.encset;
+	*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_str_conv *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_str_conv *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
@@ -1520,11 +1385,9 @@ static CItemStrconv<str_regexp> ANON;
 
 template<const char *NAME>
 class CItemLeafFunc : public CItemSubtypeFN<Item_func, NAME> {
-    virtual EncSet do_gather_type(Item_func *i, const constraints &tr, Analysis & a) const {
+    virtual EncSet do_gather_type(Item_func *i, reason &tr, Analysis & a) const {
         return tr.encset;
     }
-    virtual void do_enforce_type(Item_func *i, const constraints &tr, Analysis & a) const
-    {}
 };
 
 extern const char str_found_rows[] = "found_rows";
@@ -1537,12 +1400,12 @@ extern const char str_rand[] = "rand";
 static CItemLeafFunc<str_rand> ANON;
 
 static class ANON : public CItemSubtypeFT<Item_extract, Item_func::Functype::EXTRACT_FUNC> {
-    virtual EncSet do_gather_type(Item_extract *i, const constraints &tr, Analysis & a) const {
-        analyze(i->arguments()[0], constraints(EMPTY_EncSet, "extract", i, &tr), a);
+    virtual EncSet do_gather_type(Item_extract *i, reason &tr, Analysis & a) const {
+	/* analyze(i->arguments()[0], reason(EMPTY_EncSet, "extract", i, &tr), a);
         return tr.encset;
+	*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_extract *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_extract *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
@@ -1550,16 +1413,15 @@ static class ANON : public CItemSubtypeFT<Item_extract, Item_func::Functype::EXT
 
 template<const char *NAME>
 class CItemDateExtractFunc : public CItemSubtypeFN<Item_int_func, NAME> {
-    virtual EncSet do_gather_type(Item_int_func *i, const constraints &tr, Analysis & a) const {
-        Item **args = i->arguments();
+    virtual EncSet do_gather_type(Item_int_func *i, reason &tr, Analysis & a) const {
+        /*Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++) {
-            /* assuming we separately store different date components */
+            // assuming we separately store different date components
             analyze(args[x], tr, a);
         }
-        return tr.encset;
+        return tr.encset;*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_int_func *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_int_func *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
@@ -1591,16 +1453,16 @@ static CItemDateExtractFunc<str_unix_timestamp> ANON;
 
 extern const char str_date_add_interval[] = "date_add_interval";
 static class ANON : public CItemSubtypeFN<Item_date_add_interval, str_date_add_interval> {
-    virtual EncSet do_gather_type(Item_date_add_interval *i, const constraints &tr, Analysis & a) const {
-        Item **args = i->arguments();
+    virtual EncSet do_gather_type(Item_date_add_interval *i, reason &tr, Analysis & a) const {
+	/* Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++) {
-            /* XXX perhaps too conservative */
-            analyze(args[x], constraints(EMPTY_EncSet, "date_add", i, &tr), a);
+            // XXX perhaps too conservative 
+            analyze(args[x], reason(EMPTY_EncSet, "date_add", i, &tr), a);
         }
         return tr.encset;
+        */
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_date_add_interval *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_date_add_interval *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
@@ -1608,11 +1470,9 @@ static class ANON : public CItemSubtypeFN<Item_date_add_interval, str_date_add_i
 
 template<const char *NAME>
 class CItemDateNow : public CItemSubtypeFN<Item_func_now, NAME> {
-    virtual EncSet do_gather_type(Item_func_now *i, const constraints &tr, Analysis & a) const {
+    virtual EncSet do_gather_type(Item_func_now *i, reason &tr, Analysis & a) const {
         return tr.encset;
     }
-    virtual void do_enforce_type(Item_func_now *i, const constraints &tr, Analysis & a) const
-    {}
 };
 
 extern const char str_now[] = "now";
@@ -1626,14 +1486,14 @@ static CItemDateNow<str_sysdate> ANON;
 
 template<const char *NAME>
 class CItemBitfunc : public CItemSubtypeFN<Item_func_bit, NAME> {
-    virtual EncSet do_gather_type(Item_func_bit *i, const constraints &tr, Analysis & a) const {
-        Item **args = i->arguments();
+    virtual EncSet do_gather_type(Item_func_bit *i, reason &tr, Analysis & a) const {
+        /*Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++)
-            analyze(args[x], constraints(EMPTY_EncSet, "bitfunc", i, &tr), a);
+            analyze(args[x], reason(EMPTY_EncSet, "bitfunc", i, &tr), a);
         return tr.encset;
+	*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_func_bit *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_func_bit *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
@@ -1652,104 +1512,91 @@ extern const char str_bit_and[] = "&";
 static CItemBitfunc<str_bit_and> ANON;
 
 static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::LIKE_FUNC> {
-    virtual EncSet do_gather_type(Item_func_like *i, const constraints &tr, Analysis & a) const {
+    virtual EncSet do_gather_type(Item_func_like *i, reason &tr, Analysis & a) const {
 	LOG(cdb_v) << "Item_func do_gather_type " << *i;
 	
 	Item **args = i->arguments();
 	assert_s(i->argument_count() == 2, "expecting LIKE to have two arguments");
 
-	if (args[1]->type() == Item::Type::STRING_ITEM) {
+	if ((args[0]->type() == Item::Type::FIELD_ITEM) && (args[1]->type() == Item::Type::STRING_ITEM)) {
 
 	    string s(args[1]->str_value.ptr(), args[1]->str_value.length());
 
 	    if (s.find('%') == s.npos && s.find('_') == s.npos) {
-                /* some queries actually use LIKE as an equality check.. */
-
-		EncSet new_encset = tr.encset.intersect(EQ_EncSet);
-		const char * reason = "LIKE equality ";
-		
-		if (new_encset.osl.size() == 0) {
-		    cerr << "query not supported because  " << reason << " and " << tr;
-		    assert(false);
-		}
-
-		new_encset = gather(args[0], constraints(new_encset, reason, i, &tr), a);
-		return gather(args[1], constraints(new_encset, reason, i, &tr), a);
+                // some queries actually use LIKE as an equality check.. 
+		return typical_gather(a, i, EQ_EncSet, "LIKE equality", tr, false, PLAIN_EncSet);
 		
             } else {
 		
-                /* XXX check if pattern is one we can support? */
+		// XXX check if pattern is one we can support? 
+	     
+		reason r1;
+		EncSet es1 = gather(args[0], r1, a);
 
-		stringstream ss;
-                ss << "like:'" << s << "'";
-		EncSet new_encset = tr.encset.intersect(Search_EncSet);
-		const char * reason = "LIKE not eq";
+		EncSet solution = es1.intersect(Search_EncSet);
 
-		if (new_encset.osl.size() == 0) {
-		    cerr << "query not supported because " << reason << " and " << tr;
-		    assert(false);
+		if (solution.empty()) {
+		    cerr << "cannot support " << i << " BECAUSE it needs any of " << Search_EncSet << "\n" \
+			 << " but field only supports  " << es1 << "\n";
 		}
 		
-                return gather(args[0], constraints(new_encset, ss.str(), i, &tr), a);
+		stringstream ss;
+		ss << "like:'" << s << "'";
+		tr = reason(PLAIN_EncSet, ss.str(), i);
+		tr.add_child(r1);
+
+		a.itemRewritePlans[i] = new RewritePlan(PLAIN_OLK, solution.chooseOne(), args, 1, tr);
+
+		return PLAIN_EncSet;
             }
         } else {
-            /* we cannot support non-constant search patterns */
-	    assert_s(false, "we cannot support non-constant serach patterns");
+            // we cannot support non-constant search patterns 
+	    assert_s(false, "we cannot support search patterns not of the form (field like const string)");
 	    //for (uint x = 0; x < i->argument_count(); x++)
-            //    analyze(args[x], constraints(EMPTY_EncSet, "like-non-const", i, &tr), a);
+            //    analyze(args[x], reason(EMPTY_EncSet, "like-non-const", i, &tr), a);
         }
         return tr.encset;
-    }
-    virtual void do_enforce_type(Item_func_like *i, const constraints &tr, Analysis & a) const
-    {
-	LOG(cdb_v) << "enforce Item_func_like " << *i;
 
-	const char * reason = "LIKE func";
-	assert_s(i->argument_count() == 2, "expecting LIKE to have two arguements");
-	Item **args = i->arguments();
-	
-	enforce(args[0], constraints(tr.encset, reason, i, &tr), a);
-	
-	string s(args[1]->str_value.ptr(), args[1]->str_value.length());
-	if (s.find('%') == s.npos && s.find('_') == s.npos) {
-	    enforce(args[1], constraints(tr.encset, reason, i, &tr), a);
-	}
-	
-	record_item_meta_for_constraints(i, tr, a); //TODO: does all enforce do the
-						    //same things?
+
     }
     virtual Item * do_optimize_type(Item_func_like *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-    virtual Item * do_rewrite_type(Item_func_like *i, Analysis & a) const {
+    virtual Item * do_rewrite_type(Item_func_like *i, const OLK & constr, Analysis & a) const {
 	LOG(cdb_v) << "Item_func_like do_rewrite_type " << *i;
 	
 	assert_s(i->argument_count() == 2, "expecting LIKE to have two arguements");
 	Item **args = i->arguments();
 	
-	if (args[1]->type() == Item::Type::STRING_ITEM) {
+	if ((args[0]->type() == Item::Type::FIELD_ITEM) && (args[1]->type() == Item::Type::STRING_ITEM)) {
 
 	    string s(args[1]->str_value.ptr(), args[1]->str_value.length());
 
 	    if (s.find('%') == s.npos && s.find('_') == s.npos) {
-                /* some queries actually use LIKE as an equality check.. */
+                // some queries actually use LIKE as an equality check.. 
 
 		Item_func_like * res = new Item_func_like(args[0], args[1], NULL, false);
-		do_rewrite_type_args(res, a);
+		do_rewrite_type_args(i, res, constr, a);
 		
 		return res;
 	    		
             } else {
-                /* XXX check if pattern is one we can support? */
+		// XXX check if pattern is one we can support? 
+
+		RewritePlan * plan = getAssert(a.itemRewritePlans, (Item*) i);
+		auto childr_plan = getAssert(plan->plan, constr);
+		OLK child_OLK = getAssert(childr_plan, args[0]);
+
+		if (child_OLK == PLAIN_OLK) {
+		    return new Item_func_like(args[0], args[1], NULL, false);
+		}
 		
-		Item * field = rewrite(args[0], a);
+		Item * field = itemTypes.do_rewrite(args[0], child_OLK, a);
 		args[0]->name = NULL; //no alias
 
-		ItemMeta * im = getAssert(a.itemToMeta, (Item *)i);
-
 		Item * expr = args[1];
+		FieldMeta * fm = child_OLK.key;
 		
-		FieldMeta * fm = im->basefield;
 		EncLayer * el = getAssert(fm->onions, oSWP)->layers.back();
 		assert_s(el->level() == SECLEVEL::SEARCH, "incorrect onion  level on onion oSWP");
 
@@ -1758,12 +1605,12 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
 
 		return res;
             }
-        } else {
-            /* we cannot support non-constant search patterns */
-	    assert_s(false, "we cannot support non-constant serach patterns");
-	    return NULL;
         }
-	
+
+	// we cannot support non-constant search patterns 
+	assert_s(false, "we cannot support search patterns not of the form (field like constant string)");
+	return NULL;
+        	
     }
 } ANON;
 
@@ -1772,41 +1619,39 @@ static class ANON : public CItemSubtypeFT<Item_func, Item_func::Functype::FUNC_S
         thrower() << "unsupported store procedure call " << *i;
     }
 
-    virtual EncSet do_gather_type(Item_func *i, const constraints &tr, Analysis & a) const __attribute__((noreturn)) { error(i); }
-    virtual void do_enforce_type(Item_func *i, const constraints &tr, Analysis & a) const __attribute__((noreturn))
-    { error(i); }
+    virtual EncSet do_gather_type(Item_func *i, reason &tr, Analysis & a) const __attribute__((noreturn)) { error(i); }
 } ANON;
 
 static class ANON : public CItemSubtypeFT<Item_func_in, Item_func::Functype::IN_FUNC> {
-    virtual EncSet do_gather_type(Item_func_in *i, const constraints &tr, Analysis & a) const {
-        Item **args = i->arguments();
+    virtual EncSet do_gather_type(Item_func_in *i, reason &tr, Analysis & a) const {
+	/*  Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++)
-            analyze(args[x], constraints(EQ_EncSet, "in", i, &tr), a);
+            analyze(args[x], reason(EQ_EncSet, "in", i, &tr), a);
         return tr.encset;
+	*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_func_in *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_func_in *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
 } ANON;
 
 static class ANON : public CItemSubtypeFT<Item_func_in, Item_func::Functype::BETWEEN> {
-    virtual EncSet do_gather_type(Item_func_in *i, const constraints &tr, Analysis & a) const {
-        Item **args = i->arguments();
+    virtual EncSet do_gather_type(Item_func_in *i, reason &tr, Analysis & a) const {
+	/*  Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++)
-            analyze(args[x], constraints(ORD_EncSet, "between", i, &tr), a);
+            analyze(args[x], reason(ORD_EncSet, "between", i, &tr), a);
         return tr.encset;
+	*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_func_in *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_func_in *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
 } ANON;
 
 //TODO: use this func in other places as well
-static List<Item> *
+/*static List<Item> *
 getArgs(Item_func * itf) {
     List<Item> * res = new List<Item>();
     Item ** args = itf->arguments();
@@ -1815,28 +1660,87 @@ getArgs(Item_func * itf) {
     }
     return res;
 }
+*/
+
+class RewritePlanMinMax : public RewritePlan {
+public:
+    RewritePlanMinMax()  {}
+    OLK myOLK;
+};
 
 template<const char *FN, class IT>
 class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
-    virtual EncSet do_gather_type(Item_func_min_max *i, const constraints &tr, Analysis & a) const {
-        //cerr << "do_a_t Item_fu_min_max reason " << tr << "\n";
-        Item **args = i->arguments();
-        for (uint x = 0; x < i->argument_count(); x++)
-            analyze(args[x], constraints(ORD_EncSet, "min/max", i, &tr), a);
-        return tr.encset;
+    virtual EncSet do_gather_type(Item_func_min_max *i, reason &tr, Analysis & a) const {
+        cerr << "gather Item_func_min_max  " << *i << "\n";
+	Item **args = i->arguments();
+        uint argcount = i->argument_count();
+	if (argcount != 2) {
+	    cerr << "expected two arguments in " << *i << "\n";
+	    assert(false);
+	}
+	//at least one has to be a constant as we don't support join now
+	assert_s(args[0]->const_item() || args[1]->const_item(), "ope join not yet implemented");
+	
+	reason r1, r2;
+	EncSet es1 = gather(args[0], r1, a);
+	EncSet es2 = gather(args[1], r2, a);
+
+	EncSet needed_es = ORD_EncSet;
+
+	EncSet supported_es = needed_es.intersect(es1).intersect(es2);
+
+	if (supported_es.empty()) {
+	    cerr << "cannot support " << i << " BECAUSE it needs any of " << needed_es << "\n" \
+		 << "BUT children only have (" << r1 << "\n" << r2 << ")\n";
+	    assert(false);
+	}
+
+	EncSet out_es = es1.intersect(es2);
+
+	tr = reason(out_es, "min_max func", i);
+	tr.add_child(r1);
+	tr.add_child(r2);
+
+	//prepare rewrite plans
+	RewritePlanMinMax * rp = new RewritePlanMinMax();
+	rp->r = tr;
+	rp->myOLK = supported_es.chooseOne();
+	a.itemRewritePlans[i] = rp;
+
+	return out_es;
     }
-    virtual void do_enforce_type(Item_func_min_max *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_func_min_max *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-    virtual Item * do_rewrite_type(Item_func_min_max *i, Analysis & a) const {
-	List<Item> * arglst = getArgs(i); 
-	IT * res = new IT(*arglst);
-	do_rewrite_type_args(res, a);
-	return res;
+ 
+    virtual Item * do_rewrite_type(Item_func_min_max *i, const OLK & constr, Analysis & a) const {	
+	RewritePlanMinMax * rp = (RewritePlanMinMax *)getAssert(a.itemRewritePlans, (Item *)i);
+
+	if (rp->myOLK == PLAIN_OLK) { // no change
+	    return i;
+	}
+	
+	// replace with IF( cond_arg0 cond cond_arg1, args0, args1)
+	Item ** args = i->arguments();
+	Item * cond_arg0 = itemTypes.do_rewrite(args[0], rp->myOLK, a);
+	Item * cond_arg1 = itemTypes.do_rewrite(args[1], rp->myOLK, a);
+
+	int cmp_sign = i->*rob<Item_func_min_max, int, &Item_func_min_max::cmp_sign>::ptr();
+
+	Item * cond;
+	if (cmp_sign) {
+	    cond = new Item_func_gt(cond_arg0, cond_arg1);
+	} else {
+	    cond = new Item_func_lt(cond_arg0, cond_arg1);
+	}
+	
+	return new Item_func_if(cond,
+				itemTypes.do_rewrite(args[0], constr, a),
+				itemTypes.do_rewrite(args[1], constr, a));
     }
 };
+
+//TODO: do we still need the file analyze.cc?
 
 extern const char str_greatest[] = "greatest";
 static CItemMinMax<str_greatest, Item_func_max> ANON;
@@ -1847,59 +1751,34 @@ static CItemMinMax<str_least, Item_func_min> ANON;
 
 extern const char str_strcmp[] = "strcmp";
 static class ANON : public CItemSubtypeFN<Item_func_strcmp, str_strcmp> {
-    virtual EncSet do_gather_type(Item_func_strcmp *i, const constraints &tr, Analysis & a) const {
+    virtual EncSet do_gather_type(Item_func_strcmp *i, reason &tr, Analysis & a) const {
         //cerr << "do_a_t Item_func_strcmp reason " << tr << "\n";
-        Item **args = i->arguments();
+	/* Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++)
-            analyze(args[x], constraints(EQ_EncSet, "strcmp", i, &tr), a);
+            analyze(args[x], reason(EQ_EncSet, "strcmp", i, &tr), a);
         return tr.encset;
+	*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_func_strcmp *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_func_strcmp *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
 } ANON;
 
-
-// in-place rewrites the arguments of aggregators
-// no_args specifies a certain number of arguments that i must have
-// if negative, i can have any no. of arguments
-static void
-rewrite_agg_args(Item_sum * i, Analysis & a, int no_args = -1) {
-    if (no_args >= 0) {
-	assert_s(i->get_arg_count() == (uint)no_args,
-		 "support for aggregation with this number of arguments not currently implemented");
-    } else {
-	no_args = i->get_arg_count();
-    }
-
-    for (int j = 0; j < no_args; j++) {
-	Item * child_item = i->get_arg(j);
-	child_item = rewrite(child_item, a);
-	i->set_arg(j, current_thd, child_item);
-    }
-	
-}
-
 template<Item_sum::Sumfunctype SFT>
 class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
-    virtual EncSet do_gather_type(Item_sum_count *i, const constraints &tr, Analysis & a) const {
-        LOG(cdb_v) << "do_a_t Item_sum_count reason " << tr << "\n";
+    virtual EncSet do_gather_type(Item_sum_count *i, reason &tr, Analysis & a) const {
+	/*   LOG(cdb_v) << "do_a_t Item_sum_count reason " << tr << "\n";
         if (i->has_with_distinct()) {
-	    constraints new_tr = constraints(tr.encset.intersect(EQ_EncSet), "count distinct", i, &tr, false);
+	    reason new_tr = reason(tr.encset.intersect(EQ_EncSet), "count distinct", i, &tr, false);
             analyze(i->get_arg(0), new_tr, a);
 	} 
 	return PLAIN_EncSet;
-        
+        */
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_sum_count *i, const constraints &tr, Analysis & a) const
-	{
-	    LOG(cdb_v) << "enforce Item_sum_count " << tr << "\n"; 
-	    record_item_meta_for_constraints(i, tr, a);
-	}
-    virtual Item * do_rewrite_type(Item_sum_count *i, Analysis & a) const {
-	Item_sum_count * res = new Item_sum_count(current_thd, i);
+    virtual Item * do_rewrite_type(Item_sum_count *i, const OLK & constr, Analysis & a) const {
+/*	Item_sum_count * res = new Item_sum_count(current_thd, i);
 	
 	if (i->has_with_distinct()) {
 	    rewrite_agg_args(res, a);
@@ -1909,6 +1788,8 @@ class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
 	addToReturn(a.rmeta, a.pos++, im, false, i->name);
 	
 	return res;
+*/
+	UNIMPLEMENTED;
     }
 };
 
@@ -1918,8 +1799,8 @@ static CItemCount<Item_sum::Sumfunctype::COUNT_DISTINCT_FUNC> ANON;
 
 template<Item_sum::Sumfunctype SFT, class IT>
 class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
-    virtual EncSet do_gather_type(Item_sum_hybrid *i, const constraints &tr, Analysis & a) const {
-	constraints new_tr = constraints(tr.encset.intersect(ORD_EncSet), "min/max agg", i, &tr, false);
+    virtual EncSet do_gather_type(Item_sum_hybrid *i, reason &tr, Analysis & a) const {
+	/*reason new_tr = reason(tr.encset.intersect(ORD_EncSet), "min/max agg", i, &tr, false);
 
 	Item * child_item = i->get_arg(0);
 	
@@ -1928,12 +1809,11 @@ class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
 	new_tr.encset.setFieldForOnion(oOPE, getAssert(a.itemToFieldMeta, (Item_field *)child_item));
 	
         return new_tr.encset;
+	*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_sum_hybrid *i, const constraints &tr, Analysis & a) const {
-        record_item_meta_for_constraints(i, tr, a);
-    }
-    virtual Item * do_rewrite_type(Item_sum_hybrid *i, Analysis & a) const {
-	cerr << "hybrid rewrite! \n";
+    virtual Item * do_rewrite_type(Item_sum_hybrid *i, const OLK & constr, Analysis & a) const {
+	/*cerr << "hybrid rewrite! \n";
 	IT * res = new IT(current_thd, (IT*)i);
 
 	rewrite_agg_args(res, a);
@@ -1947,55 +1827,70 @@ class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
 	cerr << "rewrite max/min item meta is " << im->stringify() << "\n";
 
 	return res;
+	*/
+	UNIMPLEMENTED;
     }
 };
 
+static void
+check_if_empty(const EncSet & sol, Item * i, const EncSet & my_es, const reason & child_r) {
+    if (sol.empty()) {
+	cerr << "current crypto schemes do not support this query \n" \
+	     << "BECAUSE " << i << " NEEDS " << my_es << "\n"	      \
+	     << "AND children have " << child_r << "\n";
+	assert(false);
+    }
+}
 static CItemChooseOrder<Item_sum::Sumfunctype::MIN_FUNC, Item_sum_min> ANON;
 static CItemChooseOrder<Item_sum::Sumfunctype::MAX_FUNC, Item_sum_max> ANON;
 
 template<Item_sum::Sumfunctype SFT>
 class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
-    virtual EncSet do_gather_type(Item_sum_sum *i, const constraints &tr, Analysis & a) const {
-        LOG(cdb_v) << "gather in CItemSum reason " << tr;
+    virtual EncSet do_gather_type(Item_sum_sum *i, reason &tr, Analysis & a) const {
+	LOG(cdb_v) << "gather Item_sum_sum " << *i;
+	assert_s(i->get_arg_count() == 1, "expected one argument for sum"); 
 	Item * child_item = i->get_arg(0);
-	
-	if (i->has_with_distinct()) {
-	    UNIMPLEMENTED;
-	    analyze(child_item, constraints(EQ_EncSet, "agg_distinct", i, &tr, false), a);
+	reason child_r;
+	EncSet child_es = gather(child_item, child_r, a);
 	    
+	if (i->has_with_distinct()) {
+	    UNIMPLEMENTED;	    
 	}
-	constraints new_tr = constraints(tr.encset.intersect(ADD_EncSet), "sum/avg", i, &tr, false);
-	analyze(child_item, new_tr, a);
 
-	new_tr.encset.setFieldForOnion(oAGG,
-				       getAssert(a.itemToFieldMeta, (Item_field *)child_item));
-	
-	LOG(cdb_v) << "CONSTRAINTS after gathers in item_sum_sum: " << new_tr << "\n";
-	return new_tr.encset;
+	EncSet my_es = ADD_EncSet;
+
+	EncSet solution = my_es.intersect(child_es);
+
+	check_if_empty(solution, i, my_es, child_r);
+
+	OLK olk = solution.chooseOne();
+
+	EncSet return_es = EncSet(olk);
+	tr = reason(return_es, "summation", i);
+
+	a.itemRewritePlans[i] = new RewritePlan(olk, olk, &child_item, 1, tr); ;
+
+	return return_es;
     }
-    virtual void do_enforce_type(Item_sum_sum *i, const constraints &tr, Analysis & a) const
-    {
-	LOG(cdb_v) << "enforce in CItemSum tr: " << tr << "\n";
-	record_item_meta_for_constraints(i, tr, a);
-    }
-    
-    virtual Item * do_rewrite_type(Item_sum_sum * i, Analysis & a) const {
-	LOG(cdb_v) << "rewrite in CItemAdditive ";
+    virtual Item * do_rewrite_type(Item_sum_sum * i, const OLK & constr, Analysis & a) const {
+	LOG(cdb_v) << "Item_sum_sum rewrite " << *i;
 
-	assert_s(i->get_arg_count() == 1, "sum with more than one argument not supported");
-
-	Item * arg = rewrite(i->get_arg(0), a);
-	
-	ItemMeta * im = getAssert(a.itemToMeta, (Item *)i);
-	
-	//record information for decrypting results
-	addToReturn(a.rmeta, a.pos++, im,
-		    false, i->name);
-
-	FieldMeta * fm = im->basefield;
-	EncLayer * el = getAssert(fm->onions, oAGG)->layers.back();
+	list<Item *> args = rewrite_agg_args(i, constr, a, 1);
+		
+	FieldMeta * fm = constr.key;
+	EncLayer * el = getAssert(fm->onions, oAGG, "onion oAGG not in onions")->layers.back();
 	assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
-	return ((HOM *)el)->sumUDA(arg);
+	return ((HOM *)el)->sumUDA(args.front());
+    }
+
+    virtual void
+    do_rewrite_proj_type(Item_sum_sum *i, const OLK & olk, Analysis & a, vector<Item*>&l) const {
+	LOG(cdb_v) << "Item_sum_sum rewrite_proj " << *i;
+
+	//record information for decrypting results
+	addToReturn(a.rmeta, a.pos++, olk, false, i->name);
+
+	l.push_back(do_rewrite_type(i, olk, a));
     }
 };
 
@@ -2007,69 +1902,66 @@ static CItemSum<Item_sum::Sumfunctype::AVG_FUNC> ANON;
 static CItemSum<Item_sum::Sumfunctype::AVG_DISTINCT_FUNC> ANON;
 
 static class ANON : public CItemSubtypeST<Item_sum_bit, Item_sum::Sumfunctype::SUM_BIT_FUNC> {
-    virtual EncSet do_gather_type(Item_sum_bit *i, const constraints &tr, Analysis & a) const {
-        LOG(cdb_v) << "do_a_t Item_sum_bit reason " << tr;
-        analyze(i->get_arg(0), constraints(EMPTY_EncSet, "bitagg", i, &tr, false), a);
+    virtual EncSet do_gather_type(Item_sum_bit *i, reason &tr, Analysis & a) const {
+	/* LOG(cdb_v) << "do_a_t Item_sum_bit reason " << tr;
+        analyze(i->get_arg(0), reason(EMPTY_EncSet, "bitagg", i, &tr, false), a);
         return tr.encset;
+	*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_sum_bit *i, const constraints &tr, Analysis & a) const
-    {}
 } ANON;
 
 static class ANON : public CItemSubtypeST<Item_func_group_concat, Item_sum::Sumfunctype::GROUP_CONCAT_FUNC> {
-    virtual EncSet do_gather_type(Item_func_group_concat *i, const constraints &tr, Analysis & a) const {
-        LOG(cdb_v) << "do_a_t Item_func_group reason " << tr;
+    virtual EncSet do_gather_type(Item_func_group_concat *i, reason &tr, Analysis & a) const {
+	/*  LOG(cdb_v) << "do_a_t Item_func_group reason " << tr;
         uint arg_count_field = i->*rob<Item_func_group_concat, uint,
                 &Item_func_group_concat::arg_count_field>::ptr();
         for (uint x = 0; x < arg_count_field; x++) {
-            /* XXX could perform in the proxy.. */
-            analyze(i->get_arg(x), constraints(EMPTY_EncSet, "group_concat", i, &tr), a);
+            // XXX could perform in the proxy.. 
+            analyze(i->get_arg(x), reason(EMPTY_EncSet, "group_concat", i, &tr), a);
         }
 
-        /* XXX order, unused in trace queries.. */
+        // XXX order, unused in trace queries.. 
         return tr.encset;
+    */
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_func_group_concat *i, const constraints &tr, Analysis & a) const
-    {}
     // TODO(stephentu): figure out how to rob the arg fields for optimization
 } ANON;
 
 static class ANON : public CItemSubtypeFT<Item_char_typecast, Item_func::Functype::CHAR_TYPECAST_FUNC> {
-    virtual EncSet do_gather_type(Item_char_typecast *i, const constraints &tr, Analysis & a) const {
+    virtual EncSet do_gather_type(Item_char_typecast *i, reason &tr, Analysis & a) const {
         thrower() << "what does Item_char_typecast do?";
         UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_char_typecast *i, const constraints &tr, Analysis & a) const
-    {}
 } ANON;
 
 extern const char str_cast_as_signed[] = "cast_as_signed";
 static class ANON : public CItemSubtypeFN<Item_func_signed, str_cast_as_signed> {
-    virtual EncSet do_gather_type(Item_func_signed *i, const constraints &tr, Analysis & a) const {
-        LOG(cdb_v) << "do_a_t Item_func_signed reason " << tr;
+    virtual EncSet do_gather_type(Item_func_signed *i, reason &tr, Analysis & a) const {
+        /*LOG(cdb_v) << "do_a_t Item_func_signed reason " << tr;
         analyze(i->arguments()[0], tr, a);
         return tr.encset;
+	*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_func_signed *i, const constraints &tr, Analysis & a) const
-    {}
     virtual Item * do_optimize_type(Item_func_signed *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
 } ANON;
 
 static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
-    virtual EncSet do_gather_type(Item_ref *i, const constraints &tr, Analysis & a) const {
+    virtual EncSet do_gather_type(Item_ref *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << "do_a_t Item_ref reason " << tr;
-        if (i->ref) {
+	/* if (i->ref) {
             analyze(*i->ref, tr, a);
             return tr.encset;
         } else {
             thrower() << "how to resolve Item_ref::ref?";
             UNIMPLEMENTED;
-        }
+	    }*/
+	UNIMPLEMENTED;
     }
-    virtual void do_enforce_type(Item_ref *i, const constraints &tr, Analysis & a) const
-    {}
 } ANON;
 
 
@@ -2104,43 +1996,40 @@ optimize_select_lex(st_select_lex *select_lex, Analysis & a)
         optimize(o->item, a);
 }
 
+static void
+process_order(Analysis & a, SQL_I_List<ORDER> & lst) {
 
+    for (ORDER *o = lst.first; o; o = o->next) {
+	reason r;
+	gather(*o->item, r, a);
+    }
+    
+}
 
 //TODO: not clear how these process_*_lex and rewrite_*_lex overlap, cleanup
 static void
-process_filters_lex(st_select_lex * select_lex, const constraints & tr, Analysis & a) {
-  
-    if (select_lex->where)
-        analyze(select_lex->where, constraints(FULL_EncSet, "where", select_lex->where, 0), a);
+process_filters_lex(st_select_lex * select_lex, Analysis & a) {
+    
+    if (select_lex->where) {
+	analyze(select_lex->where, a);
+    }
 
-    // TODO(stephentu): I'm not sure if we can ever have a
-    // select_lex->where != select_lex->join->conds, but
-    // it is not clear to me why this branch should execute
-    // in the case where select_lex->where = select_lex->join->conds, and
-    // it breaks the assumption (at least in re-write) that there will be
-    // exactly one pass per item.
-    //
-    // I'm leaving this like so for now. Feel free to resolve it as fit
     /*if (select_lex->join &&
         select_lex->join->conds &&
         select_lex->where != select_lex->join->conds)
-        analyze(select_lex->join->conds, constraints(FULL_EncSet, "join->conds", select_lex->join->conds, 0), a);*/
+        analyze(select_lex->join->conds, reason(FULL_EncSet, "join->conds", select_lex->join->conds, 0), a);*/
 
     if (select_lex->having)
-        analyze(select_lex->having, constraints(FULL_EncSet, "having", select_lex->having, 0), a);
+        analyze(select_lex->having, a);
 
-    for (ORDER *o = select_lex->group_list.first; o; o = o->next)
-        analyze(*o->item, constraints(EQ_EncSet, "group", *o->item, 0), a);
-
-    for (ORDER *o = select_lex->order_list.first; o; o = o->next) {
-	analyze(*o->item, constraints(ORD_EncSet,
-                                      "order", *o->item, 0, select_lex->select_limit ? false : true), a);
-    }
+    process_order(a, select_lex->group_list);
+    process_order(a, select_lex->order_list);
+    
 }
 
 
 static void
-process_select_lex(st_select_lex *select_lex, const constraints &tr, Analysis & a)
+process_select_lex(st_select_lex *select_lex, Analysis & a)
 {
     //select clause
     auto item_it = List_iterator<Item>(select_lex->item_list);
@@ -2149,12 +2038,38 @@ process_select_lex(st_select_lex *select_lex, const constraints &tr, Analysis & 
         if (!item)
             break;
 
-        analyze(item, tr, a);
+        analyze(item, a);
     }
 
-    process_filters_lex(select_lex, tr, a);
+    process_filters_lex(select_lex, a);
 }
 
+static void
+rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst, const EncSet & constr, const string & name) {
+    ORDER * prev = NULL;
+    for (ORDER *o = lst.first; o; o = o->next) {
+	Item * i = *o->item;
+	RewritePlan * rp = getAssert(a.itemRewritePlans, i);
+	assert(rp);
+	EncSet es = constr.intersect(rp->es_out);
+	if (es.empty()) {
+	    cerr << " cannot support query because " << name << " item " << i << " needs to output any of " << constr << "\n" \
+		 << " BUT it can only output " << rp->es_out << " BECAUSE " << "(" << rp->r << ")\n";
+	    assert(false);
+	}
+	OLK olk = es.chooseOne();
+	
+	Item * new_item = itemTypes.do_rewrite(*o->item, olk, a);
+	ORDER * neworder = make_order(o, new_item);
+	if (prev == NULL) {
+	    lst = *oneElemList(neworder);
+	} else {
+	    prev->next = neworder;
+	}
+	prev = neworder;
+    }
+
+}
 
 static st_select_lex *
 rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
@@ -2162,7 +2077,7 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
     st_select_lex * new_select_lex = copy(select_lex);
     
     if (select_lex->where) {
-        set_where(new_select_lex, rewrite(select_lex->where, a));
+        set_where(new_select_lex, rewrite(select_lex->where, PLAIN_OLK, a));
     }
     //  if (select_lex->join &&
 	//     select_lex->join->conds &&
@@ -2172,36 +2087,25 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
     //}
 
     if (select_lex->having)
-        new_select_lex->having = rewrite(select_lex->having, a);
+        new_select_lex->having = rewrite(select_lex->having, PLAIN_OLK, a);
 
-    ORDER * prev = NULL;
-    for (ORDER *o = select_lex->group_list.first; o; o = o->next) {
-	ORDER * neworder = make_order(o, rewrite(*o->item, a));
-	if (prev == NULL) {
-	    new_select_lex->group_list = *oneElemList(neworder);
-	} else {
-	    prev->next = neworder;
-	}
-	prev = neworder;	
-    }
-
-    prev = NULL;
-    for (ORDER *o = select_lex->order_list.first; o; o = o->next) {
-	Item * new_item = rewrite(*o->item, a);
-	ORDER * neworder = make_order(o, new_item);
-	if (prev == NULL) {
-	    //first element
-	    new_select_lex->order_list = *oneElemList(neworder);
-	} else {
-	    prev->next = neworder;
-	}
-	prev = neworder;
-    }
+    rewrite_order(a, new_select_lex->group_list, EQ_EncSet, "group by");
+    rewrite_order(a, new_select_lex->order_list, ORD_EncSet, "order by");
     
     return new_select_lex;
 }
 
-// TODO: template this
+static void
+rewrite_proj(Item * i, Analysis & a, List<Item> & newList) {
+    RewritePlan * rp = getAssert(a.itemRewritePlans, i);
+    assert(rp);
+    vector<Item *> l;
+    itemTypes.do_rewrite_proj(i,rp->es_out.chooseOne(), a, l);
+    for (auto it = l.begin(); it != l.end(); ++it) {
+	newList.push_back(*it);
+    }
+}
+
 static st_select_lex *
 rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
 {
@@ -2216,14 +2120,9 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
         if (!item)
             break;
         LOG(cdb_v) << "rewrite_select_lex " << *item << " with name " << item->name;
-        vector<Item *> l;
-        itemTypes.do_rewrite_proj(item, a, l);
-        for (auto it = l.begin(); it != l.end(); ++it) {
-            //TODO: why was this here?  it ruins AS
-            //(*it)->name = NULL;
-            newList.push_back(*it);
-        }
+	rewrite_proj(item, a, newList);     
     }
+    
     // TODO(stephentu): investigate whether or not this is a memory leak
     new_select_lex->item_list = newList;
 
@@ -2274,7 +2173,7 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
         }
 
         if (t->on_expr)
-            analyze(t->on_expr, constraints(EMPTY_EncSet, "join_cond", t->on_expr, 0), a);
+            analyze(t->on_expr, a);
 
         //std::string db(t->db, t->db_length);
         //std::string table_name(t->table_name, t->table_name_length);
@@ -2288,7 +2187,7 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
              * reference columns in this derived table.
              */
 
-            process_select_lex(u->first_select(), constraints(EMPTY_EncSet,  "sub-select", 0, 0, false), a);
+            process_select_lex(u->first_select(), a);
         }
     }
 }
@@ -2349,11 +2248,11 @@ rewrite_table_list(List<TABLE_LIST> tll, Analysis & a)
             new_t->nested_join->join_list = rewrite_table_list(t->nested_join->join_list, a);
             return *new_tll;
         }
-
+/*
         if (t->on_expr) {
             new_t->on_expr = rewrite(t->on_expr, a);
 	}
-
+*/
 	/* TODO: derived tables
         if (t->derived) {
             st_select_lex_unit *u = t->derived;
@@ -2634,10 +2533,10 @@ mp_update_init(LEX *lex, Analysis &a)
 }
 
 static void
-stalefy(FieldMeta * fm, EncDesc  ed) {
+stalefy(FieldMeta * fm, const EncSet &  es) {
     for (auto o_l : fm->encdesc.olm) {
         onion o = o_l.first;
-        if (ed.olm.find(o) == ed.olm.end()) {
+        if (es.osl.find(o) == es.osl.end()) {
             fm->onions[o]->stale = true;
         }
     }
@@ -2651,7 +2550,8 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     LOG(cdb_v) << "rewriting update \n";
     
     assert_s(lex->select_lex.item_list.head(), "update needs to have item_list");
-    
+
+    // multi-princ init
     mp_update_init(lex, a);
 
     // Rewrite table name
@@ -2682,68 +2582,52 @@ rewrite_update_lex(LEX *lex, Analysis &a)
         assert(i->type() == Item::FIELD_ITEM);
         Item_field * fd = static_cast<Item_field*>(i);
         
-        Item * val = val_it++;
-        assert(val != NULL);
-        
         FieldMeta * fm = a.schema->getFieldMeta(fd->table_name, fd->field_name);
-        assert(fm);
-        FieldAMeta * fam = getAssert(a.fieldToAMeta, fm);
-        assert(fam);
-    
-        EncDesc ed = fam->exposedLevels;
+
+	Item * val = val_it++;
+	assert(val != NULL);
+            
+	if (!fm->isEncrypted()) { // not encrypted field
+	    res_items.push_back(i);
+	    res_vals.push_back(val);
+	    continue;
+	}
+
+	// Encrypted field
+
+	RewritePlan * rp = getAssert(a.itemRewritePlans, val);
+	EncSet r_es = rp->es_out.intersect(EncSet(fm));
+	if (r_es.empty()) {
+	    cerr << "update cannot be performed BECAUSE " << i << " supports " << fm->encdesc << "\n BUT " \
+		 << val << " can only provide " << rp->es_out << " BECAUSE " << rp->r << "\n";
+	    assert(false);
+	}
     
         // Determine salt for field
+	bool add_salt = false;
         if (fm->has_salt) {
             auto it_salt = a.salts.find(fm);
-            if ((it_salt == a.salts.end()) && needsSalt(ed)) {
+            if ((it_salt == a.salts.end()) && needsSalt(r_es)) {
+		add_salt = true;
                 salt_type salt = randomValue(); 
                 a.salts[fm] = salt;
             } 
         }
         
-        Item * new_fd = i;
-        Item * new_val = val;
 	Item * rew_fd = NULL;
         
-        assert(ed.olm.size() > 0);
-        
         // Rewrite field-value pair for every onion possible
-        for (auto ed_it : ed.olm) {
-            EncSet e = {
-                {
-                    {ed_it.first, LevelFieldPair(ed_it.second, fm)}
-                }  
-            };
-            
-            //make copies of original to avoid changing original
-            new_fd = new Item_field(current_thd, fd);
-            
-            //TODO: we should just clone the val here, but not sure how to clone
-            //it deeply when it is not a constant -- could implement it, but
-            // it should already exist in some form
-            if (ed.olm.size() > 1) {
-                new_val = val->clone_item();
-                assert_s(new_val, "cannot clone item because it is not a constant item");
-            } else {
-                new_val = val;
-            }
-            
-            enforce(new_fd, constraints(e, "update", new_fd, 0, false), a);
-            enforce(new_val, constraints(e, "update", new_val, 0, false), a);
-            
-            res_items.push_back(rew_fd = rewrite(new_fd, a));
-            res_vals.push_back(rewrite(new_val, a));
+        for (auto pair : r_es.osl) {
+	    OLK olk = {pair.first, pair.second.first, fm};            
+            res_items.push_back(rew_fd = itemTypes.do_rewrite(i, olk, a));
+            res_vals.push_back(itemTypes.do_rewrite(val, olk, a));
         }
 
         // Make stale all onions that were not updated
-        stalefy(fm, ed);
+        stalefy(fm, r_es);
 
-        if (!new_fd) {
-            new_fd = i;
-        }
-
-        // Add the salt field
-        if (fm->has_salt) {
+	// Add the salt field
+        if (add_salt) {
             salt_type salt = a.salts[fm];
 	    assert(rew_fd);
             res_items.push_back(make_item((Item_field *)rew_fd, fm->salt_name));
@@ -2871,10 +2755,8 @@ process_update_lex(LEX * lex, Analysis & a) {
 	    analyze_update(ifd, val, a);
 	}
     }
-
-    process_filters_lex(&lex->select_lex,
-			constraints(FULL_EncSet,"update", 0, 0),
-			a);
+    
+    process_filters_lex(&lex->select_lex, a);
 
 
 }
@@ -2895,13 +2777,7 @@ do_query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encB
         return;
     }
 
-    process_select_lex(&lex->select_lex,
-            constraints(
-                    lex->sql_command == SQLCOM_SELECT ? FULL_EncSet
-                    : EMPTY_EncSet,
-                    "select", 0, 0, true), analysis);
-
-    
+    process_select_lex(&lex->select_lex, analysis);
 }
 
 
@@ -3086,7 +2962,6 @@ updateMeta(const string & q, LEX * lex, Analysis & a)
         break;
     }
 
-    adjustOnions(a);
 }
 
 static void
@@ -3124,7 +2999,7 @@ loadUDFs(Connect * conn) {
     LOG(cdb_v) << "Loaded CryptDB's UDFs.";
 }
 
-//this must be called before we can use any Mysql API
+//this must be called before we can use any MySQL AP
 static void
 init_mysql(const string & embed_db) {
       char dir_arg[1024];
@@ -3144,7 +3019,7 @@ init_mysql(const string & embed_db) {
   
     cerr << "dir arg is " << dir_arg << "\n";
     assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
-            (char**) mysql_av, 0));
+				   (char**) mysql_av, 0));
     assert(0 == mysql_thread_init());
 
 }
@@ -3496,11 +3371,10 @@ Rewriter::mp_init(Analysis &a) {
 }
 
 list<string>
-Rewriter::rewrite(const string & q, Analysis & analysis)
-{
+Rewriter::rewrite_helper(const string & q, Analysis & analysis, query_parse & p) {
     LOG(cdb_v) << "q " << q;
     list<string> queries;
-    query_parse p(cur_db, q);
+    
     analysis = Analysis(e_conn, conn, schema, masterKey, mp);
 
     //initialize multi-principal
@@ -3542,12 +3416,33 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
     return queries;
 }
 
+// TODO: we don't need to pass analysis, enough to pass returnmeta
+list<string>
+Rewriter::rewrite(const string & q, Analysis & analysis)
+{
+    query_parse p(cur_db, q);
+    list<string> res;
+
+    //for as long as there are onion adjustments
+    while (true) {
+	try {
+	    res = rewrite_helper(q, analysis, p); 
+	} catch (OnionAdjustExcept e) {
+	    LOG(cdb_v) << "caught onion adjustment";
+	    cerr << "current thread " << (int)current_thd << " memroot " << (int)current_thd->mem_root << "\n";
+	    adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis);
+	    continue;
+	}
+	return res;
+    }
+}
+
+//TODO: replace stringify with <<
 string ReturnField::stringify() {
     stringstream res;
     res << " is_salt: " << is_salt << " filed_called " << field_called;
-    res <<" im  ";
-    string ss = stringify_ptr<ItemMeta>(im);
-    res << ss << " pos_salt " << pos_salt;
+    res <<" fm  " << olk.key << " onion " << olk.o;
+    res << " pos_salt " << pos_salt;
     return res.str();
 }
 string ReturnMeta::stringify() {
@@ -3566,7 +3461,7 @@ mp_init_decrypt(MultiPrinc * mp, Analysis & a) {
     LOG(cdb_v) << a.rmeta.stringify() << "\n";
     for (auto i = a.rmeta.rfmeta.begin(); i != a.rmeta.rfmeta.end(); i++) {
         if (!i->second.is_salt) {
-            a.tmkm.encForReturned[fullName(i->second.im->basefield->fname, i->second.im->basefield->tm->anonTableName)] = i->first;
+            a.tmkm.encForReturned[fullName(i->second.olk.key->fname, i->second.olk.key->tm->anonTableName)] = i->first;
         }
     }
 }
@@ -3591,7 +3486,7 @@ Rewriter::decryptResults(ResType & dbres,
         ReturnField rf = a.rmeta.rfmeta[index];
         if (!rf.is_salt) {
 	    //need to return this field
-            assert_s(rf.im, "ReturnField has no ItemMeta associated with it");
+            assert_s(rf.olk.key, "ReturnField has no FieldMeta associated with it");
             res.names.push_back(rf.field_called);
         }
         index++;
@@ -3610,12 +3505,11 @@ Rewriter::decryptResults(ResType & dbres,
     unsigned int col_index = 0;
     for (unsigned int c = 0; c < cols; c++) {
         ReturnField rf = a.rmeta.rfmeta[c];
-        ItemMeta * im = rf.im;
+        FieldMeta * fm = rf.olk.key;
 	
         if (!rf.is_salt) {
             for (unsigned int r = 0; r < rows; r++) {
-                //TODO: there is some redundancy in this condition, cleanup
-                if ((im->o == oPLAIN) || im->basefield->onions.empty()) {
+                if (!fm->isEncrypted()) {
                     res.rows[r][col_index] = dbres.rows[r][c];
                 } else {
                     uint64_t salt = 0;
@@ -3624,7 +3518,7 @@ Rewriter::decryptResults(ResType & dbres,
                         assert_s(!salt_item->null_value, "salt item is null");
                         salt = ((Item_int *)dbres.rows[r][rf.pos_salt])->value;
                     }
-		    res.rows[r][col_index] = decrypt_item(im, dbres.rows[r][c], salt, a, res.rows[r]);
+		    res.rows[r][col_index] = decrypt_item(fm, rf.olk.o, dbres.rows[r][c], salt, a, res.rows[r]);
                 }
             }
             col_index++;

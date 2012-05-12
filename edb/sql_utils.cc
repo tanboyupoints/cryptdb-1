@@ -31,7 +31,6 @@ make_thd_string(const string &s, size_t *lenp)
 {
     THD *thd = current_thd;
     assert(thd);
-
     if (lenp)
         *lenp = s.size();
     return thd->strmake(s.data(), s.size());
@@ -42,7 +41,6 @@ ItemToString(Item * i) {
     assert(i);
     String s;
     String *s0 = i->val_str(&s);
-    cerr << "value of item " << (char *)s0->ptr() << "\n";
     assert(s0 != NULL);
     string ret = string(s0->ptr(), s0->length());
     return ret;

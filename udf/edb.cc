@@ -427,14 +427,13 @@ search(PG_FUNCTION_ARGS)
 my_bool
 searchSWP_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
 {
-
     Token * t = new Token();
 
     uint64_t ciphLen;
-    char *ciph = getba(args, 0, ciphLen);
+    char *ciph = getba(args, 1, ciphLen);
 
     uint64_t wordKeyLen;
-    char *wordKey = getba(args, 1, wordKeyLen);
+    char *wordKey = getba(args, 2, wordKeyLen);
 
     t->ciph = Binary((unsigned int) ciphLen, (unsigned char *)ciph);
     t->wordKey = Binary((unsigned int)wordKeyLen, (unsigned char*)wordKey);
@@ -455,7 +454,7 @@ ulonglong
 searchSWP(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
 {
     uint64_t allciphLen;
-    char * allciph = getba(ARGS, 2, allciphLen);
+    char * allciph = getba(ARGS, 0, allciphLen);
     Binary overallciph = Binary((unsigned int)allciphLen, (unsigned char *)allciph);
 
     Token * t = (Token *) initid->ptr;

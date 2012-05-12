@@ -230,6 +230,7 @@ operator<<(std::ostream &out, Create_field &f)
     case MYSQL_TYPE_BLOB:
     case MYSQL_TYPE_MEDIUM_BLOB:
     case MYSQL_TYPE_LONG_BLOB:
+	break;
     case MYSQL_TYPE_ENUM:
     case MYSQL_TYPE_SET:
         if (f.charset) {

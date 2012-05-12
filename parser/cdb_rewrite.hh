@@ -17,7 +17,7 @@
 #include <sql_update.h>
 
 #include <parser/Analysis.hh>
-#include <parser/Annotation.hh>
+#include <edb/Annotation.hh>
 #include <parser/stringify.hh>
 
 #include <util/errstream.hh>
@@ -39,47 +39,6 @@ public:
 
 void
 printRes(const ResType & r);
-
-class constraints {
-public:
-    constraints(EncSet t_arg,
-                const std::string &why_t_arg,
-                Item *why_t_item_arg,
-                const constraints *parent_arg)
-    : encset(t_arg), soft(false),
-      why_t(why_t_arg), why_t_item(why_t_item_arg),
-      parent(parent_arg)
-    {
-        if (parent && parent->soft)
-            soft = true;
-    }
-
-    constraints(EncSet t_arg,
-                const std::string &why_t_arg,
-                Item *why_t_item_arg,
-                const constraints *parent_arg,
-                bool soft_arg)
-    : encset(t_arg), soft(soft_arg),
-      why_t(why_t_arg), why_t_item(why_t_item_arg),
-      parent(parent_arg)
-    {
-    }
-
-    inline constraints
-    clone_with(const EncSet &e) const
-    {
-        return constraints(e, why_t, why_t_item, parent, soft);
-    }
-
-    EncSet encset;
-  
-    bool soft;      /* can be evaluated at proxy */
-
-    std::string why_t;
-    Item *why_t_item;
-
-    const constraints *parent;
-};
 
 typedef class ConnectionInfo {
 public:
@@ -112,6 +71,7 @@ private:
     list<string> processAnnotation(Annotation annot, Analysis &a);
     //initialize multi-principal data structures
     void mp_init(Analysis &a);
+    list<string> rewrite_helper(const string & q, Analysis & a, query_parse & p);
 
     ConnectionInfo ci;
     // current database name -- wrong place for it, must be per-connection!

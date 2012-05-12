@@ -49,11 +49,6 @@ public:
     static EncLayer * encLayer(onion o, SECLEVEL sl, Create_field * cf, PRNG * key);
 };
 
-// returns true if any of the layers in ed
-// need salt
-bool
-needsSalt(EncDesc ed);
-
 class RND_int : public EncLayer {
 public:
     RND_int(Create_field *, PRNG * key);

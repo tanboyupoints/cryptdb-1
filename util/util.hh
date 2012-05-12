@@ -295,8 +295,23 @@ roll(typename std::list<T>::iterator & it,  int count)
 template<typename A, typename B>
 B getAssert(const std::map<A, B> & m, const A & x, const std::string & str = "" ) {
     auto it = m.find(x);
-    assert_s(it != m.end(), "item not present in map. " + str);
+    if (it == m.end()) {
+	std::cerr << "item not present in map " << x << ". " << str;
+	assert_s(false, "");
+    } 
     return it->second;
+}
+
+//returns true if x is in m and sets y=m[x] in that case
+template<typename A, typename B>
+bool contains_get(const std::map<A, B> & m, const A & x, B & y) {
+    auto it = m.find(x);
+    if (it == m.end()) {
+	return false;
+    } else {
+	y = it->second;
+	return true;
+    }
 }
 
 
