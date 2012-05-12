@@ -2525,10 +2525,11 @@ mp_update_init(LEX *lex, Analysis &a)
         if (!i) {
             break;
         }
-        string fname = fullName(i->table_name, i->field_name);
+        string fname = fullName(i->field_name, i->table_name);
+        LOG(cdb_v) << fname;
         if (a.mp->hasEncFor(fname)) {
             assert_s(false, "cannot update changes to access tree");
-	    } 
+	    }
     }
 }
 
@@ -3440,9 +3441,11 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
 //TODO: replace stringify with <<
 string ReturnField::stringify() {
     stringstream res;
+
     res << " is_salt: " << is_salt << " filed_called " << field_called;
     res <<" fm  " << olk.key << " onion " << olk.o;
     res << " pos_salt " << pos_salt;
+
     return res.str();
 }
 string ReturnMeta::stringify() {

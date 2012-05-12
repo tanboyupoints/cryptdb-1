@@ -105,7 +105,9 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
                 continue;
             }
 
-            assert_s(fm->setOnionLevel(o, level), "cannot set onion to requested level");
+            if (level != SECLEVEL::RND) {
+                assert_s(fm->setOnionLevel(o, level), "cannot set onion to requested level");
+            }
 
             string onionname = fm->onions[o]->onionname;
             Create_field * cf = fm->onions[o]->layers.back()->newCreateField(onionname);
@@ -153,7 +155,10 @@ typedef struct equalOp {
 bool
 MultiPrinc::hasEncFor(string field)
 {
-    return mkm.reverseEncFor.find(field) != mkm.reverseEncFor.end();
+    if (mkm.reverseEncFor.find(field) != mkm.reverseEncFor.end()) {
+        return mkm.reverseEncFor[field];
+    }
+    return false;
 }
 
 

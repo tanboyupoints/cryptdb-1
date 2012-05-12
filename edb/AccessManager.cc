@@ -460,6 +460,7 @@ MetaAccess::CheckAccess()
 
     if (results.size() != genToPrin.size()) {
         if(VERBOSE) { LOG(am_v) << "wrong number of results"; }
+        PrintMaps();
         return false;
     }
 
