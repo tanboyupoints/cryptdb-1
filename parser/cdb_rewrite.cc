@@ -34,11 +34,11 @@ using namespace std;
 
 static Item *
 stringToItemField(string field, string table, Item_field * itf) {
-    cerr << "stringtoItemF current thread " << (int)current_thd << " memroot " << (int)current_thd->mem_root << "\n";
+    cerr << "stringtoItemF current thread " << (intptr_t) current_thd << " memroot " << (intptr_t) current_thd->mem_root << "\n";
     THD * thd = current_thd;
     assert(thd);
     Item_field * res = new Item_field(thd, itf);
-    cerr << "B current thread " << (int)current_thd << " memroot " << (int)current_thd->mem_root << "\n";
+    cerr << "B current thread " << (intptr_t) current_thd << " memroot " << (intptr_t) current_thd->mem_root << "\n";
     res->name = NULL; //no alias
     res->field_name = make_thd_string(field);
     res->table_name = make_thd_string(table);
@@ -76,7 +76,7 @@ mysql_query_wrapper(MYSQL *m, const string &q)
 static void
 removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEVEL & l) {
 
-    cerr << " rem o layer current thread " << (int)current_thd << " memroot " << (int)current_thd->mem_root << "\n";
+    cerr << " rem o layer current thread " << (intptr_t) current_thd << " memroot " << (intptr_t) current_thd->mem_root << "\n";
     OnionMeta * om    = getAssert(fm->onions, o);
     string fieldanon  = om->onionname;
     string tableanon  = fm->tm->anonTableName;
@@ -114,7 +114,7 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
 static void
 adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf, Analysis & a) {
 
-    cerr << "current thread " << (int)current_thd << " memroot " << (int)current_thd->mem_root << "\n";
+    cerr << "current thread " << (intptr_t) current_thd << " memroot " << (intptr_t) current_thd->mem_root << "\n";
     //TODO: use getAssert in more places
     SECLEVEL newlevel = getAssert(fm->encdesc.olm, o);
 
@@ -3430,7 +3430,7 @@ Rewriter::rewrite(const string & q, Analysis & analysis)
 	    res = rewrite_helper(q, analysis, p); 
 	} catch (OnionAdjustExcept e) {
 	    LOG(cdb_v) << "caught onion adjustment";
-	    cerr << "current thread " << (int)current_thd << " memroot " << (int)current_thd->mem_root << "\n";
+	    cerr << "current thread " << (intptr_t) current_thd << " memroot " << (intptr_t) current_thd->mem_root << "\n";
 	    adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis);
 	    continue;
 	}
