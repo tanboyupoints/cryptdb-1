@@ -238,14 +238,17 @@ rewrite(lua_State *L)
     //clients[client]->considered = true;
 
     list<string> new_queries;
-
+    bool consider = true;
+    
     t.lap_ms();
     if (EXECUTE_QUERIES) {
         if (!DO_CRYPT) {
             new_queries.push_back(query);
         } else {
             try {
-                new_queries = r->rewrite(query, clients[client]->a);
+                QueryRewrite rew = r->rewrite(query, clients[client]->a);
+		new_queries = rew.queries;
+		consider = rew.wasRew;
                 //cerr << "query: " << *new_queries.begin() << " considered ? " << clients[client]->considered << "\n";
             } catch (CryptDBError &e) {
                 LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
@@ -260,8 +263,7 @@ rewrite(lua_State *L)
         *(clients[client]->PLAIN_LOG) << query << "\n";
     }
 
-    //lua_pushboolean(L, clients[client]->considered);
-    lua_pushboolean(L, true);
+    lua_pushboolean(L, consider);
 
     lua_createtable(L, (int) new_queries.size(), 0);
     int top = lua_gettop(L);
