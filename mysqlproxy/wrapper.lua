@@ -1,4 +1,4 @@
-assert(package.loadlib(os.getenv("EDBDIR").."/../obj/libexecute.so",
+assert(package.loadlib(os.getenv("EDBDIR").."/obj/libexecute.so",
                        "lua_cryptdb_init"))()
 local proto = assert(require("mysql.proto"))
 
@@ -16,7 +16,7 @@ function read_auth()
                     os.getenv("CRYPTDB_USER") or "root",
                     os.getenv("CRYPTDB_PASS") or "letmein",
                     os.getenv("CRYPTDB_DB") or "cryptdbtest",
-                    os.getenv("CRYPTDB_SHADOW") or "~/shadow-db")
+                    os.getenv("CRYPTDB_SHADOW") or "/var/lib/shadow-mysql")
     -- EDBClient uses its own connection to the SQL server to set up UDFs
     -- and to manipulate multi-principal state.  (And, in the future, to
     -- store its schema state for single- and multi-principal operation.)

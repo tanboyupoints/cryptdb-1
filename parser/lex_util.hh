@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <edb/sql_utils.hh>
+#include <parser/sql_utils.hh>
 #include <util/rob.hh>
 
 #include <sql_select.h>

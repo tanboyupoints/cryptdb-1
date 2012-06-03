@@ -3,7 +3,7 @@
  *
  */
 
-#include <edb/MultiPrinc.hh>
+#include <main/MultiPrinc.hh>
 //#include <util/ctr.hh>
 #include <util/cryptdb_log.hh>
 

@@ -7,7 +7,7 @@
 
 #include <stdexcept>
 #include <assert.h>
-#include <edb/Connect.hh>
+#include <main/Connect.hh>
 #include <util/cryptdb_log.hh>
 #include <string>
 #include <iostream>

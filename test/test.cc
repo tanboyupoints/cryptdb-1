@@ -18,8 +18,8 @@
 #include <crypto-old/CryptoManager.hh>
 
 //#include <edb/EDBProxy.hh>
-#include <edb/AccessManager.hh>
-#include <edb/Connect.hh>
+#include <main/AccessManager.hh>
+#include <main/Connect.hh>
 
 #include <util/util.hh>
 #include <util/params.hh>

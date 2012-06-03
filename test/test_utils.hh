@@ -10,7 +10,7 @@
 #include <string>
 #include <assert.h>
 #include <util/util.hh>
-#include <edb/sql_utils.hh>
+#include <parser/sql_utils.hh>
 
 class TestConfig {
  public:

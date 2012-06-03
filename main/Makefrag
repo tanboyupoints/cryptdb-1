@@ -1,0 +1,27 @@
+OBJDIRS	+= main
+
+CRYPTDB_SRCS := schema.cc Translator.cc Connect.cc MultiPrinc.cc AccessManager.cc mysqld-filler.cc Analysis.cc CryptoHandlers.cc cdb_rewrite.cc
+
+CRYPTDB_PROGS:= cdb_test
+
+CRYPTDBPROGOBJS	:= $(patsubst %,$(OBJDIR)/main/%,$(CRYPTDB_PROGS))
+
+all: $(CRYPTDBPROGOBJS) $(OBJDIR)/libcryptdb.so
+
+CRYPTDB_OBJS := $(patsubst %.cc,$(OBJDIR)/main/%.o,$(CRYPTDB_SRCS))
+
+$(CRYPTDBPROGOBJS): %: %.o $(OBJDIR)/libedbparser.so  $(OBJDIR)/libedbutil.so $(OBJDIR)/libcryptdb.so
+	$(CXX) $< -o $@ -ledbparser  $(LDFLAGS) -ledbutil -lcryptdb
+
+$(OBJDIR)/libcryptdb.so: $(CRYPTDB_OBJS) \
+			 $(OBJDIR)/libedbcrypto.so $(OBJDIR)/libedbcrypto2.so $(OBJDIR)/libedbutil.so \
+			 $(OBJDIR)/libedbparser.so 
+	$(CXX) -shared -o $@ $(CRYPTDB_OBJS) $(LDFLAGS) -ledbcrypto -ledbcrypto2 -ledbutil -ledbparser
+
+install: install_main
+
+.PHONY: install_main
+install_main: $(OBJDIR)/libcryptdb.so
+	install -m 644 $(OBJDIR)/libcryptdb.so /usr/lib
+
+# vim: set noexpandtab:

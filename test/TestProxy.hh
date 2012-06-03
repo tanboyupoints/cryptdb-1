@@ -9,7 +9,7 @@
 
 #include <signal.h>
 
-#include <edb/Connect.hh>
+#include <main/Connect.hh>
 #include <test/test_utils.hh>
 
 

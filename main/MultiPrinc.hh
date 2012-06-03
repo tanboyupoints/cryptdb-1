@@ -7,10 +7,10 @@
  * key access.
  */
 
-#include <edb/AccessManager.hh>
-#include <edb/Translator.hh>
-#include <edb/schema.hh>
-#include <edb/Annotation.hh>
+#include <main/AccessManager.hh>
+#include <main/Translator.hh>
+#include <main/schema.hh>
+#include <parser/Annotation.hh>
 
 class MultiPrinc {
  public:

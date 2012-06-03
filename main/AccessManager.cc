@@ -1,6 +1,6 @@
 #include <iomanip>
 
-#include <edb/AccessManager.hh>
+#include <main/AccessManager.hh>
 #include <util/cryptdb_log.hh>
 
 using namespace std;

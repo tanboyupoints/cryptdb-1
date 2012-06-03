@@ -8,7 +8,7 @@
 #include <vector>
 #include <string>
 #include <util/util.hh>
-#include <edb/sql_utils.hh>
+#include <parser/sql_utils.hh>
 
 
 extern "C" void *create_embedded_thd(int client_flag);

@@ -49,8 +49,8 @@ $(OBJDIR)/%.o: %.cc
 
 include crypto/Makefrag
 include crypto-old/Makefrag
-include edb/Makefrag
 include parser/Makefrag
+include main/Makefrag
 include test/Makefrag
 include util/Makefrag
 include udf/Makefrag

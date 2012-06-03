@@ -5,7 +5,7 @@
 #include <set>
 #include <list>
 
-#include <edb/Connect.hh>
+#include <main/Connect.hh>
 #include <crypto-old/CryptoManager.hh>
 
 

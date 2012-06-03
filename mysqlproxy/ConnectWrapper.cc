@@ -7,8 +7,8 @@
 #include <util/cryptdb_log.hh>
 #include <util/scoped_lock.hh>
 
-#include <parser/cdb_rewrite.hh>
-#include <edb/sql_utils.hh>
+#include <main/cdb_rewrite.hh>
+#include <parser/sql_utils.hh>
 
 
 using namespace std;
@@ -112,7 +112,7 @@ connect(lua_State *L)
 
         string mode = getenv("CRYPTDB_MODE")?:"";
         if (mode == "single") {
-            //cl = new EDBProxy(server, user, psswd, dbname, port, false);
+	    //cl = new EDBProxy(server, user, psswd, dbname, port, false);
             r = new Rewriter(ci, embed_dir, false, false);
         } else if (mode == "multi") {
             //cl = new EDBProxy(server, user, psswd, dbname, port, true);
@@ -121,7 +121,7 @@ connect(lua_State *L)
             //cl = new EDBProxy(server, user, psswd, dbname, port);
             r = new Rewriter(ci, embed_dir);
         }
-
+	
         uint64_t mkey = 113341234;  // XXX do not change as it's used for tpcc exps
         r->setMasterKey(BytesFromInt(mkey, AES_KEY_BYTES));
 

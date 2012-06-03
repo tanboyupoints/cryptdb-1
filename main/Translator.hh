@@ -17,8 +17,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <edb/Connect.hh>
-#include <edb/AccessManager.hh>
+#include <main/Connect.hh>
+#include <main/AccessManager.hh>
 #include <crypto-old/CryptoManager.hh>
 
 
