@@ -19,7 +19,7 @@ std::string stringify_ptr(T * x) {
 static inline std::ostream&
 operator<<(std::ostream &out, String &s)
 {
-    return out << "'" << std::string(s.ptr(), s.length()) << "'";
+    return out << std::string(s.ptr(), s.length());
 }
 
 static inline std::ostream&
@@ -42,7 +42,6 @@ operator<<(std::ostream &out, Item * i) {
 
 template<class T>
 class List_noparen: public List<T> {};
-
 template<class T>
 static inline List_noparen<T>&
 noparen(List<T> &l)
@@ -63,6 +62,26 @@ operator<<(std::ostream &out, List_noparen<T> &l)
         if (!first)
             out << ", ";
         out << *i;
+        first = false;
+    }
+    return out;
+}
+
+//Strings needs apostrophes
+//template<>
+static inline std::ostream&
+operator<<(std::ostream &out, List_noparen<String> &l)
+{
+    bool first = true;
+    for (auto it = List_iterator<String>(l);;) {
+        String *i = it++;
+        if (!i)
+            break;
+
+        if (!first) {
+            out << ", ";
+	}
+        out << "'" << *i << "'";
         first = false;
     }
     return out;
@@ -316,7 +335,8 @@ static std::ostream&
 operator<<(std::ostream &out, enum legacy_db_type db_type) {
     switch (db_type) {
     case DB_TYPE_INNODB: {out << "InnoDB"; break;}
-    case DB_TYPE_ISAM: {out << "Isam"; break;}
+    case DB_TYPE_ISAM: {out << "ISAM"; break;}
+    case DB_TYPE_MYISAM: {out << "MYISAM"; break;}
     default:
 	assert_s(false,
 		 "stringify does not know how to print db_type "
