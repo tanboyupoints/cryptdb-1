@@ -100,9 +100,11 @@ connect(lua_State *L)
 
     clients[client] = ws;
 
+    cerr << "\n\n CONNECT \n\n";
+    
     if (!r) {
       cerr << "starting proxy\n";
-        cryptdb_logger::setConf(string(getenv("CRYPTDB_LOG")?:""));
+      //cryptdb_logger::setConf(string(getenv("CRYPTDB_LOG")?:""));
 
         LOG(wrapper) << "connect " << client << "; "
                      << "server = " << server << ":" << port << "; "
@@ -114,12 +116,13 @@ connect(lua_State *L)
         if (mode == "single") {
 	    string encbydefault = getenv("ENC_BY_DEFAULT");
 	    if (encbydefault == "false") {
+		cerr << "\n\n enc by default false " << "\n\n";
 		r = new Rewriter(ci, embed_dir, false, false);
 	    } else {
+		cerr << "\n\nenc by default true" << "\n\n";
 		r = new Rewriter(ci, embed_dir, false, true);
 	    }
             
-
 	} else if (mode == "multi") {
             //cl = new EDBProxy(server, user, psswd, dbname, port, true);
             r = new Rewriter(ci, embed_dir, true, false);

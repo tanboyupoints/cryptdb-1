@@ -2340,6 +2340,8 @@ static void
 add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
     assert(lex->sql_command == SQLCOM_CREATE_TABLE);
 
+    LOG(cdb_v) << "add_table encByDefault " << encByDefault;
+    
     check_table_not_exists(a, lex, table);
 
     TableMeta *tm = new TableMeta();
@@ -2439,8 +2441,9 @@ static void rewrite_key(const string &table_name,
                         Analysis &a,
                         vector<Key*> &l)
 {
-    cryptdb_err() << "No support for rewriting keys. "
-            << "If you see this, please implement me";
+    //TODO
+    // cryptdb_err() << "No support for rewriting keys. "
+    //        << "If you see this, please implement me";
 }
 
 /*
