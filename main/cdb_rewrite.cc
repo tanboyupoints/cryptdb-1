@@ -1112,25 +1112,24 @@ static CItemCompare<Item_func::Functype::LE_FUNC,    Item_func_le>    ANON;
 template<Item_func::Functype FT, class IT>
 class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
     virtual EncSet do_gather_type(Item_cond *i, reason &tr, Analysis & a) const {
-	/* LOG(cdb_v) << "CItemCond (L1195) do_gather " << *i;
-        //cerr << "do_a_t item_cond reason " << tr << "\n";
         auto it = List_iterator<Item>(*i->argument_list());
-        //we split the current item in the different subexpressions
         for (;;) {
             Item *argitem = it++;
             if (!argitem)
                 break;
-            analyze(argitem, a);
+            EncSet e = gather(argitem, tr, a);
+            if (!e.contains(PLAIN_OLK))
+                thrower() << "cannot obtain PLAIN for " << *argitem;
         }
-        return tr.encset;*/
-	UNIMPLEMENTED;
+
+        return EncSet(PLAIN_OLK);
     }
+
     virtual Item * do_optimize_type(Item_cond *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-    virtual Item * do_rewrite_type(Item_cond *i, const OLK & olk, Analysis & a) const {
-	/* LOG(cdb_v) << "do_rewrite_type  Item_cond i " << *i << " no of args " << i->argument_count();
 
+    virtual Item * do_rewrite_type(Item_cond *i, const OLK & olk, Analysis & a) const {
 	List<Item> newlist;
 	auto it = List_iterator<Item>(*i->argument_list());
 	for (;;) {
@@ -1140,11 +1139,9 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
 	    }
 	    newlist.push_back(rewrite(argitem, olk, a));	    
 	}
-	
+
 	IT * res = new IT(newlist);
 	return res;
-	*/
-	UNIMPLEMENTED;
     }
 };
 
