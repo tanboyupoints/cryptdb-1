@@ -29,13 +29,13 @@ public:
     
     EncSet intersect(const EncSet & es2) const;
 
-    inline bool empty() const { return osl.empty(); }
+    bool empty() const { return osl.empty(); }
 
-    inline bool singleton() const { return osl.size() == 1; }
+    bool singleton() const { return osl.size() == 1; }
 
     EncDesc encdesc();
     
-    inline OLK extract_singleton() const {
+    OLK extract_singleton() const {
         assert_s(singleton(), string("encset has size ") + StringFromVal(osl.size()));
 	auto it = osl.begin();
 	return OLK(it->first, it->second.first, it->second.second);

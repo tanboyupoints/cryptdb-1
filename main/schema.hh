@@ -80,18 +80,18 @@ typedef struct FieldMeta {
 
     FieldMeta();
 
-    inline bool hasOnion(onion o) const {
+    bool hasOnion(onion o) const {
         return encdesc.olm.find(o) !=
             encdesc.olm.end();
     }
 
-    inline SECLEVEL getOnionLevel(onion o) const {
+    SECLEVEL getOnionLevel(onion o) const {
         auto it = encdesc.olm.find(o);
         if (it == encdesc.olm.end()) return SECLEVEL::INVALID;
         return it->second;
     }
 
-    inline bool setOnionLevel(onion o, SECLEVEL maxl) {
+    bool setOnionLevel(onion o, SECLEVEL maxl) {
         if (encdesc.restrict(o, maxl)) {
             while (onions[o]->layers.size() != 0 && onions[o]->layers.back()->level() != maxl) {
                 onions[o]->layers.pop_back();
@@ -101,7 +101,7 @@ typedef struct FieldMeta {
         return false;
     }
 
-    inline void removeOnion(onion o) {
+    void removeOnion(onion o) {
         onions.erase(o);
         encdesc.olm.erase(o);
         std::cerr << fname << " encdesc is " << encdesc << std::endl;
@@ -109,7 +109,7 @@ typedef struct FieldMeta {
 
     std::string stringify();
     
-    inline bool isEncrypted() {
+    bool isEncrypted() {
         return ((onions.size() != 1) ||  (onions.find(oPLAIN) == onions.end()));
     }
 } FieldMeta;

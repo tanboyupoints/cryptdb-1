@@ -106,7 +106,7 @@ public:
         assert(r);
         mysql_free_result(r);
     }
-    inline MYSQL_RES *res() { return r; }
+    MYSQL_RES *res() { return r; }
 private:
     MYSQL_RES *r;
 };
