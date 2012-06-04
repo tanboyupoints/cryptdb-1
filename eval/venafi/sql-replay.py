@@ -32,7 +32,7 @@ for l in f.readlines():
 cxns = {}
 for (id, cmd, args) in queries:
   if cmd == 'Connect':
-    cxns[id] = MySQLdb.connect(host='localhost', user='nickolai', passwd='', db='Director')
+    cxns[id] = MySQLdb.connect(host='127.0.0.1', port=3307, user='nickolai', passwd='', db='Director')
   elif cmd == 'Query':
     cursor = cxns[id].cursor()
     try:
