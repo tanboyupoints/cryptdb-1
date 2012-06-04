@@ -2442,8 +2442,7 @@ static void rewrite_key(const string &table_name,
                         vector<Key*> &l)
 {
     //TODO
-    // cryptdb_err() << "No support for rewriting keys. "
-    //        << "If you see this, please implement me";
+    l.push_back(k);
 }
 
 /*

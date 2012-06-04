@@ -315,7 +315,7 @@ operator<<(std::ostream &out, Key &k)
     const char *kname = NULL;
     switch (k.type) {
     case Key::PRIMARY     : kname = "PRIMARY KEY"; break;
-    case Key::UNIQUE      : kname = "UNIQUE";      break;
+    case Key::UNIQUE      : kname = "UNIQUE KEY";      break;
     case Key::MULTIPLE    : kname = "INDEX";       break;
     case Key::FULLTEXT    : kname = "FULLTEXT";    break;
     case Key::SPATIAL     : kname = "SPATIAL";     break;

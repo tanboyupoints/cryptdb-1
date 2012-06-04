@@ -99,8 +99,6 @@ connect(lua_State *L)
     }
 
     clients[client] = ws;
-
-    cerr << "\n\n CONNECT \n\n";
     
     if (!r) {
       cerr << "starting proxy\n";
