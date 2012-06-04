@@ -19,7 +19,7 @@ std::string stringify_ptr(T * x) {
 static inline std::ostream&
 operator<<(std::ostream &out, String &s)
 {
-    return out << std::string(s.ptr(), s.length());
+    return out << "'" << std::string(s.ptr(), s.length()) << "'";
 }
 
 static inline std::ostream&
@@ -42,6 +42,7 @@ operator<<(std::ostream &out, Item * i) {
 
 template<class T>
 class List_noparen: public List<T> {};
+
 template<class T>
 static inline List_noparen<T>&
 noparen(List<T> &l)
@@ -401,9 +402,9 @@ do_create_table(std::ostream &out, LEX &lex)
         out << noparen(kl) << ")";
 
         // TODO(stephentu): table options
-        if (lex.create_info.used_fields) {
-            mysql_thrower() << "WARNING: table options currently unsupported";
-        }
+        //if (lex.create_info.used_fields) {
+        //    mysql_thrower() << "WARNING: table options currently unsupported";
+        //}
 
         // create table ... select ...
         // this strange test for this condition comes from:

@@ -112,9 +112,15 @@ connect(lua_State *L)
 
         string mode = getenv("CRYPTDB_MODE")?:"";
         if (mode == "single") {
-	    //cl = new EDBProxy(server, user, psswd, dbname, port, false);
-            r = new Rewriter(ci, embed_dir, false, false);
-        } else if (mode == "multi") {
+	    string encbydefault = getenv("ENC_BY_DEFAULT");
+	    if (encbydefault == "false") {
+		r = new Rewriter(ci, embed_dir, false, false);
+	    } else {
+		r = new Rewriter(ci, embed_dir, false, true);
+	    }
+            
+
+	} else if (mode == "multi") {
             //cl = new EDBProxy(server, user, psswd, dbname, port, true);
             r = new Rewriter(ci, embed_dir, true, false);
         } else {
