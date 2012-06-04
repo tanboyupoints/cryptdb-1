@@ -40,6 +40,10 @@ for (id, cmd, args) in queries:
     except Exception, e:
       print 'Exception during query', args
       print e
+      if e[0] in (2006, 2013):
+        ## MySQL server has gone away
+        ## Lost connection to MySQL server during query
+        raise
     cursor.close()
   elif cmd == 'Quit':
     cxns[id].close()
