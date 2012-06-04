@@ -631,7 +631,6 @@ rewrite_agg_args(Item_sum * oldi, const OLK & constr, Analysis & a, int no_args 
 template<class T>
 class CItemSubtype : public CItemType {
     virtual EncSet do_gather(Item *i, reason &tr, Analysis & a) const {
-        LOG(cdb_v) << "CItemSubtype do_gather (L659)" << *i;
         return do_gather_type((T*) i, tr, a);
     }
     virtual Item* do_optimize(Item *i, Analysis & a) const {
@@ -1117,12 +1116,13 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
             Item *argitem = it++;
             if (!argitem)
                 break;
+	    reason new_tr(tr.encset.intersect(EQ_EncSet), "and/or", i);
             EncSet e = gather(argitem, tr, a);
             if (!e.contains(PLAIN_OLK))
                 thrower() << "cannot obtain PLAIN for " << *argitem;
         }
 
-        return EncSet(PLAIN_OLK);
+        return PLAIN_EncSet;
     }
 
     virtual Item * do_optimize_type(Item_cond *i, Analysis & a) const {
@@ -1765,14 +1765,13 @@ static class ANON : public CItemSubtypeFN<Item_func_strcmp, str_strcmp> {
 template<Item_sum::Sumfunctype SFT>
 class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
     virtual EncSet do_gather_type(Item_sum_count *i, reason &tr, Analysis & a) const {
-	/*   LOG(cdb_v) << "do_a_t Item_sum_count reason " << tr << "\n";
         if (i->has_with_distinct()) {
-	    reason new_tr = reason(tr.encset.intersect(EQ_EncSet), "count distinct", i, &tr, false);
-            analyze(i->get_arg(0), new_tr, a);
+	    reason new_tr(tr.encset.intersect(EQ_EncSet), "count distinct", i);
+            EncSet e = gather(i->get_arg(0), new_tr, a);
+            if (e.intersect(EQ_EncSet).empty())
+                thrower() << "count distinct";
 	} 
 	return PLAIN_EncSet;
-        */
-	UNIMPLEMENTED;
     }
     virtual Item * do_rewrite_type(Item_sum_count *i, const OLK & constr, Analysis & a) const {
 /*	Item_sum_count * res = new Item_sum_count(current_thd, i);
