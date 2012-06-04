@@ -24,6 +24,7 @@ PRNG * getLayerKey(AES_KEY * mKey, std::string uniqueFieldName, SECLEVEL l);
 
 typedef RSA PKCS;
 
+
 class CryptoManager {
  private:
     CryptoManager(const CryptoManager &);
