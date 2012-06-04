@@ -145,6 +145,12 @@ sql_type_to_string(enum_field_types tpe, CHARSET_INFO *charset)
 }
 
 static std::ostream&
+operator<<(std::ostream &out, CHARSET_INFO & ci) {
+    out << ci.csname;
+    return out;
+}
+
+static std::ostream&
 operator<<(std::ostream &out, Create_field &f)
 {
     
@@ -307,6 +313,19 @@ convert_lex_str(const LEX_STRING &l)
 }
 
 static std::ostream&
+operator<<(std::ostream &out, enum legacy_db_type db_type) {
+    switch (db_type) {
+    case DB_TYPE_INNODB: {out << "InnoDB"; break;}
+    case DB_TYPE_ISAM: {out << "Isam"; break;}
+    default:
+	assert_s(false,
+		 "stringify does not know how to print db_type "
+		 + strFromVal((uint) db_type));
+    }
+
+    return out;
+}
+static std::ostream&
 operator<<(std::ostream &out, Key &k)
 {
     // TODO: constraint
@@ -412,6 +431,17 @@ do_create_table(std::ostream &out, LEX &lex)
         if (lex.select_lex.item_list.elements) {
             out << " " << lex.select_lex;
         }
+
+	if (lex.create_info.db_type) {
+	    out << " ENGINE=" << lex.create_info.db_type->db_type;
+	}
+	if (lex.create_info.table_charset) {
+	    out << " CHARSET=" << *lex.create_info.table_charset;
+	}
+	if (lex.create_info.default_table_charset) {
+	    out << " DEFAULT CHARSET=" << *lex.create_info.default_table_charset;
+	}
+	
     }
 }
 
