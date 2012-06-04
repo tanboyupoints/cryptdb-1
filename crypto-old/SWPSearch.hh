@@ -22,8 +22,6 @@
 #include <openssl/rand.h>
 #include <list>
 
-#include <crypto-old/Binary.hh>
-
 
 // for all following constants unit is bytes
 
@@ -34,8 +32,8 @@ const unsigned int SWP_SALT_LEN = 8; //the size of salt in bytes
 const unsigned int SWPr = SWPCiphSize - SWPm;
 
 typedef struct Token {
-    Binary ciph;
-    Binary wordKey;
+    std::string ciph;
+    std::string wordKey;
 } Token;
 
 class SWP {
@@ -48,8 +46,8 @@ class SWP {
      * Returns: NULL on problem.
      */
 
-    static std::list<Binary> * encrypt(const Binary & key,
-                                  const std::list<Binary> & words);
+    static std::list<std::string> * encrypt(const std::string & key,
+                                  const std::list<std::string> & words);
 
     /*
      * Decrypts each word in the list ciphs.
@@ -59,14 +57,14 @@ class SWP {
      *
      */
 
-    static std::list<Binary> * decrypt(const Binary & key,
-                                  const std::list<Binary> & ciphs);
+    static std::list<std::string> * decrypt(const std::string & key,
+                                  const std::list<std::string> & ciphs);
 
     /*
      * Given the secret key and the word to search for, returns the token to
      * be used during searching.
      */
-    static Token token(const Binary & key, const Binary & word);
+    static Token token(const std::string & key, const std::string & word);
 
     /*
      * Returns a list of indexes of words in the list of ciphertexts ciphs
@@ -74,8 +72,8 @@ class SWP {
      * the value exists in the given ciphertexts or not.
      */
     static std::list<unsigned int> * search(const Token & token,
-                                       const std::list<Binary> & ciphs);
-    static bool searchExists(const Token & token, const std::list<Binary> & ciphs);
+                                       const std::list<std::string> & ciphs);
+    static bool searchExists(const Token & token, const std::list<std::string> & ciphs);
 
     static const bool canDecrypt = (SWPCiphSize % AES_BLOCK_SIZE == 0);
 
@@ -83,7 +81,7 @@ class SWP {
 
      // Computes PRP_{key}(val), where PRP is a pseudorandom permutation
      // Result is empty on problem
-     static Binary PRP(const Binary & key, const Binary & val);
+     static std::string PRP(const std::string & key, const std::string & val);
 
  private:
 
@@ -91,33 +89,33 @@ class SWP {
     /* Symmetric key crypto -- AES
      * requires: iv of AES_BLOCK_BYTES */
 
-    static Binary encryptSym(const Binary & key, const Binary & val,
-                             const Binary & iv);
-    static Binary decryptSym(const Binary & key, const Binary & ciph,
-                             const Binary & iv);
+    static std::string encryptSym(const std::string & key, const std::string & val,
+                             const std::string & iv);
+    static std::string decryptSym(const std::string & key, const std::string & ciph,
+                             const std::string & iv);
 
     /*
      * AES semantic (probabilistic) secure encryption
      * some salt is chosen randomly and appended to the ciphertext
      */
-    static Binary encryptSym(const Binary & key, const Binary & val);
-    static Binary decryptSym(const Binary & key, const Binary & ciph);
+    static std::string encryptSym(const std::string & key, const std::string & val);
+    static std::string decryptSym(const std::string & key, const std::string & ciph);
 
     //returns a random binary that has nobytes, chosen at random
-    static Binary random(unsigned int nobytes);
+    static std::string random(unsigned int nobytes);
 
     /*
      * SWP helper functions
      */
 
-    static Binary SWPencrypt(const Binary & key, Binary word,
+    static std::string SWPencrypt(const std::string & key, std::string word,
                              unsigned int index);
-    static Binary SWPdecrypt(const Binary & key, const Binary & word,
+    static std::string SWPdecrypt(const std::string & key, const std::string & word,
                              unsigned int index);
 
-    static bool SWPsearch(const Token & token, const Binary & ciph);
+    static bool SWPsearch(const Token & token, const std::string & ciph);
 
-    static void SWPHalfEncrypt(const Binary & key, Binary word, Binary & ciph,
-                               Binary & wordKey);
+    static void SWPHalfEncrypt(const std::string & key, std::string word, std::string & ciph,
+                               std::string & wordKey);
 
 };

@@ -646,42 +646,60 @@ CryptoManager::~CryptoManager()
         delete it->second;
 }
 
-Binary
-CryptoManager::encryptSWP(const Binary & key, const list<Binary> & words)
+string
+CryptoManager::encryptSWP(const string & key, const list<string> & words)
 {
     auto l = SWP::encrypt(key, words);
-    Binary r(*l);
+    string r = assembleWords(l);
     delete l;
     return r;
 }
 
-list<Binary> *
-CryptoManager::decryptSWP(const Binary & key, const Binary & overall_ciph)
+static list<string> *
+split(const string & s, unsigned int plen)
 {
-    auto l = overall_ciph.split(SWPCiphSize);
+    unsigned int len = s.length();
+    if (len % plen != 0) {
+        thrower() << "split receives invalid input";
+    }
+
+    unsigned int num = len / plen;
+    list<string> * res = new list<string>();
+
+    for (unsigned int i = 0; i < num; i++) {
+        res->push_back(s.substr(i*plen, plen));
+    }
+
+    return res;
+}
+
+list<string> *
+CryptoManager::decryptSWP(const string & key, const string & overall_ciph)
+{
+    auto l = split(overall_ciph, SWPCiphSize);
     auto r = SWP::decrypt(key, *l);
     delete l;
     return r;
 }
 
 Token
-CryptoManager::token(const Binary & key, const Binary & word)
+CryptoManager::token(const string & key, const string & word)
 {
     return SWP::token(key, word);
 }
 
 bool
-CryptoManager::searchExists(const Token & token, const Binary & overall_ciph)
+CryptoManager::searchExists(const Token & token, const string & overall_ciph)
 {
-    auto l = overall_ciph.split(SWPCiphSize);
+    auto l = split(overall_ciph, SWPCiphSize);
     bool r = SWP::searchExists(token, *l);
     delete l;
     return r;
 }
 
 list<unsigned int> *
-CryptoManager::searchSWP(const Token & token, const Binary & overall_ciph)
+CryptoManager::searchSWP(const Token & token, const string & overall_ciph)
 {
-    return SWP::search(token, *(overall_ciph.split(SWPCiphSize)));
+    return SWP::search(token, *split(overall_ciph, SWPCiphSize));
 }
 

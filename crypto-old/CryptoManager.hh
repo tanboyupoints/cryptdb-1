@@ -114,13 +114,13 @@ class CryptoManager {
 
      */
 
-    static Binary encryptSWP(const Binary & key, const std::list<Binary> & words);
-    static std::list<Binary> * decryptSWP(const Binary & key,
-                                     const Binary & overall_ciph);
-    static Token token(const Binary & key, const Binary & word);
+    static std::string encryptSWP(const std::string & key, const std::list<std::string> & words);
+    static std::list<std::string> * decryptSWP(const std::string & key,
+                                     const std::string & overall_ciph);
+    static Token token(const std::string & key, const std::string & word);
     static std::list<unsigned int> * searchSWP(const Token & token,
-                                          const Binary & overall_ciph);
-    static bool searchExists(const Token & token, const Binary & overall_ciph);
+                                          const std::string & overall_ciph);
+    static bool searchExists(const Token & token, const std::string & overall_ciph);
 
     //aggregates
     static const unsigned int Paillier_len_bytes = PAILLIER_LEN_BYTES;

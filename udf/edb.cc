@@ -95,7 +95,7 @@ decrypt_SEM(unsigned char *eValueBytes, uint64_t eValueLen,
 }
 
 static bool
-search(const Token & token, const Binary & overall_ciph)
+search(const Token & token, const string & overall_ciph)
 {
 
    return CryptoManager::searchExists(token, overall_ciph);
@@ -435,8 +435,8 @@ searchSWP_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
     uint64_t wordKeyLen;
     char *wordKey = getba(args, 2, wordKeyLen);
 
-    t->ciph = Binary((unsigned int) ciphLen, (unsigned char *)ciph);
-    t->wordKey = Binary((unsigned int)wordKeyLen, (unsigned char*)wordKey);
+    t->ciph = string(ciph, ciphLen);
+    t->wordKey = string(wordKey, wordKeyLen);
 
     initid->ptr = (char *) t;
 
@@ -455,7 +455,7 @@ searchSWP(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
 {
     uint64_t allciphLen;
     char * allciph = getba(ARGS, 0, allciphLen);
-    Binary overallciph = Binary((unsigned int)allciphLen, (unsigned char *)allciph);
+    string overallciph = string(allciph, allciphLen);
 
     Token * t = (Token *) initid->ptr;
 

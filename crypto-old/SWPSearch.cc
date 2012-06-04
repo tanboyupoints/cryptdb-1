@@ -17,12 +17,12 @@ using namespace std;
 unsigned char fixedIV[] =
 {34, 145, 42, 12, 56, 13, 111, 100, 98, 6, 2, 63, 88, 4, 22, 74};
 
-static Binary iv_det;
+static string iv_det;
 
 static const bool DEBUG = false;
 
-Binary
-SWP::PRP(const Binary & key, const Binary & val)
+string
+SWP::PRP(const string & key, const string & val)
 {
 
     return encryptSym(key, val, key);
@@ -32,123 +32,126 @@ SWP::PRP(const Binary & key, const Binary & val)
 /*************** Sym key crypto ******************/
 
 //pads with 10..00 making length of result be a multiple of len (bytes)
-static Binary
-pad(const Binary & vec, unsigned int len)
+static string
+pad(const string & vec, unsigned int len)
 {
 
-    Binary result;
-    if (vec.len % len == 0) {
-        result.len = vec.len + len;
+    string result;
+
+    unsigned int newlen;
+    if (vec.length() % len == 0) {
+        newlen = vec.length() + len;
     } else {
-        result.len = (vec.len / len + 1) * len;
+        newlen = (vec.length() / len + 1) * len;
     }
 
-    result.content = new unsigned char[result.len];
+    result = vec;
+    result.resize(newlen);
 
-    memcpy(result.content, vec.content, vec.len);
+    result[vec.length()] = 1;
 
-    result.content[vec.len] = 1;
-
-    for (unsigned int i = vec.len+1; i < result.len; i++) {
-        result.content[i] = 0;
+    for (unsigned int i = vec.length()+1; i < result.length(); i++) {
+        result[i] = 0;
     }
 
     return result;
 
 }
 
-static Binary
-unpad(const Binary & vec)
+static string
+unpad(const string & vec)
 {
 
-    int index = vec.len - 1;
+    int index = vec.length() - 1;
 
-    while ((index > 0) && (vec.content[index] == 0)) {
+    while ((index > 0) && (vec[index] == 0)) {
         index--;
     }
 
-    assert_s((index>=0) && (vec.content[index] == 1),
+    assert_s((index>=0) && (vec[index] == 1),
              "input was not padded correctly");
 
-    return vec.subbinary(0, index);
+    return vec.substr(0, index);
 }
 
-Binary
-SWP::encryptSym(const Binary & key, const Binary & val, const Binary & iv)
+string
+SWP::encryptSym(const string & key, const string & val, const string & iv)
 {
 
-    assert_s(key.len == AES_BLOCK_SIZE, "key has incorrect length");
-    assert_s(iv.len == AES_BLOCK_SIZE, "iv has incorrect length");
+    assert_s(key.length() == AES_BLOCK_SIZE, "key has incorrect length");
+    assert_s(iv.length() == AES_BLOCK_SIZE, "iv has incorrect length");
 
 
     AES_KEY aes_key;
 
-    Binary newiv(iv);
+    AES_set_encrypt_key((const unsigned char *)key.c_str(), AES_BLOCK_BITS, &aes_key);
 
-    AES_set_encrypt_key(key.content, AES_BLOCK_BITS, &aes_key);
+    string val2 = pad(val, AES_BLOCK_SIZE);
 
-    Binary val2(pad(val, AES_BLOCK_SIZE));
+    unsigned int newlen = val2.length();
+    
+    auto result = vector<unsigned char>(newlen);
 
-    Binary result(val2.len);
+    unsigned char * newiv = new unsigned char[iv.length()];
+    memcpy(newiv, iv.c_str(), iv.length());
+    
+    AES_cbc_encrypt((unsigned char *)val2.c_str(), &result[0], newlen, &aes_key,
+                    newiv, AES_ENCRYPT);
 
-    AES_cbc_encrypt(val2.content, result.content, val2.len, &aes_key,
-                    newiv.content,
-                    AES_ENCRYPT);
-    return result;
+    return string((char*)&result[0], newlen);
 }
 
-Binary
-SWP::decryptSym(const Binary & key, const Binary & ciph, const Binary & iv)
+string
+SWP::decryptSym(const string & key, const string & ciph, const string & iv)
 {
 
-    assert_s(iv.len == AES_BLOCK_SIZE, "iv has incorrect length");
-    assert_s(key.len == AES_BLOCK_SIZE, "key has incorrect length");
+    assert_s(iv.length() == AES_BLOCK_SIZE, "iv has incorrect length");
+    assert_s(key.length() == AES_BLOCK_SIZE, "key has incorrect length");
 
     AES_KEY aes_key;
 
-    Binary newiv(iv);
+    AES_set_decrypt_key((const unsigned char *)key.c_str(), AES_BLOCK_BITS, &aes_key);
 
-    AES_set_decrypt_key(key.content, AES_BLOCK_BITS, &aes_key);
+    unsigned int ciphlen = ciph.length();
+    auto result = new unsigned char[ciphlen];
 
-    Binary result(ciph.len);
+    unsigned char * newiv = new unsigned char[iv.length()];
+    memcpy(newiv, iv.c_str(), iv.length());
+    
+    AES_cbc_encrypt((const unsigned char*)ciph.c_str(), result, ciphlen, &aes_key,
+                    newiv, AES_DECRYPT);
 
-    AES_cbc_encrypt(ciph.content, result.content, ciph.len, &aes_key,
-                    newiv.content,
-                    AES_DECRYPT);
-
-    return unpad(result);
+    return unpad(string((const char *)result, ciphlen));
 
 }
 
-Binary
-SWP::encryptSym(const Binary & key, const Binary & val)
+string
+SWP::encryptSym(const string & key, const string & val)
 {
-    Binary salt = random(SWP_SALT_LEN);
-    Binary iv = PRP(key, salt);
-    Binary ciph = encryptSym(key, val, iv);
+    string salt = random(SWP_SALT_LEN);
+    string iv = PRP(key, salt);
+    string ciph = encryptSym(key, val, iv);
 
     return salt+ciph;
 }
 
-Binary
-SWP::decryptSym(const Binary & key, const Binary & ciph)
+string
+SWP::decryptSym(const string & key, const string & ciph)
 {
-    Binary salt = ciph.subbinary(0, SWP_SALT_LEN);
-    Binary iv = PRP(key, salt);
-    Binary ciph2 = ciph.subbinary(SWP_SALT_LEN, ciph.len - SWP_SALT_LEN);
+    string salt = ciph.substr(0, SWP_SALT_LEN);
+    string iv = PRP(key, salt);
+    string ciph2 = ciph.substr(SWP_SALT_LEN, ciph.length() - SWP_SALT_LEN);
 
     return decryptSym(key, ciph2, iv);
 }
 
-Binary
+string
 SWP::random(unsigned int nobytes)
 {
-    Binary bin = Binary();
-    bin.len = nobytes;
-    bin.content = new unsigned char[bin.len];
-    RAND_bytes(bin.content, bin.len);
+    unsigned char * bin = new unsigned char[nobytes];
+    RAND_bytes(bin, nobytes);
 
-    return bin;
+    return string((const char *)bin, nobytes);
 }
 
 /**************************** SWP ****************/
@@ -156,16 +159,17 @@ SWP::random(unsigned int nobytes)
 // this function performs half of the encrypt job up to the point at which
 // tokens are generated
 void
-SWP::SWPHalfEncrypt(const Binary & key, Binary word, Binary & ciph,
-                    Binary & wordKey)
+SWP::SWPHalfEncrypt(const string & key, string word, string & ciph,
+                    string & wordKey)
 {
     //encryption of word E[W_i]
-    ciph = encryptSym(key, word, Binary(AES_BLOCK_SIZE, fixedIV));
+    string IV((const char *)fixedIV, AES_BLOCK_SIZE);
+    ciph = encryptSym(key, word, IV);
 
     //L_i and R_i
-    Binary L_i;
+    string L_i;
     if (SWP::canDecrypt) {
-        L_i = ciph.subbinary(0, SWPr);
+        L_i = ciph.substr(0, SWPr);
     }
 
     //wordKey: k_i = PRP_{key}(E[W_i])
@@ -177,37 +181,49 @@ SWP::SWPHalfEncrypt(const Binary & key, Binary word, Binary & ciph,
     }
 }
 
+static string
+bytewise_xor(const string & a, const string & b) {
+    assert_s(a.length() == b.length(), "bytewise_xor expects equal lengths");
 
-Binary
-SWP::SWPencrypt(const Binary & key, Binary word, unsigned int index)
+    unsigned int len = a.length();
+    
+    char * res = new char[len];
+    for (unsigned int i = 0; i < len; i++) {
+	res[i] = a[i] xor b[i];
+    }
+    return string(res, len);
+}
+
+string
+SWP::SWPencrypt(const string & key, string word, unsigned int index)
 {
 
-    if (DEBUG) {cerr << "encrypting " << word.toString() << "\n "; }
-    Binary ciph, wordKey;
+    if (DEBUG) {cerr << "encrypting " << word << "\n "; }
+    string ciph, wordKey;
 
     SWPHalfEncrypt(key, word, ciph, wordKey);
 
     //S_i
-    Binary salt;
+    string salt;
     if (SWP::canDecrypt) {
-        salt = PRP(key, Binary::toBinary(index));
-        salt = salt.subbinary(salt.len - SWPr, SWPr);
+        salt = PRP(key, strFromVal(index));
+        salt = salt.substr(salt.length() - SWPr, SWPr);
     } else {
         salt = random(SWPr);
     }
     //F_{k_i} (S_i)
-    Binary func = PRP(wordKey, salt);
+    string func = PRP(wordKey, salt);
 
     if (SWP::canDecrypt) {
-        func = func.subbinary(SWPr, SWPm);
+        func = func.substr(SWPr, SWPm);
     }
 
-    return ciph ^ (salt + func);
+    return bytewise_xor(ciph, salt + func);
 
 }
 
 Token
-SWP::token(const Binary & key, const Binary & word)
+SWP::token(const string & key, const string & word)
 {
     Token t = Token();
 
@@ -218,21 +234,21 @@ SWP::token(const Binary & key, const Binary & word)
 }
 
 bool
-SWP::SWPsearch(const Token & token, const Binary & ciph)
+SWP::SWPsearch(const Token & token, const string & ciph)
 {
 
     if (DEBUG) { cerr << "searching! \n"; }
 
     //remove E[W_i]
-    Binary ciph2 = ciph ^ token.ciph;
+    string ciph2 = bytewise_xor(ciph, token.ciph);
 
     //remains salt, PRP(wordkey, salt)
-    Binary salt = ciph2.subbinary(0, SWPr);
-    Binary funcpart = ciph2.subbinary(SWPr, ciph2.len - SWPr);
+    string salt = ciph2.substr(0, SWPr);
+    string funcpart = ciph2.substr(SWPr, ciph2.length() - SWPr);
 
-    Binary func = PRP(token.wordKey, salt);
+    string func = PRP(token.wordKey, salt);
     if (SWP::canDecrypt) {
-        func = func.subbinary(SWPr, SWPm);
+        func = func.substr(SWPr, SWPm);
     }
 
     if (func == funcpart) {
@@ -242,22 +258,22 @@ SWP::SWPsearch(const Token & token, const Binary & ciph)
     return false;
 }
 
-list<Binary> *
-SWP::encrypt(const Binary & key, const list<Binary> & words)
+list<string> *
+SWP::encrypt(const string & key, const list<string> & words)
 {
 
-    list<Binary> * result = new list<Binary>();
+    list<string> * result = new list<string>();
 
     unsigned int index = 0;
 
-    for (list<Binary>::const_iterator it = words.begin(); it != words.end();
+    for (list<string>::const_iterator it = words.begin(); it != words.end();
          it++) {
         index++;
 
-        Binary word = *it;
+        string word = *it;
 
-        assert_s(word.len < SWPCiphSize, string(
-                     " given word ") + word.toString() +
+        assert_s(word.length() < SWPCiphSize, string(
+                     " given word ") + word +
                  " is longer than SWPCiphSize");
 
         result->push_back(SWPencrypt(key, word, index));
@@ -266,33 +282,33 @@ SWP::encrypt(const Binary & key, const list<Binary> & words)
     return result;
 }
 
-Binary
-SWP::SWPdecrypt(const Binary & key, const Binary & word, unsigned int index)
+string
+SWP::SWPdecrypt(const string & key, const string & word, unsigned int index)
 {
 
     //S_i
-    Binary salt = PRP(key, Binary::toBinary(index));
-    salt = salt.subbinary(salt.len - SWPr, SWPr);
+    string salt = PRP(key, strFromVal(index));
+    salt = salt.substr(salt.length() - SWPr, SWPr);
 
     //L_i
-    Binary L_i = salt ^ word.subbinary(0, SWPr);
+    string L_i = bytewise_xor(salt, word.substr(0, SWPr));
 
     //k_i
-    Binary wordKey = PRP(key, L_i);
+    string wordKey = PRP(key, L_i);
 
     //F_{k_i} (S_i)
-    Binary func = PRP(wordKey, salt).subbinary(SWPr, SWPm);
+    string func = PRP(wordKey, salt).substr(SWPr, SWPm);
 
-    Binary R_i = func ^ word.subbinary(SWPr, SWPm);
+    string R_i = bytewise_xor(func, word.substr(SWPr, SWPm));
 
-    return decryptSym(key, L_i + R_i, Binary(AES_BLOCK_SIZE, fixedIV));
+    return decryptSym(key, L_i + R_i, string((const char *)fixedIV, AES_BLOCK_SIZE));
 
 }
 
-list<Binary> *
-SWP::decrypt(const Binary & key, const list<Binary>  & ciph)
+list<string> *
+SWP::decrypt(const string & key, const list<string>  & ciph)
 {
-    list<Binary> * result = new list<Binary>();
+    list<string> * result = new list<string>();
 
     assert_s(
         canDecrypt,
@@ -300,13 +316,13 @@ SWP::decrypt(const Binary & key, const list<Binary>  & ciph)
 
     unsigned int index = 0;
 
-    for (list<Binary>::const_iterator it = ciph.begin(); it != ciph.end();
+    for (list<string>::const_iterator it = ciph.begin(); it != ciph.end();
          it++) {
         index++;
 
-        Binary word = *it;
+        string word = *it;
 
-        assert_s(word.len == SWPCiphSize,
+        assert_s(word.length() == SWPCiphSize,
                  " given ciphertext with invalid length ");
 
         result->push_back(SWPdecrypt(key, word, index));
@@ -317,12 +333,12 @@ SWP::decrypt(const Binary & key, const list<Binary>  & ciph)
 }
 
 list<unsigned int> *
-SWP::search(const Token & token, const list<Binary> & ciphs)
+SWP::search(const Token & token, const list<string> & ciphs)
 {
     list<unsigned int> * res = new list<unsigned int>();
 
     unsigned int index = 0;
-    for (list<Binary>::const_iterator cit = ciphs.begin(); cit != ciphs.end();
+    for (list<string>::const_iterator cit = ciphs.begin(); cit != ciphs.end();
          cit++) {
         if (SWPsearch(token, *cit)) {
             res->push_back(index);
@@ -334,10 +350,10 @@ SWP::search(const Token & token, const list<Binary> & ciphs)
 }
 
 bool
-SWP::searchExists(const Token & token, const list<Binary> & ciphs)
+SWP::searchExists(const Token & token, const list<string> & ciphs)
 {
 
-    for (list<Binary>::const_iterator cit = ciphs.begin(); cit != ciphs.end();
+    for (list<string>::const_iterator cit = ciphs.begin(); cit != ciphs.end();
             cit++) {
         if (SWPsearch(token, *cit)) {
             return true;
