@@ -8,7 +8,7 @@
 #include <iostream>
 #include <fstream>
 
-#include <crypto-old/SWPSearch.hh>
+#include <crypto/SWPSearch.hh>
 #include <util/util.hh>
 
 

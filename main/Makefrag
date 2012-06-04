@@ -10,13 +10,13 @@ all: $(CRYPTDBPROGOBJS) $(OBJDIR)/libcryptdb.so
 
 CRYPTDB_OBJS := $(patsubst %.cc,$(OBJDIR)/main/%.o,$(CRYPTDB_SRCS))
 
-$(CRYPTDBPROGOBJS): %: %.o $(OBJDIR)/libedbparser.so  $(OBJDIR)/libedbutil.so $(OBJDIR)/libcryptdb.so
-	$(CXX) $< -o $@ -ledbparser  $(LDFLAGS) -ledbutil -lcryptdb
+$(CRYPTDBPROGOBJS): %: %.o $(OBJDIR)/libedbparser.so  $(OBJDIR)/libedbutil.so $(OBJDIR)/libcryptdb.so $(OBJDIR)/libedbcrypto.so
+	$(CXX) $< -o $@ -ledbparser  $(LDFLAGS) -ledbutil -ledbcrypto -lcryptdb
 
 $(OBJDIR)/libcryptdb.so: $(CRYPTDB_OBJS) \
-			 $(OBJDIR)/libedbcrypto.so $(OBJDIR)/libedbcrypto2.so $(OBJDIR)/libedbutil.so \
+			 $(OBJDIR)/libedbcrypto.so $(OBJDIR)/libedbutil.so \
 			 $(OBJDIR)/libedbparser.so 
-	$(CXX) -shared -o $@ $(CRYPTDB_OBJS) $(LDFLAGS) -ledbcrypto -ledbcrypto2 -ledbutil -ledbparser
+	$(CXX) -shared -o $@ $(CRYPTDB_OBJS) $(LDFLAGS) -ledbcrypto -ledbutil -ledbparser
 
 install: install_main
 

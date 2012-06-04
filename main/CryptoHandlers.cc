@@ -1,5 +1,7 @@
 #include <main/CryptoHandlers.hh>
 #include <crypto/ope.hh>
+#include <crypto/BasicCrypto.hh>
+#include <crypto/SWPSearch.hh>
 #include <util/util.hh>
 #include <util/cryptdb_log.hh>
 
@@ -166,9 +168,11 @@ RND_str::unSetKey(const string &k) {
 Item *
 RND_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
     setKey(k);
-    string enc = CryptoManager::encrypt_SEM(
+    string enc = encrypt_AES_CBC(
                  ItemToString(ptext),
-                 enckey, IV);
+                 enckey,
+		 BytesFromInt(IV, SALT_LEN_BYTES),
+		 false);
     LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV " << IV << "--->"
 	      << "len of enc " << enc.length() << " enc " << enc;
     unSetKey(k);
@@ -178,9 +182,11 @@ RND_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
 Item *
 RND_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
     setKey(k);
-    string dec = CryptoManager::decrypt_SEM(
+    string dec = decrypt_AES_CBC(
 	ItemToString(ctext),
-	deckey, IV);
+	deckey,
+	BytesFromInt(IV, SALT_LEN_BYTES),
+	false);
     LOG(encl) << "RND_str decrypt " << ItemToString(ctext) << " IV " << IV << "-->"
 	      << "len of dec " << dec.length() << " dec: " << dec;
     unSetKey(k);
@@ -672,6 +678,36 @@ Search::unSetKey(const string &k) {
     //TODO: zero key
 }
 
+
+//returns the concatenation of all words in the given list
+static string
+assembleWords(list<string> * words)
+{
+    string res = "";
+
+    for (list<string>::iterator it = words->begin(); it != words->end();
+         it++) {
+        res = res + *it;
+    }
+
+    return res;
+}
+
+static string
+encryptSWP(const string & key, const list<string> & words)
+{
+    auto l = SWP::encrypt(key, words);
+    string r = assembleWords(l);
+    delete l;
+    return r;
+}
+
+static Token
+token(const string & key, const string & word)
+{
+    return SWP::token(key, word);
+}
+
 //this function should in fact be provided by the programmer
 //currently, we split by whitespaces
 // only consider words at least 3 chars in len
@@ -715,7 +751,7 @@ Search::encrypt(Item * ptext, uint64_t IV, const std::string &k) {
     string plainstr = ItemToString(ptext);
     //TODO: remove string, string serves this purpose now..
     list<string> * tokens = tokenize(plainstr);
-    string ciph = CryptoManager::encryptSWP(key, *tokens);
+    string ciph = encryptSWP(key, *tokens);
 
     unSetKey(k);
 
@@ -767,7 +803,7 @@ Search::searchUDF(Item * field, Item * expr) {
 
     // Add token
     
-    Token t = CryptoManager::token(key, string(searchstrip(ItemToString(expr))));
+    Token t = token(key, string(searchstrip(ItemToString(expr))));
     Item_string * t1 =  new Item_string(newmem(t.ciph),
 					t.ciph.length(), &my_charset_bin);
     t1->name = NULL; //no alias

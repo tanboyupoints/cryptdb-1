@@ -3,7 +3,7 @@
  *
  */
 
-#include <crypto-old/ECJoin.hh>
+#include <crypto/ECJoin.hh>
 #include <util/cryptdb_log.hh>
 #include <util/util.hh>
 

@@ -4,7 +4,7 @@
  */
 
 #include <main/MultiPrinc.hh>
-//#include <util/ctr.hh>
+#include <crypto/BasicCrypto.hh>
 #include <util/cryptdb_log.hh>
 
 using namespace std;
@@ -592,8 +592,7 @@ MultiPrinc::get_key(string fieldName, TempMKM & tmkm)
         string key =
             accMan->getKey(Prin(encForField,
                                 removeApostrophe(tmkm.encForVal[encForField])));
-        LOG(mp) << "-- key from accman is " <<
-        CryptoManager::marshallKey(key) << "\n";
+        LOG(mp) << "-- key from accman is " << marshallKey(key) << "\n";
         assert_s(
             key.length() > 0, "access manager does not have needed key!!");
         return key;
@@ -626,7 +625,7 @@ MultiPrinc::get_key(string fieldName, TMKM & tmkm, const vector<Item *> &res)
                         tmkm.encForReturned[encForField] <<
                         "\n"; }
         LOG(mp) << "-- key from accman is " <<
-        CryptoManager::marshallKey(key) << "\n";
+	    marshallKey(key) << "\n";
         assert_s(key.length() > 0, "access manager does not have key\n");
         return key;
     }
@@ -635,7 +634,7 @@ MultiPrinc::get_key(string fieldName, TMKM & tmkm, const vector<Item *> &res)
         string val = ItemToString(res[tmkm.encForReturned[encForField]]);
         string key = accMan->getKey(Prin(encForField, removeApostrophe(val)));
         LOG(mp) << "-- key from accman is " <<
-        CryptoManager::marshallKey(key) << "\n";
+	    marshallKey(key) << "\n";
         if (VERBOSE_G) {LOG(mp) << "using encforreturned: get key " <<
                         encForField << " val " << val <<
                         " encforreturned index " <<

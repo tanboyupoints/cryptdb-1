@@ -5,6 +5,11 @@
 #include <NTL/ZZ.h>
 #include <crypto/prng.hh>
 
+#define PAILLIER_LEN_BYTES 256
+const unsigned int Paillier_len_bytes = PAILLIER_LEN_BYTES;
+const unsigned int Paillier_len_bits = Paillier_len_bytes * 8;
+
+
 class Paillier {
  public:
     Paillier(const std::vector<NTL::ZZ> &pk);

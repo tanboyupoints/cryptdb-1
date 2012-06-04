@@ -1,8 +1,6 @@
 #pragma once
 
-#include <crypto-old/CryptoManager.hh>
 #include <util/onions.hh>
-
 #include <parser/embedmysql.hh>
 #include <parser/stringify.hh>
 #include <main/MultiPrinc.hh>

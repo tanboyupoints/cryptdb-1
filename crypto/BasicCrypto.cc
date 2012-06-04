@@ -5,12 +5,63 @@
  */
 
 #include <assert.h>
-#include <crypto-old/BasicCrypto.hh>
+#include <crypto/BasicCrypto.hh>
 #include <util/ctr.hh>
 #include <util/util.hh>
+#include <util/cryptdb_log.hh>
 
 
 using namespace std;
+
+
+string
+getKey(AES_KEY * masterKeyArg, const string &uniqueFieldName,
+                      SECLEVEL sec)
+{
+    string id = uniqueFieldName + strFromVal((unsigned int) sec);
+
+    unsigned char shaDigest[SHA_DIGEST_LENGTH];
+    SHA1((const uint8_t *) &id[0], id.length(), shaDigest);
+
+    string result;
+    result.resize(AES_BLOCK_BYTES);
+    AES_encrypt(shaDigest, (uint8_t *) &result[0], masterKeyArg);
+    return result;
+}
+
+string
+marshallKey(const string &key)
+{
+    // we will be sending key as two big nums
+    string res = "";
+
+    for (unsigned int i = 0; i < AES_KEY_SIZE/bitsPerByte; i++) {
+        res = res + strFromVal((unsigned int)(key[i])) + ",";
+    }
+
+    //remove last comma
+    res.resize(res.length() - 1);
+    return res;
+}
+
+AES_KEY *
+getKey(const string & key) {
+    AES_KEY * resKey = new AES_KEY();
+    string mkey = key;
+
+    // PAD KEY to be AES_KEY_SIZE bits long
+    if (mkey.size() < AES_KEY_BYTES) {
+      char buf[AES_KEY_BYTES];
+      memset(buf, 0, sizeof(buf));
+      memcpy(buf, mkey.data(), mkey.size());
+      mkey = string(buf, sizeof(buf));
+    }
+
+    AES_set_encrypt_key(
+            (const uint8_t *) mkey.data(), AES_KEY_SIZE, resKey);
+
+    return resKey;
+}
 
 AES_KEY *
 get_AES_KEY(const string &key)
@@ -241,3 +292,138 @@ decrypt_AES_CMC(const string &ctext, const AES_KEY * deckey, bool dopad)
     return decrypt_AES_CBC(reversed, deckey, "0", dopad);
 }
 
+
+//**************** Public Key Cryptosystem (PKCS)
+// ****************************************/
+
+//marshall key
+static string
+DER_encode_RSA_public(RSA *rsa)
+{
+    string s;
+    s.resize(i2d_RSAPublicKey(rsa, 0));
+
+    uint8_t *next = (uint8_t *) &s[0];
+    i2d_RSAPublicKey(rsa, &next);
+    return s;
+}
+
+static RSA *
+DER_decode_RSA_public(const string &s)
+{
+    const uint8_t *buf = (const uint8_t*) s.data();
+    return d2i_RSAPublicKey(0, &buf, s.length());
+}
+
+//marshall key
+static string
+DER_encode_RSA_private(RSA *rsa)
+{
+    string s;
+    s.resize(i2d_RSAPrivateKey(rsa, 0));
+
+    uint8_t *next = (uint8_t *) &s[0];
+    i2d_RSAPrivateKey(rsa, &next);
+    return s;
+}
+
+static RSA *
+DER_decode_RSA_private(const string &s)
+{
+    const uint8_t *buf = (const uint8_t*) s.data();
+    return d2i_RSAPrivateKey(0, &buf, s.length());
+}
+
+static void
+remove_private_key(RSA *r)
+{
+    r->d = r->p = r->q = r->dmp1 = r->dmq1 = r->iqmp = 0;
+}
+
+//Credits: the above five functions are from "secure programming cookbook for
+// C++"
+
+void
+generateKeys(PKCS * & pk, PKCS * & sk)
+{
+    LOG(crypto) << "pkcs generate";
+    PKCS * key =  RSA_generate_key(PKCS_bytes_size*8, 3, NULL, NULL);
+
+    sk = RSAPrivateKey_dup(key);
+
+    pk = key;
+    remove_private_key(pk);
+
+}
+
+string
+marshallKey(PKCS * mkey, bool ispk)
+{
+    LOG(crypto) << "pkcs encrypt";
+    string key;
+    if (!ispk) {
+        key = DER_encode_RSA_private(mkey);
+    } else {
+        key = DER_encode_RSA_public(mkey);
+    }
+    assert_s(key.length() >= 1, "issue with RSA pk \n");
+    return key;
+}
+
+PKCS *
+unmarshallKey(const string &key, bool ispk)
+{
+    LOG(crypto) << "pkcs decrypt";
+    //cerr << "before \n";
+    if (ispk) {
+        return DER_decode_RSA_public(key);
+    } else {
+        return DER_decode_RSA_private(key);
+    }
+}
+
+string
+encrypt(PKCS * key, const string &s)
+{
+    string tocipher;
+    tocipher.resize(RSA_size(key));
+
+    RSA_public_encrypt((int) s.length(),
+                       (const uint8_t*) s.data(), (uint8_t*) &tocipher[0],
+                       key,
+                       RSA_PKCS1_OAEP_PADDING);
+
+    return tocipher;
+}
+
+string
+decrypt(PKCS * key, const string &s)
+{
+    assert_s(s.length() == (uint)RSA_size(key), "fromlen is not RSA_size");
+    string toplain;
+    toplain.resize(RSA_size(key));
+
+    uint len =
+        RSA_private_decrypt((int) s.length(),
+                            (const uint8_t*) s.data(),
+                            (uint8_t*) &toplain[0], key,
+                            RSA_PKCS1_OAEP_PADDING);
+    toplain.resize(len);
+
+    return toplain;
+}
+
+void
+freeKey(PKCS * key)
+{
+    RSA_free(key);
+}
+
+
+PRNG *
+getLayerKey(AES_KEY * mKey, string uniqueFieldName, SECLEVEL l) {
+    string rawkey = getKey(mKey, uniqueFieldName, l);
+    urandom * key = new urandom();
+    key->seed_bytes(rawkey.length(), (uint8_t*)rawkey.data());
+    return key;
+}

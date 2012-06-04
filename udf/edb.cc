@@ -16,8 +16,10 @@
 
 #define DEBUG 1
 
-#include <crypto-old/CryptoManager.hh> /* various functions for EDB */
+#include <crypto/BasicCrypto.hh> 
 #include <crypto/blowfish.hh>
+#include <crypto/SWPSearch.hh>
+#include <crypto/paillier.hh>
 #include <util/params.hh>
 #include <util/util.hh>
 
@@ -91,15 +93,43 @@ decrypt_SEM(unsigned char *eValueBytes, uint64_t eValueLen,
             AES_KEY * aesKey, uint64_t salt)
 {
     string c((char *) eValueBytes, (unsigned int) eValueLen);
-    return CryptoManager::decrypt_SEM(c, aesKey, salt);
+    return decrypt_AES_CBC(c, aesKey, BytesFromInt(salt, SALT_LEN_BYTES), false);
 }
+
+
+static list<string> *
+split(const string & s, unsigned int plen)
+{
+    unsigned int len = s.length();
+    if (len % plen != 0) {
+        thrower() << "split receives invalid input";
+    }
+
+    unsigned int num = len / plen;
+    list<string> * res = new list<string>();
+
+    for (unsigned int i = 0; i < num; i++) {
+        res->push_back(s.substr(i*plen, plen));
+    }
+
+    return res;
+}
+
+
+static bool
+searchExists(const Token & token, const string & overall_ciph)
+{
+    auto l = split(overall_ciph, SWPCiphSize);
+    bool r = SWP::searchExists(token, *l);
+    delete l;
+    return r;
+}
+
 
 static bool
 search(const Token & token, const string & overall_ciph)
 {
-
-   return CryptoManager::searchExists(token, overall_ciph);
-
+   return searchExists(token, overall_ciph);
 }
 
 
@@ -479,7 +509,7 @@ agg_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
 {
     cerr << "in agg_init \n";
     agg_state *as = new agg_state();
-    as->rbuf = malloc(CryptoManager::Paillier_len_bytes);
+    as->rbuf = malloc(Paillier_len_bytes);
     initid->ptr = (char *) as;
     cerr << "returning from agg_init \n";
     return 0;
@@ -531,8 +561,8 @@ agg(UDF_INIT *initid, UDF_ARGS *args, char *result,
 {
     agg_state *as = (agg_state *) initid->ptr;
     BytesFromZZ((uint8_t *) as->rbuf, as->sum,
-                CryptoManager::Paillier_len_bytes);
-    *length = CryptoManager::Paillier_len_bytes;
+                 Paillier_len_bytes);
+    *length = Paillier_len_bytes;
     return (char *) as->rbuf;
 }
 

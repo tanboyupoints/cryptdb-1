@@ -14,8 +14,8 @@ $(PARSERPROGOBJS): %: %.o $(OBJDIR)/libedbparser.so  $(OBJDIR)/libedbutil.so
 EDBPARSER_OBJS	:= $(patsubst %.cc,$(OBJDIR)/parser/%.o,$(PARSERSRC))
 
 $(OBJDIR)/libedbparser.so: $(EDBPARSER_OBJS) $(OBJDIR)/libedbutil.so \
-			   $(OBJDIR)/libedbcrypto.so $(OBJDIR)/libedbcrypto2.so
-	$(CXX) -shared -o $@ $(EDBPARSER_OBJS) $(LDFLAGS) -ledbutil -ledbcrypto -ledbcrypto2 \
+			   $(OBJDIR)/libedbcrypto.so 
+	$(CXX) -shared -o $@ $(EDBPARSER_OBJS) $(LDFLAGS) -ledbutil -ledbcrypto \
 	       -Wl,--whole-archive -L$(MYBUILD)/libmysqld -lmysqld \
 	       -Wl,--no-whole-archive $(LDFLAGS)
 

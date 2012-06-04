@@ -6,8 +6,7 @@
 #include <list>
 
 #include <main/Connect.hh>
-#include <crypto-old/CryptoManager.hh>
-
+#include <crypto/BasicCrypto.hh>
 
 /*
  * This class maintains the flow of access based on user-annotated schema.
@@ -316,7 +315,7 @@ class KeyAccess {
     std::map<Prin, std::set<Prin> > orphanToChildren;
     //the MetaAccess that described the possible access links
     MetaAccess * meta;
-    CryptoManager * crypt_man;
+    std::string crypt_key;
     Connect * conn;
     bool VERBOSE;
     bool meta_finished;

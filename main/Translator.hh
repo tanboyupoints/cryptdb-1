@@ -19,8 +19,6 @@
 
 #include <main/Connect.hh>
 #include <main/AccessManager.hh>
-#include <crypto-old/CryptoManager.hh>
-
 
 bool isCommand(std::string str);
 

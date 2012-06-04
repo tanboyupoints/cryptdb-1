@@ -7,7 +7,7 @@
 
 #include <util/cryptdb_log.hh>
 #include <crypto/pbkdf2.hh>
-#include <crypto-old/ECJoin.hh>
+#include <crypto/ECJoin.hh>
 #include <test/TestCrypto.hh>
 
 

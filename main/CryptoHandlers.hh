@@ -2,12 +2,12 @@
 
 #include <util/util.hh>
 #include <crypto/prng.hh>
-#include <crypto-old/BasicCrypto.hh>
-#include <crypto-old/CryptoManager.hh>
+#include <crypto/BasicCrypto.hh>
 #include <crypto/paillier.hh>
 #include <crypto/ope.hh>
 #include <crypto/blowfish.hh>
 #include <parser/sql_utils.hh>
+#include <crypto/SWPSearch.hh>
 
 #include <sql_select.h>
 #include <sql_delete.h>

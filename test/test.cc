@@ -13,11 +13,6 @@
 #include <time.h>
 #include <sys/wait.h>
 
-//#include <crypto-old/OPE.hh>
-//#include <crypto-old/HGD.hh>
-#include <crypto-old/CryptoManager.hh>
-
-//#include <edb/EDBProxy.hh>
 #include <main/AccessManager.hh>
 #include <main/Connect.hh>
 
@@ -26,14 +21,8 @@
 #include <util/cryptdb_log.hh>
 
 #include <test/test_utils.hh>
-//#include <test/TestSinglePrinc.hh>
-//#include <test/TestMultiPrinc.hh>
-//#include <test/TestCrypto.hh>
 #include <test/TestAccessManager.hh>
-//#include <test/TestProxy.hh>
 #include <test/TestQueries.hh>
-//#include <test/TestNotConsider.hh>
-
 
 using namespace std;
 using namespace NTL;
@@ -4698,28 +4687,28 @@ test_PKCS(const TestConfig &tc, int ac, char **av)
 {
 
     PKCS * pk,* sk;
-    CryptoManager::generateKeys(pk, sk);
+    generateKeys(pk, sk);
     assert_s(pk != NULL, "pk is null");
     assert_s(sk != NULL, "pk is null");
 
-    string pkbytes = CryptoManager::marshallKey(pk, true);
+    string pkbytes = marshallKey(pk, true);
 
     assert_s(pkbytes ==
-            CryptoManager::marshallKey(CryptoManager::unmarshallKey(pkbytes,
+            marshallKey(unmarshallKey(pkbytes,
                     1),
                     1), "marshall does not work");
 
-    string skbytes = CryptoManager::marshallKey(sk, false);
+    string skbytes = marshallKey(sk, false);
 
     assert_s(skbytes ==
-            CryptoManager::marshallKey(CryptoManager::unmarshallKey(skbytes,
+            marshallKey(unmarshallKey(skbytes,
                     0),
                     0), "marshall does not work");
 
     char msg[] = "Hello world";
 
-    string enc = CryptoManager::encrypt(pk, msg);
-    string dec = CryptoManager::decrypt(sk, enc);
+    string enc = encrypt(pk, msg);
+    string dec = decrypt(sk, enc);
     assert_s(msg == dec, "decryption is not original msg");
 
     cerr << "msg" << dec << "\n";

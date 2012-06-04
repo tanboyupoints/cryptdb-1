@@ -7,9 +7,7 @@
  *      Author: cat_red
  */
 
-#include <crypto-old/CryptoManager.hh>
-#include <crypto-old/HGD.hh>
-#include <crypto-old/OPE.hh>
+
 #include <test/test_utils.hh>
 
 class TestCrypto {

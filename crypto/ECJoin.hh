@@ -32,7 +32,7 @@
 #include <openssl/bn.h>
 #include <openssl/ec.h>
 
-#include <crypto-old/BasicCrypto.hh>
+#include <crypto/BasicCrypto.hh>
 
 
 struct ECJoinSK{

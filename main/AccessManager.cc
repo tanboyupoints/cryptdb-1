@@ -2,6 +2,7 @@
 
 #include <main/AccessManager.hh>
 #include <util/cryptdb_log.hh>
+#include <crypto/BasicCrypto.hh>
 
 using namespace std;
 
@@ -598,7 +599,7 @@ KeyAccess::KeyAccess(Connect * connect)
 {
     this->VERBOSE = VERBOSE_KEYACCESS;
     this->meta = new MetaAccess(connect, VERBOSE);
-    this->crypt_man = new CryptoManager(randomBytes(AES_KEY_BYTES));
+    this->crypt_key = randomBytes(AES_KEY_BYTES);
     this->conn = connect;
     this->meta_finished = false;
     this->log_file = "CryptDB_log";
@@ -952,7 +953,7 @@ KeyAccess::insert(Prin hasAccess, Prin accessTo)
     else {
         PKCS * hasAccess_publicKey = getPublicKey(hasAccess);
         assert_s(hasAccess_publicKey, "Could not access public key");
-        encrypted_accessToKey = crypt_man->encrypt(hasAccess_publicKey,
+        encrypted_accessToKey = encrypt(hasAccess_publicKey,
                                                    accessToKey);
         string_encrypted_accessToKey = marshallBinary(encrypted_accessToKey);
         sql = "INSERT INTO " + table + "(hasAccessType, hasAccessValue, " +
@@ -1264,7 +1265,7 @@ KeyAccess::getPublicKey(Prin prin)
     }
 
     string key = ItemToString(res.rows[0][2]);
-    return crypt_man->unmarshallKey(key, true);
+    return unmarshallKey(key, true);
 }
 
 PrinKey
@@ -1774,9 +1775,9 @@ KeyAccess::GenerateAsymKeys(Prin prin, PrinKey prin_key)
         uint64_t salt = randomValue();
         PKCS * rsa_pub_key;
         PKCS * rsa_sec_key;
-        crypt_man->generateKeys(rsa_pub_key,rsa_sec_key);
-        string pub_key = crypt_man->marshallKey(rsa_pub_key,true);
-        string sec_key = crypt_man->marshallKey(rsa_sec_key,false);
+        generateKeys(rsa_pub_key,rsa_sec_key);
+        string pub_key = marshallKey(rsa_pub_key,true);
+        string sec_key = marshallKey(rsa_sec_key,false);
         string encrypted_sec_key = encrypt_AES_CBC(sec_key, aes, BytesFromInt(salt, SALT_LEN_BYTES));
         salt_string = strFromVal(salt);
         encrypted_sec_key_string = marshallBinary(encrypted_sec_key);
@@ -1816,9 +1817,9 @@ KeyAccess::decryptAsym(const string &sql_encrypted_key, const string &secret_key
     if(VERBOSE) {
         LOG(am) << "\tuse asymmetric decryption";
     }
-    PKCS * pk_sec_key = crypt_man->unmarshallKey(secret_key, false);
+    PKCS * pk_sec_key = unmarshallKey(secret_key, false);
     string encrypted_key = sql_encrypted_key;
-    string key = crypt_man->decrypt(pk_sec_key, encrypted_key);
+    string key = decrypt(pk_sec_key, encrypted_key);
     assert_s(
         key.length() == (unsigned int) AES_KEY_BYTES,
         "Secret key is the wrong length!");
@@ -1914,5 +1915,4 @@ KeyAccess::~KeyAccess()
     }
     keys.clear();
     delete meta;
-    delete crypt_man;
 }

@@ -3035,7 +3035,7 @@ Rewriter::Rewriter(ConnectionInfo ci,
     init_mysql(embed_dir);
 
     urandom u;
-    masterKey = CryptoManager::getKey(u.rand_string(AES_KEY_BYTES));
+    masterKey = getKey(u.rand_string(AES_KEY_BYTES));
 
     if (multi) {
 	encByDefault = false;
@@ -3291,7 +3291,7 @@ Rewriter::initSchema()
 void
 Rewriter::setMasterKey(const string &mkey)
 {
-    masterKey = CryptoManager::getKey(mkey);
+    masterKey = getKey(mkey);
 }
 
 list<string>
