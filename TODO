@@ -1,4 +1,8 @@
-Make sure that constant expressions in queries (e.g., SELECT "mysecret";)
-are encrypted with RND, even if it's some temporary key that does not
-correspond to any column.
+* Make sure that constant expressions in queries (e.g., SELECT "mysecret";)
+  are encrypted with RND, even if it's some temporary key that does not
+  correspond to any column.
+
+* Update cur_db in Rewriter::rewrite() when it changes due to a USE command,
+  and set it initially when receiving a connection via mysql-proxy and
+  CryptDB.connect().
 
