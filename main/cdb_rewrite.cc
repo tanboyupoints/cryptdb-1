@@ -811,8 +811,6 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     virtual void
     do_rewrite_insert_type(Item_field *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
-        LOG(cdb_v) << "do_rewrite_insert_type L701 (IT)";
-
 	assert(fm==NULL);
         fm = a.schema->getFieldMeta(i->table_name, i->field_name);
 
@@ -870,8 +868,6 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     virtual void
     do_rewrite_insert_type(Item_string *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
-        LOG(cdb_v) << "do_rewrite_insert_type L880 " << *i;
-       
 	if (!fm->isEncrypted()) {
 	    l.push_back(make_item(i));
 	    return;
@@ -925,8 +921,6 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     virtual void
     do_rewrite_insert_type(Item_num *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
-        LOG(cdb_v) << "do_rewrite_insert_type L942 " << *i << endl;
-
 	if (!fm->isEncrypted()) {
 	    l.push_back(make_item((Item_int*)i));
 	     return;
@@ -974,7 +968,6 @@ static class ANON : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITEM
     virtual void
     do_rewrite_insert_type(Item_decimal *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
-        LOG(cdb_v) << "do_rewrite_insert_type L997";
         assert(fm != NULL);
         double n = i->val_real();
         char buf[sizeof(double) * 2];
