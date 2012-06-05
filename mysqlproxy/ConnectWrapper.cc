@@ -87,8 +87,7 @@ connect(lua_State *L)
     uint port = luaL_checkint(L, 3);
     string user = xlua_tolstring(L, 4);
     string psswd = xlua_tolstring(L, 5);
-    string dbname = xlua_tolstring(L, 6);
-    string embed_dir = xlua_tolstring(L, 7);
+    string embed_dir = xlua_tolstring(L, 6);
     
     ConnectionInfo ci = ConnectionInfo(server, user, psswd, port);
 
@@ -107,8 +106,7 @@ connect(lua_State *L)
         LOG(wrapper) << "connect " << client << "; "
                      << "server = " << server << ":" << port << "; "
                      << "user = " << user << "; "
-                     << "password = " << psswd << "; "
-                     << "database = " << dbname;
+                     << "password = " << psswd;
 
         string mode = getenv("CRYPTDB_MODE")?:"";
         if (mode == "single") {
@@ -122,10 +120,8 @@ connect(lua_State *L)
 	    }
             
 	} else if (mode == "multi") {
-            //cl = new EDBProxy(server, user, psswd, dbname, port, true);
             r = new Rewriter(ci, embed_dir, true, false);
         } else {
-            //cl = new EDBProxy(server, user, psswd, dbname, port);
             r = new Rewriter(ci, embed_dir);
         }
 	
