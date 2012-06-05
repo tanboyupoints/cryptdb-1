@@ -2995,9 +2995,10 @@ loadUDFs(Connect * conn) {
 
 //this must be called before we can use any MySQL AP
 static void
-init_mysql(const string & embed_db) {
-      char dir_arg[1024];
-      snprintf(dir_arg, sizeof(dir_arg), "--datadir=%s", embed_db.c_str());
+init_mysql(const string & embed_db)
+{
+    char dir_arg[1024];
+    snprintf(dir_arg, sizeof(dir_arg), "--datadir=%s", embed_db.c_str());
 
     const char *mysql_av[] =
     { "progname",
@@ -3009,14 +3010,11 @@ init_mysql(const string & embed_db) {
             "--language=" MYSQL_BUILD_DIR "/sql/share/"
     };
 
-    cerr << "mysql_av" << mysql_av[4] << "\n";
-  
-    cerr << "dir arg is " << dir_arg << "\n";
     assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
 				   (char**) mysql_av, 0));
     assert(0 == mysql_thread_init());
-
 }
+
 Rewriter::Rewriter(ConnectionInfo ci, 
                    const std::string &embed_dir,
                    bool multi,
