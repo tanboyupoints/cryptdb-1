@@ -3032,13 +3032,7 @@ Rewriter::Rewriter(ConnectionInfo ci,
     
     e_conn = Connect::getEmbedded();
 
-    // TODO XXX need a per-connection place to store this.
-    cur_db = "cryptdbtest";
-    
-    //XXX hack
-    assert (e_conn->execute("CREATE DATABASE IF NOT EXISTS " + cur_db));
-    assert (e_conn->execute("use " + cur_db));
-    conn = new Connect(ci.server, ci.user, ci.passwd, cur_db, ci.port);
+    conn = new Connect(ci.server, ci.user, ci.passwd, ci.port);
 
     schema = new SchemaInfo();
     totalTables = 0;
@@ -3181,7 +3175,7 @@ Rewriter::initSchema()
             create_table_query = string(row[1], lengths[1]);
         }
 
-        query_parse parser(cur_db, create_table_query);
+        query_parse parser(dbname, create_table_query);
         LEX *lex = parser.lex();
         assert(lex->sql_command == SQLCOM_CREATE_TABLE);
 
@@ -3430,10 +3424,11 @@ noRewrite(LEX * lex) {
 
 // TODO: we don't need to pass analysis, enough to pass returnmeta
 QueryRewrite 
-Rewriter::rewrite(const string & q, Analysis & analysis)
+Rewriter::rewrite(const string & q, Analysis & analysis, string *cur_db)
 {
-    init_mysql(cur_db); //TODO: should not have to do this for every rewrite
-    query_parse p(cur_db, q);
+    assert(0 == mysql_thread_init());
+
+    query_parse p(*cur_db, q);
     QueryRewrite res;
 
     //optimization: do not process queries that we will not rewrite

@@ -87,7 +87,8 @@ main(int ac, char **av)
         Analysis analysis;
         DBResult * dbres;
         try {
-            list<string> new_queries = r.rewrite(q, analysis).queries;
+            string curdb("cryptdbtest");
+            list<string> new_queries = r.rewrite(q, analysis, &curdb).queries;
             //only last query should return anything
             if (new_queries.size() == 0) {
                 continue;

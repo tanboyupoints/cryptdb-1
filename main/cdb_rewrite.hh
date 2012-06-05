@@ -68,7 +68,7 @@ public:
     ~Rewriter();
 
     void setMasterKey(const std::string &mkey);
-    QueryRewrite rewrite(const std::string &q, Analysis & a);
+    QueryRewrite rewrite(const std::string &q, Analysis & a, std::string *cur_db);
     ResType decryptResults(ResType & dbres, Analysis & a);
 
 private:
@@ -80,8 +80,7 @@ private:
     list<string> rewrite_helper(const string & q, Analysis & a, query_parse & p);
 
     ConnectionInfo ci;
-    // current database name -- wrong place for it, must be per-connection!
-    std::string    cur_db;
+
     // connection to remote and embedded server
     Connect*       conn;
     Connect*       e_conn;

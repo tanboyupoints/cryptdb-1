@@ -940,7 +940,8 @@ Connection::executeRewriter(string query) {
         conn = conn_set.begin();
     }
     Analysis analysis;
-    list<string> enc_queries = re->rewrite(query, analysis).queries;
+    string curdb("cryptdbtest");
+    list<string> enc_queries = re->rewrite(query, analysis, &curdb).queries;
     
     //execute
     // only the last query should actually have a useful result

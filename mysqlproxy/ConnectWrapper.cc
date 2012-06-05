@@ -19,6 +19,7 @@ class WrapperState {
     bool considered;
     ofstream * PLAIN_LOG;
     Analysis a;
+    string cur_db;
 };
 
 static Timer t;
@@ -132,7 +133,8 @@ connect(lua_State *L)
             LOG(wrapper) << "proxy trains using " << trainQuery;
             if (trainQuery != "") {
                 Analysis a;
-                r->rewrite(trainQuery, a);
+                string curdb;   // unknown
+                r->rewrite(trainQuery, a, &curdb);
             } else {
                 cerr << "empty training!\n";
             }
@@ -246,7 +248,9 @@ rewrite(lua_State *L)
             new_queries.push_back(query);
         } else {
             try {
-                QueryRewrite rew = r->rewrite(query, clients[client]->a);
+                QueryRewrite rew = r->rewrite(query,
+                                              clients[client]->a,
+                                              &clients[client]->cur_db);
 		new_queries = rew.queries;
 		consider = rew.wasRew;
                 //cerr << "query: " << *new_queries.begin() << " considered ? " << clients[client]->considered << "\n";
