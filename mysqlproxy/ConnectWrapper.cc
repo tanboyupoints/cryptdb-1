@@ -43,17 +43,23 @@ static int counter = 0;
 static map<string, WrapperState*> clients;
 
 static Item *
-make_item(string value, enum_field_types type) {
+make_item(string value, enum_field_types type)
+{
     Item * i;
+
     switch(type) {
     case MYSQL_TYPE_SHORT:
     case MYSQL_TYPE_LONG:
     case MYSQL_TYPE_LONGLONG:
     case MYSQL_TYPE_INT24:
         i = new Item_int((long long) valFromStr(value));
+        break;
+
     case MYSQL_TYPE_VARCHAR:
     case MYSQL_TYPE_VAR_STRING:
         i = new Item_string(make_thd_string(value), value.length(), &my_charset_bin);
+        break;
+
     default:
         thrower() << "unknown data type " << type;
     }
