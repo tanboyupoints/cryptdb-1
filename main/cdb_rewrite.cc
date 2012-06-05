@@ -228,9 +228,14 @@ decrypt_item_layers(Item * i, onion o,  list<EncLayer *> & layers, uint64_t IV, 
 
 // encrypts a constant item based on the information in a
 static Item *
-encrypt_item(Item * i, const OLK & olk, Analysis & a){
+encrypt_item(Item * i, const OLK & olk, Analysis & a)
+{
+    if (olk.l == SECLEVEL::PLAINVAL)
+        return i;
  
     FieldMeta * fm = olk.key;
+    assert(fm);
+
     onion o        = olk.o;
     LOG(cdb_v) << fm->fname << " " << fm->onions.size();
 
@@ -465,7 +470,8 @@ optimize(Item **i, Analysis &a) {
 // this function should be called at the root of a tree of items
 // that should be rewritten
 static inline Item *
-rewrite(Item *i, const OLK & constr, Analysis &a, string context = "") {
+rewrite(Item *i, const OLK & constr, Analysis &a, string context = "")
+{
     if (context.size()) {
 	context = " for " + context;
     }
@@ -476,9 +482,7 @@ rewrite(Item *i, const OLK & constr, Analysis &a, string context = "") {
 	     << "BUT it can only return " << rp->es_out << " BECAUSE " << rp->r << "\n";
 	assert(false);
     }
-    Item *i0 = itemTypes.do_rewrite(i, constr, a);
-    assert(i0 != i);
-    return i0;
+    return itemTypes.do_rewrite(i, constr, a);
 }
 
 template <class T>
@@ -2099,10 +2103,14 @@ static void
 rewrite_proj(Item * i, Analysis & a, List<Item> & newList) {
     RewritePlan * rp = getAssert(a.itemRewritePlans, i);
     assert(rp);
-    vector<Item *> l;
-    itemTypes.do_rewrite_proj(i,rp->es_out.chooseOne(), a, l);
-    for (auto it = l.begin(); it != l.end(); ++it) {
-	newList.push_back(*it);
+
+    OLK olk = rp->es_out.chooseOne();
+    Item *ir = rewrite(i, olk, a);
+    newList.push_back(ir);
+    if (olk.key && olk.key->has_salt) {
+        assert(ir->type() == Item::Type::FIELD_ITEM);
+        newList.push_back(make_item((Item_field*) ir, olk.key->salt_name));
+        addSaltToReturn(a.rmeta, a.pos++);
     }
 }
 

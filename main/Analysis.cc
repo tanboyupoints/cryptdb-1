@@ -94,6 +94,14 @@ EncSet::chooseOne() const
 	onion o = onion_order[i];
         auto it = osl.find(o);
         if (it != osl.end()) {
+            if (it->second.second == 0 && it->second.first != SECLEVEL::PLAINVAL) {
+                /*
+                 * If no key, skip this OLK.
+                 * What are the semantics of chooseOne() anyway?
+                 */
+                continue;
+            }
+
 	    cerr << "chosen " << OLK(o, it->second.first, it->second.second) << "\n";
 	    return OLK(o,  it->second.first, it->second.second);
         }
