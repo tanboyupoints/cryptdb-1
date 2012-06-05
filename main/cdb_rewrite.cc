@@ -275,8 +275,6 @@ class CItemType {
     virtual EncSet do_gather(Item *, reason&, Analysis &) const = 0;
     virtual Item * do_optimize(Item *, Analysis &) const = 0;
     virtual Item * do_rewrite(Item *, const OLK & constr, Analysis &) const = 0;
-    virtual void   do_rewrite_proj(Item *, const OLK & constr, Analysis &,
-				   vector<Item *> &) const = 0;
     virtual void   do_rewrite_insert(Item *, Analysis &, vector<Item *> &, FieldMeta *fm) const = 0;
 };
 
@@ -304,10 +302,6 @@ class CItemTypeDir : public CItemType {
 
     Item* do_rewrite(Item *i, const OLK & constr, Analysis &a) const {
         return lookup(i)->do_rewrite(i, constr, a);
-    }
-
-    void do_rewrite_proj(Item *i, const OLK & constr, Analysis &a, vector<Item *> &l) const {
-        lookup(i)->do_rewrite_proj(i, constr, a, l);
     }
 
     void do_rewrite_insert(Item *i, Analysis &a, vector<Item *> &l, FieldMeta *fm) const {
@@ -386,7 +380,8 @@ gather(Item *i, reason &tr, Analysis & a)
 static EncSet
 typical_gather(Analysis & a, Item_func * i,
 	     const EncSet & my_es, string why, reason & my_r,
-	     bool encset_from_intersection, const EncSet & other_encset = PLAIN_EncSet) {
+	     bool encset_from_intersection, const EncSet & other_encset = PLAIN_EncSet)
+{
 
     Item **args = i->arguments();
     assert(i->argument_count() == 2);
@@ -645,9 +640,6 @@ class CItemSubtype : public CItemType {
     virtual Item* do_rewrite(Item *i, const OLK & constr, Analysis & a) const {
         return do_rewrite_type((T*) i, constr, a);
     }
-    virtual void  do_rewrite_proj(Item *i, const OLK & constr, Analysis & a, vector<Item *> &l) const {
-        do_rewrite_proj_type((T*) i, constr, a, l);
-    }
     virtual void  do_rewrite_insert(Item *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const {
         do_rewrite_insert_type((T*) i, a, l, fm);
     }
@@ -660,11 +652,6 @@ class CItemSubtype : public CItemType {
         LOG(cdb_v) << "do_rewrite_type L676 " << *i;
 	assert_s(false, "why is this rewrite called?");
         return i;
-    }
-    virtual void do_rewrite_proj_type(T *i, const OLK & constr, Analysis & a, vector<Item *> &l) const {
-	cerr << "rewrite proj " << *i << "\n";
-	assert_s(false, "this function should not be called -- should be overloaded in children");
-	UNIMPLEMENTED;
     }
     virtual void   do_rewrite_insert_type(T *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const {
         // default is un-implemented. we'll implement these as they come
@@ -791,27 +778,6 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 	return OLK();
     }
 */  
-    //TODO: why do we need a different rewrite proj type from the one above?
-    virtual void
-    do_rewrite_proj_type(Item_field *i, const OLK & olk, Analysis & a, vector<Item *> &l) const
-    {
-        LOG(cdb_v) << "do_rewrite_proj_type";
-
-	FieldMeta *fm = olk.key;
-       
-        // rewrite current projection field
-	Item_field * new_item = (Item_field*)do_rewrite_type(i, olk, a);
-	l.push_back(new_item);
-	// record for results
-        addToReturn(a.rmeta, a.pos++, olk, fm->has_salt, i->name);
-        
-        // fetch salt as well if needed
-        if (fm->has_salt) {
-	    Item_field * itf_salt = make_item(new_item, fm->salt_name);
-            l.push_back(itf_salt);
-            addSaltToReturn(a.rmeta, a.pos++);
-        }
-    }
 
     //do we need do_rewrite_insert? 
     virtual void
@@ -1880,16 +1846,6 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
 	assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
 	return ((HOM *)el)->sumUDA(args.front());
     }
-
-    virtual void
-    do_rewrite_proj_type(Item_sum_sum *i, const OLK & olk, Analysis & a, vector<Item*>&l) const {
-	LOG(cdb_v) << "Item_sum_sum rewrite_proj " << *i;
-
-	//record information for decrypting results
-	addToReturn(a.rmeta, a.pos++, olk, false, i->name);
-
-	l.push_back(do_rewrite_type(i, olk, a));
-    }
 };
 
 //TODO: field OPE should not be blob for text either
@@ -2100,13 +2056,16 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
 }
 
 static void
-rewrite_proj(Item * i, Analysis & a, List<Item> & newList) {
+rewrite_proj(Item * i, Analysis & a, List<Item> & newList)
+{
     RewritePlan * rp = getAssert(a.itemRewritePlans, i);
     assert(rp);
 
     OLK olk = rp->es_out.chooseOne();
     Item *ir = rewrite(i, olk, a);
     newList.push_back(ir);
+    addToReturn(a.rmeta, a.pos++, olk, olk.key && olk.key->has_salt, i->name);
+
     if (olk.key && olk.key->has_salt) {
         assert(ir->type() == Item::Type::FIELD_ITEM);
         newList.push_back(make_item((Item_field*) ir, olk.key->salt_name));
