@@ -328,7 +328,6 @@ static class ANON : public CItemTypeDir<Item::Type> {
     CItemType *lookup(Item *i) const {
         return do_lookup(i, i->type(), "type");
     }
-
 } itemTypes;
 
 static class CItemFuncDir : public CItemTypeDir<Item_func::Functype> {
@@ -1953,6 +1952,12 @@ static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
             UNIMPLEMENTED;
 	    }*/
 	UNIMPLEMENTED;
+    }
+} ANON;
+
+static class ANON : public CItemSubtypeIT<Item_null, Item::Type::NULL_ITEM> {
+    virtual EncSet do_gather_type(Item_null *i, reason &tr, Analysis & a) const {
+        return FULL_EncSet;
     }
 } ANON;
 
