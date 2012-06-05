@@ -1389,6 +1389,9 @@ static CItemLeafFunc<str_last_insert_id> ANON;
 extern const char str_rand[] = "rand";
 static CItemLeafFunc<str_rand> ANON;
 
+extern const char str_database[] = "database";
+static CItemLeafFunc<str_database> ANON;
+
 static class ANON : public CItemSubtypeFT<Item_extract, Item_func::Functype::EXTRACT_FUNC> {
     virtual EncSet do_gather_type(Item_extract *i, reason &tr, Analysis & a) const {
 	/* analyze(i->arguments()[0], reason(EMPTY_EncSet, "extract", i, &tr), a);
