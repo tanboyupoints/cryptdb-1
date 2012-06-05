@@ -1,0 +1,4 @@
+Make sure that constant expressions in queries (e.g., SELECT "mysecret";)
+are encrypted with RND, even if it's some temporary key that does not
+correspond to any column.
+
