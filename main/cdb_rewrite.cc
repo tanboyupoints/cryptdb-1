@@ -556,7 +556,10 @@ do_optimize_const_item(T *i, Analysis &a) {
                 rep = new Item_null();
             }
             mysql_free_result(r);
-            if (rep != NULL) return rep;
+            if (rep != NULL) {
+                rep->name = i->name;
+                return rep;
+            }
         } else {
             // some error in dealing with the DB
             LOG(warn) << "could not retrieve result set";
