@@ -55,7 +55,7 @@ make_item(string value, enum_field_types type) {
     case MYSQL_TYPE_VAR_STRING:
         i = new Item_string(make_thd_string(value), value.length(), &my_charset_bin);
     default:
-        assert_s(false, "ConnectWrapper does not know that datatype");
+        thrower() << "unknown data type " << type;
     }
     return i;
 }
@@ -315,6 +315,8 @@ decrypt(lua_State *L)
         lua_pop(L, 1);
     }
 
+    assert(res.names.size() == res.types.size());
+
     /* iterate over the rows argument */
     lua_pushnil(L);
     while (lua_next(L, 3)) {
@@ -322,14 +324,15 @@ decrypt(lua_State *L)
             LOG(warn) << "mismatch";
 
         /* initialize all items to NULL, since Lua skips nil array entries */
-        vector<Item *> row(res.names.size());
+        vector<Item *> row(res.types.size());
 
         lua_pushnil(L);
         while (lua_next(L, -2)) {
-            int key = luaL_checkint(L, -2);
+            int key = luaL_checkint(L, -2) - 1;
+            assert(key >= 0 && (uint) key < res.types.size());
             string data = xlua_tolstring(L, -1);
             Item * value = make_item(data, res.types[key]);
-            row[key - 1] = value;
+            row[key] = value;
             lua_pop(L, 1);
         }
 
