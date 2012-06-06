@@ -52,11 +52,15 @@ public:
     
 } ConnectionInfo;
 
+//contains the results of a query rewrite:
+// - rewritten queries
+// - data structure needed to decrypt results
 class QueryRewrite {
 public:
     QueryRewrite() : wasRew(true) {}
-    bool wasRew;
+    bool wasRew; //if query was rewritten
     std::list<std::string> queries;
+    ReturnMeta * rmeta;
 };
 
 class Rewriter {
@@ -68,8 +72,8 @@ public:
     ~Rewriter();
 
     void setMasterKey(const std::string &mkey);
-    QueryRewrite rewrite(const std::string &q, Analysis & a, std::string *cur_db);
-    ResType decryptResults(ResType & dbres, Analysis & a);
+    QueryRewrite rewrite(const std::string &q, std::string *cur_db);
+    ResType decryptResults(ResType & dbres, ReturnMeta * rm);
 
 private:
     void initSchema();
@@ -92,7 +96,6 @@ private:
     unsigned int   totalTables;
 
     MultiPrinc*    mp;
-    TMKM           tmkm;
 
 };
 

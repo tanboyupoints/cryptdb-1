@@ -84,16 +84,17 @@ main(int ac, char **av)
             break;
         }
         add_history(input);
-        Analysis analysis;
         DBResult * dbres;
+	QueryRewrite qr;
+	
         try {
             string curdb("cryptdbtest");
-            list<string> new_queries = r.rewrite(q, analysis, &curdb).queries;
+	    qr = r.rewrite(q, &curdb);
             //only last query should return anything
-            if (new_queries.size() == 0) {
+            if (qr.queries.size() == 0) {
                 continue;
             }
-            for (auto new_q = new_queries.begin(); new_q != new_queries.end(); new_q++) {
+            for (auto new_q = qr.queries.begin(); new_q != qr.queries.end(); new_q++) {
                 cerr << "SUCCESS: " << *new_q << endl;
                 assert(conn.execute(*new_q, dbres));
             }
@@ -106,7 +107,7 @@ main(int ac, char **av)
             if (!res.ok) {
                 continue;
             }
-            ResType dec_res = r.decryptResults(res, analysis);
+            ResType dec_res = r.decryptResults(res, qr.rmeta);
             cerr << "decrypted results are: \n"; printRes(dec_res);
 
         } catch (std::runtime_error &e) {

@@ -941,17 +941,17 @@ Connection::executeRewriter(string query) {
     }
     Analysis analysis;
     string curdb("cryptdbtest");
-    list<string> enc_queries = re->rewrite(query, analysis, &curdb).queries;
+    QueryRewrite qr = re->rewrite(query, &curdb);
     
     //execute
     // only the last query should actually have a useful result
     ResType enc_res;
-    for (auto q = enc_queries.begin(); q != enc_queries.end(); q++) {
+    for (auto q = qr.queries.begin(); q != qr.queries.end(); q++) {
         enc_res = executeConn(*q);
     }
     
     //decrypt results
-    return re->decryptResults(enc_res, analysis);
+    return re->decryptResults(enc_res, qr.rmeta);
 }
 
 my_ulonglong

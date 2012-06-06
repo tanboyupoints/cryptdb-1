@@ -18,7 +18,7 @@ class WrapperState {
     string last_query;
     bool considered;
     ofstream * PLAIN_LOG;
-    Analysis a;
+    ReturnMeta * rmeta;
     string cur_db;
 };
 
@@ -138,9 +138,8 @@ connect(lua_State *L)
             string trainQuery = ev;
             LOG(wrapper) << "proxy trains using " << trainQuery;
             if (trainQuery != "") {
-                Analysis a;
                 string curdb;   // unknown
-                r->rewrite(trainQuery, a, &curdb);
+                QueryRewrite qr = r->rewrite(trainQuery, &curdb);
             } else {
                 cerr << "empty training!\n";
             }
@@ -255,9 +254,9 @@ rewrite(lua_State *L)
         } else {
             try {
                 QueryRewrite rew = r->rewrite(query,
-                                              clients[client]->a,
                                               &clients[client]->cur_db);
 		new_queries = rew.queries;
+		clients[client]->rmeta = rew.rmeta;
 		consider = rew.wasRew;
                 //cerr << "query: " << *new_queries.begin() << " considered ? " << clients[client]->considered << "\n";
             } catch (CryptDBError &e) {
@@ -351,7 +350,7 @@ decrypt(lua_State *L)
         rd = res;
     } else {
         try {
-            rd = r->decryptResults(res, clients[client]->a);
+            rd = r->decryptResults(res, clients[client]->rmeta);
         }
         catch(CryptDBError e) {
             lua_pushnil(L);

@@ -134,7 +134,7 @@ FieldQualifies(const FieldMeta * restriction,
 
 
 static void
-addToReturn(ReturnMeta & rm, int pos, const OLK & constr,  bool has_salt) {
+addToReturn(ReturnMeta * rm, int pos, const OLK & constr,  bool has_salt) {
     ReturnField rf = ReturnField();
     rf.is_salt = false;
     rf.olk = constr;
@@ -143,22 +143,22 @@ addToReturn(ReturnMeta & rm, int pos, const OLK & constr,  bool has_salt) {
     } else {
         rf.pos_salt = -1;
     }
-    rm.rfmeta[pos] = rf;
+    rm->rfmeta[pos] = rf;
 }
 
 static void
-addToReturn(ReturnMeta &rm, int pos, const OLK & constr, bool has_salt, string name) {
+addToReturn(ReturnMeta * rm, int pos, const OLK & constr, bool has_salt, string name) {
     addToReturn(rm, pos, constr, has_salt);
-    rm.rfmeta[pos].field_called = name;
+    rm->rfmeta[pos].field_called = name;
 }
 
 static void
-addSaltToReturn(ReturnMeta & rm, int pos) {
+addSaltToReturn(ReturnMeta * rm, int pos) {
     ReturnField rf = ReturnField();
     rf.is_salt = true;
     rf.olk = OLK();
     rf.pos_salt = -1;
-    rm.rfmeta[pos] = rf;
+    rm->rfmeta[pos] = rf;
 }
 
 //TODO: which encrypt/decrypt should handle null?
@@ -3339,8 +3339,6 @@ Rewriter::rewrite_helper(const string & q, Analysis & analysis, query_parse & p)
     LOG(cdb_v) << "q " << q;
     list<string> queries;
     
-    analysis = Analysis(e_conn, conn, schema, masterKey, mp);
-
     //initialize multi-principal
     mp_init(analysis);
 
@@ -3402,10 +3400,12 @@ noRewrite(LEX * lex) {
 
 // TODO: we don't need to pass analysis, enough to pass returnmeta
 QueryRewrite 
-Rewriter::rewrite(const string & q, Analysis & analysis, string *cur_db)
+Rewriter::rewrite(const string & q, string *cur_db)
 {
     assert(0 == mysql_thread_init());
 
+    Analysis analysis = Analysis(e_conn, conn, schema, masterKey, mp);
+    
     query_parse p(*cur_db, q);
     QueryRewrite res;
 
@@ -3419,13 +3419,16 @@ Rewriter::rewrite(const string & q, Analysis & analysis, string *cur_db)
     //for as long as there are onion adjustments
     while (true) {
 	try {
-	    res.queries = rewrite_helper(q, analysis, p); 
+	    res.queries = rewrite_helper(q, analysis, p);
 	} catch (OnionAdjustExcept e) {
 	    LOG(cdb_v) << "caught onion adjustment";
 	    cerr << "current thread " << (intptr_t) current_thd << " memroot " << (intptr_t) current_thd->mem_root << "\n";
 	    adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis);
 	    continue;
 	}
+	res.wasRew = true;
+	res.rmeta = analysis.rmeta;
+	res.rmeta->tmkm = analysis.tmkm;
 	return res;
     }
 }
@@ -3453,8 +3456,8 @@ mp_init_decrypt(MultiPrinc * mp, Analysis & a) {
     if (!mp) {return;}
     
     a.tmkm.processingQuery = false;
-    LOG(cdb_v) << a.rmeta.stringify() << "\n";
-    for (auto i = a.rmeta.rfmeta.begin(); i != a.rmeta.rfmeta.end(); i++) {
+    LOG(cdb_v) << a.rmeta->stringify() << "\n";
+    for (auto i = a.rmeta->rfmeta.begin(); i != a.rmeta->rfmeta.end(); i++) {
         if (!i->second.is_salt) {
             a.tmkm.encForReturned[fullName(i->second.olk.key->fname, i->second.olk.key->tm->anonTableName)] = i->first;
         }
@@ -3463,9 +3466,13 @@ mp_init_decrypt(MultiPrinc * mp, Analysis & a) {
 
 ResType
 Rewriter::decryptResults(ResType & dbres,
-			 Analysis & a) {
+			 ReturnMeta * rmeta) {
     printRes(dbres);
 
+    Analysis a = Analysis(e_conn, conn, schema, masterKey, mp);
+    a.rmeta = rmeta;
+    a.tmkm = rmeta->tmkm;
+	
     mp_init_decrypt(mp, a);
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
@@ -3478,7 +3485,7 @@ Rewriter::decryptResults(ResType & dbres,
     // un-anonymize the names
     for (auto it = dbres.names.begin();
 	 it != dbres.names.end(); it++) {
-        ReturnField rf = a.rmeta.rfmeta[index];
+        ReturnField rf = rmeta->rfmeta[index];
         if (!rf.is_salt) {
 	    //need to return this field
             assert_s(rf.olk.key, "ReturnField has no FieldMeta associated with it");
@@ -3499,7 +3506,7 @@ Rewriter::decryptResults(ResType & dbres,
     // decrypt rows
     unsigned int col_index = 0;
     for (unsigned int c = 0; c < cols; c++) {
-        ReturnField rf = a.rmeta.rfmeta[c];
+        ReturnField rf = rmeta->rfmeta[c];
         FieldMeta * fm = rf.olk.key;
 	
         if (!rf.is_salt) {

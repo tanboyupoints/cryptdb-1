@@ -140,6 +140,7 @@ typedef struct ReturnField {//TODO: isn't FieldMeta more fit than ItemMeta?
 typedef struct ReturnMeta {
     map<int, ReturnField> rfmeta;
     string stringify();
+    TMKM tmkm;
 } ReturnMeta;
 
 
@@ -208,11 +209,12 @@ operator<<(ostream &out, const RewritePlan * rp);
 class Analysis {
 public:
     Analysis(Connect * e_conn, Connect * conn, SchemaInfo * schema, AES_KEY *key, MultiPrinc *mp)
-        : schema(schema), masterKey(key), conn(conn), e_conn(e_conn), mp(mp), pos(0) {}
+        : schema(schema), masterKey(key), conn(conn), e_conn(e_conn), mp(mp), pos(0), rmeta(new ReturnMeta()) {}
     
-    Analysis(): schema(NULL), masterKey(NULL), conn(NULL), e_conn(NULL), mp(NULL), pos(0) {}
+    Analysis(): schema(NULL), masterKey(NULL), conn(NULL), e_conn(NULL), mp(NULL), pos(0), rmeta(new ReturnMeta()) {}
  
-
+/*** Pointers to data structures persistent across queries ***/
+    
     // Proxy Metadata    
     SchemaInfo *                        schema;
     AES_KEY *                           masterKey;
@@ -222,17 +224,20 @@ public:
 
     MultiPrinc *                        mp;
 
-    // Query specific information
+/*** Temporary structures for processing one query ***/
 
     // maps an Item to ways we could rewrite the item and its children
     // does not contain Items that do not have children
     map<Item *, RewritePlan *> itemRewritePlans;
    
     unsigned int pos; //a counter indicating how many projection fields have been analyzed so far                                                                    
-    std::map<FieldMeta *, salt_type>    salts;  
-    ReturnMeta rmeta;
-
+    std::map<FieldMeta *, salt_type>    salts;
     TMKM                                tmkm; //for multi princ
+
+/*** Information for decrypting results ***/
+    
+    ReturnMeta * rmeta;
+
 private:
     MYSQL * m;
 
