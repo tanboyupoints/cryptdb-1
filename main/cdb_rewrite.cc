@@ -72,8 +72,6 @@ mysql_query_wrapper(MYSQL *m, const string &q)
     if (!ret) assert(false);
 }
 
-
-
 static void
 createMetaTablesIfNotExists(ProxyState & ps)
 {
@@ -694,7 +692,10 @@ rewrite(Item *i, const OLK & constr, Analysis &a, string context = "")
 template <class T>
 static Item *
 do_optimize_const_item(T *i, Analysis &a) {
-   
+
+    return i;
+    
+    /* TODO for later
     if (i->const_item()) {
         // ask embedded DB to eval this const item,
         // then replace this item with the eval-ed constant
@@ -776,6 +777,8 @@ do_optimize_const_item(T *i, Analysis &a) {
         }
     }
     return i;
+
+    */
 }
 
 template <class T>
@@ -2970,8 +2973,8 @@ static void
 query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault)
 {
     // optimize the query first
-    optimize_table_list(&lex->select_lex.top_join_list, analysis);
-    optimize_select_lex(&lex->select_lex, analysis);
+    //optimize_table_list(&lex->select_lex.top_join_list, analysis);
+    //optimize_select_lex(&lex->select_lex, analysis);
 
     do_query_analyze(q, lex, analysis, encByDefault);
     //print(analysis.schema->tableMetaMap);
