@@ -31,17 +31,9 @@ operator<<(std::ostream &out, Item &i)
     return out << s;
 }
 
-
-static inline std::ostream&
-operator<<(std::ostream &out, Item * i) {
-    assert(i);
-    String s, s1;
-    s = *(i->val_str(&s1));	 
-    return out << s;
-}
-
 template<class T>
 class List_noparen: public List<T> {};
+
 template<class T>
 static inline List_noparen<T>&
 noparen(List<T> &l)
