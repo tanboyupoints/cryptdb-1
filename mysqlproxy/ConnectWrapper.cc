@@ -85,6 +85,7 @@ connect(lua_State *L)
 {
     ANON_REGION(__func__, &perf_cg);
     scoped_lock l(&big_lock);
+    assert(0 == mysql_thread_init());
 
     string client = xlua_tolstring(L, 1);
     string server = xlua_tolstring(L, 2);
@@ -218,6 +219,7 @@ disconnect(lua_State *L)
 {
     ANON_REGION(__func__, &perf_cg);
     scoped_lock l(&big_lock);
+    assert(0 == mysql_thread_init());
 
     string client = xlua_tolstring(L, 1);
     if (clients.find(client) == clients.end())
@@ -235,6 +237,7 @@ rewrite(lua_State *L)
 {
     ANON_REGION(__func__, &perf_cg);
     scoped_lock l(&big_lock);
+    assert(0 == mysql_thread_init());
 
     string client = xlua_tolstring(L, 1);
     if (clients.find(client) == clients.end())
@@ -292,6 +295,16 @@ decrypt(lua_State *L)
 {
     ANON_REGION(__func__, &perf_cg);
     scoped_lock l(&big_lock);
+    assert(0 == mysql_thread_init());
+
+    THD *thd = (THD*) create_embedded_thd(0);
+    auto thd_cleanup = cleanup([&]
+        {
+            thd->clear_data_list();
+            thd->store_globals();
+            thd->unlink();
+            delete thd;
+        });
 
     string client = xlua_tolstring(L, 1);
     if (clients.find(client) == clients.end())
