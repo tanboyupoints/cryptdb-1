@@ -40,18 +40,6 @@ public:
 void
 printRes(const ResType & r);
 
-typedef class ConnectionInfo {
-public:
-    std::string server;
-    uint port;
-    std::string user;
-    std::string passwd;
-   
-    ConnectionInfo(std::string s, std::string u, std::string p, uint port = 0) :
-	server(s), port(port), user(u), passwd(p) {}
-    
-} ConnectionInfo;
-
 //contains the results of a query rewrite:
 // - rewritten queries
 // - data structure needed to decrypt results
@@ -63,6 +51,7 @@ public:
     ReturnMeta * rmeta;
 };
 
+// Main class processing rewriting
 class Rewriter {
 public:
     Rewriter(ConnectionInfo ci, 
@@ -76,27 +65,7 @@ public:
     ResType decryptResults(ResType & dbres, ReturnMeta * rm);
 
 private:
-    void initSchema();
-    void createMetaTablesIfNotExists();
-    list<string> processAnnotation(Annotation annot, Analysis &a);
-    //initialize multi-principal data structures
-    void mp_init(Analysis &a);
-    list<string> rewrite_helper(const string & q, Analysis & a, query_parse & p);
-
-    ConnectionInfo ci;
-
-    // connection to remote and embedded server
-    Connect*       conn;
-    Connect*       e_conn;
-
-    bool           encByDefault;
-    AES_KEY*       masterKey;
-    
-    SchemaInfo*    schema;
-    unsigned int   totalTables;
-
-    MultiPrinc*    mp;
-
+    ProxyState ps;
 };
 
 class ScopedMySQLRes {

@@ -203,26 +203,54 @@ public:
 };
 
 
+typedef class ConnectionInfo {
+public:
+    std::string server;
+    uint port;
+    std::string user;
+    std::string passwd;
+   
+    ConnectionInfo(std::string s, std::string u, std::string p, uint port = 0) :
+	server(s), port(port), user(u), passwd(p) {};
+    ConnectionInfo() : server(""), port(0), user(""), passwd("") {};
+    
+} ConnectionInfo;
+
 ostream&
 operator<<(ostream &out, const RewritePlan * rp);
 
+
+// state maintained at the proxy
+typedef struct ProxyState {
+
+    ProxyState(): conn(NULL), e_conn(NULL), encByDefault(true),
+		  masterKey(NULL), schema(NULL), totalTables(0), mp(NULL) {}
+    ConnectionInfo ci;
+
+    // connection to remote and embedded server
+    Connect*       conn;
+    Connect*       e_conn;
+
+    bool           encByDefault;
+    AES_KEY*       masterKey;
+    
+    SchemaInfo*    schema;
+    unsigned int   totalTables;
+
+    MultiPrinc*    mp;
+
+    ~ProxyState();
+} ProxyState;
+
+
 class Analysis {
 public:
-    Analysis(Connect * e_conn, Connect * conn, SchemaInfo * schema, AES_KEY *key, MultiPrinc *mp)
-        : schema(schema), masterKey(key), conn(conn), e_conn(e_conn), mp(mp), pos(0), rmeta(new ReturnMeta()) {}
+    Analysis(ProxyState * ps) : ps(ps), pos(0), rmeta(new ReturnMeta()) {}
     
-    Analysis(): schema(NULL), masterKey(NULL), conn(NULL), e_conn(NULL), mp(NULL), pos(0), rmeta(new ReturnMeta()) {}
+    Analysis(): ps(NULL), pos(0), rmeta(new ReturnMeta()) {}
  
-/*** Pointers to data structures persistent across queries ***/
-    
-    // Proxy Metadata    
-    SchemaInfo *                        schema;
-    AES_KEY *                           masterKey;
-    
-    Connect *                           conn;
-    Connect *                           e_conn;
-
-    MultiPrinc *                        mp;
+    // pointer to proxy metadata 
+    ProxyState * ps;
 
 /*** Temporary structures for processing one query ***/
 
@@ -234,8 +262,7 @@ public:
     std::map<FieldMeta *, salt_type>    salts;
     TMKM                                tmkm; //for multi princ
 
-/*** Information for decrypting results ***/
-    
+    // information for decrypting results 
     ReturnMeta * rmeta;
 
 private:
