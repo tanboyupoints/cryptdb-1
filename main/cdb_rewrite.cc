@@ -2632,13 +2632,14 @@ static void rewrite_key(const string &table_name,
  *
  */
 static void
-process_create_lex(LEX * lex, Analysis & a, bool encByDefault)
+process_create_lex(LEX * lex, Analysis & a,
+		   bool encByDefault, const string & cur_db)
 {
     const string &table =
         lex->select_lex.table_list.first->table_name;
     //create table in embedded db
     //TODO: temporary hack!
-    assert(a.ps->e_conn->execute("use cryptdbtest;"));
+    assert(a.ps->e_conn->execute("use " + cur_db + ";"));
     stringstream q;
     q << *lex;
     assert(a.ps->e_conn->execute(q.str()));
@@ -2945,12 +2946,12 @@ process_update_lex(LEX * lex, Analysis & a) {
 
 }
 static void
-do_query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault) {
+do_query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault, const string & cur_db) {
     // iterate over the entire select statement..
     // based on st_select_lex::print in mysql-server/sql/sql_select.cc
 
     if (lex->sql_command == SQLCOM_CREATE_TABLE) {
-        process_create_lex(lex, analysis, encByDefault);
+        process_create_lex(lex, analysis, encByDefault, cur_db);
         return;
     }
 
@@ -2970,13 +2971,13 @@ do_query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encB
  * Results are set in analysis.
  */
 static void
-query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault)
+query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault, const string & cur_db)
 {
     // optimize the query first
     //optimize_table_list(&lex->select_lex.top_join_list, analysis);
     //optimize_select_lex(&lex->select_lex, analysis);
 
-    do_query_analyze(q, lex, analysis, encByDefault);
+    do_query_analyze(q, lex, analysis, encByDefault, cur_db);
     //print(analysis.schema->tableMetaMap);
     for (auto it = analysis.tmkm.encForVal.begin(); it != analysis.tmkm.encForVal.end(); it++) {
         if (it->first == "" || it->second == "") {
@@ -3204,6 +3205,8 @@ init_mysql(const string & embed_db)
 
     assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
 				   (char**) mysql_av, 0));
+    assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
+				   (char**) mysql_av, 0));
     assert(0 == mysql_thread_init());
 }
 
@@ -3349,7 +3352,8 @@ mp_init(Analysis &a) {
 }
 
 static list<string>
-rewrite_helper(const string & q, Analysis & analysis, query_parse & p) {
+rewrite_helper(const string & q, Analysis & analysis,
+	       query_parse & p, const string & cur_db) {
     LOG(cdb_v) << "q " << q;
     list<string> queries;
     
@@ -3372,7 +3376,7 @@ rewrite_helper(const string & q, Analysis & analysis, query_parse & p) {
 
     //TODO: is db neededs as param in all these funcs?
     //analyze query
-    query_analyze(q, lex, analysis, analysis.ps->encByDefault);
+    query_analyze(q, lex, analysis, analysis.ps->encByDefault, cur_db);
 
     //update metadata about onions if it's not delete
     if (lex->sql_command != SQLCOM_DROP_TABLE) {
@@ -3417,7 +3421,7 @@ QueryRewrite
 Rewriter::rewrite(const string & q, string *cur_db)
 {
     assert(0 == mysql_thread_init());
-    assert(0 == create_embedded_thd(0));
+    //assert(0 == create_embedded_thd(0));
     
     Analysis analysis = Analysis(&ps);
     
@@ -3434,7 +3438,7 @@ Rewriter::rewrite(const string & q, string *cur_db)
     //for as long as there are onion adjustments
     while (true) {
 	try {
-	    res.queries = rewrite_helper(q, analysis, p);
+	    res.queries = rewrite_helper(q, analysis, p, *cur_db);
 	} catch (OnionAdjustExcept e) {
 	    LOG(cdb_v) << "caught onion adjustment";
 	    cerr << "current thread " << (intptr_t) current_thd << " memroot " << (intptr_t) current_thd->mem_root << "\n";

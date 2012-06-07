@@ -61,9 +61,10 @@ main(int ac, char **av)
     using_history();
     read_history(user_histfile().c_str());
     atexit(__write_history);
-    
-    ConnectionInfo ci("localhost", "root", "letmein");
 
+        
+    ConnectionInfo ci("localhost", "root", "letmein");
+    
     Rewriter r(ci, av[1], Multi, encByDefault);
     //TODO: conn creation has to occur after rewriter creation
     //because rewriter inits mysql library; fix this
