@@ -3417,7 +3417,8 @@ QueryRewrite
 Rewriter::rewrite(const string & q, string *cur_db)
 {
     assert(0 == mysql_thread_init());
-
+    assert(0 == create_embedded_thd(0));
+    
     Analysis analysis = Analysis(&ps);
     
     query_parse p(*cur_db, q);

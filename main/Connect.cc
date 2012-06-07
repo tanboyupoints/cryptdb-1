@@ -109,15 +109,8 @@ Connect::execute(const string &query, DBResult * & res)
         res = DBResult::wrap(mysql_store_result(conn));
     }
 
-    // HACK taken from stephentu:
-    // Calling mysql_query seems to have destructive effects
-    // on the current_thd. Thus, we must call create_embedded_thd
-    // again.
-    // TODO: mysql examples for embed server do not need to recreate thd,
-    // what are we doing different?
     void* ret = create_embedded_thd(0);
     if (!ret) assert(false);
-
     
     return success;
 }
