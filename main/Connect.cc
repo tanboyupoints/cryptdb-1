@@ -43,7 +43,7 @@ Connect::do_connect(const string &server, const string &user,
         "--character-set-server=utf8",
         "--language=" MYSQL_BUILD_DIR "/sql/share/"
     };
-    assert(0 == mysql_server_init(sizeof(dummy_argv) / sizeof(*dummy_argv),
+    assert(0 == mysql_library_init(sizeof(dummy_argv) / sizeof(*dummy_argv),
                                   (char**) dummy_argv, 0));
 
     conn = mysql_init(NULL);
@@ -73,7 +73,10 @@ Connect::select_db(const std::string &dbname)
     return mysql_select_db(conn, dbname.c_str()) ? false : true;
 }
 
-Connect * Connect::getEmbedded() {
+Connect * Connect::getEmbedded(const string & embed_db) {
+    
+    init_mysql(embed_db);
+
     MYSQL * m = mysql_init(0);
     assert(m);
     

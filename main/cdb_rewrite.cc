@@ -3186,35 +3186,14 @@ loadUDFs(Connect * conn) {
     LOG(cdb_v) << "Loaded CryptDB's UDFs.";
 }
 
-//this must be called before we can use any MySQL AP
-static void
-init_mysql(const string & embed_db)
-{
-    char dir_arg[1024];
-    snprintf(dir_arg, sizeof(dir_arg), "--datadir=%s", embed_db.c_str());
 
-    const char *mysql_av[] =
-    { "progname",
-            "--skip-grant-tables",
-            dir_arg,
-            /* "--skip-innodb", */
-            /* "--default-storage-engine=MEMORY", */
-            "--character-set-server=utf8",
-            "--language=" MYSQL_BUILD_DIR "/sql/share/"
-    };
-
-    assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
-				   (char**) mysql_av, 0));
-    assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
-				   (char**) mysql_av, 0));
-    assert(0 == mysql_thread_init());
-}
 
 Rewriter::Rewriter(ConnectionInfo ci, 
                    const std::string &embed_dir,
                    bool multi,
 		   bool encByDefault)
 {   
+
     init_mysql(embed_dir);
 
     ps.ci = ci;
@@ -3227,7 +3206,7 @@ Rewriter::Rewriter(ConnectionInfo ci,
 	ps.encByDefault = false;
     }
     
-    ps.e_conn = Connect::getEmbedded();
+    ps.e_conn = Connect::getEmbedded(embed_dir);
 
     ps.conn = new Connect(ci.server, ci.user, ci.passwd, ci.port);
 

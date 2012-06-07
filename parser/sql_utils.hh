@@ -10,6 +10,10 @@
 #include <sql_update.h>
 
 
+// must be called before we can use any MySQL AP
+void
+init_mysql(const std::string & embed_db);
+
 class ResType {
  public:
     explicit ResType(bool okflag = true) : ok(okflag) {}

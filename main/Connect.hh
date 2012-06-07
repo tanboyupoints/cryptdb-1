@@ -37,7 +37,7 @@ class Connect {
     Connect(MYSQL* _conn) : conn(_conn), close_on_destroy(false) { }
 
     //returns Connect for the embedded server
-    static Connect * getEmbedded();
+    static Connect * getEmbedded(const std::string & embed_dir);
     
     // returns true if execution was ok; caller must delete DBResult
     bool execute(const std::string &query, DBResult *&);
