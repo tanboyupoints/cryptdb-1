@@ -662,11 +662,10 @@ optimize(Item **i, Analysis &a) {
     Item *i0 = itemTypes.do_optimize(*i, a);
     if (i0 != *i) {
         // item i was optimized (replaced) by i0
-
-        // don't delete explicitly, b/c this is handled by
-        // deleting the lex
-        // delete *i;
-
+        if (a.itemRewritePlans.find(*i) != a.itemRewritePlans.end()) {
+            a.itemRewritePlans[i0] = a.itemRewritePlans[*i];
+            a.itemRewritePlans.erase(*i);
+        }
         *i = i0;
     }
 }

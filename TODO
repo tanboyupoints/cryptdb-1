@@ -5,4 +5,4 @@
 * Update cur_db in Rewriter::rewrite() when it changes due to a USE command,
   and set it initially when receiving a connection via mysql-proxy and
   CryptDB.connect().
-
+  
