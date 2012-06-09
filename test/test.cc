@@ -4774,7 +4774,7 @@ main(int argc, char ** argv)
     TestConfig tc;
     int c;
 
-    while ((c = getopt(argc, argv, "v:sh:u:p:d:t:")) != -1) {
+    while ((c = getopt(argc, argv, "v:sh:u:p:d:t:e:")) != -1) {
         switch (c) {
         case 'v':
             if (log_name_to_group.find(optarg) == log_name_to_group.end()) {
