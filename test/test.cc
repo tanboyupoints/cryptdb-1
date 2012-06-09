@@ -4756,6 +4756,7 @@ help(const TestConfig &tc, int ac, char **av)
             << "    -u user      database username [" << tc.user << "]" << endl
             << "    -p pass      database password [" << tc.pass << "]" << endl
             << "    -d db        database to use [" << tc.db << "]" << endl
+	    << "    -e db        embedded database to use [" << tc.shadowdb_dir << "]" << endl
             << "    -v group     enable verbose messages in group" << endl;
     cerr << "Verbose groups:" << endl;
     for (auto i = log_name_to_group.begin(); i != log_name_to_group.end(); i++)
@@ -4807,6 +4808,10 @@ main(int argc, char ** argv)
         case 't':
             tc.port = atoi(optarg);
             break;
+
+	case 'e':
+	    tc.shadowdb_dir = optarg;
+	    break;
 
         default:
             help(tc, argc, argv);
