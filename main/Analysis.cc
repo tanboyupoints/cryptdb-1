@@ -150,23 +150,8 @@ operator<<(ostream &out, const reason &r)
     return out;
 }
 
-RewritePlan::RewritePlan(const OLK & parent_olk, const OLK & childr_olk,
-			 Item ** childr, uint no_childr, reason r) {
-    map<Item *, OLK> childr_plan = map<Item *, OLK>();
-    for (uint i = 0; i < no_childr; i++) {
-	childr_plan[childr[i]] = childr_olk;
-    }
-    plan[parent_olk] = childr_plan;
-    es_out = EncSet(parent_olk);
-    this->r = r;
-}
 
-
-RewritePlan::RewritePlan(const EncSet & es, reason r) {
-    es_out = es;
-    this->r = r;
-}
-
+/*
 void
 RewritePlan::restrict(const EncSet & es) {
     es_out = es_out.intersect(es);
@@ -180,7 +165,7 @@ RewritePlan::restrict(const EncSet & es) {
 	}
     }
 }
-
+*/
 
 ostream&
 operator<<(ostream &out, const RewritePlan * rp)
@@ -190,17 +175,8 @@ operator<<(ostream &out, const RewritePlan * rp)
 	return out;
     }
 
-    out << " RewritePlan: \n---> out encset " << rp->es_out << "\n---> reason " << rp->r << "\n---> plan " << "(";
-    for (auto pair: rp->plan) {
-	out << "OLK " << pair.first << " ";
-	for (auto pair2 : pair.second) {
-	    out << " Item " << *pair2.first << " " << " OLK " << pair2.second;
-	}
-	cerr << "\n";
-    }
-
-    out << ")";
-
+    out << " RewritePlan: \n---> out encset " << rp->es_out << "\n---> reason " << rp->r << "\n";
+    
     return out;
 }
 

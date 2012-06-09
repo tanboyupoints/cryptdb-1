@@ -178,30 +178,38 @@ public:
 ostream&
 operator<<(ostream &out, const reason &r);
 
+// The rewrite plan of a lex node: the information a
+// node remembers after gather, to be used during rewrite
+// Other more specific RewritePlan-s inherit from this class
 class RewritePlan {
 public:
     reason r;
     EncSet es_out; // encset that this item can output
-    
-    // plan for how to rewrite an item based on what the enc level the
-    // parent asks this item for
-    //olk needed by parent child   olk to ask to child
-    std::map<OLK, std::map<Item *, OLK> > plan;
 
+    RewritePlan(const EncSet & es, reason r) : r(r), es_out(es) {};
     RewritePlan() {};
     
-    //constructor for a node with only one child and one outgoing olk
-    RewritePlan(const OLK & parent_olk, const OLK & childr_olk,
-		Item ** childr, uint no_childr, reason r);
-
-    //constructor for a node with no children
-    RewritePlan(const EncSet & es, reason r);
-    
     //only keep plans that have parent_olk in es
-    void restrict(const EncSet & es);
+//    void restrict(const EncSet & es);
 
 };
 
+
+//rewrite plan in which we only need to remember one olk
+// to know how to rewrite
+class RewritePlanOneOLK: public RewritePlan {
+public:
+    OLK olk;
+    // the following store how to rewrite children
+    RewritePlan ** childr_rp;
+    
+    RewritePlanOneOLK(const EncSet & es_out,
+		      const OLK & olk,
+		      RewritePlan ** childr_rp,
+		      reason r) : RewritePlan(es_out, r),
+				  olk(olk),
+				  childr_rp(childr_rp) {}
+};
 
 typedef class ConnectionInfo {
 public:
@@ -252,15 +260,12 @@ public:
     // pointer to proxy metadata 
     ProxyState * ps;
 
-/*** Temporary structures for processing one query ***/
-
-    // maps an Item to ways we could rewrite the item and its children
-    // does not contain Items that do not have children
-    map<Item *, RewritePlan *> itemRewritePlans;
+    /* Temporary structures for processing one query */
    
     unsigned int pos; //a counter indicating how many projection fields have been analyzed so far                                                                    
     std::map<FieldMeta *, salt_type>    salts;
     TMKM                                tmkm; //for multi princ
+    std::map<Item *, RewritePlan *>     rewritePlans;
 
     // information for decrypting results 
     ReturnMeta * rmeta;
