@@ -3213,7 +3213,6 @@ updateMeta(const string & q, LEX * lex, Analysis & a)
 static void
 dropAll(Connect * conn)
 {
-    assert_s(conn->execute("use cryptdbtest;"), "cannot use cryptdbtest");
     for (udf_func* u: udf_list) {
         stringstream ss;
         ss << "DROP FUNCTION IF EXISTS " << convert_lex_str(u->name) << ";";
@@ -3242,11 +3241,14 @@ createAll(Connect * conn)
 
 static void
 loadUDFs(Connect * conn) {
+    //need a database for the UDFs
+    assert_s(conn->execute("DROP DATABASE IF EXISTS cryptdb_udf"), "cannot drop db for udfs even with 'if exists'");
+    assert_s(conn->execute("CREATE DATABASE cryptdb_udf;"), "cannot create db for udfs");
+    assert_s(conn->execute("USE cryptdb_udf;"), "cannot use db");
     dropAll(conn);
     createAll(conn);
     LOG(cdb_v) << "Loaded CryptDB's UDFs.";
 }
-
 
 
 Rewriter::Rewriter(ConnectionInfo ci, 
@@ -3268,7 +3270,7 @@ Rewriter::Rewriter(ConnectionInfo ci,
     }
     
     ps.e_conn = Connect::getEmbedded(embed_dir);
-
+    
     ps.conn = new Connect(ci.server, ci.user, ci.passwd, ci.port);
 
     ps.schema = new SchemaInfo();
