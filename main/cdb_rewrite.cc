@@ -820,12 +820,12 @@ rewrite_args_FN(T * i, const OLK & constr,
         args[x]->name = NULL; // args should never have aliases...
     }
 }
-/* TODO: rewrite
+
 // rewrites the arguments of aggregators
 // no_args specifies a certain number of arguments that I must have
 // if negative, i can have any no. of arguments
 static list<Item *>
-rewrite_agg_args(Item_sum * oldi, const OLK & constr, const RewritePlan * rp,
+rewrite_agg_args(Item_sum * oldi, const OLK & constr, const RewritePlanOneOLK * rp,
 		 Analysis & a, int no_args = -1) {
     if (no_args >= 0) {
 	assert_s(oldi->get_arg_count() == (uint)no_args,
@@ -834,18 +834,16 @@ rewrite_agg_args(Item_sum * oldi, const OLK & constr, const RewritePlan * rp,
 	no_args = oldi->get_arg_count();
     }
 
-    auto childr_plan = getAssert(plan->plan, constr);
-
     list<Item *> res = list<Item *>();
     for (int j = 0; j < no_args; j++) {
 	Item * child_item = oldi->get_arg(j);
-	child_item = itemTypes.do_rewrite(child_item, getAssert(childr_plan, child_item), a);
+	child_item = itemTypes.do_rewrite(child_item, rp->olk, rp->childr_rp[j], a);
 	res.push_back(child_item);
     }
 
     return res;
 }
-*/
+
 
 /*
  * CItemType classes for supported Items: supporting machinery.
@@ -2100,17 +2098,16 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
     virtual Item * do_rewrite_type(Item_sum_sum * i,
 				   const OLK & constr, const RewritePlan * rp,
 				   Analysis & a) const {
-/* TODO: update with rewrite plans
-  LOG(cdb_v) << "Item_sum_sum rewrite " << *i;
 
-	list<Item *> args = rewrite_agg_args(i, constr, rp, a, 1);
+	LOG(cdb_v) << "Item_sum_sum rewrite " << *i;
+
+	list<Item *> args = rewrite_agg_args(i, constr, (RewritePlanOneOLK *)rp, a, 1);
 		
 	FieldMeta * fm = constr.key;
 	EncLayer * el = getAssert(fm->onions, oAGG, "onion oAGG not in onions")->layers.back();
 	assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
-	return ((HOM *)el)->sumUDA(args.front());*/
+	return ((HOM *)el)->sumUDA(args.front());
 
-	UNIMPLEMENTED;
     }
 };
 
@@ -2332,8 +2329,7 @@ rewrite_proj(Item * i, const RewritePlan * rp, Analysis & a, List<Item> & newLis
     addToReturn(a.rmeta, a.pos++, olk, olk.key && olk.key->has_salt, i->name);
 
     if (olk.key && olk.key->has_salt) {
-        assert(ir->type() == Item::Type::FIELD_ITEM);
-        newList.push_back(make_item((Item_field*) ir, olk.key->salt_name));
+        newList.push_back(make_item((Item_field*) i, olk.key->salt_name));
         addSaltToReturn(a.rmeta, a.pos++);
     }
 }
@@ -3217,6 +3213,7 @@ updateMeta(const string & q, LEX * lex, Analysis & a)
 static void
 dropAll(Connect * conn)
 {
+    assert_s(conn->execute("use cryptdbtest;"), "cannot use cryptdbtest");
     for (udf_func* u: udf_list) {
         stringstream ss;
         ss << "DROP FUNCTION IF EXISTS " << convert_lex_str(u->name) << ";";
@@ -3227,6 +3224,7 @@ dropAll(Connect * conn)
 static void
 createAll(Connect * conn)
 {
+    assert_s(conn->execute("use cryptdbtest;"), "cannot use cryptdbtest");
     for (udf_func* u: udf_list) {
         stringstream ss;
         ss << "CREATE ";
