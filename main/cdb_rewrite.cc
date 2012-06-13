@@ -2332,9 +2332,11 @@ rewrite_proj(Item * i, const RewritePlan * rp, Analysis & a, List<Item> & newLis
     OLK olk = rp->es_out.chooseOne();
     Item *ir = rewrite(i, olk, a);
     newList.push_back(ir);
-    addToReturn(a.rmeta, a.pos++, olk, olk.key && olk.key->has_salt, i->name);
+    bool use_salt = needsSalt(olk);
+    
+    addToReturn(a.rmeta, a.pos++, olk, use_salt, i->name);
 
-    if (needsSalt(olk)) {
+    if (use_salt) {
         newList.push_back(make_item((Item_field*) ir, olk.key->salt_name));
         addSaltToReturn(a.rmeta, a.pos++);
     }
