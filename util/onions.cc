@@ -1,6 +1,10 @@
 #include "util/onions.hh"
 #include "util/util.hh"
 
+bool needsSalt(SECLEVEL l) {
+    return l == SECLEVEL::RND;
+}
+
 std::ostream&
 operator<<(std::ostream &out, const EncDesc & ed)
 {

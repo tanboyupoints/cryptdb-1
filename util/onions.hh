@@ -54,6 +54,7 @@ SECLEVELS(__temp_m)
     return SECLEVEL::INVALID;
 }
 
+bool needsSalt(SECLEVEL l);
 
 //Onion layouts - initial structure of onions
 typedef std::map<onion, std::list<SECLEVEL> > onionlayout;

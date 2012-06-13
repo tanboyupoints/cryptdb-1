@@ -2075,6 +2075,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
 	reason child_r;
 	RewritePlan ** childr_rp = new RewritePlan*[1];
 	RewritePlan * child_rp = gather(child_item, child_r, a);
+	childr_rp[0] = child_rp;
 	EncSet child_es = child_rp->es_out;
 	
 	if (i->has_with_distinct()) {
@@ -2320,6 +2321,11 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
     return new_select_lex;
 }
 
+static bool
+needsSalt(OLK olk) {
+    return olk.key && olk.key && olk.key->has_salt && needsSalt(olk.l);   
+}
+
 static void
 rewrite_proj(Item * i, const RewritePlan * rp, Analysis & a, List<Item> & newList)
 {
@@ -2328,8 +2334,8 @@ rewrite_proj(Item * i, const RewritePlan * rp, Analysis & a, List<Item> & newLis
     newList.push_back(ir);
     addToReturn(a.rmeta, a.pos++, olk, olk.key && olk.key->has_salt, i->name);
 
-    if (olk.key && olk.key->has_salt) {
-        newList.push_back(make_item((Item_field*) i, olk.key->salt_name));
+    if (needsSalt(olk)) {
+        newList.push_back(make_item((Item_field*) ir, olk.key->salt_name));
         addSaltToReturn(a.rmeta, a.pos++);
     }
 }
