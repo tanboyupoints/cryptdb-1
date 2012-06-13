@@ -71,7 +71,7 @@ mysql_query_wrapper(MYSQL *m, const string &q)
     void* ret = create_embedded_thd(0);
     if (!ret) assert(false);
 }
-
+/* TODO: put back
 static void
 createMetaTablesIfNotExists(ProxyState & ps)
 {
@@ -145,10 +145,12 @@ createMetaTablesIfNotExists(ProxyState & ps)
                    ", FOREIGN KEY( table_id ) REFERENCES table_info( id ) ON DELETE CASCADE"
                    ") ENGINE=InnoDB;"));
 }
-
+*/
+/* TODO: put back
 static void
 initSchema(ProxyState & ps)
 {
+
     cerr << "warning: initSchema does not init enc layers correctly from shadow db\n";
     createMetaTablesIfNotExists(ps);
 
@@ -279,7 +281,7 @@ initSchema(ProxyState & ps)
         }
     }
 }
-
+*/
 
 //l gets updated to the new level
 static void
@@ -1369,8 +1371,16 @@ static CItemNullcheck<Item_func::Functype::ISNULL_FUNC> ANON;
 static CItemNullcheck<Item_func::Functype::ISNOTNULL_FUNC> ANON;
 
 static class ANON : public CItemSubtypeFT<Item_func_get_system_var, Item_func::Functype::GSYSVAR_FUNC> {
+
     virtual RewritePlan * do_gather_type(Item_func_get_system_var *i, reason &tr, Analysis & a) const {
-	UNIMPLEMENTED;
+	reason r = reason(PLAIN_EncSet, "system var", i);
+	return new RewritePlan(PLAIN_EncSet, r);
+    }
+
+    virtual Item * do_rewrite_type(Item_func_get_system_var * i,
+	                           const OLK & constr, const RewritePlan * _rp,
+	                           Analysis & a) const {
+	return i;
     }
 } ANON;
 
@@ -3283,7 +3293,7 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
     ps.schema = new SchemaInfo();
     ps.totalTables = 0;
-    initSchema(ps);
+    //initSchema(ps);
   
     loadUDFs(ps.conn);
 
@@ -3474,8 +3484,9 @@ Rewriter::rewrite(const string & q, string *cur_db)
     //assert(0 == create_embedded_thd(0));
     
     Analysis analysis = Analysis(&ps);
-    
+    cerr << "before parsing " <<q << "\n";
     query_parse p(*cur_db, q);
+    cerr << "done parsing\n";
     QueryRewrite res;
 
     //optimization: do not process queries that we will not rewrite
