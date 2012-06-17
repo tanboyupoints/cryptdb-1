@@ -30,15 +30,14 @@ using namespace std;
                         string(__PRETTY_FUNCTION__))
 
 //TODO: rewrite_proj may not need to be part of each class;
-// it just does gather, choose and then rewrite
+// it just does gather, choos and then rewrite
 
 static Item *
 stringToItemField(string field, string table, Item_field * itf) {
-    cerr << "stringtoItemF current thread " << (intptr_t) current_thd << " memroot " << (intptr_t) current_thd->mem_root << "\n";
+
     THD * thd = current_thd;
     assert(thd);
     Item_field * res = new Item_field(thd, itf);
-    cerr << "B current thread " << (intptr_t) current_thd << " memroot " << (intptr_t) current_thd->mem_root << "\n";
     res->name = NULL; //no alias
     res->field_name = make_thd_string(field);
     res->table_name = make_thd_string(table);
@@ -287,7 +286,6 @@ initSchema(ProxyState & ps)
 static void
 removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEVEL & l) {
 
-    cerr << " rem o layer current thread " << (intptr_t) current_thd << " memroot " << (intptr_t) current_thd->mem_root << "\n";
     OnionMeta * om    = getAssert(fm->onions, o);
     string fieldanon  = om->onionname;
     string tableanon  = fm->tm->anonTableName;
@@ -300,6 +298,8 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
 		  				  stringToItemField(fm->salt_name, tableanon, itf));
 
     query << *decUDF << ";";
+
+    cerr << "\nADJUST: \n" << query.str() << "\n";
     
     //execute decryption query
     assert_s(a.ps->conn->execute(query.str()), "failed to execute onion decryption query");
@@ -325,7 +325,6 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
 static void
 adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf, Analysis & a) {
 
-    cerr << "current thread " << (intptr_t) current_thd << " memroot " << (intptr_t) current_thd->mem_root << "\n";
     //TODO: use getAssert in more places
     SECLEVEL newlevel = getAssert(fm->encdesc.olm, o);
 
@@ -1890,7 +1889,6 @@ getArgs(Item_func * itf) {
 template<const char *FN, class IT>
 class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
     virtual RewritePlan * do_gather_type(Item_func_min_max *i, reason &tr, Analysis & a) const {
-        cerr << "gather Item_func_min_max  " << *i << "\n";
 	Item **args = i->arguments();
         uint argcount = i->argument_count();
 	if (argcount != 2) {
@@ -2333,7 +2331,7 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
 
 static bool
 needsSalt(OLK olk) {
-    return olk.key && olk.key && olk.key->has_salt && needsSalt(olk.l);   
+    return olk.key && olk.key->has_salt && needsSalt(olk.l);   
 }
 
 static void
@@ -2343,7 +2341,7 @@ rewrite_proj(Item * i, const RewritePlan * rp, Analysis & a, List<Item> & newLis
     Item *ir = rewrite(i, olk, a);
     newList.push_back(ir);
     bool use_salt = needsSalt(olk);
-    
+
     addToReturn(a.rmeta, a.pos++, olk, use_salt, i->name);
 
     if (use_salt) {
@@ -2993,7 +2991,6 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
         new_lex->many_values = newList;
     }
 
-    cerr << "new lex after insert " << *new_lex << "\n";
     return new_lex;
 }
 
@@ -3105,7 +3102,7 @@ lex_rewrite(LEX * lex, Analysis & analysis)
     return NULL;
 }
 
-
+/*
 static inline void
 drop_table_update_meta(const string &q,
                        LEX *lex,
@@ -3135,6 +3132,7 @@ drop_table_update_meta(const string &q,
 
     assert(a.ps->e_conn->execute("COMMIT"));
 }
+*/
 
 static void
 add_table_update_meta(const string &q,
@@ -3216,7 +3214,7 @@ updateMeta(const string & q, LEX * lex, Analysis & a)
     switch (lex->sql_command) {
     // TODO: alter tables will need to modify the embedded DB schema
     case SQLCOM_DROP_TABLE:
-        drop_table_update_meta(q, lex, a);
+        //drop_table_update_meta(q, lex, a);
         break;
     case SQLCOM_CREATE_TABLE:
         add_table_update_meta(q, lex, a);
@@ -3241,7 +3239,6 @@ dropAll(Connect * conn)
 static void
 createAll(Connect * conn)
 {
-    assert_s(conn->execute("use cryptdbtest;"), "cannot use cryptdbtest");
     for (udf_func* u: udf_list) {
         stringstream ss;
         ss << "CREATE ";
@@ -3483,10 +3480,8 @@ Rewriter::rewrite(const string & q, string *cur_db)
     assert(0 == mysql_thread_init());
     //assert(0 == create_embedded_thd(0));
     
-    Analysis analysis = Analysis(&ps);
-    cerr << "before parsing " <<q << "\n";
+ 
     query_parse p(*cur_db, q);
-    cerr << "done parsing\n";
     QueryRewrite res;
 
     //optimization: do not process queries that we will not rewrite
@@ -3498,11 +3493,11 @@ Rewriter::rewrite(const string & q, string *cur_db)
     
     //for as long as there are onion adjustments
     while (true) {
+	Analysis analysis = Analysis(&ps);
 	try {
 	    res.queries = rewrite_helper(q, analysis, p, *cur_db);
 	} catch (OnionAdjustExcept e) {
 	    LOG(cdb_v) << "caught onion adjustment";
-	    cerr << "current thread " << (intptr_t) current_thd << " memroot " << (intptr_t) current_thd->mem_root << "\n";
 	    adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis);
 	    continue;
 	}
@@ -3547,7 +3542,6 @@ mp_init_decrypt(MultiPrinc * mp, Analysis & a) {
 ResType
 Rewriter::decryptResults(ResType & dbres,
 			 ReturnMeta * rmeta) {
-    printRes(dbres);
 
     Analysis a = Analysis(&ps);
     a.rmeta = rmeta;
@@ -3568,7 +3562,6 @@ Rewriter::decryptResults(ResType & dbres,
         ReturnField rf = rmeta->rfmeta[index];
         if (!rf.is_salt) {
 	    //need to return this field
-            assert_s(rf.olk.key, "ReturnField has no FieldMeta associated with it");
             res.names.push_back(rf.field_called);
         }
         index++;
@@ -3591,7 +3584,7 @@ Rewriter::decryptResults(ResType & dbres,
 	
         if (!rf.is_salt) {
             for (unsigned int r = 0; r < rows; r++) {
-                if (!fm->isEncrypted()) {
+                if (!fm || !fm->isEncrypted()) {
                     res.rows[r][col_index] = dbres.rows[r][c];
                 } else {
                     uint64_t salt = 0;

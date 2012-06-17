@@ -96,7 +96,7 @@ main(int ac, char **av)
                 continue;
             }
             for (auto new_q = qr.queries.begin(); new_q != qr.queries.end(); new_q++) {
-                cerr << "SUCCESS: " << *new_q << endl;
+                cerr << "\nENCRYPTED QUERY:\n" << *new_q << endl;
                 assert(conn.execute(*new_q, dbres));
             }
             if (!dbres) {
@@ -108,8 +108,11 @@ main(int ac, char **av)
             if (!res.ok) {
                 continue;
             }
+	    cerr << "\nRESULTS FROM DB: \n";
+	    printRes(res);
+	    cerr << "\n";
             ResType dec_res = r.decryptResults(res, qr.rmeta);
-            cerr << "decrypted results are: \n"; printRes(dec_res);
+            printRes(dec_res);
 
         } catch (std::runtime_error &e) {
             cout << "Unexpected Error: " << e.what() << " in query " << q << endl;

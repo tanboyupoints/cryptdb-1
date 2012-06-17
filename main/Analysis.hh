@@ -128,10 +128,10 @@ needsSalt(EncSet ed);
 
 extern "C" void *create_embedded_thd(int client_flag);
 
-typedef struct ReturnField {//TODO: isn't FieldMeta more fit than ItemMeta?
+typedef struct ReturnField {
     bool is_salt;
     std::string field_called;
-    OLK olk;
+    OLK olk; // if !olk.key, field is not encrypted
     int pos_salt; //position of salt of this field in the query results,
                   // or -1 if such salt was not requested
     string stringify();

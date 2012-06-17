@@ -274,7 +274,6 @@ DET_int::decrypt(Item * ctext, uint64_t IV, const string &k) {
     ulonglong res = (ulonglong) bf.decrypt(val);
     LOG(encl) << "DET_int decrypt " << val << "-->" << res;
     Item * ni = new Item_int(res);
-    cerr << "det int " << ni << "\n";
     unSetKey(k);
     return ni;
 }
@@ -505,7 +504,6 @@ OPE_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
 	pv = pv * 256 + (int)ps[i];
     }
     
-    cerr << "VALUE associated with " << ps << " is " << pv << "\n";
     ZZ enc = ope.encrypt(to_ZZ(pv));
     unSetKey(k);
     return new Item_int((ulonglong) uint64FromZZ(enc));

@@ -87,7 +87,6 @@ EncSet::chooseOne() const
 	oPLAIN, 
     };
 
-    cerr << "choosing one from " << *this << "\n";
     
     static size_t onion_size = sizeof(onion_order) / sizeof(onion_order[0]);
     for (size_t i = 0; i < onion_size; i++) {
@@ -102,7 +101,6 @@ EncSet::chooseOne() const
                 continue;
             }
 
-	    cerr << "chosen " << OLK(o, it->second.first, it->second.second) << "\n";
 	    return OLK(o,  it->second.first, it->second.second);
         }
     }

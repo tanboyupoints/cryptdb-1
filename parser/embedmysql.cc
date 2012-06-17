@@ -123,7 +123,7 @@ query_parse::query_parse(const std::string &db, const std::string &q)
     
     //if first word of query is CRYPTDB, we can't use the embedded db
     //  set annotation to true and return
-    cerr << "q is " << q << endl;
+
     if (strncmp(toLowerCase(q).c_str(), "cryptdb", 7) == 0) {
         annot = new Annotation(q);
         return;

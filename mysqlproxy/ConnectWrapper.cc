@@ -11,7 +11,9 @@
 #include <parser/sql_utils.hh>
 
 
+
 using namespace std;
+
 
 class WrapperState {
  public:
@@ -248,7 +250,7 @@ rewrite(lua_State *L)
     //clients[client]->considered = true;
 
     list<string> new_queries;
-    bool consider = true;
+
     
     t.lap_ms();
     if (EXECUTE_QUERIES) {
@@ -256,11 +258,12 @@ rewrite(lua_State *L)
             new_queries.push_back(query);
         } else {
             try {
+		string cur_db = "cryptdbtest"; //TODO: remove
                 QueryRewrite rew = r->rewrite(query,
-                                              &clients[client]->cur_db);
+                                              &cur_db);
 		new_queries = rew.queries;
 		clients[client]->rmeta = rew.rmeta;
-		consider = rew.wasRew;
+		clients[client]->considered = rew.wasRew;
                 //cerr << "query: " << *new_queries.begin() << " considered ? " << clients[client]->considered << "\n";
             } catch (CryptDBError &e) {
                 LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
@@ -275,7 +278,7 @@ rewrite(lua_State *L)
         *(clients[client]->PLAIN_LOG) << query << "\n";
     }
 
-    lua_pushboolean(L, consider);
+    lua_pushboolean(L, clients[client]->considered);
 
     lua_createtable(L, (int) new_queries.size(), 0);
     int top = lua_gettop(L);
@@ -359,6 +362,7 @@ decrypt(lua_State *L)
     }
 
     ResType rd;
+    cerr << "do crypt is " << DO_CRYPT << " and considered is " << clients[client]->considered << "\n";
     if (!DO_CRYPT || !clients[client]->considered) {
         rd = res;
     } else {
