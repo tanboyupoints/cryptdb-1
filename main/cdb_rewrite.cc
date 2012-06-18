@@ -284,7 +284,7 @@ initSchema(ProxyState & ps)
 
 //l gets updated to the new level
 static void
-removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEVEL & l) {
+removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEVEL & l, const string & cur_db) {
 
     OnionMeta * om    = getAssert(fm->onions, o);
     string fieldanon  = om->onionname;
@@ -300,7 +300,10 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
     query << *decUDF << ";";
 
     cerr << "\nADJUST: \n" << query.str() << "\n";
-    
+
+    string usedb = "USE " +  cur_db + ";";
+    //HACk: make sure right cur_db in other ways
+    assert_s(a.ps->conn->execute(usedb),  "failed to execute " + usedb);
     //execute decryption query
     assert_s(a.ps->conn->execute(query.str()), "failed to execute onion decryption query");
         
@@ -323,13 +326,13 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
  *
  */
 static void
-adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf, Analysis & a) {
+adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf, Analysis & a, const string & cur_db) {
 
     //TODO: use getAssert in more places
     SECLEVEL newlevel = getAssert(fm->encdesc.olm, o);
 
     while (newlevel > tolevel) {
-	removeOnionLayer(fm, itf, a, o, newlevel);
+	removeOnionLayer(fm, itf, a, o, newlevel, cur_db);
     }
     assert(newlevel == tolevel);
 }
@@ -3477,10 +3480,10 @@ noRewrite(LEX * lex) {
 QueryRewrite 
 Rewriter::rewrite(const string & q, string *cur_db)
 {
+    
     assert(0 == mysql_thread_init());
     //assert(0 == create_embedded_thd(0));
-    
- 
+
     query_parse p(*cur_db, q);
     QueryRewrite res;
 
@@ -3498,7 +3501,7 @@ Rewriter::rewrite(const string & q, string *cur_db)
 	    res.queries = rewrite_helper(q, analysis, p, *cur_db);
 	} catch (OnionAdjustExcept e) {
 	    LOG(cdb_v) << "caught onion adjustment";
-	    adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis);
+	    adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis, *cur_db);
 	    continue;
 	}
 	res.wasRew = true;
@@ -3563,12 +3566,14 @@ Rewriter::decryptResults(ResType & dbres,
         if (!rf.is_salt) {
 	    //need to return this field
             res.names.push_back(rf.field_called);
+	    // switch types to original ones : TODO
+
         }
         index++;
     }
 
     unsigned int real_cols = res.names.size();
-    // switch types to original ones : TODO
+
 
     //allocate space in results for decrypted rows
     res.rows = vector<vector<Item*> >(rows);
