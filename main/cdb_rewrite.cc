@@ -145,7 +145,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
                    ") ENGINE=InnoDB;"));
 }
 */
-
+	 /*
 static void
 printEC(Connect * e_conn, const string & command) {
     DBResult * dbres;
@@ -161,14 +161,14 @@ printEmbeddedState(ProxyState & ps) {
     printEC(ps.e_conn, "show tables;");
     
 }
-
-
+	 */
+/*
 static void
 initSchema(ProxyState & ps)
 {
 
     printEmbeddedState(ps);
-
+*/
     /*   cerr << "warning: initSchema does not init enc layers correctly from shadow db\n";
     createMetaTablesIfNotExists(ps);
 
@@ -298,8 +298,8 @@ initSchema(ProxyState & ps)
             }
         }
     } */
-}
-
+    /*}
+*/
 
 //l gets updated to the new level
 static void
@@ -3314,7 +3314,7 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
     ps.schema = new SchemaInfo();
     ps.totalTables = 0;
-    initSchema(ps);
+    //initSchema(ps);
   
     loadUDFs(ps.conn);
 
