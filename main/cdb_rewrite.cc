@@ -649,8 +649,10 @@ static inline void
 analyze_update(Item_field * field, Item * val, Analysis & a) {
 
     reason r;
-    gather(val, r, a);
-
+    RewritePlan * rp = gather(val, r, a);
+    a.rewritePlans[val] = rp;
+    a.rewritePlans[field] = gather(field, r, a);
+    
     //TODO: an optimization could be performed here to support more updates
     // For example: SET x = x+1, x = 2 --> no need to invalidate DET and OPE
     // onions because first SET does not matter

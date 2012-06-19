@@ -38,6 +38,14 @@ createFieldHelper(const Create_field *f, int field_length,
     
 }
 
+static Item *
+get_key_item(const string & key) {
+    Item_string * keyI = new Item_string(make_thd_string(key),
+					 key.length(), &my_charset_bin);
+    keyI->name = NULL; // no alias
+    return keyI;
+}
+
 /****************** RND *********************/
 
 RND_int::RND_int(Create_field * f, PRNG * prng)
@@ -115,10 +123,7 @@ RND_int::decryptUDF(Item * col, Item * ivcol) {
     List<Item> l;
     l.push_back(col);
     
-    Item * keyI = new Item_string(make_thd_string(key),
-				  key.length(), &my_charset_bin);
-    keyI->name = NULL;
-    l.push_back(keyI);
+    l.push_back(get_key_item(key));
     
     l.push_back(ivcol);
     
@@ -214,9 +219,7 @@ Item *
 RND_str::decryptUDF(Item * col, Item * ivcol) {
     List<Item> l;
     l.push_back(col);
-    Item * key = new Item_string(make_thd_string(rawkey), rawkey.length(), &my_charset_bin);
-    key->name = NULL; // no alias
-    l.push_back(key);
+    l.push_back(get_key_item(rawkey));
     l.push_back(ivcol);
     
     return new Item_func_udf_str(&u_decRNDString, l);	
@@ -301,9 +304,7 @@ DET_int::decryptUDF(Item * col, Item * ivcol) {
     List<Item> l;
     l.push_back(col);
 
-    Item * keyI = new Item_string(make_thd_string(key), key.length(), &my_charset_bin);
-    keyI->name = NULL;
-    l.push_back(keyI);
+    l.push_back(get_key_item(key));
     
     Item * udfdec = new Item_func_udf_int(&u_decDETInt, l);
     udfdec->name = NULL;
@@ -390,9 +391,7 @@ Item *
 DET_str::decryptUDF(Item * col, Item * ivcol) {
     List<Item> l;
     l.push_back(col);
-    Item_string * key = new Item_string(make_thd_string(rawkey), rawkey.length(), &my_charset_bin);
-    key->name = NULL; //no alias
-    l.push_back(key);
+    l.push_back(get_key_item(rawkey));
     return new Item_func_udf_str(&u_decDETStr, l);
 
 }
