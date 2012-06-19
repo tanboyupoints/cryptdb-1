@@ -145,12 +145,31 @@ createMetaTablesIfNotExists(ProxyState & ps)
                    ") ENGINE=InnoDB;"));
 }
 */
-/* TODO: put back
+
+static void
+printEC(Connect * e_conn, const string & command) {
+    DBResult * dbres;
+    assert_s(e_conn->execute(command, dbres), "command failed");
+    ResType res = dbres->unpack();
+    printRes(res);
+}
+
+static void
+printEmbeddedState(ProxyState & ps) {
+    printEC(ps.e_conn, "use proxy_db;");
+    printEC(ps.e_conn, "show databases;");
+    printEC(ps.e_conn, "show tables;");
+    
+}
+
+
 static void
 initSchema(ProxyState & ps)
 {
 
-    cerr << "warning: initSchema does not init enc layers correctly from shadow db\n";
+    printEmbeddedState(ps);
+
+    /*   cerr << "warning: initSchema does not init enc layers correctly from shadow db\n";
     createMetaTablesIfNotExists(ps);
 
     vector<string> tablelist;
@@ -278,9 +297,9 @@ initSchema(ProxyState & ps)
                 tm->fieldMetaMap[fm->fname] = fm;
             }
         }
-    }
+    } */
 }
-*/
+
 
 //l gets updated to the new level
 static void
@@ -3295,7 +3314,7 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
     ps.schema = new SchemaInfo();
     ps.totalTables = 0;
-    //initSchema(ps);
+    initSchema(ps);
   
     loadUDFs(ps.conn);
 
@@ -3485,7 +3504,7 @@ Rewriter::rewrite(const string & q, string *cur_db)
     
     assert(0 == mysql_thread_init());
     //assert(0 == create_embedded_thd(0));
-
+    
     query_parse p(*cur_db, q);
     QueryRewrite res;
 
