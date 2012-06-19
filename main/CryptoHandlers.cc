@@ -214,7 +214,9 @@ Item *
 RND_str::decryptUDF(Item * col, Item * ivcol) {
     List<Item> l;
     l.push_back(col);
-    l.push_back(new Item_string(make_thd_string(rawkey), rawkey.length(), &my_charset_bin));
+    Item * key = new Item_string(make_thd_string(rawkey), rawkey.length(), &my_charset_bin);
+    key->name = NULL; // no alias
+    l.push_back(key);
     l.push_back(ivcol);
     
     return new Item_func_udf_str(&u_decRNDString, l);	
@@ -388,8 +390,9 @@ Item *
 DET_str::decryptUDF(Item * col, Item * ivcol) {
     List<Item> l;
     l.push_back(col);
-    l.push_back(new Item_string(make_thd_string(rawkey), rawkey.length(), &my_charset_bin));
-    
+    Item_string * key = new Item_string(make_thd_string(rawkey), rawkey.length(), &my_charset_bin);
+    key->name = NULL; //no alias
+    l.push_back(key);
     return new Item_func_udf_str(&u_decDETStr, l);
 
 }
