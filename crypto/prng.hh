@@ -111,3 +111,24 @@ class blockrng : public PRNG {
     BlockCipher bc;
     uint8_t ctr[BlockCipher::blocksize];
 };
+
+template<>
+inline bool
+PRNG::rand<bool>()
+{
+    uint8_t v;
+    rand_bytes(1, &v);
+    return v & 1;
+}
+
+template<>
+inline std::vector<bool>
+PRNG::rand_vec(size_t nelem)
+{
+    uint8_t buf[nelem];
+    rand_bytes(nelem, &buf[0]);
+    for (size_t i = 0; i < nelem; i++)
+        buf[i] &= 1;
+
+    return std::vector<bool>(&buf[0], &buf[nelem]);
+}

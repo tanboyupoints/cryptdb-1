@@ -21,6 +21,7 @@
 #include <crypto/online_ope.hh>
 #include <crypto/padding.hh>
 #include <crypto/mont.hh>
+#include <crypto/gfe.hh>
 #include <util/timer.hh>
 #include <NTL/ZZ.h>
 #include <NTL/RR.h>
@@ -527,6 +528,76 @@ test_padding()
     cout << "test padding ok\n";
 }
 
+template<typename T>
+static void
+test_gfe(size_t q)
+{
+    urandom u;
+    gfe_priv<T> gp(u.rand_string(16), q);
+
+    for (int i = 0; i < 100; i++) {
+        // Check PRF generation
+        int a = u.rand<uint8_t>();
+        int b = u.rand<uint8_t>();
+        auto x = u.rand<T>();
+        auto y = u.rand<T>();
+
+        if (x == y)
+            y++;
+        if (a == b)
+            b++;
+
+        assert(gp.prf(make_pair(a, x))  == gp.prf(make_pair(a, x)));
+        assert(gp.prf(make_pair(a, x))  != gp.prf(make_pair(a, y)));
+        assert(gp.prf(make_pair(a, x))  != gp.prf(make_pair(b, x)));
+        assert(gp.prf(make_pair(a, x))  != gp.prf(make_pair(b, y)));
+        assert(gp.prf(make_pair(a, x))  != gp.prf(make_pair(-1, x)));
+        assert(gp.prf(make_pair(a, x))  != gp.prf(make_pair(-1, y)));
+        assert(gp.prf(make_pair(-1, x)) != gp.prf(make_pair(-1, x)));
+    }
+
+    for (int i = 0; i < 1000; i++) {
+        auto x = u.rand<T>();
+        auto y = u.rand<T>();
+
+        // Check prefix generation
+        auto xv = gfe<T>::cover_prefixes(x);
+        auto yv = gfe<T>::right_prefixes(y);
+
+        assert(xv.size() == yv.size());
+        int match = 0;
+        for (uint i = 0; i < xv.size(); i++)
+            if (xv[i] == yv[i])
+                match++;
+
+        if (x > y)
+            assert(match == 1);
+        else
+            assert(match == 0);
+    }
+
+    for (int i = 0; i < 100; i++) {
+        auto x = u.rand<T>();
+        auto y = u.rand<T>();
+
+        auto xv = gfe<T>::cover_prefixes(x);
+        auto yv = gfe<T>::right_prefixes(y);
+
+        // Check dot-product
+        auto xpv = gp.prfvec(xv);
+        auto ypv = gp.prfvec(yv);
+        uint64_t dp = gfe<T>::dotproduct(xpv, ypv);
+
+        // cout << "x " << (int)x << ", y " << (int)y << ", dp " << dp << endl;
+        if (x > y)
+            assert(labs(dp - gp.e1_) < labs(dp - gp.e0_));
+        else
+            assert(labs(dp - gp.e0_) < labs(dp - gp.e1_));
+    }
+
+    cout << "test_gfe size " << sizeof(T) << " q " << q << " ok\n";
+}
+
 int
 main(int ac, char **av)
 {
@@ -535,6 +606,9 @@ main(int ac, char **av)
     cout << u.rand<int64_t>() << endl;
 
     test_online_ope_rebalance();
+
+    test_gfe<uint8_t>(4);
+    test_gfe<uint16_t>(3);
     
     test_padding();
     test_bn();
