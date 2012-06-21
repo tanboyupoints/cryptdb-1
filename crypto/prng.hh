@@ -123,7 +123,7 @@ PRNG::rand<bool>()
 
 template<>
 inline std::vector<bool>
-PRNG::rand_vec(size_t nelem)
+PRNG::rand_vec<bool>(size_t nelem)
 {
     uint8_t buf[nelem];
     rand_bytes(nelem, &buf[0]);

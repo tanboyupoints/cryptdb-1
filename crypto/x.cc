@@ -609,7 +609,9 @@ main(int ac, char **av)
 
     test_gfe<uint8_t>(4);
     test_gfe<uint16_t>(3);
-    
+    test_gfe<uint32_t>(3);
+    test_gfe<uint64_t>(3);
+
     test_padding();
     test_bn();
     test_ecjoin();

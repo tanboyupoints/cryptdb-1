@@ -27,7 +27,7 @@ class gfe {
     {
         std::vector<std::pair<int, T>> r;
         for (uint i = 0; i < sizeof(T) * 8; i++) {
-            if (v & (1 << i)) {
+            if (v & (((T)1) << i)) {
                 r.push_back(make_pair(-1, 0));
             } else {
                 r.push_back(make_pair(i, (v >> i) | 1));
@@ -37,12 +37,12 @@ class gfe {
     }
 
     static uint64_t
-    dotproduct(const std::vector<bool> &v1, const std::vector<bool> &v2)
+    dotproduct(const std::vector<uint8_t> &v1, const std::vector<uint8_t> &v2)
     {
         uint64_t count = 0;
         assert(v1.size() == v2.size());
         for (size_t i = 0; i < v1.size(); i++)
-            count += v1[i] * v2[i];
+            count += __builtin_popcount(v1[i] & v2[i]);
         return count;
     }
 
@@ -73,15 +73,17 @@ class gfe {
 template<typename T>
 class gfe_priv : public gfe<T> {
  public:
-    gfe_priv(const std::string &key, size_t q) : gfe<T>(q), key_(key) {}
+    gfe_priv(const std::string &key, size_t q)
+        : gfe<T>(q), key_(key), urand_(), prand_(urand_.rand_string(32)) {}
 
-    std::vector<bool>
+    typedef std::vector<uint8_t> bitvec;
+
+    std::vector<uint8_t>
     prf(const std::pair<int, T> &p)
     {
         if (p.first == -1) {
             /* Hole in the prefix list, generate a random value */
-            urandom u;
-            return u.rand_vec<bool>(gfe<T>::kq_);
+            return prand_.rand_vec<uint8_t>(gfe<T>::kq_ / 8);
         } else {
             hmac<sha256> hm(key_.data(), key_.size());
             hm.update(&p.first,  sizeof(p.first));
@@ -89,22 +91,24 @@ class gfe_priv : public gfe<T> {
             std::string phash = hm.final();
 
             blockrng<AES> r(phash);
-            return r.rand_vec<bool>(gfe<T>::kq_);
+            return r.rand_vec<uint8_t>(gfe<T>::kq_ / 8);
         }
     }
 
-    std::vector<bool>
+    std::vector<uint8_t>
     prfvec(const std::vector<std::pair<int, T>> &pv)
     {
-        std::vector<bool> rv(gfe<T>::kq_ * gfe<T>::k_);
+        std::vector<uint8_t> rv(gfe<T>::kq_ * gfe<T>::k_ / 8);
         assert(pv.size() == gfe<T>::k_);
         for (uint i = 0; i < gfe<T>::k_; i++) {
             auto x = prf(pv[i]);
-            rv.insert(rv.begin(), x.begin(), x.end());
+            memcpy(&rv[i * gfe<T>::kq_ / 8], &x[0], gfe<T>::kq_ / 8);
         }
         return rv;
     }
 
  private:
     std::string key_;
+    urandom urand_;
+    streamrng<arc4> prand_;
 };
