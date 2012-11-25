@@ -2717,10 +2717,6 @@ static void rewrite_key(const string &table_name,
 static void
 create_table_embedded(Connect * e_conn, const string & cur_db,
     const string & create_q) {
-    assert(e_conn->execute("drop database if exists " + cur_db));
-    assert(e_conn->execute("create database " + cur_db + ";"));
-    
-    assert(e_conn->execute("use " + cur_db + ";"));
     assert(e_conn->execute(create_q));
 }
 
@@ -2739,6 +2735,7 @@ process_create_lex(LEX * lex, Analysis & a,
     //TODO: temporary hack!
     stringstream q;
     q << *lex;
+    cerr << "creating in embedded : " << q.str() << "\n";
     create_table_embedded(a.ps->e_conn, cur_db, q.str());
     LOG(cdb_v) << "table is " << table << " and encByDefault is " << encByDefault << " and true is " << true;
     add_table(a, table, lex, encByDefault);
