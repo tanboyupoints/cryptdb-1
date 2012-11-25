@@ -102,7 +102,7 @@ public:
     Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "");
     Item * decryptUDF(Item * col, Item * ivcol = NULL);
 
-private:
+protected:
     std::string key;
     blowfish bf;
     static const int bf_key_size = 16;
@@ -123,7 +123,7 @@ public:
     Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "");
     Item * decryptUDF(Item * col, Item * = NULL);
 
-private:
+protected:
     std::string rawkey;
     static const int key_bytes = 16;
     AES_KEY * enckey;
@@ -134,13 +134,15 @@ private:
 };
 
 
-class DETJOIN : public EncLayer {
+class DETJOIN_int : public DET_int {
     //TODO: this layer currently does not do encryption
 public:
-    DETJOIN(Create_field * cf, PRNG * key) : EncLayer(cf) {}
+    DETJOIN_int(Create_field * cf, PRNG * key) : DET_int(cf, key) {
+	this->key="joinjoinjoinjoin";
+	setKey(this->key);}
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
-    Create_field * newCreateField(std::string anonname = "") {return cf;}
+/*    Create_field * newCreateField(std::string anonname = "") {return cf;}
     
     //TODO: DETJOIN for multi
     Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
@@ -152,6 +154,34 @@ public:
 private:
     void setKey(const std::string &k) {};
     void unSetKey(const std::string &k) {};
+
+*/
+};
+
+
+class DETJOIN_str : public DET_str {
+    //TODO: this layer currently does not do encryption
+public:
+    DETJOIN_str(Create_field * cf, PRNG * key) : DET_str(cf, key) {
+	this->rawkey="joinjoinjoinjoin";
+	setKey(this->rawkey);
+    }
+
+    SECLEVEL level() {return SECLEVEL::DETJOIN;}
+/*    Create_field * newCreateField(std::string anonname = "") {return cf;}
+    
+    //TODO: DETJOIN for multi
+    Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
+    Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = "");
+    Item * decryptUDF(Item * col, Item * ivcol = NULL) {
+        thrower() << "should not decrypt from joindet\n";
+    }
+
+private:
+    void setKey(const std::string &k) {};
+    void unSetKey(const std::string &k) {};
+
+*/
 };
 
 

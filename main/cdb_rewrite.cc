@@ -332,6 +332,7 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
     om->layers.pop_back();
     l = om->layers.back()->level();
     fm->encdesc.olm[o] = l;
+
     //todo:we do not need olm any more; then, do we need level in Enclayer?
 }
 
@@ -989,7 +990,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         LOG(cdb_v) << "do_rewrite_type FIELD_ITEM " << *i;
         
 	FieldMeta *fm = a.ps->schema->getFieldMeta(i->table_name, i->field_name);
-	assert(constr.key == fm);
+	//assert(constr.key == fm);
 
 	//check if we need onion adjustment
 	if (constr.l < fm->encdesc.olm[constr.o]) {
@@ -1301,7 +1302,7 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
         if (!args[0]->const_item() && !args[1]->const_item()) {
             why = why + "; join";
 	    cerr << "join";
-	    UNIMPLEMENTED;
+	    my_es = JOIN_EncSet;
 	}
 
 	return typical_gather(a, i, my_es, why, tr, false, PLAIN_EncSet);
@@ -2532,6 +2533,7 @@ rewrite_table_list(List<TABLE_LIST> tll, Analysis & a)
     return *new_tll;
 }
 
+		      
 // If mkey == NULL, the field is not encrypted
 static void
 init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf, onionlayout ol) {
@@ -2549,7 +2551,9 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
         if (mKey) { 
             //generate enclayers for encrypted field
             for (auto l: it.second) {
-                PRNG * key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);
+                PRNG * key;
+		key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);
+
                 om->layers.push_back(EncLayerFactory::encLayer(o, l, cf, key));
             }
         }
@@ -2717,7 +2721,8 @@ static void rewrite_key(const string &table_name,
 static void
 create_table_embedded(Connect * e_conn, const string & cur_db,
     const string & create_q) {
-      
+      assert(e_conn->execute("create database if not exists " + cur_db + ";"));
+    
     assert(e_conn->execute("use " + cur_db + ";"));
     assert(e_conn->execute(create_q));
 }
@@ -2737,7 +2742,6 @@ process_create_lex(LEX * lex, Analysis & a,
     //TODO: temporary hack!
     stringstream q;
     q << *lex;
-    cerr << "creating in embedded : " << q.str() << "\n";
     create_table_embedded(a.ps->e_conn, cur_db, q.str());
     LOG(cdb_v) << "table is " << table << " and encByDefault is " << encByDefault << " and true is " << true;
     add_table(a, table, lex, encByDefault);

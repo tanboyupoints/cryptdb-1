@@ -235,7 +235,7 @@ DET_int::DET_int(Create_field * f, PRNG * prng)
       key(prng->rand_string(bf_key_size)),
       bf(key)
 {
-    setKey(prng->rand_string(bf_key_size));
+    setKey(key);
 }
 
 Create_field *
@@ -260,7 +260,7 @@ DET_int::unSetKey(const string &k) {
     key = "";
     //TODO: unset blowfish
 }
-
+ 
 //TODO: may want to do more specialized crypto for lengths
 Item *
 DET_int::encrypt(Item * ptext, uint64_t IV, const string &k) {
@@ -397,7 +397,7 @@ DET_str::decryptUDF(Item * col, Item * ivcol) {
 }
 
 /*************** DETJOIN *********************/
-
+/*
 Item *
 DETJOIN::encrypt(Item * p, uint64_t IV, const string &k) {
     return p->clone_item();
@@ -407,7 +407,7 @@ Item *
 DETJOIN::decrypt(Item * c, uint64_t IV, const string &k) {
     return c->clone_item();
 }
-
+*/
 /**************** OPE **************************/
 
 OPE_int::OPE_int(Create_field * f, PRNG * prng)
@@ -837,7 +837,11 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf, PRNG * key) {
 	}
     }
     case SECLEVEL::DETJOIN: {
-        return new DETJOIN(cf, key);
+	if (IsMySQLTypeNumeric(cf->sql_type)) {
+	    return new DETJOIN_int(cf, key);
+	} else {
+	    return new DETJOIN_str(cf, key);
+	}
     }
     case SECLEVEL::OPE: {
 	if (IsMySQLTypeNumeric(cf->sql_type)) {

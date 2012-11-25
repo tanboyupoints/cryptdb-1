@@ -423,6 +423,7 @@ freeKey(PKCS * key)
 PRNG *
 getLayerKey(AES_KEY * mKey, string uniqueFieldName, SECLEVEL l) {
     string rawkey = getKey(mKey, uniqueFieldName, l);
+ 
     urandom * key = new urandom();
     key->seed_bytes(rawkey.length(), (uint8_t*)rawkey.data());
     return key;

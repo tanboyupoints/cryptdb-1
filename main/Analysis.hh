@@ -58,6 +58,13 @@ const EncSet EQ_EncSet = {
         }
 };
 
+const EncSet JOIN_EncSet = {
+        {
+	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+            {oDET,   LevelFieldPair(SECLEVEL::DETJOIN, NULL)},
+        }
+};
+
 const EncSet ORD_EncSet = {
     {
 	{oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
