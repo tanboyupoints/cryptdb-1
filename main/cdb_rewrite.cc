@@ -84,7 +84,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
                    ", anon_name varchar(64) NOT NULL"
                    ", UNIQUE INDEX idx_table_name( dbname, name )"
                    ") ENGINE=InnoDB;"));
-	
+
     assert(ps.e_conn->execute(
                    "CREATE TABLE IF NOT EXISTS proxy_db.column_info"
                    "( id bigint NOT NULL auto_increment PRIMARY KEY"
@@ -159,7 +159,7 @@ printEmbeddedState(ProxyState & ps) {
     printEC(ps.e_conn, "use proxy_db;");
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables;");
-    
+
 }
 	 */
 /*
@@ -262,25 +262,25 @@ initSchema(ProxyState & ps)
 
                 if (fm->onions.size() > 0) {
                     fm->onions[oDET]->onionname = string(row[i++], l[j++]);
-                    
+
                     if (has_ope) { fm->onions[oOPE]->onionname = string(row[i++], l[j++]); }
                     else         { i++; j++; }
-                    
+
                     if (has_agg) { fm->onions[oAGG]->onionname = string(row[i++], l[j++]); }
                     else         { i++; j++; }
 
                     if (has_swp) { fm->onions[oSWP]->onionname = string(row[i++], l[j++]); }
                     else         { i++; j++; }
-                    
+
                     OnionLevelMap om;
 
                     om[oDET] = string_to_sec_level(string(row[i++], l[j++]));
 
                     if (has_ope) { om[oOPE] = string_to_sec_level(string(row[i++], l[j++])); }
                     else         { i++; j++; }
-                    
+
                     if (has_agg) { om[oAGG] = SECLEVEL::HOM; }
-                    
+
                     if (has_swp) { om[oSWP] = SECLEVEL::SEARCH; }
 
                     fm->encdesc = EncDesc(om);
@@ -309,10 +309,10 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
     string fieldanon  = om->onionname;
     string tableanon  = fm->tm->anonTableName;
 
-    //removes onion layer at the DB 
+    //removes onion layer at the DB
     stringstream query;
     query << "UPDATE " << tableanon << " SET " << fieldanon  << " = ";
-    
+
     Item * decUDF = om->layers.back()->decryptUDF(stringToItemField(fieldanon,     tableanon, itf),
 		  				  stringToItemField(fm->salt_name, tableanon, itf));
 
@@ -325,7 +325,7 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
     assert_s(a.ps->conn->execute(usedb),  "failed to execute " + usedb);
     //execute decryption query
     assert_s(a.ps->conn->execute(query.str()), "failed to execute onion decryption query");
-        
+
     LOG(cdb_v) << "adjust onions: \n" << query.str() << "\n";
 
     //remove onion layer in schema
@@ -336,7 +336,7 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
 }
 
 /*
- * Adjusts the onion for a field fm/itf to level: tolevel. 
+ * Adjusts the onion for a field fm/itf to level: tolevel.
  *
  * Issues queries for decryption to the DBMS.
  *
@@ -432,7 +432,7 @@ decrypt_item_layers(Item * i, onion o,  list<EncLayer *> & layers, uint64_t IV, 
     }
 
     // Encrypted item
-    
+
     Item * dec = i;
     Item * prev_dec = NULL;
 
@@ -464,7 +464,7 @@ encrypt_item(Item * i, const OLK & olk, Analysis & a)
 {
     if (olk.l == SECLEVEL::PLAINVAL)
         return i;
- 
+
     FieldMeta * fm = olk.key;
     assert(fm);
 
@@ -482,7 +482,7 @@ encrypt_item(Item * i, const OLK & olk, Analysis & a)
 static void
 encrypt_item_all_onions(Item * i, FieldMeta * fm,
                         uint64_t IV, vector<Item*> & l, Analysis &a) {
-    
+
     for (auto it : fm->onions) {
         l.push_back(encrypt_item_layers(i, it.first, it.second->layers, a, fm, IV));
     }
@@ -601,12 +601,12 @@ static class CItemFuncNameDir : public CItemTypeDir<std::string> {
 /*
  * Helper functions to look up via directory & invoke method.
  */
-static inline RewritePlan * 
+static inline RewritePlan *
 gather(Item *i, reason &tr, Analysis & a)
 {
     return itemTypes.do_gather(i, tr, a);
 }
-    
+
 // An implementation of gather for the common case
 // Works for Item_func with two arguments, solution encset is intersect of
 // children and my_es
@@ -643,7 +643,7 @@ typical_gather(Analysis & a, Item_func * i,
     } else {
 	out_es = PLAIN_EncSet;
     }
-    
+
     my_r = reason(out_es, why, i);
     my_r.add_child(r1);
     my_r.add_child(r2);
@@ -671,7 +671,7 @@ analyze_update(Item_field * field, Item * val, Analysis & a) {
     RewritePlan * rp = gather(val, r, a);
     a.rewritePlans[val] = rp;
     a.rewritePlans[field] = gather(field, r, a);
-    
+
     //TODO: an optimization could be performed here to support more updates
     // For example: SET x = x+1, x = 2 --> no need to invalidate DET and OPE
     // onions because first SET does not matter
@@ -724,7 +724,7 @@ static Item *
 do_optimize_const_item(T *i, Analysis &a) {
 
     return i;
-    
+
     /* TODO for later
     if (i->const_item()) {
         // ask embedded DB to eval this const item,
@@ -742,7 +742,7 @@ do_optimize_const_item(T *i, Analysis &a) {
 
 	DBResult * dbres = NULL;
 	assert(a.ps->e_conn->execute(q, dbres));
-	
+
         THD *thd = current_thd;
         assert(thd != NULL);
 
@@ -835,7 +835,7 @@ template <class T>
 static void
 rewrite_args_FN(T * i, const OLK & constr,
 		const RewritePlanOneOLK * rp, Analysis &a) {
-    
+
     Item **args = i->arguments();
     uint count = i->argument_count();
     for (uint x = 0; x < count; x++) {
@@ -896,7 +896,7 @@ class CItemSubtype : public CItemType {
     }
     virtual Item * do_rewrite_type(T *i,
 				   const OLK & constr, const RewritePlan * rp,
-				   Analysis & a) const { 
+				   Analysis & a) const {
         LOG(cdb_v) << "do_rewrite_type L676 " << *i;
 	assert_s(false, "why is this rewrite called?");
         return i;
@@ -944,7 +944,7 @@ intersect(const EncSet & es, FieldMeta * fm) {
         if ((ed_it != fm->encdesc.olm.end()) && (!fm->onions[o]->stale)) {
             //an onion to keep
             res[o] = LevelFieldPair(min(it.second.first, ed_it->second), fm);
-        } 
+        }
     }
 
     return res;
@@ -976,7 +976,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 	EncSet es  = EncSet(fm);
 
 	tr = reason(es, "is a field", i);
-	
+
 	return new RewritePlan(es, tr);
 
     }
@@ -987,7 +987,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 		    Analysis & a) const
     {
         LOG(cdb_v) << "do_rewrite_type FIELD_ITEM " << *i;
-        
+
 	FieldMeta *fm = a.ps->schema->getFieldMeta(i->table_name, i->field_name);
 	assert(constr.key == fm);
 
@@ -998,16 +998,16 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 	}
 
 	Item_field * res = make_item(i);
-	
+
 	if (!fm->isEncrypted()) { // Not encrypted
 	    return res;
 	}
-	    
+
 	// Encrypted item
-	    
+
 	res->table_name = make_thd_string(anonymize_table_name(i->table_name, a));
 	res->field_name = make_thd_string(fm->onions[constr.o]->onionname);
-	
+
         return res;
     }
 /*
@@ -1026,9 +1026,9 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 	assert_s(false, "field " + fm->fname + " does not have any decryptable onions for projection");
 	return OLK();
     }
-*/  
+*/
 
-    //do we need do_rewrite_insert? 
+    //do we need do_rewrite_insert?
     virtual void
     do_rewrite_insert_type(Item_field *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
@@ -1041,7 +1041,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 	}
 
 	// Encrypted field
-	
+
 	Item_field * new_field = NULL;
         for (auto it = fm->onions.begin();
              it != fm->onions.end(); ++it) {
@@ -1073,7 +1073,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
 
 	tr = reason(FULL_EncSet, "is a constant", i);
 	return new RewritePlan(FULL_EncSet_Str, tr);
-	
+
     }
     virtual Item * do_optimize_type(Item_string *i, Analysis & a) const {
         return i;
@@ -1083,7 +1083,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
 				   const OLK & constr, const RewritePlan * rp,
 				   Analysis & a) const {
         LOG(cdb_v) << "do_rewrite_type String item " << *i;
-        
+
         return encrypt_item(i, constr, a);
     }
 
@@ -1096,7 +1096,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
 	}
 
 	// Encrypted
-       
+
 	uint64_t salt = 0;
 
 	if (fm->has_salt) {
@@ -1106,10 +1106,10 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
         }
 
         encrypt_item_all_onions(i, fm, salt, l, a);
-       
+
         if (fm->has_salt) {
             l.push_back(new Item_int((ulonglong) salt));
-        }	
+        }
     }
 } ANON;
 
@@ -1129,7 +1129,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
 	return new RewritePlan(FULL_EncSet_Int, tr);
 
     }
-    
+
     virtual Item * do_optimize_type(Item_num *i, Analysis & a) const {
         return i;
     }
@@ -1138,9 +1138,9 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
 				   const OLK & constr, const RewritePlan * rp,
 				   Analysis & a) const {
         LOG(cdb_v) << "do_rewrite_type " << *i << endl;
-        return encrypt_item(i, constr, a);	
+        return encrypt_item(i, constr, a);
     }
- 
+
     virtual void
     do_rewrite_insert_type(Item_num *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
@@ -1150,7 +1150,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
 	}
 
 	//Encrypted
-	
+
         uint64_t salt = 0;
         if (fm->has_salt) {
             salt = randomValue();
@@ -1163,7 +1163,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
         for (auto it = fm->onions.begin(); it != fm->onions.end();it++) {
             l.push_back(encrypt_item_layers(i, it->first, it->second->layers, a, fm, salt));
         }
-	
+
         if (fm->has_salt) {
              l.push_back(new Item_int((ulonglong) salt));
         }
@@ -1277,7 +1277,7 @@ static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
     }
 } ANON;
 
-    
+
 template<Item_func::Functype FT, class IT>
 class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
     virtual RewritePlan * do_gather_type(Item_func *i, reason &tr, Analysis & a) const {
@@ -1363,7 +1363,7 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
 	    if (!argitem) {
 		break;
 	    }
-	    newlist.push_back(rewrite(argitem, olk, a));	    
+	    newlist.push_back(rewrite(argitem, olk, a));
 	}
 
 	IT * res = new IT(newlist);
@@ -1415,7 +1415,7 @@ class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
     virtual Item * do_optimize_type(Item_func_additive_op *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-    
+
     virtual Item * do_rewrite_type(Item_func_additive_op *i,
 				   const OLK & constr, const RewritePlan * _rp,
 				   Analysis & a) const {
@@ -1426,14 +1426,14 @@ class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
 	Item **args = i->arguments();
 
 	RewritePlanOneOLK * rp = (RewritePlanOneOLK *) _rp;
-	
+
         cerr << "Rewrite plan is " << rp << "\n";
 
 	Item * arg0 = itemTypes.do_rewrite(args[0],
 					   rp->olk, rp->childr_rp[0], a);
 	Item * arg1 = itemTypes.do_rewrite(args[1],
 					   rp->olk, rp->childr_rp[1], a);
-	
+
 	EncLayer *el = getAssert(constr.key->onions, oAGG)->layers.back();
 	assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
 	return ((HOM*)el)->sumUDF(arg0, arg1);
@@ -1697,7 +1697,7 @@ static class ANON : public CItemSubtypeFN<Item_date_add_interval, str_date_add_i
     virtual RewritePlan * do_gather_type(Item_date_add_interval *i, reason &tr, Analysis & a) const {
 	/* Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++) {
-            // XXX perhaps too conservative 
+            // XXX perhaps too conservative
             analyze(args[x], reason(EMPTY_EncSet, "date_add", i, &tr), a);
         }
         return tr.encset;
@@ -1759,7 +1759,7 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
 	assert_s(false, "LIKE needs to be adapted to new RewritePlans");
 	/*
 	LOG(cdb_v) << "Item_func do_gather_type " << *i;
-	
+
 	Item **args = i->arguments();
 	assert_s(i->argument_count() == 2, "expecting LIKE to have two arguments");
 
@@ -1768,13 +1768,13 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
 	    string s(args[1]->str_value.ptr(), args[1]->str_value.length());
 
 	    if (s.find('%') == s.npos && s.find('_') == s.npos) {
-                // some queries actually use LIKE as an equality check.. 
+                // some queries actually use LIKE as an equality check..
 		return typical_gather(a, i, EQ_EncSet, "LIKE equality", tr, false, PLAIN_EncSet);
-		
+
             } else {
-		
-		// XXX check if pattern is one we can support? 
-	     
+
+		// XXX check if pattern is one we can support?
+
 		reason r1;
 		RewritePlan * rp1 = gather(args[0], r1, a);
 
@@ -1784,7 +1784,7 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
 		    cerr << "cannot support " << i << " BECAUSE it needs any of " << Search_EncSet << "\n" \
 			 << " but field only supports  " << rp1->es_out << "\n";
 		}
-		
+
 		stringstream ss;
 		ss << "like:'" << s << "'";
 		tr = reason(PLAIN_EncSet, ss.str(), i);
@@ -1793,7 +1793,7 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
 		return new RewritePlan(PLAIN_OLK, solution.chooseOne(), tr);
             }
         } else {
-            // we cannot support non-constant search patterns 
+            // we cannot support non-constant search patterns
 	    assert_s(false, "we cannot support search patterns not of the form (field like const string)");
 	    //for (uint x = 0; x < i->argument_count(); x++)
             //    analyze(args[x], reason(EMPTY_EncSet, "like-non-const", i, &tr), a);
@@ -1810,24 +1810,24 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
 				   const OLK & constr, const RewritePlan *rp,
 				   Analysis & a) const {
 /*	LOG(cdb_v) << "Item_func_like do_rewrite_type " << *i;
-	
+
 	assert_s(i->argument_count() == 2, "expecting LIKE to have two arguements");
 	Item **args = i->arguments();
-	
+
 	if ((args[0]->type() == Item::Type::FIELD_ITEM) && (args[1]->type() == Item::Type::STRING_ITEM)) {
 
 	    string s(args[1]->str_value.ptr(), args[1]->str_value.length());
 
 	    if (s.find('%') == s.npos && s.find('_') == s.npos) {
-                // some queries actually use LIKE as an equality check.. 
+                // some queries actually use LIKE as an equality check..
 
 		Item_func_like * res = new Item_func_like(args[0], args[1], NULL, false);
 		do_rewrite_type_args(i, res, constr, a);
-		
+
 		return res;
-	    		
+
             } else {
-		// XXX check if pattern is one we can support? 
+		// XXX check if pattern is one we can support?
 
 		RewritePlan * plan = getAssert(a.itemRewritePlans, (Item*) i);
 		auto childr_plan = getAssert(plan->plan, constr);
@@ -1836,13 +1836,13 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
 		if (child_OLK == PLAIN_OLK) {
 		    return new Item_func_like(args[0], args[1], NULL, false);
 		}
-		
+
 		Item * field = itemTypes.do_rewrite(args[0], child_OLK, a);
 		args[0]->name = NULL; //no alias
 
 		Item * expr = args[1];
 		FieldMeta * fm = child_OLK.key;
-		
+
 		EncLayer * el = getAssert(fm->onions, oSWP)->layers.back();
 		assert_s(el->level() == SECLEVEL::SEARCH, "incorrect onion  level on onion oSWP");
 
@@ -1853,12 +1853,12 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
             }
         }
 
-	// we cannot support non-constant search patterns 
+	// we cannot support non-constant search patterns
 	assert_s(false, "we cannot support search patterns not of the form (field like constant string)");
 */
 	assert_s(false, "LIKE needs to be updated to new RewritePlan interface");
 	return NULL;
-        	
+
     }
 } ANON;
 
@@ -1921,14 +1921,14 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
 	}
 	//at least one has to be a constant as we don't support join now
 	assert_s(args[0]->const_item() || args[1]->const_item(), "ope join not yet implemented");
-	
+
 	reason r1, r2;
 	RewritePlan ** childr_rp = new RewritePlan*[2];
 	childr_rp[0] = gather(args[0], r1, a);
         childr_rp[1] = gather(args[1], r2, a);
 	EncSet es1 = childr_rp[0]->es_out;
 	EncSet es2 = childr_rp[1]->es_out;
-	
+
 	EncSet needed_es = ORD_EncSet;
 
 	EncSet supported_es = needed_es.intersect(es1).intersect(es2);
@@ -1953,16 +1953,16 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
     virtual Item * do_optimize_type(Item_func_min_max *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
- 
+
     virtual Item * do_rewrite_type(Item_func_min_max *i,
 				   const OLK & constr, const RewritePlan * _rp,
-				   Analysis & a) const {	
+				   Analysis & a) const {
 	RewritePlanOneOLK * rp = (RewritePlanOneOLK *) _rp;
 
 	if (rp->olk == PLAIN_OLK) { // no change
 	    return i;
 	}
-	
+
 	// replace with IF( cond_arg0 cond cond_arg1, args0, args1)
 	Item ** args = i->arguments();
 	Item * cond_arg0 = itemTypes.do_rewrite(args[0],
@@ -1978,7 +1978,7 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
 	} else {
 	    cond = new Item_func_lt(cond_arg0, cond_arg1);
 	}
-	
+
 	return new Item_func_if(cond,
 				itemTypes.do_rewrite(args[0], constr,
 						     rp->childr_rp[0], a),
@@ -1997,7 +1997,7 @@ static CItemMinMax<str_least, Item_func_min> ANON;
 
 
 extern const char str_strcmp[] = "strcmp";
-static class ANON : public CItemSubtypeFN<Item_func_strcmp, str_strcmp> {     
+static class ANON : public CItemSubtypeFN<Item_func_strcmp, str_strcmp> {
     virtual RewritePlan * do_gather_type(Item_func_strcmp *i, reason &tr, Analysis & a) const {
         //cerr << "do_a_t Item_func_strcmp reason " << tr << "\n";
 	/* Item **args = i->arguments();
@@ -2021,23 +2021,23 @@ class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
             EncSet e = gather(i->get_arg(0), new_tr, a);
             if (e.intersect(EQ_EncSet).empty())
                 thrower() << "count distinct";
-	} 
+	}
 	return PLAIN_EncSet;*/
 	UNIMPLEMENTED;
-       
+
     }
     virtual Item * do_rewrite_type(Item_sum_count *i,
 				   const OLK & constr, const RewritePlan * rp,
 				   Analysis & a) const {
 /*	Item_sum_count * res = new Item_sum_count(current_thd, i);
-	
+
 	if (i->has_with_distinct()) {
 	    rewrite_agg_args(res, a);
 	}
 	ItemMeta *im = getAssert(a.itemToMeta, (Item *)i);
 
 	addToReturn(a.rmeta, a.pos++, im, false, i->name);
-	
+
 	return res;
 */
 	UNIMPLEMENTED;
@@ -2054,11 +2054,11 @@ class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
 	/*reason new_tr = reason(tr.encset.intersect(ORD_EncSet), "min/max agg", i, &tr, false);
 
 	Item * child_item = i->get_arg(0);
-	
+
         analyze(child_item, new_tr, a);
 
 	new_tr.encset.setFieldForOnion(oOPE, getAssert(a.itemToFieldMeta, (Item_field *)child_item));
-	
+
         return new_tr.encset;
 	*/
 	UNIMPLEMENTED;
@@ -2072,7 +2072,7 @@ class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
 	rewrite_agg_args(res, a);
 
 	ItemMeta * im = getAssert(a.itemToMeta, (Item *)i);
-	
+
 	//record information for decrypting results
 	addToReturn(a.rmeta, a.pos++, im,
 		    false, i->name);
@@ -2100,18 +2100,18 @@ static CItemChooseOrder<Item_sum::Sumfunctype::MAX_FUNC, Item_sum_max> ANON;
 template<Item_sum::Sumfunctype SFT>
 class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
     virtual RewritePlan * do_gather_type(Item_sum_sum *i, reason &tr, Analysis & a) const {
-	
+
 	LOG(cdb_v) << "gather Item_sum_sum " << *i;
-	assert_s(i->get_arg_count() == 1, "expected one argument for sum"); 
+	assert_s(i->get_arg_count() == 1, "expected one argument for sum");
 	Item * child_item = i->get_arg(0);
 	reason child_r;
 	RewritePlan ** childr_rp = new RewritePlan*[1];
 	RewritePlan * child_rp = gather(child_item, child_r, a);
 	childr_rp[0] = child_rp;
 	EncSet child_es = child_rp->es_out;
-	
+
 	if (i->has_with_distinct()) {
-	    UNIMPLEMENTED;	    
+	    UNIMPLEMENTED;
 	}
 
 	EncSet my_es = ADD_EncSet;
@@ -2135,7 +2135,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
 	LOG(cdb_v) << "Item_sum_sum rewrite " << *i;
 
 	list<Item *> args = rewrite_agg_args(i, constr, (RewritePlanOneOLK *)rp, a, 1);
-		
+
 	FieldMeta * fm = constr.key;
 	EncLayer * el = getAssert(fm->onions, oAGG, "onion oAGG not in onions")->layers.back();
 	assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
@@ -2167,11 +2167,11 @@ static class ANON : public CItemSubtypeST<Item_func_group_concat, Item_sum::Sumf
         uint arg_count_field = i->*rob<Item_func_group_concat, uint,
                 &Item_func_group_concat::arg_count_field>::ptr();
         for (uint x = 0; x < arg_count_field; x++) {
-            // XXX could perform in the proxy.. 
+            // XXX could perform in the proxy..
             analyze(i->get_arg(x), reason(EMPTY_EncSet, "group_concat", i, &tr), a);
         }
 
-        // XXX order, unused in trace queries.. 
+        // XXX order, unused in trace queries..
         return tr.encset;
     */
 	UNIMPLEMENTED;
@@ -2260,13 +2260,13 @@ process_order(Analysis & a, SQL_I_List<ORDER> & lst) {
 	reason r;
 	gather(*o->item, r, a);
     }
-    
+
 }
 
 //TODO: not clear how these process_*_lex and rewrite_*_lex overlap, cleanup
 static void
 process_filters_lex(st_select_lex * select_lex, Analysis & a) {
-    
+
     if (select_lex->where) {
 	analyze(select_lex->where, a);
     }
@@ -2281,7 +2281,7 @@ process_filters_lex(st_select_lex * select_lex, Analysis & a) {
 
     process_order(a, select_lex->group_list);
     process_order(a, select_lex->order_list);
-    
+
 }
 
 
@@ -2316,7 +2316,7 @@ rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
 	    assert(false);
 	}
 	OLK olk = es.chooseOne();
-	
+
 	Item * new_item = itemTypes.do_rewrite(*o->item, olk, rp, a);
 	ORDER * neworder = make_order(o, new_item);
 	if (prev == NULL) {
@@ -2333,7 +2333,7 @@ static st_select_lex *
 rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
 
     st_select_lex * new_select_lex = copy(select_lex);
-    
+
     if (select_lex->where) {
         set_where(new_select_lex, rewrite(select_lex->where, PLAIN_OLK, a));
     }
@@ -2349,13 +2349,13 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
 
     rewrite_order(a, new_select_lex->group_list, EQ_EncSet, "group by");
     rewrite_order(a, new_select_lex->order_list, ORD_EncSet, "order by");
-    
+
     return new_select_lex;
 }
 
 static bool
 needsSalt(OLK olk) {
-    return olk.key && olk.key->has_salt && needsSalt(olk.l);   
+    return olk.key && olk.key->has_salt && needsSalt(olk.l);
 }
 
 static void
@@ -2378,7 +2378,7 @@ static st_select_lex *
 rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
 {
     st_select_lex * new_select_lex = copy(select_lex);
-    
+
     LOG(cdb_v) << "rewrite select lex input is " << *select_lex;
     auto item_it = List_iterator<Item>(select_lex->item_list);
 
@@ -2388,9 +2388,9 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
         if (!item)
             break;
         LOG(cdb_v) << "rewrite_select_lex " << *item << " with name " << item->name;
-	rewrite_proj(item, getAssert(a.rewritePlans, item), a, newList);     
+	rewrite_proj(item, getAssert(a.rewritePlans, item), a, newList);
     }
-    
+
     // TODO(stephentu): investigate whether or not this is a memory leak
     new_select_lex->item_list = newList;
 
@@ -2473,14 +2473,14 @@ rewrite_table_list(TABLE_LIST *t, Analysis &a)
 }
 
 
-static SQL_I_List<TABLE_LIST> 
+static SQL_I_List<TABLE_LIST>
 rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a)
 {
     if (!tlist.elements) {
 	return SQL_I_List<TABLE_LIST>();
     }
     TABLE_LIST * tl = rewrite_table_list(tlist.first, a);
-    
+
     SQL_I_List<TABLE_LIST> * new_tlist = oneElemList<TABLE_LIST>(tl);
 
     TABLE_LIST * prev = tl;
@@ -2491,16 +2491,16 @@ rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a)
 	prev = new_tbl;
     }
     prev->next_local = NULL;
-	
+
     return *new_tlist;
 }
 
 
-static List<TABLE_LIST> 
+static List<TABLE_LIST>
 rewrite_table_list(List<TABLE_LIST> tll, Analysis & a)
 {
     List<TABLE_LIST> * new_tll = new List<TABLE_LIST>();
-    
+
     List_iterator<TABLE_LIST> join_it(tll);
 
     for (;;) {
@@ -2511,7 +2511,7 @@ rewrite_table_list(List<TABLE_LIST> tll, Analysis & a)
 
         TABLE_LIST * new_t = rewrite_table_list(t, a);
 	new_tll->push_back(new_t);
-	
+
         if (t->nested_join) {
             new_t->nested_join->join_list = rewrite_table_list(t->nested_join->join_list, a);
             return *new_tll;
@@ -2538,26 +2538,26 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
 
     fm->onions.clear();
     fm->encdesc.clear();
-    
+
     for (auto it: ol) {
         onion o = it.first;
         OnionMeta * om = new OnionMeta();
         fm->onions[o] = om;
-	
+
         om->onionname = anonymizeFieldName(index, o, fm->fname, false);
-	
-        if (mKey) { 
+
+        if (mKey) {
             //generate enclayers for encrypted field
             for (auto l: it.second) {
                 PRNG * key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);
                 om->layers.push_back(EncLayerFactory::encLayer(o, l, cf, key));
             }
         }
-	
+
         LOG(cdb_v) << "adding onion layer " << om->onionname << " for " << fm->fname;
-	
+
         //set outer layer
-        fm->encdesc.olm[o] = it.second.back(); 
+        fm->encdesc.olm[o] = it.second.back();
     }
 }
 
@@ -2574,7 +2574,7 @@ init_onions(AES_KEY * mKey, FieldMeta * fm, Create_field * cf, uint index = 0) {
 
     fm->has_salt = true;
     fm->salt_name = getFieldSalt(index, fm->tm->anonTableName);
-    
+
     if (IsMySQLTypeNumeric(cf->sql_type)) {
         init_onions_layout(mKey, fm, index, cf, NUM_ONION_LAYOUT);
     } else {
@@ -2609,7 +2609,7 @@ add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
     assert(lex->sql_command == SQLCOM_CREATE_TABLE);
 
     LOG(cdb_v) << "add_table encByDefault " << encByDefault;
-    
+
     check_table_not_exists(a, lex, table);
 
     TableMeta *tm = new TableMeta();
@@ -2638,18 +2638,18 @@ add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
         fm->fname         = string(fm->sql_field->field_name);
         fm->index         = index;
 
-        if (encByDefault) { 
-            init_onions(a.ps->masterKey, fm, field, index);            
+        if (encByDefault) {
+            init_onions(a.ps->masterKey, fm, field, index);
         } else {
             init_onions(NULL, fm, field);
         }
-        
+
         assert(tm->fieldMetaMap.find(fm->fname) == tm->fieldMetaMap.end());
         tm->fieldMetaMap[fm->fname] = fm;
         tm->fieldNames.push_back(fm->fname);//TODO: do we need fieldNames?
 
         index++;
-        
+
     }
 
 }
@@ -2661,7 +2661,7 @@ static void rewrite_create_field(const string &table_name,
                                  vector<Create_field *> &l)
 {
     LOG(cdb_v) << "in rewrite create field for " << *f;
-    
+
     FieldMeta *fm = a.ps->schema->getFieldMeta(table_name, f->field_name);
 
     if (!fm->isEncrypted()) {
@@ -2671,7 +2671,7 @@ static void rewrite_create_field(const string &table_name,
     }
 
     // Encrypted field
-    
+
     //check if field is not encrypted
     if (fm->onions.empty()) {
         l.push_back(f);
@@ -2686,7 +2686,7 @@ static void rewrite_create_field(const string &table_name,
 	EncLayer * last_layer = oit->second->layers.back();
 	//create field with anonymous name
 	Create_field * new_cf = last_layer->newCreateField(oit->second->onionname.c_str());
-		
+
         l.push_back(new_cf);
     }
 
@@ -2717,7 +2717,8 @@ static void rewrite_key(const string &table_name,
 static void
 create_table_embedded(Connect * e_conn, const string & cur_db,
     const string & create_q) {
-      
+
+    assert(e_conn->execute("create database if not exists " + cur_db + ";"));
     assert(e_conn->execute("use " + cur_db + ";"));
     assert(e_conn->execute(create_q));
 }
@@ -2743,11 +2744,11 @@ process_create_lex(LEX * lex, Analysis & a,
     add_table(a, table, lex, encByDefault);
 }
 
-static LEX * 
+static LEX *
 rewrite_create_lex(LEX *lex, Analysis &a)
 {
     LEX * new_lex = copy(lex);
-    
+
     // table name
     const string &table =
         lex->select_lex.table_list.first->table_name;
@@ -2823,13 +2824,13 @@ stalefy(FieldMeta * fm, const EncSet &  es) {
     }
 }
 
-static LEX * 
+static LEX *
 rewrite_update_lex(LEX *lex, Analysis &a)
 {
     LEX * new_lex = copy(lex);
-    
+
     LOG(cdb_v) << "rewriting update \n";
-    
+
     assert_s(lex->select_lex.item_list.head(), "update needs to have item_list");
 
     // multi-princ init
@@ -2841,13 +2842,13 @@ rewrite_update_lex(LEX *lex, Analysis &a)
 
     // Rewrite filters
     set_select_lex(new_lex, rewrite_filters_lex(&new_lex->select_lex, a));
- 
+
     // Rewrite SET values
     assert(lex->select_lex.item_list.head());
     assert(lex->value_list.head());
 
     List<Item> res_items, res_vals;
-    
+
     auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
     auto val_it = List_iterator<Item>(lex->value_list);
 
@@ -2862,12 +2863,12 @@ rewrite_update_lex(LEX *lex, Analysis &a)
         }
         assert(i->type() == Item::FIELD_ITEM);
         Item_field * fd = static_cast<Item_field*>(i);
-        
+
         FieldMeta * fm = a.ps->schema->getFieldMeta(fd->table_name, fd->field_name);
 
 	Item * val = val_it++;
 	assert(val != NULL);
-            
+
 	if (!fm->isEncrypted()) { // not encrypted field
 	    res_items.push_back(i);
 	    res_vals.push_back(val);
@@ -2883,23 +2884,23 @@ rewrite_update_lex(LEX *lex, Analysis &a)
 		 << val << " can only provide " << rp->es_out << " BECAUSE " << rp->r << "\n";
 	    assert(false);
 	}
-    
+
         // Determine salt for field
 	bool add_salt = false;
         if (fm->has_salt) {
             auto it_salt = a.salts.find(fm);
             if ((it_salt == a.salts.end()) && needsSalt(r_es)) {
 		add_salt = true;
-                salt_type salt = randomValue(); 
+                salt_type salt = randomValue();
                 a.salts[fm] = salt;
-            } 
+            }
         }
-        
+
 	Item * rew_fd = NULL;
-        
+
         // Rewrite field-value pair for every onion possible
         for (auto pair : r_es.osl) {
-	    OLK olk = {pair.first, pair.second.first, fm};            
+	    OLK olk = {pair.first, pair.second.first, fm};
             res_items.push_back(rew_fd = itemTypes.do_rewrite(i, olk,
 							      getAssert(a.rewritePlans, i), a));
             res_vals.push_back(itemTypes.do_rewrite(val, olk,
@@ -2915,12 +2916,12 @@ rewrite_update_lex(LEX *lex, Analysis &a)
 	    assert(rew_fd);
             res_items.push_back(make_item((Item_field *)rew_fd, fm->salt_name));
             res_vals.push_back(new Item_int((ulonglong) salt));
-        } 
-        
+        }
+
     }
 
     //TODO: cleanup old item and value list
-    
+
     new_lex->select_lex.item_list = res_items;
     new_lex->value_list = res_vals;
 
@@ -2936,7 +2937,7 @@ mp_insert_init(LEX *lex, Analysis &a)
     a.ps->mp->insertLex(lex, a.ps->schema, a.tmkm);
 }
 
-static LEX * 
+static LEX *
 rewrite_insert_lex(LEX *lex, Analysis &a)
 {
     LEX * new_lex = copy(lex);
@@ -3019,13 +3020,13 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
 
 static void
 process_update_lex(LEX * lex, Analysis & a) {
-  
+
     if (lex->select_lex.item_list.head()) {
 	assert(lex->value_list.head());
-	
+
 	auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
 	auto val_it = List_iterator<Item>(lex->value_list);
-	
+
         for (;;) {
             Item *i = fd_it++;
 	    Item * val = val_it++;
@@ -3037,7 +3038,7 @@ process_update_lex(LEX * lex, Analysis & a) {
 	    analyze_update(ifd, val, a);
 	}
     }
-    
+
     process_filters_lex(&lex->select_lex, a);
 
 
@@ -3112,7 +3113,7 @@ lex_rewrite(LEX * lex, Analysis & analysis)
 	return new_lex;
     }
     case SQLCOM_SELECT: {
-        LEX * new_lex = copy(lex); 
+        LEX * new_lex = copy(lex);
 	new_lex->select_lex.top_join_list = rewrite_table_list(lex->select_lex.top_join_list, analysis);
 	set_select_lex(new_lex, rewrite_select_lex(&new_lex->select_lex, analysis));
         return new_lex;
@@ -3132,7 +3133,7 @@ drop_table_update_meta(const string &q,
                        Analysis &a)
 {
     assert(a.ps->e_conn->execute("START TRANSACTION;"));
-    
+
     TABLE_LIST *tbl = lex->select_lex.table_list.first;
     for (; tbl; tbl = tbl->next_local) {
         char* dbname = tbl->db;
@@ -3150,7 +3151,7 @@ drop_table_update_meta(const string &q,
         a.ps->schema->totalTables--;
         a.ps->schema->tableMetaMap.erase(table);
 
-	assert(a.ps->e_conn->execute(q));	    
+	assert(a.ps->e_conn->execute(q));
     }
 
     assert(a.ps->e_conn->execute("COMMIT"));
@@ -3168,7 +3169,7 @@ add_table_update_meta(const string &q,
     char* table  = lex->select_lex.table_list.first->table_name;
     TableMeta *tm = a.ps->schema->tableMetaMap[table];
     assert(tm != NULL);
-    
+
     {
         ostringstream s;
         s << "INSERT INTO proxy_db.table_info VALUES ("
@@ -3225,12 +3226,12 @@ add_table_update_meta(const string &q,
 
     //need to update embedded schema with the new table
     a.ps->e_conn->execute(q);
-    
+
     a.ps->e_conn->execute("COMMIT");
 }
 
 //TODO: potential inconsistency problem because we update state,
-//but only the proxy is responsible for 
+//but only the proxy is responsible for
 static void
 updateMeta(const string & q, LEX * lex, Analysis & a)
 {
@@ -3289,32 +3290,32 @@ loadUDFs(Connect * conn) {
 }
 
 
-Rewriter::Rewriter(ConnectionInfo ci, 
+Rewriter::Rewriter(ConnectionInfo ci,
                    const std::string &embed_dir,
                    bool multi,
 		   bool encByDefault)
-{   
+{
 
     init_mysql(embed_dir);
 
     ps.ci = ci;
     ps.encByDefault = encByDefault;
-    
+
     urandom u;
     ps.masterKey = getKey(u.rand_string(AES_KEY_BYTES));
 
     if (multi) {
 	ps.encByDefault = false;
     }
-    
+
     ps.e_conn = Connect::getEmbedded(embed_dir);
-    
+
     ps.conn = new Connect(ci.server, ci.user, ci.passwd, ci.port);
 
     ps.schema = new SchemaInfo();
     ps.totalTables = 0;
     //initSchema(ps);
-  
+
     loadUDFs(ps.conn);
 
     if (multi) {
@@ -3354,12 +3355,12 @@ processAnnotation(Annotation annot, Analysis &a)
 {
     MultiPrinc * mp = a.ps->mp;
     SchemaInfo * schema = a.ps->schema;
-    
+
     if (mp && annot.type != ENCFOR) {
         bool encryptField;
         return mp->processAnnotation(annot, encryptField, schema);
     }
-    
+
     //TODO: use EncLayer CreateField information
     assert_s(annot.type == SINGLE_ENC || annot.type == ENCFOR,
 	     "parser is in single principal mode, but annotations are for multiple principals");
@@ -3368,7 +3369,7 @@ processAnnotation(Annotation annot, Analysis &a)
     LOG(cdb_v) << "table is " << annot.getPrimitiveTableName() << "; field is " << annot.getPrimitiveFieldName();
 
     FieldMeta * fm = schema->getFieldMeta(annot.getPrimitiveTableName(), annot.getPrimitiveFieldName());
-  
+
     if (mp) {
         init_onions_mp(a.ps->masterKey, fm, fm->sql_field, fm->index);
     } else {
@@ -3379,7 +3380,7 @@ processAnnotation(Annotation annot, Analysis &a)
         bool encryptField;
         return mp->processAnnotation(annot, encryptField, schema);
     }
-    
+
     list<string> query_list;
     string onionname = "";
 
@@ -3387,10 +3388,10 @@ processAnnotation(Annotation annot, Analysis &a)
         onion o = pr.first;
         onionname = fm->onions[o]->onionname;
         Create_field * cf = fm->onions[o]->layers.back()->newCreateField(onionname);
-		
+
         stringstream query;
         query << "ALTER TABLE " << fm->tm->anonTableName;
-        
+
         switch (o) {
         case oDET:
             LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets DET onion";
@@ -3400,7 +3401,7 @@ processAnnotation(Annotation annot, Analysis &a)
             LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets OPE onion";
             query << " ADD " << *cf << " AFTER " << fm->onions[oDET]->onionname << ";";
             break;
-        case oAGG: 
+        case oAGG:
             LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets AGG onion";
             query << " ADD " << *cf <<  " AFTER " << fm->onions[oOPE]->onionname << ";";
             break;
@@ -3411,10 +3412,10 @@ processAnnotation(Annotation annot, Analysis &a)
         default:
             assert_s(false, "unknown onion type");
         }
-        
+
         query_list.push_back(query.str());
     }
-    
+
     query_list.push_back("ALTER TABLE " + fm->tm->anonTableName  +
                          " ADD " + fm->salt_name + " " + TN_SALT +
                          " AFTER " + onionname + ";");
@@ -3436,16 +3437,16 @@ rewrite_helper(const string & q, Analysis & analysis,
 	       query_parse & p, const string & cur_db) {
     LOG(cdb_v) << "q " << q;
     list<string> queries;
-    
+
     //initialize multi-principal
     mp_init(analysis);
 
     if (p.annot) {
         return processAnnotation(*p.annot, analysis);
     }
-    
+
     LEX *lex = p.lex();
-    
+
     //login/logout command; nothing needs to be passed on
     if ((lex->sql_command == SQLCOM_DELETE || lex->sql_command == SQLCOM_INSERT)
         && analysis.ps->mp && analysis.ps->mp->checkPsswd(lex)){
@@ -3487,7 +3488,7 @@ noRewrite(LEX * lex) {
     case SQLCOM_SHOW_TABLES:
 	return true;
     case SQLCOM_SELECT: {
-	
+
     }
     default:
 	return false;
@@ -3497,13 +3498,13 @@ noRewrite(LEX * lex) {
 }
 
 // TODO: we don't need to pass analysis, enough to pass returnmeta
-QueryRewrite 
+QueryRewrite
 Rewriter::rewrite(const string & q, string *cur_db)
 {
-    
+
     assert(0 == mysql_thread_init());
     //assert(0 == create_embedded_thd(0));
-    
+
     query_parse p(*cur_db, q);
     QueryRewrite res;
 
@@ -3513,7 +3514,7 @@ Rewriter::rewrite(const string & q, string *cur_db)
 	res.queries.push_back(q);
 	return res;
     }
-    
+
     //for as long as there are onion adjustments
     while (true) {
 	Analysis analysis = Analysis(&ps);
@@ -3552,7 +3553,7 @@ string ReturnMeta::stringify() {
 static void
 mp_init_decrypt(MultiPrinc * mp, Analysis & a) {
     if (!mp) {return;}
-    
+
     a.tmkm.processingQuery = false;
     LOG(cdb_v) << a.rmeta->stringify() << "\n";
     for (auto i = a.rmeta->rfmeta.begin(); i != a.rmeta->rfmeta.end(); i++) {
@@ -3569,7 +3570,7 @@ Rewriter::decryptResults(ResType & dbres,
     Analysis a = Analysis(&ps);
     a.rmeta = rmeta;
     a.tmkm = rmeta->tmkm;
-	
+
     mp_init_decrypt(ps.mp, a);
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
@@ -3578,7 +3579,7 @@ Rewriter::decryptResults(ResType & dbres,
     ResType res = ResType();
 
     unsigned int index = 0;
-    
+
     // un-anonymize the names
     for (auto it = dbres.names.begin();
 	 it != dbres.names.end(); it++) {
@@ -3606,7 +3607,7 @@ Rewriter::decryptResults(ResType & dbres,
     for (unsigned int c = 0; c < cols; c++) {
         ReturnField rf = rmeta->rfmeta[c];
         FieldMeta * fm = rf.olk.key;
-	
+
         if (!rf.is_salt) {
             for (unsigned int r = 0; r < rows; r++) {
                 if (!fm || !fm->isEncrypted()) {
@@ -3624,7 +3625,7 @@ Rewriter::decryptResults(ResType & dbres,
             col_index++;
         }
     }
-    
+
 
     return res;
 }
