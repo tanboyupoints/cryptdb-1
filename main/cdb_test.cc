@@ -65,6 +65,10 @@ static inline std::string &trim(std::string &s) {
   return ltrim(rtrim(s));
 }
 
+static const std::string RED_BEGIN = "\033[1;31m";
+static const std::string GREEN_BEGIN = "\033[1;92m";
+static const std::string COLOR_END = "\033[0m ";
+
 /** returns true if should stop, to keep looping */
 static bool handle_line(Connect& conn, Rewriter& r, const string& q)
 {
@@ -79,7 +83,7 @@ static bool handle_line(Connect& conn, Rewriter& r, const string& q)
   if (q.find(":load") == 0) {
     string filename = q.substr(6);
     trim(filename);
-    cerr << "loading commands from: " << filename << endl;
+    cerr << RED_BEGIN << "loading commands from: " << filename << COLOR_END << endl;
     ifstream f(filename.c_str());
     if (!f.is_open()) {
       cerr << "cannot open file: " << filename << endl;
@@ -89,6 +93,7 @@ static bool handle_line(Connect& conn, Rewriter& r, const string& q)
       getline(f, line);
       if (line.empty())
         continue;
+      cerr << GREEN_BEGIN << line << COLOR_END << endl;
       if (!handle_line(conn, r, line)) {
         f.close();
         return false;
@@ -109,7 +114,9 @@ static bool handle_line(Connect& conn, Rewriter& r, const string& q)
       return true;
     }
     for (auto new_q = qr.queries.begin(); new_q != qr.queries.end(); new_q++) {
-      cerr << "\nENCRYPTED QUERY:\n" << *new_q << endl;
+      cerr << endl
+           << RED_BEGIN << "ENCRYPTED QUERY:" << COLOR_END << endl
+           << *new_q << endl;
       assert(conn.execute(*new_q, dbres));
     }
     if (!dbres) {
@@ -121,9 +128,9 @@ static bool handle_line(Connect& conn, Rewriter& r, const string& q)
     if (!res.ok) {
       return true;
     }
-    cerr << "\nRESULTS FROM DB: \n";
+    cerr << endl << RED_BEGIN << "RESULTS FROM DB:" << COLOR_END << endl;
     printRes(res);
-    cerr << "\n";
+    cerr << endl;
     ResType dec_res = r.decryptResults(res, qr.rmeta);
     printRes(dec_res);
 
