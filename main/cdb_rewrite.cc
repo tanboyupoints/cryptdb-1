@@ -2717,6 +2717,8 @@ static void rewrite_key(const string &table_name,
 static void
 create_table_embedded(Connect * e_conn, const string & cur_db,
     const string & create_q) {
+      
+    assert(e_conn->execute("use " + cur_db + ";"));
     assert(e_conn->execute(create_q));
 }
 
