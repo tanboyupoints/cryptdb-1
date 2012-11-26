@@ -2533,7 +2533,7 @@ rewrite_table_list(List<TABLE_LIST> tll, Analysis & a)
     return *new_tll;
 }
 
-		      
+
 // If mkey == NULL, the field is not encrypted
 static void
 init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf, onionlayout ol) {
@@ -3644,7 +3644,7 @@ printRes(const ResType & r) {
     std::stringstream ssn;
     for (unsigned int i = 0; i < r.names.size(); i++) {
         char buf[400];
-        snprintf(buf, sizeof(buf), "%-20s", r.names[i].c_str());
+        snprintf(buf, sizeof(buf), "%-25s", r.names[i].c_str());
         ssn << buf;
     }
     std::cerr << ssn.str() << std::endl;
@@ -3657,7 +3657,7 @@ printRes(const ResType & r) {
             char buf[400];
             std::stringstream sstr;
             sstr << *r.rows[i][j];
-            snprintf(buf, sizeof(buf), "%-20s", sstr.str().c_str());
+            snprintf(buf, sizeof(buf), "%-25s", sstr.str().c_str());
             ss << buf;
         }
         std::cerr << ss.str() << std::endl;
