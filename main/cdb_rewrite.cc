@@ -2048,44 +2048,6 @@ class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
 static CItemCount<Item_sum::Sumfunctype::COUNT_FUNC> ANON;
 static CItemCount<Item_sum::Sumfunctype::COUNT_DISTINCT_FUNC> ANON;
 
-
-template<Item_sum::Sumfunctype SFT, class IT>
-class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
-    virtual RewritePlan * do_gather_type(Item_sum_hybrid *i, reason &tr, Analysis & a) const {
-	/*reason new_tr = reason(tr.encset.intersect(ORD_EncSet), "min/max agg", i, &tr, false);
-
-	Item * child_item = i->get_arg(0);
-
-        analyze(child_item, new_tr, a);
-
-	new_tr.encset.setFieldForOnion(oOPE, getAssert(a.itemToFieldMeta, (Item_field *)child_item));
-
-        return new_tr.encset;
-	*/
-	UNIMPLEMENTED;
-    }
-    virtual Item * do_rewrite_type(Item_sum_hybrid *i,
-				   const OLK & constr, const RewritePlan * rp,
-				   Analysis & a) const {
-	/*cerr << "hybrid rewrite! \n";
-	IT * res = new IT(current_thd, (IT*)i);
-
-	rewrite_agg_args(res, a);
-
-	ItemMeta * im = getAssert(a.itemToMeta, (Item *)i);
-
-	//record information for decrypting results
-	addToReturn(a.rmeta, a.pos++, im,
-		    false, i->name);
-
-	cerr << "rewrite max/min item meta is " << im->stringify() << "\n";
-
-	return res;
-	*/
-	UNIMPLEMENTED;
-    }
-};
-
 static void
 check_if_empty(const EncSet & sol, Item * i, const EncSet & my_es, const reason & child_r) {
     if (sol.empty()) {
@@ -2095,6 +2057,34 @@ check_if_empty(const EncSet & sol, Item * i, const EncSet & my_es, const reason 
 	assert(false);
     }
 }
+
+template<Item_sum::Sumfunctype SFT, class IT>
+class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
+    virtual RewritePlan * do_gather_type(Item_sum_hybrid *i, reason &tr, Analysis & a) const {
+      assert(i->get_arg_count() == 1);
+      Item *child = i->get_arg(0);
+      RewritePlan **child_rp = new RewritePlan*[1];
+      reason r;
+      child_rp[0] = gather(child, r, a);
+      EncSet es = child_rp[0]->es_out;
+      EncSet needed = ORD_EncSet;
+      EncSet supported = needed.intersect(es);
+      check_if_empty(supported, i, needed, r);
+      OLK olk = supported.chooseOne();
+      EncSet out = EncSet(olk);
+      tr= reason(out, "min/max", i);
+      return new RewritePlanOneOLK(out, olk, child_rp, tr);
+    }
+
+    virtual Item * do_rewrite_type(Item_sum_hybrid *i,
+           const OLK & constr, const RewritePlan * rp,
+           Analysis & a) const {
+      list<Item *> args =
+        rewrite_agg_args(i, constr, (RewritePlanOneOLK *)rp, a, 1);
+      return new IT(args.front());
+    }
+};
+
 static CItemChooseOrder<Item_sum::Sumfunctype::MIN_FUNC, Item_sum_min> ANON;
 static CItemChooseOrder<Item_sum::Sumfunctype::MAX_FUNC, Item_sum_max> ANON;
 
