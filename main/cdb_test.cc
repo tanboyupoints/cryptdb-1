@@ -65,9 +65,10 @@ static inline std::string &trim(std::string &s) {
   return ltrim(rtrim(s));
 }
 
+static const std::string BOLD_BEGIN = "\033[1m";
 static const std::string RED_BEGIN = "\033[1;31m";
 static const std::string GREEN_BEGIN = "\033[1;92m";
-static const std::string COLOR_END = "\033[0m ";
+static const std::string COLOR_END = "\033[0m";
 
 /** returns true if should stop, to keep looping */
 static bool handle_line(Connect& conn, Rewriter& r, const string& q)
@@ -83,10 +84,10 @@ static bool handle_line(Connect& conn, Rewriter& r, const string& q)
   if (q.find(":load") == 0) {
     string filename = q.substr(6);
     trim(filename);
-    cerr << RED_BEGIN << "loading commands from: " << filename << COLOR_END << endl;
+    cerr << RED_BEGIN << "Loading commands from file: " << filename << COLOR_END << endl;
     ifstream f(filename.c_str());
     if (!f.is_open()) {
-      cerr << "cannot open file: " << filename << endl;
+      cerr << "ERROR: cannot open file: " << filename << endl;
     }
     while (f.good()) {
       string line;
@@ -128,10 +129,12 @@ static bool handle_line(Connect& conn, Rewriter& r, const string& q)
     if (!res.ok) {
       return true;
     }
-    cerr << endl << RED_BEGIN << "RESULTS FROM DB:" << COLOR_END << endl;
+    cerr << endl << RED_BEGIN << "ENCRYPTED RESULTS FROM DB:" << COLOR_END << endl;
     printRes(res);
     cerr << endl;
     ResType dec_res = r.decryptResults(res, qr.rmeta);
+
+    cerr << endl << RED_BEGIN << "DECRYPTED RESULTS:" << COLOR_END << endl;
     printRes(dec_res);
 
   } catch (std::runtime_error &e) {
@@ -165,8 +168,10 @@ main(int ac, char **av)
 
     r.setMasterKey("2392834");
 
+    string prompt = BOLD_BEGIN + "CryptDB=#" + COLOR_END + " ";
+
     for (;;) {
-        char *input = readline("CryptDB=# ");
+        char *input = readline(prompt.c_str());
         if (!input) break;
         string q(input);
         if (q.empty()) continue;
