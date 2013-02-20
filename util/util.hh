@@ -367,16 +367,6 @@ std::string processParen(std::list<std::string>::iterator & it, const std::list<
 std::string getBeforeChar(const std::string &str, char c);
 
 //performs a case insensitive search
-template<class T>
-bool contains(const std::string &token, const T &values)
-{
-    for (auto i = values.begin(); i != values.end(); i++)
-        if (equalsIgnoreCase(token, *i))
-            return true;
-    return false;
-}
-
-//performs a case insensitive search
 bool isOnly(const std::string &token, const std::string * values, unsigned int noValues);
 
 void addIfNotContained(const std::string &token, std::list<std::string> & lst);
@@ -393,6 +383,16 @@ std::string toLowerCase(const std::string &token);
 std::string toUpperCase(const std::string &token);
 
 bool equalsIgnoreCase(const std::string &s1, const std::string &s2);
+
+//performs a case insensitive search
+template<class T>
+bool contains(const std::string &token, const T &values)
+{
+    for (auto i = values.begin(); i != values.end(); i++)
+        if (equalsIgnoreCase(token, *i))
+            return true;
+    return false;
+}
 
 
 /**** HELPERS FOR EVAL **************/

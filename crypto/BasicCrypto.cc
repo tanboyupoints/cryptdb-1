@@ -35,7 +35,7 @@ marshallKey(const string &key)
     // we will be sending key as two big nums
     string res = "";
 
-    for (unsigned int i = 0; i < AES_KEY_SIZE/bitsPerByte; i++) {
+    for (unsigned int i = 0; i < AES_KEY_BYTES; i++) {
         res = res + strFromVal((unsigned int)(key[i])) + ",";
     }
 
@@ -49,7 +49,7 @@ getKey(const string & key) {
     AES_KEY * resKey = new AES_KEY();
     string mkey = key;
 
-    // PAD KEY to be AES_KEY_SIZE bits long
+    // PAD KEY to be AES_KEY_BYTES bytes long
     if (mkey.size() < AES_KEY_BYTES) {
       char buf[AES_KEY_BYTES];
       memset(buf, 0, sizeof(buf));
@@ -58,7 +58,7 @@ getKey(const string & key) {
     }
 
     AES_set_encrypt_key(
-            (const uint8_t *) mkey.data(), AES_KEY_SIZE, resKey);
+            (const uint8_t *) mkey.data(), AES_KEY_BYTES*8, resKey);
 
     return resKey;
 }
@@ -77,10 +77,8 @@ get_AES_enc_key(const string &key)
 
     AES_KEY * aes_key = new AES_KEY();
 
-    if (AES_set_encrypt_key((const uint8_t*) key.c_str(), AES_KEY_SIZE,
-            aes_key) <0) {
-        myassert(false, "problem with AES set encrypt ");
-    }
+    assert(AES_set_encrypt_key((const uint8_t*) key.c_str(), AES_KEY_BYTES*8,
+                               aes_key) >= 0);
 
     return aes_key;
 }
@@ -93,12 +91,10 @@ get_AES_dec_key(const string &key)
 
     AES_KEY * aes_key = new AES_KEY();
 
-    assert_s(key.size() == AES_KEY_SIZE/8, "key size is not AES_KEY_SIZE");
+    assert(key.size() == AES_KEY_BYTES);
     
-    if (AES_set_decrypt_key((const unsigned char*)key.c_str(), AES_KEY_SIZE,
-                            aes_key) <0) {
-        myassert(false, "problem with AES set encrypt ");
-    }
+    assert(AES_set_decrypt_key((const unsigned char*)key.c_str(), AES_KEY_BYTES*8,
+                               aes_key) >= 0);
     
     return aes_key;
 
@@ -174,7 +170,9 @@ getIVec(string salt)
 static vector<unsigned char>
 pad(vector<unsigned char> data, unsigned int unit)
 {
-    assert_s(unit < 256, "pad does not work for padding unit more than 256 bytes");
+    // pad does not work for padding unit more than 256 bytes
+    assert(unit < 256);
+
     size_t blocks = getBlocks(unit, data.size());
     size_t multipleLen = blocks * unit;
     size_t padding;
@@ -200,7 +198,7 @@ unpad(vector<unsigned char> data)
     //cerr << "padding to remove " << (int)data[len-1] << "\n";
     size_t actualLen = len - (int)data[len-1];
     //cerr << " len is " << len << " and data[len-1] " << (int)data[len-1] << "\n";
-    assert_s(data[len-1] <= len, "invalid pad value when unpadding");
+    assert(data[len-1] <= len);     // invalid pad value when unpadding
     vector<unsigned char> res(actualLen);
     memcpy(&res[0], &data[0], actualLen);
     return res;
@@ -366,7 +364,7 @@ marshallKey(PKCS * mkey, bool ispk)
     } else {
         key = DER_encode_RSA_public(mkey);
     }
-    assert_s(key.length() >= 1, "issue with RSA pk \n");
+    assert(key.length() >= 1);  // issue with RSA pk
     return key;
 }
 
@@ -399,7 +397,7 @@ encrypt(PKCS * key, const string &s)
 string
 decrypt(PKCS * key, const string &s)
 {
-    assert_s(s.length() == (uint)RSA_size(key), "fromlen is not RSA_size");
+    assert(s.length() == (uint)RSA_size(key));
     string toplain;
     toplain.resize(RSA_size(key));
 
