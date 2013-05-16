@@ -256,16 +256,6 @@ createInMemoryTables(ProxyState & ps)
     return;
 }
 
-static void
-initSchema(ProxyState & ps)
-{
-    createMetaTablesIfNotExists(ps);
-
-    createInMemoryTables(ps);
-
-    return;
-}
-
 
 /* TODO: put back
 static void
@@ -342,7 +332,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
                    ") ENGINE=InnoDB;"));
 }
 */
-	 /*
+
 static void
 printEC(Connect * e_conn, const string & command) {
     DBResult * dbres;
@@ -353,12 +343,24 @@ printEC(Connect * e_conn, const string & command) {
 
 static void
 printEmbeddedState(ProxyState & ps) {
-    printEC(ps.e_conn, "use proxy_db;");
+    printEC(ps.e_conn, "use pdb;");
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables;");
 
 }
-	 */
+
+static void
+initSchema(ProxyState & ps)
+{
+    createMetaTablesIfNotExists(ps);
+
+    printEmbeddedState(ps);
+
+    createInMemoryTables(ps);
+
+    return;
+}
+
 /*
 static void
 initSchema(ProxyState & ps)
@@ -3330,11 +3332,11 @@ drop_table_update_meta(const string &q,
         char* table  = tbl->table_name;
 
         ostringstream s;
-        s << "DELETE pdb.table_info, pdb.field_info "
-          << "FROM   pdb.table_info INNER JOIN pdb.field_info "
-          << "WHERE  pdb.table_info.id = pdb.field_info.table_info_id "
-          << "AND    pdb.table_info.name = '" << table << "'"
-          << "AND    pdb.table_info.database_name = '" << dbname << "'";
+        s << " DELETE pdb.table_info, pdb.field_info "
+          << " FROM   pdb.table_info INNER JOIN pdb.field_info "
+          << " WHERE  pdb.table_info.number = pdb.field_info.table_info_number "
+          << " AND    pdb.table_info.name = '" << table << "' "
+          << " AND    pdb.table_info.database_name = '" << dbname << "'";
 
 	assert(a.ps->e_conn->execute(s.str()));
 
@@ -3493,7 +3495,7 @@ add_table_update_meta(const string &q,
 
     {
         ostringstream s;
-        s << "INSERT INTO proxy_db.table_info VALUES ("
+        s << "INSERT INTO pdb.table_info VALUES ("
           << tm->tableNo << ", "
           << "'" << dbname << "'" << ", "
           << "'" << table << "'" << ", "
@@ -3511,7 +3513,7 @@ add_table_update_meta(const string &q,
         assert(it->first == fm->fname);
 
         ostringstream s;
-        s << "INSERT INTO proxy_db.column_info VALUES ("
+        s << "INSERT INTO pdb.column_info VALUES ("
           << "0, " /* auto assign id */
           << tm->tableNo << ", '"
           << fm->fname << "', ";
