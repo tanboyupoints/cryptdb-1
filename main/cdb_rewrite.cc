@@ -79,51 +79,51 @@ createMetaTablesIfNotExists(ProxyState & ps)
 
     // FIXME: Add UNIQUE's where appropriate.
     assert(ps.e_conn->execute(
-                "CREATE TABLE IF NOT EXISTS pdb.table_info"
-                "(number bigint NOT NULL,"
-                " anonymous_name varchar(64) NOT NULL,"
-                " name varchar(64) NOT NULL,"
-                " has_sensitive boolean,"
-                " has_salt boolean,"
-                " salt_name varchar(64) NOT NULL,"
-                " database_name varchar(64) NOT NULL,"
-                " id SERIAL PRIMARY KEY)"
-                "ENGINE=InnoDB;"));
+                " CREATE TABLE IF NOT EXISTS pdb.table_info"
+                " (number bigint NOT NULL,"
+                "  anonymous_name varchar(64) NOT NULL,"
+                "  name varchar(64) NOT NULL,"
+                "  has_sensitive boolean,"
+                "  has_salt boolean,"
+                "  salt_name varchar(64) NOT NULL,"
+                "  database_name varchar(64) NOT NULL,"
+                "  id SERIAL PRIMARY KEY)"
+                " ENGINE=InnoDB;"));
 
    assert(ps.e_conn->execute(
-               "CREATE TABLE IF NOT EXISTS pdb.field_info"
-               "(table_info_id bigint NOT NULL," // Foreign key.
-               " name varchar(64) NOT NULL,"
-               " ndex bigint NOT NULL,"
-               " has_salt boolean,"
-               " salt_name varchar(64),"
-               " id bigint NOT NULL PRIMARY KEY)"
-               "ENGINE=InnoDB;"));
+               " CREATE TABLE IF NOT EXISTS pdb.field_info"
+               " (table_info_id bigint NOT NULL," // Foreign key.
+               "  name varchar(64) NOT NULL,"
+               "  ndex bigint NOT NULL,"
+               "  has_salt boolean,"
+               "  salt_name varchar(64),"
+               "  id bigint NOT NULL PRIMARY KEY)"
+               " ENGINE=InnoDB;"));
 
    assert(ps.e_conn->execute(
-               "CREATE TABLE IF NOT EXISTS pdb.onion_info"
-               "(field_info_id bigint NOT NULL," // Foreign key.
-               " name varchar(64) NOT NULL,"
-               " type enum"
-               "    ('oDET',"
-               "     'oOPE',"
-               "     'oAGG',"
-               "     'oSWP',"
-               "     'INVALID')"
-               "    NOT NULL DEFAULT 'INVALID',"
-               " current_level enum"
-               "    ('RND',"
-               "     'DET',"
-               "     'DETJOIN',"
-               "     'OPE',"
-               "     'HOM',"
-               "     'SEARCH',"
-               "     'PLAINVAL'," 
-               "     'INVALID')"
-               "    NOT NULL DEFAULT 'INVALID',"
-               " stale boolean,"
-               " id bigint NOT NULL PRIMARY KEY)"
-               "ENGINE=InnoDB;"));
+               " CREATE TABLE IF NOT EXISTS pdb.onion_info"
+               " (field_info_id bigint NOT NULL," // Foreign key.
+               "  name varchar(64) NOT NULL,"
+               "  type enum"
+               "     ('oDET',"
+               "      'oOPE',"
+               "      'oAGG',"
+               "      'oSWP',"
+               "      'INVALID')"
+               "     NOT NULL DEFAULT 'INVALID',"
+               "  current_level enum"
+               "     ('RND',"
+               "      'DET',"
+               "      'DETJOIN',"
+               "      'OPE',"
+               "      'HOM',"
+               "      'SEARCH',"
+               "      'PLAINVAL'," 
+               "      'INVALID')"
+               "     NOT NULL DEFAULT 'INVALID',"
+               "  stale boolean,"
+               "  id bigint NOT NULL PRIMARY KEY)"
+               " ENGINE=InnoDB;"));
 
     return;
 }
@@ -133,6 +133,64 @@ static void
 createInMemoryTables(ProxyState & ps)
 {
     fprintf(stderr, "createInMemoryTables not implemented!\n");
+    DBResult *dbres;
+    assert(ps.e_conn->execute(
+                " SELECT number, anonymous_name, name, has_sensitive,"
+                "        has_salt, salt_name, database_name"
+                " FROM pdb.table_info", dbres));
+    ScopedMySQLRes r(dbres->n);
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(r.res()))) {
+        unsigned long *l = mysql_fetch_lengths(r.res());
+        assert(l != NULL);
+        TableMeta *tm = new TableMeta;
+        tm->tableNo = (unsigned int)atoi(string(row[0], l[0]).c_str());
+        tm->anonTableName = string(row[1], l[1]);
+        // > FIXME: Correctly get boolean values.
+        // > http://stackoverflow.com/questions/289727/which-mysql-datatype-to-use-for-storing-boolean-values
+        // tm->hasSensitive = string(row[3], l[3]);
+        // tm->has_salt = string(row[4], l[4]);
+        tm->salt_name = string(row[5], l[5]);
+                        
+        string origTableName(row[2], l[2]);
+        string dbName(row[6], l[6]);
+
+        ps.schema->tableMetaMap[origTableName] = tm;
+        ps.schema->totalTables++;
+
+        {
+            string q = " SELECT f.name, f.ndex, f.has_salt, f.salt_name,"
+                       "        o.name, o.type, o.current_level, o.stale"
+                       " FROM pdb.table_info t, pdb.field_info f,"
+                       "      pdb.onion_info o"
+                       " WHERE t.database_name = '" + dbName + "' "
+                       "     AND t.id = f.table_info_id "
+                       "     AND f.id = o.field_info_id;";
+
+            DBResult *dbRes;
+            assert(ps.e_conn->execute(q, dbRes));
+
+            ScopedMySQLRes r(dbRes->n);
+            MYSQL_ROW row;
+            while ((row = mysql_fetch_row(r.res()))) {
+                unsigned long *l = mysql_fetch_lengths(r.res());
+                assert(l != NULL);
+
+                FieldMeta *fm = new FieldMeta;
+                fm->tm = tm;
+                fm->fname = string(row[0], l[0]);
+                fm->index = atoi(string(row[1], l[1]).c_str());
+                // FIXME.
+                // fm->has_salt = string(row[2], l[2]);
+                fm->salt_name = string(row[3], l[3]);
+
+                tm->fieldMetaMap[fm->fname] = fm;
+
+                // FIXME: Do onion stuff.
+            }
+        }
+    }
+
     return;
 }
 static void
