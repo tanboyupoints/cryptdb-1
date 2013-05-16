@@ -346,7 +346,9 @@ printEmbeddedState(ProxyState & ps) {
     printEC(ps.e_conn, "use pdb;");
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables;");
-
+    printEC(ps.e_conn, "select * from pdb.table_info;");
+    printEC(ps.e_conn, "select * from pdb.field_info;");
+    printEC(ps.e_conn, "select * from pdb.onion_info;");
 }
 
 static void
@@ -3336,14 +3338,15 @@ drop_table_update_meta(const string &q,
           << " FROM   pdb.table_info INNER JOIN pdb.field_info "
           << " WHERE  pdb.table_info.number = pdb.field_info.table_info_number "
           << " AND    pdb.table_info.name = '" << table << "' "
-          << " AND    pdb.table_info.database_name = '" << dbname << "'";
+          << " AND    pdb.table_info.database_name = '" << dbname << "';";
 
 	assert(a.ps->e_conn->execute(s.str()));
 
         a.ps->schema->totalTables--;
         a.ps->schema->tableMetaMap.erase(table);
 
-	assert(a.ps->e_conn->execute(q));
+        // FIXME: I think the following line is unessesary.
+	// assert(a.ps->e_conn->execute(q));
     }
 
     assert(a.ps->e_conn->execute("COMMIT"));
@@ -3372,7 +3375,7 @@ static string
 string_enc_level(SECLEVEL secLevel)
 {
     if (SECLEVEL::RND == secLevel) {
-        return string("RET");
+        return string("RND");
     } else if (SECLEVEL::DET == secLevel) {
         return string("DET");
     } else if (SECLEVEL::DETJOIN == secLevel) {
@@ -3407,13 +3410,15 @@ add_table_update_meta(const string &q,
           << tm->tableNo << ", "
           << "'" << tm->anonTableName << "', "
           << "'" << table << "', "
-          << "'" << tm->hasSensitive << "', "
-          << "'" << tm->has_salt << "', "
+          // FIXME: Fix boolean.
+          // << "'" << tm->hasSensitive << "', "
+          // << "'" << tm->has_salt << "', "
+          << "FALSE, FALSE, "
           << "'" << tm->salt_name << "', "
-          << "'" << dbname << "'" << ","
+          << "'" << dbname << "'"
           << ");";
 
-        a.ps->e_conn->execute(s.str());
+        assert(a.ps->e_conn->execute(s.str()));
     }
 
     for (std::pair<std::string, FieldMeta *> fm_pair: tm->fieldMetaMap) {
@@ -3425,10 +3430,11 @@ add_table_update_meta(const string &q,
           << fm->index << ", "
           // FIXME.
           // << "'" << fm->has_salt << "' "
+          << "FALSE, "
           << "'" << fm->salt_name << "' "
           << ");";
 
-        a.ps->e_conn->execute(s.str());
+        assert(a.ps->e_conn->execute(s.str()));
 
         // FIXME: Add onions.
         for (std::pair<onion, OnionMeta *> onion_pair: fm->onions) {
@@ -3439,9 +3445,13 @@ add_table_update_meta(const string &q,
               << std::to_string(fm->index) << ", "
               << "'" << om->onionname << "', "
               << "'" << string_onion(o) << "', "
-              << "'" << string_enc_level(fm->encdesc.olm[o]) << "');";
+              << "'" << string_enc_level(fm->encdesc.olm[o]) << "', "
+              // FIXME: We should not be specifying the id.
+              << "FALSE, 0);";
               // FIXME.
               // << "'" << om->stale << ", "
+            
+            assert(a.ps->e_conn->execute(s.str()));
         }
     }
 
@@ -3828,6 +3838,8 @@ Rewriter::rewrite(const string & q, string *cur_db)
 
     assert(0 == mysql_thread_init());
     //assert(0 == create_embedded_thd(0));
+
+    printEmbeddedState(ps);
 
     query_parse p(*cur_db, q);
     QueryRewrite res;
