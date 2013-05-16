@@ -128,7 +128,50 @@ createMetaTablesIfNotExists(ProxyState & ps)
     return;
 }
 
+static onion
+get_onion(string onion_text)
+{
+    if (string("oPLAIN") == onion_text) {
+        return oPLAIN;
+    } else if (string("oDET") == onion_text) {
+            return oDET;
+    } else if (string("oOPE") == onion_text) {
+            return oOPE;
+    } else if (string("oAGG") == onion_text) {
+            return oAGG;
+    } else if (string("oSWP") == onion_text) {
+            return oSWP;
+    } else {
+        fprintf(stderr, "Bad onion text from database!\n");
+        exit(1);
+    }
+}
+
 // FIXME: Implement.
+static SECLEVEL
+get_seclevel(string seclevel_text)
+{
+    if (string("RND") == seclevel_text) {
+        return SECLEVEL::RND;
+    } else if (string("DET") == seclevel_text) {
+        return SECLEVEL::DET;
+    } else if (string("DETJOIN") == seclevel_text) {
+        return SECLEVEL::DETJOIN;
+    } else if (string("OPE") == seclevel_text) {
+        return SECLEVEL::OPE;
+    } else if (string("HOM") == seclevel_text) {
+        return SECLEVEL::HOM;
+    } else if (string("SEARCH") == seclevel_text) {
+        return SECLEVEL::SEARCH;
+    } else {
+        fprintf(stderr, "Bad seclevel text from database!\n");
+        exit(1);
+    }
+}
+
+// FIXME: Break up into smaller functions.
+// FIXME: Correctly get boolean values.
+// FIXME: TESTME (especially onion stuff).
 static void
 createInMemoryTables(ProxyState & ps)
 {
@@ -160,12 +203,10 @@ createInMemoryTables(ProxyState & ps)
 
         {
             string q = " SELECT f.name, f.ndex, f.has_salt, f.salt_name,"
-                       "        o.name, o.type, o.current_level, o.stale"
-                       " FROM pdb.table_info t, pdb.field_info f,"
-                       "      pdb.onion_info o"
+                       "        f.id"
+                       " FROM pdb.table_info t, pdb.field_info f"
                        " WHERE t.database_name = '" + dbName + "' "
-                       "     AND t.id = f.table_info_id "
-                       "     AND f.id = o.field_info_id;";
+                       "     AND t.id = f.table_info_id;";
 
             DBResult *dbRes;
             assert(ps.e_conn->execute(q, dbRes));
@@ -184,15 +225,44 @@ createInMemoryTables(ProxyState & ps)
                 // fm->has_salt = string(row[2], l[2]);
                 fm->salt_name = string(row[3], l[3]);
 
+                string field_id(row[4], l[4]);
+
                 tm->fieldMetaMap[fm->fname] = fm;
 
                 // FIXME: Do onion stuff.
+                string q = " SELECT o.name, o.type, o.current_level,"
+                           "        o.stale"
+                           " FROM pdb.onion_info o, pdb.field_info f"
+                           " WHERE o.field_info_id = '" + field_id + "';";
+
+                DBResult *dbRes;
+                assert(ps.e_conn->execute(q, dbRes));
+
+                ScopedMySQLRes r(dbRes->n);
+                MYSQL_ROW row;
+                while ((row = mysql_fetch_row(r.res()))) {
+                    unsigned long *l = mysql_fetch_lengths(r.res());
+                    assert(l != NULL);
+
+                    OnionMeta *om = new OnionMeta();
+                    om->onionname = string(row[0], l[0]);
+                    // FIXME.
+                    // om->stale = string(row[3], l[3]); 
+
+                    onion type = get_onion(string(row[1], l[1]));
+                    SECLEVEL current_level =
+                        get_seclevel(string(row[2], l[2]));
+
+                    fm->onions[type] = om;
+                    fm->encdesc.olm[type] = current_level;
+                }
             }
         }
     }
 
     return;
 }
+
 static void
 initSchema(ProxyState & ps)
 {
