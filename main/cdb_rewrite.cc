@@ -80,27 +80,29 @@ createMetaTablesIfNotExists(ProxyState & ps)
     // FIXME: Add UNIQUE's where appropriate.
     assert(ps.e_conn->execute(
                 " CREATE TABLE IF NOT EXISTS pdb.table_info"
-                " (number bigint NOT NULL PRIMARY KEY,"
+                " (number bigint NOT NULL,"
                 "  anonymous_name varchar(64) NOT NULL,"
                 "  name varchar(64) NOT NULL,"
                 "  has_sensitive boolean,"
                 "  has_salt boolean,"
                 "  salt_name varchar(64) NOT NULL,"
-                "  database_name varchar(64) NOT NULL)"
+                "  database_name varchar(64) NOT NULL,"
+                "  id SERIAL PRIMARY KEY)"
                 " ENGINE=InnoDB;"));
 
    assert(ps.e_conn->execute(
                " CREATE TABLE IF NOT EXISTS pdb.field_info"
-               " (table_info_number bigint NOT NULL," // Foreign key.
+               " (table_info_id bigint NOT NULL," // Foreign key.
                "  name varchar(64) NOT NULL,"
-               "  ndex bigint NOT NULL PRIMARY KEY,"
+               "  ndex bigint NOT NULL,"
                "  has_salt boolean,"
-               "  salt_name varchar(64))"
+               "  salt_name varchar(64),"
+               "  id SERIAL PRIMARY KEY)"
                " ENGINE=InnoDB;"));
 
    assert(ps.e_conn->execute(
                " CREATE TABLE IF NOT EXISTS pdb.onion_info"
-               " (field_info_ndex bigint NOT NULL," // Foreign key.
+               " (field_info_id bigint NOT NULL," // Foreign key.
                "  name varchar(64) NOT NULL,"
                "  type enum"
                "     ('oDET',"
@@ -201,7 +203,8 @@ createInMemoryTables(ProxyState & ps)
             string q = " SELECT f.name, f.ndex, f.has_salt, f.salt_name"
                        " FROM pdb.table_info t, pdb.field_info f"
                        " WHERE t.database_name = '" + dbName + "' "
-                       "     AND t.number = f.table_info_number;";
+                       "   AND t.number = " + std::to_string(tm->tableNo) +
+                       "   AND t.id = f.table_info_id;";
 
             DBResult *dbRes;
             assert(ps.e_conn->execute(q, dbRes));
@@ -226,7 +229,8 @@ createInMemoryTables(ProxyState & ps)
                 string q = " SELECT o.name, o.type, o.current_level,"
                            "        o.stale"
                            " FROM pdb.onion_info o, pdb.field_info f"
-                           " WHERE o.field_info_ndex = " + std::to_string(fm->index) + ";";
+                           " WHERE o.field_info_id = f.id"
+                           "    AND f.ndex = " + std::to_string(fm->index) + ";";
 
                 DBResult *dbRes;
                 assert(ps.e_conn->execute(q, dbRes));
@@ -3336,7 +3340,7 @@ drop_table_update_meta(const string &q,
         ostringstream s;
         s << " DELETE pdb.table_info, pdb.field_info "
           << " FROM   pdb.table_info INNER JOIN pdb.field_info "
-          << " WHERE  pdb.table_info.number = pdb.field_info.table_info_number "
+          << " WHERE  pdb.table_info.id = pdb.field_info.table_info_id"
           << " AND    pdb.table_info.name = '" << table << "' "
           << " AND    pdb.table_info.database_name = '" << dbname << "';";
 
@@ -3406,35 +3410,41 @@ add_table_update_meta(const string &q,
 
     {
         ostringstream s;
-        s << "INSERT INTO pdb.table_info VALUES ("
-          << tm->tableNo << ", "
-          << "'" << tm->anonTableName << "', "
-          << "'" << table << "', "
+        s << " INSERT INTO pdb.table_info VALUES ("
+          << " " << tm->tableNo << ", "
+          << " '" << tm->anonTableName << "', "
+          << " '" << table << "', "
           // FIXME: Fix boolean.
           // << "'" << tm->hasSensitive << "', "
           // << "'" << tm->has_salt << "', "
-          << "FALSE, FALSE, "
-          << "'" << tm->salt_name << "', "
-          << "'" << dbname << "'"
-          << ");";
+          << " FALSE, FALSE, "
+          << " '" << tm->salt_name << "', "
+          << " '" << dbname << "',"
+          << " 0"
+          << " );";
 
         assert(a.ps->e_conn->execute(s.str()));
     }
 
+    unsigned long long tableID = a.ps->e_conn->last_insert_id();
+
     for (std::pair<std::string, FieldMeta *> fm_pair: tm->fieldMetaMap) {
         FieldMeta *fm = fm_pair.second;
         ostringstream s;
-        s << "INSERT INTO pdb.field_info VALUES ("
-          << tm->tableNo << ", "
-          << "'" << fm->fname << "', "
+        s << " INSERT INTO pdb.field_info VALUES ("
+          << " " << tableID << ", "
+          << " '" << fm->fname << "', "
           << fm->index << ", "
           // FIXME.
           // << "'" << fm->has_salt << "' "
-          << "FALSE, "
-          << "'" << fm->salt_name << "' "
-          << ");";
+          << " FALSE, "
+          << " '" << fm->salt_name << "',"
+          << " 0"
+          << " );";
 
         assert(a.ps->e_conn->execute(s.str()));
+
+        unsigned long long fieldID = a.ps->e_conn->last_insert_id();
 
         // FIXME: Add onions.
         for (std::pair<onion, OnionMeta *> onion_pair: fm->onions) {
@@ -3442,11 +3452,10 @@ add_table_update_meta(const string &q,
             onion o = onion_pair.first;
             ostringstream s;
             s << "INSERT INTO pdb.onion_info VALUES ("
-              << std::to_string(fm->index) << ", "
+              << std::to_string(fieldID) << ", "
               << "'" << om->onionname << "', "
               << "'" << string_onion(o) << "', "
               << "'" << string_enc_level(fm->encdesc.olm[o]) << "', "
-              // FIXME: We should not be specifying the id.
               << "FALSE, 0);";
               // FIXME.
               // << "'" << om->stale << ", "
@@ -3911,7 +3920,7 @@ Rewriter::decryptResults(ResType & dbres,
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
     unsigned int cols = dbres.names.size();
-
+    
     ResType res = ResType();
 
     unsigned int index = 0;
@@ -3930,7 +3939,6 @@ Rewriter::decryptResults(ResType & dbres,
     }
 
     unsigned int real_cols = res.names.size();
-
 
     //allocate space in results for decrypted rows
     res.rows = vector<vector<Item*> >(rows);
