@@ -80,29 +80,27 @@ createMetaTablesIfNotExists(ProxyState & ps)
     // FIXME: Add UNIQUE's where appropriate.
     assert(ps.e_conn->execute(
                 " CREATE TABLE IF NOT EXISTS pdb.table_info"
-                " (number bigint NOT NULL,"
+                " (number bigint NOT NULL PRIMARY KEY,"
                 "  anonymous_name varchar(64) NOT NULL,"
                 "  name varchar(64) NOT NULL,"
                 "  has_sensitive boolean,"
                 "  has_salt boolean,"
                 "  salt_name varchar(64) NOT NULL,"
-                "  database_name varchar(64) NOT NULL,"
-                "  id SERIAL PRIMARY KEY)"
+                "  database_name varchar(64) NOT NULL)"
                 " ENGINE=InnoDB;"));
 
    assert(ps.e_conn->execute(
                " CREATE TABLE IF NOT EXISTS pdb.field_info"
-               " (table_info_id bigint NOT NULL," // Foreign key.
+               " (table_info_number bigint NOT NULL," // Foreign key.
                "  name varchar(64) NOT NULL,"
-               "  ndex bigint NOT NULL,"
+               "  ndex bigint NOT NULL PRIMARY KEY,"
                "  has_salt boolean,"
-               "  salt_name varchar(64),"
-               "  id bigint NOT NULL PRIMARY KEY)"
+               "  salt_name varchar(64))"
                " ENGINE=InnoDB;"));
 
    assert(ps.e_conn->execute(
                " CREATE TABLE IF NOT EXISTS pdb.onion_info"
-               " (field_info_id bigint NOT NULL," // Foreign key.
+               " (field_info_ndex bigint NOT NULL," // Foreign key.
                "  name varchar(64) NOT NULL,"
                "  type enum"
                "     ('oDET',"
@@ -122,7 +120,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
                "      'INVALID')"
                "     NOT NULL DEFAULT 'INVALID',"
                "  stale boolean,"
-               "  id bigint NOT NULL PRIMARY KEY)"
+               "  id SERIAL PRIMARY KEY)"
                " ENGINE=InnoDB;"));
 
     return;
@@ -147,7 +145,6 @@ get_onion(string onion_text)
     }
 }
 
-// FIXME: Implement.
 static SECLEVEL
 get_seclevel(string seclevel_text)
 {
@@ -175,7 +172,6 @@ get_seclevel(string seclevel_text)
 static void
 createInMemoryTables(ProxyState & ps)
 {
-    fprintf(stderr, "createInMemoryTables not implemented!\n");
     DBResult *dbres;
     assert(ps.e_conn->execute(
                 " SELECT number, anonymous_name, name, has_sensitive,"
@@ -202,11 +198,10 @@ createInMemoryTables(ProxyState & ps)
         ps.schema->totalTables++;
 
         {
-            string q = " SELECT f.name, f.ndex, f.has_salt, f.salt_name,"
-                       "        f.id"
+            string q = " SELECT f.name, f.ndex, f.has_salt, f.salt_name"
                        " FROM pdb.table_info t, pdb.field_info f"
                        " WHERE t.database_name = '" + dbName + "' "
-                       "     AND t.id = f.table_info_id;";
+                       "     AND t.number = f.table_info_number;";
 
             DBResult *dbRes;
             assert(ps.e_conn->execute(q, dbRes));
@@ -225,15 +220,13 @@ createInMemoryTables(ProxyState & ps)
                 // fm->has_salt = string(row[2], l[2]);
                 fm->salt_name = string(row[3], l[3]);
 
-                string field_id(row[4], l[4]);
-
                 tm->fieldMetaMap[fm->fname] = fm;
 
                 // FIXME: Do onion stuff.
                 string q = " SELECT o.name, o.type, o.current_level,"
                            "        o.stale"
                            " FROM pdb.onion_info o, pdb.field_info f"
-                           " WHERE o.field_info_id = '" + field_id + "';";
+                           " WHERE o.field_info_ndex = " + std::to_string(fm->index) + ";";
 
                 DBResult *dbRes;
                 assert(ps.e_conn->execute(q, dbRes));
@@ -3354,6 +3347,46 @@ drop_table_update_meta(const string &q,
     assert(a.ps->e_conn->execute("COMMIT"));
 }
 
+static string
+string_onion(onion o)
+{
+    if (o == oPLAIN) {
+        return string("oPLAIN");
+    } else if (o == oDET) {
+        return string("oDET");
+    } else if (o == oOPE) {
+        return string("oOPE");
+    } else if (o == oAGG) {
+        return string("oAGG");
+    } else if (o == oSWP) {
+        return string("oSWP");
+    } else {
+        fprintf(stderr, "Bad onion!\n");
+        exit(0);
+    }
+}
+
+static string
+string_enc_level(SECLEVEL secLevel)
+{
+    if (SECLEVEL::RND == secLevel) {
+        return string("RET");
+    } else if (SECLEVEL::DET == secLevel) {
+        return string("DET");
+    } else if (SECLEVEL::DETJOIN == secLevel) {
+        return string("DETJOIN");
+    } else if (SECLEVEL::OPE == secLevel) {
+        return string("OPE");
+    } else if (SECLEVEL::HOM == secLevel) {
+        return string("HOM");
+    } else if (SECLEVEL::SEARCH == secLevel) {
+        return string("SEARCH");
+    } else {
+        fprintf(stderr, "Bad secLevel!\n");
+        exit(1);
+    }
+}
+
 static inline void
 add_table_update_meta(const string &q,
                       LEX *lex,
@@ -3368,7 +3401,7 @@ add_table_update_meta(const string &q,
 
     {
         ostringstream s;
-        s << "INSERT INTO proxy_db.table_info VALUES ("
+        s << "INSERT INTO pdb.table_info VALUES ("
           << tm->tableNo << ", "
           << "'" << tm->anonTableName << "', "
           << "'" << table << "', "
@@ -3376,14 +3409,41 @@ add_table_update_meta(const string &q,
           << "'" << tm->has_salt << "', "
           << "'" << tm->salt_name << "', "
           << "'" << dbname << "'" << ","
-          << ")";
+          << ");";
 
         a.ps->e_conn->execute(s.str());
     }
 
-    a.ps->e_conn->execute("COMMIT");
+    for (std::pair<std::string, FieldMeta *> fm_pair: tm->fieldMetaMap) {
+        FieldMeta *fm = fm_pair.second;
+        ostringstream s;
+        s << "INSERT INTO pdb.field_info VALUES ("
+          << tm->tableNo << ", "
+          << "'" << fm->fname << "', "
+          << fm->index << ", "
+          // FIXME.
+          // << "'" << fm->has_salt << "' "
+          << "'" << fm->salt_name << "' "
+          << ");";
 
-    // FIXME: Add code to handle FieldMeta and OnionMeta.
+        a.ps->e_conn->execute(s.str());
+
+        // FIXME: Add onions.
+        for (std::pair<onion, OnionMeta *> onion_pair: fm->onions) {
+            OnionMeta *om = onion_pair.second;
+            onion o = onion_pair.first;
+            ostringstream s;
+            s << "INSERT INTO pdb.onion_info VALUES ("
+              << std::to_string(fm->index) << ", "
+              << "'" << om->onionname << "', "
+              << "'" << string_onion(o) << "', "
+              << "'" << string_enc_level(fm->encdesc.olm[o]) << "');";
+              // FIXME.
+              // << "'" << om->stale << ", "
+        }
+    }
+
+    a.ps->e_conn->execute("COMMIT");
 }
 
 /*
