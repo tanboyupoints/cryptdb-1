@@ -70,11 +70,87 @@ mysql_query_wrapper(MYSQL *m, const string &q)
     void* ret = create_embedded_thd(0);
     if (!ret) assert(false);
 }
+
+// FIXME: TESTME.
+static void
+createMetaTablesIfNotExists(ProxyState & ps)
+{
+    assert(ps.e_conn->execute("CREATE DATABASE IF NOT EXISTS pdb"));
+
+    // FIXME: Add UNIQUE's where appropriate.
+    assert(ps.e_conn->execute(
+                "CREATE TABLE IF NOT EXISTS pdb.table_info"
+                "(number bigint NOT NULL,"
+                " anonymous_name varchar(64) NOT NULL,"
+                " name varchar(64) NOT NULL,"
+                " has_sensitive boolean,"
+                " has_salt boolean,"
+                " salt_name varchar(64) NOT NULL,"
+                " database_name varchar(64) NOT NULL,"
+                " id SERIAL PRIMARY KEY)"
+                "ENGINE=InnoDB;"));
+
+   assert(ps.e_conn->execute(
+               "CREATE TABLE IF NOT EXISTS pdb.field_info"
+               "(table_info_id bigint NOT NULL," // Foreign key.
+               " name varchar(64) NOT NULL,"
+               " ndex bigint NOT NULL,"
+               " has_salt boolean,"
+               " salt_name varchar(64),"
+               " id bigint NOT NULL PRIMARY KEY)"
+               "ENGINE=InnoDB;"));
+
+   assert(ps.e_conn->execute(
+               "CREATE TABLE IF NOT EXISTS pdb.onion_info"
+               "(field_info_id bigint NOT NULL," // Foreign key.
+               " name varchar(64) NOT NULL,"
+               " type enum"
+               "    ('oDET',"
+               "     'oOPE',"
+               "     'oAGG',"
+               "     'oSWP',"
+               "     'INVALID')"
+               "    NOT NULL DEFAULT 'INVALID',"
+               " current_level enum"
+               "    ('RND',"
+               "     'DET',"
+               "     'DETJOIN',"
+               "     'OPE',"
+               "     'HOM',"
+               "     'SEARCH',"
+               "     'PLAINVAL'," 
+               "     'INVALID')"
+               "    NOT NULL DEFAULT 'INVALID',"
+               " stale boolean,"
+               " id bigint NOT NULL PRIMARY KEY)"
+               "ENGINE=InnoDB;"));
+
+    return;
+}
+
+// FIXME: Implement.
+static void
+createInMemoryTables(ProxyState & ps)
+{
+    fprintf(stderr, "createInMemoryTables not implemented!\n");
+    return;
+}
+static void
+initSchema(ProxyState & ps)
+{
+    createMetaTablesIfNotExists(ps);
+
+    createInMemoryTables(ps);
+
+    return;
+}
+
+
 /* TODO: put back
 static void
 createMetaTablesIfNotExists(ProxyState & ps)
 {
-    assert(ps.e_conn->execute("CREATE DATABASE IF NOT EXISTS proxy_db"));
+    assert(ps.e_conn->execute("CREATE DATABASE IF NOT EXISTS proxy_db");
 
     assert(ps.e_conn->execute(
                    "CREATE TABLE IF NOT EXISTS proxy_db.table_info"
@@ -3120,6 +3196,68 @@ lex_rewrite(LEX * lex, Analysis & analysis)
     return NULL;
 }
 
+static inline void
+drop_table_update_meta(const string &q,
+                       LEX *lex,
+                       Analysis &a)
+{
+    assert(a.ps->e_conn->execute("START TRANSACTION;"));
+
+    TABLE_LIST *tbl = lex->select_lex.table_list.first;
+    for (; tbl; tbl = tbl->next_local) {
+        char* dbname = tbl->db;
+        char* table  = tbl->table_name;
+
+        ostringstream s;
+        s << "DELETE pdb.table_info, pdb.field_info "
+          << "FROM   pdb.table_info INNER JOIN pdb.field_info "
+          << "WHERE  pdb.table_info.id = pdb.field_info.table_info_id "
+          << "AND    pdb.table_info.name = '" << table << "'"
+          << "AND    pdb.table_info.database_name = '" << dbname << "'";
+
+	assert(a.ps->e_conn->execute(s.str()));
+
+        a.ps->schema->totalTables--;
+        a.ps->schema->tableMetaMap.erase(table);
+
+	assert(a.ps->e_conn->execute(q));
+    }
+
+    assert(a.ps->e_conn->execute("COMMIT"));
+}
+
+static inline void
+add_table_update_meta(const string &q,
+                      LEX *lex,
+                      Analysis &a)
+{
+    a.ps->e_conn->execute("START TRANSACTION");
+
+    char* dbname = lex->select_lex.table_list.first->db;
+    char* table  = lex->select_lex.table_list.first->table_name;
+    TableMeta *tm = a.ps->schema->tableMetaMap[table];
+    assert(tm != NULL);
+
+    {
+        ostringstream s;
+        s << "INSERT INTO proxy_db.table_info VALUES ("
+          << tm->tableNo << ", "
+          << "'" << tm->anonTableName << "', "
+          << "'" << table << "', "
+          << "'" << tm->hasSensitive << "', "
+          << "'" << tm->has_salt << "', "
+          << "'" << tm->salt_name << "', "
+          << "'" << dbname << "'" << ","
+          << ")";
+
+        a.ps->e_conn->execute(s.str());
+    }
+
+    a.ps->e_conn->execute("COMMIT");
+
+    // FIXME: Add code to handle FieldMeta and OnionMeta.
+}
+
 /*
 static inline void
 drop_table_update_meta(const string &q,
@@ -3152,6 +3290,7 @@ drop_table_update_meta(const string &q,
 }
 */
 
+#ifdef SUN_IS_GREEN
 static void
 add_table_update_meta(const string &q,
                       LEX *lex,
@@ -3223,6 +3362,7 @@ add_table_update_meta(const string &q,
 
     a.ps->e_conn->execute("COMMIT");
 }
+#endif
 
 //TODO: potential inconsistency problem because we update state,
 //but only the proxy is responsible for
@@ -3232,7 +3372,7 @@ updateMeta(const string & q, LEX * lex, Analysis & a)
     switch (lex->sql_command) {
     // TODO: alter tables will need to modify the embedded DB schema
     case SQLCOM_DROP_TABLE:
-        //drop_table_update_meta(q, lex, a);
+        drop_table_update_meta(q, lex, a);
         break;
     case SQLCOM_CREATE_TABLE:
         add_table_update_meta(q, lex, a);
@@ -3308,7 +3448,7 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
     ps.schema = new SchemaInfo();
     ps.totalTables = 0;
-    //initSchema(ps);
+    initSchema(ps);
 
     loadUDFs(ps.conn);
 
