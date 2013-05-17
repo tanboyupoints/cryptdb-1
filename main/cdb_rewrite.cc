@@ -170,90 +170,6 @@ createMetaTablesIfNotExists(ProxyState & ps)
     return;
 }
 
-static SECLEVEL
-get_seclevel(string seclevel_text)
-{
-    if (string("RND") == seclevel_text) {
-        return SECLEVEL::RND;
-    } else if (string("DET") == seclevel_text) {
-        return SECLEVEL::DET;
-    } else if (string("DETJOIN") == seclevel_text) {
-        return SECLEVEL::DETJOIN;
-    } else if (string("OPE") == seclevel_text) {
-        return SECLEVEL::OPE;
-    } else if (string("HOM") == seclevel_text) {
-        return SECLEVEL::HOM;
-    } else if (string("SEARCH") == seclevel_text) {
-        return SECLEVEL::SEARCH;
-    } else {
-        fprintf(stderr, "Bad seclevel text from database!\n");
-        exit(1);
-    }
-}
-
-static enum enum_field_types
-get_sql_type(string sql_type_text)
-{
-    if ("MYSQL_TYPE_BIT" == sql_type_text) {
-        return MYSQL_TYPE_BIT;
-    } else if ("MYSQL_TYPE_BLOB" == sql_type_text) {
-        return MYSQL_TYPE_BLOB;
-    } else if ("MYSQL_TYPE_DATE" == sql_type_text) {
-        return MYSQL_TYPE_DATE;
-    } else if ("MYSQL_TYPE_DATETIME" == sql_type_text) {
-        return MYSQL_TYPE_DATETIME;
-    } else if ("MYSQL_TYPE_DECIMAL" == sql_type_text) {
-        return MYSQL_TYPE_DECIMAL;
-    } else if ("MYSQL_TYPE_DOUBLE" == sql_type_text) {
-        return MYSQL_TYPE_DOUBLE;
-    } else if ("MYSQL_TYPE_ENUM" == sql_type_text) {
-        return MYSQL_TYPE_ENUM;
-    } else if ("MYSQL_TYPE_FLOAT" == sql_type_text) {
-        return MYSQL_TYPE_FLOAT;
-    } else if ("MYSQL_TYPE_GEOMETRY" == sql_type_text) {
-        return MYSQL_TYPE_GEOMETRY;
-    } else if ("MYSQL_TYPE_INT24" == sql_type_text) {
-        return MYSQL_TYPE_INT24;
-    } else if ("MYSQL_TYPE_LONG" == sql_type_text) {
-        return MYSQL_TYPE_LONG;
-    } else if ("MYSQL_TYPE_LONG_BLOB" == sql_type_text) {
-        return MYSQL_TYPE_LONG_BLOB;
-    } else if ("MYSQL_TYPE_LONGLONG" == sql_type_text) {
-        return MYSQL_TYPE_LONGLONG;
-    } else if ("MYSQL_TYPE_MEDIUM_BLOB" == sql_type_text) {
-        return MYSQL_TYPE_MEDIUM_BLOB;
-    } else if ("MYSQL_TYPE_NEWDATE" == sql_type_text) {
-        return MYSQL_TYPE_NEWDATE;
-    } else if ("MYSQL_TYPE_NEWDECIMAL" == sql_type_text) {
-        return MYSQL_TYPE_NEWDECIMAL;
-    } else if ("MYSQL_TYPE_NULL" == sql_type_text) {
-        return MYSQL_TYPE_NULL;
-    } else if ("MYSQL_TYPE_SET" == sql_type_text) {
-        return MYSQL_TYPE_SET;
-    } else if ("MYSQL_TYPE_SHORT" == sql_type_text) {
-        return MYSQL_TYPE_SHORT;
-    } else if ("MYSQL_TYPE_STRING" == sql_type_text) {
-        return MYSQL_TYPE_STRING;
-    } else if ("MYSQL_TYPE_TIME" == sql_type_text) {
-        return MYSQL_TYPE_TIME;
-    } else if ("MYSQL_TYPE_TIMESTAMP" == sql_type_text) {
-        return MYSQL_TYPE_TIMESTAMP;
-    } else if ("MYSQL_TYPE_TINY" == sql_type_text) {
-        return MYSQL_TYPE_TINY;
-    } else if ("MYSQL_TYPE_TINY_BLOB" == sql_type_text) {
-        return MYSQL_TYPE_TINY_BLOB;
-    } else if ("MYSQL_TYPE_VAR_STRING" == sql_type_text) {
-        return MYSQL_TYPE_VAR_STRING;
-    } else if ("MYSQL_TYPE_VARCHAR" == sql_type_text) {
-        return MYSQL_TYPE_VARCHAR;
-    } else if ("MYSQL_TYPE_YEAR" == sql_type_text) {
-        return MYSQL_TYPE_YEAR;
-    } else {
-        fprintf(stderr, "Bad sql enum text!");
-        exit(1);
-    }
-}
-
 static List<String> *
 get_interval_list(string interval_list_text)
 {
@@ -388,7 +304,7 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
 
         onion o = EnumText<onion>::toEnum(onion_type);
         SECLEVEL current_level =
-            get_seclevel(onion_current_level);
+            EnumText<SECLEVEL>::toEnum(onion_current_level);
 
         fm->onions[o] = om;
         fm->encdesc.olm[o] = current_level;
@@ -454,7 +370,8 @@ buildEncLayers(ProxyState &ps, onion o, OnionMeta *om,
        Create_field * cf = new Create_field;
        THD *thd = current_thd;
        assert(thd);
-       cf->init(thd, layer_name_cstr, get_sql_type(layer_type),
+       cf->init(thd, layer_name_cstr,
+                EnumText<enum enum_field_types>::toEnum(layer_type),
                 layer_length_cstr, layer_decimals_cstr, dummy_uint,
                 dummy_item, dummy_item, &layer_comment_lex_str,
                 layer_chnge_cstr, get_interval_list(layer_interval_list),
@@ -576,21 +493,80 @@ initSchema(ProxyState & ps)
     return;
 }
 
+template <typename type> static void
+translatorHelper(const char **texts, type *enums, int count)
+{
+    vector<type> vec_enums(count);
+    vector<std::string> vec_texts(count);
+
+    for (int i = 0; i < count; ++i) {
+        vec_enums[i] = enums[i];
+        vec_texts[i] = texts[i];
+    }
+
+    EnumText<type>::addSet(vec_enums, vec_texts);
+}
+
+#define arraysize(a) (sizeof(a)/sizeof(a[0]))
+
 static void
 buildEnumTextTranslator()
 {
+    // Onions.
     const char *onion_chars[] = {"oPLAIN", "oDET", "oOPE", "oAGG", "oSWP"};
-    int onion_count = sizeof(onion_chars)/sizeof(onion_chars[0]);
-    vector<std::string> onion_texts(onion_chars,
-                                    onion_chars + onion_count);
-
     onion onions[] = {oPLAIN, oDET, oOPE, oAGG, oSWP};
-    vector<onion> onion_enums(5);
-    for (int i = 0; i < onion_count; ++i) {
-        onion_enums[i] = onions[i];
-    }
+    assert(arraysize(onion_chars) == arraysize(onions));
+    int count = arraysize(onion_chars);
+    translatorHelper((const char **)onion_chars, (onion *)onions, count);
 
-    EnumText<onion>::addSet(onion_enums, onion_texts);
+    // SecLevels.
+    const char *seclevel_chars[] = {"RND", "DET", "DETJOIN", "OPE", "HOM",
+                                    "SEARCH", "PLAINVAL"};
+    SECLEVEL seclevels[] = {SECLEVEL::RND, SECLEVEL::DET,
+                            SECLEVEL::DETJOIN, SECLEVEL::OPE,
+                            SECLEVEL::HOM, SECLEVEL::SEARCH,
+                            SECLEVEL::PLAINVAL};
+    assert(arraysize(seclevel_chars) == arraysize(seclevels));
+    count = arraysize(seclevel_chars);
+    translatorHelper((const char **)seclevel_chars, (SECLEVEL *)seclevels,
+                     count);
+
+    // MYSQL types.
+    const char *mysql_type_chars[] =
+    {
+        "MYSQL_TYPE_BIT", "MYSQL_TYPE_BLOB", "MYSQL_TYPE_DATE",
+        "MYSQL_TYPE_DATETIME", "MYSQL_TYPE_DECIMAL", "MYSQL_TYPE_DOUBLE",
+        "MYSQL_TYPE_ENUM", "MYSQL_TYPE_FLOAT", "MYSQL_TYPE_GEOMETRY",
+        "MYSQL_TYPE_INT24", "MYSQL_TYPE_LONG", "MYSQL_TYPE_LONG_BLOB",
+        "MYSQL_TYPE_LONGLONG", "MYSQL_TYPE_MEDIUM_BLOB",
+        "MYSQL_TYPE_NEWDATE", "MYSQL_TYPE_NEWDECIMAL", "MYSQL_TYPE_NULL",
+        "MYSQL_TYPE_SET", "MYSQL_TYPE_SHORT", "MYSQL_TYPE_STRING",
+        "MYSQL_TYPE_TIME", "MYSQL_TYPE_TIMESTAMP", "MYSQL_TYPE_TINY",
+        "MYSQL_TYPE_TINY_BLOB", "MYSQL_TYPE_VAR_STRING",
+        "MYSQL_TYPE_VARCHAR", "MYSQL_TYPE_YEAR"
+    };
+    enum enum_field_types mysql_types[] =
+    {
+        MYSQL_TYPE_BIT, MYSQL_TYPE_BLOB, MYSQL_TYPE_DATE,
+        MYSQL_TYPE_DATETIME, MYSQL_TYPE_DECIMAL, MYSQL_TYPE_DOUBLE,
+        MYSQL_TYPE_ENUM, MYSQL_TYPE_FLOAT, MYSQL_TYPE_GEOMETRY,
+        MYSQL_TYPE_INT24, MYSQL_TYPE_LONG, MYSQL_TYPE_LONG_BLOB,
+        MYSQL_TYPE_LONGLONG, MYSQL_TYPE_MEDIUM_BLOB,
+        MYSQL_TYPE_NEWDATE, MYSQL_TYPE_NEWDECIMAL, MYSQL_TYPE_NULL,
+        MYSQL_TYPE_SET, MYSQL_TYPE_SHORT, MYSQL_TYPE_STRING,
+        MYSQL_TYPE_TIME, MYSQL_TYPE_TIMESTAMP, MYSQL_TYPE_TINY,
+        MYSQL_TYPE_TINY_BLOB, MYSQL_TYPE_VAR_STRING,
+        MYSQL_TYPE_VARCHAR, MYSQL_TYPE_YEAR
+    };
+    assert(arraysize(mysql_type_chars) == arraysize(mysql_types));
+    count = arraysize(mysql_type_chars);
+    translatorHelper((const char **)mysql_type_chars,
+                     (enum_field_types *)mysql_types, count);
+
+
+    // FIXME: Implement.
+    // Geometry type.
+
     return;
 }
 
@@ -3596,91 +3572,6 @@ drop_table_update_meta(const string &q,
 }
 
 static string
-string_enc_level(SECLEVEL secLevel)
-{
-    if (SECLEVEL::RND == secLevel) {
-        return string("RND");
-    } else if (SECLEVEL::DET == secLevel) {
-        return string("DET");
-    } else if (SECLEVEL::DETJOIN == secLevel) {
-        return string("DETJOIN");
-    } else if (SECLEVEL::OPE == secLevel) {
-        return string("OPE");
-    } else if (SECLEVEL::HOM == secLevel) {
-        return string("HOM");
-    } else if (SECLEVEL::SEARCH == secLevel) {
-        return string("SEARCH");
-    } else {
-        fprintf(stderr, "Bad secLevel!\n");
-        exit(1);
-    }
-}
-
-static string
-string_sql_type(enum enum_field_types sql_type)
-{
-    switch (sql_type) {
-        case MYSQL_TYPE_BIT:
-            return string("MYSQL_TYPE_BIT");
-        case MYSQL_TYPE_BLOB:
-            return string("MYSQL_TYPE_BLOB");
-        case MYSQL_TYPE_DATE:
-            return string("MYSQL_TYPE_DATE");
-        case MYSQL_TYPE_DATETIME:
-            return string("MYSQL_TYPE_DATETIME");
-        case MYSQL_TYPE_DECIMAL:
-            return string("MYSQL_TYPE_DECIMAL");
-        case MYSQL_TYPE_DOUBLE:
-            return string("MYSQL_TYPE_DOUBLE");
-        case MYSQL_TYPE_ENUM:
-            return string("MYSQL_TYPE_ENUM");
-        case MYSQL_TYPE_FLOAT:
-            return string("MYSQL_TYPE_FLOAT");
-        case MYSQL_TYPE_GEOMETRY:
-            return string("MYSQL_TYPE_GEOMETRY");
-        case MYSQL_TYPE_INT24:
-            return string("MYSQL_TYPE_INT24");
-        case MYSQL_TYPE_LONG:
-            return string("MYSQL_TYPE_LONG");
-        case MYSQL_TYPE_LONG_BLOB:
-            return string("MYSQL_TYPE_LONG_BLOB");
-        case MYSQL_TYPE_LONGLONG:
-            return string("MYSQL_TYPE_LONGLONG");
-        case MYSQL_TYPE_MEDIUM_BLOB:
-            return string("MYSQL_TYPE_MEDIUM_BLOB");
-        case MYSQL_TYPE_NEWDATE:
-            return string("MYSQL_TYPE_NEWDATE");
-        case MYSQL_TYPE_NEWDECIMAL:
-            return string("MYSQL_TYPE_NEWDECIMAL");
-        case MYSQL_TYPE_NULL:
-            return string("MYSQL_TYPE_NULL");
-        case MYSQL_TYPE_SET:
-            return string("MYSQL_TYPE_SET");
-        case MYSQL_TYPE_SHORT:
-            return string("MYSQL_TYPE_SHORT");
-        case MYSQL_TYPE_STRING:
-            return string("MYSQL_TYPE_STRING");
-        case MYSQL_TYPE_TIME:
-            return string("MYSQL_TYPE_TIME");
-        case MYSQL_TYPE_TIMESTAMP:
-            return string("MYSQL_TYPE_TIMESTAMP");
-        case MYSQL_TYPE_TINY:
-            return string("MYSQL_TYPE_TINY");
-        case MYSQL_TYPE_TINY_BLOB:
-            return string("MYSQL_TYPE_TINY_BLOB");
-        case MYSQL_TYPE_VAR_STRING:
-            return string("MYSQL_TYPE_VAR_STRING");
-        case MYSQL_TYPE_VARCHAR:
-            return string("MYSQL_TYPE_VARCHAR");
-        case MYSQL_TYPE_YEAR:
-            return string("MYSQL_TYPE_YEAR");
-        default:
-            fprintf(stderr, "Bad sql enum type!");
-            exit(1);
-    }
-}
-
-static string
 LEX_STRING_to_string(LEX_STRING lex_str)
 {
     return string(lex_str.str, lex_str.length);
@@ -3770,7 +3661,7 @@ add_table_update_meta(const string &q,
               << " " << std::to_string(fieldID) << ", "
               << " '" << om->onionname << "', "
               << " '" << EnumText<onion>::toText(o) << "', "
-              << " '" << string_enc_level(fm->encdesc.olm[o]) << "', "
+              << " '" << EnumText<SECLEVEL>::toText(fm->encdesc.olm[o]) << "', "
               << " FALSE, 0);";
               // FIXME.
               // << "'" << om->stale << ", "
@@ -3786,7 +3677,9 @@ add_table_update_meta(const string &q,
                 s << " INSERT INTO pdb.layer_info VALUES ("
                   << " " << onionID << ", "
                   << " '" << cf->field_name << "', "
-                  << " '" << string_sql_type(cf->sql_type) << "', "
+                  << " '"
+                  <<  EnumText<enum enum_field_types>::toText(cf->sql_type)
+                  << "', "
                   << " " << cf->length << ", "
                   << " " << cf->decimals << ", "
                   << " '" << LEX_STRING_to_string(cf->comment) << "', "
