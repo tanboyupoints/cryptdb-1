@@ -15,7 +15,7 @@
 #include <util/cryptdb_log.hh>
 #include <main/CryptoHandlers.hh>
 #include <parser/lex_util.hh>
-
+#include <main/enum_text.hh>
 
 #include "field.h"
 
@@ -145,7 +145,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
         
     assert(ps.e_conn->execute(
                 " CREATE TABLE IF NOT EXISTS pdb.layer_info"
-                " (onion_field_id bigint NOT NULL,"  // Foreign key.
+                " (onion_info_id bigint NOT NULL,"  // Foreign key.
                 "  name varchar(64) NOT NULL,"
                 "  type varchar(64) NOT NULL,"       // Should be enum.
                 "  length bigint NOT NULL,"
@@ -168,25 +168,6 @@ createMetaTablesIfNotExists(ProxyState & ps)
                 " ENGINE=InnoDB;"));
 
     return;
-}
-
-static onion
-get_onion(string onion_text)
-{
-    if (string("oPLAIN") == onion_text) {
-        return oPLAIN;
-    } else if (string("oDET") == onion_text) {
-            return oDET;
-    } else if (string("oOPE") == onion_text) {
-            return oOPE;
-    } else if (string("oAGG") == onion_text) {
-            return oAGG;
-    } else if (string("oSWP") == onion_text) {
-            return oSWP;
-    } else {
-        fprintf(stderr, "Bad onion text from database!\n");
-        exit(1);
-    }
 }
 
 static SECLEVEL
@@ -213,8 +194,64 @@ get_seclevel(string seclevel_text)
 static enum enum_field_types
 get_sql_type(string sql_type_text)
 {
-    fprintf(stderr, "implmement get_sql_type");
-    exit(1);
+    if ("MYSQL_TYPE_BIT" == sql_type_text) {
+        return MYSQL_TYPE_BIT;
+    } else if ("MYSQL_TYPE_BLOB" == sql_type_text) {
+        return MYSQL_TYPE_BLOB;
+    } else if ("MYSQL_TYPE_DATE" == sql_type_text) {
+        return MYSQL_TYPE_DATE;
+    } else if ("MYSQL_TYPE_DATETIME" == sql_type_text) {
+        return MYSQL_TYPE_DATETIME;
+    } else if ("MYSQL_TYPE_DECIMAL" == sql_type_text) {
+        return MYSQL_TYPE_DECIMAL;
+    } else if ("MYSQL_TYPE_DOUBLE" == sql_type_text) {
+        return MYSQL_TYPE_DOUBLE;
+    } else if ("MYSQL_TYPE_ENUM" == sql_type_text) {
+        return MYSQL_TYPE_ENUM;
+    } else if ("MYSQL_TYPE_FLOAT" == sql_type_text) {
+        return MYSQL_TYPE_FLOAT;
+    } else if ("MYSQL_TYPE_GEOMETRY" == sql_type_text) {
+        return MYSQL_TYPE_GEOMETRY;
+    } else if ("MYSQL_TYPE_INT24" == sql_type_text) {
+        return MYSQL_TYPE_INT24;
+    } else if ("MYSQL_TYPE_LONG" == sql_type_text) {
+        return MYSQL_TYPE_LONG;
+    } else if ("MYSQL_TYPE_LONG_BLOB" == sql_type_text) {
+        return MYSQL_TYPE_LONG_BLOB;
+    } else if ("MYSQL_TYPE_LONGLONG" == sql_type_text) {
+        return MYSQL_TYPE_LONGLONG;
+    } else if ("MYSQL_TYPE_MEDIUM_BLOB" == sql_type_text) {
+        return MYSQL_TYPE_MEDIUM_BLOB;
+    } else if ("MYSQL_TYPE_NEWDATE" == sql_type_text) {
+        return MYSQL_TYPE_NEWDATE;
+    } else if ("MYSQL_TYPE_NEWDECIMAL" == sql_type_text) {
+        return MYSQL_TYPE_NEWDECIMAL;
+    } else if ("MYSQL_TYPE_NULL" == sql_type_text) {
+        return MYSQL_TYPE_NULL;
+    } else if ("MYSQL_TYPE_SET" == sql_type_text) {
+        return MYSQL_TYPE_SET;
+    } else if ("MYSQL_TYPE_SHORT" == sql_type_text) {
+        return MYSQL_TYPE_SHORT;
+    } else if ("MYSQL_TYPE_STRING" == sql_type_text) {
+        return MYSQL_TYPE_STRING;
+    } else if ("MYSQL_TYPE_TIME" == sql_type_text) {
+        return MYSQL_TYPE_TIME;
+    } else if ("MYSQL_TYPE_TIMESTAMP" == sql_type_text) {
+        return MYSQL_TYPE_TIMESTAMP;
+    } else if ("MYSQL_TYPE_TINY" == sql_type_text) {
+        return MYSQL_TYPE_TINY;
+    } else if ("MYSQL_TYPE_TINY_BLOB" == sql_type_text) {
+        return MYSQL_TYPE_TINY_BLOB;
+    } else if ("MYSQL_TYPE_VAR_STRING" == sql_type_text) {
+        return MYSQL_TYPE_VAR_STRING;
+    } else if ("MYSQL_TYPE_VARCHAR" == sql_type_text) {
+        return MYSQL_TYPE_VARCHAR;
+    } else if ("MYSQL_TYPE_YEAR" == sql_type_text) {
+        return MYSQL_TYPE_YEAR;
+    } else {
+        fprintf(stderr, "Bad sql enum text!");
+        exit(1);
+    }
 }
 
 static List<String> *
@@ -349,7 +386,7 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
         // FIXME.
         // om->stale = string(row[3], l[3]); 
 
-        onion o = get_onion(onion_type);
+        onion o = EnumText<onion>::toEnum(onion_type);
         SECLEVEL current_level =
             get_seclevel(onion_current_level);
 
@@ -536,6 +573,24 @@ initSchema(ProxyState & ps)
 
     createInMemoryTables(ps);
 
+    return;
+}
+
+static void
+buildEnumTextTranslator()
+{
+    const char *onion_chars[] = {"oPLAIN", "oDET", "oOPE", "oAGG", "oSWP"};
+    int onion_count = sizeof(onion_chars)/sizeof(onion_chars[0]);
+    vector<std::string> onion_texts(onion_chars,
+                                    onion_chars + onion_count);
+
+    onion onions[] = {oPLAIN, oDET, oOPE, oAGG, oSWP};
+    vector<onion> onion_enums(5);
+    for (int i = 0; i < onion_count; ++i) {
+        onion_enums[i] = onions[i];
+    }
+
+    EnumText<onion>::addSet(onion_enums, onion_texts);
     return;
 }
 
@@ -3541,25 +3596,6 @@ drop_table_update_meta(const string &q,
 }
 
 static string
-string_onion(onion o)
-{
-    if (o == oPLAIN) {
-        return string("oPLAIN");
-    } else if (o == oDET) {
-        return string("oDET");
-    } else if (o == oOPE) {
-        return string("oOPE");
-    } else if (o == oAGG) {
-        return string("oAGG");
-    } else if (o == oSWP) {
-        return string("oSWP");
-    } else {
-        fprintf(stderr, "Bad onion!\n");
-        exit(0);
-    }
-}
-
-static string
 string_enc_level(SECLEVEL secLevel)
 {
     if (SECLEVEL::RND == secLevel) {
@@ -3589,7 +3625,7 @@ string_sql_type(enum enum_field_types sql_type)
         case MYSQL_TYPE_BLOB:
             return string("MYSQL_TYPE_BLOB");
         case MYSQL_TYPE_DATE:
-            return string("MYSQL_TYPE_DATA");
+            return string("MYSQL_TYPE_DATE");
         case MYSQL_TYPE_DATETIME:
             return string("MYSQL_TYPE_DATETIME");
         case MYSQL_TYPE_DECIMAL:
@@ -3733,7 +3769,7 @@ add_table_update_meta(const string &q,
             s << " INSERT INTO pdb.onion_info VALUES ("
               << " " << std::to_string(fieldID) << ", "
               << " '" << om->onionname << "', "
-              << " '" << string_onion(o) << "', "
+              << " '" << EnumText<onion>::toText(o) << "', "
               << " '" << string_enc_level(fm->encdesc.olm[o]) << "', "
               << " FALSE, 0);";
               // FIXME.
@@ -3961,6 +3997,9 @@ Rewriter::Rewriter(ConnectionInfo ci,
     ps.schema = new SchemaInfo();
     ps.totalTables = 0;
     initSchema(ps);
+
+    // HACKed in.
+    buildEnumTextTranslator();
 
     loadUDFs(ps.conn);
 
@@ -4254,22 +4293,18 @@ Rewriter::decryptResults(ResType & dbres,
     for (unsigned int c = 0; c < cols; c++) {
         ReturnField rf = rmeta->rfmeta[c];
         FieldMeta * fm = rf.olk.key;
-        printf("SALT: %d\n", rf.is_salt);
         if (!rf.is_salt) {
             for (unsigned int r = 0; r < rows; r++) {
-                printf("ENC: %d\n", !fm || !fm->isEncrypted());
                 if (!fm || !fm->isEncrypted()) {
                     res.rows[r][col_index] = dbres.rows[r][c];
                 } else {
                     uint64_t salt = 0;
-                    printf("SIZE: %d\n", rf.pos_salt);
                     if (rf.pos_salt>=0) {
                         Item * salt_item = dbres.rows[r][rf.pos_salt];
                         assert_s(!salt_item->null_value, "salt item is null");
                         salt = ((Item_int *)dbres.rows[r][rf.pos_salt])->value;
                     }
-                    printf("SLLLL: %lu\n", salt);
-                    printf("ONION: %s\n", string_onion(rf.olk.o).c_str());
+
 		    res.rows[r][col_index] = decrypt_item(fm, rf.olk.o, dbres.rows[r][c], salt, a, res.rows[r]);
                 }
             }
@@ -4311,3 +4346,68 @@ printRes(const ResType & r) {
         //LOG(edb_v) << ss.str();
     }
 }
+
+template <typename _type> void
+EnumText<_type>::addSet(std::vector<_type> enums,
+                        std::vector<std::string> texts)
+{
+    if (enums.size() != texts.size()) {
+        throw "enums and text must be the same length!";
+    }
+
+    EnumText<_type>::instance= new EnumText<_type>(enums, texts);
+
+    return;
+}
+
+template <typename _type> std::vector<std::string>
+EnumText<_type>::allText()
+{
+    return EnumText<_type>::instance->allText();
+}
+
+template <typename _type> std::vector<_type>
+EnumText<_type>::allEnum()
+{
+    return EnumText<_type>::instance->allEnum();
+}
+
+template <typename _type> std::string
+EnumText<_type>::toText(_type e)
+{
+    return EnumText<_type>::instance->getText(e);
+}
+
+template <typename _type> _type
+EnumText<_type>::toEnum(std::string t)
+{
+    return EnumText<_type>::instance->getEnum(t);
+}
+
+// FIXME: I'm assuming getText or getEnum is broken.
+template <typename _type>
+std::string EnumText<_type>::getText(_type e)
+{
+   typename std::vector<_type>::iterator iter =
+       std::find(theEnums.begin(), theEnums.end(), e);
+   if (theEnums.end() == iter) {
+       throw "enum does not exist!"; 
+   }
+
+   int pos = iter - theEnums.begin();
+   return theTexts[pos];
+}
+
+template <typename _type>
+_type EnumText<_type>::getEnum(std::string t)
+{
+    std::vector<std::string>::iterator iter =
+        std::find(theTexts.begin(), theTexts.end(), t);
+    if (theTexts.end() == iter) {
+        throw "text does not exist!"; 
+    }
+
+    int pos = iter - theTexts.begin();
+    return theEnums[pos];
+}
+
