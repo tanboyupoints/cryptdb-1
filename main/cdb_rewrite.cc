@@ -29,6 +29,11 @@ using namespace std;
         throw runtime_error(string("Unimplemented: ") + \
                         string(__PRETTY_FUNCTION__))
 
+// FIXME: Placement.
+static void
+add_layer(AES_KEY * mKey, string layerName, onion o, OnionMeta *om,
+          SECLEVEL secLevel, Create_field *cf);
+
 //TODO: rewrite_proj may not need to be part of each class;
 // it just does gather, choos and then rewrite
 
@@ -307,13 +312,13 @@ createInMemoryTables(ProxyState & ps)
                     // FIXME.
                     // om->stale = string(row[3], l[3]); 
 
-                    onion type = get_onion(onion_type);
+                    onion o = get_onion(onion_type);
                     SECLEVEL current_level =
                         get_seclevel(onion_current_level);
 
                     // FIXME: Implement om->layers.
-                    fm->onions[type] = om;
-                    fm->encdesc.olm[type] = current_level;
+                    fm->onions[o] = om;
+                    fm->encdesc.olm[o] = current_level;
 
                     string q = " SELECT l.name, l.type, l.length,"
                                "        l.decimals,"
@@ -381,8 +386,10 @@ createInMemoryTables(ProxyState & ps)
                                  &my_charset_bin,
                                  (uint)get_geometry_type(layer_geometry_type));
                         
-                        // fIXME.
+                        // TESTME.
                         // Then, build EncLayer subclasses.
+                        add_layer(ps.masterKey, layer_name, o, om,
+                                  current_level, cf);
                      }
                            
                 }
@@ -2880,10 +2887,9 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
         if (mKey) {
             //generate enclayers for encrypted field
             for (auto l: it.second) {
-                PRNG * key;
-		key = getLayerKey(mKey, fullName(om->onionname, fm->tm->anonTableName), l);
-
-                om->layers.push_back(EncLayerFactory::encLayer(o, l, cf, key));
+                string layerName = fullName(om->onionname,
+                                            fm->tm->anonTableName);
+                add_layer(mKey, layerName, o, om, l, cf);
             }
         }
 
@@ -2892,6 +2898,18 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
         //set outer layer
         fm->encdesc.olm[o] = it.second.back();
     }
+}
+
+static void
+add_layer(AES_KEY * mKey, string layerName, onion o, OnionMeta *om,
+          SECLEVEL secLevel, Create_field *cf)
+{
+    PRNG * key;
+    key = getLayerKey(mKey, layerName, secLevel);
+
+    om->layers.push_back(EncLayerFactory::encLayer(o, secLevel, cf, key));
+
+    return;
 }
 
 static void
