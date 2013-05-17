@@ -177,13 +177,6 @@ get_interval_list(string interval_list_text)
     exit(1);
 }
 
-static Field::geometry_type
-get_geometry_type(string geometry_type_text)
-{
-    fprintf(stderr, "implement get_geometry_type!");
-    exit(1);
-}
-
 // FIXME: Break up into smaller functions.
 // FIXME: Correctly get boolean values.
 // FIXME: TESTME (especially onion stuff).
@@ -376,7 +369,7 @@ buildEncLayers(ProxyState &ps, onion o, OnionMeta *om,
                 dummy_item, dummy_item, &layer_comment_lex_str,
                 layer_chnge_cstr, get_interval_list(layer_interval_list),
                 &my_charset_bin,
-                (uint)get_geometry_type(layer_geometry_type));
+                (uint)EnumText<Field::geometry_type>::toEnum(layer_geometry_type));
        
        // Then, build EncLayer subclasses.
        add_layer(ps.masterKey, layer_name, o, om, current_security_level,
@@ -564,8 +557,24 @@ buildEnumTextTranslator()
                      (enum_field_types *)mysql_types, count);
 
 
-    // FIXME: Implement.
     // Geometry type.
+    const char *geometry_type_chars[] = 
+    {
+        "GEOM_GEOMETRY", "GEOM_POINT", "GEOM_LINESTRING", "GEOM_POLYGON",
+        "GEOM_MULTIPOINT", "GEOM_MULTILINESTRING", "GEOM_MULTIPOLYGON",
+        "GEOM_GEOMETRYCOLLECTION"
+    };
+    Field::geometry_type geometry_types[] = 
+    {
+        Field::GEOM_GEOMETRY, Field::GEOM_POINT, Field::GEOM_LINESTRING,
+        Field::GEOM_POLYGON, Field::GEOM_MULTIPOINT,
+        Field::GEOM_MULTILINESTRING, Field::GEOM_MULTIPOLYGON,
+        Field::GEOM_GEOMETRYCOLLECTION
+    };
+    assert(arraysize(geometry_type_chars) == arraysize(geometry_types));
+    count = arraysize(geometry_type_chars);
+    translatorHelper((const char **)geometry_type_chars,
+                    (Field::geometry_type *)geometry_types, count);
 
     return;
 }
@@ -3577,32 +3586,6 @@ LEX_STRING_to_string(LEX_STRING lex_str)
     return string(lex_str.str, lex_str.length);
 }
 
-static string
-string_geo_type(Field::geometry_type geo_type)
-{
-    switch (geo_type) {
-        case Field::GEOM_GEOMETRY:
-            return string("GEOM_GEOMETRY");
-        case Field::GEOM_POINT:
-            return string("GEOM_POINT");
-        case Field::GEOM_LINESTRING:
-            return string("GEOM_LINESTRING");
-        case Field::GEOM_POLYGON:
-            return string("GEOM_POLYGON");
-        case Field::GEOM_MULTIPOINT:
-            return string("GEOM_MULTIPOINT");
-        case Field::GEOM_MULTILINESTRING:
-            return string("GEOM_MULTILINESTRING");
-        case Field::GEOM_MULTIPOLYGON:
-            return string("GEOM_MULTIPOLYGON");
-        case Field::GEOM_GEOMETRYCOLLECTION:
-            return string("GEOM_GEOMETRYCOLLECTION");
-        default:
-            fprintf(stderr, "Unknown geometry type!");
-            exit(1);
-    }
-}
-
 static inline void
 add_table_update_meta(const string &q,
                       LEX *lex,
@@ -3688,7 +3671,7 @@ add_table_update_meta(const string &q,
                   << " 'whatever', "
                   // FIXME.
                   << " '" << "interval list should be here" << "', "
-                  << " '" << string_geo_type(cf->geom_type) << "', "
+                  << " '" << EnumText<Field::geometry_type>::toText(cf->geom_type) << "', "
                   << "0);";
 
                 assert(a.ps->e_conn->execute(s.str()));
