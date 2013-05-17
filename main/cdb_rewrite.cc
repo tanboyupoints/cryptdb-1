@@ -129,7 +129,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
                 " CREATE TABLE IF NOT EXISTS pdb.layers_info"
                 " (onion_field_id bigint NOT NULL,"  // Foreign key.
                 "  name varchar(64) NOT NULL,"
-                "  type varchar(64) NOT NULL,"
+                "  type varchar(64) NOT NULL,"       // Should be enum.
                 "  length bigint NOT NULL,"
                 "  decimals bigint NOT NULL,"
                 "  comment varchar(64) NOT NULL,"
@@ -3475,19 +3475,97 @@ string_enc_level(SECLEVEL secLevel)
 static string
 string_sql_type(enum enum_field_types sql_type)
 {
-    return string("implement me!");
+    switch (sql_type) {
+        case MYSQL_TYPE_BIT:
+            return string("MYSQL_TYPE_BIT");
+        case MYSQL_TYPE_BLOB:
+            return string("MYSQL_TYPE_BLOB");
+        case MYSQL_TYPE_DATE:
+            return string("MYSQL_TYPE_DATA");
+        case MYSQL_TYPE_DATETIME:
+            return string("MYSQL_TYPE_DATETIME");
+        case MYSQL_TYPE_DECIMAL:
+            return string("MYSQL_TYPE_DECIMAL");
+        case MYSQL_TYPE_DOUBLE:
+            return string("MYSQL_TYPE_DOUBLE");
+        case MYSQL_TYPE_ENUM:
+            return string("MYSQL_TYPE_ENUM");
+        case MYSQL_TYPE_FLOAT:
+            return string("MYSQL_TYPE_FLOAT");
+        case MYSQL_TYPE_GEOMETRY:
+            return string("MYSQL_TYPE_GEOMETRY");
+        case MYSQL_TYPE_INT24:
+            return string("MYSQL_TYPE_INT24");
+        case MYSQL_TYPE_LONG:
+            return string("MYSQL_TYPE_LONG");
+        case MYSQL_TYPE_LONG_BLOB:
+            return string("MYSQL_TYPE_LONG_BLOB");
+        case MYSQL_TYPE_LONGLONG:
+            return string("MYSQL_TYPE_LONGLONG");
+        case MYSQL_TYPE_MEDIUM_BLOB:
+            return string("MYSQL_TYPE_MEDIUM_BLOB");
+        case MYSQL_TYPE_NEWDATE:
+            return string("MYSQL_TYPE_NEWDATE");
+        case MYSQL_TYPE_NEWDECIMAL:
+            return string("MYSQL_TYPE_NEWDECIMAL");
+        case MYSQL_TYPE_NULL:
+            return string("MYSQL_TYPE_NULL");
+        case MYSQL_TYPE_SET:
+            return string("MYSQL_TYPE_SET");
+        case MYSQL_TYPE_SHORT:
+            return string("MYSQL_TYPE_SHORT");
+        case MYSQL_TYPE_STRING:
+            return string("MYSQL_TYPE_STRING");
+        case MYSQL_TYPE_TIME:
+            return string("MYSQL_TYPE_TIME");
+        case MYSQL_TYPE_TIMESTAMP:
+            return string("MYSQL_TYPE_TIMESTAMP");
+        case MYSQL_TYPE_TINY:
+            return string("MYSQL_TYPE_TINY");
+        case MYSQL_TYPE_TINY_BLOB:
+            return string("MYSQL_TYPE_TINY_BLOB");
+        case MYSQL_TYPE_VAR_STRING:
+            return string("MYSQL_TYPE_VAR_STRING");
+        case MYSQL_TYPE_VARCHAR:
+            return string("MYSQL_TYPE_VARCHAR");
+        case MYSQL_TYPE_YEAR:
+            return string("MYSQL_TYPE_YEAR");
+        default:
+            fprintf(stderr, "Bad sql enum type!");
+            exit(1);
+    }
 }
 
 static string
 LEX_STRING_to_string(LEX_STRING lex_str)
 {
-    return string("Implement me!");
+    return string(lex_str.str, lex_str.length);
 }
 
 static string
 string_geo_type(Field::geometry_type geo_type)
 {
-    return string("Implement me!");
+    switch (geo_type) {
+        case Field::GEOM_GEOMETRY:
+            return string("GEOM_GEOMETRY");
+        case Field::GEOM_POINT:
+            return string("GEOM_POINT");
+        case Field::GEOM_LINESTRING:
+            return string("GEOM_LINESTRING");
+        case Field::GEOM_POLYGON:
+            return string("GEOM_POLYGON");
+        case Field::GEOM_MULTIPOINT:
+            return string("GEOM_MULTIPOINT");
+        case Field::GEOM_MULTILINESTRING:
+            return string("GEOM_MULTILINESTRING");
+        case Field::GEOM_MULTIPOLYGON:
+            return string("GEOM_MULTIPOLYGON");
+        case Field::GEOM_GEOMETRYCOLLECTION:
+            return string("GEOM_GEOMETRYCOLLECTION");
+        default:
+            fprintf(stderr, "Unknown geometry type!");
+            exit(1);
+    }
 }
 
 static inline void
@@ -3561,14 +3639,16 @@ add_table_update_meta(const string &q,
                 Create_field * cf = layer->cf;
 
                 ostringstream s;
-                s << " INSERT INTO pdb.layer_info VALUES ("
-                  << " " << std::to_string(onionID) << ", "
+                s << " INSERT INTO pdb.layers_info VALUES ("
+                  << " " << onionID << ", "
                   << " '" << cf->field_name << "', "
                   << " '" << string_sql_type(cf->sql_type) << "', "
-                  << " '" << cf->length << "', "
-                  << " '" << cf->decimals << "', "
+                  << " " << cf->length << ", "
+                  << " " << cf->decimals << ", "
                   << " '" << LEX_STRING_to_string(cf->comment) << "', "
+                  // FIXME.
                   << " '" << cf->change << "', "
+                  // << " 'whatever', "
                   // FIXME.
                   << " '" << "interval list should be here" << "', "
                   << " '" << string_geo_type(cf->geom_type) << "', "
