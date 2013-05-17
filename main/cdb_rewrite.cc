@@ -192,6 +192,27 @@ get_seclevel(string seclevel_text)
     }
 }
 
+static enum enum_field_types
+get_sql_type(string sql_type_text)
+{
+    fprintf(stderr, "implmement get_sql_type");
+    exit(1);
+}
+
+static List<String> *
+get_interval_list(string interval_list_text)
+{
+    fprintf(stderr, "implement get_interval_list");
+    exit(1);
+}
+
+static Field::geometry_type
+get_geometry_type(string geometry_type_text)
+{
+    fprintf(stderr, "implement get_geometry_type!");
+    exit(1);
+}
+
 // FIXME: Break up into smaller functions.
 // FIXME: Correctly get boolean values.
 // FIXME: TESTME (especially onion stuff).
@@ -312,19 +333,56 @@ createInMemoryTables(ProxyState & ps)
                         unsigned long *l = mysql_fetch_lengths(r.res());
                         assert(l != NULL);
 
-                        string name(row[0], l[1]);
-                        string type(row[1], l[1]);
-                        string length(row[2], l[2]);
-                        string decimals(row[3], l[3]);
-                        string comment(row[4], l[4]);
-                        string chnge(row[5], l[5]);
-                        string interval_list(row[6], l[6]);
-                        string geometry_list(row[7], l[7]);
+                        string layer_name(row[0], l[1]);
+                        string layer_type(row[1], l[1]);
+                        string layer_length(row[2], l[2]);
+                        string layer_decimals(row[3], l[3]);
+                        string layer_comment(row[4], l[4]);
+                        string layer_chnge(row[5], l[5]);
+                        string layer_interval_list(row[6], l[6]);
+                        string layer_geometry_type(row[7], l[7]);
+
+                        // FIXME: Memleaks.
+                        char *layer_name_cstr = strdup(layer_name.c_str());
+                        char *layer_comment_cstr =
+                            strdup(layer_comment.c_str());
+                        char *layer_length_cstr =
+                            strdup(layer_length.c_str());
+                        char *layer_decimals_cstr =
+                            strdup(layer_decimals.c_str());
+                        char *layer_chnge_cstr = 
+                            strdup(layer_chnge.c_str());
+
+                        LEX_STRING layer_comment_lex_str = 
+                        {
+                            layer_comment_cstr,
+                            layer_comment.length()
+                        };
+
+                        // FIXME: Dummies.
+                        uint dummy_uint = 0;
+                        Item *dummy_item = NULL;
+                        
+                        // FIXME: Determine if this is okay useage of
+                        // my_charset_bin.
 
                         // First build a Create_field. 
-
+                        Create_field * cf = new Create_field;
+                        THD *thd = current_thd;
+                        assert(thd);
+                        cf->init(thd, layer_name_cstr,
+                                 get_sql_type(layer_type),
+                                 layer_length_cstr,
+                                 layer_decimals_cstr, dummy_uint,
+                                 dummy_item, dummy_item,
+                                 &layer_comment_lex_str,
+                                 layer_chnge_cstr,
+                                 get_interval_list(layer_interval_list),
+                                 &my_charset_bin,
+                                 (uint)get_geometry_type(layer_geometry_type));
                         
-                        // Then build EncLayer dervied process.
+                        // fIXME.
+                        // Then, build EncLayer subclasses.
                      }
                            
                 }
@@ -3647,8 +3705,8 @@ add_table_update_meta(const string &q,
                   << " " << cf->decimals << ", "
                   << " '" << LEX_STRING_to_string(cf->comment) << "', "
                   // FIXME.
-                  << " '" << cf->change << "', "
-                  // << " 'whatever', "
+                  // << " '" << cf->change << "', "
+                  << " 'whatever', "
                   // FIXME.
                   << " '" << "interval list should be here" << "', "
                   << " '" << string_geo_type(cf->geom_type) << "', "
