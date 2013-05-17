@@ -36,9 +36,10 @@ class EncLayer {
         thrower() << "decryptUDF not supported";
     }
 
- protected:
+    // FIXME: This should probably still be protected.
     Create_field *cf;
 
+ protected:
     virtual void setKey(const std::string &k) = 0;
     virtual void unSetKey(const std::string &k) = 0;
 };

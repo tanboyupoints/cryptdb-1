@@ -89,41 +89,65 @@ createMetaTablesIfNotExists(ProxyState & ps)
                 "  database_name varchar(64) NOT NULL,"
                 "  id SERIAL PRIMARY KEY)"
                 " ENGINE=InnoDB;"));
+    
+    assert(ps.e_conn->execute(
+                " CREATE TABLE IF NOT EXISTS pdb.field_info"
+                " (table_info_id bigint NOT NULL," // Foreign key.
+                "  name varchar(64) NOT NULL,"
+                "  ndex bigint NOT NULL,"
+                "  has_salt boolean,"
+                "  salt_name varchar(64),"
+                "  id SERIAL PRIMARY KEY)"
+                " ENGINE=InnoDB;"));
 
-   assert(ps.e_conn->execute(
-               " CREATE TABLE IF NOT EXISTS pdb.field_info"
-               " (table_info_id bigint NOT NULL," // Foreign key.
-               "  name varchar(64) NOT NULL,"
-               "  ndex bigint NOT NULL,"
-               "  has_salt boolean,"
-               "  salt_name varchar(64),"
-               "  id SERIAL PRIMARY KEY)"
-               " ENGINE=InnoDB;"));
-
-   assert(ps.e_conn->execute(
-               " CREATE TABLE IF NOT EXISTS pdb.onion_info"
-               " (field_info_id bigint NOT NULL," // Foreign key.
-               "  name varchar(64) NOT NULL,"
-               "  type enum"
-               "     ('oDET',"
-               "      'oOPE',"
-               "      'oAGG',"
-               "      'oSWP',"
-               "      'INVALID')"
-               "     NOT NULL DEFAULT 'INVALID',"
-               "  current_level enum"
-               "     ('RND',"
-               "      'DET',"
-               "      'DETJOIN',"
-               "      'OPE',"
-               "      'HOM',"
-               "      'SEARCH',"
-               "      'PLAINVAL'," 
-               "      'INVALID')"
-               "     NOT NULL DEFAULT 'INVALID',"
-               "  stale boolean,"
-               "  id SERIAL PRIMARY KEY)"
-               " ENGINE=InnoDB;"));
+    assert(ps.e_conn->execute(
+                " CREATE TABLE IF NOT EXISTS pdb.onion_info"
+                " (field_info_id bigint NOT NULL," // Foreign key.
+                "  name varchar(64) NOT NULL,"
+                "  type enum"
+                "     ('oDET',"
+                "      'oOPE',"
+                "      'oAGG',"
+                "      'oSWP',"
+                "      'INVALID')"
+                "     NOT NULL DEFAULT 'INVALID',"
+                "  current_level enum"
+                "     ('RND',"
+                "      'DET',"
+                "      'DETJOIN',"
+                "      'OPE',"
+                "      'HOM',"
+                "      'SEARCH',"
+                "      'PLAINVAL'," 
+                "      'INVALID')"
+                "     NOT NULL DEFAULT 'INVALID',"
+                "  stale boolean,"
+                "  id SERIAL PRIMARY KEY)"
+                " ENGINE=InnoDB;"));
+        
+    assert(ps.e_conn->execute(
+                " CREATE TABLE IF NOT EXISTS pdb.layers_info"
+                " (onion_field_id bigint NOT NULL,"  // Foreign key.
+                "  name varchar(64) NOT NULL,"
+                "  type varchar(64) NOT NULL,"
+                "  length bigint NOT NULL,"
+                "  decimals bigint NOT NULL,"
+                "  comment varchar(64) NOT NULL,"
+                "  chnge varchar(64) NOT NULL,"
+                "  interval_list varchar(1024) NOT NULL," // Hacked.
+                "  geometry_type enum"
+                "    ('GEOM_GEOMETRY',"
+                "     'GEOM_POINT',"
+                "     'GEOM_LINESTRING',"
+                "     'GEOM_POLYGON',"
+                "     'GEOM_MULTIPOINT',"
+                "     'GEOM_MULTILINESTRING',"
+                "     'GEOM_MULTIPOLYGON',"
+                "     'GEOM_GEOMETRYCOLLECTION',"
+                "     'INVALID')"
+                "    NOT NULL DEFAULT 'INVALID',"
+                "  id SERIAL PRIMARY KEY)"
+                " ENGINE=InnoDB;"));
 
     return;
 }
@@ -184,27 +208,34 @@ createInMemoryTables(ProxyState & ps)
     while ((row = mysql_fetch_row(r.res()))) {
         unsigned long *l = mysql_fetch_lengths(r.res());
         assert(l != NULL);
+
+        string table_number(row[0], l[0]);
+        string table_anonymous_name(row[1], l[1]);
+        string table_name(row[2], l[2]);
+        string table_has_sensitive(row[3], l[3]);
+        string table_has_salt(row[4], l[4]);
+        string table_salt_name(row[5], l[5]);
+        string table_database_name(row[6], l[6]);
+
         TableMeta *tm = new TableMeta;
-        tm->tableNo = (unsigned int)atoi(string(row[0], l[0]).c_str());
-        tm->anonTableName = string(row[1], l[1]);
+        tm->tableNo = (unsigned int)atoi(table_number.c_str());
+        tm->anonTableName = table_anonymous_name;
         // > FIXME: Correctly get boolean values.
         // > http://stackoverflow.com/questions/289727/which-mysql-datatype-to-use-for-storing-boolean-values
         // tm->hasSensitive = string(row[3], l[3]);
         // tm->has_salt = string(row[4], l[4]);
-        tm->salt_name = string(row[5], l[5]);
+        tm->salt_name = table_salt_name;
                         
-        string origTableName(row[2], l[2]);
-        string dbName(row[6], l[6]);
-
-        ps.schema->tableMetaMap[origTableName] = tm;
+        ps.schema->tableMetaMap[table_name] = tm;
         ps.schema->totalTables++;
 
         {
-            string q = " SELECT f.name, f.ndex, f.has_salt, f.salt_name"
-                       " FROM pdb.table_info t, pdb.field_info f"
-                       " WHERE t.database_name = '" + dbName + "' "
-                       "   AND t.number = " + std::to_string(tm->tableNo) +
-                       "   AND t.id = f.table_info_id;";
+            string q = 
+                " SELECT f.name, f.ndex, f.has_salt, f.salt_name"
+                " FROM pdb.table_info t, pdb.field_info f"
+                " WHERE t.database_name = '" + table_database_name + "' "
+                "   AND t.number = " + std::to_string(tm->tableNo) +
+                "   AND t.id = f.table_info_id;";
 
             DBResult *dbRes;
             assert(ps.e_conn->execute(q, dbRes));
@@ -215,17 +246,21 @@ createInMemoryTables(ProxyState & ps)
                 unsigned long *l = mysql_fetch_lengths(r.res());
                 assert(l != NULL);
 
+                string field_name(row[0], l[0]);
+                string field_ndex(row[1], l[1]);
+                string field_has_salt(row[2], l[2]);
+                string field_salt_name(row[3], l[3]);
+
                 FieldMeta *fm = new FieldMeta;
                 fm->tm = tm;
-                fm->fname = string(row[0], l[0]);
-                fm->index = atoi(string(row[1], l[1]).c_str());
+                fm->fname = field_name;
+                fm->index = atoi(field_ndex.c_str());
                 // FIXME.
                 // fm->has_salt = string(row[2], l[2]);
-                fm->salt_name = string(row[3], l[3]);
+                fm->salt_name = field_salt_name;
 
                 tm->fieldMetaMap[fm->fname] = fm;
 
-                // FIXME: Do onion stuff.
                 string q = " SELECT o.name, o.type, o.current_level,"
                            "        o.stale"
                            " FROM pdb.onion_info o, pdb.field_info f"
@@ -241,17 +276,57 @@ createInMemoryTables(ProxyState & ps)
                     unsigned long *l = mysql_fetch_lengths(r.res());
                     assert(l != NULL);
 
+                    string onion_name(row[0], l[0]);
+                    string onion_type(row[1], l[1]);
+                    string onion_current_level(row[2], l[2]);
+                    string onion_stale(row[3], l[3]);
+
                     OnionMeta *om = new OnionMeta();
-                    om->onionname = string(row[0], l[0]);
+                    om->onionname = onion_name;
                     // FIXME.
                     // om->stale = string(row[3], l[3]); 
 
-                    onion type = get_onion(string(row[1], l[1]));
+                    onion type = get_onion(onion_type);
                     SECLEVEL current_level =
-                        get_seclevel(string(row[2], l[2]));
+                        get_seclevel(onion_current_level);
 
+                    // FIXME: Implement om->layers.
                     fm->onions[type] = om;
                     fm->encdesc.olm[type] = current_level;
+
+                    string q = " SELECT l.name, l.type, l.length,"
+                               "        l.decimals,"
+                               "        l.comment, l.chnge,"
+                               "        l.interval_list, l.geometry_type"
+                               " FROM pdb.layer_info l, pdb.onion_info o"
+                               " WHERE l.onion_info_id = o.id;";
+
+                     DBResult *dbRes;
+                     assert(ps.e_conn->execute(q, dbRes));
+
+                     ScopedMySQLRes r(dbRes->n);
+                     MYSQL_ROW row;
+
+                     // FIXME.
+                     while ((row = mysql_fetch_row(r.res()))) {
+                        unsigned long *l = mysql_fetch_lengths(r.res());
+                        assert(l != NULL);
+
+                        string name(row[0], l[1]);
+                        string type(row[1], l[1]);
+                        string length(row[2], l[2]);
+                        string decimals(row[3], l[3]);
+                        string comment(row[4], l[4]);
+                        string chnge(row[5], l[5]);
+                        string interval_list(row[6], l[6]);
+                        string geometry_list(row[7], l[7]);
+
+                        // First build a Create_field. 
+
+                        
+                        // Then build EncLayer dervied process.
+                     }
+                           
                 }
             }
         }
@@ -696,6 +771,7 @@ encrypt_item_all_onions(Item * i, FieldMeta * fm,
 
 static Item *
 decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV, Analysis &a, vector<Item *> &res) {
+    printf("SIEE: %lu\n", (fm->onions[o]->layers).size());
     return decrypt_item_layers(i, o, fm->onions[o]->layers, IV, a, fm, res);
 }
 
@@ -3396,6 +3472,24 @@ string_enc_level(SECLEVEL secLevel)
     }
 }
 
+static string
+string_sql_type(enum enum_field_types sql_type)
+{
+    return string("implement me!");
+}
+
+static string
+LEX_STRING_to_string(LEX_STRING lex_str)
+{
+    return string("Implement me!");
+}
+
+static string
+string_geo_type(Field::geometry_type geo_type)
+{
+    return string("Implement me!");
+}
+
 static inline void
 add_table_update_meta(const string &q,
                       LEX *lex,
@@ -3446,21 +3540,42 @@ add_table_update_meta(const string &q,
 
         unsigned long long fieldID = a.ps->e_conn->last_insert_id();
 
-        // FIXME: Add onions.
         for (std::pair<onion, OnionMeta *> onion_pair: fm->onions) {
             OnionMeta *om = onion_pair.second;
             onion o = onion_pair.first;
             ostringstream s;
-            s << "INSERT INTO pdb.onion_info VALUES ("
-              << std::to_string(fieldID) << ", "
-              << "'" << om->onionname << "', "
-              << "'" << string_onion(o) << "', "
-              << "'" << string_enc_level(fm->encdesc.olm[o]) << "', "
-              << "FALSE, 0);";
+            s << " INSERT INTO pdb.onion_info VALUES ("
+              << " " << std::to_string(fieldID) << ", "
+              << " '" << om->onionname << "', "
+              << " '" << string_onion(o) << "', "
+              << " '" << string_enc_level(fm->encdesc.olm[o]) << "', "
+              << " FALSE, 0);";
               // FIXME.
               // << "'" << om->stale << ", "
             
             assert(a.ps->e_conn->execute(s.str()));
+
+            unsigned long long onionID = a.ps->e_conn->last_insert_id();
+
+            for (auto layer: om->layers) {
+                Create_field * cf = layer->cf;
+
+                ostringstream s;
+                s << " INSERT INTO pdb.layer_info VALUES ("
+                  << " " << std::to_string(onionID) << ", "
+                  << " '" << cf->field_name << "', "
+                  << " '" << string_sql_type(cf->sql_type) << "', "
+                  << " '" << cf->length << "', "
+                  << " '" << cf->decimals << "', "
+                  << " '" << LEX_STRING_to_string(cf->comment) << "', "
+                  << " '" << cf->change << "', "
+                  // FIXME.
+                  << " '" << "interval list should be here" << "', "
+                  << " '" << string_geo_type(cf->geom_type) << "', "
+                  << "0);";
+
+                assert(a.ps->e_conn->execute(s.str()));
+            }
         }
     }
 
@@ -3951,18 +4066,22 @@ Rewriter::decryptResults(ResType & dbres,
     for (unsigned int c = 0; c < cols; c++) {
         ReturnField rf = rmeta->rfmeta[c];
         FieldMeta * fm = rf.olk.key;
-
+        printf("SALT: %d\n", rf.is_salt);
         if (!rf.is_salt) {
             for (unsigned int r = 0; r < rows; r++) {
+                printf("ENC: %d\n", !fm || !fm->isEncrypted());
                 if (!fm || !fm->isEncrypted()) {
                     res.rows[r][col_index] = dbres.rows[r][c];
                 } else {
                     uint64_t salt = 0;
+                    printf("SIZE: %d\n", rf.pos_salt);
                     if (rf.pos_salt>=0) {
                         Item * salt_item = dbres.rows[r][rf.pos_salt];
                         assert_s(!salt_item->null_value, "salt item is null");
                         salt = ((Item_int *)dbres.rows[r][rf.pos_salt])->value;
                     }
+                    printf("SLLLL: %lu\n", salt);
+                    printf("ONION: %s\n", string_onion(rf.olk.o).c_str());
 		    res.rows[r][col_index] = decrypt_item(fm, rf.olk.o, dbres.rows[r][c], salt, a, res.rows[r]);
                 }
             }
