@@ -31,6 +31,19 @@ using namespace std;
 
 // FIXME: Placement.
 static void
+buildTableMeta(ProxyState &ps);
+
+static void
+buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name);
+
+static void
+buildOnionMeta(ProxyState &ps, FieldMeta *fm);
+
+static void
+buildEncLayers(ProxyState &ps, onion o, OnionMeta *om,
+               SECLEVEL current_security_level);
+
+static void
 add_layer(AES_KEY * mKey, string layerName, onion o, OnionMeta *om,
           SECLEVEL secLevel, Create_field *cf);
 
@@ -131,7 +144,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
                 " ENGINE=InnoDB;"));
         
     assert(ps.e_conn->execute(
-                " CREATE TABLE IF NOT EXISTS pdb.layers_info"
+                " CREATE TABLE IF NOT EXISTS pdb.layer_info"
                 " (onion_field_id bigint NOT NULL,"  // Foreign key.
                 "  name varchar(64) NOT NULL,"
                 "  type varchar(64) NOT NULL,"       // Should be enum.
@@ -224,6 +237,14 @@ get_geometry_type(string geometry_type_text)
 static void
 createInMemoryTables(ProxyState & ps)
 {
+    buildTableMeta(ps);
+    return;
+}
+
+static void
+buildTableMeta(ProxyState &ps)
+{
+
     DBResult *dbres;
     assert(ps.e_conn->execute(
                 " SELECT number, anonymous_name, name, has_sensitive,"
@@ -255,151 +276,161 @@ createInMemoryTables(ProxyState & ps)
         ps.schema->tableMetaMap[table_name] = tm;
         ps.schema->totalTables++;
 
-        {
-            string q = 
-                " SELECT f.name, f.ndex, f.has_salt, f.salt_name"
-                " FROM pdb.table_info t, pdb.field_info f"
-                " WHERE t.database_name = '" + table_database_name + "' "
-                "   AND t.number = " + std::to_string(tm->tableNo) +
-                "   AND t.id = f.table_info_id;";
-
-            DBResult *dbRes;
-            assert(ps.e_conn->execute(q, dbRes));
-
-            ScopedMySQLRes r(dbRes->n);
-            MYSQL_ROW row;
-            while ((row = mysql_fetch_row(r.res()))) {
-                unsigned long *l = mysql_fetch_lengths(r.res());
-                assert(l != NULL);
-
-                string field_name(row[0], l[0]);
-                string field_ndex(row[1], l[1]);
-                string field_has_salt(row[2], l[2]);
-                string field_salt_name(row[3], l[3]);
-
-                FieldMeta *fm = new FieldMeta;
-                fm->tm = tm;
-                fm->fname = field_name;
-                fm->index = atoi(field_ndex.c_str());
-                // FIXME.
-                // fm->has_salt = string(row[2], l[2]);
-                fm->salt_name = field_salt_name;
-
-                tm->fieldMetaMap[fm->fname] = fm;
-
-                string q = " SELECT o.name, o.type, o.current_level,"
-                           "        o.stale"
-                           " FROM pdb.onion_info o, pdb.field_info f"
-                           " WHERE o.field_info_id = f.id"
-                           "    AND f.ndex = " + std::to_string(fm->index) + ";";
-
-                DBResult *dbRes;
-                assert(ps.e_conn->execute(q, dbRes));
-
-                ScopedMySQLRes r(dbRes->n);
-                MYSQL_ROW row;
-                while ((row = mysql_fetch_row(r.res()))) {
-                    unsigned long *l = mysql_fetch_lengths(r.res());
-                    assert(l != NULL);
-
-                    string onion_name(row[0], l[0]);
-                    string onion_type(row[1], l[1]);
-                    string onion_current_level(row[2], l[2]);
-                    string onion_stale(row[3], l[3]);
-
-                    OnionMeta *om = new OnionMeta();
-                    om->onionname = onion_name;
-                    // FIXME.
-                    // om->stale = string(row[3], l[3]); 
-
-                    onion o = get_onion(onion_type);
-                    SECLEVEL current_level =
-                        get_seclevel(onion_current_level);
-
-                    // FIXME: Implement om->layers.
-                    fm->onions[o] = om;
-                    fm->encdesc.olm[o] = current_level;
-
-                    string q = " SELECT l.name, l.type, l.length,"
-                               "        l.decimals,"
-                               "        l.comment, l.chnge,"
-                               "        l.interval_list, l.geometry_type"
-                               " FROM pdb.layer_info l, pdb.onion_info o"
-                               " WHERE l.onion_info_id = o.id;";
-
-                     DBResult *dbRes;
-                     assert(ps.e_conn->execute(q, dbRes));
-
-                     ScopedMySQLRes r(dbRes->n);
-                     MYSQL_ROW row;
-
-                     // FIXME.
-                     while ((row = mysql_fetch_row(r.res()))) {
-                        unsigned long *l = mysql_fetch_lengths(r.res());
-                        assert(l != NULL);
-
-                        string layer_name(row[0], l[1]);
-                        string layer_type(row[1], l[1]);
-                        string layer_length(row[2], l[2]);
-                        string layer_decimals(row[3], l[3]);
-                        string layer_comment(row[4], l[4]);
-                        string layer_chnge(row[5], l[5]);
-                        string layer_interval_list(row[6], l[6]);
-                        string layer_geometry_type(row[7], l[7]);
-
-                        // FIXME: Memleaks.
-                        char *layer_name_cstr = strdup(layer_name.c_str());
-                        char *layer_comment_cstr =
-                            strdup(layer_comment.c_str());
-                        char *layer_length_cstr =
-                            strdup(layer_length.c_str());
-                        char *layer_decimals_cstr =
-                            strdup(layer_decimals.c_str());
-                        char *layer_chnge_cstr = 
-                            strdup(layer_chnge.c_str());
-
-                        LEX_STRING layer_comment_lex_str = 
-                        {
-                            layer_comment_cstr,
-                            layer_comment.length()
-                        };
-
-                        // FIXME: Dummies.
-                        uint dummy_uint = 0;
-                        Item *dummy_item = NULL;
-                        
-                        // FIXME: Determine if this is okay useage of
-                        // my_charset_bin.
-
-                        // First build a Create_field. 
-                        Create_field * cf = new Create_field;
-                        THD *thd = current_thd;
-                        assert(thd);
-                        cf->init(thd, layer_name_cstr,
-                                 get_sql_type(layer_type),
-                                 layer_length_cstr,
-                                 layer_decimals_cstr, dummy_uint,
-                                 dummy_item, dummy_item,
-                                 &layer_comment_lex_str,
-                                 layer_chnge_cstr,
-                                 get_interval_list(layer_interval_list),
-                                 &my_charset_bin,
-                                 (uint)get_geometry_type(layer_geometry_type));
-                        
-                        // TESTME.
-                        // Then, build EncLayer subclasses.
-                        add_layer(ps.masterKey, layer_name, o, om,
-                                  current_level, cf);
-                     }
-                           
-                }
-            }
-        }
+        buildFieldMeta(ps, tm, table_database_name);
     }
 
     return;
 }
 
+static void
+buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
+{
+
+    string q = " SELECT f.name, f.ndex, f.has_salt, f.salt_name"
+               " FROM pdb.table_info t, pdb.field_info f"
+               " WHERE t.database_name = '" + database_name + "' "
+               "   AND t.number = " + std::to_string(tm->tableNo) +
+               "   AND t.id = f.table_info_id;";
+
+    DBResult *dbRes;
+    assert(ps.e_conn->execute(q, dbRes));
+
+    ScopedMySQLRes r(dbRes->n);
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(r.res()))) {
+        unsigned long *l = mysql_fetch_lengths(r.res());
+        assert(l != NULL);
+
+        string field_name(row[0], l[0]);
+        string field_ndex(row[1], l[1]);
+        string field_has_salt(row[2], l[2]);
+        string field_salt_name(row[3], l[3]);
+
+        FieldMeta *fm = new FieldMeta;
+        fm->tm = tm;
+        fm->fname = field_name;
+        fm->index = atoi(field_ndex.c_str());
+        // FIXME.
+        // fm->has_salt = string(row[2], l[2]);
+        fm->salt_name = field_salt_name;
+
+        tm->fieldMetaMap[fm->fname] = fm;
+        buildOnionMeta(ps, fm);
+    }
+    return;
+}
+
+static void
+buildOnionMeta(ProxyState &ps, FieldMeta *fm)
+{
+
+    string q = " SELECT o.name, o.type, o.current_level,"
+               "        o.stale"
+               " FROM pdb.onion_info o, pdb.field_info f"
+               " WHERE o.field_info_id = f.id"
+               "    AND f.ndex = " + std::to_string(fm->index) + ";";
+
+    DBResult *dbRes;
+    assert(ps.e_conn->execute(q, dbRes));
+
+    ScopedMySQLRes r(dbRes->n);
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(r.res()))) {
+        unsigned long *l = mysql_fetch_lengths(r.res());
+        assert(l != NULL);
+
+        string onion_name(row[0], l[0]);
+        string onion_type(row[1], l[1]);
+        string onion_current_level(row[2], l[2]);
+        string onion_stale(row[3], l[3]);
+
+        OnionMeta *om = new OnionMeta();
+        om->onionname = onion_name;
+        // FIXME.
+        // om->stale = string(row[3], l[3]); 
+
+        onion o = get_onion(onion_type);
+        SECLEVEL current_level =
+            get_seclevel(onion_current_level);
+
+        fm->onions[o] = om;
+        fm->encdesc.olm[o] = current_level;
+
+        buildEncLayers(ps, o, om, current_level);
+    }
+
+    return;
+}
+
+static void
+buildEncLayers(ProxyState &ps, onion o, OnionMeta *om,
+               SECLEVEL current_security_level)
+{
+    string q = " SELECT l.name, l.type, l.length,"
+               "        l.decimals,"
+               "        l.comment, l.chnge,"
+               "        l.interval_list, l.geometry_type"
+               " FROM pdb.layer_info l, pdb.onion_info o"
+               " WHERE l.onion_info_id = o.id;";
+
+    DBResult *dbRes;
+    assert(ps.e_conn->execute(q, dbRes));
+
+    ScopedMySQLRes r(dbRes->n);
+    MYSQL_ROW row;
+
+    // FIXME.
+    while ((row = mysql_fetch_row(r.res()))) {
+       unsigned long *l = mysql_fetch_lengths(r.res());
+       assert(l != NULL);
+
+       string layer_name(row[0], l[1]);
+       string layer_type(row[1], l[1]);
+       string layer_length(row[2], l[2]);
+       string layer_decimals(row[3], l[3]);
+       string layer_comment(row[4], l[4]);
+       string layer_chnge(row[5], l[5]);
+       string layer_interval_list(row[6], l[6]);
+       string layer_geometry_type(row[7], l[7]);
+
+       // FIXME: Memleaks.
+       char *layer_name_cstr = strdup(layer_name.c_str());
+       char *layer_comment_cstr = strdup(layer_comment.c_str());
+       char *layer_length_cstr = strdup(layer_length.c_str());
+       char *layer_decimals_cstr = strdup(layer_decimals.c_str());
+       char *layer_chnge_cstr = strdup(layer_chnge.c_str());
+
+       LEX_STRING layer_comment_lex_str = 
+       {
+           layer_comment_cstr,
+           layer_comment.length()
+       };
+
+       // FIXME: Dummies.
+       uint dummy_uint = 0;
+       Item *dummy_item = NULL;
+       
+       // FIXME: Determine if this is okay useage of
+       // my_charset_bin.
+
+       // First build a Create_field. 
+       Create_field * cf = new Create_field;
+       THD *thd = current_thd;
+       assert(thd);
+       cf->init(thd, layer_name_cstr, get_sql_type(layer_type),
+                layer_length_cstr, layer_decimals_cstr, dummy_uint,
+                dummy_item, dummy_item, &layer_comment_lex_str,
+                layer_chnge_cstr, get_interval_list(layer_interval_list),
+                &my_charset_bin,
+                (uint)get_geometry_type(layer_geometry_type));
+       
+       // Then, build EncLayer subclasses.
+       add_layer(ps.masterKey, layer_name, o, om, current_security_level,
+                 cf);
+    }
+          
+    return;
+}
 
 /* TODO: put back
 static void
@@ -493,6 +524,7 @@ printEmbeddedState(ProxyState & ps) {
     printEC(ps.e_conn, "select * from pdb.table_info;");
     printEC(ps.e_conn, "select * from pdb.field_info;");
     printEC(ps.e_conn, "select * from pdb.onion_info;");
+    printEC(ps.e_conn, "select * from pdb.layer_info;");
 }
 
 static void
@@ -3715,7 +3747,7 @@ add_table_update_meta(const string &q,
                 Create_field * cf = layer->cf;
 
                 ostringstream s;
-                s << " INSERT INTO pdb.layers_info VALUES ("
+                s << " INSERT INTO pdb.layer_info VALUES ("
                   << " " << onionID << ", "
                   << " '" << cf->field_name << "', "
                   << " '" << string_sql_type(cf->sql_type) << "', "
