@@ -1,7 +1,5 @@
 #include "enum_text.h"
 
-template<typename _type> EnumText<_type>* EnumText<_type>::instance = NULL;
-
 template <typename _type> void
 EnumText<_type>::addSet(std::vector<_type> enums,
                         std::vector<std::string> texts)

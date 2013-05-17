@@ -1,3 +1,5 @@
+#pragma once
+
 #include <vector>
 #include <string>
 #include <algorithm>
@@ -29,4 +31,6 @@ protected:
     std::vector<type> theEnums;
     static EnumText *instance;
 };
+
+template<typename _type> EnumText<_type>* EnumText<_type>::instance = NULL;
 
