@@ -9,7 +9,7 @@ template <typename type>
 class EnumText {
 public:
     EnumText(std::vector<type> enums, std::vector<std::string> texts) :
-        theEnums(enums), theTexts(texts) {}
+        theTexts(texts), theEnums(enums) {}
 
     ~EnumText() {;}
 
