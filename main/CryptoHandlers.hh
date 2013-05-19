@@ -25,7 +25,9 @@
 
 class EncLayer {
  public:
-    EncLayer(Create_field * f) : cf(f) {}
+    EncLayer(Create_field * f) : cf(f), sql_type(f->sql_type) {}
+
+    EncLayer(enum enum_field_types sql_type) : sql_type(sql_type) {}
 
     virtual SECLEVEL level() = 0;
     virtual Create_field * newCreateField(std::string anonname = "") = 0;
@@ -36,12 +38,14 @@ class EncLayer {
         thrower() << "decryptUDF not supported";
     }
 
-    // FIXME: This should probably still be protected.
-    Create_field *cf;
 
  protected:
+    Create_field *cf;
     virtual void setKey(const std::string &k) = 0;
     virtual void unSetKey(const std::string &k) = 0;
+
+ public:
+    enum enum_field_types sql_type;
 };
 
 

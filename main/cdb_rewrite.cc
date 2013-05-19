@@ -40,11 +40,7 @@ static void
 buildOnionMeta(ProxyState &ps, FieldMeta *fm);
 
 static void
-buildEncLayers(ProxyState &ps, onion o, OnionMeta *om,
-               SECLEVEL current_security_level);
-
-static void
-add_layer(AES_KEY * mKey, string layerName, onion o, OnionMeta *om,
+add_layer(AES_KEY * mKey, string uniqueFieldName, onion o, OnionMeta *om,
           SECLEVEL secLevel, Create_field *cf);
 
 //TODO: rewrite_proj may not need to be part of each class;
@@ -115,6 +111,11 @@ createMetaTablesIfNotExists(ProxyState & ps)
                 "  ndex bigint NOT NULL,"
                 "  has_salt boolean,"
                 "  salt_name varchar(64),"
+                "  onion_layout enum"
+                "     ('PLAIN_ONION_LAYOUT',"
+                "      'NUM_ONION_LAYOUT',"
+                "      'MP_NUM_ONION_LAYOUT',"
+                "      'STR_ONION_LAYOUT')," 
                 "  id SERIAL PRIMARY KEY)"
                 " ENGINE=InnoDB;"));
 
@@ -139,42 +140,11 @@ createMetaTablesIfNotExists(ProxyState & ps)
                 "      'PLAINVAL'," 
                 "      'INVALID')"
                 "     NOT NULL DEFAULT 'INVALID',"
-                "  stale boolean,"
+               "  stale boolean,"
+                "  sql_type varchar(64) NOT NULL," // FIXME: Enum.
                 "  id SERIAL PRIMARY KEY)"
                 " ENGINE=InnoDB;"));
-        
-    assert(ps.e_conn->execute(
-                " CREATE TABLE IF NOT EXISTS pdb.layer_info"
-                " (onion_info_id bigint NOT NULL,"  // Foreign key.
-                "  name varchar(64) NOT NULL,"
-                "  type varchar(64) NOT NULL,"       // Should be enum.
-                "  length bigint NOT NULL,"
-                "  decimals bigint NOT NULL,"
-                "  comment varchar(64) NOT NULL,"
-                "  chnge varchar(64) NOT NULL,"
-                "  interval_list varchar(1024) NOT NULL," // Hacked.
-                "  geometry_type enum"
-                "    ('GEOM_GEOMETRY',"
-                "     'GEOM_POINT',"
-                "     'GEOM_LINESTRING',"
-                "     'GEOM_POLYGON',"
-                "     'GEOM_MULTIPOINT',"
-                "     'GEOM_MULTILINESTRING',"
-                "     'GEOM_MULTIPOLYGON',"
-                "     'GEOM_GEOMETRYCOLLECTION',"
-                "     'INVALID')"
-                "    NOT NULL DEFAULT 'INVALID',"
-                "  id SERIAL PRIMARY KEY)"
-                " ENGINE=InnoDB;"));
-
     return;
-}
-
-static List<String> *
-get_interval_list(string interval_list_text)
-{
-    fprintf(stderr, "implement get_interval_list");
-    exit(1);
 }
 
 // FIXME: Break up into smaller functions.
@@ -232,7 +202,8 @@ static void
 buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
 {
 
-    string q = " SELECT f.name, f.ndex, f.has_salt, f.salt_name"
+    string q = " SELECT f.name, f.ndex, f.has_salt, f.salt_name,"
+               "        f.onion_layout"
                " FROM pdb.table_info t, pdb.field_info f"
                " WHERE t.database_name = '" + database_name + "' "
                "   AND t.number = " + std::to_string(tm->tableNo) +
@@ -251,6 +222,7 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
         string field_ndex(row[1], l[1]);
         string field_has_salt(row[2], l[2]);
         string field_salt_name(row[3], l[3]);
+        string field_onion_layout(row[4], l[4]);
 
         FieldMeta *fm = new FieldMeta;
         fm->tm = tm;
@@ -259,19 +231,23 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
         // FIXME.
         // fm->has_salt = string(row[2], l[2]);
         fm->salt_name = field_salt_name;
+        fm->onion_layout =
+            EnumText<onionlayout>::toEnum(field_onion_layout);
 
         tm->fieldMetaMap[fm->fname] = fm;
+
         buildOnionMeta(ps, fm);
     }
     return;
 }
 
+// Should basically mirror init_onions_layout()
 static void
 buildOnionMeta(ProxyState &ps, FieldMeta *fm)
 {
 
-    string q = " SELECT o.name, o.type, o.current_level,"
-               "        o.stale"
+    string q = " SELECT o.name, o.type, o.current_level, o.stale," 
+               "        o.sql_type"
                " FROM pdb.onion_info o, pdb.field_info f"
                " WHERE o.field_info_id = f.id"
                "    AND f.ndex = " + std::to_string(fm->index) + ";";
@@ -289,94 +265,43 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
         string onion_type(row[1], l[1]);
         string onion_current_level(row[2], l[2]);
         string onion_stale(row[3], l[3]);
+        string onion_sql_type(row[4], l[4]);
 
         OnionMeta *om = new OnionMeta();
         om->onionname = onion_name;
+        om->sql_type  =
+            EnumText<enum enum_field_types>::toEnum(onion_sql_type);
         // FIXME.
         // om->stale = string(row[3], l[3]); 
 
         onion o = EnumText<onion>::toEnum(onion_type);
-        SECLEVEL current_level =
+        fm->onions[o] = om;
+        // Current layer level.
+        fm->encdesc.olm[o] =
             EnumText<SECLEVEL>::toEnum(onion_current_level);
 
-        fm->onions[o] = om;
-        fm->encdesc.olm[o] = current_level;
+        // HACK(burrows).
+        Create_field * dummy_cf = new Create_field;
+        dummy_cf->sql_type = om->sql_type;
 
-        buildEncLayers(ps, o, om, current_level);
-    }
-
-    return;
-}
-
-static void
-buildEncLayers(ProxyState &ps, onion o, OnionMeta *om,
-               SECLEVEL current_security_level)
-{
-    string q = " SELECT l.name, l.type, l.length,"
-               "        l.decimals,"
-               "        l.comment, l.chnge,"
-               "        l.interval_list, l.geometry_type"
-               " FROM pdb.layer_info l, pdb.onion_info o"
-               " WHERE l.onion_info_id = o.id;";
-
-    DBResult *dbRes;
-    assert(ps.e_conn->execute(q, dbRes));
-
-    ScopedMySQLRes r(dbRes->n);
-    MYSQL_ROW row;
-
-    // FIXME.
-    while ((row = mysql_fetch_row(r.res()))) {
-       unsigned long *l = mysql_fetch_lengths(r.res());
-       assert(l != NULL);
-
-       string layer_name(row[0], l[1]);
-       string layer_type(row[1], l[1]);
-       string layer_length(row[2], l[2]);
-       string layer_decimals(row[3], l[3]);
-       string layer_comment(row[4], l[4]);
-       string layer_chnge(row[5], l[5]);
-       string layer_interval_list(row[6], l[6]);
-       string layer_geometry_type(row[7], l[7]);
-
-       // FIXME: Memleaks.
-       char *layer_name_cstr = strdup(layer_name.c_str());
-       char *layer_comment_cstr = strdup(layer_comment.c_str());
-       char *layer_length_cstr = strdup(layer_length.c_str());
-       char *layer_decimals_cstr = strdup(layer_decimals.c_str());
-       char *layer_chnge_cstr = strdup(layer_chnge.c_str());
-
-       LEX_STRING layer_comment_lex_str = 
-       {
-           layer_comment_cstr,
-           layer_comment.length()
-       };
-
-       // FIXME: Dummies.
-       uint dummy_uint = 0;
-       Item *dummy_item = NULL;
+        // Then, build EncLayer subclasses.
+        string uniqueFieldName = fullName(om->onionname,
+                                         fm->tm->anonTableName);
        
-       // FIXME: Determine if this is okay useage of
-       // my_charset_bin.
+        // Add elements to OnionMeta.layers starting with the bottom layer
+        // and stopping at the current level.
+        // FIXME: TESTME.
+        std::list<SECLEVEL> layers = fm->onion_layout[o];
+        for (auto it: layers) {
+            add_layer(ps.masterKey, uniqueFieldName, o, om, it, dummy_cf);
 
-       // First build a Create_field. 
-       Create_field * cf = new Create_field;
-       THD *thd = current_thd;
-       assert(thd);
-       cf->init(thd, layer_name_cstr,
-                EnumText<enum enum_field_types>::toEnum(layer_type),
-                layer_length_cstr, layer_decimals_cstr, dummy_uint,
-                dummy_item, dummy_item, &layer_comment_lex_str,
-                layer_chnge_cstr, get_interval_list(layer_interval_list),
-                &my_charset_bin,
-                (uint)EnumText<Field::geometry_type>::toEnum(layer_geometry_type));
-       
-       // Then, build EncLayer subclasses.
-       add_layer(ps.masterKey, layer_name, o, om, current_security_level,
-                 cf);
-    }
+            if (it == fm->encdesc.olm[o]) {
+                break;
+            }
+        }
+     }
           
-    return;
+     return;
 }
 
 /* TODO: put back
@@ -471,19 +396,6 @@ printEmbeddedState(ProxyState & ps) {
     printEC(ps.e_conn, "select * from pdb.table_info;");
     printEC(ps.e_conn, "select * from pdb.field_info;");
     printEC(ps.e_conn, "select * from pdb.onion_info;");
-    printEC(ps.e_conn, "select * from pdb.layer_info;");
-}
-
-static void
-initSchema(ProxyState & ps)
-{
-    createMetaTablesIfNotExists(ps);
-
-    printEmbeddedState(ps);
-
-    createInMemoryTables(ps);
-
-    return;
 }
 
 template <typename type> static void
@@ -493,8 +405,8 @@ translatorHelper(const char **texts, type *enums, int count)
     vector<std::string> vec_texts(count);
 
     for (int i = 0; i < count; ++i) {
-        vec_enums[i] = enums[i];
         vec_texts[i] = texts[i];
+        vec_enums[i] = enums[i];
     }
 
     EnumText<type>::addSet(vec_enums, vec_texts);
@@ -554,8 +466,23 @@ buildEnumTextTranslator()
     assert(arraysize(mysql_type_chars) == arraysize(mysql_types));
     count = arraysize(mysql_type_chars);
     translatorHelper((const char **)mysql_type_chars,
-                     (enum_field_types *)mysql_types, count);
+                     (enum enum_field_types *)mysql_types, count);
 
+    // Onion Layouts.
+    const char *onion_layout_chars[] =
+    {
+        "PLAIN_ONION_LAYOUT", "NUM_ONION_LAYOUT", "MP_NUM_ONION_LAYOUT",
+        "STR_ONION_LAYOUT"
+    };
+    onionlayout onion_layouts[] =
+    {
+        PLAIN_ONION_LAYOUT, NUM_ONION_LAYOUT, MP_NUM_ONION_LAYOUT,
+        STR_ONION_LAYOUT
+    };
+    assert(arraysize(onion_layout_chars) == arraysize(onion_layouts));
+    count = arraysize(onion_layout_chars);
+    translatorHelper((const char **)onion_layout_chars,
+                     (onionlayout *)onion_layouts, count);
 
     // Geometry type.
     const char *geometry_type_chars[] = 
@@ -579,6 +506,20 @@ buildEnumTextTranslator()
     return;
 }
 
+
+static void
+initSchema(ProxyState & ps)
+{
+    createMetaTablesIfNotExists(ps);
+
+    printEmbeddedState(ps);
+
+    // HACKed in.
+    buildEnumTextTranslator();
+    createInMemoryTables(ps);
+
+    return;
+}
 /*
 static void
 initSchema(ProxyState & ps)
@@ -2948,6 +2889,9 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
 
     fm->onions.clear();
     fm->encdesc.clear();
+    
+    // HACK(burrows).
+    fm->onion_layout = ol;
 
     for (auto it: ol) {
         onion o = it.first;
@@ -2955,13 +2899,15 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
         fm->onions[o] = om;
 
         om->onionname = anonymizeFieldName(index, o, fm->fname, false);
+        // HACK(burrows)
+        om->sql_type = cf->sql_type;
 
         if (mKey) {
             //generate enclayers for encrypted field
             for (auto l: it.second) {
-                string layerName = fullName(om->onionname,
-                                            fm->tm->anonTableName);
-                add_layer(mKey, layerName, o, om, l, cf);
+                string uniqueFieldName = fullName(om->onionname,
+                                                  fm->tm->anonTableName);
+                add_layer(mKey, uniqueFieldName, o, om, l, cf);
             }
         }
 
@@ -2973,11 +2919,11 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
 }
 
 static void
-add_layer(AES_KEY * mKey, string layerName, onion o, OnionMeta *om,
+add_layer(AES_KEY * mKey, string uniqueFieldName, onion o, OnionMeta *om,
           SECLEVEL secLevel, Create_field *cf)
 {
     PRNG * key;
-    key = getLayerKey(mKey, layerName, secLevel);
+    key = getLayerKey(mKey, uniqueFieldName, secLevel);
 
     om->layers.push_back(EncLayerFactory::encLayer(o, secLevel, cf, key));
 
@@ -3580,12 +3526,6 @@ drop_table_update_meta(const string &q,
     assert(a.ps->e_conn->execute("COMMIT"));
 }
 
-static string
-LEX_STRING_to_string(LEX_STRING lex_str)
-{
-    return string(lex_str.str, lex_str.length);
-}
-
 static inline void
 add_table_update_meta(const string &q,
                       LEX *lex,
@@ -3604,7 +3544,7 @@ add_table_update_meta(const string &q,
           << " " << tm->tableNo << ", "
           << " '" << tm->anonTableName << "', "
           << " '" << table << "', "
-          // FIXME: Fix boolean.
+          // FIXME(burrows): Fix boolean.
           // << "'" << tm->hasSensitive << "', "
           // << "'" << tm->has_salt << "', "
           << " FALSE, FALSE, "
@@ -3629,7 +3569,8 @@ add_table_update_meta(const string &q,
           // << "'" << fm->has_salt << "' "
           << " FALSE, "
           << " '" << fm->salt_name << "',"
-          << " 0"
+          << " '" << EnumText<onionlayout>::toText(fm->onion_layout) << "',"
+          << " 0" 
           << " );";
 
         assert(a.ps->e_conn->execute(s.str()));
@@ -3645,37 +3586,13 @@ add_table_update_meta(const string &q,
               << " '" << om->onionname << "', "
               << " '" << EnumText<onion>::toText(o) << "', "
               << " '" << EnumText<SECLEVEL>::toText(fm->encdesc.olm[o]) << "', "
-              << " FALSE, 0);";
-              // FIXME.
-              // << "'" << om->stale << ", "
+              // FIXME(burrows).
+              << " FALSE, "
+              << " '" << EnumText<enum enum_field_types>::toText(om->sql_type) << "', "
+              << " 0);";
             
+            cout << "QUERY: " << s.str() << endl;
             assert(a.ps->e_conn->execute(s.str()));
-
-            unsigned long long onionID = a.ps->e_conn->last_insert_id();
-
-            for (auto layer: om->layers) {
-                Create_field * cf = layer->cf;
-
-                ostringstream s;
-                s << " INSERT INTO pdb.layer_info VALUES ("
-                  << " " << onionID << ", "
-                  << " '" << cf->field_name << "', "
-                  << " '"
-                  <<  EnumText<enum enum_field_types>::toText(cf->sql_type)
-                  << "', "
-                  << " " << cf->length << ", "
-                  << " " << cf->decimals << ", "
-                  << " '" << LEX_STRING_to_string(cf->comment) << "', "
-                  // FIXME.
-                  // << " '" << cf->change << "', "
-                  << " 'whatever', "
-                  // FIXME.
-                  << " '" << "interval list should be here" << "', "
-                  << " '" << EnumText<Field::geometry_type>::toText(cf->geom_type) << "', "
-                  << "0);";
-
-                assert(a.ps->e_conn->execute(s.str()));
-            }
         }
     }
 
@@ -3873,9 +3790,6 @@ Rewriter::Rewriter(ConnectionInfo ci,
     ps.schema = new SchemaInfo();
     ps.totalTables = 0;
     initSchema(ps);
-
-    // HACKed in.
-    buildEnumTextTranslator();
 
     loadUDFs(ps.conn);
 
@@ -4223,6 +4137,23 @@ printRes(const ResType & r) {
     }
 }
 
+// FIXME(burrows): Add deconstructor.
+template <typename _type>
+EnumText<_type>::EnumText(std::vector<_type> enums,
+                          std::vector<std::string> texts)
+{
+    // FIXME(burrows): Better semantics? Only needs one loop.
+    for (auto e: enums) {
+        _type *new_e = new _type(e);
+        theEnums.push_back(new_e);
+    }
+
+    for (auto t: texts) {
+        std::string *new_t = new std::string(t);
+        theTexts.push_back(new_t);
+    }
+}
+
 template <typename _type> void
 EnumText<_type>::addSet(std::vector<_type> enums,
                         std::vector<std::string> texts)
@@ -4231,18 +4162,18 @@ EnumText<_type>::addSet(std::vector<_type> enums,
         throw "enums and text must be the same length!";
     }
 
-    EnumText<_type>::instance= new EnumText<_type>(enums, texts);
+    EnumText<_type>::instance = new EnumText<_type>(enums, texts);
 
     return;
 }
 
-template <typename _type> std::vector<std::string>
+template <typename _type> std::vector<std::string *>
 EnumText<_type>::allText()
 {
     return EnumText<_type>::instance->allText();
 }
 
-template <typename _type> std::vector<_type>
+template <typename _type> std::vector<_type *>
 EnumText<_type>::allEnum()
 {
     return EnumText<_type>::instance->allEnum();
@@ -4260,30 +4191,28 @@ EnumText<_type>::toEnum(std::string t)
     return EnumText<_type>::instance->getEnum(t);
 }
 
-// FIXME: I'm assuming getText or getEnum is broken.
+// FIXME(burrows): Should use a functor + find_if.
 template <typename _type>
 std::string EnumText<_type>::getText(_type e)
 {
-   typename std::vector<_type>::iterator iter =
-       std::find(theEnums.begin(), theEnums.end(), e);
-   if (theEnums.end() == iter) {
-       throw "enum does not exist!"; 
-   }
+    for (unsigned int i = 0; i != theEnums.size(); ++i) {
+        if (*(theEnums[i]) == e) {
+            return *(theTexts[i]);
+        }
+    }
 
-   int pos = iter - theEnums.begin();
-   return theTexts[pos];
+    throw "enum does not exist!"; 
 }
 
 template <typename _type>
 _type EnumText<_type>::getEnum(std::string t)
 {
-    std::vector<std::string>::iterator iter =
-        std::find(theTexts.begin(), theTexts.end(), t);
-    if (theTexts.end() == iter) {
-        throw "text does not exist!"; 
+    for (unsigned int i = 0; i != theTexts.size(); ++i) {
+        if (*(theTexts[i]) == t) {
+            return *(theEnums[i]);
+        }
     }
 
-    int pos = iter - theTexts.begin();
-    return theEnums[pos];
+    throw "text does not exist!"; 
 }
 

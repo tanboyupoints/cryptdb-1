@@ -8,9 +8,7 @@
 template <typename type>
 class EnumText {
 public:
-    EnumText(std::vector<type> enums, std::vector<std::string> texts) :
-        theTexts(texts), theEnums(enums) {}
-
+    EnumText(std::vector<type> enums, std::vector<std::string> texts);
     ~EnumText() {;}
 
     // Instance.
@@ -20,15 +18,15 @@ public:
     // Static.
     static void addSet(std::vector<type> enums,
                        std::vector<std::string> text);
-    static std::vector<std::string> allText();
-    static std::vector<type> allEnum();
+    static std::vector<std::string *> allText();
+    static std::vector<type *> allEnum();
     static std::string toText(type e);
     static type toEnum(std::string t);
 
 protected:
     // Instance.
-    std::vector<std::string> theTexts;
-    std::vector<type> theEnums;
+    std::vector<std::string *> theTexts;
+    std::vector<type *> theEnums;
     static EnumText *instance;
 };
 
