@@ -228,13 +228,15 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
         fm->tm = tm;
         fm->fname = field_name;
         fm->index = atoi(field_ndex.c_str());
-        // FIXME.
+        // FIXME(burrows).
         // fm->has_salt = string(row[2], l[2]);
         fm->salt_name = field_salt_name;
         fm->onion_layout =
             EnumText<onionlayout>::toEnum(field_onion_layout);
 
         tm->fieldMetaMap[fm->fname] = fm;
+        // FIXME(burrows): This needs to be in order.
+        tm->fieldNames.push_back(fm->fname);
 
         buildOnionMeta(ps, fm);
     }
@@ -783,6 +785,7 @@ encrypt_item_layers(Item * i, onion o, list<EncLayer *> & layers, Analysis &a, F
     return enc;
 }
 
+// FIXME(burrows): Decryption is breaking here.
 static Item *
 decrypt_item_layers(Item * i, onion o,  list<EncLayer *> & layers, uint64_t IV, Analysis &a, FieldMeta *fm, const vector<Item *> &res) {
 
@@ -849,7 +852,9 @@ encrypt_item_all_onions(Item * i, FieldMeta * fm,
 
 static Item *
 decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV, Analysis &a, vector<Item *> &res) {
-    printf("SIEE: %lu\n", (fm->onions[o]->layers).size());
+    printf("ONION: %d\n", o);
+    printf("SIZE: %lu\n", (fm->onions[o]->layers).size());
+    printf("IV: %lu\n", IV);
     return decrypt_item_layers(i, o, fm->onions[o]->layers, IV, a, fm, res);
 }
 
@@ -3361,6 +3366,7 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
             List_item *li = it++;
             if (!li)
                 break;
+            // FIXME(burrows): Breaks here, fmVec.size() is wrong value.
             assert(li->elements == fmVec.size());
             List<Item> *newList0 = new List<Item>();
             auto it0 = List_iterator<Item>(*li);
