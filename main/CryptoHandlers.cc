@@ -53,7 +53,6 @@ RND_int::RND_int(Create_field * f, PRNG * prng)
       key(prng->rand_string(key_bytes)),
       bf(key)
 {
-    crypto_key = key;
     setKey(prng->rand_string(key_bytes));
 }
 
@@ -79,7 +78,6 @@ RND_int::setKey(const string &k) {
     }
     key = k;
     bf = blowfish(key);
-    crypto_key = k;
 }
 
 //if we're using MultiPrinc, we don't want to keep a copy of a key around
@@ -246,7 +244,6 @@ DET_int::DET_int(Create_field * f, PRNG * prng)
       key(prng->rand_string(bf_key_size)),
       bf(key)
 {
-    crypto_key = key;
     setKey(key);
 }
 
@@ -424,7 +421,6 @@ DETJOIN_int::DETJOIN_int(Create_field * f, std::string key)
 {
     setKey("joinjoinjoinjoin");
     cf = f;
-    crypto_key = "joinjoinjoinjoin";
 }
 
 
@@ -446,7 +442,6 @@ OPE_int::OPE_int(Create_field * f, PRNG * prng)
       key(prng->rand_string(key_bytes)),
       ope(key, plain_size*8, ciph_size*8)
 {
-    crypto_key = key;
     setKey(prng->rand_string(key_bytes));
 }
 
@@ -454,7 +449,6 @@ OPE_int::OPE_int(Create_field *f, std::string key)
     : EncLayer(f),
       ope(key, plain_size*8, ciph_size*8)
 {
-    crypto_key = key;
     setKey(key);
 }
 
@@ -564,7 +558,6 @@ HOM::HOM(Create_field * f, PRNG * key)
     : EncLayer(f),
       sk(Paillier_priv::keygen(key, nbits))
 {
-    // crypto_key = *key;
 }
 
 Create_field *
@@ -691,7 +684,6 @@ HOM::sumUDF(Item * i1, Item * i2, const string &k) {
 Search::Search(Create_field * f, PRNG * key)
     : EncLayer(f)
 {
-    // crypto_key = *key;
     setKey(key->rand_string(key_bytes));
 }
 

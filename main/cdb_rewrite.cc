@@ -928,9 +928,6 @@ encrypt_item_all_onions(Item * i, FieldMeta * fm,
 
 static Item *
 decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV, Analysis &a, vector<Item *> &res) {
-    printf("ONION: %d\n", o);
-    printf("SIZE: %lu\n", (fm->onions[o]->layers).size());
-    printf("IV: %lu\n", IV);
     return decrypt_item_layers(i, o, fm->onions[o]->layers, IV, a, fm, res);
 }
 
@@ -3675,7 +3672,7 @@ add_table_update_meta(const string &q,
             // FIXME(burrows): Add keys.
             for (unsigned int i = 0; i < onion_pair.second->layers.size(); ++i) {
                 std::string crypto_key =
-                    onion_pair.second->layers[i]->crypto_key;
+                    onion_pair.second->layers[i]->getKey();
                 unsigned int escaped_length = crypto_key.size() * 2 + 1;
                 char escaped_key[escaped_length];
                 mysql_real_escape_string(a.ps->e_conn->conn, escaped_key,

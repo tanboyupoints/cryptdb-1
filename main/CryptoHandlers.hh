@@ -26,7 +26,7 @@
 class EncLayer {
  public:
     EncLayer(Create_field * f) : cf(f), sql_type(f->sql_type) {}
-    EncLayer(Create_field * f, std::string key) : cf(f), crypto_key(key) {}
+    EncLayer(Create_field * f, std::string key) : cf(f) {}
 
     EncLayer(enum enum_field_types sql_type) : sql_type(sql_type) {}
 
@@ -39,6 +39,7 @@ class EncLayer {
         thrower() << "decryptUDF not supported";
     }
 
+    virtual std::string getKey() {return std::string("unsupported");}
 
  protected:
     Create_field *cf;
@@ -46,7 +47,6 @@ class EncLayer {
     virtual void unSetKey(const std::string &k) = 0;
 
  public:
-    std::string crypto_key;
     enum enum_field_types sql_type;
 };
 
@@ -68,6 +68,8 @@ public:
     Item * encrypt(Item * ptext, uint64_t IV, const std::string &k = "");
     Item * decrypt(Item * ctext, uint64_t IV, const std::string &k = "");
     Item * decryptUDF(Item * col, Item * ivcol);
+
+    std::string getKey() {return key;}
 
 private:
     std::string key;
@@ -112,6 +114,8 @@ public:
     Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "");
     Item * decryptUDF(Item * col, Item * ivcol = NULL);
 
+    std::string getKey() {return key;}
+
 protected:
     std::string key;
     blowfish bf;
@@ -153,6 +157,9 @@ public:
     DETJOIN_int(Create_field *cf, std::string key);
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
+    
+    std::string getKey() {return key;}
+
 /*    Create_field * newCreateField(std::string anonname = "") {return cf;}
     
     //TODO: DETJOIN for multi
@@ -207,6 +214,8 @@ public:
     Item * encrypt(Item * p, uint64_t IV, const std::string &k = "");
     Item * decrypt(Item * c, uint64_t IV, const std::string &k = "");
 
+    std::string getKey() {return key;}
+
 private:
     std::string key;
     OPE ope;
@@ -255,6 +264,7 @@ public:
     //expr is the expression (e.g. a field) over which to sum
     Item * sumUDA(Item * expr, const std::string &k = "");
     Item * sumUDF(Item * i1, Item * i2, const std::string &k = "");
+
 private:
     static const uint nbits = 1024;
     Paillier_priv sk;
