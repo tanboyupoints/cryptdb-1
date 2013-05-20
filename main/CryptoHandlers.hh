@@ -84,7 +84,7 @@ private:
 class RND_str : public EncLayer {
 public:
     RND_str(Create_field *, PRNG * key);
-    RND_str(Create_field *cf, std::string key) : EncLayer(cf), rawkey(key) {}
+    RND_str(Create_field *cf, std::string key) : EncLayer(cf) {setKey(key);}
 
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField(std::string anonname = "");
@@ -132,7 +132,7 @@ protected:
 class DET_str : public EncLayer {
 public:
     DET_str(Create_field *, PRNG * key);
-    DET_str(Create_field *cf, std::string key) : EncLayer(cf), rawkey(key) {}
+    DET_str(Create_field *cf, std::string key) : EncLayer(cf) {setKey(key);}
 
     SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField(std::string anonname = "");
@@ -242,7 +242,7 @@ private:
 class OPE_str : public EncLayer {
 public:
     OPE_str(Create_field *, PRNG * key);
-    OPE_str(Create_field *cf, std::string key) : EncLayer(cf), key(key), ope(key, plain_size*8, ciph_size*8) {}
+    OPE_str(Create_field *cf, std::string key) : EncLayer(cf), key(key), ope(key, plain_size*8, ciph_size*8) {setKey(key);}
 
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField(std::string anonname = "");
@@ -290,7 +290,7 @@ private:
 class Search : public EncLayer {
 public:
     Search(Create_field * cf, PRNG * key);
-    Search(Create_field *cf, std::string key) : EncLayer(cf), rawkey(key), key(key) {}
+    Search(Create_field *cf, std::string key) : EncLayer(cf) {setKey(key);}
 
     SECLEVEL level() {return SECLEVEL::SEARCH;}
     Create_field * newCreateField(std::string anonname = "");
