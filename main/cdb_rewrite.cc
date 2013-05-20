@@ -84,6 +84,8 @@ mysql_query_wrapper(MYSQL *m, const string &q)
 static void
 createMetaTablesIfNotExists(ProxyState & ps)
 {
+    ostringstream s;
+
     assert(ps.e_conn->execute("CREATE DATABASE IF NOT EXISTS pdb"));
 
     // FIXME(burrows): Add UNIQUE's where appropriate.
@@ -99,74 +101,51 @@ createMetaTablesIfNotExists(ProxyState & ps)
                 "  id SERIAL PRIMARY KEY)"
                 " ENGINE=InnoDB;"));
     
-    assert(ps.e_conn->execute(
-                " CREATE TABLE IF NOT EXISTS pdb.field_info"
-                " (table_info_id bigint NOT NULL," // Foreign key.
-                "  name varchar(64) NOT NULL,"
-                "  ndex bigint NOT NULL,"
-                "  has_salt boolean,"
-                "  salt_name varchar(64),"
-                "  onion_layout enum"
-                "     ('PLAIN_ONION_LAYOUT',"
-                "      'NUM_ONION_LAYOUT',"
-                "      'MP_NUM_ONION_LAYOUT',"
-                "      'STR_ONION_LAYOUT')," 
-                "  id SERIAL PRIMARY KEY)"
-                " ENGINE=InnoDB;"));
+    s << " CREATE TABLE IF NOT EXISTS pdb.field_info"
+      << " (table_info_id bigint NOT NULL," // Foreign key.
+      << "  name varchar(64) NOT NULL,"
+      << "  ndex bigint NOT NULL,"
+      << "  has_salt boolean,"
+      << "  salt_name varchar(64),"
+      << "  onion_layout enum"
+      << " " << EnumText<onionlayout>::parenList().c_str() << " NOT NULL,"
+      << "  id SERIAL PRIMARY KEY)"
+      << " ENGINE=InnoDB;";
 
-    assert(ps.e_conn->execute(
-                " CREATE TABLE IF NOT EXISTS pdb.onion_info"
-                " (field_info_id bigint NOT NULL," // Foreign key.
-                "  name varchar(64) NOT NULL,"
-                "  type enum"
-                "     ('oPLAIN',"
-                "      'oDET',"
-                "      'oOPE',"
-                "      'oAGG',"
-                "      'oSWP',"
-                "      'INVALID')"
-                "     NOT NULL DEFAULT 'INVALID',"
-                "  current_level enum"
-                "     ('RND',"
-                "      'DET',"
-                "      'DETJOIN',"
-                "      'OPE',"
-                "      'HOM',"
-                "      'SEARCH',"
-                "      'PLAINVAL'," 
-                "      'INVALID')"
-                "     NOT NULL DEFAULT 'INVALID',"
-                "  stale boolean,"
-                "  sql_type varchar(64) NOT NULL," // FIXME: Enum.
-                "  id SERIAL PRIMARY KEY)"
-                " ENGINE=InnoDB;"));
+    cout << "QUERY: " << s.str() << endl;
+    assert(ps.e_conn->execute(s.str()));
+    s.str("");
+    s.clear();
 
-    assert(ps.e_conn->execute(
-                " CREATE TABLE IF NOT EXISTS pdb.layer_key"
-                " (onion_info_id bigint NOT NULL," // Foreign key.
-                "  lkey varbinary(64) NOT NULL,"
-                "  type enum"
-                "     ('oPLAIN',"
-                "      'oDET',"
-                "      'oOPE',"
-                "      'oAGG',"
-                "      'oSWP',"
-                "      'INVALID')"
-                "     NOT NULL DEFAULT 'INVALID',"
-                "  level enum"
-                "     ('RND',"
-                "      'DET',"
-                "      'DETJOIN',"
-                "      'OPE',"
-                "      'HOM',"
-                "      'SEARCH',"
-                "      'PLAINVAL'," 
-                "      'INVALID')"
-                "     NOT NULL DEFAULT 'INVALID',"
-                "  len bigint NOT NULL,"
-                "  id SERIAL PRIMARY KEY)"
-                " ENGINE=InnoDB;"));
+    s << " CREATE TABLE IF NOT EXISTS pdb.onion_info"
+      << " (field_info_id bigint NOT NULL," // Foreign key.
+      << "  name varchar(64) NOT NULL,"
+      << "  type enum"
+      << " " << EnumText<onion>::parenList() << " NOT NULL,"
+      << "  current_level enum"
+      << " " << EnumText<SECLEVEL>::parenList() << " NOT NULL,"
+      << "  stale boolean,"
+      << " sql_type enum"
+      << " " << EnumText<enum enum_field_types>::parenList() <<" NOT NULL,"
+      << "  id SERIAL PRIMARY KEY)"
+      << " ENGINE=InnoDB;";
 
+    assert(ps.e_conn->execute(s.str()));
+    s.str("");
+    s.clear();
+
+    s << " CREATE TABLE IF NOT EXISTS pdb.layer_key"
+      << " (onion_info_id bigint NOT NULL," // Foreign key.
+      << "  lkey varbinary(64) NOT NULL,"
+      << "  type enum"
+      << " " << EnumText<onion>::parenList() << " NOT NULL,"
+      << "  level enum"
+      << " " << EnumText<SECLEVEL>::parenList() << " NOT NULL,"
+      << "  len bigint NOT NULL,"
+      << "  id SERIAL PRIMARY KEY)"
+      << " ENGINE=InnoDB;";
+
+    assert(ps.e_conn->execute(s.str()));
     return;
 }
 
@@ -509,9 +488,6 @@ initSchema(ProxyState & ps)
     createMetaTablesIfNotExists(ps);
 
     // printEmbeddedState(ps);
-
-    // HACKed in (Must come before createInMemoryTables).
-    buildEnumTextTranslator();
 
     createInMemoryTables(ps);
 
@@ -3597,7 +3573,6 @@ add_table_update_meta(const string &q,
 
             unsigned long long onionID = a.ps->e_conn->last_insert_id();
 
-            // FIXME(burrows): Add keys.
             for (unsigned int i = 0; i < onion_pair.second->layers.size(); ++i) {
                 std::string crypto_key =
                     onion_pair.second->layers[i]->getKey();
@@ -3720,6 +3695,9 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
     ps.schema = new SchemaInfo();
     ps.totalTables = 0;
+
+    // Must be called before initSchema.
+    buildEnumTextTranslator();
     initSchema(ps);
 
     loadUDFs(ps.conn);
@@ -4119,6 +4097,23 @@ template <typename _type> _type
 EnumText<_type>::toEnum(std::string t)
 {
     return EnumText<_type>::instance->getEnum(t);
+}
+
+template <typename _type> std::string
+EnumText<_type>::parenList()
+{
+    std::vector<std::string> texts = *EnumText<_type>::instance->theTexts;
+    std::stringstream s;
+    s << "(";
+    for (unsigned int i = 0; i < texts.size(); ++i) {
+        s << "'" << texts[i] << "'";
+        if (i != texts.size() - 1) {
+            s << ", ";
+        }
+    }
+    s << ")";
+
+    return s.str();
 }
 
 // FIXME(burrows): Should use a functor + find_if.

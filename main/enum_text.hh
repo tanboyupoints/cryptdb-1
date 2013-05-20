@@ -22,6 +22,7 @@ public:
     static std::vector<type> allEnum();
     static std::string toText(type e);
     static type toEnum(std::string t);
+    static std::string parenList();
 
 protected:
     // Instance.
