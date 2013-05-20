@@ -21,6 +21,7 @@
 //TODO: currently, we have one such object per onion layer per field
 // optimize storage by sharing these handlers among objects with same type
 //TODO: need to implement cleanup & destructors
+//TODO(burrows): Make getKey virtual.
 
 
 class EncLayer {
@@ -256,7 +257,7 @@ class HOM : public EncLayer {
 public:
     HOM(Create_field * cf, PRNG * key);
     // HACK(burrows).
-    HOM(Create_field *cf, std::string key) : EncLayer(cf), dummy_prng(new urandom()), sk(Paillier_priv::keygen(NULL, nbits)) {throw "HOM does not support persistence!";}
+    HOM(Create_field *cf, std::string key) : EncLayer(cf), dummy_prng(new urandom()), sk(Paillier_priv::keygen(dummy_prng, nbits)) {throw "HOM does not support persistence!";}
 
     SECLEVEL level() {return SECLEVEL::HOM;}
     Create_field * newCreateField(std::string anonname = "");
