@@ -4249,21 +4249,20 @@ printRes(const ResType & r) {
     }
 }
 
-// FIXME(burrows): Add deconstructor.
 template <typename _type>
 EnumText<_type>::EnumText(std::vector<_type> enums,
                           std::vector<std::string> texts)
 {
-    // FIXME(burrows): Better semantics? Only needs one loop.
-    for (auto e: enums) {
-        _type *new_e = new _type(e);
-        theEnums.push_back(new_e);
-    }
+    theEnums = new std::vector<_type>(enums);
+    theTexts = new std::vector<std::string>(texts);
+}
 
-    for (auto t: texts) {
-        std::string *new_t = new std::string(t);
-        theTexts.push_back(new_t);
-    }
+// FIXME(burrows): Use destructor.
+template <typename _type>
+EnumText<_type>::~EnumText()
+{
+    delete theEnums;
+    delete theTexts;
 }
 
 template <typename _type> void
@@ -4279,13 +4278,13 @@ EnumText<_type>::addSet(std::vector<_type> enums,
     return;
 }
 
-template <typename _type> std::vector<std::string *>
+template <typename _type> std::vector<std::string>
 EnumText<_type>::allText()
 {
     return EnumText<_type>::instance->allText();
 }
 
-template <typename _type> std::vector<_type *>
+template <typename _type> std::vector<_type>
 EnumText<_type>::allEnum()
 {
     return EnumText<_type>::instance->allEnum();
@@ -4307,9 +4306,9 @@ EnumText<_type>::toEnum(std::string t)
 template <typename _type>
 std::string EnumText<_type>::getText(_type e)
 {
-    for (unsigned int i = 0; i != theEnums.size(); ++i) {
-        if (*(theEnums[i]) == e) {
-            return *(theTexts[i]);
+    for (unsigned int i = 0; i != theEnums->size(); ++i) {
+        if ((*theEnums)[i] == e) {
+            return (*theTexts)[i];
         }
     }
 
@@ -4319,9 +4318,9 @@ std::string EnumText<_type>::getText(_type e)
 template <typename _type>
 _type EnumText<_type>::getEnum(std::string t)
 {
-    for (unsigned int i = 0; i != theTexts.size(); ++i) {
-        if (*(theTexts[i]) == t) {
-            return *(theEnums[i]);
+    for (unsigned int i = 0; i != theTexts->size(); ++i) {
+        if ((*theTexts)[i] == t) {
+            return (*theEnums)[i];
         }
     }
 
