@@ -2909,6 +2909,7 @@ static void rewrite_key(const string &table_name,
 }
 
 
+// FIXME(burrows): I suspect this function should be excised.
 static void
 create_table_embedded(Connect * e_conn, const string & cur_db,
     const string & create_q) {
@@ -3334,8 +3335,6 @@ drop_table_update_meta(const string &q,
         char* table  = tbl->table_name;
         ostringstream s;
 
-        cout << "TNAME: " << table << endl;
-        cout << "DBNAM: " << dbname << endl;
         s << " DELETE FROM pdb.table_info, pdb.field_info, "
           << "             pdb.onion_info, pdb.layer_key"
           << " USING pdb.table_info INNER JOIN pdb.field_info"
@@ -3350,7 +3349,27 @@ drop_table_update_meta(const string &q,
 
         // FIXME(burrows): Also cleanup FieldMeta and OnionMeta
         a.ps->schema->totalTables--;
-        a.ps->schema->tableMetaMap.erase(table);
+        // Using a loop because we need to look up the table by it's
+        // normal name, which isn't available otherwise?
+        for (auto it: a.ps->schema->tableMetaMap) {
+            if (it.second->anonTableName == string(table)) {
+                std::string normalTableName = it.first;
+                for (auto it2: it.second->fieldMetaMap) {
+                    for (auto it3: it2.second->onions) {
+                        it2.second->onions.erase(it3.first);
+                    } 
+                    it.second->fieldMetaMap.erase(it2.first);
+                }
+                a.ps->schema->tableMetaMap.erase(normalTableName);
+
+                ostringstream ds;
+                ds << " DROP TABLE " << dbname << "." << normalTableName
+                   << ";";
+                assert(a.ps->e_conn->execute(ds.str()));
+                break;
+            }
+        }
+
     }
 
     assert(a.ps->e_conn->execute("COMMIT"));
