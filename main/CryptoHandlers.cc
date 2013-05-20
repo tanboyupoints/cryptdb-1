@@ -56,16 +56,6 @@ RND_int::RND_int(Create_field * f, PRNG * prng)
     setKey(prng->rand_string(key_bytes));
 }
 
-// FIXME(burrows)
-RND_int::RND_int(Create_field *f, std::string key)
-    : EncLayer(f),
-      key(key),
-      bf(key)
-{
-
-}
-
-
 Create_field *
 RND_int::newCreateField(string anonname) {
     return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
@@ -247,16 +237,6 @@ DET_int::DET_int(Create_field * f, PRNG * prng)
     setKey(key);
 }
 
-// FIXME(burrows)
-DET_int::DET_int(Create_field *f, std::string key)
-    : EncLayer(f),
-      key(key),
-      bf(key)
-{
-
-}
-
-
 Create_field *
 DET_int::newCreateField(string anonname) {
     return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
@@ -416,14 +396,6 @@ DET_str::decryptUDF(Item * col, Item * ivcol) {
 }
 
 /*************** DETJOIN *********************/
-DETJOIN_int::DETJOIN_int(Create_field * f, std::string key)
-    : DET_int(f, key)
-{
-    setKey("joinjoinjoinjoin");
-    cf = f;
-}
-
-
 /*
 Item *
 DETJOIN::encrypt(Item * p, uint64_t IV, const string &k) {
@@ -443,13 +415,6 @@ OPE_int::OPE_int(Create_field * f, PRNG * prng)
       ope(key, plain_size*8, ciph_size*8)
 {
     setKey(prng->rand_string(key_bytes));
-}
-
-OPE_int::OPE_int(Create_field *f, std::string key)
-    : EncLayer(f),
-      ope(key, plain_size*8, ciph_size*8)
-{
-    setKey(key);
 }
 
 Create_field *
@@ -904,32 +869,35 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf, std::string k
 	if (IsMySQLTypeNumeric(cf->sql_type) || (o == oOPE)) {
 	    return new RND_int(cf, key);
 	} else {
-	    // return new RND_str(cf, key);
+	    return new RND_str(cf, key);
 	}
     }
     case SECLEVEL::DET: {
 	if (IsMySQLTypeNumeric(cf->sql_type)) {
 	    return new DET_int(cf, key);
 	} else {
-	    // return new DET_str(cf, key);
+	    return new DET_str(cf, key);
 	}
     }
     case SECLEVEL::DETJOIN: {
-        return new DETJOIN_int(cf, key);
+	if (IsMySQLTypeNumeric(cf->sql_type)) {
+	    return new DETJOIN_int(cf, key);
+	} else {
+	    return new DETJOIN_str(cf, key);
+	}
     }
     case SECLEVEL::OPE: {
 	if (IsMySQLTypeNumeric(cf->sql_type)) {
 	    return new OPE_int(cf, key);
 	} else {
-	    throw "whatve";
+	    return new OPE_str(cf, key);
 	}
     }
     case SECLEVEL::HOM: {
         throw "pallier";
     }
     case SECLEVEL::SEARCH: {
-        cout << "SEARCH" << endl;
-        break;
+        return new Search(cf, key);
     }
     default:
         thrower() << "unknown or unimplemented NEW security level \n";

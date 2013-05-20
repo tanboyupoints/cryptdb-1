@@ -60,7 +60,7 @@ public:
 class RND_int : public EncLayer {
 public:
     RND_int(Create_field *, PRNG * key);
-    RND_int(Create_field *, std::string key);
+    RND_int(Create_field *cf, std::string key) : EncLayer(cf), key(key), bf(key) {}
 
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField(std::string anonname = "");
@@ -84,6 +84,7 @@ private:
 class RND_str : public EncLayer {
 public:
     RND_str(Create_field *, PRNG * key);
+    RND_str(Create_field *cf, std::string key) : EncLayer(cf), rawkey(key) {}
 
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField(std::string anonname = "");
@@ -91,6 +92,8 @@ public:
     Item * encrypt(Item * ptext, uint64_t IV, const std::string &k = "");
     Item * decrypt(Item * ctext, uint64_t IV, const std::string &k = "");
     Item * decryptUDF(Item * col, Item * ivcol);
+
+    std::string getKey() {return rawkey;}
 
 private:
     std::string rawkey;
@@ -105,7 +108,7 @@ private:
 class DET_int : public EncLayer {
 public:
     DET_int(Create_field *, PRNG * key);
-    DET_int(Create_field *, std::string key);
+    DET_int(Create_field *cf, std::string key) : EncLayer(cf), key(key), bf(key) {}
 
     SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField(std::string anonname = "");
@@ -129,6 +132,7 @@ protected:
 class DET_str : public EncLayer {
 public:
     DET_str(Create_field *, PRNG * key);
+    DET_str(Create_field *cf, std::string key) : EncLayer(cf), rawkey(key) {}
 
     SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField(std::string anonname = "");
@@ -136,6 +140,8 @@ public:
     Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "");
     Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "");
     Item * decryptUDF(Item * col, Item * = NULL);
+
+    std::string getKey() {return rawkey;}
 
 protected:
     std::string rawkey;
@@ -154,7 +160,7 @@ public:
     DETJOIN_int(Create_field * cf, PRNG * key) : DET_int(cf, key) {
 	this->key="joinjoinjoinjoin";
 	setKey(this->key);}
-    DETJOIN_int(Create_field *cf, std::string key);
+    DETJOIN_int(Create_field *cf, std::string key) : DET_int(cf, key) {}
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
     
@@ -185,7 +191,12 @@ public:
 	setKey(this->rawkey);
     }
 
+    DETJOIN_str(Create_field *cf, std::string key) : DET_str(cf, key) {}
+
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
+
+    std::string getKey() {return rawkey;}
+
 /*    Create_field * newCreateField(std::string anonname = "") {return cf;}
     
     //TODO: DETJOIN for multi
@@ -206,7 +217,7 @@ private:
 class OPE_int : public EncLayer {
 public:
     OPE_int(Create_field *, PRNG * key);
-    OPE_int(Create_field *, std::string key);
+    OPE_int(Create_field *cf, std::string key) : EncLayer(cf), key(key), ope(key, plain_size*8, ciph_size*8) {}
 
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField(std::string anonname = "");
@@ -231,6 +242,7 @@ private:
 class OPE_str : public EncLayer {
 public:
     OPE_str(Create_field *, PRNG * key);
+    OPE_str(Create_field *cf, std::string key) : EncLayer(cf), key(key), ope(key, plain_size*8, ciph_size*8) {}
 
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField(std::string anonname = "");
@@ -238,6 +250,8 @@ public:
     Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
     Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = "")__attribute__((noreturn));
   
+    std::string getKey() {return key;}
+
 private:
     std::string key;
     OPE ope;
@@ -276,6 +290,7 @@ private:
 class Search : public EncLayer {
 public:
     Search(Create_field * cf, PRNG * key);
+    Search(Create_field *cf, std::string key) : EncLayer(cf), rawkey(key), key(key) {}
 
     SECLEVEL level() {return SECLEVEL::SEARCH;}
     Create_field * newCreateField(std::string anonname = "");
@@ -286,6 +301,9 @@ public:
     //expr is the expression (e.g. a field) over which to sum
     Item * searchUDF(Item * field, Item * expr);
     
+    // FIXME(burrows): rawkey or key?
+    std::string getKey() {return rawkey;}
+
 private:
     static const uint key_bytes = 16;
     std::string rawkey;
