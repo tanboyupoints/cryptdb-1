@@ -112,7 +112,6 @@ createMetaTablesIfNotExists(ProxyState & ps)
       << "  id SERIAL PRIMARY KEY)"
       << " ENGINE=InnoDB;";
 
-    cout << "QUERY: " << s.str() << endl;
     assert(ps.e_conn->execute(s.str()));
     s.str("");
     s.clear();
@@ -3337,23 +3336,21 @@ drop_table_update_meta(const string &q,
 
         cout << "TNAME: " << table << endl;
         cout << "DBNAM: " << dbname << endl;
-        s << " DELETE"
-          << " FROM   pdb.table_info"
-          // << " JOIN   pdb.field_info f ON t.id = f.table_info_id"
-          << " WHERE  pdb.table_info.name = '" << table << "' "
-          << " AND    pdb.table_info..database_name = '" << dbname << "';";
-          // << " AND    pdb.field_info.id = pdb.onion_info.field_info_id"
-          // << " AND    pdb.onion_info.id = pdb.layer_key.onion_info_id;";
+        s << " DELETE FROM pdb.table_info, pdb.field_info, "
+          << "             pdb.onion_info, pdb.layer_key"
+          << " USING pdb.table_info INNER JOIN pdb.field_info"
+          << "       INNER JOIN pdb.onion_info INNER JOIN pdb.layer_key"
+          << " WHERE  pdb.table_info.anonymous_name = '" << table << "' "
+          << " AND    pdb.table_info.database_name = '" << dbname << "' "
+          << " AND    pdb.table_info.id = pdb.field_info.table_info_id"
+          << " AND    pdb.field_info.id = pdb.onion_info.field_info_id"
+          << " AND    pdb.onion_info.id = pdb.layer_key.onion_info_id;";
 
-        cout << "QUERY: " << s.str() << endl;
 	assert(a.ps->e_conn->execute(s.str()));
 
         // FIXME(burrows): Also cleanup FieldMeta and OnionMeta
         a.ps->schema->totalTables--;
         a.ps->schema->tableMetaMap.erase(table);
-
-        // FIXME: I think the following line is unessesary.
-	// assert(a.ps->e_conn->execute(q));
     }
 
     assert(a.ps->e_conn->execute("COMMIT"));
@@ -3747,7 +3744,7 @@ Rewriter::rewrite(const string & q, string *cur_db)
     assert(0 == mysql_thread_init());
     //assert(0 == create_embedded_thd(0));
 
-    // printEmbeddedState(ps);
+    printEmbeddedState(ps);
 
     query_parse p(*cur_db, q);
     QueryRewrite res;
@@ -3978,7 +3975,7 @@ EnumText<_type>::parenList()
 template <typename _type>
 std::string EnumText<_type>::getText(_type e)
 {
-    for (unsigned int i = 0; i != theEnums->size(); ++i) {
+    for (unsigned int i = 0; i < theEnums->size(); ++i) {
         if ((*theEnums)[i] == e) {
             return (*theTexts)[i];
         }
@@ -3990,7 +3987,7 @@ std::string EnumText<_type>::getText(_type e)
 template <typename _type>
 _type EnumText<_type>::getEnum(std::string t)
 {
-    for (unsigned int i = 0; i != theTexts->size(); ++i) {
+    for (unsigned int i = 0; i < theTexts->size(); ++i) {
         if ((*theTexts)[i] == t) {
             return (*theEnums)[i];
         }
