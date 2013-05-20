@@ -81,13 +81,12 @@ mysql_query_wrapper(MYSQL *m, const string &q)
     if (!ret) assert(false);
 }
 
-// FIXME: TESTME.
 static void
 createMetaTablesIfNotExists(ProxyState & ps)
 {
     assert(ps.e_conn->execute("CREATE DATABASE IF NOT EXISTS pdb"));
 
-    // FIXME: Add UNIQUE's where appropriate.
+    // FIXME(burrows): Add UNIQUE's where appropriate.
     assert(ps.e_conn->execute(
                 " CREATE TABLE IF NOT EXISTS pdb.table_info"
                 " (number bigint NOT NULL,"
@@ -171,9 +170,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
     return;
 }
 
-// FIXME: Break up into smaller functions.
 // FIXME: Correctly get boolean values.
-// FIXME: TESTME (especially onion stuff).
 static void
 createInMemoryTables(ProxyState & ps)
 {
@@ -466,13 +463,11 @@ printEC(Connect * e_conn, const string & command) {
 static void
 printEmbeddedState(ProxyState & ps) {
     printEC(ps.e_conn, "use pdb;");
-    /*
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables;");
     printEC(ps.e_conn, "select * from pdb.table_info;");
     printEC(ps.e_conn, "select * from pdb.field_info;");
     printEC(ps.e_conn, "select * from pdb.onion_info;");
-    */
 }
 
 template <typename type> static void
@@ -591,8 +586,9 @@ initSchema(ProxyState & ps)
 
     // printEmbeddedState(ps);
 
-    // HACKed in.
+    // HACKed in (Must come before createInMemoryTables).
     buildEnumTextTranslator();
+
     createInMemoryTables(ps);
 
     return;
@@ -2968,7 +2964,8 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
     fm->onions.clear();
     fm->encdesc.clear();
     
-    // HACK(burrows).
+    // This additional reflection is needed as we must rebuild the
+    // OnionMeta's (and their layers) after a restart.
     fm->onion_layout = ol;
 
     for (auto it: ol) {
@@ -2985,6 +2982,7 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
             for (auto l: it.second) {
                 PRNG *key;
 
+                // TODO(burrows): This can be pulled out of loop.
                 string uniqueFieldName = fullName(om->onionname,
                                                   fm->tm->anonTableName);
                 key = getLayerKey(mKey, uniqueFieldName, l);
@@ -3576,16 +3574,22 @@ drop_table_update_meta(const string &q,
     for (; tbl; tbl = tbl->next_local) {
         char* dbname = tbl->db;
         char* table  = tbl->table_name;
-
         ostringstream s;
-        s << " DELETE pdb.table_info, pdb.field_info "
-          << " FROM   pdb.table_info INNER JOIN pdb.field_info "
-          << " WHERE  pdb.table_info.id = pdb.field_info.table_info_id"
-          << " AND    pdb.table_info.name = '" << table << "' "
-          << " AND    pdb.table_info.database_name = '" << dbname << "';";
 
+        cout << "TNAME: " << table << endl;
+        cout << "DBNAM: " << dbname << endl;
+        s << " DELETE"
+          << " FROM   pdb.table_info"
+          // << " JOIN   pdb.field_info f ON t.id = f.table_info_id"
+          << " WHERE  pdb.table_info.name = '" << table << "' "
+          << " AND    pdb.table_info..database_name = '" << dbname << "';";
+          // << " AND    pdb.field_info.id = pdb.onion_info.field_info_id"
+          // << " AND    pdb.onion_info.id = pdb.layer_key.onion_info_id;";
+
+        cout << "QUERY: " << s.str() << endl;
 	assert(a.ps->e_conn->execute(s.str()));
 
+        // FIXME(burrows): Also cleanup FieldMeta and OnionMeta
         a.ps->schema->totalTables--;
         a.ps->schema->tableMetaMap.erase(table);
 
