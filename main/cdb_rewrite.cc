@@ -235,7 +235,7 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
             EnumText<onionlayout>::toEnum(field_onion_layout);
 
         tm->fieldMetaMap[fm->fname] = fm;
-        // FIXME(burrows): This needs to be in order.
+        // FIXME(burrows): Guarentee orderness?
         tm->fieldNames.push_back(fm->fname);
 
         buildOnionMeta(ps, fm);
@@ -270,7 +270,6 @@ get_layer_keys(ProxyState &ps, onion o, int onion_id) {
         SECLEVEL level = EnumText<SECLEVEL>::toEnum(layer_level);
         std::pair<SECLEVEL, std::string> key(level, layer_lkey);
         layer_keys.insert(key);
-        cout << "OUTKEY: " << layer_lkey << endl;
     }
 
     return layer_keys;
@@ -487,150 +486,12 @@ initSchema(ProxyState & ps)
 {
     createMetaTablesIfNotExists(ps);
 
-    // printEmbeddedState(ps);
+    printEmbeddedState(ps);
 
     createInMemoryTables(ps);
 
     return;
 }
-/*
-static void
-initSchema(ProxyState & ps)
-{
-
-    printEmbeddedState(ps);
-*/
-    /*   cerr << "warning: initSchema does not init enc layers correctly from shadow db\n";
-    createMetaTablesIfNotExists(ps);
-
-    vector<string> tablelist;
-
-    DBResult * dbres;
-    assert(ps.e_conn->execute("SELECT id, dbname, name, anon_name FROM proxy_db.table_info", dbres));
-    ScopedMySQLRes r(dbres->n);
-    MYSQL_ROW row;
-    while ((row = mysql_fetch_row(r.res()))) {
-        unsigned long *l = mysql_fetch_lengths(r.res());
-        assert(l != NULL);
-        TableMeta *tm = new TableMeta;
-        tm->tableNo = (unsigned int) atoi(string(row[0], l[0]).c_str());
-        tm->anonTableName = string(row[3], l[3]);
-        tm->has_salt = false;
-        string dbname(row[1], l[1]);
-        string origTableName(row[2], l[2]);
-        // tableMetaMap keys should include dbname: make_pair(dbname, origTableName)?
-        ps.schema->tableMetaMap[origTableName] = tm;
-        ps.schema->totalTables++;
-
-        string create_table_query;
-        {
-            string q = "SHOW CREATE TABLE `" + dbname + "`.`" + origTableName + "`";
-            DBResult * dbres = NULL;
-            assert(ps.e_conn->execute(q, dbres));
-            ScopedMySQLRes r(dbres->n);
-            assert(mysql_num_rows(r.res()) == 1);
-            assert(mysql_num_fields(r.res()) == 2);
-            MYSQL_ROW row = mysql_fetch_row(r.res());
-            unsigned long *lengths = mysql_fetch_lengths(r.res());
-            create_table_query = string(row[1], lengths[1]);
-        }
-
-        query_parse parser(dbname, create_table_query);
-        LEX *lex = parser.lex();
-        assert(lex->sql_command == SQLCOM_CREATE_TABLE);
-
-        // fetch all the column info for this table
-        {
-            string q = "SELECT "
-                       "c.name, "
-
-                       "c.has_ope, "
-                       "c.has_agg, "
-                       "c.has_search, "
-
-                       "c.anon_det_name, "
-                       "c.anon_ope_name, "
-                       "c.anon_agg_name, "
-                       "c.anon_swp_name, "
-
-                       "c.sec_level_det, "
-                       "c.sec_level_ope, "
-
-                       "c.salt_name, "
-                       "c.is_encrypted, "
-                       "c.can_be_null, "
-
-                       "c.has_salt "
-
-                       //TODO: what do these fields do?
-                       //"c.ope_used, "
-                       //"c.agg_used, "
-                       //"c.search_used, "
-
-                       "FROM proxy_db.column_info c, proxy_db.table_info t "
-                       "WHERE t.name = '" + origTableName + "'"
-                            " AND t.dbname = '" + dbname + "'"
-                            " AND c.table_id = t.id";
-
-            DBResult * dbres;
-            assert(ps.e_conn->execute(q, dbres));
-
-            ScopedMySQLRes r(dbres->n);
-            MYSQL_ROW row;
-            while ((row = mysql_fetch_row(r.res()))) {
-                unsigned long *l = mysql_fetch_lengths(r.res());
-                assert(l != NULL);
-
-                FieldMeta *fm = new FieldMeta;
-                fm->tm = tm;
-
-                size_t i = 0, j = 0;
-                fm->fname = string(row[i++], l[j++]);
-
-                bool has_ope = string(row[i++], l[j++]) == "1";
-                bool has_agg = string(row[i++], l[j++]) == "1";
-                bool has_swp = string(row[i++], l[j++]) == "1";
-
-                if (fm->onions.size() > 0) {
-                    fm->onions[oDET]->onionname = string(row[i++], l[j++]);
-
-                    if (has_ope) { fm->onions[oOPE]->onionname = string(row[i++], l[j++]); }
-                    else         { i++; j++; }
-
-                    if (has_agg) { fm->onions[oAGG]->onionname = string(row[i++], l[j++]); }
-                    else         { i++; j++; }
-
-                    if (has_swp) { fm->onions[oSWP]->onionname = string(row[i++], l[j++]); }
-                    else         { i++; j++; }
-
-                    OnionLevelMap om;
-
-                    om[oDET] = string_to_sec_level(string(row[i++], l[j++]));
-
-                    if (has_ope) { om[oOPE] = string_to_sec_level(string(row[i++], l[j++])); }
-                    else         { i++; j++; }
-
-                    if (has_agg) { om[oAGG] = SECLEVEL::HOM; }
-
-                    if (has_swp) { om[oSWP] = SECLEVEL::SEARCH; }
-
-                    fm->encdesc = EncDesc(om);
-
-                    fm->salt_name = string(row[i++], l[j++]);
-                }
-
-                i++; j++; // is_encrypted
-                i++; j++; // can_be_null
-
-                fm->has_salt = string(row[i++], l[j++]) == "1";
-
-                tm->fieldNames.push_back(fm->fname);
-                tm->fieldMetaMap[fm->fname] = fm;
-            }
-        }
-    } */
-    /*}
-*/
 
 //l gets updated to the new level
 static void
@@ -756,7 +617,6 @@ encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers, Analysi
     return enc;
 }
 
-// FIXME(burrows): Decryption is breaking here.
 static Item *
 decrypt_item_layers(Item * i, onion o, vector<EncLayer *> & layers, uint64_t IV, Analysis &a, FieldMeta *fm, const vector<Item *> &res) {
 
@@ -3328,7 +3188,6 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
             List_item *li = it++;
             if (!li)
                 break;
-            // FIXME(burrows): Breaks here, fmVec.size() is wrong value.
             assert(li->elements == fmVec.size());
             List<Item> *newList0 = new List<Item>();
             auto it0 = List_iterator<Item>(*li);
@@ -3594,7 +3453,6 @@ add_table_update_meta(const string &q,
                   << " 0"
                   << " );";
 
-                cout << "INNKEY: " << crypto_key << endl;
                 assert(a.ps->e_conn->execute(s.str()));
 
                 // FIXME(burrows): This shouldn't happen until last
@@ -3889,7 +3747,7 @@ Rewriter::rewrite(const string & q, string *cur_db)
     assert(0 == mysql_thread_init());
     //assert(0 == create_embedded_thd(0));
 
-    printEmbeddedState(ps);
+    // printEmbeddedState(ps);
 
     query_parse p(*cur_db, q);
     QueryRewrite res;
