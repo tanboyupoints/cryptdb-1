@@ -25,10 +25,8 @@
 
 class EncLayer {
  public:
-    EncLayer(Create_field * f) : cf(f), sql_type(f->sql_type) {}
+    EncLayer(Create_field * f) : cf(f) {}
     EncLayer(Create_field * f, std::string key) : cf(f) {}
-
-    EncLayer(enum enum_field_types sql_type) : sql_type(sql_type) {}
 
     virtual SECLEVEL level() = 0;
     virtual Create_field * newCreateField(std::string anonname = "") = 0;
@@ -45,9 +43,6 @@ class EncLayer {
     Create_field *cf;
     virtual void setKey(const std::string &k) = 0;
     virtual void unSetKey(const std::string &k) = 0;
-
- public:
-    enum enum_field_types sql_type;
 };
 
 
