@@ -53,7 +53,17 @@ RND_int::RND_int(Create_field * f, PRNG * prng)
       key(prng->rand_string(key_bytes)),
       bf(key)
 {
+    crypto_key = key;
     setKey(prng->rand_string(key_bytes));
+}
+
+// FIXME(burrows)
+RND_int::RND_int(Create_field *f, std::string key)
+    : EncLayer(f),
+      key(key),
+      bf(key)
+{
+
 }
 
 
@@ -69,6 +79,7 @@ RND_int::setKey(const string &k) {
     }
     key = k;
     bf = blowfish(key);
+    crypto_key = k;
 }
 
 //if we're using MultiPrinc, we don't want to keep a copy of a key around
@@ -235,8 +246,19 @@ DET_int::DET_int(Create_field * f, PRNG * prng)
       key(prng->rand_string(bf_key_size)),
       bf(key)
 {
+    crypto_key = key;
     setKey(key);
 }
+
+// FIXME(burrows)
+DET_int::DET_int(Create_field *f, std::string key)
+    : EncLayer(f),
+      key(key),
+      bf(key)
+{
+
+}
+
 
 Create_field *
 DET_int::newCreateField(string anonname) {
@@ -397,6 +419,15 @@ DET_str::decryptUDF(Item * col, Item * ivcol) {
 }
 
 /*************** DETJOIN *********************/
+DETJOIN_int::DETJOIN_int(Create_field * f, std::string key)
+    : DET_int(f, key)
+{
+    setKey("joinjoinjoinjoin");
+    cf = f;
+    crypto_key = "joinjoinjoinjoin";
+}
+
+
 /*
 Item *
 DETJOIN::encrypt(Item * p, uint64_t IV, const string &k) {
@@ -415,7 +446,16 @@ OPE_int::OPE_int(Create_field * f, PRNG * prng)
       key(prng->rand_string(key_bytes)),
       ope(key, plain_size*8, ciph_size*8)
 {
+    crypto_key = key;
     setKey(prng->rand_string(key_bytes));
+}
+
+OPE_int::OPE_int(Create_field *f, std::string key)
+    : EncLayer(f),
+      ope(key, plain_size*8, ciph_size*8)
+{
+    crypto_key = key;
+    setKey(key);
 }
 
 Create_field *
@@ -524,6 +564,7 @@ HOM::HOM(Create_field * f, PRNG * key)
     : EncLayer(f),
       sk(Paillier_priv::keygen(key, nbits))
 {
+    // crypto_key = *key;
 }
 
 Create_field *
@@ -650,6 +691,7 @@ HOM::sumUDF(Item * i1, Item * i2, const string &k) {
 Search::Search(Create_field * f, PRNG * key)
     : EncLayer(f)
 {
+    // crypto_key = *key;
     setKey(key->rand_string(key_bytes));
 }
 
@@ -862,6 +904,47 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf, PRNG * key) {
     }
     thrower() << "unknown or unimplemented security level \n";
 }
+
+EncLayer *
+EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf, std::string key) {
+    switch (sl) {
+    case SECLEVEL::RND: {
+	if (IsMySQLTypeNumeric(cf->sql_type) || (o == oOPE)) {
+	    return new RND_int(cf, key);
+	} else {
+	    // return new RND_str(cf, key);
+	}
+    }
+    case SECLEVEL::DET: {
+	if (IsMySQLTypeNumeric(cf->sql_type)) {
+	    return new DET_int(cf, key);
+	} else {
+	    // return new DET_str(cf, key);
+	}
+    }
+    case SECLEVEL::DETJOIN: {
+        return new DETJOIN_int(cf, key);
+    }
+    case SECLEVEL::OPE: {
+	if (IsMySQLTypeNumeric(cf->sql_type)) {
+	    return new OPE_int(cf, key);
+	} else {
+	    throw "whatve";
+	}
+    }
+    case SECLEVEL::HOM: {
+        throw "pallier";
+    }
+    case SECLEVEL::SEARCH: {
+        cout << "SEARCH" << endl;
+        break;
+    }
+    default:
+        thrower() << "unknown or unimplemented NEW security level \n";
+    }
+    throw "failfail";
+}
+
 
 const std::vector<udf_func*> udf_list = {
     &u_decRNDInt,

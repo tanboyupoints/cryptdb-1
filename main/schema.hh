@@ -57,7 +57,7 @@ typedef struct OnionMeta {
     std::string onionname;
     bool stale;
     enum enum_field_types sql_type;
-    std::list<EncLayer *> layers; //first in list is lowest layer
+    std::vector<EncLayer *> layers; //first in list is lowest layer
 
     OnionMeta(): onionname(""), stale(false) {};
 } OnionMeta;

@@ -51,10 +51,12 @@ class Connect {
 
     ~Connect();
 
+    // FIXME(burrows): private.
+    MYSQL *  conn;
+
  private:
     void do_connect(const std::string &server, const std::string &user,
                     const std::string &passwd, uint port);
 
-    MYSQL *  conn;
     bool     close_on_destroy;
 };

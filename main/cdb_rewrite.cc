@@ -39,10 +39,6 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name);
 static void
 buildOnionMeta(ProxyState &ps, FieldMeta *fm);
 
-static void
-add_layer(AES_KEY * mKey, string uniqueFieldName, onion o, OnionMeta *om,
-          SECLEVEL secLevel, Create_field *cf);
-
 //TODO: rewrite_proj may not need to be part of each class;
 // it just does gather, choos and then rewrite
 
@@ -124,7 +120,8 @@ createMetaTablesIfNotExists(ProxyState & ps)
                 " (field_info_id bigint NOT NULL," // Foreign key.
                 "  name varchar(64) NOT NULL,"
                 "  type enum"
-                "     ('oDET',"
+                "     ('oPLAIN',"
+                "      'oDET',"
                 "      'oOPE',"
                 "      'oAGG',"
                 "      'oSWP',"
@@ -140,10 +137,37 @@ createMetaTablesIfNotExists(ProxyState & ps)
                 "      'PLAINVAL'," 
                 "      'INVALID')"
                 "     NOT NULL DEFAULT 'INVALID',"
-               "  stale boolean,"
+                "  stale boolean,"
                 "  sql_type varchar(64) NOT NULL," // FIXME: Enum.
                 "  id SERIAL PRIMARY KEY)"
                 " ENGINE=InnoDB;"));
+
+    assert(ps.e_conn->execute(
+                " CREATE TABLE IF NOT EXISTS pdb.layer_key"
+                " (onion_info_id bigint NOT NULL," // Foreign key.
+                "  lkey varbinary(64) NOT NULL,"
+                "  type enum"
+                "     ('oPLAIN',"
+                "      'oDET',"
+                "      'oOPE',"
+                "      'oAGG',"
+                "      'oSWP',"
+                "      'INVALID')"
+                "     NOT NULL DEFAULT 'INVALID',"
+                "  level enum"
+                "     ('RND',"
+                "      'DET',"
+                "      'DETJOIN',"
+                "      'OPE',"
+                "      'HOM',"
+                "      'SEARCH',"
+                "      'PLAINVAL'," 
+                "      'INVALID')"
+                "     NOT NULL DEFAULT 'INVALID',"
+                "  len bigint NOT NULL,"
+                "  id SERIAL PRIMARY KEY)"
+                " ENGINE=InnoDB;"));
+
     return;
 }
 
@@ -243,13 +267,46 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
     return;
 }
 
+static std::map<SECLEVEL, std::string>
+get_layer_keys(ProxyState &ps, onion o, int onion_id) {
+    string q = " SELECT l.lkey, l.type, l.level, l.len"
+               " FROM pdb.layer_key l, pdb.onion_info o"
+               " WHERE l.onion_info_id = " + std::to_string(onion_id) +
+               "    AND o.type = l.type;";
+
+    DBResult *dbRes;
+    assert(ps.e_conn->execute(q, dbRes));
+
+    ScopedMySQLRes r(dbRes->n);
+    MYSQL_ROW row;
+    std::map<SECLEVEL, std::string> layer_keys;
+    while ((row = mysql_fetch_row(r.res()))) {
+        unsigned long *l = mysql_fetch_lengths(r.res());
+        assert(l != NULL);
+
+        string layer_lkey(row[0], l[0]);
+        string layer_type(row[1], l[1]);
+        string layer_level(row[2], l[2]);
+        string layer_len(row[3], l[3]);
+
+        layer_lkey.erase(atoi(layer_len.c_str()), std::string::npos);
+
+        SECLEVEL level = EnumText<SECLEVEL>::toEnum(layer_level);
+        std::pair<SECLEVEL, std::string> key(level, layer_lkey);
+        layer_keys.insert(key);
+        cout << "OUTKEY: " << layer_lkey << endl;
+    }
+
+    return layer_keys;
+}
+
 // Should basically mirror init_onions_layout()
 static void
 buildOnionMeta(ProxyState &ps, FieldMeta *fm)
 {
 
     string q = " SELECT o.name, o.type, o.current_level, o.stale," 
-               "        o.sql_type"
+               "        o.sql_type, o.id"
                " FROM pdb.onion_info o, pdb.field_info f"
                " WHERE o.field_info_id = f.id"
                "    AND f.ndex = " + std::to_string(fm->index) + ";";
@@ -268,6 +325,7 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
         string onion_current_level(row[2], l[2]);
         string onion_stale(row[3], l[3]);
         string onion_sql_type(row[4], l[4]);
+        string onion_id(row[5], l[5]);
 
         OnionMeta *om = new OnionMeta();
         om->onionname = onion_name;
@@ -292,11 +350,26 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
        
         // Add elements to OnionMeta.layers starting with the bottom layer
         // and stopping at the current level.
-        // FIXME: TESTME.
-        std::list<SECLEVEL> layers = fm->onion_layout[o];
+        // FIXME: Use layer keys.
+        std::map<SECLEVEL, std::string> layer_keys = 
+            get_layer_keys(ps, o, atoi(onion_id.c_str()));
+        std::vector<SECLEVEL> layers = fm->onion_layout[o];
         for (auto it: layers) {
-            add_layer(ps.masterKey, uniqueFieldName, o, om, it, dummy_cf);
+            EncLayer *enc_layer;
+            string uniqueFieldName = fullName(om->onionname,
+                                              fm->tm->anonTableName);
 
+            // FIXME(burrows): HOM doesn't support a string key yet.
+            if (it == SECLEVEL::HOM) {
+                PRNG *key = getLayerKey(ps.masterKey, uniqueFieldName, it);
+                enc_layer = EncLayerFactory::encLayer(o, it, dummy_cf,
+                                                      key);
+            } else { 
+                enc_layer = EncLayerFactory::encLayer(o, it, dummy_cf,
+                                                      layer_keys[it]);
+            }
+
+            om->layers.push_back(enc_layer);
             if (it == fm->encdesc.olm[o]) {
                 break;
             }
@@ -393,11 +466,13 @@ printEC(Connect * e_conn, const string & command) {
 static void
 printEmbeddedState(ProxyState & ps) {
     printEC(ps.e_conn, "use pdb;");
+    /*
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables;");
     printEC(ps.e_conn, "select * from pdb.table_info;");
     printEC(ps.e_conn, "select * from pdb.field_info;");
     printEC(ps.e_conn, "select * from pdb.onion_info;");
+    */
 }
 
 template <typename type> static void
@@ -514,7 +589,7 @@ initSchema(ProxyState & ps)
 {
     createMetaTablesIfNotExists(ps);
 
-    printEmbeddedState(ps);
+    // printEmbeddedState(ps);
 
     // HACKed in.
     buildEnumTextTranslator();
@@ -756,7 +831,7 @@ addSaltToReturn(ReturnMeta * rm, int pos) {
 
 //TODO: which encrypt/decrypt should handle null?
 static Item *
-encrypt_item_layers(Item * i, onion o, list<EncLayer *> & layers, Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0) {
+encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers, Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0) {
     if (o == oPLAIN) {//Unencrypted item
 	return i;
     }
@@ -787,7 +862,7 @@ encrypt_item_layers(Item * i, onion o, list<EncLayer *> & layers, Analysis &a, F
 
 // FIXME(burrows): Decryption is breaking here.
 static Item *
-decrypt_item_layers(Item * i, onion o,  list<EncLayer *> & layers, uint64_t IV, Analysis &a, FieldMeta *fm, const vector<Item *> &res) {
+decrypt_item_layers(Item * i, onion o, vector<EncLayer *> & layers, uint64_t IV, Analysis &a, FieldMeta *fm, const vector<Item *> &res) {
 
     if (o == oPLAIN) {// Unencrypted item
 	return i;
@@ -808,6 +883,7 @@ decrypt_item_layers(Item * i, onion o,  list<EncLayer *> & layers, uint64_t IV, 
             }
             cerr << "mp decrypt key " << key << endl;
         }
+
         dec = (*it)->decrypt(dec, IV, key);
         LOG(cdb_v) << "dec okay";
         //need to free space for all decs except last
@@ -2910,9 +2986,12 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
         if (mKey) {
             //generate enclayers for encrypted field
             for (auto l: it.second) {
+                PRNG *key;
+
                 string uniqueFieldName = fullName(om->onionname,
                                                   fm->tm->anonTableName);
-                add_layer(mKey, uniqueFieldName, o, om, l, cf);
+                key = getLayerKey(mKey, uniqueFieldName, l);
+                om->layers.push_back(EncLayerFactory::encLayer(o, l, cf, key));
             }
         }
 
@@ -2921,18 +3000,6 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
         //set outer layer
         fm->encdesc.olm[o] = it.second.back();
     }
-}
-
-static void
-add_layer(AES_KEY * mKey, string uniqueFieldName, onion o, OnionMeta *om,
-          SECLEVEL secLevel, Create_field *cf)
-{
-    PRNG * key;
-    key = getLayerKey(mKey, uniqueFieldName, secLevel);
-
-    om->layers.push_back(EncLayerFactory::encLayer(o, secLevel, cf, key));
-
-    return;
 }
 
 static void
@@ -3587,18 +3654,57 @@ add_table_update_meta(const string &q,
             OnionMeta *om = onion_pair.second;
             onion o = onion_pair.first;
             ostringstream s;
+
+            std::string str_seclevel =
+                EnumText<SECLEVEL>::toText(fm->encdesc.olm[o]); 
+            std::string str_onion  = EnumText<onion>::toText(o);
             s << " INSERT INTO pdb.onion_info VALUES ("
               << " " << std::to_string(fieldID) << ", "
               << " '" << om->onionname << "', "
-              << " '" << EnumText<onion>::toText(o) << "', "
-              << " '" << EnumText<SECLEVEL>::toText(fm->encdesc.olm[o]) << "', "
+              << " '" << str_onion << "', "
+              << " '" << str_seclevel << "', "
               // FIXME(burrows).
               << " FALSE, "
               << " '" << EnumText<enum enum_field_types>::toText(om->sql_type) << "', "
               << " 0);";
             
-            cout << "QUERY: " << s.str() << endl;
             assert(a.ps->e_conn->execute(s.str()));
+
+            unsigned long long onionID = a.ps->e_conn->last_insert_id();
+
+            // FIXME(burrows): Add keys.
+            for (unsigned int i = 0; i < onion_pair.second->layers.size(); ++i) {
+                std::string crypto_key =
+                    onion_pair.second->layers[i]->crypto_key;
+                unsigned int escaped_length = crypto_key.size() * 2 + 1;
+                char escaped_key[escaped_length];
+                mysql_real_escape_string(a.ps->e_conn->conn, escaped_key,
+                                         crypto_key.c_str(),
+                                         escaped_length);
+                SECLEVEL level = fm->onion_layout[o][i];
+                std::string str_level =  
+                    EnumText<SECLEVEL>::toText(level); 
+                ostringstream s;
+                s << " INSERT INTO pdb.layer_key VALUES ("
+                  << " " << onionID << ", "
+                  << " '" << escaped_key << "', "
+                  << " '" << str_onion << "', "
+                  << " '" << str_level << "', "
+                  << " '" << crypto_key.size() << "', "
+                  << " 0"
+                  << " );";
+
+                cout << "INNKEY: " << crypto_key << endl;
+                assert(a.ps->e_conn->execute(s.str()));
+
+                // FIXME(burrows): This shouldn't happen until last
+                // iteration.
+                /*
+                if (seclevel == level) {
+                    break;
+                }
+                */
+            }
         }
     }
 

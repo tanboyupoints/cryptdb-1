@@ -4,6 +4,7 @@
 #include <map>
 #include <list>
 #include <iostream>
+#include <vector>
 
 
 typedef enum onion {
@@ -57,27 +58,27 @@ SECLEVELS(__temp_m)
 bool needsSalt(SECLEVEL l);
 
 //Onion layouts - initial structure of onions
-typedef std::map<onion, std::list<SECLEVEL> > onionlayout;
+typedef std::map<onion, std::vector<SECLEVEL> > onionlayout;
 
 static onionlayout PLAIN_ONION_LAYOUT = {
-    {oPLAIN, std::list<SECLEVEL>({SECLEVEL::PLAINVAL})}
+    {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL})}
 };
 
 static onionlayout NUM_ONION_LAYOUT = {
-    {oDET, std::list<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
-    {oOPE, std::list<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
-    {oAGG, std::list<SECLEVEL>({SECLEVEL::HOM})}
+    {oDET, std::vector<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
+    {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
+    {oAGG, std::vector<SECLEVEL>({SECLEVEL::HOM})}
 };
 
 static onionlayout MP_NUM_ONION_LAYOUT = {
-    {oDET, std::list<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
-    {oOPE, std::list<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})}
+    {oDET, std::vector<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
+    {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})}
 };
     
 static onionlayout STR_ONION_LAYOUT = {
-    {oDET, std::list<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
-    {oOPE, std::list<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
-    {oSWP, std::list<SECLEVEL>({SECLEVEL::SEARCH})}
+    {oDET, std::vector<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
+    {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
+    {oSWP, std::vector<SECLEVEL>({SECLEVEL::SEARCH})}
 };
 
 typedef std::map<onion, SECLEVEL>  OnionLevelMap;

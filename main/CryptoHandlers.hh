@@ -26,6 +26,7 @@
 class EncLayer {
  public:
     EncLayer(Create_field * f) : cf(f), sql_type(f->sql_type) {}
+    EncLayer(Create_field * f, std::string key) : cf(f), crypto_key(key) {}
 
     EncLayer(enum enum_field_types sql_type) : sql_type(sql_type) {}
 
@@ -45,6 +46,7 @@ class EncLayer {
     virtual void unSetKey(const std::string &k) = 0;
 
  public:
+    std::string crypto_key;
     enum enum_field_types sql_type;
 };
 
@@ -52,11 +54,13 @@ class EncLayer {
 class EncLayerFactory {
 public:
     static EncLayer * encLayer(onion o, SECLEVEL sl, Create_field * cf, PRNG * key);
+    static EncLayer * encLayer(onion o, SECLEVEL sl, Create_field * cf, std::string key);
 };
 
 class RND_int : public EncLayer {
 public:
     RND_int(Create_field *, PRNG * key);
+    RND_int(Create_field *, std::string key);
 
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField(std::string anonname = "");
@@ -99,6 +103,7 @@ private:
 class DET_int : public EncLayer {
 public:
     DET_int(Create_field *, PRNG * key);
+    DET_int(Create_field *, std::string key);
 
     SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField(std::string anonname = "");
@@ -145,6 +150,7 @@ public:
     DETJOIN_int(Create_field * cf, PRNG * key) : DET_int(cf, key) {
 	this->key="joinjoinjoinjoin";
 	setKey(this->key);}
+    DETJOIN_int(Create_field *cf, std::string key);
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
 /*    Create_field * newCreateField(std::string anonname = "") {return cf;}
@@ -193,6 +199,7 @@ private:
 class OPE_int : public EncLayer {
 public:
     OPE_int(Create_field *, PRNG * key);
+    OPE_int(Create_field *, std::string key);
 
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField(std::string anonname = "");
