@@ -359,10 +359,10 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
             // FIXME(burrows): HOM doesn't support a string key yet.
             if (it == SECLEVEL::HOM) {
                 PRNG *key = getLayerKey(ps.masterKey, uniqueFieldName, it);
-                enc_layer = EncLayerFactory::encLayer(o, it, dummy_cf,
+                enc_layer = EncLayerFactory<PRNG *>::encLayer(o, it, dummy_cf,
                                                       key);
             } else { 
-                enc_layer = EncLayerFactory::encLayer(o, it, dummy_cf,
+                enc_layer = EncLayerFactory<std::string>::encLayer(o, it, dummy_cf,
                                                       layer_keys[it]);
             }
 
@@ -2986,7 +2986,7 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
                 string uniqueFieldName = fullName(om->onionname,
                                                   fm->tm->anonTableName);
                 key = getLayerKey(mKey, uniqueFieldName, l);
-                om->layers.push_back(EncLayerFactory::encLayer(o, l, cf, key));
+                om->layers.push_back(EncLayerFactory<PRNG *>::encLayer(o, l, cf, key));
             }
         }
 

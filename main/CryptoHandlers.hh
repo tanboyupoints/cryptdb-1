@@ -45,13 +45,6 @@ class EncLayer {
     virtual void unSetKey(const std::string &k) = 0;
 };
 
-
-class EncLayerFactory {
-public:
-    static EncLayer * encLayer(onion o, SECLEVEL sl, Create_field * cf, PRNG * key);
-    static EncLayer * encLayer(onion o, SECLEVEL sl, Create_field * cf, std::string key);
-};
-
 class RND_int : public EncLayer {
 public:
     RND_int(Create_field *, PRNG * key);
@@ -262,6 +255,8 @@ private:
 class HOM : public EncLayer {
 public:
     HOM(Create_field * cf, PRNG * key);
+    // HACK(burrows).
+    HOM(Create_field *cf, std::string key) : EncLayer(cf), dummy_prng(new urandom()), sk(Paillier_priv::keygen(NULL, nbits)) {throw "HOM does not support persistence!";}
 
     SECLEVEL level() {return SECLEVEL::HOM;}
     Create_field * newCreateField(std::string anonname = "");
@@ -276,6 +271,7 @@ public:
 
 private:
     static const uint nbits = 1024;
+    PRNG *dummy_prng;
     Paillier_priv sk;
 
     void setKey(const std::string &key);
@@ -310,4 +306,56 @@ private:
 
 
 extern const std::vector<udf_func*> udf_list;
+
+template <typename type>
+class EncLayerFactory {
+public:
+    static EncLayer * encLayer(onion o, SECLEVEL sl, Create_field * cf,
+                               type key)
+    {
+        switch (sl) {
+            case SECLEVEL::RND: {
+                if (IsMySQLTypeNumeric(cf->sql_type) || (o == oOPE)) {
+                    return new RND_int(cf, key);
+                } else {
+                    return new RND_str(cf, key);
+                }
+            }
+            case SECLEVEL::DET: {
+                if (IsMySQLTypeNumeric(cf->sql_type)) {
+                    return new DET_int(cf, key);
+                } else {
+                    return new DET_str(cf, key);
+                }
+            }
+            case SECLEVEL::DETJOIN: {
+                if (IsMySQLTypeNumeric(cf->sql_type)) {
+                    return new DETJOIN_int(cf, key);
+                } else {
+                    return new DETJOIN_str(cf, key);
+                }
+            }
+            case SECLEVEL::OPE: {
+                if (IsMySQLTypeNumeric(cf->sql_type)) {
+                    return new OPE_int(cf, key);
+                } else {
+                    return new OPE_str(cf, key);
+                }
+            }
+            case SECLEVEL::HOM: {
+                return new HOM(cf, key);
+            }
+            case SECLEVEL::SEARCH: {
+                return new Search(cf, key);
+            }
+            default:{
+                
+            }
+        }
+        thrower() << "unknown or unimplemented security level \n";
+    }
+
+    // static EncLayer * encLayer(onion o, SECLEVEL sl, Create_field * cf, std::string key);
+};
+
 
