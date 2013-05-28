@@ -6,10 +6,10 @@
 #include <iostream>
 
 template <typename type>
-class EnumText {
+class TypeText {
 public:
-    EnumText(std::vector<type> enums, std::vector<std::string> texts);
-    ~EnumText();
+    TypeText(std::vector<type> enums, std::vector<std::string> texts);
+    ~TypeText();
 
     // Instance.
     std::string getText(type e);
@@ -21,15 +21,16 @@ public:
     static std::vector<std::string> allText();
     static std::vector<type> allEnum();
     static std::string toText(type e);
-    static type toEnum(std::string t);
+    // TODO(burrows): Add case insensitive lookup.
+    static type toType(std::string t);
     static std::string parenList();
 
 protected:
     // Instance.
     std::vector<std::string> *theTexts;
     std::vector<type> *theEnums;
-    static EnumText *instance;
+    static TypeText *instance;
 };
 
-template<typename _type> EnumText<_type>* EnumText<_type>::instance = NULL;
+template<typename _type> TypeText<_type>* TypeText<_type>::instance = NULL;
 

@@ -88,12 +88,11 @@ createMetaTablesIfNotExists(ProxyState & ps)
 
     assert(ps.e_conn->execute("CREATE DATABASE IF NOT EXISTS pdb"));
 
-    // FIXME(burrows): Add UNIQUE's where appropriate.
     assert(ps.e_conn->execute(
                 " CREATE TABLE IF NOT EXISTS pdb.table_info"
-                " (number bigint NOT NULL,"
-                "  anonymous_name varchar(64) NOT NULL,"
-                "  name varchar(64) NOT NULL,"
+                " (number bigint NOT NULL UNIQUE,"
+                "  anonymous_name varchar(64) NOT NULL UNIQUE,"
+                "  name varchar(64) NOT NULL UNIQUE,"
                 "  has_sensitive boolean,"
                 "  has_salt boolean,"
                 "  salt_name varchar(64) NOT NULL,"
@@ -108,7 +107,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
       << "  has_salt boolean,"
       << "  salt_name varchar(64),"
       << "  onion_layout enum"
-      << " " << EnumText<onionlayout>::parenList().c_str() << " NOT NULL,"
+      << " " << TypeText<onionlayout>::parenList().c_str() << " NOT NULL,"
       << "  id SERIAL PRIMARY KEY)"
       << " ENGINE=InnoDB;";
 
@@ -120,12 +119,12 @@ createMetaTablesIfNotExists(ProxyState & ps)
       << " (field_info_id bigint NOT NULL," // Foreign key.
       << "  name varchar(64) NOT NULL,"
       << "  type enum"
-      << " " << EnumText<onion>::parenList() << " NOT NULL,"
+      << " " << TypeText<onion>::parenList() << " NOT NULL,"
       << "  current_level enum"
-      << " " << EnumText<SECLEVEL>::parenList() << " NOT NULL,"
+      << " " << TypeText<SECLEVEL>::parenList() << " NOT NULL,"
       << "  stale boolean,"
       << " sql_type enum"
-      << " " << EnumText<enum enum_field_types>::parenList() <<" NOT NULL,"
+      << " " << TypeText<enum enum_field_types>::parenList() <<" NOT NULL,"
       << "  id SERIAL PRIMARY KEY)"
       << " ENGINE=InnoDB;";
 
@@ -137,9 +136,9 @@ createMetaTablesIfNotExists(ProxyState & ps)
       << " (onion_info_id bigint NOT NULL," // Foreign key.
       << "  lkey varbinary(64) NOT NULL,"
       << "  type enum"
-      << " " << EnumText<onion>::parenList() << " NOT NULL,"
+      << " " << TypeText<onion>::parenList() << " NOT NULL,"
       << "  level enum"
-      << " " << EnumText<SECLEVEL>::parenList() << " NOT NULL,"
+      << " " << TypeText<SECLEVEL>::parenList() << " NOT NULL,"
       << "  len bigint NOT NULL,"
       << "  id SERIAL PRIMARY KEY)"
       << " ENGINE=InnoDB;";
@@ -148,7 +147,6 @@ createMetaTablesIfNotExists(ProxyState & ps)
     return;
 }
 
-// FIXME: Correctly get boolean values.
 static void
 createInMemoryTables(ProxyState & ps)
 {
@@ -182,10 +180,8 @@ buildTableMeta(ProxyState &ps)
         TableMeta *tm = new TableMeta;
         tm->tableNo = (unsigned int)atoi(table_number.c_str());
         tm->anonTableName = table_anonymous_name;
-        // > FIXME: Correctly get boolean values.
-        // > http://stackoverflow.com/questions/289727/which-mysql-datatype-to-use-for-storing-boolean-values
-        // tm->hasSensitive = string(row[3], l[3]);
-        // tm->has_salt = string(row[4], l[4]);
+        tm->hasSensitive = TypeText<bool>::toType(table_has_sensitive);
+        tm->has_salt = TypeText<bool>::toType(table_has_salt);
         tm->salt_name = table_salt_name;
                         
         ps.schema->tableMetaMap[table_name] = tm;
@@ -227,14 +223,14 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
         fm->tm = tm;
         fm->fname = field_name;
         fm->index = atoi(field_ndex.c_str());
-        // FIXME(burrows).
-        // fm->has_salt = string(row[2], l[2]);
+        fm->has_salt = TypeText<bool>::toType(field_has_salt);
         fm->salt_name = field_salt_name;
         fm->onion_layout =
-            EnumText<onionlayout>::toEnum(field_onion_layout);
+            TypeText<onionlayout>::toType(field_onion_layout);
 
         tm->fieldMetaMap[fm->fname] = fm;
-        // FIXME(burrows): Guarentee orderness?
+        // Guarentee order.
+        assert(tm->fieldNames.size() == (unsigned long)fm->index);
         tm->fieldNames.push_back(fm->fname);
 
         buildOnionMeta(ps, fm);
@@ -266,7 +262,7 @@ get_layer_keys(ProxyState &ps, onion o, int onion_id) {
 
         layer_lkey.erase(atoi(layer_len.c_str()), std::string::npos);
 
-        SECLEVEL level = EnumText<SECLEVEL>::toEnum(layer_level);
+        SECLEVEL level = TypeText<SECLEVEL>::toType(layer_level);
         std::pair<SECLEVEL, std::string> key(level, layer_lkey);
         layer_keys.insert(key);
     }
@@ -304,15 +300,14 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
         OnionMeta *om = new OnionMeta();
         om->onionname = onion_name;
         om->sql_type  =
-            EnumText<enum enum_field_types>::toEnum(onion_sql_type);
-        // FIXME.
-        // om->stale = string(row[3], l[3]); 
+            TypeText<enum enum_field_types>::toType(onion_sql_type);
+        om->stale = TypeText<bool>::toType(onion_stale);
 
-        onion o = EnumText<onion>::toEnum(onion_type);
+        onion o = TypeText<onion>::toType(onion_type);
         fm->onions[o] = om;
         // Current layer level.
         fm->encdesc.olm[o] =
-            EnumText<SECLEVEL>::toEnum(onion_current_level);
+            TypeText<SECLEVEL>::toType(onion_current_level);
 
         // HACK(burrows).
         Create_field * dummy_cf = new Create_field;
@@ -336,11 +331,13 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
             // FIXME(burrows): HOM doesn't support a string key yet.
             if (it == SECLEVEL::HOM) {
                 PRNG *key = getLayerKey(ps.masterKey, uniqueFieldName, it);
-                enc_layer = EncLayerFactory<PRNG *>::encLayer(o, it, dummy_cf,
+                enc_layer =
+                    EncLayerFactory<PRNG *>::encLayer(o, it, dummy_cf,
                                                       key);
             } else { 
-                enc_layer = EncLayerFactory<std::string>::encLayer(o, it, dummy_cf,
-                                                      layer_keys[it]);
+                enc_layer =
+                    EncLayerFactory<std::string>::encLayer(o, it, dummy_cf,
+                                                           layer_keys[it]);
             }
 
             om->layers.push_back(enc_layer);
@@ -382,13 +379,13 @@ translatorHelper(const char **texts, type *enums, int count)
         vec_enums[i] = enums[i];
     }
 
-    EnumText<type>::addSet(vec_enums, vec_texts);
+    TypeText<type>::addSet(vec_enums, vec_texts);
 }
 
 #define arraysize(a) (sizeof(a)/sizeof(a[0]))
 
 static void
-buildEnumTextTranslator()
+buildTypeTextTranslator()
 {
     // Onions.
     const char *onion_chars[] = {"oPLAIN", "oDET", "oOPE", "oAGG", "oSWP"};
@@ -476,6 +473,14 @@ buildEnumTextTranslator()
     translatorHelper((const char **)geometry_type_chars,
                     (Field::geometry_type *)geometry_types, count);
 
+    // Boolean type.
+    // HACK(burrows): mysql_fetch_row returns 1 and 0 for bool type.
+    const char *boolean_chars[] = { "TRUE", "FALSE", "1", "0" };
+    bool boolean_types[] = { true, false, true, false };
+    assert(arraysize(boolean_chars) == arraysize(boolean_types));
+    count = arraysize(boolean_chars);
+    translatorHelper((const char **)boolean_chars, (bool *)boolean_types,
+                     count);
     return;
 }
 
@@ -2909,7 +2914,6 @@ static void rewrite_key(const string &table_name,
 }
 
 
-// FIXME(burrows): I suspect this function should be excised.
 static void
 create_table_embedded(Connect * e_conn, const string & cur_db,
     const string & create_q) {
@@ -3347,7 +3351,6 @@ drop_table_update_meta(const string &q,
 
 	assert(a.ps->e_conn->execute(s.str()));
 
-        // FIXME(burrows): Also cleanup FieldMeta and OnionMeta
         a.ps->schema->totalTables--;
         // Using a loop because we need to look up the table by it's
         // normal name, which isn't available otherwise?
@@ -3393,10 +3396,8 @@ add_table_update_meta(const string &q,
           << " " << tm->tableNo << ", "
           << " '" << tm->anonTableName << "', "
           << " '" << table << "', "
-          // FIXME(burrows): Fix boolean.
-          // << "'" << tm->hasSensitive << "', "
-          // << "'" << tm->has_salt << "', "
-          << " FALSE, FALSE, "
+          << " " << TypeText<bool>::toText(tm->hasSensitive) << ", "
+          << " " << TypeText<bool>::toText(tm->has_salt) << ", "
           << " '" << tm->salt_name << "', "
           << " '" << dbname << "',"
           << " 0"
@@ -3414,11 +3415,9 @@ add_table_update_meta(const string &q,
           << " " << tableID << ", "
           << " '" << fm->fname << "', "
           << fm->index << ", "
-          // FIXME.
-          // << "'" << fm->has_salt << "' "
-          << " FALSE, "
+          << " " << TypeText<bool>::toText(fm->has_salt) << ", "
           << " '" << fm->salt_name << "',"
-          << " '" << EnumText<onionlayout>::toText(fm->onion_layout) << "',"
+          << " '" << TypeText<onionlayout>::toText(fm->onion_layout)<< "',"
           << " 0" 
           << " );";
 
@@ -3431,17 +3430,17 @@ add_table_update_meta(const string &q,
             onion o = onion_pair.first;
             ostringstream s;
 
+            SECLEVEL current_sec_level = fm->encdesc.olm[o];
             std::string str_seclevel =
-                EnumText<SECLEVEL>::toText(fm->encdesc.olm[o]); 
-            std::string str_onion  = EnumText<onion>::toText(o);
+                TypeText<SECLEVEL>::toText(current_sec_level); 
+            std::string str_onion  = TypeText<onion>::toText(o);
             s << " INSERT INTO pdb.onion_info VALUES ("
               << " " << std::to_string(fieldID) << ", "
               << " '" << om->onionname << "', "
               << " '" << str_onion << "', "
               << " '" << str_seclevel << "', "
-              // FIXME(burrows).
-              << " FALSE, "
-              << " '" << EnumText<enum enum_field_types>::toText(om->sql_type) << "', "
+              << " " << TypeText<bool>::toText(om->stale) << ", "
+              << " '" << TypeText<enum enum_field_types>::toText(om->sql_type) << "', "
               << " 0);";
             
             assert(a.ps->e_conn->execute(s.str()));
@@ -3458,7 +3457,7 @@ add_table_update_meta(const string &q,
                                                  escaped_length);
                 SECLEVEL level = fm->onion_layout[o][i];
                 std::string str_level =  
-                    EnumText<SECLEVEL>::toText(level); 
+                    TypeText<SECLEVEL>::toText(level); 
                 ostringstream s;
                 s << " INSERT INTO pdb.layer_key VALUES ("
                   << " " << onionID << ", "
@@ -3471,13 +3470,11 @@ add_table_update_meta(const string &q,
 
                 assert(a.ps->e_conn->execute(s.str()));
 
-                // FIXME(burrows): This shouldn't happen until last
-                // iteration.
-                /*
-                if (seclevel == level) {
-                    break;
+                // The last iteration should get us to the current
+                // security level.
+                if (current_sec_level == level) {
+                    assert(i == onion_pair.second->layers.size() - 1);
                 }
-                */
             }
         }
     }
@@ -3571,7 +3568,7 @@ Rewriter::Rewriter(ConnectionInfo ci,
     ps.totalTables = 0;
 
     // Must be called before initSchema.
-    buildEnumTextTranslator();
+    buildTypeTextTranslator();
     initSchema(ps);
 
     loadUDFs(ps.conn);
@@ -3922,7 +3919,7 @@ printRes(const ResType & r) {
 }
 
 template <typename _type>
-EnumText<_type>::EnumText(std::vector<_type> enums,
+TypeText<_type>::TypeText(std::vector<_type> enums,
                           std::vector<std::string> texts)
 {
     theEnums = new std::vector<_type>(enums);
@@ -3931,53 +3928,53 @@ EnumText<_type>::EnumText(std::vector<_type> enums,
 
 // FIXME(burrows): Use destructor.
 template <typename _type>
-EnumText<_type>::~EnumText()
+TypeText<_type>::~TypeText()
 {
     delete theEnums;
     delete theTexts;
 }
 
 template <typename _type> void
-EnumText<_type>::addSet(std::vector<_type> enums,
+TypeText<_type>::addSet(std::vector<_type> enums,
                         std::vector<std::string> texts)
 {
     if (enums.size() != texts.size()) {
         throw "enums and text must be the same length!";
     }
 
-    EnumText<_type>::instance = new EnumText<_type>(enums, texts);
+    TypeText<_type>::instance = new TypeText<_type>(enums, texts);
 
     return;
 }
 
 template <typename _type> std::vector<std::string>
-EnumText<_type>::allText()
+TypeText<_type>::allText()
 {
-    return EnumText<_type>::instance->allText();
+    return TypeText<_type>::instance->allText();
 }
 
 template <typename _type> std::vector<_type>
-EnumText<_type>::allEnum()
+TypeText<_type>::allEnum()
 {
-    return EnumText<_type>::instance->allEnum();
+    return TypeText<_type>::instance->allEnum();
 }
 
 template <typename _type> std::string
-EnumText<_type>::toText(_type e)
+TypeText<_type>::toText(_type e)
 {
-    return EnumText<_type>::instance->getText(e);
+    return TypeText<_type>::instance->getText(e);
 }
 
 template <typename _type> _type
-EnumText<_type>::toEnum(std::string t)
+TypeText<_type>::toType(std::string t)
 {
-    return EnumText<_type>::instance->getEnum(t);
+    return TypeText<_type>::instance->getEnum(t);
 }
 
 template <typename _type> std::string
-EnumText<_type>::parenList()
+TypeText<_type>::parenList()
 {
-    std::vector<std::string> texts = *EnumText<_type>::instance->theTexts;
+    std::vector<std::string> texts = *TypeText<_type>::instance->theTexts;
     std::stringstream s;
     s << "(";
     for (unsigned int i = 0; i < texts.size(); ++i) {
@@ -3993,7 +3990,7 @@ EnumText<_type>::parenList()
 
 // FIXME(burrows): Should use a functor + find_if.
 template <typename _type>
-std::string EnumText<_type>::getText(_type e)
+std::string TypeText<_type>::getText(_type e)
 {
     for (unsigned int i = 0; i < theEnums->size(); ++i) {
         if ((*theEnums)[i] == e) {
@@ -4005,7 +4002,7 @@ std::string EnumText<_type>::getText(_type e)
 }
 
 template <typename _type>
-_type EnumText<_type>::getEnum(std::string t)
+_type TypeText<_type>::getEnum(std::string t)
 {
     for (unsigned int i = 0; i < theTexts->size(); ++i) {
         if ((*theTexts)[i] == t) {
@@ -4013,6 +4010,7 @@ _type EnumText<_type>::getEnum(std::string t)
         }
     }
 
+    cout << "TEXT: " << t << endl;
     throw "text does not exist!"; 
 }
 
