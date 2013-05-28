@@ -48,13 +48,14 @@ class Connect {
     std::string getError();
 
     my_ulonglong last_insert_id();
+    unsigned long real_escape_string(char *to, const char *from,
+                                     unsigned long length);
 
     ~Connect();
 
-    // FIXME(burrows): private.
+ private:
     MYSQL *  conn;
 
- private:
     void do_connect(const std::string &server, const std::string &user,
                     const std::string &passwd, uint port);
 

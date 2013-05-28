@@ -3453,9 +3453,9 @@ add_table_update_meta(const string &q,
                     onion_pair.second->layers[i]->getKey();
                 unsigned int escaped_length = crypto_key.size() * 2 + 1;
                 char escaped_key[escaped_length];
-                mysql_real_escape_string(a.ps->e_conn->conn, escaped_key,
-                                         crypto_key.c_str(),
-                                         escaped_length);
+                a.ps->e_conn->real_escape_string(escaped_key,
+                                                 crypto_key.c_str(),
+                                                 escaped_length);
                 SECLEVEL level = fm->onion_layout[o][i];
                 std::string str_level =  
                     EnumText<SECLEVEL>::toText(level); 
@@ -3763,7 +3763,7 @@ Rewriter::rewrite(const string & q, string *cur_db)
     assert(0 == mysql_thread_init());
     //assert(0 == create_embedded_thd(0));
 
-    printEmbeddedState(ps);
+    // printEmbeddedState(ps);
 
     query_parse p(*cur_db, q);
     QueryRewrite res;
@@ -3782,6 +3782,7 @@ Rewriter::rewrite(const string & q, string *cur_db)
 	    res.queries = rewrite_helper(q, analysis, p, *cur_db);
 	} catch (OnionAdjustExcept e) {
 	    LOG(cdb_v) << "caught onion adjustment";
+            cout << "Adjusting onion!" << endl;
 	    adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis, *cur_db);
 	    continue;
 	}

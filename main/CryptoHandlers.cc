@@ -94,6 +94,7 @@ RND_int::encrypt(Item * ptext, uint64_t IV, const string &k) {
 
 Item *
 RND_int::decrypt(Item * ctext, uint64_t IV, const string &k) {
+    cout << "DECRYPT RND INT" << endl;
     setKey(k);
     uint64_t c = static_cast<Item_int*>(ctext)->value;
     uint64_t p = bf.decrypt(c) ^ IV;

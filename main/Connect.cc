@@ -142,6 +142,13 @@ Connect::last_insert_id()
     return mysql_insert_id(conn);
 }
 
+unsigned long
+Connect::real_escape_string(char *to, const char *from,
+                            unsigned long length)
+{
+    return mysql_real_escape_string(conn, to, from, length);
+}
+
 Connect::~Connect()
 {
     if (close_on_destroy) {
