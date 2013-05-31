@@ -154,6 +154,18 @@ createInMemoryTables(ProxyState & ps)
     return;
 }
 
+static bool
+string_to_bool(std::string s)
+{
+    if (s == std::string("TRUE") || s == std::string("1")) {
+        return true;
+    } else if (s == std::string("FALSE") || s == std::string("0")) {
+        return false;
+    } else {
+        throw "unrecognized string in string_to_bool!";
+    }
+}
+
 static void
 buildTableMeta(ProxyState &ps)
 {
@@ -180,8 +192,8 @@ buildTableMeta(ProxyState &ps)
         TableMeta *tm = new TableMeta;
         tm->tableNo = (unsigned int)atoi(table_number.c_str());
         tm->anonTableName = table_anonymous_name;
-        tm->hasSensitive = TypeText<bool>::toType(table_has_sensitive);
-        tm->has_salt = TypeText<bool>::toType(table_has_salt);
+        tm->hasSensitive = string_to_bool(table_has_sensitive);
+        tm->has_salt = string_to_bool(table_has_salt);
         tm->salt_name = table_salt_name;
                         
         ps.schema->tableMetaMap[table_name] = tm;
@@ -223,7 +235,7 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
         fm->tm = tm;
         fm->fname = field_name;
         fm->index = atoi(field_ndex.c_str());
-        fm->has_salt = TypeText<bool>::toType(field_has_salt);
+        fm->has_salt = string_to_bool(field_has_salt);
         fm->salt_name = field_salt_name;
         fm->onion_layout =
             TypeText<onionlayout>::toType(field_onion_layout);
@@ -301,7 +313,7 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
         om->onionname = onion_name;
         om->sql_type  =
             TypeText<enum enum_field_types>::toType(onion_sql_type);
-        om->stale = TypeText<bool>::toType(onion_stale);
+        om->stale = string_to_bool(onion_stale);
 
         onion o = TypeText<onion>::toType(onion_type);
         fm->onions[o] = om;
@@ -473,14 +485,6 @@ buildTypeTextTranslator()
     translatorHelper((const char **)geometry_type_chars,
                     (Field::geometry_type *)geometry_types, count);
 
-    // Boolean type.
-    // HACK(burrows): mysql_fetch_row returns 1 and 0 for bool type.
-    const char *boolean_chars[] = { "TRUE", "FALSE", "1", "0" };
-    bool boolean_types[] = { true, false, true, false };
-    assert(arraysize(boolean_chars) == arraysize(boolean_types));
-    count = arraysize(boolean_chars);
-    translatorHelper((const char **)boolean_chars, (bool *)boolean_types,
-                     count);
     return;
 }
 
@@ -3378,6 +3382,16 @@ drop_table_update_meta(const string &q,
     assert(a.ps->e_conn->execute("COMMIT"));
 }
 
+static std::string
+bool_to_string(bool b)
+{
+    if (true == b) {
+        return "TRUE";
+    } else {
+        return "FALSE";
+    }
+}
+
 static inline void
 add_table_update_meta(const string &q,
                       LEX *lex,
@@ -3396,8 +3410,8 @@ add_table_update_meta(const string &q,
           << " " << tm->tableNo << ", "
           << " '" << tm->anonTableName << "', "
           << " '" << table << "', "
-          << " " << TypeText<bool>::toText(tm->hasSensitive) << ", "
-          << " " << TypeText<bool>::toText(tm->has_salt) << ", "
+          << " " << bool_to_string(tm->hasSensitive) << ", "
+          << " " << bool_to_string(tm->has_salt) << ", "
           << " '" << tm->salt_name << "', "
           << " '" << dbname << "',"
           << " 0"
@@ -3414,8 +3428,8 @@ add_table_update_meta(const string &q,
         s << " INSERT INTO pdb.field_info VALUES ("
           << " " << tableID << ", "
           << " '" << fm->fname << "', "
-          << fm->index << ", "
-          << " " << TypeText<bool>::toText(fm->has_salt) << ", "
+          << " " << fm->index << ", "
+          << " " << bool_to_string(fm->has_salt) << ", "
           << " '" << fm->salt_name << "',"
           << " '" << TypeText<onionlayout>::toText(fm->onion_layout)<< "',"
           << " 0" 
@@ -3439,7 +3453,7 @@ add_table_update_meta(const string &q,
               << " '" << om->onionname << "', "
               << " '" << str_onion << "', "
               << " '" << str_seclevel << "', "
-              << " " << TypeText<bool>::toText(om->stale) << ", "
+              << " " << bool_to_string(om->stale) << ", "
               << " '" << TypeText<enum enum_field_types>::toText(om->sql_type) << "', "
               << " 0);";
             
@@ -3448,16 +3462,23 @@ add_table_update_meta(const string &q,
             unsigned long long onionID = a.ps->e_conn->last_insert_id();
 
             for (unsigned int i = 0; i < onion_pair.second->layers.size(); ++i) {
-                std::string crypto_key =
-                    onion_pair.second->layers[i]->getKey();
+                SECLEVEL level = fm->onion_layout[o][i];
+                std::string str_level =  
+                    TypeText<SECLEVEL>::toText(level); 
+
+                std::string crypto_key;
+                if (SECLEVEL::HOM == level) {
+                    crypto_key = std::string("unsupported!");
+                } else {
+                    crypto_key =
+                        onion_pair.second->layers[i]->getKey();
+                }
                 unsigned int escaped_length = crypto_key.size() * 2 + 1;
                 char escaped_key[escaped_length];
                 a.ps->e_conn->real_escape_string(escaped_key,
                                                  crypto_key.c_str(),
                                                  escaped_length);
-                SECLEVEL level = fm->onion_layout[o][i];
-                std::string str_level =  
-                    TypeText<SECLEVEL>::toText(level); 
+
                 ostringstream s;
                 s << " INSERT INTO pdb.layer_key VALUES ("
                   << " " << onionID << ", "
@@ -4010,7 +4031,6 @@ _type TypeText<_type>::getEnum(std::string t)
         }
     }
 
-    cout << "TEXT: " << t << endl;
     throw "text does not exist!"; 
 }
 

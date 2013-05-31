@@ -46,6 +46,56 @@ get_key_item(const string & key) {
     return keyI;
 }
 
+template <typename type>
+EncLayer *
+EncLayerFactory<type>::encLayer(onion o, SECLEVEL sl, Create_field * cf,
+                                type key)
+{
+    switch (sl) {
+        case SECLEVEL::RND: {
+            if (IsMySQLTypeNumeric(cf->sql_type) || (o == oOPE)) {
+                return new RND_int(cf, key);
+            } else {
+                return new RND_str(cf, key);
+            }
+        }
+        case SECLEVEL::DET: {
+            if (IsMySQLTypeNumeric(cf->sql_type)) {
+                return new DET_int(cf, key);
+            } else {
+                return new DET_str(cf, key);
+            }
+        }
+        case SECLEVEL::DETJOIN: {
+            if (IsMySQLTypeNumeric(cf->sql_type)) {
+                return new DETJOIN_int(cf, key);
+            } else {
+                return new DETJOIN_str(cf, key);
+            }
+        }
+        case SECLEVEL::OPE: {
+            if (IsMySQLTypeNumeric(cf->sql_type)) {
+                return new OPE_int(cf, key);
+            } else {
+                return new OPE_str(cf, key);
+            }
+        }
+        case SECLEVEL::HOM: {
+            return new HOM(cf, key);
+        }
+        case SECLEVEL::SEARCH: {
+            return new Search(cf, key);
+        }
+        default:{
+            
+        }
+    }
+    thrower() << "unknown or unimplemented security level \n";
+}
+
+template class EncLayerFactory<std::string>;
+template class EncLayerFactory<PRNG *>;
+                        
 /****************** RND *********************/
 
 RND_int::RND_int(Create_field * f, PRNG * prng)

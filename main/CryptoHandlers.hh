@@ -38,7 +38,7 @@ class EncLayer {
         thrower() << "decryptUDF not supported";
     }
 
-    virtual std::string getKey() {return std::string("unsupported");}
+    virtual std::string getKey() {throw "does not support getKey";}
 
  protected:
     Create_field *cf;
@@ -311,52 +311,8 @@ extern const std::vector<udf_func*> udf_list;
 template <typename type>
 class EncLayerFactory {
 public:
-    static EncLayer * encLayer(onion o, SECLEVEL sl, Create_field * cf,
-                               type key)
-    {
-        switch (sl) {
-            case SECLEVEL::RND: {
-                if (IsMySQLTypeNumeric(cf->sql_type) || (o == oOPE)) {
-                    return new RND_int(cf, key);
-                } else {
-                    return new RND_str(cf, key);
-                }
-            }
-            case SECLEVEL::DET: {
-                if (IsMySQLTypeNumeric(cf->sql_type)) {
-                    return new DET_int(cf, key);
-                } else {
-                    return new DET_str(cf, key);
-                }
-            }
-            case SECLEVEL::DETJOIN: {
-                if (IsMySQLTypeNumeric(cf->sql_type)) {
-                    return new DETJOIN_int(cf, key);
-                } else {
-                    return new DETJOIN_str(cf, key);
-                }
-            }
-            case SECLEVEL::OPE: {
-                if (IsMySQLTypeNumeric(cf->sql_type)) {
-                    return new OPE_int(cf, key);
-                } else {
-                    return new OPE_str(cf, key);
-                }
-            }
-            case SECLEVEL::HOM: {
-                return new HOM(cf, key);
-            }
-            case SECLEVEL::SEARCH: {
-                return new Search(cf, key);
-            }
-            default:{
-                
-            }
-        }
-        thrower() << "unknown or unimplemented security level \n";
-    }
-
-    // static EncLayer * encLayer(onion o, SECLEVEL sl, Create_field * cf, std::string key);
+    static EncLayer * encLayer(onion o, SECLEVEL sl, Create_field *cf,
+                               type key);
 };
 
 
