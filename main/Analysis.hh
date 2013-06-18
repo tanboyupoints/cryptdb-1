@@ -33,8 +33,6 @@ public:
 
     bool singleton() const { return osl.size() == 1; }
 
-    EncDesc encdesc();
-    
     OLK extract_singleton() const {
         assert_s(singleton(), string("encset has size ") + StringFromVal(osl.size()));
 	auto it = osl.begin();

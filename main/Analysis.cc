@@ -7,8 +7,8 @@ EncSet::EncSet() : osl(FULL_EncSet.osl) {}
 
 EncSet::EncSet(FieldMeta * fm) {
     osl.clear();
-    for (auto pair : fm->encdesc.olm) {
-	osl[pair.first] = LevelFieldPair(pair.second, fm);
+    for (auto pair : fm->onions) {
+	osl[pair.first] = LevelFieldPair(pair.second->sec_level, fm);
     }
 }
 
@@ -62,15 +62,6 @@ operator<<(ostream &out, const EncSet & es)
     return out;
 }
 
-
-EncDesc
-EncSet::encdesc() {
-    OnionLevelMap olm = OnionLevelMap();
-    for (auto it : osl) {
-	olm[it.first] = it.second.first;
-    }
-    return EncDesc(olm);
-}
 
 void
 EncSet::setFieldForOnion(onion o, FieldMeta * fm) {

@@ -318,7 +318,7 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
         onion o = TypeText<onion>::toType(onion_type);
         fm->onions[o] = om;
         // Current layer level.
-        fm->encdesc.olm[o] =
+        fm->onions[o]->sec_level =
             TypeText<SECLEVEL>::toType(onion_current_level);
 
         // HACK(burrows).
@@ -331,7 +331,6 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
        
         // Add elements to OnionMeta.layers starting with the bottom layer
         // and stopping at the current level.
-        // FIXME: Use layer keys.
         std::map<SECLEVEL, std::string> layer_keys = 
             get_layer_keys(ps, o, atoi(onion_id.c_str()));
         std::vector<SECLEVEL> layers = fm->onion_layout[o];
@@ -353,7 +352,7 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
             }
 
             om->layers.push_back(enc_layer);
-            if (it == fm->encdesc.olm[o]) {
+            if (it == fm->onions[o]->sec_level) {
                 break;
             }
         }
@@ -531,7 +530,7 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
     //remove onion layer in schema
     om->layers.pop_back();
     l = om->layers.back()->level();
-    fm->encdesc.olm[o] = l;
+    fm->onions[o]->sec_level = l;
 
     //todo:we do not need olm any more; then, do we need level in Enclayer?
 }
@@ -549,7 +548,8 @@ static void
 adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf, Analysis & a, const string & cur_db) {
 
     //TODO: use getAssert in more places
-    SECLEVEL newlevel = getAssert(fm->encdesc.olm, o);
+    OnionMeta *om = getAssert(fm->onions, o);
+    SECLEVEL newlevel = om->sec_level;
 
     while (newlevel > tolevel) {
 	removeOnionLayer(fm, itf, a, o, newlevel, cur_db);
@@ -1194,7 +1194,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 	//assert(constr.key == fm);
 
 	//check if we need onion adjustment
-	if (constr.l < fm->encdesc.olm[constr.o]) {
+	if (constr.l < fm->onions[constr.o]->sec_level) {
 	    //need adjustment, throw exception
 	    throw OnionAdjustExcept(constr.o, fm, constr.l, i);
 	}
@@ -2730,7 +2730,6 @@ static void
 init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf, onionlayout ol) {
 
     fm->onions.clear();
-    fm->encdesc.clear();
     
     // This additional reflection is needed as we must rebuild the
     // OnionMeta's (and their layers) after a restart.
@@ -2761,7 +2760,7 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
         LOG(cdb_v) << "adding onion layer " << om->onionname << " for " << fm->fname;
 
         //set outer layer
-        fm->encdesc.olm[o] = it.second.back();
+        fm->onions[o]->sec_level = it.second.back();
     }
 }
 
@@ -3020,7 +3019,7 @@ mp_update_init(LEX *lex, Analysis &a)
 
 static void
 stalefy(FieldMeta * fm, const EncSet &  es) {
-    for (auto o_l : fm->encdesc.olm) {
+    for (auto o_l : fm->onions) {
         onion o = o_l.first;
         if (es.osl.find(o) == es.osl.end()) {
             fm->onions[o]->stale = true;
@@ -3084,8 +3083,11 @@ rewrite_update_lex(LEX *lex, Analysis &a)
 	RewritePlan * rp = getAssert(a.rewritePlans, val);
 	EncSet r_es = rp->es_out.intersect(EncSet(fm));
 	if (r_es.empty()) {
+            /*
+             * FIXME(burrows): Change error message.
 	    cerr << "update cannot be performed BECAUSE " << i << " supports " << fm->encdesc << "\n BUT " \
 		 << val << " can only provide " << rp->es_out << " BECAUSE " << rp->r << "\n";
+            */
 	    assert(false);
 	}
 
@@ -3444,7 +3446,7 @@ add_table_update_meta(const string &q,
             onion o = onion_pair.first;
             ostringstream s;
 
-            SECLEVEL current_sec_level = fm->encdesc.olm[o];
+            SECLEVEL current_sec_level = fm->onions[o]->sec_level;
             std::string str_seclevel =
                 TypeText<SECLEVEL>::toText(current_sec_level); 
             std::string str_onion  = TypeText<onion>::toText(o);
@@ -3660,7 +3662,7 @@ processAnnotation(Annotation annot, Analysis &a)
     list<string> query_list;
     string onionname = "";
 
-    for (auto pr : fm->encdesc.olm) {
+    for (auto pr : fm->onions) {
         onion o = pr.first;
         onionname = fm->onions[o]->onionname;
         Create_field * cf = fm->onions[o]->layers.back()->newCreateField(onionname);

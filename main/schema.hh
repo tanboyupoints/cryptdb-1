@@ -58,6 +58,7 @@ typedef struct OnionMeta {
     bool stale;
     enum enum_field_types sql_type;
     std::vector<EncLayer *> layers; //first in list is lowest layer
+    SECLEVEL sec_level;
 
     OnionMeta(): onionname(""), stale(false) {};
 } OnionMeta;
@@ -75,7 +76,7 @@ typedef struct FieldMeta {
 
     //TODO: may want to integrate onions with encdesc for clarity
     std::map<onion, OnionMeta *> onions;
-    EncDesc encdesc;
+    // EncDesc encdesc;
 
     bool has_salt; //whether this field has its own salt
     std::string salt_name;
@@ -83,18 +84,18 @@ typedef struct FieldMeta {
     FieldMeta();
 
     bool hasOnion(onion o) const {
-        return encdesc.olm.find(o) !=
-            encdesc.olm.end();
+        return onions.find(o) !=
+            onions.end();
     }
 
     SECLEVEL getOnionLevel(onion o) const {
-        auto it = encdesc.olm.find(o);
-        if (it == encdesc.olm.end()) return SECLEVEL::INVALID;
-        return it->second;
+        auto it = onions.find(o);
+        if (it == onions.end()) return SECLEVEL::INVALID;
+        return it->second->sec_level;
     }
 
     bool setOnionLevel(onion o, SECLEVEL maxl) {
-        if (encdesc.restrict(o, maxl)) {
+        if (restrict(o, maxl)) {
             while (onions[o]->layers.size() != 0 && onions[o]->layers.back()->level() != maxl) {
                 onions[o]->layers.pop_back();
             }
@@ -103,10 +104,26 @@ typedef struct FieldMeta {
         return false;
     }
 
+    bool restrict(onion o, SECLEVEL maxl)
+    {
+        //TODO:
+        //assert(maxl is on onion o);
+
+        auto it = onions.find(o);
+        assert_s(it != onions.end(), "onion not found in encdesc");
+
+        OnionMeta *om = it->second;
+        if (om->sec_level > maxl) {
+            om->sec_level = maxl;
+            return true;
+        }
+
+        return false;
+    }
+
     void removeOnion(onion o) {
         onions.erase(o);
-        encdesc.olm.erase(o);
-        std::cerr << fname << " encdesc is " << encdesc << std::endl;
+        // std::cerr << fname << " encdesc is " << encdesc << std::endl;
     }
 
     std::string stringify();

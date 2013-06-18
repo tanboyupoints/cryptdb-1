@@ -93,9 +93,8 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
         mkm.encForMap[fullName(fm->fname, prim_table)] = right_col;
 
         string prev_onion = "";
-        OnionLevelMap olm = fm->encdesc.olm;
 
-        for (auto pr : olm) {
+        for (auto pr : fm->onions) {
             onion o = pr.first;
             SECLEVEL level = annot.hasOnion(o);
             cerr << o << " " << levelnames[(int) level] << endl;
