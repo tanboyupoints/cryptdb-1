@@ -103,6 +103,10 @@ typedef struct FieldMeta {
         return false;
     }
 
+    void setCurrentOnionLevel(onion o, SECLEVEL level) {
+        encdesc.olm[o] = level;
+    }
+
     void removeOnion(onion o) {
         onions.erase(o);
         encdesc.olm.erase(o);
