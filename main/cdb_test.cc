@@ -70,6 +70,25 @@ static const std::string RED_BEGIN = "\033[1;31m";
 static const std::string GREEN_BEGIN = "\033[1;92m";
 static const std::string COLOR_END = "\033[0m";
 
+static bool
+isprintable(uint c) {
+    return (c >= 9) && (c <= 126);
+}
+static string prettyquery(string q) {
+    stringstream res;
+
+    for (auto c : q) {
+	if (isprintable((uint)c)) {
+	    res << c;
+	} else {
+	    res << "\\";
+            res << (uint)c;
+	}
+    }
+
+    return res.str();
+}
+
 /** returns true if should stop, to keep looping */
 static bool handle_line(Connect& conn, Rewriter& r, const string& q)
 {
@@ -117,7 +136,7 @@ static bool handle_line(Connect& conn, Rewriter& r, const string& q)
     for (auto new_q = qr.queries.begin(); new_q != qr.queries.end(); new_q++) {
       cerr << endl
            << RED_BEGIN << "ENCRYPTED QUERY:" << COLOR_END << endl
-           << *new_q << endl;
+           << prettyquery(*new_q) << endl;
       assert(conn.execute(*new_q, dbres));
     }
     if (!dbres) {
