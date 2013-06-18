@@ -1,3 +1,27 @@
+Aaron:
+wiki -- host it on git?
+encdesc
+check if static lists are cleaner than directories?
+
+Carlos:
+doxygen
+finish editing intersect
+
+Both:
+unimplemented gather/rewrite for other functions, search through cdb_rewrite.cc
+
+
+--------------
+
+Raluca:
+partition cdb_rewrite.cc
+can we simplify EncSet/FieldMeta repetition?
+
+
+
+
+
+
 * Make sure that constant expressions in queries (e.g., SELECT "mysecret";)
   are encrypted with RND, even if it's some temporary key that does not
   correspond to any column.
