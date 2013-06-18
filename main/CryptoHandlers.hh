@@ -38,7 +38,7 @@ class EncLayer {
         thrower() << "decryptUDF not supported";
     }
 
-    virtual std::string getKey() {throw "does not support getKey";}
+    virtual std::string getKey() = 0;
 
  protected:
     Create_field *cf;
@@ -265,6 +265,8 @@ public:
     //TODO needs multi encrypt and decrypt
     Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
     Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = "");
+    
+    std::string getKey() {throw "Does not support getKey()";};
 
     //expr is the expression (e.g. a field) over which to sum
     Item * sumUDA(Item * expr, const std::string &k = "");
