@@ -50,6 +50,17 @@ class Connect {
     my_ulonglong last_insert_id();
     unsigned long real_escape_string(char *to, const char *from,
                                      unsigned long length);
+        
+	// Sets current database name (after the "USE" query.
+    // dbname is static string
+    std::string setCurDBName(const std::string &dbname) { 
+        return cur_db_name(dbname);
+    };
+
+    // Returns current database name
+    std::string getCurDBName(void) { 
+        return cur_db_name();
+    };
 
     ~Connect();
 
@@ -58,6 +69,9 @@ class Connect {
 
     void do_connect(const std::string &server, const std::string &user,
                     const std::string &passwd, uint port);
+
+    std::string cur_db_name(const std::string & dbname);
+    std::string cur_db_name(void);
 
     bool     close_on_destroy;
 };
