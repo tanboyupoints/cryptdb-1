@@ -3276,6 +3276,8 @@ do_query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encB
 /*
  * Analyzes how to encrypt and rewrite items in a query.
  * Results are set in analysis.
+ *
+ * TODO <ccarvalho> string q is not used, remove it from here and from do_query_analyze() ?
  */
 static void
 query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault, const string & cur_db)
@@ -3790,6 +3792,31 @@ Rewriter::rewrite(const string & q, string *cur_db)
 
     query_parse p(*cur_db, q);
     QueryRewrite res;
+
+    // saves new database name
+    // <ccarvalho>
+    // TODO/FIXME: Use lex instead of parsing query again!
+    if(p.lex()->sql_command == SQLCOM_CHANGE_DB)
+    {
+        size_t found = string::npos;
+        std::vector<char> bytes(q.begin(), q.end());
+        bytes.push_back('\0');
+        string newdbname(&bytes[0]);
+
+        // gets last word
+        found = newdbname.find_last_of(" ");
+        if(found != string::npos)
+            newdbname = newdbname.substr(found+1);
+
+        // erases ";" if present
+        found = newdbname.find_last_of(";");
+        if(found != string::npos)
+            newdbname.erase(found);
+
+        // new dbname is saved for next queries
+        (void)ps.conn->setCurDBName(newdbname);
+    }
+
 
     //optimization: do not process queries that we will not rewrite
     if (noRewrite(p.lex())) {
