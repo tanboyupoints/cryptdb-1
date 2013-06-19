@@ -29,32 +29,6 @@
 #include "util/errstream.hh"
 #include "util/cryptdb_log.hh"
 
-#define QDIR "./qdir"
-
-using namespace std;
-
-class testBatchCommands {
-    public:
-       map<int, char*> files;
-       DIR *dir;
-       struct dirent *dentry;
-
-       vector<string>populate(string filename);
-};
-
-vector<string>
-testBatchCommands::populate(string filename)
-{
-    vector<string>vec;
-    string tmp = QDIR;
-    tmp += "/" + filename;
-
-    //TODO: open file and fill up vec
-    
-    return vec;
-}
-
-
 // if true, uses MultiPrinc mode
 static bool Multi = false;
 
@@ -172,27 +146,9 @@ static bool handle_line(Connect& conn, Rewriter& r, const string& q)
   return true;
 }
 
-
-static string parse_args(const char *msg)
-{
-    string ret;
-    static char cmd[64];
-    memset(cmd, 0, 64);
-
-    cerr << GREEN_BEGIN << msg << COLOR_END;
-    fgets(cmd, 64, stdin);
-    
-    cmd[strlen(cmd)-1] = '\0';
-    ret = cmd;
-
-    return ret;
-}
-
 int
 main(int ac, char **av)
 {
-
-
     if (ac != 2) {
         cerr << "Usage: " << av[0] << " embed-db " << endl;
         exit(1);
@@ -214,67 +170,13 @@ main(int ac, char **av)
 
     string prompt = BOLD_BEGIN + "CryptDB=#" + COLOR_END + " ";
 
-    testBatchCommands batch;
-
-    batch.dir = opendir(QDIR);
-    if(!batch.dir)
-    {
-        cout << "Warning: Could not open dir: " <<  QDIR <<endl;
-    } else
-    {
-        while((batch.dentry = readdir(batch.dir)) != NULL)
-        {
-            static int i = 0;
-            // Fill up files names
-            string tmp = batch.dentry->d_name;
-            if(tmp != "." && tmp != "..")
-                //batch.files.push_back(batch.dentry->d_name);
-                batch.files.insert ( std::pair<int, char*>(i++,batch.dentry->d_name) );
-        }
-    }
 
     for (;;) {
         char *input = readline(prompt.c_str());
         if (!input) break;
         string q(input);
         if (q.empty()) continue;
-
-        /*
-         * Alternative options
-         */
-        if(q == "!help")
-        {
-            cout << "!help: Show this help" << endl;
-            cout << "!file: Load mysql commands from file" << endl;
-            continue;
-        } else if(q == "!list")
-        {
-            if(batch.files.size() == 0)
-                continue;
-
-            for(map<int, char*>::iterator it = batch.files.begin(); 
-                    it != batch.files.end(); ++it)
-                cout << "[" << it->first << "] " << it->second << endl; 
-
-        } else if(q == "!file")
-        {
-            string arg = parse_args("CryptDB [Enter id number]=# ");
-            if(arg.size() > 0)
-            {
-                map<int, char*>::iterator it = batch.files.find(atoi(arg.c_str()));
-                if(it != batch.files.end())
-                {
-                    vector<string>vaec = batch.populate(it->second);
-                    //TODO: execute line by line
-                }
-            }
-
-            if(batch.files.size() == 0)
-                continue;
-
-            continue;
-        } else
-        {
+        else{
             if (!handle_line(conn, r, q))
                 break;
         }
