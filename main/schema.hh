@@ -78,9 +78,7 @@ typedef struct FieldMeta {
     onionlayout onion_layout;
     int index;
 
-    //TODO: may want to integrate onions with encdesc for clarity
     std::map<onion, OnionMeta *> onions;
-    // EncDesc encdesc;
 
     bool has_salt; //whether this field has its own salt
     std::string salt_name;
@@ -112,7 +110,6 @@ typedef struct FieldMeta {
 
     void removeOnion(onion o) {
         onions.erase(o);
-        // std::cerr << fname << " encdesc is " << encdesc << std::endl;
     }
 
     std::string stringify();

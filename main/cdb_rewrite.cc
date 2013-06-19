@@ -533,8 +533,6 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
 
     //remove onion layer in schema
     om->layers.pop_back();
-    l = om->layers.back()->level();
-    // fm->setCurrentOnionLevel(o, l);
 
     //todo:we do not need olm any more; then, do we need level in Enclayer?
 }
