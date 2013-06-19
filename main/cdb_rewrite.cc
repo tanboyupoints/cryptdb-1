@@ -38,7 +38,7 @@ static void
 buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name);
 
 static void
-buildOnionMeta(ProxyState &ps, FieldMeta *fm);
+buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id);
 
 //TODO: rewrite_proj may not need to be part of each class;
 // it just does gather, choos and then rewrite
@@ -211,7 +211,7 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
 {
 
     string q = " SELECT f.name, f.ndex, f.has_salt, f.salt_name,"
-               "        f.onion_layout"
+               "        f.onion_layout, f.id"
                " FROM pdb.table_info t, pdb.field_info f"
                " WHERE t.database_name = '" + database_name + "' "
                "   AND t.number = " + std::to_string(tm->tableNo) +
@@ -231,6 +231,7 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
         string field_has_salt(row[2], l[2]);
         string field_salt_name(row[3], l[3]);
         string field_onion_layout(row[4], l[4]);
+        string field_id(row[5], l[5]);
 
         FieldMeta *fm = new FieldMeta;
         fm->tm = tm;
@@ -246,7 +247,7 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
         assert(tm->fieldNames.size() == (unsigned long)fm->index);
         tm->fieldNames.push_back(fm->fname);
 
-        buildOnionMeta(ps, fm);
+        buildOnionMeta(ps, fm, atoi(field_id.c_str()));
     }
     return;
 }
@@ -285,14 +286,13 @@ get_layer_keys(ProxyState &ps, onion o, int onion_id) {
 
 // Should basically mirror init_onions_layout()
 static void
-buildOnionMeta(ProxyState &ps, FieldMeta *fm)
+buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
 {
 
     string q = " SELECT o.name, o.type, o.current_level, o.stale," 
                "        o.sql_type, o.id"
                " FROM pdb.onion_info o, pdb.field_info f"
-               " WHERE o.field_info_id = f.id"
-               "    AND f.ndex = " + std::to_string(fm->index) + ";";
+               " WHERE o.field_info_id = " + std::to_string(field_id) +";";
 
     DBResult *dbRes;
     assert(ps.e_conn->execute(q, dbRes));
@@ -332,6 +332,8 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
         std::map<SECLEVEL, std::string> layer_keys = 
             get_layer_keys(ps, o, atoi(onion_id.c_str()));
         std::vector<SECLEVEL> layers = fm->onion_layout[o];
+        SECLEVEL current_level =
+            TypeText<SECLEVEL>::toType(onion_current_level);
         for (auto it: layers) {
             EncLayer *enc_layer;
             string uniqueFieldName = fullName(om->onionname,
@@ -352,15 +354,11 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
             om->layers.push_back(enc_layer);
             SECLEVEL onion_level = fm->getOnionLevel(o);
             assert(onion_level != SECLEVEL::INVALID);
-            if (it == fm->getOnionLevel(o)) {
+            if (it == current_level) {
+                assert(it == layers.back());
                 break;
             }
         }
-        
-        // TODO(burrows): Stop saving the current level.
-        // Current layer level.
-        // SECLEVEL level = TypeText<SECLEVEL>::toType(onion_current_level);
-        // fm->setCurrentOnionLevel(o, level);
      }
           
      return;
@@ -379,9 +377,10 @@ printEmbeddedState(ProxyState & ps) {
     printEC(ps.e_conn, "use pdb;");
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables;");
-    printEC(ps.e_conn, "select * from pdb.table_info;");
-    printEC(ps.e_conn, "select * from pdb.field_info;");
-    printEC(ps.e_conn, "select * from pdb.onion_info;");
+    // printEC(ps.e_conn, "select * from pdb.table_info;");
+    // printEC(ps.e_conn, "select * from pdb.field_info;");
+    // printEC(ps.e_conn, "select * from pdb.onion_info;");
+    // printEC(ps.e_conn, "select * from pdb.layer_key;");
 }
 
 template <typename type> static void
@@ -3469,7 +3468,6 @@ add_table_update_meta(const string &q,
             assert(a.ps->e_conn->execute(s.str()));
 
             unsigned long long onionID = a.ps->e_conn->last_insert_id();
-
             for (unsigned int i = 0; i < onion_pair.second->layers.size(); ++i) {
                 SECLEVEL level = fm->onion_layout[o][i];
                 std::string str_level =  

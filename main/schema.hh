@@ -100,30 +100,13 @@ typedef struct FieldMeta {
     }
 
     bool setOnionLevel(onion o, SECLEVEL maxl) {
-        if (restrict(o, maxl)) {
+        SECLEVEL current_sec_level = onions[o]->getSecLevel();
+        if (current_sec_level > maxl) {
             while (onions[o]->layers.size() != 0 && onions[o]->layers.back()->level() != maxl) {
                 onions[o]->layers.pop_back();
             }
             return true;
         }
-        return false;
-    }
-
-    bool restrict(onion o, SECLEVEL maxl)
-    {
-        //TODO:
-        //assert(maxl is on onion o);
-
-        auto it = onions.find(o);
-        assert_s(it != onions.end(), "onion not found in encdesc");
-
-        OnionMeta *om = it->second;
-        SECLEVEL seclevel = om->getSecLevel();
-        if (seclevel > maxl) {
-            seclevel = maxl;
-            return true;
-        }
-
         return false;
     }
 
