@@ -21,27 +21,34 @@ EncSet::intersect(const EncSet & es2) const
 {
     OnionLevelFieldMap m;
     for (auto it2 = es2.osl.begin();
-         it2 != es2.osl.end(); ++it2) {
+            it2 != es2.osl.end(); ++it2) {
         auto it = osl.find(it2->first);
+
+        FieldMeta *fm = it->second.second;
+        FieldMeta *fm2 = it2->second.second;
+
         if (it != osl.end()) {
             SECLEVEL sl = (SECLEVEL)min((int)it->second.first,
-                                        (int)it2->second.first);
-            if (it->second.second == NULL) {
+                    (int)it2->second.first);
+            if (fm == NULL) {
                 m[it->first] = LevelFieldPair(
-                        sl, it2->second.second);
-            } else if (it2->second.second == NULL) {
+                        sl, fm2);
+            } else if (fm2 == NULL) {
                 m[it->first] = LevelFieldPair(
-                        sl, it->second.second);
-            } else if (it->second.second == it2->second.second) {
-                m[it->first] = LevelFieldPair(
-                        sl, it->second.second);
-            } else {
-	    // different fields for same onion, level gives null intersection,
-	    // unless join
-		if (sl == SECLEVEL::DETJOIN) {
-		    m[it->first] = LevelFieldPair(sl, it->second.second);
-		}
-	    }
+                        sl, fm);
+            } else if (fm != NULL && fm2 != NULL) {
+                EncLayer *el = getAssert(fm->onions, it->first)->layers.back();
+                EncLayer *el2 = getAssert(fm2->onions, it2->first)->layers.back();
+                if (el->getKey() == el2->getKey()) {
+                    m[it->first] = LevelFieldPair(sl, fm);
+                }
+            /*} else {
+                // different fields for same onion, level gives null intersection,
+                // unless join
+                if (sl == SECLEVEL::DETJOIN) {  //TODO: Remove it
+                    m[it->first] = LevelFieldPair(sl, it->second.second);
+                }*/
+            }
         }
     }
     return EncSet(m);
