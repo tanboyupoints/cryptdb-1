@@ -29,6 +29,8 @@ Connect::Connect(const string &server, const string &user, const string &passwd,
     do_connect(server, user, passwd, port);
     if (!select_db(dbname))
         thrower() << "cannot select dbname " << dbname;
+
+    cur_db_name(dbname);
 }
 
 void
@@ -65,6 +67,30 @@ Connect::do_connect(const string &server, const string &user,
         LOG(warn) << "mysql_real_connect: " << mysql_error(conn);
         throw runtime_error("cannot connect");
     }
+}
+
+std::string
+Connect::cur_db_name(const string & dbname)
+{
+    /*
+     * <ccarvalho>
+     * Perhaps a more sophisticated (better!)
+     * way than static string to be shared by multiple
+     * instances..
+     */
+    static std::string s_cur_db("");
+
+    if(dbname.size() > 0)
+        s_cur_db = dbname;
+
+    return s_cur_db;
+}
+
+// Wrapper
+std::string
+Connect::cur_db_name()
+{
+    return cur_db_name("");
 }
 
 bool
