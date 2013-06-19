@@ -825,12 +825,12 @@ typical_gather(Analysis & a, Item_func * i,
     assert(i->argument_count() == 2);
 
     reason r1, r2;
-    RewritePlan ** childr_rp = (RewritePlan**)malloc(sizeof(RewritePlan *));
-    childr_rp[1] = gather(args[0], r1, a);
-    childr_rp[2] = gather(args[1], r2, a);
+    RewritePlan ** childr_rp = new RewritePlan*[2];
+    childr_rp[0] = gather(args[0], r1, a);
+    childr_rp[1] = gather(args[1], r2, a);
 
-    EncSet solution = my_es.intersect(childr_rp[1]->es_out).
-	                    intersect(childr_rp[2]->es_out);
+    EncSet solution = my_es.intersect(childr_rp[0]->es_out).
+	                    intersect(childr_rp[1]->es_out);
 
     if (solution.empty()) {
 	cerr << "crypto schemes does not support this query BECAUSE " << i << "NEEDS " << my_es << "\n" \
