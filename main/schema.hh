@@ -58,7 +58,11 @@ typedef struct OnionMeta {
     bool stale;
     enum enum_field_types sql_type;
     std::vector<EncLayer *> layers; //first in list is lowest layer
-    SECLEVEL sec_level;
+
+    SECLEVEL getSecLevel() {
+        assert(layers.size() > 0);
+        return layers.back()->level();
+    }
 
     OnionMeta(): onionname(""), stale(false) {};
 } OnionMeta;
@@ -91,7 +95,8 @@ typedef struct FieldMeta {
     SECLEVEL getOnionLevel(onion o) const {
         auto it = onions.find(o);
         if (it == onions.end()) return SECLEVEL::INVALID;
-        return it->second->sec_level;
+        
+        return it->second->getSecLevel();
     }
 
     bool setOnionLevel(onion o, SECLEVEL maxl) {
@@ -113,8 +118,9 @@ typedef struct FieldMeta {
         assert_s(it != onions.end(), "onion not found in encdesc");
 
         OnionMeta *om = it->second;
-        if (om->sec_level > maxl) {
-            om->sec_level = maxl;
+        SECLEVEL seclevel = om->getSecLevel();
+        if (seclevel > maxl) {
+            seclevel = maxl;
             return true;
         }
 

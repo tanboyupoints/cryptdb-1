@@ -1,0 +1,2 @@
+-- is it really needed to convert to int integers and salt when we can work with binaries in mysql as well?
+-- 

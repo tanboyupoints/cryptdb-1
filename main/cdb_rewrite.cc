@@ -23,6 +23,7 @@
 
 using namespace std;
 
+//TODO: use getAssert in more places
 //TODO: replace table/field with FieldMeta * for speed and conciseness
 
 #define UNIMPLEMENTED \
@@ -317,10 +318,7 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
 
         onion o = TypeText<onion>::toType(onion_type);
         fm->onions[o] = om;
-        // Current layer level.
-        fm->onions[o]->sec_level =
-            TypeText<SECLEVEL>::toType(onion_current_level);
-
+        
         // HACK(burrows).
         Create_field * dummy_cf = new Create_field;
         dummy_cf->sql_type = om->sql_type;
@@ -352,10 +350,17 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm)
             }
 
             om->layers.push_back(enc_layer);
-            if (it == fm->onions[o]->sec_level) {
+            SECLEVEL onion_level = fm->getOnionLevel(o);
+            assert(onion_level != SECLEVEL::INVALID);
+            if (it == fm->getOnionLevel(o)) {
                 break;
             }
         }
+        
+        // TODO(burrows): Stop saving the current level.
+        // Current layer level.
+        // SECLEVEL level = TypeText<SECLEVEL>::toType(onion_current_level);
+        // fm->setCurrentOnionLevel(o, level);
      }
           
      return;
@@ -530,7 +535,7 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
     //remove onion layer in schema
     om->layers.pop_back();
     l = om->layers.back()->level();
-    fm->onions[o]->sec_level = l;
+    // fm->setCurrentOnionLevel(o, l);
 
     //todo:we do not need olm any more; then, do we need level in Enclayer?
 }
@@ -547,9 +552,8 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
 static void
 adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf, Analysis & a, const string & cur_db) {
 
-    //TODO: use getAssert in more places
-    OnionMeta *om = getAssert(fm->onions, o);
-    SECLEVEL newlevel = om->sec_level;
+    SECLEVEL newlevel = fm->getOnionLevel(o);
+    assert(newlevel != SECLEVEL::INVALID);
 
     while (newlevel > tolevel) {
 	removeOnionLayer(fm, itf, a, o, newlevel, cur_db);
@@ -1194,7 +1198,9 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 	//assert(constr.key == fm);
 
 	//check if we need onion adjustment
-	if (constr.l < fm->onions[constr.o]->sec_level) {
+        SECLEVEL onion_level = fm->getOnionLevel(constr.o);
+        assert(onion_level != SECLEVEL::INVALID);
+	if (constr.l < onion_level) {
 	    //need adjustment, throw exception
 	    throw OnionAdjustExcept(constr.o, fm, constr.l, i);
 	}
@@ -2760,7 +2766,7 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
         LOG(cdb_v) << "adding onion layer " << om->onionname << " for " << fm->fname;
 
         //set outer layer
-        fm->onions[o]->sec_level = it.second.back();
+        // fm->setCurrentOnionLevel(o, it.second.back());
     }
 }
 
@@ -3446,7 +3452,8 @@ add_table_update_meta(const string &q,
             onion o = onion_pair.first;
             ostringstream s;
 
-            SECLEVEL current_sec_level = fm->onions[o]->sec_level;
+            SECLEVEL current_sec_level = fm->getOnionLevel(o);
+            assert(current_sec_level != SECLEVEL::INVALID);
             std::string str_seclevel =
                 TypeText<SECLEVEL>::toText(current_sec_level); 
             std::string str_onion  = TypeText<onion>::toText(o);

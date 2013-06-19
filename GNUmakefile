@@ -22,6 +22,7 @@ CXXFLAGS += -I$(MYBUILD)/include \
 LDFLAGS	 += -lpthread -lrt -ldl -lcrypt -lreadline
 
 ## To be populated by Makefrag files
+
 OBJDIRS	:=
 
 .PHONY: all
@@ -33,6 +34,10 @@ install:
 .PHONY: clean
 clean:
 	rm -rf $(OBJDIR)
+
+.PHONY: doc
+doc:
+	doxygen CryptDBdoxgen
 
 # Eliminate default suffix rules
 .SUFFIXES:
