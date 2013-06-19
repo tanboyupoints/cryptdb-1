@@ -8,7 +8,7 @@ EncSet::EncSet() : osl(FULL_EncSet.osl) {}
 EncSet::EncSet(FieldMeta * fm) {
     osl.clear();
     for (auto pair : fm->onions) {
-	osl[pair.first] = LevelFieldPair(pair.second->sec_level, fm);
+	osl[pair.first] = LevelFieldPair(pair.second->getSecLevel(), fm);
     }
 }
 
