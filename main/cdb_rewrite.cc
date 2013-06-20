@@ -2930,26 +2930,6 @@ create_table_embedded(Connect * e_conn, const string & cur_db,
     assert(e_conn->execute(create_q));
 }
 
-/*
- * Analyzes create query.
- * Updates encrypted schema info.
- *
- */
-static void
-process_create_lex(LEX * lex, Analysis & a,
-		   bool encByDefault, const string & cur_db)
-{
-    const string &table =
-        lex->select_lex.table_list.first->table_name;
-    //create table in embedded db
-    //TODO: temporary hack!
-    stringstream q;
-    q << *lex;
-    create_table_embedded(a.ps->e_conn, cur_db, q.str());
-    LOG(cdb_v) << "table is " << table << " and encByDefault is " << encByDefault << " and true is " << true;
-    add_table(a, table, lex, encByDefault);
-}
-
 static LEX *
 rewrite_create_lex(LEX *lex, Analysis &a)
 {
@@ -3403,13 +3383,18 @@ static inline void
 add_table_update_meta(const string &q,
                       LEX *lex,
                       Analysis &a)
-{
-    a.ps->e_conn->execute("START TRANSACTION");
-
+{   
     char* dbname = lex->select_lex.table_list.first->db;
     char* table  = lex->select_lex.table_list.first->table_name;
+
+    // TODO(burrows): This should be a seperate step.
+    create_table_embedded(a.ps->e_conn, dbname, q);
+    add_table(a, std::string(table), lex, a.ps->encByDefault);
+
     TableMeta *tm = a.ps->schema->tableMetaMap[table];
     assert(tm != NULL);
+
+    a.ps->e_conn->execute("START TRANSACTION");
 
     {
         ostringstream s;
@@ -3818,6 +3803,21 @@ Rewriter::rewrite(const string & q, string *cur_db)
     }
 
 
+    /*
+     * FIXME(burrows): This optimization breaks the code because
+     * cdb_test.cc<handle_line> expects this function to return data in
+     * res.rmeta which is then passed to decryptResults.
+     *
+     * lex_rewrite
+     *   rewrite_select_lex
+     *     rewrite_proj
+     *       addToReturn
+     *
+     * AddToReturn is responsible for building the ReturnMeta structure.
+     *
+     * This optimization is dubious because we still might want to 
+     * updateMeta or something.
+     */
     //optimization: do not process queries that we will not rewrite
     if (noRewrite(p.lex())) {
 	res.wasRew = false;
