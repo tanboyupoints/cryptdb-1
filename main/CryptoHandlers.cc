@@ -265,36 +265,17 @@ RND_str::decryptUDF(Item * col, Item * ivcol) {
 
 
 
-DET_int::DET_int(Create_field * f, PRNG * prng)
+DET_int::DET_int(Create_field * f, string seed_key)
     : EncLayer(f),
-      key(prng->rand_string(bf_key_size)),
+      key(prng_expand(seed_key, bf_key_size)),
       bf(key)
-{
-    setKey(key);
-}
+{}
 
 Create_field *
 DET_int::newCreateField(string anonname) {
     return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
 }
 
-void
-DET_int::setKey(const string &k) {
-    if (k.empty()) {
-        return;
-    }
-    key = k;
-    bf = blowfish(key);
-}
-
-void
-DET_int::unSetKey(const string &k) {
-    if (k.empty()) {
-        return;
-    }
-    key = "";
-    //TODO: unset blowfish
-}
  
 //TODO: may want to do more specialized crypto for lengths
 Item *

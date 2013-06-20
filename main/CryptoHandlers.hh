@@ -97,8 +97,7 @@ private:
 
 class DET_int : public EncLayer {
 public:
-    DET_int(Create_field *, PRNG * key);
-    DET_int(Create_field *cf, std::string key) : EncLayer(cf), key(key), bf(key) {}
+    DET_int(Create_field *, std::string seed_key);
 
     SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField(std::string anonname = "");
@@ -107,8 +106,9 @@ public:
     Item * decrypt(Item * ctext, uint64_t IV = 0);
     Item * decryptUDF(Item * col, Item * ivcol = NULL);
 
-    std::string getKey() {return key;}
-
+    virtual std::string serialize() {return ""; //just key}
+    virtual static EncLayer* deserialize() {return NULL;}
+    
 protected:
     std::string key;
     blowfish bf;
