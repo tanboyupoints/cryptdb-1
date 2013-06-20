@@ -24,6 +24,9 @@
 
 using namespace std;
 
+//TODO: potential inconsistency problem because we update state,
+//but only the proxy is responsible for WRT to updateMeta
+
 //TODO: use getAssert in more places
 //TODO: replace table/field with FieldMeta * for speed and conciseness
 
@@ -1157,7 +1160,9 @@ intersect(const EncSet & es, FieldMeta * fm) {
 /*
  * Actual item handlers.
  */
-static void process_select_lex(st_select_lex *select_lex, Analysis & a);
+static void process_select_lex(LEX *lex, Analysis & a);
+static void process_select_lex(st_select_lex *select_lex,
+                                   Analysis & a);
 
 static void optimize_select_lex(st_select_lex *select_lex, Analysis & a);
 
@@ -2482,6 +2487,12 @@ process_filters_lex(st_select_lex * select_lex, Analysis & a) {
 
 
 static void
+process_select_lex(LEX *lex, Analysis & a)
+{
+    process_select_lex(&lex->select_lex, a);
+}
+
+static void
 process_select_lex(st_select_lex *select_lex, Analysis & a)
 {
     //select clause
@@ -3208,9 +3219,37 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
     return new_lex;
 }
 
+static LEX *
+rewrite_drop_table_lex(LEX *lex, Analysis &a)
+{
+    LEX * new_lex = copy(lex);
+    new_lex->select_lex.table_list = rewrite_table_list(lex->select_lex.table_list, a);
+
+    return new_lex;
+}
+
+static LEX *
+rewrite_delete_lex(LEX *lex, Analysis &a)
+{
+    LEX * new_lex = copy(lex);
+    new_lex->query_tables = rewrite_table_list(lex->query_tables, a);
+    set_select_lex(new_lex, rewrite_select_lex(&new_lex->select_lex, a));
+
+    return new_lex;
+}
+
+static LEX *
+rewrite_select_lex(LEX *lex, Analysis &a)
+{
+    LEX * new_lex = copy(lex);
+    new_lex->select_lex.top_join_list = rewrite_table_list(lex->select_lex.top_join_list, a);
+    set_select_lex(new_lex, rewrite_select_lex(&new_lex->select_lex, a));
+
+    return new_lex;
+}
+
 static void
 process_update_lex(LEX * lex, Analysis & a) {
-
     if (lex->select_lex.item_list.head()) {
 	assert(lex->value_list.head());
 
@@ -3233,84 +3272,11 @@ process_update_lex(LEX * lex, Analysis & a) {
 
 
 }
+
 static void
-do_query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault, const string & cur_db) {
-    // iterate over the entire select statement..
-    // based on st_select_lex::print in mysql-server/sql/sql_select.cc
-    
-    process_table_list(&lex->select_lex.top_join_list, analysis);
-
-    if (lex->sql_command == SQLCOM_UPDATE) {
-        process_update_lex(lex, analysis);
-        return;
-    }
-
-    process_select_lex(&lex->select_lex, analysis);
-}
-
-
-/*
- * Analyzes how to encrypt and rewrite items in a query.
- * Results are set in analysis.
- *
- * TODO <ccarvalho> string q is not used, remove it from here and from do_query_analyze() ?
- */
-static void
-query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault, const string & cur_db)
+noopUpdateMeta(const string &q, LEX *lex, Analysis &a)
 {
-    // optimize the query first
-    //optimize_table_list(&lex->select_lex.top_join_list, analysis);
-    //optimize_select_lex(&lex->select_lex, analysis);
 
-    do_query_analyze(q, lex, analysis, encByDefault, cur_db);
-    //print(analysis.schema->tableMetaMap);
-    for (auto it = analysis.tmkm.encForVal.begin(); it != analysis.tmkm.encForVal.end(); it++) {
-        if (it->first == "" || it->second == "") {
-            analysis.tmkm.encForVal.erase(it);
-        }
-    }
-}
-
-
-/*
- * Rewrites lex by translating and encrypting based on information in analysis.
- *
- * Fills rmeta with information about how to decrypt fields returned.
- */
-static LEX *
-lex_rewrite(LEX * lex, Analysis & analysis)
-{
-    switch (lex->sql_command) {
-    case SQLCOM_CREATE_TABLE:
-        return rewrite_create_lex(lex, analysis);
-    case SQLCOM_INSERT:
-    case SQLCOM_REPLACE:
-        return rewrite_insert_lex(lex, analysis);
-    case SQLCOM_DROP_TABLE: {
-	LEX * new_lex = copy(lex);
-	new_lex->select_lex.table_list = rewrite_table_list(lex->select_lex.table_list, analysis);
-	return new_lex;
-    }
-    case SQLCOM_UPDATE:
-        return rewrite_update_lex(lex, analysis);
-    case SQLCOM_DELETE: {
-	LEX * new_lex = copy(lex);
-	new_lex->query_tables = rewrite_table_list(lex->query_tables, analysis);
-	set_select_lex(new_lex, rewrite_select_lex(&new_lex->select_lex, analysis));
-	return new_lex;
-    }
-    case SQLCOM_SELECT: {
-        LEX * new_lex = copy(lex);
-	new_lex->select_lex.top_join_list = rewrite_table_list(lex->select_lex.top_join_list, analysis);
-	set_select_lex(new_lex, rewrite_select_lex(&new_lex->select_lex, analysis));
-        return new_lex;
-    }
-    default: {
-	return lex;
-    }
-    }
-    assert_s(false, "invalid sql command");
-    return NULL;
 }
 
 static inline void
@@ -3489,26 +3455,6 @@ add_table_update_meta(const string &q,
     }
 
     a.ps->e_conn->execute("COMMIT");
-}
-
-//TODO: potential inconsistency problem because we update state,
-//but only the proxy is responsible for
-static void
-updateMeta(const string & q, LEX * lex, Analysis & a)
-{
-    switch (lex->sql_command) {
-    // TODO: alter tables will need to modify the embedded DB schema
-    case SQLCOM_DROP_TABLE:
-        drop_table_update_meta(q, lex, a);
-        break;
-    case SQLCOM_CREATE_TABLE:
-        add_table_update_meta(q, lex, a);
-        break;
-    default:
-        // no-op
-        break;
-    }
-
 }
 
 static void
@@ -3723,10 +3669,14 @@ rewrite_helper(const string & q, Analysis & analysis,
 
     SqlHandler *sql_handler = SqlHandler::getHandler(lex->sql_command);
     assert(sql_handler);
+    
+    // TODO(burrows): Where should this call be?
+    // - In each analysis function?
+    // - Here?
+    process_table_list(&lex->select_lex.top_join_list, analysis);
 
     //TODO: is db neededs as param in all these funcs?
-    (*sql_handler->query_analyze)(q, lex, analysis,
-                                 analysis.ps->encByDefault, cur_db);
+    (*sql_handler->query_analyze)(lex, analysis);
 
     if (false == sql_handler->updateAfter()) {
         (*sql_handler->update_meta)(q, lex, analysis);
@@ -4092,32 +4042,32 @@ static bool buildSqlHandlers()
 {
     SqlHandler *h;
     
-    h = new SqlHandler(SQLCOM_CREATE_TABLE, query_analyze,
+    h = new SqlHandler(SQLCOM_CREATE_TABLE, process_select_lex,
                        add_table_update_meta, rewrite_create_lex); 
     SqlHandler::addHandler(h);
 
-    h = new SqlHandler(SQLCOM_INSERT, query_analyze, updateMeta,
-                       lex_rewrite);
+    h = new SqlHandler(SQLCOM_INSERT, process_select_lex, noopUpdateMeta,
+                       rewrite_insert_lex);
     SqlHandler::addHandler(h);
 
-    h = new SqlHandler(SQLCOM_REPLACE, query_analyze, updateMeta,
-                       lex_rewrite);
+    h = new SqlHandler(SQLCOM_REPLACE, process_select_lex, noopUpdateMeta,
+                       rewrite_insert_lex);
     SqlHandler::addHandler(h);
 
-    h = new SqlHandler(SQLCOM_DROP_TABLE, query_analyze, updateMeta,
-                       lex_rewrite);
+    h = new SqlHandler(SQLCOM_DROP_TABLE, process_select_lex,
+                       drop_table_update_meta, rewrite_drop_table_lex);
     SqlHandler::addHandler(h);
 
-    h = new SqlHandler(SQLCOM_UPDATE, query_analyze, updateMeta,
-                       lex_rewrite);
+    h = new SqlHandler(SQLCOM_UPDATE, process_update_lex, noopUpdateMeta,
+                       rewrite_update_lex);
     SqlHandler::addHandler(h);
 
-    h = new SqlHandler(SQLCOM_DELETE, query_analyze, updateMeta,
-                       lex_rewrite);
+    h = new SqlHandler(SQLCOM_DELETE, process_select_lex, noopUpdateMeta,
+                       rewrite_delete_lex);
     SqlHandler::addHandler(h);
 
-    h = new SqlHandler(SQLCOM_SELECT, query_analyze, updateMeta,
-                       lex_rewrite);
+    h = new SqlHandler(SQLCOM_SELECT, process_select_lex, noopUpdateMeta,
+                       rewrite_select_lex);
     SqlHandler::addHandler(h);
 
     return true;
