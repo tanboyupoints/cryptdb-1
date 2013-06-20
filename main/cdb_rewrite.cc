@@ -1661,11 +1661,10 @@ static CItemAdditive<str_minus> ANON;
 template<const char *NAME>
 class CItemMath : public CItemSubtypeFN<Item_func, NAME> {
     virtual RewritePlan * do_gather_type(Item_func *i, reason &tr, Analysis & a) const {
-	/* Item **args = i->arguments();
-        for (uint x = 0; x < i->argument_count(); x++)
-            analyze(args[x], reason(EMPTY_EncSet, "math", i, &tr), a);
-	    return tr.encset;*/
-	UNIMPLEMENTED;
+	 Item **args = i->arguments();
+        for (uint x = 0; x < i->argument_count(); x++) 
+            analyze(args[x], a);
+	    return a.rewritePlans.find(i)->second;
     }
     virtual Item * do_optimize_type(Item_func *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
