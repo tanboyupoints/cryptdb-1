@@ -28,6 +28,7 @@ class EncLayer {
  public:
     EncLayer(Create_field * f) : cf(f) {}
     //  EncLayer(Create_field * f, std::string key) : cf(f) {}
+    
 
     virtual SECLEVEL level() = 0;
 
@@ -43,7 +44,6 @@ class EncLayer {
     }
 
     virtual std::string serialize() = 0;
-    virtual static EncLayer * deserialize() = 0; 
 
  protected:
     Create_field *cf;
@@ -53,6 +53,10 @@ class RND_int : public EncLayer {
 public:
     RND_int(Create_field *cf, std::string seed_key);
 
+    virtual std::string serialize() {return ""; /*just key*/}
+    //create object from serialized contents
+    RND_int(std::string serial): EncLayer(NULL) {/*todo*/}
+    
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField(std::string anonname = "");
     
@@ -60,8 +64,8 @@ public:
     Item * decrypt(Item * ctext, uint64_t IV);
     Item * decryptUDF(Item * col, Item * ivcol);
 
-    virtual std::string serialize() {return ""; //just key}
-    virtual static EncLayer* deserialize() {return NULL;}
+
+
 
 private:
     std::string key;
@@ -75,17 +79,17 @@ class RND_str : public EncLayer {
 public:
     RND_str(Create_field *, std::string seed_key);
 
+    std::string serialize() {return rawkey; }
+    // create object from serialized contents
+    RND_str(std::string serial):EncLayer(NULL) {/*todo*/}
+ 
+
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField(std::string anonname = "");
     
     Item * encrypt(Item * ptext, uint64_t IV);
     Item * decrypt(Item * ctext, uint64_t IV);
     Item * decryptUDF(Item * col, Item * ivcol);
-
-
-    std::string serialize() {return ""; //just rawkey}
-    static EncLayer* deserialize() {return NULL;}
-
 
 private:
     std::string rawkey;
@@ -99,16 +103,19 @@ class DET_int : public EncLayer {
 public:
     DET_int(Create_field *, std::string seed_key);
 
+    std::string serialize() {return key; }
+    // create object from serialized contents
+    DET_int(std::string serial) : EncLayer(NULL) {/*todo*/}
+ 
+
     SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField(std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV = 0);
     Item * decrypt(Item * ctext, uint64_t IV = 0);
     Item * decryptUDF(Item * col, Item * ivcol = NULL);
-
-    std::string serialize() {return ""; /*just key*/ }
-    static EncLayer* deserialize() {return NULL;}
-    
+  
+      
 protected:
     std::string key;
     blowfish bf;
@@ -119,8 +126,12 @@ protected:
 
 class DET_str : public EncLayer {
 public:
-    DET_str(Create_field *, PRNG * key);
-    DET_str(Create_field *cf, std::string key) : EncLayer(cf) {setKey(key);}
+    DET_str(Create_field *cf, std::string seed_key);
+
+    std::string serialize() {return rawkey;}
+    // create object from serialized contents
+    DET_str(std::string serial) : EncLayer(NULL) {/*todo*/}
+ 
 
     SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField(std::string anonname = "");
@@ -129,10 +140,6 @@ public:
     Item * decrypt(Item * ctext, uint64_t IV = 0);
     Item * decryptUDF(Item * col, Item * = NULL);
     
-    std::string serialize() {return ""; /* just rawkey */}
-    static EncLayer* deserialize() {return NULL;}
-
-
 protected:
     std::string rawkey;
     static const int key_bytes = 16;
@@ -164,16 +171,17 @@ public:
 class OPE_int : public EncLayer {
 public:
     OPE_int(Create_field *, std::string seed_key);
-  
 
+    std::string serialize() {return key;}
+    // create object from serialized contents
+    OPE_int(std::string serial) : EncLayer(NULL) {/*todo*/}
+ 
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField(std::string anonname = "");
 
     Item * encrypt(Item * p, uint64_t IV);
     Item * decrypt(Item * c, uint64_t IV);
 
-    std::string serialize() {return ""; /* just key */}
-    static EncLayer* deserialize() {return NULL;}
 
 private:
     std::string key;
@@ -189,15 +197,17 @@ class OPE_str : public EncLayer {
 public:
     OPE_str(Create_field *, std::string seed_key);
 
+    std::string serialize() {return key;}
+    // create object from serialized contents
+    OPE_str(std::string serial) : EncLayer(NULL) {/* todo */}
+ 
+
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField(std::string anonname = "");
 
     Item * encrypt(Item * p, uint64_t IV = 0);
     Item * decrypt(Item * c, uint64_t IV = 0)__attribute__((noreturn));
   
-    std::string serialize() {return ""; /* just key */}
-    static EncLayer* deserialize() {return NULL;}
-
 private:
     std::string key;
     OPE ope;
@@ -209,7 +219,12 @@ private:
 
 class HOM : public EncLayer {
 public:
-    HOM(Create_field * cf, std::string key);
+    HOM(Create_field * cf, std::string seed_key);
+
+    std::string serialize() {return key;}
+    //create object from serialized contents
+    HOM(std::string serial) : EncLayer(NULL) {/*todo*/}
+ 
     
     SECLEVEL level() {return SECLEVEL::HOM;}
     Create_field * newCreateField(std::string anonname = "");
@@ -218,24 +233,25 @@ public:
     Item * encrypt(Item * p, uint64_t IV = 0);
     Item * decrypt(Item * c, uint64_t IV = 0);
     
-    std::string getKey() {throw "Does not support getKey()";};
-
     //expr is the expression (e.g. a field) over which to sum
     Item * sumUDA(Item * expr);
     Item * sumUDF(Item * i1, Item * i2);
 
 private:
     static const uint nbits = 1024;
-    PRNG *dummy_prng;
     Paillier_priv sk;
 
 };
 
 class Search : public EncLayer {
 public:
-    Search(Create_field * cf, PRNG * key);
-    Search(Create_field *cf, std::string key) : EncLayer(cf) {setKey(key);}
+    Search(Create_field * cf, std::string seed_key);
 
+    std::string serialize() {return key;}
+    // create object from serialized contents
+    Search(std::string serial) : EncLayer(NULL) {/* todo */}
+ 
+   
     SECLEVEL level() {return SECLEVEL::SEARCH;}
     Create_field * newCreateField(std::string anonname = "");
 
@@ -245,12 +261,9 @@ public:
     //expr is the expression (e.g. a field) over which to sum
     Item * searchUDF(Item * field, Item * expr);
     
-    // FIXME(burrows): rawkey or key?
-    std::string getKey() {return rawkey;}
 
 private:
     static const uint key_bytes = 16;
-    std::string rawkey;
     std::string key;
 
 };

@@ -612,35 +612,15 @@ HOM::sumUDF(Item * i1, Item * i2, const string &k) {
 
 /******* SEARCH **************************/
 
-Search::Search(Create_field * f, PRNG * key)
+Search::Search(Create_field * f, string seed_key)
     : EncLayer(f)
 {
-    setKey(key->rand_string(key_bytes));
+    key = prng_expand(seed_key, key_bytes)
 }
 
 Create_field *
 Search::newCreateField(string anonname) {
     return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname, &my_charset_bin);
-}
-
-
-void
-Search::setKey(const string &k) {
-    if (k.empty()) {
-        return;
-    }
-    rawkey = k;
-    key = k;
-    key.resize(key_bytes);
-}
-
-void
-Search::unSetKey(const string &k) {
-    if (k.empty()) {
-        return;
-    }
-    rawkey = "";
-    //TODO: zero key
 }
 
 
