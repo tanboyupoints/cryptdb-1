@@ -533,8 +533,6 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
 
     //remove onion layer in schema
     om->layers.pop_back();
-
-    //todo:we do not need olm any more; then, do we need level in Enclayer?
 }
 
 /*
@@ -3806,6 +3804,9 @@ Rewriter::rewrite(const string & q, string *cur_db)
      */
     //optimization: do not process queries that we will not rewrite
     if (noRewrite(p.lex())) {
+        // HACK(burrows): This 'Analysis' is dummy as we never call 
+        // addToReturn. But it works because this optimized cases don't
+        // have anything to do in addToReturn anyways.
 	Analysis analysis = Analysis(&ps);
 
 	res.wasRew = false;
