@@ -3458,6 +3458,17 @@ add_table_update_meta(const string &q,
 }
 
 static void
+changeDBUpdateMeta(const string &q, LEX *lex, Analysis &a)
+{
+    assert(lex->select_lex.db);
+    char* dbname = lex->select_lex.db;
+    
+    // new dbname is saved for next queries
+    (void)a.ps->conn->setCurDBName(dbname);
+
+}
+
+static void
 dropAll(Connect * conn)
 {
     for (udf_func* u: udf_list) {
@@ -3716,30 +3727,6 @@ Rewriter::rewrite(const string & q, string *cur_db)
 
     query_parse p(*cur_db, q);
     QueryRewrite res;
-
-    // saves new database name
-    // <ccarvalho>
-    // TODO/FIXME: Use lex instead of parsing query again!
-    if(p.lex()->sql_command == SQLCOM_CHANGE_DB)
-    {
-        size_t found = string::npos;
-        std::vector<char> bytes(q.begin(), q.end());
-        bytes.push_back('\0');
-        string newdbname(&bytes[0]);
-
-        // gets last word
-        found = newdbname.find_last_of(" ");
-        if(found != string::npos)
-            newdbname = newdbname.substr(found+1);
-
-        // erases ";" if present
-        found = newdbname.find_last_of(";");
-        if(found != string::npos)
-            newdbname.erase(found);
-
-        // new dbname is saved for next queries
-        (void)ps.conn->setCurDBName(newdbname);
-    }
 
     /*
      * At minimum we must create a valid Analysis object here because we
@@ -4063,4 +4050,9 @@ static void buildSqlHandlers()
     h = new SqlHandler(SQLCOM_SELECT, process_select_lex, noopUpdateMeta,
                        rewrite_select_lex);
     assert(SqlHandler::addHandler(h));
+
+    h = new SqlHandler(SQLCOM_CHANGE_DB, process_select_lex,
+                       changeDBUpdateMeta, rewrite_select_lex);
+    assert(SqlHandler::addHandler(h));
+
 }
