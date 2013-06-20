@@ -3236,7 +3236,7 @@ static void
 do_query_analyze(const std::string &q, LEX * lex, Analysis & analysis, bool encByDefault, const string & cur_db) {
     // iterate over the entire select statement..
     // based on st_select_lex::print in mysql-server/sql/sql_select.cc
-
+    
     process_table_list(&lex->select_lex.top_join_list, analysis);
 
     if (lex->sql_command == SQLCOM_UPDATE) {
@@ -3797,26 +3797,21 @@ Rewriter::rewrite(const string & q, string *cur_db)
         (void)ps.conn->setCurDBName(newdbname);
     }
 
-
     /*
-     * FIXME(burrows): This optimization breaks the code because
-     * cdb_test.cc<handle_line> expects this function to return data in
-     * res.rmeta which is then passed to decryptResults.
+     * At minimum we must create a valid Analysis object here because we
+     * res requires valid rmeta and tmkm objects.
      *
-     * lex_rewrite
-     *   rewrite_select_lex
-     *     rewrite_proj
-     *       addToReturn
-     *
-     * AddToReturn is responsible for building the ReturnMeta structure.
-     *
-     * This optimization is dubious because we still might want to 
+     * The optimization is dubious however as we may still want to
      * updateMeta or something.
      */
     //optimization: do not process queries that we will not rewrite
     if (noRewrite(p.lex())) {
+	Analysis analysis = Analysis(&ps);
+
 	res.wasRew = false;
 	res.queries.push_back(q);
+        res.rmeta = analysis.rmeta;
+	res.rmeta->tmkm = analysis.tmkm;
 	return res;
     }
 
@@ -3831,7 +3826,7 @@ Rewriter::rewrite(const string & q, string *cur_db)
 	    adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis, *cur_db);
 	    continue;
 	}
-	res.wasRew = true;
+        res.wasRew = true;
 	res.rmeta = analysis.rmeta;
 	res.rmeta->tmkm = analysis.tmkm;
 	return res;
