@@ -3635,14 +3635,6 @@ processAnnotation(Annotation annot, Analysis &a)
     return query_list;
 }
 
-static void
-mp_init(Analysis &a) {
-    //start new temp mkm
-    a.tmkm.encForVal.clear();
-    a.tmkm.encForReturned.clear();
-    a.tmkm.processingQuery = false;
-    a.tmkm.returnBitMap.clear();
-}
 
 static list<string>
 rewrite_helper(const string & q, Analysis & analysis,
@@ -3650,9 +3642,7 @@ rewrite_helper(const string & q, Analysis & analysis,
     LOG(cdb_v) << "q " << q;
     list<string> queries;
 
-    //initialize multi-principal
-    mp_init(analysis);
-
+   
     if (p.annot) {
         return processAnnotation(*p.annot, analysis);
     }
