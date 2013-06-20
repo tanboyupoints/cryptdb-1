@@ -83,8 +83,8 @@ public:
     Item * decryptUDF(Item * col, Item * ivcol);
 
 
-    virtual std::string serialize() {return ""; //just rawkey}
-    virtual static EncLayer* deserialize() {return NULL;}
+    std::string serialize() {return ""; //just rawkey}
+    static EncLayer* deserialize() {return NULL;}
 
 
 private:
@@ -106,8 +106,8 @@ public:
     Item * decrypt(Item * ctext, uint64_t IV = 0);
     Item * decryptUDF(Item * col, Item * ivcol = NULL);
 
-    virtual std::string serialize() {return ""; //just key}
-    virtual static EncLayer* deserialize() {return NULL;}
+    std::string serialize() {return ""; /*just key*/ }
+    static EncLayer* deserialize() {return NULL;}
     
 protected:
     std::string key;
@@ -128,8 +128,10 @@ public:
     Item * encrypt(Item * ptext, uint64_t IV = 0);
     Item * decrypt(Item * ctext, uint64_t IV = 0);
     Item * decryptUDF(Item * col, Item * = NULL);
+    
+    std::string serialize() {return ""; /* just rawkey */}
+    static EncLayer* deserialize() {return NULL;}
 
-    std::string getKey() {return rawkey;}
 
 protected:
     std::string rawkey;
@@ -141,69 +143,28 @@ protected:
 
 
 class DETJOIN_int : public DET_int {
-    //TODO: this layer currently does not do encryption
+    //TODO
 public:
-    DETJOIN_int(Create_field * cf, PRNG * key) : DET_int(cf, key) {
-	this->key="joinjoinjoinjoin";
-	setKey(this->key);}
-    DETJOIN_int(Create_field *cf, std::string key) : DET_int(cf, key) {}
+    DETJOIN_int(Create_field * cf, std::string seed_key) : DET_int(cf, seed_key) {}
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
-    
-    std::string getKey() {return key;}
-
-/*    Create_field * newCreateField(std::string anonname = "") {return cf;}
-    
-    //TODO: DETJOIN for multi
-    Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
-    Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = "");
-    Item * decryptUDF(Item * col, Item * ivcol = NULL) {
-        thrower() << "should not decrypt from joindet\n";
-    }
-
-private:
-    void setKey(const std::string &k) {};
-    void unSetKey(const std::string &k) {};
-
-*/
 };
 
 
 class DETJOIN_str : public DET_str {
-    //TODO: this layer currently does not do encryption
+    //TODO
 public:
-    DETJOIN_str(Create_field * cf, PRNG * key) : DET_str(cf, key) {
-	this->rawkey="joinjoinjoinjoin";
-	setKey(this->rawkey);
-    }
-
-    DETJOIN_str(Create_field *cf, std::string key) : DET_str(cf, key) {}
+    DETJOIN_str(Create_field * cf, std::string seed_key) : DET_str(cf, seed_key) {}    }
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
 
-    std::string getKey() {return rawkey;}
-
-/*    Create_field * newCreateField(std::string anonname = "") {return cf;}
-    
-    //TODO: DETJOIN for multi
-    Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
-    Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = "");
-    Item * decryptUDF(Item * col, Item * ivcol = NULL) {
-        thrower() << "should not decrypt from joindet\n";
-    }
-
-private:
-    void setKey(const std::string &k) {};
-    void unSetKey(const std::string &k) {};
-
-*/
 };
 
 
 class OPE_int : public EncLayer {
 public:
-    OPE_int(Create_field *, PRNG * key);
-    OPE_int(Create_field *cf, std::string key) : EncLayer(cf), key(key), ope(key, plain_size*8, ciph_size*8) {}
+    OPE_int(Create_field *, std::string seed_key);
+  
 
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField(std::string anonname = "");
@@ -211,7 +172,8 @@ public:
     Item * encrypt(Item * p, uint64_t IV);
     Item * decrypt(Item * c, uint64_t IV);
 
-    std::string getKey() {return key;}
+    std::string serialize() {return ""; /* just key */}
+    static EncLayer* deserialize() {return NULL;}
 
 private:
     std::string key;

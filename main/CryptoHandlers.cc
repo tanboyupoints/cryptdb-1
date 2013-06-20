@@ -332,10 +332,15 @@ DET_int::decryptUDF(Item * col, Item * ivcol) {
     return udf;
 }
 
-DET_str::DET_str(Create_field * f, PRNG * key)
+
+
+DET_str::DET_str(Create_field * f, string seed_key)
     : EncLayer(f)
 {
-    setKey(key->rand_string(key_bytes));
+    rawkey = prng_expand(seed_key, key_bytes);
+    enckey = get_AES_enc_key(rawkey);
+    deckey = get_AES_dec_key(rawkey);
+
 }
 
 
@@ -343,26 +348,6 @@ Create_field *
 DET_str::newCreateField(string anonname) {
 //TODO: use more precise sizes and types
     return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname, &my_charset_bin);
-}
-
-void
-DET_str::setKey(const string &k) {
-    if (k.empty()) {
-        return;
-    }
-    rawkey = k;
-    enckey = get_AES_enc_key(rawkey);
-    deckey = get_AES_dec_key(rawkey);
-}
-
-void
-DET_str::unSetKey(const string &k) {
-    if (k.empty()) {
-        return;
-    }
-    rawkey = "";
-    enckey = NULL;
-    deckey = NULL;
 }
 
 Item *
@@ -426,35 +411,16 @@ DETJOIN::decrypt(Item * c, uint64_t IV, const string &k) {
 */
 /**************** OPE **************************/
 
-OPE_int::OPE_int(Create_field * f, PRNG * prng)
-    : EncLayer(f),
-      key(prng->rand_string(key_bytes)),
-      ope(key, plain_size*8, ciph_size*8)
+OPE_int::OPE_int(Create_field * f, string seed_key)
+    : EncLayer(f)
 {
-    setKey(prng->rand_string(key_bytes));
+    key = prng_expand(seed_key, key_bytes);
+    ope = OPE(key, plain_size * 8, ciph_size * 8);
 }
 
 Create_field *
 OPE_int::newCreateField(string anonname) {
     return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname);
-}
-
-void
-OPE_int::setKey(const string &k) {
-    if (k.empty()) {
-        return;
-    }
-    key = k;
-    ope = OPE(key, plain_size * 8, ciph_size * 8);
-}
-
-void
-OPE_int::unSetKey(const string &k) {
-    if (k.empty()) {
-        return;
-    }
-    key = "";
-    ope = OPE("", plain_size*8, ciph_size*8);
 }
 
 Item *
@@ -480,33 +446,14 @@ OPE_int::decrypt(Item * ctext, uint64_t IV, const string &k) {
 
 OPE_str::OPE_str(Create_field * f, PRNG * prng)
     : EncLayer(f),
-      key(prng->rand_string(key_bytes)),
-      ope(key, plain_size*8, ciph_size*8)
 {
-    setKey(prng->rand_string(key_bytes));
+    key = prng_expand(seed_key, key_bytes);
+    ope = OPE(key, plain_size * 8, ciph_size * 8);
 }
 
 Create_field *
 OPE_str::newCreateField(string anonname) {
     return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname, &my_charset_bin);
-}
-
-void
-OPE_str::setKey(const string &k) {
-    if (k.empty()) {
-        return;
-    }
-    key = k;
-    ope = OPE(key, plain_size * 8, ciph_size * 8);
-}
-
-void
-OPE_str::unSetKey(const string &k) {
-    if (k.empty()) {
-        return;
-    }
-    key = "";
-    ope = OPE("", plain_size*8, ciph_size*8);
 }
 
 Item *
