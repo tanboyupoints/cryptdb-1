@@ -27,18 +27,23 @@
 class EncLayer {
  public:
     EncLayer(Create_field * f) : cf(f) {}
-    EncLayer(Create_field * f, std::string key) : cf(f) {}
+    //  EncLayer(Create_field * f, std::string key) : cf(f) {}
 
     virtual SECLEVEL level() = 0;
+
+    // returns a rewritten create field to include in rewritten query
     virtual Create_field * newCreateField(std::string anonname = "") = 0;
     
     virtual Item * encrypt(Item * ptext, uint64_t IV = 0) = 0;
     virtual Item * decrypt(Item * ctext, uint64_t IV = 0) = 0;
+
+    // returns the decryptUDF to remove the onion layer 
     virtual Item * decryptUDF(Item * col, Item * ivcol = NULL) {
         thrower() << "decryptUDF not supported";
     }
 
-    virtual std::string getKey() = 0;
+    virtual std::string serialize() = 0;
+    virtual static EncLayer * deserialize() = 0; 
 
  protected:
     Create_field *cf;
@@ -46,8 +51,7 @@ class EncLayer {
 
 class RND_int : public EncLayer {
 public:
-    RND_int(Create_field *, PRNG * key);
-    RND_int(Create_field *cf, std::string key) : EncLayer(cf), key(key), bf(key) {}
+    RND_int(Create_field *cf, std::string seed_key);
 
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField(std::string anonname = "");
@@ -56,7 +60,8 @@ public:
     Item * decrypt(Item * ctext, uint64_t IV);
     Item * decryptUDF(Item * col, Item * ivcol);
 
-    std::string getKey() {return key;}
+    virtual std::string serialize() {return ""; //just key}
+    virtual static EncLayer* deserialize() {return NULL;}
 
 private:
     std::string key;
@@ -68,8 +73,7 @@ private:
 
 class RND_str : public EncLayer {
 public:
-    RND_str(Create_field *, PRNG * key);
-    RND_str(Create_field *cf, std::string key) : EncLayer(cf) {setKey(key);}
+    RND_str(Create_field *, std::string seed_key);
 
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField(std::string anonname = "");
@@ -78,7 +82,10 @@ public:
     Item * decrypt(Item * ctext, uint64_t IV);
     Item * decryptUDF(Item * col, Item * ivcol);
 
-    std::string getKey() {return rawkey;}
+
+    virtual std::string serialize() {return ""; //just rawkey}
+    virtual static EncLayer* deserialize() {return NULL;}
+
 
 private:
     std::string rawkey;

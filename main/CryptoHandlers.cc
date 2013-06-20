@@ -11,6 +11,12 @@
 using namespace std;
 using namespace NTL;
 
+static
+string prng_expand(string seed_key, uint key_bytes) {
+    streamrng<arc4> prng(seed_key);
+    return prng.rand_string(key_bytes);
+}
+
 //TODO: remove above newcreatefield
 static Create_field*
 createFieldHelper(const Create_field *f, int field_length,
@@ -98,36 +104,15 @@ template class EncLayerFactory<PRNG *>;
                         
 /****************** RND *********************/
 
-RND_int::RND_int(Create_field * f, PRNG * prng)
+RND_int::RND_int(Create_field * f, string seed_key)
     : EncLayer(f),
-      key(prng->rand_string(key_bytes)),
+      key(prng_expand(seed_key, key_bytes)),
       bf(key)
-{
-    setKey(prng->rand_string(key_bytes));
-}
+{}
 
 Create_field *
 RND_int::newCreateField(string anonname) {
     return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
-}
-
-void
-RND_int::setKey(const string &k) {
-    if (k.empty()) {
-        return;
-    }
-    key = k;
-    bf = blowfish(key);
-}
-
-//if we're using MultiPrinc, we don't want to keep a copy of a key around
-void
-RND_int::unSetKey(const string &k) {
-    if (k.empty()) {
-        return;
-    }
-    key = "";
-    //TODO: unset blowfish
 }
 
 //TODO: may want to do more specialized crypto for lengths
@@ -186,11 +171,14 @@ RND_int::decryptUDF(Item * col, Item * ivcol) {
     return udf;
 }
 
+///////////////////////////////////////////////
 
-RND_str::RND_str(Create_field * f, PRNG * key)
+RND_str::RND_str(Create_field * f, string seed_key)
     : EncLayer(f)
 {
-    setKey(key->rand_string(key_bytes));
+    rawkey = prng_expand(seed_key, key_bytes);
+    enckey = get_AES_enc_key(rawkey);
+    deckey = get_AES_dec_key(rawkey);
 }
 
 Create_field *
@@ -204,9 +192,7 @@ RND_str::setKey(const string &k) {
     if (k.empty()) {
         return;
     }
-    rawkey = k;
-    enckey = get_AES_enc_key(rawkey);
-    deckey = get_AES_dec_key(rawkey);
+    
 }
 
 void
