@@ -19,7 +19,7 @@
 
 #include <util/onions.hh>
 
-PRNG * getLayerKey(AES_KEY * mKey, std::string uniqueFieldName, SECLEVEL l);
+std::string getLayerKey(AES_KEY * mKey, std::string uniqueFieldName, SECLEVEL l);
 
 AES_KEY * getKey(const std::string & key);
 /**

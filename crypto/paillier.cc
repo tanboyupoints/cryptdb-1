@@ -9,6 +9,9 @@ using namespace NTL;
  * Public-key operations
  */
 
+Paillier::Paillier() : nbits(0) {
+}
+
 Paillier::Paillier(const vector<ZZ> &pk)
     : n(pk[0]), g(pk[1]),
       nbits(NumBits(n)), n2(n*n)

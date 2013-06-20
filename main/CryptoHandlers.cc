@@ -4,6 +4,7 @@
 #include <crypto/SWPSearch.hh> 
 #include <util/util.hh>
 #include <util/cryptdb_log.hh>
+#include <crypto/arc4.hh>
 
 #define LEXSTRING(cstr) { (char*) cstr, sizeof(cstr) }
 
@@ -100,17 +101,21 @@ EncLayerFactory<type>::encLayer(onion o, SECLEVEL sl, Create_field * cf,
 }
 
 template class EncLayerFactory<std::string>;
-template class EncLayerFactory<PRNG *>;
+
                         
 /****************** RND *********************/
 
-RND_int::RND_int(Create_field * f, string seed_key)
+RND_int::RND_int(Create_field * f, const string & seed_key)
     : EncLayer(f),
       key(prng_expand(seed_key, key_bytes)),
       bf(key)
 {}
 
-RND_int(std::string serial) : RND_int(NULL, serial) {}
+RND_int::RND_int(const std::string & serial)
+    : EncLayer(NULL),
+      key(serial),
+      bf(key)
+{}
 
 Create_field *
 RND_int::newCreateField(string anonname) {
@@ -119,23 +124,21 @@ RND_int::newCreateField(string anonname) {
 
 //TODO: may want to do more specialized crypto for lengths
 Item *
-RND_int::encrypt(Item * ptext, uint64_t IV, const string &k) {
-    setKey(k);
+RND_int::encrypt(Item * ptext, uint64_t IV) {
     //TODO: should have encrypt_SEM work for any length
     uint64_t p = static_cast<Item_int *>(ptext)->value;
     uint64_t c = bf.encrypt(p ^ IV);
     LOG(encl) << "RND_int encrypt " << p << " IV " << IV << "-->" << c;
-    unSetKey(k);
+
     return new Item_int((ulonglong) c);
 }
 
 Item *
-RND_int::decrypt(Item * ctext, uint64_t IV, const string &k) {
-    setKey(k);
+RND_int::decrypt(Item * ctext, uint64_t IV) {
     uint64_t c = static_cast<Item_int*>(ctext)->value;
     uint64_t p = bf.decrypt(c) ^ IV;
     LOG(encl) << "RND_int decrypt " << c << " IV " << IV << " --> " << p;
-    unSetKey(k);
+
     return new Item_int((ulonglong) p);
 }
 
@@ -175,7 +178,7 @@ RND_int::decryptUDF(Item * col, Item * ivcol) {
 
 ///////////////////////////////////////////////
 
-RND_str::RND_str(Create_field * f, string seed_key)
+RND_str::RND_str(Create_field * f,  const string & seed_key)
     : EncLayer(f)
 {
     rawkey = prng_expand(seed_key, key_bytes);
@@ -183,8 +186,11 @@ RND_str::RND_str(Create_field * f, string seed_key)
     deckey = get_AES_dec_key(rawkey);
 }
 
- RND_str(std::string serial)
-     : RND_str(NULL, serial)
+RND_str::RND_str(std::string serial)
+  : EncLayer(NULL),
+    rawkey(serial),
+    enckey(get_AES_enc_key(rawkey)),
+    deckey(get_AES_dec_key(rawkey))
  {}
 
 
@@ -195,27 +201,9 @@ RND_str::newCreateField(string anonname) {
     return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname, &my_charset_bin);
 }
 
-void
-RND_str::setKey(const string &k) {
-    if (k.empty()) {
-        return;
-    }
-    
-}
-
-void
-RND_str::unSetKey(const string &k) {
-    if (k.empty()) {
-        return;
-    }
-    rawkey = "";
-    enckey = NULL;
-    deckey = NULL;
-}
 
 Item *
-RND_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
-    setKey(k);
+RND_str::encrypt(Item * ptext, uint64_t IV) {
     string enc = encrypt_AES_CBC(
                  ItemToString(ptext),
                  enckey,
@@ -223,13 +211,12 @@ RND_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
 		 false);
     LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV " << IV << "--->"
 	      << "len of enc " << enc.length() << " enc " << enc;
-    unSetKey(k);
+
     return new Item_string(make_thd_string(enc), enc.length(), &my_charset_bin);
 }
 
 Item *
-RND_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
-    setKey(k);
+RND_str::decrypt(Item * ctext, uint64_t IV) {
     string dec = decrypt_AES_CBC(
 	ItemToString(ctext),
 	deckey,
@@ -237,7 +224,7 @@ RND_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
 	false);
     LOG(encl) << "RND_str decrypt " << ItemToString(ctext) << " IV " << IV << "-->"
 	      << "len of dec " << dec.length() << " dec: " << dec;
-    unSetKey(k);
+ 
     return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
 }
 
@@ -273,13 +260,16 @@ RND_str::decryptUDF(Item * col, Item * ivcol) {
 
 
 
-DET_int::DET_int(Create_field * f, string seed_key)
+DET_int::DET_int(Create_field * f, const string & seed_key)
     : EncLayer(f),
       key(prng_expand(seed_key, bf_key_size)),
       bf(key)
 {}
 
-
+DET_int::DET_int(string serial) : EncLayer(NULL),
+				  key(serial),
+				  bf(key)
+{}
 
 Create_field *
 DET_int::newCreateField(string anonname) {
@@ -289,23 +279,21 @@ DET_int::newCreateField(string anonname) {
  
 //TODO: may want to do more specialized crypto for lengths
 Item *
-DET_int::encrypt(Item * ptext, uint64_t IV, const string &k) {
-    setKey(k);
+DET_int::encrypt(Item * ptext, uint64_t IV) {
     ulonglong val = static_cast<Item_int *>(ptext)->value;
     ulonglong res = (ulonglong) bf.encrypt(val);
     LOG(encl) << "DET_int encrypt " << val << "--->" << res;
-    unSetKey(k);
+
     return new Item_int(res);
 }
 
 Item *
-DET_int::decrypt(Item * ctext, uint64_t IV, const string &k) {
-    setKey(k);
+DET_int::decrypt(Item * ctext, uint64_t IV) {
     ulonglong val = static_cast<Item_int*>(ctext)->value;
     ulonglong res = (ulonglong) bf.decrypt(val);
     LOG(encl) << "DET_int decrypt " << val << "-->" << res;
     Item * ni = new Item_int(res);
-    unSetKey(k);
+
     return ni;
 }
 
@@ -353,7 +341,12 @@ DET_str::DET_str(Create_field * f, string seed_key)
 
 }
 
-DET_str(std::string serial): DET_str(NULL, seed_key) {}
+DET_str::DET_str(std::string serial): EncLayer(NULL),
+			     rawkey(serial),
+			     enckey(get_AES_enc_key(rawkey)),
+			     deckey(get_AES_dec_key(rawkey))
+{}
+			     
 
 Create_field *
 DET_str::newCreateField(string anonname) {
@@ -362,24 +355,22 @@ DET_str::newCreateField(string anonname) {
 }
 
 Item *
-DET_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
-    setKey(k);
+DET_str::encrypt(Item * ptext, uint64_t IV) {
     string plain =  ItemToString(ptext);
     string enc = encrypt_AES_CMC(plain,enckey, true);
     LOG(encl) << " DET_str encrypt " << plain  << " IV " << IV << " ---> "
 	      << " enc len " << enc.length() << " enc " << enc;
-    unSetKey(k);
+
     return new Item_string(make_thd_string(enc), enc.length(), &my_charset_bin);
 }
 
 Item *
-DET_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
-    setKey(k);
+DET_str::decrypt(Item * ctext, uint64_t IV) {
     string enc = ItemToString(ctext);
     string dec = decrypt_AES_CMC(enc, deckey, true);
     LOG(encl) << " DET_str decrypt enc len " << enc.length() << " enc " << enc
 	      << " IV " << IV << " ---> " << " dec len " << dec.length() << " dec " << dec;
-    unSetKey(k);
+
     return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
 }
 
@@ -411,25 +402,26 @@ DET_str::decryptUDF(Item * col, Item * ivcol) {
 /*************** DETJOIN *********************/
 /*
 Item *
-DETJOIN::encrypt(Item * p, uint64_t IV, const string &k) {
+DETJOIN::encrypt(Item * p, uint64_t IV) {
     return p->clone_item();
 }
 
 Item *
-DETJOIN::decrypt(Item * c, uint64_t IV, const string &k) {
+DETJOIN::decrypt(Item * c, uint64_t IV) {
     return c->clone_item();
 }
 */
 /**************** OPE **************************/
 
 OPE_int::OPE_int(Create_field * f, string seed_key)
-    : EncLayer(f)
-{
-    key = prng_expand(seed_key, key_bytes);
-    ope = OPE(key, plain_size * 8, ciph_size * 8);
-}
+    : EncLayer(f), key(prng_expand(seed_key, key_bytes)),
+      ope(OPE(key, plain_size * 8, ciph_size * 8))
+{}
 
-OPE_int(std::string serial) : OPE_int(NULL, seed_key) {}
+OPE_int::OPE_int(std::string serial) :
+    EncLayer(NULL),
+    key(serial), ope(OPE(key, plain_size * 8, ciph_size * 8))
+{}
 
 Create_field *
 OPE_int::newCreateField(string anonname) {
@@ -437,34 +429,33 @@ OPE_int::newCreateField(string anonname) {
 }
 
 Item *
-OPE_int::encrypt(Item * ptext, uint64_t IV, const string &k) {
-    setKey(k);
+OPE_int::encrypt(Item * ptext, uint64_t IV) {
     ulong pval =  (ulong)static_cast<Item_int *>(ptext)->value;
     ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ(pval)));
     LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV << "--->" << enc;
-    unSetKey(k);
+
     return new Item_int(enc);
 }
 
 Item *
-OPE_int::decrypt(Item * ctext, uint64_t IV, const string &k) {
-    setKey(k);
+OPE_int::decrypt(Item * ctext, uint64_t IV) {
     ulonglong cval = (ulonglong) static_cast<Item_int*>(ctext)->value;
     ulonglong dec = uint64FromZZ(ope.decrypt(ZZFromUint64(cval)));
     LOG(encl) << "OPE_int decrypt " << cval << " IV " << IV << "--->" << dec; 
-    unSetKey(k);
+
     return new Item_int(dec);
 }
 
 
-OPE_str::OPE_str(Create_field * f, PRNG * prng)
-    : EncLayer(f),
-{
-    key = prng_expand(seed_key, key_bytes);
-    ope = OPE(key, plain_size * 8, ciph_size * 8);
-}
+OPE_str::OPE_str(Create_field * f, string seed_key)
+    : EncLayer(f), key(prng_expand(seed_key, key_bytes)), 
+      ope(OPE(key, plain_size * 8, ciph_size * 8))
+{}
 
-OPE_str(std::string serial) : OPE_str(NULL, serial) {}
+OPE_str::OPE_str(std::string serial) : EncLayer(NULL),
+				       key(serial),
+				       ope(OPE(key, plain_size * 8, ciph_size * 8))
+{}
 
 Create_field *
 OPE_str::newCreateField(string anonname) {
@@ -472,8 +463,7 @@ OPE_str::newCreateField(string anonname) {
 }
 
 Item *
-OPE_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
-    setKey(k);
+OPE_str::encrypt(Item * ptext, uint64_t IV) {
     string ps = ItemToString(ptext);
     if (ps.size() < plain_size)
         ps = ps + string(plain_size - ps.size(), 0);
@@ -485,12 +475,12 @@ OPE_str::encrypt(Item * ptext, uint64_t IV, const string &k) {
     }
     
     ZZ enc = ope.encrypt(to_ZZ(pv));
-    unSetKey(k);
+
     return new Item_int((ulonglong) uint64FromZZ(enc));
 }
 
 Item *
-OPE_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
+OPE_str::decrypt(Item * ctext, uint64_t IV) {
     thrower() << "cannot decrypt string from OPE";
 }
 
@@ -498,17 +488,22 @@ OPE_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
 
 /**************** HOM ***************************/
 
-HOM::HOM(Create_field * f, string seed_key)
-    : EncLayer(f), seed_key(seed_key)
+
+
+HOM::HOM(Create_field * f, string seed_key) : EncLayer(f),
+					      seed_key(seed_key) 
 {
     streamrng<arc4> * prng = new streamrng<arc4>(seed_key);
-    sk = Paillier_priv::keygen(prng, nbits);
+    sk =  new Paillier_priv(Paillier_priv::keygen(prng, nbits));
     delete prng;
 }
 
-
-
-HOM(std::string serial) : HOM(NULL, serial) {}
+HOM::HOM(std::string serial): EncLayer(NULL), seed_key(serial)
+{
+    streamrng<arc4> * prng = new streamrng<arc4>(seed_key);
+    sk = new Paillier_priv(Paillier_priv::keygen(prng, nbits));
+    delete prng;
+}
 
 Create_field *
 HOM::newCreateField(string anonname) {
@@ -543,20 +538,16 @@ ItemStrToZZ(Item* i) {
 }
 
 Item *
-HOM::encrypt(Item * ptext, uint64_t IV, const string &k) {
-    setKey(k);
-    ZZ enc = sk.encrypt(ItemIntToZZ(ptext));
-    unSetKey(k);
+HOM::encrypt(Item * ptext, uint64_t IV) {
+    ZZ enc = sk->encrypt(ItemIntToZZ(ptext));
     return ZZToItemStr(enc);
 }
 
 Item *
-HOM::decrypt(Item * ctext, uint64_t IV, const string &k) {
-    setKey(k);
+HOM::decrypt(Item * ctext, uint64_t IV) {
     ZZ enc = ItemStrToZZ(ctext);
-    ZZ dec = sk.decrypt(enc);
+    ZZ dec = sk->decrypt(enc);
     LOG(encl) << "HOM ciph " << enc << "---->" << dec; 
-    unSetKey(k);
     return ZZToItemInt(dec);
 }
 
@@ -589,25 +580,25 @@ static udf_func u_sum_f = {
 };
 
 Item *
-HOM::sumUDA(Item * expr, const string &k) {
-    setKey(k);
+HOM::sumUDA(Item * expr) {
     List<Item> l;
     l.push_back(expr);
-    l.push_back(ZZToItemStr(sk.hompubkey()));
-    unSetKey(k);
+    l.push_back(ZZToItemStr(sk->hompubkey()));
     return new Item_func_udf_str(&u_sum_a, l);
 }
 
 Item *
-HOM::sumUDF(Item * i1, Item * i2, const string &k) {
-    setKey(k);
+HOM::sumUDF(Item * i1, Item * i2) {
     List<Item> l;
     l.push_back(i1);
     l.push_back(i2);
-    l.push_back(ZZToItemStr(sk.hompubkey()));
-    unSetKey(k);
+    l.push_back(ZZToItemStr(sk->hompubkey()));
 
     return new Item_func_udf_str(&u_sum_f, l);
+}
+
+HOM::~HOM() {
+    delete sk;
 }
 
 /******* SEARCH **************************/
@@ -615,10 +606,12 @@ HOM::sumUDF(Item * i1, Item * i2, const string &k) {
 Search::Search(Create_field * f, string seed_key)
     : EncLayer(f)
 {
-    key = prng_expand(seed_key, key_bytes)
+    key = prng_expand(seed_key, key_bytes);
 }
 
-Search(std::string serial) : Search(NULL, serial) {}
+Search::Search(std::string serial) : EncLayer(NULL) {
+    key = prng_expand(serial, key_bytes);
+}
 
 Create_field *
 Search::newCreateField(string anonname) {
@@ -693,14 +686,11 @@ newmem(const string & a) {
 }
 
 Item *
-Search::encrypt(Item * ptext, uint64_t IV, const std::string &k) {
-    setKey(k);
+Search::encrypt(Item * ptext, uint64_t IV) {
     string plainstr = ItemToString(ptext);
     //TODO: remove string, string serves this purpose now..
     list<string> * tokens = tokenize(plainstr);
     string ciph = encryptSWP(key, *tokens);
-
-    unSetKey(k);
 
     LOG(encl) << "SEARCH encrypt " << plainstr << " --> " << ciph;
   
@@ -708,7 +698,7 @@ Search::encrypt(Item * ptext, uint64_t IV, const std::string &k) {
 }
 
 Item *
-Search::decrypt(Item * ctext, uint64_t IV, const std::string &k) {
+Search::decrypt(Item * ctext, uint64_t IV) {
     thrower() << "decryption from SWP not supported \n";
 }
 

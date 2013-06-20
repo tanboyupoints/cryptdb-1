@@ -418,11 +418,11 @@ freeKey(PKCS * key)
 }
 
 
-PRNG *
+string
 getLayerKey(AES_KEY * mKey, string uniqueFieldName, SECLEVEL l) {
-    string rawkey = getKey(mKey, uniqueFieldName, l);
+    if (l == SECLEVEL::DETJOIN) {
+	return getKey(mKey, "joinjoin", l);
+    } 
+    return getKey(mKey, uniqueFieldName, l);
  
-    urandom * key = new urandom();
-    key->seed_bytes(rawkey.length(), (uint8_t*)rawkey.data());
-    return key;
 }

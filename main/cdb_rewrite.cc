@@ -347,9 +347,9 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
 
             // FIXME(burrows): HOM doesn't support a string key yet.
             if (it == SECLEVEL::HOM) {
-                PRNG *key = getLayerKey(ps.masterKey, uniqueFieldName, it);
+		std::string key = getLayerKey(ps.masterKey, uniqueFieldName, it);
                 enc_layer =
-                    EncLayerFactory<PRNG *>::encLayer(o, it, dummy_cf,
+                    EncLayerFactory<std::string>::encLayer(o, it, dummy_cf,
                                                       key);
             } else { 
                 enc_layer =
@@ -613,12 +613,7 @@ encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers, Analysi
     Item * prev_enc = NULL;
     for (auto layer : layers) {
         LOG(encl) << "encrypt layer " << levelnames[(int)layer->level()] << "\n";
-        string key = "";
-        if (a.ps->mp) {
-            key = a.ps->mp->get_key(fullName(fm->fname, fm->tm->anonTableName), a.tmkm);
-            cerr << "mp key " << key << endl;
-        }
-        enc = layer->encrypt(enc, IV, key);
+	enc = layer->encrypt(enc, IV);
         //need to free space for all enc
         //except the last one
         if (prev_enc) {
@@ -643,17 +638,8 @@ decrypt_item_layers(Item * i, onion o, vector<EncLayer *> & layers, uint64_t IV,
     Item * prev_dec = NULL;
 
     for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
-        string key = "";
-        if (a.ps->mp) {
-            if (a.tmkm.processingQuery) {
-                key = a.ps->mp->get_key(fullName(fm->fname, fm->tm->anonTableName), a.tmkm);
-            } else {
-                key = a.ps->mp->get_key(fullName(fm->fname, fm->tm->anonTableName), a.tmkm, res);
-            }
-            cerr << "mp decrypt key " << key << endl;
-        }
-
-        dec = (*it)->decrypt(dec, IV, key);
+    
+        dec = (*it)->decrypt(dec, IV);
         LOG(cdb_v) << "dec okay";
         //need to free space for all decs except last
         if (prev_dec) {
@@ -1617,6 +1603,7 @@ static class ANON : public CItemSubtypeFT<Item_func_get_system_var, Item_func::F
 	return i;
     }
 } ANON;
+
 
 template<const char *NAME>
 class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
@@ -2762,13 +2749,13 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
         if (mKey) {
             //generate enclayers for encrypted field
             for (auto l: it.second) {
-                PRNG *key;
+                string key;
 
                 // TODO(burrows): This can be pulled out of loop.
                 string uniqueFieldName = fullName(om->onionname,
                                                   fm->tm->anonTableName);
                 key = getLayerKey(mKey, uniqueFieldName, l);
-                om->layers.push_back(EncLayerFactory<PRNG *>::encLayer(o, l, cf, key));
+                om->layers.push_back(EncLayerFactory<string>::encLayer(o, l, cf, key));
             }
         }
 
@@ -2809,6 +2796,8 @@ init_onions_mp(AES_KEY * mKey, FieldMeta * fm, Create_field * cf, uint index) {
         init_onions_layout(mKey, fm, index, cf, STR_ONION_LAYOUT);
     }
 }
+// TODO: temporarily commented out some of persistency
+/*
 
 static void
 check_table_not_exists(Analysis & a, LEX * lex, string table) {
@@ -2821,7 +2810,6 @@ check_table_not_exists(Analysis & a, LEX * lex, string table) {
         return;
     }
 }
-
 static void
 add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
     assert(lex->sql_command == SQLCOM_CREATE_TABLE);
@@ -2871,7 +2859,7 @@ add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
     }
 
 }
-
+*/
 //TODO: no need to pass create_field to this
 static void rewrite_create_field(const string &table_name,
                                  Create_field *f,
@@ -2931,7 +2919,7 @@ static void rewrite_key(const string &table_name,
     l.push_back(k);
 }
 
-
+/* TODO: temporarily commented out
 static void
 create_table_embedded(Connect * e_conn, const string & cur_db,
     const string & create_q) {
@@ -2941,7 +2929,7 @@ create_table_embedded(Connect * e_conn, const string & cur_db,
     assert(e_conn->execute("use " + cur_db + ";"));
     assert(e_conn->execute(create_q));
 }
-
+*/
 static LEX *
 rewrite_create_lex(LEX *lex, Analysis &a)
 {
@@ -3329,7 +3317,7 @@ drop_table_update_meta(const string &q,
 
     assert(a.ps->e_conn->execute("COMMIT"));
 }
-
+/*
 static std::string
 bool_to_string(bool b)
 {
@@ -3339,13 +3327,13 @@ bool_to_string(bool b)
         return "FALSE";
     }
 }
-
+*/
 static inline void
 add_table_update_meta(const string &q,
                       LEX *lex,
                       Analysis &a)
 {   
-    char* dbname = lex->select_lex.table_list.first->db;
+    /*  char* dbname = lex->select_lex.table_list.first->db;
     char* table  = lex->select_lex.table_list.first->table_name;
 
     // TODO(burrows): This should be a seperate step.
@@ -3454,6 +3442,7 @@ add_table_update_meta(const string &q,
     }
 
     a.ps->e_conn->execute("COMMIT");
+    */
 }
 
 static void

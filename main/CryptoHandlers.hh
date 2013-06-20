@@ -51,11 +51,11 @@ class EncLayer {
 
 class RND_int : public EncLayer {
 public:
-    RND_int(Create_field *cf, std::string seed_key);
+    RND_int(Create_field *cf, const std::string & seed_key);
 
     // serialize and deserialize
     virtual std::string serialize() {return ""; /*just key*/}
-    RND_int(std::string serial);
+    RND_int(const std::string & serial);
     
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField(std::string anonname = "");
@@ -74,11 +74,11 @@ private:
 
 class RND_str : public EncLayer {
 public:
-    RND_str(Create_field *, std::string seed_key);
+    RND_str(Create_field *, const std::string & seed_key);
 
     // serialize and deserialize
     std::string serialize() {return rawkey; }
-    RND_str(std::string serial):EncLayer(NULL) {/*todo*/}
+    RND_str(std::string serial);
  
 
     SECLEVEL level() {return SECLEVEL::RND;}
@@ -98,7 +98,7 @@ private:
 
 class DET_int : public EncLayer {
 public:
-    DET_int(Create_field *, std::string seed_key);
+    DET_int(Create_field *,  const std::string & seed_key);
 
     std::string serialize() {return key; }
     // create object from serialized contents
@@ -237,8 +237,9 @@ public:
 private:
     std::string seed_key;
     static const uint nbits = 1024;
-    Paillier_priv sk;
+    Paillier_priv * sk;
 
+    ~HOM();
 };
 
 class Search : public EncLayer {

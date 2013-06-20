@@ -12,6 +12,7 @@ const unsigned int Paillier_len_bits = Paillier_len_bytes * 8;
 
 class Paillier {
  public:
+    Paillier(); //HACK: we should not need this
     Paillier(const std::vector<NTL::ZZ> &pk);
     std::vector<NTL::ZZ> pubkey() const { return { n, g }; }
     NTL::ZZ hompubkey() const { return n2; }
@@ -106,6 +107,7 @@ class Paillier {
 
 class Paillier_priv : public Paillier {
  public:
+    Paillier_priv() : fast(false) {} //HACK: should not need this 
     Paillier_priv(const std::vector<NTL::ZZ> &sk);
     std::vector<NTL::ZZ> privkey() const { return { p, q, g, a }; }
 

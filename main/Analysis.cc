@@ -39,7 +39,7 @@ EncSet::intersect(const EncSet & es2) const
                 m[it->first] = LevelFieldPair(
                         sl, fm);
             } else if (fm != NULL && fm2 != NULL) {
-		if (l == DETJOIN) {
+		if (sl == SECLEVEL::DETJOIN) {
 		    m[o] = LevelFieldPair(sl, fm);
 		}
             }
