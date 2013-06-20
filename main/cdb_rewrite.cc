@@ -1707,14 +1707,12 @@ static CItemMath<str_radians> ANON;
 extern const char str_if[] = "if";
 static class ANON : public CItemSubtypeFN<Item_func_if, str_if> {
     virtual RewritePlan * do_gather_type(Item_func_if *i, reason &tr, Analysis & a) const {
-/*
-	Item **args = i->arguments();
+        Item **args = i->arguments();
         assert(i->argument_count() == 3);
-        analyze(args[0], reason(tr.encset, "if_cond", i, &tr), a);
-        analyze(args[1], reason(tr.encset, "true_branch", i, &tr), a);
-        analyze(args[2], reason(tr.encset, "false_branch", i, &tr), a);
-        return tr.encset;*/
-	UNIMPLEMENTED;
+        analyze(args[0], a);
+        analyze(args[1], a);
+        analyze(args[2], a);
+        return a.rewritePlans.find(i)->second;
     }
     virtual Item * do_optimize_type(Item_func_if *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
