@@ -35,7 +35,7 @@ using namespace std;
                         string(__PRETTY_FUNCTION__))
 
 // FIXME: Placement.
-static bool buildSqlHandlers();
+static void buildSqlHandlers();
 
 static void
 buildTableMeta(ProxyState &ps);
@@ -4028,47 +4028,48 @@ SqlHandler *SqlHandler::getHandler(enum_sql_command cmd)
     return h->second;
 }
 
-void SqlHandler::addHandler(SqlHandler *handler)
+bool SqlHandler::addHandler(SqlHandler *handler)
 {
     enum_sql_command cmd = handler->getSqlCmd();
     std::map<enum_sql_command, SqlHandler *>::iterator h =
         SqlHandler::handlers.find(cmd);
-    assert(SqlHandler::handlers.end() == h);
+    if (SqlHandler::handlers.end() != h) {
+        return false;
+    }
 
     SqlHandler::handlers[cmd] = handler;
+    return true;
 }
 
-static bool buildSqlHandlers()
+static void buildSqlHandlers()
 {
     SqlHandler *h;
     
     h = new SqlHandler(SQLCOM_CREATE_TABLE, process_select_lex,
                        add_table_update_meta, rewrite_create_lex); 
-    SqlHandler::addHandler(h);
+    assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_INSERT, process_select_lex, noopUpdateMeta,
                        rewrite_insert_lex);
-    SqlHandler::addHandler(h);
+    assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_REPLACE, process_select_lex, noopUpdateMeta,
                        rewrite_insert_lex);
-    SqlHandler::addHandler(h);
+    assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_DROP_TABLE, process_select_lex,
                        drop_table_update_meta, rewrite_drop_table_lex);
-    SqlHandler::addHandler(h);
+    assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_UPDATE, process_update_lex, noopUpdateMeta,
                        rewrite_update_lex);
-    SqlHandler::addHandler(h);
+    assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_DELETE, process_select_lex, noopUpdateMeta,
                        rewrite_delete_lex);
-    SqlHandler::addHandler(h);
+    assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_SELECT, process_select_lex, noopUpdateMeta,
                        rewrite_select_lex);
-    SqlHandler::addHandler(h);
-
-    return true;
+    assert(SqlHandler::addHandler(h));
 }
