@@ -3296,7 +3296,7 @@ drop_table_update_meta(const string &q,
           << "             pdb.onion_info, pdb.layer_key"
           << " USING pdb.table_info INNER JOIN pdb.field_info"
           << "       INNER JOIN pdb.onion_info INNER JOIN pdb.layer_key"
-          << " WHERE  pdb.table_info.anonymous_name = '" << table << "' "
+          << " WHERE  pdb.table_info.name = '" << table << "' "
           << " AND    pdb.table_info.database_name = '" << dbname << "' "
           << " AND    pdb.table_info.id = pdb.field_info.table_info_id"
           << " AND    pdb.field_info.id = pdb.onion_info.field_info_id"
@@ -4048,7 +4048,8 @@ static void buildSqlHandlers()
     assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_DROP_TABLE, process_select_lex,
-                       drop_table_update_meta, rewrite_drop_table_lex);
+                       drop_table_update_meta, rewrite_drop_table_lex,
+                       true);
     assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_UPDATE, process_update_lex, noopUpdateMeta,
