@@ -512,7 +512,7 @@ initSchema(ProxyState & ps)
 
 //l gets updated to the new level
 static void
-removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEVEL & l, const string & cur_db) {
+removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEVEL & new_level, const string & cur_db) {
 
     OnionMeta * om    = getAssert(fm->onions, o);
     string fieldanon  = om->onionname;
@@ -539,6 +539,8 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
 
     //remove onion layer in schema
     om->layers.pop_back();
+    
+    new_level = om->layers.back()->level();
 }
 
 /*
