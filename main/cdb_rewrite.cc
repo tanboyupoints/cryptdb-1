@@ -1724,13 +1724,10 @@ static class ANON : public CItemSubtypeFN<Item_func_if, str_if> {
 extern const char str_nullif[] = "nullif";
 static class ANON : public CItemSubtypeFN<Item_func_nullif, str_nullif> {
     virtual RewritePlan * do_gather_type(Item_func_nullif *i, reason &tr, Analysis & a) const {
-	/*    Item **args = i->arguments();
-        EncSet cur = EQ_EncSet;
+	    Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++)
-            cur = gather(args[x], reason(cur, "nullif", i, &tr), a);
-        return cur;
-	*/
-	UNIMPLEMENTED;
+            analyze(args[x], a);
+        return a.rewritePlans.find(i)->second;
     }
     virtual Item * do_optimize_type(Item_func_nullif *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
