@@ -3308,8 +3308,8 @@ drop_table_update_meta(const string &q,
         // Using a loop because we need to look up the table by it's
         // normal name, which isn't available otherwise?
         for (auto it: a.ps->schema->tableMetaMap) {
-            if (it.second->anonTableName == string(table)) {
-                std::string normalTableName = it.first;
+            std::string normalTableName = it.first;
+            if (normalTableName == string(table)) {
                 for (auto it2: it.second->fieldMetaMap) {
                     for (auto it3: it2.second->onions) {
                         it2.second->onions.erase(it3.first);
@@ -3325,7 +3325,6 @@ drop_table_update_meta(const string &q,
                 break;
             }
         }
-
     }
 
     assert(a.ps->e_conn->execute("COMMIT"));
