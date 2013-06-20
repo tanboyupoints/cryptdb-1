@@ -2796,8 +2796,6 @@ init_onions_mp(AES_KEY * mKey, FieldMeta * fm, Create_field * cf, uint index) {
         init_onions_layout(mKey, fm, index, cf, STR_ONION_LAYOUT);
     }
 }
-// TODO: temporarily commented out some of persistency
-/*
 
 static void
 check_table_not_exists(Analysis & a, LEX * lex, string table) {
@@ -2859,7 +2857,7 @@ add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
     }
 
 }
-*/
+
 //TODO: no need to pass create_field to this
 static void rewrite_create_field(const string &table_name,
                                  Create_field *f,
@@ -2919,7 +2917,7 @@ static void rewrite_key(const string &table_name,
     l.push_back(k);
 }
 
-/* TODO: temporarily commented out
+
 static void
 create_table_embedded(Connect * e_conn, const string & cur_db,
     const string & create_q) {
@@ -2929,7 +2927,7 @@ create_table_embedded(Connect * e_conn, const string & cur_db,
     assert(e_conn->execute("use " + cur_db + ";"));
     assert(e_conn->execute(create_q));
 }
-*/
+
 static LEX *
 rewrite_create_lex(LEX *lex, Analysis &a)
 {
@@ -3317,7 +3315,7 @@ drop_table_update_meta(const string &q,
 
     assert(a.ps->e_conn->execute("COMMIT"));
 }
-/*
+
 static std::string
 bool_to_string(bool b)
 {
@@ -3327,13 +3325,13 @@ bool_to_string(bool b)
         return "FALSE";
     }
 }
-*/
+
 static inline void
 add_table_update_meta(const string &q,
                       LEX *lex,
                       Analysis &a)
 {   
-    /*  char* dbname = lex->select_lex.table_list.first->db;
+    char* dbname = lex->select_lex.table_list.first->db;
     char* table  = lex->select_lex.table_list.first->table_name;
 
     // TODO(burrows): This should be a seperate step.
@@ -3407,13 +3405,8 @@ add_table_update_meta(const string &q,
                 std::string str_level =  
                     TypeText<SECLEVEL>::toText(level); 
 
-                std::string crypto_key;
-                if (SECLEVEL::HOM == level) {
-                    crypto_key = std::string("unsupported!");
-                } else {
-                    crypto_key =
-                        onion_pair.second->layers[i]->getKey();
-                }
+                std::string crypto_key = onion_pair.second->layers[i]->serialize();
+		
                 unsigned int escaped_length = crypto_key.size() * 2 + 1;
                 char escaped_key[escaped_length];
                 a.ps->e_conn->real_escape_string(escaped_key,
@@ -3442,7 +3435,7 @@ add_table_update_meta(const string &q,
     }
 
     a.ps->e_conn->execute("COMMIT");
-    */
+   
 }
 
 static void
