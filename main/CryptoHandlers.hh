@@ -53,9 +53,9 @@ class RND_int : public EncLayer {
 public:
     RND_int(Create_field *cf, std::string seed_key);
 
+    // serialize and deserialize
     virtual std::string serialize() {return ""; /*just key*/}
-    //create object from serialized contents
-    RND_int(std::string serial): EncLayer(NULL) {/*todo*/}
+    RND_int(std::string serial);
     
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField(std::string anonname = "");
@@ -63,9 +63,6 @@ public:
     Item * encrypt(Item * ptext, uint64_t IV);
     Item * decrypt(Item * ctext, uint64_t IV);
     Item * decryptUDF(Item * col, Item * ivcol);
-
-
-
 
 private:
     std::string key;
@@ -79,8 +76,8 @@ class RND_str : public EncLayer {
 public:
     RND_str(Create_field *, std::string seed_key);
 
+    // serialize and deserialize
     std::string serialize() {return rawkey; }
-    // create object from serialized contents
     RND_str(std::string serial):EncLayer(NULL) {/*todo*/}
  
 
@@ -105,7 +102,7 @@ public:
 
     std::string serialize() {return key; }
     // create object from serialized contents
-    DET_int(std::string serial) : EncLayer(NULL) {/*todo*/}
+    DET_int(std::string serial);
  
 
     SECLEVEL level() {return SECLEVEL::DET;}
@@ -128,9 +125,9 @@ class DET_str : public EncLayer {
 public:
     DET_str(Create_field *cf, std::string seed_key);
 
+    // serialize and deserialize
     std::string serialize() {return rawkey;}
-    // create object from serialized contents
-    DET_str(std::string serial) : EncLayer(NULL) {/*todo*/}
+    DET_str(std::string serial);
  
 
     SECLEVEL level() {return SECLEVEL::DET;}
@@ -161,7 +158,7 @@ public:
 class DETJOIN_str : public DET_str {
     //TODO
 public:
-    DETJOIN_str(Create_field * cf, std::string seed_key) : DET_str(cf, seed_key) {}    }
+    DETJOIN_str(Create_field * cf, std::string seed_key) : DET_str(cf, seed_key) {}    
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
 
@@ -172,9 +169,9 @@ class OPE_int : public EncLayer {
 public:
     OPE_int(Create_field *, std::string seed_key);
 
+    // serialize and deserialize
     std::string serialize() {return key;}
-    // create object from serialized contents
-    OPE_int(std::string serial) : EncLayer(NULL) {/*todo*/}
+    OPE_int(std::string serial);
  
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField(std::string anonname = "");
@@ -197,9 +194,9 @@ class OPE_str : public EncLayer {
 public:
     OPE_str(Create_field *, std::string seed_key);
 
+    // serialize and deserialize
     std::string serialize() {return key;}
-    // create object from serialized contents
-    OPE_str(std::string serial) : EncLayer(NULL) {/* todo */}
+    OPE_str(std::string serial);
  
 
     SECLEVEL level() {return SECLEVEL::OPE;}
@@ -220,10 +217,10 @@ private:
 class HOM : public EncLayer {
 public:
     HOM(Create_field * cf, std::string seed_key);
-
-    std::string serialize() {return key;}
-    //create object from serialized contents
-    HOM(std::string serial) : EncLayer(NULL) {/*todo*/}
+    
+    // serialize and deserialize
+    std::string serialize() {return seed_key;}
+    HOM(std::string serial);
  
     
     SECLEVEL level() {return SECLEVEL::HOM;}
@@ -238,6 +235,7 @@ public:
     Item * sumUDF(Item * i1, Item * i2);
 
 private:
+    std::string seed_key;
     static const uint nbits = 1024;
     Paillier_priv sk;
 
@@ -247,9 +245,9 @@ class Search : public EncLayer {
 public:
     Search(Create_field * cf, std::string seed_key);
 
+    // serialize and deserialize
     std::string serialize() {return key;}
-    // create object from serialized contents
-    Search(std::string serial) : EncLayer(NULL) {/* todo */}
+    Search(std::string serial);
  
    
     SECLEVEL level() {return SECLEVEL::SEARCH;}

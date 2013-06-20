@@ -30,24 +30,18 @@ EncSet::intersect(const EncSet & es2) const
         if (it != osl.end()) {
             SECLEVEL sl = (SECLEVEL)min((int)it->second.first,
                     (int)it2->second.first);
+	    onion o = it->first;
+
             if (fm == NULL) {
-                m[it->first] = LevelFieldPair(
+                m[o] = LevelFieldPair(
                         sl, fm2);
             } else if (fm2 == NULL) {
                 m[it->first] = LevelFieldPair(
                         sl, fm);
             } else if (fm != NULL && fm2 != NULL) {
-                EncLayer *el = getAssert(fm->onions, it->first)->layers.back();
-                EncLayer *el2 = getAssert(fm2->onions, it2->first)->layers.back();
-                if (el->getKey() == el2->getKey()) {
-                    m[it->first] = LevelFieldPair(sl, fm);
-                }
-            /*} else {
-                // different fields for same onion, level gives null intersection,
-                // unless join
-                if (sl == SECLEVEL::DETJOIN) {  //TODO: Remove it
-                    m[it->first] = LevelFieldPair(sl, it->second.second);
-                }*/
+		if (l == DETJOIN) {
+		    m[o] = LevelFieldPair(sl, fm);
+		}
             }
         }
     }

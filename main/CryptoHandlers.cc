@@ -110,6 +110,8 @@ RND_int::RND_int(Create_field * f, string seed_key)
       bf(key)
 {}
 
+RND_int(std::string serial) : RND_int(NULL, serial) {}
+
 Create_field *
 RND_int::newCreateField(string anonname) {
     return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
@@ -180,6 +182,12 @@ RND_str::RND_str(Create_field * f, string seed_key)
     enckey = get_AES_enc_key(rawkey);
     deckey = get_AES_dec_key(rawkey);
 }
+
+ RND_str(std::string serial)
+     : RND_str(NULL, serial)
+ {}
+
+
 
 Create_field *
 RND_str::newCreateField(string anonname) {
@@ -271,6 +279,8 @@ DET_int::DET_int(Create_field * f, string seed_key)
       bf(key)
 {}
 
+
+
 Create_field *
 DET_int::newCreateField(string anonname) {
     return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
@@ -343,6 +353,7 @@ DET_str::DET_str(Create_field * f, string seed_key)
 
 }
 
+DET_str(std::string serial): DET_str(NULL, seed_key) {}
 
 Create_field *
 DET_str::newCreateField(string anonname) {
@@ -418,6 +429,8 @@ OPE_int::OPE_int(Create_field * f, string seed_key)
     ope = OPE(key, plain_size * 8, ciph_size * 8);
 }
 
+OPE_int(std::string serial) : OPE_int(NULL, seed_key) {}
+
 Create_field *
 OPE_int::newCreateField(string anonname) {
     return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname);
@@ -450,6 +463,8 @@ OPE_str::OPE_str(Create_field * f, PRNG * prng)
     key = prng_expand(seed_key, key_bytes);
     ope = OPE(key, plain_size * 8, ciph_size * 8);
 }
+
+OPE_str(std::string serial) : OPE_str(NULL, serial) {}
 
 Create_field *
 OPE_str::newCreateField(string anonname) {
@@ -484,12 +499,16 @@ OPE_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
 /**************** HOM ***************************/
 
 HOM::HOM(Create_field * f, string seed_key)
-    : EncLayer(f)
+    : EncLayer(f), seed_key(seed_key)
 {
     streamrng<arc4> * prng = new streamrng<arc4>(seed_key);
     sk = Paillier_priv::keygen(prng, nbits);
     delete prng;
 }
+
+
+
+HOM(std::string serial) : HOM(NULL, serial) {}
 
 Create_field *
 HOM::newCreateField(string anonname) {
@@ -521,25 +540,6 @@ static ZZ
 ItemStrToZZ(Item* i) {
     string res = ItemToString(i);
     return ZZFromString(res);
-}
-
-void
-HOM::setKey(const string &k) {
-    if(k.empty()) {
-        return;
-    }
-    //TODO: figure out how to make this work
-    //PRNG *key = getLayerKey(get_AES_KEY(k), fullName(cf->onions[oAGG]->onionname, cf->tm->anonTableName), SECLEVEL::HOM);
-    //sk = Paillier_priv::keygen(key, nbits);
-    thrower() << "HOM setKey not implemented";
-}
-
-void
-HOM::unSetKey(const string &k) {
-    if (k.empty()) {
-        return;
-    }
-    //TODO: set sk to 0
 }
 
 Item *
@@ -617,6 +617,8 @@ Search::Search(Create_field * f, string seed_key)
 {
     key = prng_expand(seed_key, key_bytes)
 }
+
+Search(std::string serial) : Search(NULL, serial) {}
 
 Create_field *
 Search::newCreateField(string anonname) {
