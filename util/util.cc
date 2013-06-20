@@ -27,7 +27,7 @@ myassert(bool value, const string &mess)
 }
 
 void
-assert_s (bool value, const string &msg)
+assert_s(bool value, const string &msg)
 throw (CryptDBError)
 {
     if (ASSERTS_ON) {

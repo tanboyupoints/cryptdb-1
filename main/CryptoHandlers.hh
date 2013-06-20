@@ -32,8 +32,8 @@ class EncLayer {
     virtual SECLEVEL level() = 0;
     virtual Create_field * newCreateField(std::string anonname = "") = 0;
     
-    virtual Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "") = 0;
-    virtual Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "") = 0;
+    virtual Item * encrypt(Item * ptext, uint64_t IV = 0) = 0;
+    virtual Item * decrypt(Item * ctext, uint64_t IV = 0) = 0;
     virtual Item * decryptUDF(Item * col, Item * ivcol = NULL) {
         thrower() << "decryptUDF not supported";
     }
@@ -42,8 +42,6 @@ class EncLayer {
 
  protected:
     Create_field *cf;
-    virtual void setKey(const std::string &k) = 0;
-    virtual void unSetKey(const std::string &k) = 0;
 };
 
 class RND_int : public EncLayer {
@@ -54,8 +52,8 @@ public:
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField(std::string anonname = "");
     
-    Item * encrypt(Item * ptext, uint64_t IV, const std::string &k = "");
-    Item * decrypt(Item * ctext, uint64_t IV, const std::string &k = "");
+    Item * encrypt(Item * ptext, uint64_t IV);
+    Item * decrypt(Item * ctext, uint64_t IV);
     Item * decryptUDF(Item * col, Item * ivcol);
 
     std::string getKey() {return key;}
@@ -66,8 +64,6 @@ private:
     static const int key_bytes = 16;    
     static const int ciph_size = 8;
 
-    void setKey(const std::string &key);
-    void unSetKey(const std::string &key);    
 };
 
 class RND_str : public EncLayer {
@@ -78,8 +74,8 @@ public:
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField(std::string anonname = "");
     
-    Item * encrypt(Item * ptext, uint64_t IV, const std::string &k = "");
-    Item * decrypt(Item * ctext, uint64_t IV, const std::string &k = "");
+    Item * encrypt(Item * ptext, uint64_t IV);
+    Item * decrypt(Item * ctext, uint64_t IV);
     Item * decryptUDF(Item * col, Item * ivcol);
 
     std::string getKey() {return rawkey;}
@@ -90,8 +86,6 @@ private:
     AES_KEY * enckey;
     AES_KEY * deckey;
 
-    void setKey(const std::string &key);
-    void unSetKey(const std::string &key);    
 };
 
 class DET_int : public EncLayer {
@@ -102,8 +96,8 @@ public:
     SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField(std::string anonname = "");
 
-    Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "");
-    Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "");
+    Item * encrypt(Item * ptext, uint64_t IV = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0);
     Item * decryptUDF(Item * col, Item * ivcol = NULL);
 
     std::string getKey() {return key;}
@@ -114,8 +108,6 @@ protected:
     static const int bf_key_size = 16;
     static const int ciph_size = 8;
 
-    void setKey(const std::string &key);
-    void unSetKey(const std::string &key);    
 };
 
 class DET_str : public EncLayer {
@@ -126,8 +118,8 @@ public:
     SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField(std::string anonname = "");
     
-    Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "");
-    Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "");
+    Item * encrypt(Item * ptext, uint64_t IV = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0);
     Item * decryptUDF(Item * col, Item * = NULL);
 
     std::string getKey() {return rawkey;}
@@ -138,8 +130,6 @@ protected:
     AES_KEY * enckey;
     AES_KEY * deckey;
 
-    void setKey(const std::string &key);
-    void unSetKey(const std::string &key);    
 };
 
 
@@ -211,8 +201,8 @@ public:
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField(std::string anonname = "");
 
-    Item * encrypt(Item * p, uint64_t IV, const std::string &k = "");
-    Item * decrypt(Item * c, uint64_t IV, const std::string &k = "");
+    Item * encrypt(Item * p, uint64_t IV);
+    Item * decrypt(Item * c, uint64_t IV);
 
     std::string getKey() {return key;}
 
@@ -223,8 +213,6 @@ private:
     static const size_t plain_size = 4;
     static const size_t ciph_size = 8;
 
-    void setKey(const std::string &key);
-    void unSetKey(const std::string &key);    
 };
 
 
@@ -236,8 +224,8 @@ public:
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField(std::string anonname = "");
 
-    Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
-    Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = "")__attribute__((noreturn));
+    Item * encrypt(Item * p, uint64_t IV = 0);
+    Item * decrypt(Item * c, uint64_t IV = 0)__attribute__((noreturn));
   
     std::string getKey() {return key;}
 
@@ -248,8 +236,6 @@ private:
     static const size_t plain_size = 4;
     static const size_t ciph_size = 8;
 
-    void setKey(const std::string &key);
-    void unSetKey(const std::string &key);    
 };
 
 
@@ -263,22 +249,20 @@ public:
     Create_field * newCreateField(std::string anonname = "");
 
     //TODO needs multi encrypt and decrypt
-    Item * encrypt(Item * p, uint64_t IV = 0, const std::string &k = "");
-    Item * decrypt(Item * c, uint64_t IV = 0, const std::string &k = "");
+    Item * encrypt(Item * p, uint64_t IV = 0);
+    Item * decrypt(Item * c, uint64_t IV = 0);
     
     std::string getKey() {throw "Does not support getKey()";};
 
     //expr is the expression (e.g. a field) over which to sum
-    Item * sumUDA(Item * expr, const std::string &k = "");
-    Item * sumUDF(Item * i1, Item * i2, const std::string &k = "");
+    Item * sumUDA(Item * expr);
+    Item * sumUDF(Item * i1, Item * i2);
 
 private:
     static const uint nbits = 1024;
     PRNG *dummy_prng;
     Paillier_priv sk;
 
-    void setKey(const std::string &key);
-    void unSetKey(const std::string &key);
 };
 
 class Search : public EncLayer {
@@ -289,8 +273,8 @@ public:
     SECLEVEL level() {return SECLEVEL::SEARCH;}
     Create_field * newCreateField(std::string anonname = "");
 
-    Item * encrypt(Item * ptext, uint64_t IV = 0, const std::string &k = "");
-    Item * decrypt(Item * ctext, uint64_t IV = 0, const std::string &k = "")__attribute__((noreturn));
+    Item * encrypt(Item * ptext, uint64_t IV = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0)__attribute__((noreturn));
 
     //expr is the expression (e.g. a field) over which to sum
     Item * searchUDF(Item * field, Item * expr);
@@ -303,8 +287,6 @@ private:
     std::string rawkey;
     std::string key;
 
-    void setKey(const std::string &key);
-    void unSetKey(const std::string &key);
 };
 
 
