@@ -16,6 +16,7 @@
 #include <main/CryptoHandlers.hh>
 #include <parser/lex_util.hh>
 #include <main/enum_text.hh>
+#include <main/sql_handler.hh>
 
 #include "field.h"
 
@@ -31,6 +32,8 @@ using namespace std;
                         string(__PRETTY_FUNCTION__))
 
 // FIXME: Placement.
+static bool buildSqlHandlers();
+
 static void
 buildTableMeta(ProxyState &ps);
 
@@ -3577,6 +3580,8 @@ Rewriter::Rewriter(ConnectionInfo ci,
     buildTypeTextTranslator();
     initSchema(ps);
 
+    buildSqlHandlers();
+
     loadUDFs(ps.conn);
 
     if (multi) {
@@ -3716,22 +3721,23 @@ rewrite_helper(const string & q, Analysis & analysis,
     }
     LOG(cdb_v) << "pre-analyze " << *lex;
 
+    SqlHandler *sql_handler = SqlHandler::getHandler(lex->sql_command);
+    assert(sql_handler);
+
     //TODO: is db neededs as param in all these funcs?
-    //analyze query
-    query_analyze(q, lex, analysis, analysis.ps->encByDefault, cur_db);
+    (*sql_handler->query_analyze)(q, lex, analysis,
+                                 analysis.ps->encByDefault, cur_db);
 
-    //update metadata about onions if it's not delete
-    if (lex->sql_command != SQLCOM_DROP_TABLE) {
-        updateMeta(q, lex, analysis);
+    if (false == sql_handler->updateAfter()) {
+        (*sql_handler->update_meta)(q, lex, analysis);
     }
-    //TODO:these two invokations of updateMeta are confusing:
-    //one is for adjust onions, and other for dropping table
 
-    //rewrite query
-    LEX * new_lex = lex_rewrite(lex, analysis);
-    if (new_lex->sql_command == SQLCOM_DROP_TABLE) {
-        updateMeta(q, new_lex, analysis);
+    LEX * new_lex = (*sql_handler->lex_rewrite)(lex, analysis);
+
+    if (true == sql_handler->updateAfter()) {
+        (*sql_handler->update_meta)(q, lex, analysis);
     }
+
     stringstream ss;
     ss << *new_lex;
     LOG(cdb_v) << "FINAL QUERY: " << *new_lex << endl;
@@ -4057,3 +4063,62 @@ _type TypeText<_type>::getEnum(std::string t)
     throw "text does not exist!"; 
 }
 
+/*
+ * SQL Handlers
+ */
+
+SqlHandler *SqlHandler::getHandler(enum_sql_command cmd)
+{
+    std::map<enum_sql_command, SqlHandler *>::iterator h =
+        handlers.find(cmd); 
+    if (handlers.end() == h) {
+        return NULL;
+    }
+
+    return h->second;
+}
+
+void SqlHandler::addHandler(SqlHandler *handler)
+{
+    enum_sql_command cmd = handler->getSqlCmd();
+    std::map<enum_sql_command, SqlHandler *>::iterator h =
+        SqlHandler::handlers.find(cmd);
+    assert(SqlHandler::handlers.end() == h);
+
+    SqlHandler::handlers[cmd] = handler;
+}
+
+static bool buildSqlHandlers()
+{
+    SqlHandler *h;
+    
+    h = new SqlHandler(SQLCOM_CREATE_TABLE, query_analyze,
+                       add_table_update_meta, rewrite_create_lex); 
+    SqlHandler::addHandler(h);
+
+    h = new SqlHandler(SQLCOM_INSERT, query_analyze, updateMeta,
+                       lex_rewrite);
+    SqlHandler::addHandler(h);
+
+    h = new SqlHandler(SQLCOM_REPLACE, query_analyze, updateMeta,
+                       lex_rewrite);
+    SqlHandler::addHandler(h);
+
+    h = new SqlHandler(SQLCOM_DROP_TABLE, query_analyze, updateMeta,
+                       lex_rewrite);
+    SqlHandler::addHandler(h);
+
+    h = new SqlHandler(SQLCOM_UPDATE, query_analyze, updateMeta,
+                       lex_rewrite);
+    SqlHandler::addHandler(h);
+
+    h = new SqlHandler(SQLCOM_DELETE, query_analyze, updateMeta,
+                       lex_rewrite);
+    SqlHandler::addHandler(h);
+
+    h = new SqlHandler(SQLCOM_SELECT, query_analyze, updateMeta,
+                       lex_rewrite);
+    SqlHandler::addHandler(h);
+
+    return true;
+}
