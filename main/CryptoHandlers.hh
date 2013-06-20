@@ -187,8 +187,7 @@ private:
 
 class OPE_str : public EncLayer {
 public:
-    OPE_str(Create_field *, PRNG * key);
-    OPE_str(Create_field *cf, std::string key) : EncLayer(cf), key(key), ope(key, plain_size*8, ciph_size*8) {setKey(key);}
+    OPE_str(Create_field *, std::string seed_key);
 
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField(std::string anonname = "");
@@ -196,7 +195,8 @@ public:
     Item * encrypt(Item * p, uint64_t IV = 0);
     Item * decrypt(Item * c, uint64_t IV = 0)__attribute__((noreturn));
   
-    std::string getKey() {return key;}
+    std::string serialize() {return ""; /* just key */}
+    static EncLayer* deserialize() {return NULL;}
 
 private:
     std::string key;
@@ -204,16 +204,13 @@ private:
     static const size_t key_bytes = 16;
     static const size_t plain_size = 4;
     static const size_t ciph_size = 8;
-
 };
 
 
 class HOM : public EncLayer {
 public:
-    HOM(Create_field * cf, PRNG * key);
-    // HACK(burrows).
-    HOM(Create_field *cf, std::string key) : EncLayer(cf), dummy_prng(new urandom()), sk(Paillier_priv::keygen(dummy_prng, nbits)) {throw "HOM does not support persistence!";}
-
+    HOM(Create_field * cf, std::string key);
+    
     SECLEVEL level() {return SECLEVEL::HOM;}
     Create_field * newCreateField(std::string anonname = "");
 

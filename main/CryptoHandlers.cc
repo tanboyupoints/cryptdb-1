@@ -483,10 +483,12 @@ OPE_str::decrypt(Item * ctext, uint64_t IV, const string &k) {
 
 /**************** HOM ***************************/
 
-HOM::HOM(Create_field * f, PRNG * key)
-    : EncLayer(f),
-      sk(Paillier_priv::keygen(key, nbits))
+HOM::HOM(Create_field * f, string seed_key)
+    : EncLayer(f)
 {
+    streamrng<arc4> * prng = new streamrng<arc4>(seed_key);
+    sk = Paillier_priv::keygen(prng, nbits);
+    delete prng;
 }
 
 Create_field *
