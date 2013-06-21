@@ -21,30 +21,33 @@ EncSet::intersect(const EncSet & es2) const
 {
     OnionLevelFieldMap m;
     for (auto it2 = es2.osl.begin();
-            it2 != es2.osl.end(); ++it2) {
+         it2 != es2.osl.end();
+         it2++) {
         auto it = osl.find(it2->first);
+        if (it == osl.end()) {
+            continue;
+        }
 
         FieldMeta *fm = it->second.second;
         FieldMeta *fm2 = it2->second.second;
 
-        if (it != osl.end()) {
-            SECLEVEL sl = (SECLEVEL)min((int)it->second.first,
-                    (int)it2->second.first);
-	    onion o = it->first;
+        SECLEVEL sl = (SECLEVEL)min((int)it->second.first,
+                (int)it2->second.first);
+        onion o = it->first;
 
-            if (fm == NULL) {
-                m[o] = LevelFieldPair(
-                        sl, fm2);
-            } else if (fm2 == NULL) {
-                m[it->first] = LevelFieldPair(
-                        sl, fm);
-            } else if (fm != NULL && fm2 != NULL) {
-		if (sl == SECLEVEL::DETJOIN) {
-		    m[o] = LevelFieldPair(sl, fm);
-		}
-            }
+        if (fm == NULL) {
+            m[o] = LevelFieldPair(sl, fm2);
+        } else if (fm2 == NULL) {
+            m[o] = LevelFieldPair(sl, fm);
+        } else if (fm != fm2) {
+            // TODO(burrows): Ensure that the keys actually match.
+            m[o] = LevelFieldPair(sl, fm);
+        } else {
+            // TODO(burrows): Ensure that both fields are constants.
+            m[o] = LevelFieldPair(sl, fm);
         }
     }
+
     return EncSet(m);
 }
 
