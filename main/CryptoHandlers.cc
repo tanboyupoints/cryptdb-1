@@ -400,17 +400,7 @@ DET_str::decryptUDF(Item * col, Item * ivcol) {
 }
 
 /*************** DETJOIN *********************/
-/*
-Item *
-DETJOIN::encrypt(Item * p, uint64_t IV) {
-    return p->clone_item();
-}
 
-Item *
-DETJOIN::decrypt(Item * c, uint64_t IV) {
-    return c->clone_item();
-}
-*/
 /**************** OPE **************************/
 
 OPE_int::OPE_int(Create_field * f, string seed_key)
