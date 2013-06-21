@@ -78,7 +78,7 @@ public:
 
     // serialize and deserialize
     std::string serialize() {return rawkey; }
-    RND_str(std::string serial);
+    RND_str(const std::string & serial);
  
 
     SECLEVEL level() {return SECLEVEL::RND;}

@@ -235,7 +235,7 @@ RND_str::RND_str(Create_field * f,  const string & seed_key)
     deckey = get_AES_dec_key(rawkey);
 }
 
-RND_str::RND_str(std::string serial)
+RND_str::RND_str(const std::string & serial)
   : EncLayer(NULL),
     rawkey(serial),
     enckey(get_AES_enc_key(rawkey)),
