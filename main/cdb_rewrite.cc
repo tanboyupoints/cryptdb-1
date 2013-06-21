@@ -325,9 +325,6 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
         onion o = TypeText<onion>::toType(onion_type);
         fm->onions[o] = om;
         
-        // HACK(burrows).
-        Create_field * dummy_cf = new Create_field;
-        dummy_cf->sql_type = om->sql_type;
 
         // Then, build EncLayer subclasses.
         string uniqueFieldName = fullName(om->onionname,
