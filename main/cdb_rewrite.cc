@@ -1682,13 +1682,16 @@ static CItemMath<str_radians> ANON;
 
 extern const char str_if[] = "if";
 static class ANON : public CItemSubtypeFN<Item_func_if, str_if> {
-    virtual RewritePlan * do_gather_type(Item_func_if *i, /* TODO reason not necessary */ reason &tr, Analysis & a) const {
+    virtual RewritePlan * do_gather_type(Item_func_if *i, reason &tr, Analysis & a) const {
+        /*
         Item **args = i->arguments();
         assert(i->argument_count() == 3);
         analyze(args[0], a);
         analyze(args[1], a);
         analyze(args[2], a);
         return a.rewritePlans.find(i)->second;
+        */
+        UNIMPLEMENTED;
     }
     virtual Item * do_optimize_type(Item_func_if *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
@@ -1697,11 +1700,14 @@ static class ANON : public CItemSubtypeFN<Item_func_if, str_if> {
 
 extern const char str_nullif[] = "nullif";
 static class ANON : public CItemSubtypeFN<Item_func_nullif, str_nullif> {
-    virtual RewritePlan * do_gather_type(Item_func_nullif *i, /* TODO reason not necessary */ reason &tr, Analysis & a) const {
+    virtual RewritePlan * do_gather_type(Item_func_nullif *i, reason &tr, Analysis & a) const {
+        /*
 	    Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++)
             analyze(args[x], a);
         return a.rewritePlans.find(i)->second;
+        */
+        UNIMPLEMENTED;
     }
     virtual Item * do_optimize_type(Item_func_nullif *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
@@ -1710,11 +1716,14 @@ static class ANON : public CItemSubtypeFN<Item_func_nullif, str_nullif> {
 
 extern const char str_coalesce[] = "coalesce";
 static class ANON : public CItemSubtypeFN<Item_func_coalesce, str_coalesce> {
-    virtual RewritePlan * do_gather_type(Item_func_coalesce *i, /* TODO reason not necessary */ reason &tr, Analysis & a) const {
+    virtual RewritePlan * do_gather_type(Item_func_coalesce *i, reason &tr, Analysis & a) const {
+        /*
 	 Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++)
             analyze(args[x], a);
 	    return a.rewritePlans.find(i)->second;
+        */
+        UNIMPLEMENTED;
     }
     virtual Item * do_optimize_type(Item_func_coalesce *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
