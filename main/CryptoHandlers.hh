@@ -54,7 +54,7 @@ public:
     RND_int(Create_field *cf, const std::string & seed_key);
 
     // serialize and deserialize
-    virtual std::string serialize() {return ""; /*just key*/}
+    virtual std::string serialize() {return key;}
     RND_int(const std::string & serial);
     
     SECLEVEL level() {return SECLEVEL::RND;}
