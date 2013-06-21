@@ -1563,11 +1563,29 @@ static CItemCond<Item_func::Functype::COND_OR_FUNC,  Item_cond_or>  ANON;
 template<Item_func::Functype FT>
 class CItemNullcheck : public CItemSubtypeFT<Item_bool_func, FT> {
     virtual RewritePlan * do_gather_type(Item_bool_func *i, reason &tr, Analysis & a) const {
-	/*  Item **args = i->arguments();
-        for (uint x = 0; x < i->argument_count(); x++)
-            analyze(args[x], reason(EMPTY_EncSet,  "nullcheck", i, &tr), a);
-	    return tr.encset;*/
-	UNIMPLEMENTED;
+        Item **args = i->arguments();
+        assert(i->argument_count() == 1);
+
+        reason r;
+        RewritePlan **child_rp = new RewritePlan*[2];
+        child_rp[0] = gather(args[0], r, a);
+
+        EncSet solution = child_rp[0]->es_out;
+        EncSet out_es = PLAIN_EncSet;
+
+        tr = reason(out_es, "nullcheck", i);
+        tr.add_child(r);
+
+        return new RewritePlanOneOLK(out_es.extract_singleton(),
+                                     solution.chooseOne(),
+                                     child_rp, tr);
+    }
+
+    virtual Item * do_rewrite_type(Item_bool_func * i, const OLK & constr,
+                                   const RewritePlan * _rp, Analysis & a)
+                                  const {
+        rewrite_args_FN(i, constr, (const RewritePlanOneOLK *)_rp, a);
+        return i;
     }
 
     virtual Item * do_optimize_type(Item_bool_func *i, Analysis & a) const {
