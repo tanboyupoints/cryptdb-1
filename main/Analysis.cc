@@ -40,8 +40,15 @@ EncSet::intersect(const EncSet & es2) const
         } else if (fm2 == NULL) {
             m[o] = LevelFieldPair(sl, fm);
         } else if (fm != fm2) {
-            // TODO(burrows): Ensure that the keys actually match.
-            m[o] = LevelFieldPair(sl, fm);
+            // Ensure that the keys actually match.
+            OnionMeta *om = fm->onions[o];
+            OnionMeta *om2 = fm2->onions[o];
+            assert(om && om2 && om->layers.size() > 0 &&
+                   om2->layers.size() > 0);
+            if (om->layers.back()->serialize() ==
+                om2->layers.back()->serialize()) {
+                m[o] = LevelFieldPair(sl, fm);
+            }
         } else {
             m[o] = LevelFieldPair(sl, fm);
         }
