@@ -325,14 +325,13 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
         onion o = TypeText<onion>::toType(onion_type);
         fm->onions[o] = om;
         
-
         // Then, build EncLayer subclasses.
         string uniqueFieldName = fullName(om->onionname,
                                          fm->tm->anonTableName);
        
         // Add elements to OnionMeta.layers starting with the bottom layer
         // and stopping at the current level.
-        std::map<SECLEVEL, std::string> layer_keys = 
+        std::map<SECLEVEL, std::string> layer_serial = 
             get_layer_keys(ps, o, atoi(onion_id.c_str()));
         std::vector<SECLEVEL> layers = fm->onion_layout[o];
         SECLEVEL current_level =
@@ -342,17 +341,8 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
             string uniqueFieldName = fullName(om->onionname,
                                               fm->tm->anonTableName);
 
-            // FIXME(burrows): HOM doesn't support a string key yet.
-            if (it == SECLEVEL::HOM) {
-		std::string key = getLayerKey(ps.masterKey, uniqueFieldName, it);
-                enc_layer =
-                    EncLayerFactory<std::string>::encLayer(o, it, dummy_cf,
-                                                      key);
-            } else { 
-                enc_layer =
-                    EncLayerFactory<std::string>::encLayer(o, it, dummy_cf,
-                                                           layer_keys[it]);
-            }
+	    enc_layer =
+		EncLayerFactory<std::string>::encLayerFromSerial(o, it, om->sql_type, layer_serial[it]);
 
             om->layers.push_back(enc_layer);
             SECLEVEL onion_level = fm->getOnionLevel(o);

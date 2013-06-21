@@ -100,6 +100,55 @@ EncLayerFactory<type>::encLayer(onion o, SECLEVEL sl, Create_field * cf,
     thrower() << "unknown or unimplemented security level \n";
 }
 
+
+template <typename type>
+EncLayer *
+EncLayerFactory<type>::encLayerFromSerial(onion o, SECLEVEL sl,
+				enum enum_field_types sql_type, const string & serial)
+{
+    bool is_num = IsMySQLTypeNumeric(sql_type);
+    switch (sl) {
+        case SECLEVEL::RND: {
+            if (is_num || (o == oOPE)) {
+                return new RND_int(serial);
+            } else {
+                return new RND_str(serial);
+            }
+        }
+        case SECLEVEL::DET: {
+            if (is_num) {
+                return new DET_int(serial);
+            } else {
+                return new DET_str(serial);
+            }
+        }
+        case SECLEVEL::DETJOIN: {
+            if (is_num) {
+                return new DETJOIN_int(serial);
+            } else {
+                return new DETJOIN_str(serial);
+            }
+        }
+        case SECLEVEL::OPE: {
+            if (is_num) {
+                return new OPE_int(serial);
+            } else {
+                return new OPE_str(serial);
+            }
+        }
+        case SECLEVEL::HOM: {
+            return new HOM(serial);
+        }
+        case SECLEVEL::SEARCH: {
+            return new Search(serial);
+        }
+        default:{
+            
+        }
+    }
+    thrower() << "unknown or unimplemented security level \n";
+}
+
 template class EncLayerFactory<std::string>;
 
                         
