@@ -102,7 +102,7 @@ public:
 
     std::string serialize() {return key; }
     // create object from serialized contents
-    DET_int(std::string serial);
+    DET_int(const std::string & serial);
  
 
     SECLEVEL level() {return SECLEVEL::DET;}
@@ -127,7 +127,7 @@ public:
 
     // serialize and deserialize
     std::string serialize() {return rawkey;}
-    DET_str(std::string serial);
+    DET_str(const std::string & serial);
  
 
     SECLEVEL level() {return SECLEVEL::DET;}
@@ -180,7 +180,7 @@ public:
 
     // serialize and deserialize
     std::string serialize() {return key;}
-    OPE_int(std::string serial);
+    OPE_int(const std::string & serial);
  
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField(std::string anonname = "");
@@ -205,7 +205,7 @@ public:
 
     // serialize and deserialize
     std::string serialize() {return key;}
-    OPE_str(std::string serial);
+    OPE_str(const std::string & serial);
  
 
     SECLEVEL level() {return SECLEVEL::OPE;}
@@ -229,7 +229,7 @@ public:
     
     // serialize and deserialize
     std::string serialize() {return seed_key;}
-    HOM(std::string serial);
+    HOM(const std::string & serial);
  
     
     SECLEVEL level() {return SECLEVEL::HOM;}
@@ -257,7 +257,7 @@ public:
 
     // serialize and deserialize
     std::string serialize() {return key;}
-    Search(std::string serial);
+    Search(const std::string & serial);
  
    
     SECLEVEL level() {return SECLEVEL::SEARCH;}

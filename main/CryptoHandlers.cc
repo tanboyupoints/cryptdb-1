@@ -315,7 +315,7 @@ DET_int::DET_int(Create_field * f, const string & seed_key)
       bf(key)
 {}
 
-DET_int::DET_int(string serial) : EncLayer(NULL),
+DET_int::DET_int(const string & serial) : EncLayer(NULL),
 				  key(serial),
 				  bf(key)
 {}
@@ -390,7 +390,7 @@ DET_str::DET_str(Create_field * f, string seed_key)
 
 }
 
-DET_str::DET_str(std::string serial): EncLayer(NULL),
+DET_str::DET_str(const std::string & serial): EncLayer(NULL),
 			     rawkey(serial),
 			     enckey(get_AES_enc_key(rawkey)),
 			     deckey(get_AES_dec_key(rawkey))
@@ -457,7 +457,7 @@ OPE_int::OPE_int(Create_field * f, string seed_key)
       ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
 
-OPE_int::OPE_int(std::string serial) :
+OPE_int::OPE_int(const std::string & serial) :
     EncLayer(NULL),
     key(serial), ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
@@ -491,7 +491,7 @@ OPE_str::OPE_str(Create_field * f, string seed_key)
       ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
 
-OPE_str::OPE_str(std::string serial) : EncLayer(NULL),
+OPE_str::OPE_str(const std::string & serial) : EncLayer(NULL),
 				       key(serial),
 				       ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
@@ -537,7 +537,7 @@ HOM::HOM(Create_field * f, string seed_key) : EncLayer(f),
     delete prng;
 }
 
-HOM::HOM(std::string serial): EncLayer(NULL), seed_key(serial)
+HOM::HOM(const std::string & serial): EncLayer(NULL), seed_key(serial)
 {
     streamrng<arc4> * prng = new streamrng<arc4>(seed_key);
     sk = new Paillier_priv(Paillier_priv::keygen(prng, nbits));
@@ -648,7 +648,7 @@ Search::Search(Create_field * f, string seed_key)
     key = prng_expand(seed_key, key_bytes);
 }
 
-Search::Search(std::string serial) : EncLayer(NULL) {
+Search::Search(const std::string & serial) : EncLayer(NULL) {
     key = prng_expand(serial, key_bytes);
 }
 
