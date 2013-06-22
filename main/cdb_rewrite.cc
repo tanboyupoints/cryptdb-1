@@ -820,7 +820,7 @@ typical_gather(Analysis & a, Item_func * i,
 
     EncSet out_es;
     if (encset_from_intersection) {
-	// assert_s(solution.singleton(), "cannot use basic_gather with more outgoing encsets");
+	assert_s(solution.singleton(), "cannot use basic_gather with more outgoing encsets");
 	out_es = solution;
     } else {
 	out_es = PLAIN_EncSet;
@@ -830,7 +830,7 @@ typical_gather(Analysis & a, Item_func * i,
     my_r.add_child(r1);
     my_r.add_child(r2);
 
-    return new RewritePlanOneOLK(out_es.chooseOne(),
+    return new RewritePlanOneOLK(out_es.extract_singleton(),
 				 solution.chooseOne(), childr_rp,
 				 my_r);
 
@@ -1634,21 +1634,16 @@ class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
 
         cerr << "Rewrite plan is " << rp << "\n";
 
-        rewrite_args_FN(i, constr, (const RewritePlanOneOLK *)_rp, a);
+	Item * arg0 = itemTypes.do_rewrite(args[0],
+					   rp->olk, rp->childr_rp[0], a);
+	Item * arg1 = itemTypes.do_rewrite(args[1],
+					   rp->olk, rp->childr_rp[1], a);
 
-        if (constr.key == NULL) { // Two constants.
-            return i;
-        } else {
-            auto it = constr.key->onions.find(oAGG);
-            assert(it != constr.key->onions.end());
-            OnionMeta *om = it->second;
-            assert(om->layers.size() > 0);
-            EncLayer *el = om->layers.back();
-	    assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
-	    return ((HOM*)el)->sumUDF(args[0], args[1]);
-        }
+	EncLayer *el = getAssert(constr.key->onions, oAGG)->layers.back();
+	assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
+	return ((HOM*)el)->sumUDF(arg0, arg1);
 
-    }
+	}
 };
 
 extern const char str_plus[] = "+";
