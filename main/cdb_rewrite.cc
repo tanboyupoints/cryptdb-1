@@ -1051,6 +1051,32 @@ rewrite_agg_args(Item_sum * oldi, const OLK & constr, const RewritePlanOneOLK * 
     return res;
 }
 
+template <typename ItemType>
+static void
+typical_rewrite_insert_type(ItemType *i, Analysis &a, vector<Item *> &l,
+                            FieldMeta *fm)
+{
+    if (!fm->isEncrypted()) {
+        l.push_back(make_item(i));
+        return;
+    }
+
+    // Encrypted
+
+    uint64_t salt = 0;
+
+    if (fm->has_salt) {
+        salt = randomValue();
+    } else {
+        //TODO: need to use table salt in this case
+    }
+
+    encrypt_item_all_onions(i, fm, salt, l, a);
+
+    if (fm->has_salt) {
+        l.push_back(new Item_int((ulonglong) salt));
+    }
+}
 
 /*
  * CItemType classes for supported Items: supporting machinery.
@@ -1276,26 +1302,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     virtual void
     do_rewrite_insert_type(Item_string *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
-	if (!fm->isEncrypted()) {
-	    l.push_back(make_item(i));
-	    return;
-	}
-
-	// Encrypted
-
-	uint64_t salt = 0;
-
-	if (fm->has_salt) {
-            salt = randomValue();
-        } else {
-            //TODO: need to use table salt in this case
-        }
-
-        encrypt_item_all_onions(i, fm, salt, l, a);
-
-        if (fm->has_salt) {
-            l.push_back(new Item_int((ulonglong) salt));
-        }
+        typical_rewrite_insert_type(i, a, l, fm);
     }
 } ANON;
 
@@ -1330,29 +1337,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     virtual void
     do_rewrite_insert_type(Item_num *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
-	if (!fm->isEncrypted()) {
-	    l.push_back(make_item((Item_int*)i));
-	     return;
-	}
-
-	//Encrypted
-
-        uint64_t salt = 0;
-        if (fm->has_salt) {
-            salt = randomValue();
-        } else {
-            //TODO raluca
-            //need to use table salt in this case
-        }
-
-      	//encrypt for each onion
-        for (auto it = fm->onions.begin(); it != fm->onions.end();it++) {
-            l.push_back(encrypt_item_layers(i, it->first, it->second->layers, a, fm, salt));
-        }
-
-        if (fm->has_salt) {
-             l.push_back(new Item_int((ulonglong) salt));
-        }
+        typical_rewrite_insert_type(i, a, l, fm);
     }
 } ANON;
 

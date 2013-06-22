@@ -26,10 +26,15 @@ make_item(Item_string * i) {
     return new Item_string(make_thd_string(s), s.length(), i->default_charset());
 }
 
-
 Item_int *
 make_item(Item_int * i) {
     return new Item_int(i->value);
+}
+
+Item_int *
+make_item(Item_num *i)
+{
+    return make_item((Item_int *)i);
 }
 
 ORDER *

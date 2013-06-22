@@ -35,6 +35,7 @@ T * copy(T *x) {
 Item_field *make_item(Item_field *t, std::string field_name = "");
 Item_string * make_item(Item_string * i);
 Item_int * make_item(Item_int * i);
+Item_int * make_item(Item_num * i);
 ORDER * make_order(ORDER * old_order, Item * i);
 
 
