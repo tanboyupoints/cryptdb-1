@@ -43,6 +43,7 @@ EncSet::intersect(const EncSet & es2) const
             // TODO(burrows): Ensure that the keys actually match.
             m[o] = LevelFieldPair(sl, fm);
         } else {
+            // TODO(burrows): Ensure that both fields are constants.
             m[o] = LevelFieldPair(sl, fm);
         }
     }

@@ -1637,7 +1637,6 @@ class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
         rewrite_args_FN(i, constr, (const RewritePlanOneOLK *)_rp, a);
 
         if (constr.key == NULL) { // Two constants.
-            // TODO(burrows): Ensure that both fields are constants.
             return i;
         } else {
             auto it = constr.key->onions.find(oAGG);
