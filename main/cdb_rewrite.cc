@@ -3182,14 +3182,16 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
                 if (!i)
                     break;
                 vector<Item *> l;
-                itemTypes.do_rewrite_insert(i, a, l, *fmVecIt);
-                for (auto it1 = l.begin(); it1 != l.end(); ++it1) {
-                    newList0->push_back(*it1);
-                    /*String s;
-                    (*it1)->print(&s, QT_ORDINARY);
-                    cerr << s << endl;*/
+                if (fmVecIt != fmVec.end()) {
+                    itemTypes.do_rewrite_insert(i, a, l, *fmVecIt);
+                    for (auto it1 = l.begin(); it1 != l.end(); ++it1) {
+                        newList0->push_back(*it1);
+                        /*String s;
+                        (*it1)->print(&s, QT_ORDINARY);
+                        cerr << s << endl;*/
+                    }
+                    ++fmVecIt;
                 }
-                ++fmVecIt;
             }
             newList.push_back(newList0);
         }
