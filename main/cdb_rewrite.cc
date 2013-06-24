@@ -2651,11 +2651,17 @@ static inline TABLE_LIST *
 rewrite_table_list(TABLE_LIST *t, Analysis &a)
 {
     TABLE_LIST * new_t = copy(t);
-    string anon_name = anonymize_table_name(string(t->table_name,
-                                                   t->table_name_length), a);
-    new_t->table_name = make_thd_string(anon_name, &new_t->table_name_length);
-    new_t->alias = make_thd_string(anon_name);
-    new_t->next_local = NULL;
+    
+    // Table name can only be empty when grouping a nested join.
+    assert(t->table_name || t->nested_join);
+    if (t->table_name) {
+        string anon_name = anonymize_table_name(string(t->table_name,
+                                                       t->table_name_length), a);
+        new_t->table_name = make_thd_string(anon_name, &new_t->table_name_length);
+        new_t->alias = make_thd_string(anon_name);
+        new_t->next_local = NULL;
+    }
+
     return new_t;
 }
 
