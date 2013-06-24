@@ -850,8 +850,7 @@ static inline void
 analyze_update(Item_field * field, Item * val, Analysis & a) {
 
     reason r;
-    RewritePlan * rp = gather(val, r, a);
-    a.rewritePlans[val] = rp;
+    a.rewritePlans[val] = gather(val, r, a);
     a.rewritePlans[field] = gather(field, r, a);
 
     //TODO: an optimization could be performed here to support more updates
@@ -3037,6 +3036,10 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     for (;;) {
         Item * i = fd_it++;
         if (!i) {
+            // Ensure that we were not dealing with an invalid query where
+            // we had more values than fields.
+            Item *v = val_it++;
+            assert(NULL == v);
             break;
         }
         assert(i->type() == Item::FIELD_ITEM);
@@ -3182,16 +3185,21 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
                 if (!i)
                     break;
                 vector<Item *> l;
-                if (fmVecIt != fmVec.end()) {
-                    itemTypes.do_rewrite_insert(i, a, l, *fmVecIt);
-                    for (auto it1 = l.begin(); it1 != l.end(); ++it1) {
-                        newList0->push_back(*it1);
-                        /*String s;
-                        (*it1)->print(&s, QT_ORDINARY);
-                        cerr << s << endl;*/
-                    }
-                    ++fmVecIt;
+                // Prevent the dereferencing of a bad iterator if 
+                // the user supplies more values than fields and the parser
+                // fails to throw an error.
+                // TODO(burrows): It seems like the expected behavior is
+                // for the parser to catch this bad state, so we will fail
+                // until further notice.
+                assert(fmVecIt != fmVec.end());
+                itemTypes.do_rewrite_insert(i, a, l, *fmVecIt);
+                for (auto it1 = l.begin(); it1 != l.end(); ++it1) {
+                    newList0->push_back(*it1);
+                    /*String s;
+                    (*it1)->print(&s, QT_ORDINARY);
+                    cerr << s << endl;*/
                 }
+                ++fmVecIt;
             }
             newList.push_back(newList0);
         }
