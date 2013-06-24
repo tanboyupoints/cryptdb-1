@@ -1258,6 +1258,8 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
              it != fm->onions.end(); ++it) {
             string name = it->second->onionname;
 	    new_field = make_item(i, name);
+            new_field->table_name =
+                make_thd_string(anonymize_table_name(i->table_name, a));
             l.push_back(new_field);
         }
         if (fm->has_salt) {
