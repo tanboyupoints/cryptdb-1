@@ -37,6 +37,12 @@ make_item(Item_num *i)
     return make_item((Item_int *)i);
 }
 
+Item_null *
+make_item(Item_null *i)
+{
+    return new Item_null(i->name);
+}
+
 ORDER *
 make_order(ORDER * old_order, Item * i) {
     ORDER * new_order = (ORDER *)malloc(sizeof(ORDER));

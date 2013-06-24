@@ -2399,8 +2399,25 @@ static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
 
 static class ANON : public CItemSubtypeIT<Item_null, Item::Type::NULL_ITEM> {
     virtual RewritePlan * do_gather_type(Item_null *i, reason &tr, Analysis & a) const {
-	UNIMPLEMENTED;
-        //return FULL_EncSet;
+        tr = reason(FULL_EncSet, "is a constant", i);
+        return new RewritePlan(FULL_EncSet, tr);
+    }
+    virtual Item * do_rewrite_type(Item_null *i,
+				   const OLK & constr, const RewritePlan * rp,
+				   Analysis & a) const {
+        return i;
+        // return encrypt_item(i, constr, a);
+    }
+    virtual void
+    do_rewrite_insert_type(Item_null *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
+    {
+        for (uint j = 0; j < fm->onions.size(); ++j) {
+            l.push_back(make_item(i));
+        }
+        if (fm->has_salt) {
+            ulonglong salt = randomValue();
+            l.push_back(new Item_int((ulonglong) salt));
+        }
     }
 } ANON;
 
@@ -3836,7 +3853,8 @@ Rewriter::decryptResults(ResType & dbres,
         FieldMeta * fm = rf.olk.key;
         if (!rf.is_salt) {
             for (unsigned int r = 0; r < rows; r++) {
-                if (!fm || !fm->isEncrypted()) {
+                if (!fm || !fm->isEncrypted() ||
+                    dbres.rows[r][c]->is_null()) {
                     res.rows[r][col_index] = dbres.rows[r][c];
                 } else {
                     uint64_t salt = 0;

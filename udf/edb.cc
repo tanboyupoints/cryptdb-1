@@ -14,6 +14,13 @@
  * The MySQL versions of the UDFs are more likely to get this right.
  */
 
+/*
+ * Handling NULL value
+ * - Encryption routines should never get a NULL value due to the way
+ *   rewriting is handled for NULL.
+ * - Decryption routines should forgo the decryption of NULL values.
+ */
+
 #define DEBUG 1
 
 #include <crypto/BasicCrypto.hh> 
@@ -194,16 +201,22 @@ Datum
 decrypt_int_sem(PG_FUNCTION_ARGS)
 #endif
 {
-    uint64_t eValue = getui(ARGS, 0);
 
-    uint64_t keyLen;
-    char * keyBytes = getba(args, 1, keyLen);
-    string key = string(keyBytes, keyLen);
-    
-    uint64_t salt = getui(args, 2);
+    uint64_t value;
+    if (NULL == ARGS->args[0]) {
+        value = 0;
+    } else {
+        uint64_t eValue = getui(ARGS, 0);
 
-    blowfish bf(key);
-    uint64_t value = bf.decrypt(eValue) ^ salt;
+        uint64_t keyLen;
+        char * keyBytes = getba(args, 1, keyLen);
+        string key = string(keyBytes, keyLen);
+        
+        uint64_t salt = getui(args, 2);
+
+        blowfish bf(key);
+        value = bf.decrypt(eValue) ^ salt;
+    }
 
     //cerr << "udf: encVal " << eValue << " key " << (int)key[0] << " " << (int)key[1] << " " << (int) key[3]  << " salt " << salt  << " obtains: " << value << " and cast to ulonglong " << (ulonglong) value << "\n";
 
@@ -281,9 +294,8 @@ decrypt_text_sem(UDF_INIT *initid, UDF_ARGS *args,
     uint64_t salt = getui(ARGS, 2);
 
     AES_KEY *aesKey = get_AES_dec_key(key);
-          
-   string value = decrypt_SEM((unsigned char *)eValueBytes, eValueLen, aesKey, salt);
-   delete aesKey;
+    string value = decrypt_SEM((unsigned char *)eValueBytes, eValueLen, aesKey, salt);
+    delete aesKey;
     
     char * res = new char[value.length()];
     initid->ptr = res;
