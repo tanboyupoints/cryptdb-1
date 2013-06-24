@@ -58,6 +58,7 @@ include parser/Makefrag
 include main/Makefrag
 include test/Makefrag
 include util/Makefrag
+#include tools/Makefrag
 include udf/Makefrag
 include mysqlproxy/Makefrag
 
