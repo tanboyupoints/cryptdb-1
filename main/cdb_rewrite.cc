@@ -2709,11 +2709,11 @@ rewrite_table_list(List<TABLE_LIST> tll, Analysis & a)
             new_t->nested_join->join_list = rewrite_table_list(t->nested_join->join_list, a);
             return *new_tll;
         }
-/*
+
         if (t->on_expr) {
-            new_t->on_expr = rewrite(t->on_expr, a);
+            new_t->on_expr = rewrite(t->on_expr, PLAIN_OLK, a);
 	}
-*/
+
 	/* TODO: derived tables
         if (t->derived) {
             st_select_lex_unit *u = t->derived;
