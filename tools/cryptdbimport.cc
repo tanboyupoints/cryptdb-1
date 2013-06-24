@@ -25,14 +25,47 @@ XMLParser::XMLParser(void)
     //TODO: implement this
 } 
 
+//TODO: rename this function and make it create the objects.
 void
 XMLParser::printNamesDebug(xmlNode *node)
 {
     xmlNode *cur_node = NULL;
+    //xmlChar *key;
     for (cur_node = node; cur_node; cur_node = cur_node->next) 
     {
         if (cur_node->type == XML_ELEMENT_NODE) 
-            cout << "Element name: " << cur_node->name << endl;
+        {
+            //cout << "Element name: " << cur_node->name << endl;
+                
+            if ((!xmlStrcmp(cur_node->name, (const xmlChar *)"table_structure"))) 
+            {
+                xmlAttrPtr attr = cur_node->properties;
+                cout << "table: " << attr->children->content << endl;
+#if 0
+                xmlNode *children = cur_node->children;
+                while(children != NULL)
+                {
+                    if ((!xmlStrcmp(children->name, (const xmlChar *)"field"))) {
+                        key = xmlNodeListGetString(doc, children->xmlChildrenNode, 1);
+                        //printf("type: %d field: %s\n", children->type, key);
+                        xmlFree(key);
+                    } else if((!xmlStrcmp(children->content, (const xmlChar *)"row")))
+                    {
+                        key = xmlNodeListGetString(doc, children->xmlChildrenNode, 1);
+                        //printf("type: %d row: %s\n", children->type, key);
+                        xmlFree(key);
+                    }
+                    children = children->next;
+                }
+#endif
+
+            }
+            
+
+
+
+
+        }
 
         printNamesDebug(cur_node->children);
     }
@@ -55,7 +88,6 @@ do_display_fields(const char *filename)
 
     XMLParser xml;
     xml.setDoc(doc);
-    cout << "doc1: " << doc << endl;
 
     node = xmlDocGetRootElement(xml.getDoc());
     assert(node != NULL);

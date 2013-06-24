@@ -17,5 +17,8 @@ class XMLParser
 
     private:
         xmlDoc *doc; 
+
+        // dbname<tablename<tablefields>>
+        map<string, map<string, vector<string>>>dbmap;
 };
 
