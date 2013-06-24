@@ -275,6 +275,7 @@ decrypt_int_det(PG_FUNCTION_ARGS)
 my_bool
 decrypt_text_sem_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
 {
+    initid->maybe_null = 1;
     return 0;
 }
 
@@ -293,18 +294,24 @@ char *
 decrypt_text_sem(UDF_INIT *initid, UDF_ARGS *args,
                  char *result, unsigned long *length,
                  char *is_null, char *error) {
-    uint64_t eValueLen;
-    char *eValueBytes = getba(args, 0, eValueLen);
+    string value;
+    if (NULL == ARGS->args[0]) {
+        value = "A";
+        *is_null = 1;
+    } else {
+        uint64_t eValueLen;
+        char *eValueBytes = getba(args, 0, eValueLen);
 
-    uint64_t keyLen;
-    char * keyBytes = getba(args, 1, keyLen);
-    string key = string(keyBytes, keyLen);
-    
-    uint64_t salt = getui(ARGS, 2);
+        uint64_t keyLen;
+        char * keyBytes = getba(args, 1, keyLen);
+        string key = string(keyBytes, keyLen);
+        
+        uint64_t salt = getui(ARGS, 2);
 
-    AES_KEY *aesKey = get_AES_dec_key(key);
-    string value = decrypt_SEM((unsigned char *)eValueBytes, eValueLen, aesKey, salt);
-    delete aesKey;
+        AES_KEY *aesKey = get_AES_dec_key(key);
+        value = decrypt_SEM((unsigned char *)eValueBytes, eValueLen, aesKey, salt);
+        delete aesKey;
+    }
     
     char * res = new char[value.length()];
     initid->ptr = res;
