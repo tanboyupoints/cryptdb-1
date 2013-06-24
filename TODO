@@ -1,5 +1,9 @@
 Aaron:
 wiki -- host it on git?
+TRANSACT on stale onions after UPDATE
+LEFT/RIGH OUTER JOIN
+DECIMAL
+VARCHAR
 
 Carlos:
 doxygen
@@ -8,7 +12,6 @@ finish editing intersect
 Both:
 unimplemented gather/rewrite for other functions, search through cdb_rewrite.cc
 date
-decimal
 
 --------------
 
