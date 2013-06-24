@@ -191,6 +191,7 @@ extern "C" {
 my_bool
 decrypt_int_sem_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
 {
+    initid->maybe_null = 1;
     return 0;
 }
 
@@ -201,10 +202,10 @@ Datum
 decrypt_int_sem(PG_FUNCTION_ARGS)
 #endif
 {
-
     uint64_t value;
     if (NULL == ARGS->args[0]) {
         value = 0;
+        *is_null = 1;
     } else {
         uint64_t eValue = getui(ARGS, 0);
 
@@ -234,6 +235,7 @@ decrypt_int_sem(PG_FUNCTION_ARGS)
 my_bool
 decrypt_int_det_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
 {
+    initid->maybe_null = 1;
     return 0;
 }
 
@@ -244,14 +246,21 @@ Datum
 decrypt_int_det(PG_FUNCTION_ARGS)
 #endif
 {
-    uint64_t eValue = getui(ARGS, 0);
+    uint64_t value;
+    if (NULL == ARGS->args[0]) {
+        value = 0;
+        *is_null = 1;
+    } else {
+        uint64_t eValue = getui(ARGS, 0);
 
-    uint64_t keyLen;
-    char * keyBytes = getba(args, 1, keyLen);
-    string key = string(keyBytes, keyLen);
-   
-    blowfish bf(key);
-    uint64_t value = bf.decrypt(eValue);
+        uint64_t keyLen;
+        char * keyBytes = getba(args, 1, keyLen);
+        string key = string(keyBytes, keyLen);
+        
+        blowfish bf(key);
+        value = bf.decrypt(eValue);
+    }
+
 
 #if MYSQL_S
     return (ulonglong) value;

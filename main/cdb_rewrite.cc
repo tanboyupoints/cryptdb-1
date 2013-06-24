@@ -591,6 +591,8 @@ addSaltToReturn(ReturnMeta * rm, int pos) {
 //TODO: which encrypt/decrypt should handle null?
 static Item *
 encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers, Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0) {
+    assert(!i->is_null());
+
     if (o == oPLAIN) {//Unencrypted item
 	return i;
     }
@@ -616,6 +618,7 @@ encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers, Analysi
 
 static Item *
 decrypt_item_layers(Item * i, onion o, vector<EncLayer *> & layers, uint64_t IV, Analysis &a, FieldMeta *fm, const vector<Item *> &res) {
+    assert(!i->is_null());
 
     if (o == oPLAIN) {// Unencrypted item
 	return i;
@@ -644,6 +647,8 @@ decrypt_item_layers(Item * i, onion o, vector<EncLayer *> & layers, uint64_t IV,
 static Item *
 encrypt_item(Item * i, const OLK & olk, Analysis & a)
 {
+    assert(!i->is_null());
+
     if (olk.l == SECLEVEL::PLAINVAL)
         return i;
 
@@ -672,6 +677,7 @@ encrypt_item_all_onions(Item * i, FieldMeta * fm,
 
 static Item *
 decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV, Analysis &a, vector<Item *> &res) {
+    assert(!i->is_null());
     return decrypt_item_layers(i, o, fm->onions[o]->layers, IV, a, fm, res);
 }
 
@@ -1332,6 +1338,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
 				   const OLK & constr, const RewritePlan * rp,
 				   Analysis & a) const {
         LOG(cdb_v) << "do_rewrite_type " << *i << endl;
+
         return encrypt_item(i, constr, a);
     }
 
