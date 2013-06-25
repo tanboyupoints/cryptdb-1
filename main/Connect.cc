@@ -27,8 +27,9 @@ Connect::Connect(const string &server, const string &user, const string &passwd,
     : conn(nullptr), close_on_destroy(true)
 {
     do_connect(server, user, passwd, port);
-    if (!select_db(dbname))
-        thrower() << "cannot select dbname " << dbname;
+    
+    if(dbname.size() == 0)
+        LOG(warn) << "database name not set";
 
     cur_db_name(dbname);
 }

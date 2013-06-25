@@ -106,8 +106,6 @@ static bool handle_line(Connect& conn, Rewriter& r, const string& q)
   try {
     // static initialized database name
     string curdb(conn.getCurDBName());
-    if(curdb.size() == 0)
-        throw runtime_error("database name not set");
 
     qr = r.rewrite(q, &curdb);
     //only last query should return anything
