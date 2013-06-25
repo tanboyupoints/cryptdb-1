@@ -296,7 +296,7 @@ decrypt_text_sem(UDF_INIT *initid, UDF_ARGS *args,
                  char *is_null, char *error) {
     string value;
     if (NULL == ARGS->args[0]) {
-        value = "A";
+        value = "";
         *is_null = 1;
     } else {
         uint64_t eValueLen;
@@ -313,6 +313,8 @@ decrypt_text_sem(UDF_INIT *initid, UDF_ARGS *args,
         delete aesKey;
     }
     
+    // NOTE: This is not creating a proper C string, no guarentee of NUL
+    // termination.
     char * res = new char[value.length()];
     initid->ptr = res;
     memcpy(res, value.data(), value.length());
