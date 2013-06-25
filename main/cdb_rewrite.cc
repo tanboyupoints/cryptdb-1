@@ -2660,6 +2660,7 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
         //std::string table_name(t->table_name, t->table_name_length);
         //std::string alias(t->alias);
 
+        // Handles SUBSELECTs in table clause.
         if (t->derived) {
             st_select_lex_unit *u = t->derived;
             /*
