@@ -683,11 +683,15 @@ decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV, Analysis &a, vector
 
 
 // anonymizes table name based on the information in a.schema
+// TODO(burrows): Do we want to handle aliasing here, or up a level?
 static string
 anonymize_table_name(const string &tname,
                      Analysis & a)
 {
-    return getAssert(a.ps->schema->tableMetaMap, tname)->anonTableName;
+    TableMeta *tm = a.getTableMeta(tname);
+    assert(tm);
+
+    return tm->anonTableName;
 }
 
 class CItemType {
@@ -1186,7 +1190,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 	    a.tmkm.encForVal[fullname] = "";
         }
 
-        FieldMeta * fm = a.ps->schema->getFieldMeta(table, fieldname);
+        FieldMeta * fm = a.getFieldMeta(table, fieldname);
 
 	EncSet es  = EncSet(fm);
 
@@ -1203,7 +1207,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     {
         LOG(cdb_v) << "do_rewrite_type FIELD_ITEM " << *i;
 
-	FieldMeta *fm = a.ps->schema->getFieldMeta(i->table_name, i->field_name);
+	FieldMeta *fm = a.getFieldMeta(i->table_name, i->field_name);
 	//assert(constr.key == fm);
 
 	//check if we need onion adjustment
@@ -1250,7 +1254,7 @@ static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     do_rewrite_insert_type(Item_field *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
 	assert(fm==NULL);
-        fm = a.ps->schema->getFieldMeta(i->table_name, i->field_name);
+        fm = a.getFieldMeta(i->table_name, i->field_name);
 
 	if (!fm->isEncrypted()) {
 	    l.push_back(make_item(i, fm->fname));
@@ -2660,6 +2664,9 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
         //std::string table_name(t->table_name, t->table_name_length);
         //std::string alias(t->alias);
 
+        if (t->is_alias)
+            assert(a.addAlias(t->alias, t->table_name));
+
         // Handles SUBSELECTs in table clause.
         if (t->derived) {
             st_select_lex_unit *u = t->derived;
@@ -2892,7 +2899,7 @@ static void rewrite_create_field(const string &table_name,
 {
     LOG(cdb_v) << "in rewrite create field for " << *f;
 
-    FieldMeta *fm = a.ps->schema->getFieldMeta(table_name, f->field_name);
+    FieldMeta *fm = a.getFieldMeta(table_name, f->field_name);
 
     if (!fm->isEncrypted()) {
         // Unencrypted field
@@ -3078,7 +3085,7 @@ rewrite_update_lex(LEX *lex, Analysis &a)
         assert(i->type() == Item::FIELD_ITEM);
         Item_field * fd = static_cast<Item_field*>(i);
 
-        FieldMeta * fm = a.ps->schema->getFieldMeta(fd->table_name, fd->field_name);
+        FieldMeta * fm = a.getFieldMeta(fd->table_name, fd->field_name);
 
 	Item * val = val_it++;
 	assert(val != NULL);
@@ -3179,7 +3186,7 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
             assert(i->type() == Item::FIELD_ITEM);
             Item_field *ifd = static_cast<Item_field*>(i);
             //cerr << "field " << ifd->table_name << "." << ifd->field_name << endl;
-            fmVec.push_back(a.ps->schema->getFieldMeta(ifd->table_name, ifd->field_name));
+            fmVec.push_back(a.getFieldMeta(ifd->table_name, ifd->field_name));
             vector<Item *> l;
             itemTypes.do_rewrite_insert(i, a, l, NULL);
             for (auto it0 = l.begin(); it0 != l.end(); ++it0) {
@@ -3609,7 +3616,7 @@ processAnnotation(Annotation annot, Analysis &a)
 	     "enc annotation has no primitive");
     LOG(cdb_v) << "table is " << annot.getPrimitiveTableName() << "; field is " << annot.getPrimitiveFieldName();
 
-    FieldMeta * fm = schema->getFieldMeta(annot.getPrimitiveTableName(), annot.getPrimitiveFieldName());
+    FieldMeta * fm = a.getFieldMeta(annot.getPrimitiveTableName(), annot.getPrimitiveFieldName());
 
     if (mp) {
         init_onions_mp(a.ps->masterKey, fm, fm->sql_field, fm->index);

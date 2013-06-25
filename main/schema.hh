@@ -146,6 +146,8 @@ typedef struct SchemaInfo {
 
     SchemaInfo():totalTables(0) {};
     ~SchemaInfo() { tableMetaMap.clear();}
+    // TODO(burrows): getTableMeta/getFieldMeta should be private with
+    // Analysis::getFieldMeta as a friend.
     TableMeta * getTableMeta(const std::string & table);
     FieldMeta * getFieldMeta(const std::string & table, const std::string & field);
 } SchemaInfo;

@@ -271,12 +271,18 @@ public:
     std::map<FieldMeta *, salt_type>    salts;
     TMKM                                tmkm; //for multi princ
     std::map<Item *, RewritePlan *>     rewritePlans;
+    std::map<std::string, std::string>  table_aliases;
 
     // information for decrypting results 
     ReturnMeta * rmeta;
 
+    bool addAlias(std::string alias, std::string table);
+    FieldMeta *getFieldMeta(std::string table, std::string field);
+    TableMeta *getTableMeta(std::string table);
+
 private:
     MYSQL * m;
+    std::string unAliasTable(std::string table);
 
 };
 
