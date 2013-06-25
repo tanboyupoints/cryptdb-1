@@ -17,6 +17,7 @@
 #include <algorithm>
 
 #include <cdb_rewrite.hh>
+#include <Connect.hh>
 #include <field.h>
 #include <cryptdbimport.hh>
     
@@ -25,9 +26,9 @@ XMLParser::XMLParser(void)
     //TODO: implement this
 } 
 
-//TODO: rename this function and make it create the objects.
+
 void
-XMLParser::printNamesDebug(xmlNode *node)
+XMLParser::loadXmlStructure(xmlNode *node)
 {
     xmlNode *cur_node = NULL;
     //xmlChar *key;
@@ -35,39 +36,78 @@ XMLParser::printNamesDebug(xmlNode *node)
     {
         if (cur_node->type == XML_ELEMENT_NODE) 
         {
-            //cout << "Element name: " << cur_node->name << endl;
-                
-            if ((!xmlStrcmp(cur_node->name, (const xmlChar *)"table_structure"))) 
+            if ((!xmlStrcmp(cur_node->name, (const xmlChar *)"database"))) 
             {
                 xmlAttrPtr attr = cur_node->properties;
-                cout << "table: " << attr->children->content << endl;
-#if 0
-                xmlNode *children = cur_node->children;
-                while(children != NULL)
+                cout << "db_name: " << attr->children->content << endl;
+                xmlNode *ch = cur_node->xmlChildrenNode;
+                if(!ch->properties)
                 {
-                    if ((!xmlStrcmp(children->name, (const xmlChar *)"field"))) {
-                        key = xmlNodeListGetString(doc, children->xmlChildrenNode, 1);
-                        //printf("type: %d field: %s\n", children->type, key);
-                        xmlFree(key);
-                    } else if((!xmlStrcmp(children->content, (const xmlChar *)"row")))
-                    {
-                        key = xmlNodeListGetString(doc, children->xmlChildrenNode, 1);
-                        //printf("type: %d row: %s\n", children->type, key);
-                        xmlFree(key);
-                    }
-                    children = children->next;
+                    //TODO: Table is empty so we just create it
+                    cout << "\tdb: " << attr->children->content << " has no properties" << endl;
                 }
-#endif
 
+                while(ch != NULL)
+                {
+                    // TABLE_STRUCTURE
+                    if ((!xmlStrcmp(ch->name, (const xmlChar *)"table_structure"))) 
+                    {
+                        // Here we create if not exists
+                        xmlAttrPtr attr2 = ch->properties;
+                        cout << "\ttable_name: " << attr2->children->content << endl;
+                        xmlNode *ch2 = ch->xmlChildrenNode;
+                        while(ch2 != NULL)
+                        {
+                            while(ch2->properties != NULL)
+                            {
+                                xmlAttrPtr attr3 = ch2->properties;
+                                if(strlen((char*)attr3->children->content) > 0)
+                                {
+                                    cout << "\t\ttable_name_field: " << attr3->children->content << endl;
+                                }
+                                ch2->properties = ch2->properties->next;
+                            }
+                            ch2 = ch2->next;
+                        }
+
+                    // TABLE_DATA
+                    } else if ((!xmlStrcmp(ch->name, (const xmlChar *)"table_data"))) 
+                    {
+                        // No need to create table here
+                        xmlAttrPtr attr2 = ch->properties;
+                        cout << "\ttable_data: " << attr2->children->content << endl;
+
+                        xmlNode *ch2 = ch->xmlChildrenNode;
+                        while(ch2 != NULL)
+                        {
+                            if ((!xmlStrcmp(ch2->name, (const xmlChar *)"row"))) 
+                            {
+                                xmlNode *ch3 = ch2->xmlChildrenNode;
+                                while(ch3 != NULL)
+                                {
+                                    while(ch3->properties != NULL)
+                                    {
+                                        xmlAttrPtr attr3 = ch3->properties;
+                                        cout << "\t\ttable_data_row: " << attr3->children->content << endl;
+                                        
+                                        // ROW_VALUE
+                                        unsigned char *name = xmlNodeListGetString(this->getDoc(), ch3->xmlChildrenNode, 1);
+                                        if(name)
+                                            cout << "\t\t\ttable_data_row_value: " << name << endl;
+                                        ch3->properties = ch3->properties->next;
+                                    }
+                                    ch3 = ch3->next;
+                                }
+                            }
+                            ch2 = ch2->next;
+                        }
+                    }
+
+                    ch = ch->next;
+                }
             }
-            
-
-
-
-
         }
-
-        printNamesDebug(cur_node->children);
+        loadXmlStructure(cur_node->children);
     }
 }
 
@@ -83,6 +123,7 @@ do_display_fields(const char *filename)
     xmlNode *node = NULL;
 
     assert(filename != NULL);
+
     doc = xmlReadFile(filename, NULL, 0);
     assert(doc != NULL);
 
@@ -90,9 +131,8 @@ do_display_fields(const char *filename)
     xml.setDoc(doc);
 
     node = xmlDocGetRootElement(xml.getDoc());
-    assert(node != NULL);
 
-    xml.printNamesDebug(node);
+    xml.loadXmlStructure(node);
     xmlFreeDoc(xml.getDoc());
 }
 
@@ -100,8 +140,7 @@ do_display_fields(const char *filename)
 int main(int argc, char **argv)
 {
     int c, threads = 1, optind = 0;
-    string username("");
-    string password("");
+    XMLParser xml;
 
     static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
@@ -127,10 +166,10 @@ int main(int argc, char **argv)
                 do_display_fields(optarg);
                 break;
             case 'p':
-                password = optarg;
+                xml.setPassword(optarg);
                 break;
             case 'u':
-                username = optarg;
+                xml.setUsername(optarg);
                 break;
             case 't':
                 threads = atoi(optarg);
@@ -142,6 +181,8 @@ int main(int argc, char **argv)
                 break;
         }
     }
+    //Connect conn("localhost" /* will use this as default for while */, xml.getUsername(), xml.getPassword(), 
+    //        "cryptdbtest" /* get this one in run time or NULL if possible */);
 
     return 0;
 }
