@@ -56,24 +56,24 @@ createEmptyDB(XMLParser& xml, Connect & conn, Rewriter& r, string dbname)
  * Structure fields setup.
  */
 void    
-XMLParser::fillRWO(string& dbname, string& tablename, 
+XMLParser::fillRIWO(string& dbname, string& tablename, 
             string& fo, tableDataType_e type)
 {
-    //RWO->type = type;
-    RWO->fieldVec.push_back(fo);
-    RWO->tablesStructMap[dbname].insert(make_pair(tablename, RWO->fieldVec));
+    //RIWO->type = type;
+    RIWO->fieldVec.push_back(fo);
+    RIWO->tablesStructMap[dbname].insert(make_pair(tablename, RIWO->fieldVec));
 }
 
 /**
  * Data fields setup.
  */
 void 
-XMLParser::fillRWO(string& dbname, string& tablename, 
+XMLParser::fillRIWO(string& dbname, string& tablename, 
             string& fo, string& value, tableDataType_e type)
 {
-    //RWO->type = type;
-    RWO->dataVecPair.push_back(make_pair(value, fo));
-    RWO->tablesDataMap[dbname].insert(make_pair(tablename, RWO->dataVecPair));
+    //RIWO->type = type;
+    RIWO->dataVecPair.push_back(make_pair(value, fo));
+    RIWO->tablesDataMap[dbname].insert(make_pair(tablename, RIWO->dataVecPair));
 }
 
 
@@ -81,14 +81,14 @@ XMLParser::fillRWO(string& dbname, string& tablename,
  * Structure fields write out.
  */
 int
-XMLParser::writeStructureRWO(void)
+XMLParser::writeStructureRIWO(void)
 {
     // TODO: Format query string, rewrite query, execute query
     // 
     
     //databases
-    for(StructDBMap_t::iterator itdb = RWO->tablesStructMap.begin(); 
-            itdb != RWO->tablesStructMap.end(); ++itdb)
+    for(StructDBMap_t::iterator itdb = RIWO->tablesStructMap.begin(); 
+            itdb != RIWO->tablesStructMap.end(); ++itdb)
     {
         //tables by database
         for(TableMap_t::iterator ittables = itdb->second.begin(); 
@@ -107,8 +107,8 @@ XMLParser::writeStructureRWO(void)
         }
     }
 
-    RWO->fieldVec.clear();
-    RWO->tablesStructMap.clear();
+    RIWO->fieldVec.clear();
+    RIWO->tablesStructMap.clear();
 
     return 0;
 
@@ -119,10 +119,10 @@ XMLParser::writeStructureRWO(void)
  * Data fields write out.
  */
 int
-XMLParser::writeDataRWO(void)
+XMLParser::writeDataRIWO(void)
 {
     //databases
-    for(DataDBMap_t::iterator itdb = RWO->tablesDataMap.begin(); itdb != RWO->tablesDataMap.end();
+    for(DataDBMap_t::iterator itdb = RIWO->tablesDataMap.begin(); itdb != RIWO->tablesDataMap.end();
             ++itdb)
     {
         //tables by database
@@ -141,8 +141,8 @@ XMLParser::writeDataRWO(void)
         }
     }
 
-    RWO->dataVecPair.clear();
-    RWO->tablesDataMap.clear();
+    RIWO->dataVecPair.clear();
+    RIWO->tablesDataMap.clear();
 
     return 0;
 }
@@ -191,8 +191,8 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                                 {
                                     //TODO/FIXME: Identify when we are working on filds, keys and options 
                                     string fo = (char*)attr3->children->content;
-                                    xml.fillRWO(dbname, tablename, fo, UNDEFINED);
-                                    assert(xml.writeStructureRWO() != 1);
+                                    xml.fillRIWO(dbname, tablename, fo, UNDEFINED);
+                                    assert(xml.writeStructureRIWO() != 1);
                                 }
                                 ch2->properties = ch2->properties->next;
                             }
@@ -224,8 +224,8 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                                         if(name)
                                             fo = (char*)name;
                                         string value = (char*)attr3->children->content;
-                                        xml.fillRWO(dbname, tablename, fo, value  , UNDEFINED);
-                                        assert(xml.writeDataRWO() != 1);
+                                        xml.fillRIWO(dbname, tablename, fo, value  , UNDEFINED);
+                                        assert(xml.writeDataRIWO() != 1);
 
                                         ch3->properties = ch3->properties->next;
                                     }
@@ -270,7 +270,7 @@ do_init(XMLParser & xml, Connect & conn, Rewriter& r, const char *filename)
 
     loadXmlStructure(xml, conn, r, node);
     
-    //assert(xml.writeStructureRWO() != 1);
+    //assert(xml.writeStructureRIWO() != 1);
 
     xmlFreeDoc(xml.getDoc());
 }

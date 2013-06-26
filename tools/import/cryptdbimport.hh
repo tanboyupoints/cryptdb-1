@@ -50,12 +50,12 @@ class XMLParser
 {
     public:
         XMLParser() {
-            RWO = new readInWriteOut_st[sizeof(readInWriteOut_st)]();
-            assert(RWO != NULL);
+            RIWO = new readInWriteOut_st[sizeof(readInWriteOut_st)]();
+            assert(RIWO != NULL);
         }
         ~XMLParser(){
             xmlCleanupParser();
-            delete [] RWO;
+            delete [] RIWO;
         }
 
         void setDoc(xmlDoc *document){
@@ -81,17 +81,17 @@ class XMLParser
 
         vector<string>loadXmlDatabaseName(xmlNode *node);
 
-        void fillRWO(string& dbname, string& tablename, 
+        void fillRIWO(string& dbname, string& tablename, 
                 string& fo, tableDataType_e type);  
 
-        void fillRWO(string& dbname, string& tablename, 
+        void fillRIWO(string& dbname, string& tablename, 
                 string& fo, string& value, tableDataType_e type);  
 
-        int writeStructureRWO(void);  
-        int writeDataRWO(void);
+        int writeStructureRIWO(void);  
+        int writeDataRIWO(void);
 
     private:
-        readInWriteOut_st *RWO;
+        readInWriteOut_st *RIWO;
         xmlDoc *doc; 
         string username;
         string password;
