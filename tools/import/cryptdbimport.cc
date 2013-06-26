@@ -1,3 +1,23 @@
+/*
+ * Author: ccarvalho
+ * Jun 25 19:44:52 BRT 2013
+ *
+ * TODO/Missing impl. list:
+ *
+ * - Parse ALL fields in STRUCTURE. Some of then are missing.
+ * - Get rid of descriptive text that mysqldump prints.
+ * - Make possible to create empty tables by locating the xml field indicating empty tables.
+ * - Implement query creation.
+ * - Cleanup code and interfaces, get rid of some of then.
+ * - Simplify loadXmlStructure(): Way too far obfuscate.
+ * - Improve code reuse: fill*() & write*() functions.
+ * - Re-think the whole interface, too many functions.
+ * - Re-check xml parser for missing fields.
+ * - Memory leak check.
+ * - Use Rewriter.
+ * - Use Connect. 
+ * - Test, test and test.
+ */
 #include <string>
 #include <stdio.h>
 #include <iostream>
@@ -21,49 +41,158 @@
 #include <field.h>
 #include <cryptdbimport.hh>
     
-XMLParser::XMLParser(void)
+
+//TODO: implement this
+static void __attribute__((unused))
+createEmptyDB(XMLParser& xml, Connect & conn, Rewriter& r, string dbname)
 {
-    //TODO: implement this
-} 
+    //TODO: 
+    // - Format query;
+    // - Emulate cdb_test's handle_line
+}
 
 
-void
-XMLParser::loadXmlStructure(xmlNode *node)
+/**
+ * Structure fields setup.
+ */
+void    
+XMLParser::fillRWO(string& dbname, string& tablename, 
+            string& fo, tableDataType_e type)
+{
+    //RWO->type = type;
+    RWO->fieldVec.push_back(fo);
+    RWO->tablesStructMap[dbname].insert(make_pair(tablename, RWO->fieldVec));
+}
+
+/**
+ * Data fields setup.
+ */
+void 
+XMLParser::fillRWO(string& dbname, string& tablename, 
+            string& fo, string& value, tableDataType_e type)
+{
+    //RWO->type = type;
+    RWO->dataVecPair.push_back(make_pair(value, fo));
+    RWO->tablesDataMap[dbname].insert(make_pair(tablename, RWO->dataVecPair));
+}
+
+
+/**
+ * Structure fields write out.
+ */
+int
+XMLParser::writeStructureRWO(void)
+{
+    // TODO: Format query string, rewrite query, execute query
+    // 
+    
+    //databases
+    for(StructDBMap_t::iterator itdb = RWO->tablesStructMap.begin(); 
+            itdb != RWO->tablesStructMap.end(); ++itdb)
+    {
+        //tables by database
+        for(TableMap_t::iterator ittables = itdb->second.begin(); 
+                ittables != itdb->second.end(); ++ittables)
+        {
+
+            //fields by table
+            for(FieldsVec_t::iterator itdata = ittables->second.begin(); 
+                    itdata != ittables->second.end(); ++itdata)
+            {
+                cout << "[TABLE_STRUCTURE] " << "db: " << itdb->first 
+                    << " table: " << ittables->first << " field: " << *itdata << endl;
+                //TODO: Ok, we've got almost all necessary fields, now let's create the query,
+                //rewrite it and write encrypted query in backend database.
+            }
+        }
+    }
+
+    RWO->fieldVec.clear();
+    RWO->tablesStructMap.clear();
+
+    return 0;
+
+}
+
+
+/**
+ * Data fields write out.
+ */
+int
+XMLParser::writeDataRWO(void)
+{
+    //databases
+    for(DataDBMap_t::iterator itdb = RWO->tablesDataMap.begin(); itdb != RWO->tablesDataMap.end();
+            ++itdb)
+    {
+        //tables by database
+        for(DataTableMap_t::iterator ittables = itdb->second.begin(); 
+                ittables != itdb->second.end(); ++ittables)
+        {
+            // field/value pair by table
+            for(ValuesPair_t::iterator itvalues = ittables->second.begin(); itvalues != ittables->second.end();
+                    ++itvalues)
+            {
+                cout << "[TABLE_DATA] " << "db: " << itdb->first 
+                    << " table: " << ittables->first << " field: " << itvalues->first << " Value: " << itvalues->second << endl;
+                //TODO: Ok, we've got almost all necessary fields, now let's create the query,
+                //rewrite it and write encrypted query in backend database.
+            }
+        }
+    }
+
+    RWO->dataVecPair.clear();
+    RWO->tablesDataMap.clear();
+
+    return 0;
+}
+
+// TODO: add sanity checks make it more OO
+static void
+loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
 {
     xmlNode *cur_node = NULL;
-    //xmlChar *key;
     for (cur_node = node; cur_node; cur_node = cur_node->next) 
     {
         if (cur_node->type == XML_ELEMENT_NODE) 
         {
             if ((!xmlStrcmp(cur_node->name, (const xmlChar *)"database"))) 
             {
+                string dbname("");
                 xmlAttrPtr attr = cur_node->properties;
-                cout << "db_name: " << attr->children->content << endl;
+                cout << "[" << attr->children->content << "]" << endl;
                 xmlNode *ch = cur_node->xmlChildrenNode;
-                if(!ch->properties)
-                {
-                    //TODO: Table is empty so we just create it
-                    cout << "\tdb: " << attr->children->content << " has no properties" << endl;
-                }
+                dbname = (char*)attr->children->content; 
+                
+                //TODO/FIXME:   discover if table is empty
+                //              so I can simply add such table.
+                //if(!ch->properties) //this is wrong!
+                //    cout << "empty" << endl;
 
                 while(ch != NULL)
                 {
                     // TABLE_STRUCTURE
+                    string tablename("");
                     if ((!xmlStrcmp(ch->name, (const xmlChar *)"table_structure"))) 
                     {
                         // Here we create if not exists
+                        string tablename("");
                         xmlAttrPtr attr2 = ch->properties;
-                        cout << "\ttable_name: " << attr2->children->content << endl;
+                        tablename = (char*)attr2->children->content;
+                        //cout << "\t" << "[" << dbname << "::" << tablename << "](structure)" << endl;
                         xmlNode *ch2 = ch->xmlChildrenNode;
                         while(ch2 != NULL)
                         {
                             while(ch2->properties != NULL)
                             {
                                 xmlAttrPtr attr3 = ch2->properties;
-                                if(strlen((char*)attr3->children->content) > 0)
+                                string options = (char*)attr3->children->content;
+                                if(options.size() > 0)
                                 {
-                                    cout << "\t\ttable_name_field: " << attr3->children->content << endl;
+                                    //TODO/FIXME: Identify when we are working on filds, keys and options 
+                                    string fo = (char*)attr3->children->content;
+                                    xml.fillRWO(dbname, tablename, fo, UNDEFINED);
+                                    assert(xml.writeStructureRWO() != 1);
                                 }
                                 ch2->properties = ch2->properties->next;
                             }
@@ -75,7 +204,7 @@ XMLParser::loadXmlStructure(xmlNode *node)
                     {
                         // No need to create table here
                         xmlAttrPtr attr2 = ch->properties;
-                        cout << "\ttable_data: " << attr2->children->content << endl;
+                        string tablename = (char*)attr2->children->content;
 
                         xmlNode *ch2 = ch->xmlChildrenNode;
                         while(ch2 != NULL)
@@ -88,12 +217,16 @@ XMLParser::loadXmlStructure(xmlNode *node)
                                     while(ch3->properties != NULL)
                                     {
                                         xmlAttrPtr attr3 = ch3->properties;
-                                        cout << "\t\ttable_data_row: " << attr3->children->content << endl;
-                                        
+
                                         // ROW_VALUE
-                                        unsigned char *name = xmlNodeListGetString(this->getDoc(), ch3->xmlChildrenNode, 1);
+                                        unsigned char *name = xmlNodeListGetString(xml.getDoc(), ch3->xmlChildrenNode, 1);
+                                        string fo("");
                                         if(name)
-                                            cout << "\t\t\ttable_data_row_value: " << name << endl;
+                                            fo = (char*)name;
+                                        string value = (char*)attr3->children->content;
+                                        xml.fillRWO(dbname, tablename, fo, value  , UNDEFINED);
+                                        assert(xml.writeDataRWO() != 1);
+
                                         ch3->properties = ch3->properties->next;
                                     }
                                     ch3 = ch3->next;
@@ -101,13 +234,17 @@ XMLParser::loadXmlStructure(xmlNode *node)
                             }
                             ch2 = ch2->next;
                         }
+                        /*
+                         * Here we add data into table
+                         *
+                         */
                     }
-
                     ch = ch->next;
                 }
             }
         }
-        loadXmlStructure(cur_node->children);
+        // Recursive
+        loadXmlStructure(xml, conn, r, cur_node->children);
     }
 }
 
@@ -117,7 +254,7 @@ static void do_display_help(const char *arg)
 }
 
 static void 
-do_display_fields(const char *filename)
+do_init(XMLParser & xml, Connect & conn, Rewriter& r, const char *filename)
 {
     xmlDoc *doc = NULL;
     xmlNode *node = NULL;
@@ -127,12 +264,14 @@ do_display_fields(const char *filename)
     doc = xmlReadFile(filename, NULL, 0);
     assert(doc != NULL);
 
-    XMLParser xml;
     xml.setDoc(doc);
 
     node = xmlDocGetRootElement(xml.getDoc());
 
-    xml.loadXmlStructure(node);
+    loadXmlStructure(xml, conn, r, node);
+    
+    //assert(xml.writeStructureRWO() != 1);
+
     xmlFreeDoc(xml.getDoc());
 }
 
@@ -163,7 +302,12 @@ int main(int argc, char **argv)
             case 'h': 
                 do_display_help(argv[0]);
             case 's':
-                do_display_fields(optarg);
+                {
+                    ConnectionInfo ci("localhost", xml.getUsername(), xml.getPassword());
+                    Rewriter r(ci, "/var/lib/shadow-mysql", false, true);
+                    Connect conn("localhost", xml.getUsername(), xml.getPassword(), "");
+                    do_init(xml, conn, r, optarg);
+                }
                 break;
             case 'p':
                 xml.setPassword(optarg);
@@ -181,8 +325,6 @@ int main(int argc, char **argv)
                 break;
         }
     }
-    //Connect conn("localhost" /* will use this as default for while */, xml.getUsername(), xml.getPassword(), 
-    //        "cryptdbtest" /* get this one in run time or NULL if possible */);
 
     return 0;
 }
