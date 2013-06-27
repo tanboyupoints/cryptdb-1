@@ -81,3 +81,12 @@ public:
 private:
     MYSQL_RES *r;
 };
+
+ResType *
+executeQuery(Connect &conn, Rewriter &r, const string &q, bool show);
+
+const string BOLD_BEGIN = "\033[1m";
+const string RED_BEGIN = "\033[1;31m";
+const string GREEN_BEGIN = "\033[1;92m";
+const string COLOR_END = "\033[0m";
+

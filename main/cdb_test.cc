@@ -61,11 +61,6 @@ static inline string &trim(string &s) {
   return ltrim(rtrim(s));
 }
 
-static const string BOLD_BEGIN = "\033[1m";
-static const string RED_BEGIN = "\033[1;31m";
-static const string GREEN_BEGIN = "\033[1;92m";
-static const string COLOR_END = "\033[0m";
-
 /** returns true if should stop, to keep looping */
 static bool handle_line(Connect& conn, Rewriter& r, const string& q)
 {
@@ -100,48 +95,8 @@ static bool handle_line(Connect& conn, Rewriter& r, const string& q)
     return true;
   }
 
-  DBResult * dbres;
-  QueryRewrite qr;
 
-  try {
-    // static initialized database name
-    string curdb(conn.getCurDBName());
-
-    qr = r.rewrite(q, &curdb);
-    //only last query should return anything
-    if (qr.queries.size() == 0) {
-      return true;
-    }
-    for (auto new_q = qr.queries.begin(); new_q != qr.queries.end(); new_q++) {
-      cerr << endl
-           << RED_BEGIN << "ENCRYPTED QUERY:" << COLOR_END << endl
-           << *new_q << endl;
-      assert(conn.execute(*new_q, dbres));
-    }
-    if (!dbres) {
-      return true;
-    }
-
-    ResType res = dbres->unpack();
-
-    if (!res.ok) {
-      return true;
-    }
-    cerr << endl << RED_BEGIN << "ENCRYPTED RESULTS FROM DB:" << COLOR_END << endl;
-    printRes(res);
-    cerr << endl;
-    ResType dec_res = r.decryptResults(res, qr.rmeta);
-
-    cerr << endl << RED_BEGIN << "DECRYPTED RESULTS:" << COLOR_END << endl;
-    printRes(dec_res);
-
-  } catch (runtime_error &e) {
-    cout << "Unexpected Error: " << e.what() << " in query " << q << endl;
-  } catch (CryptDBError &e) {
-    cout << "Internal Error: " << e.msg << " in query " << q << endl;
-  }
-
-  return true;
+  return (bool)executeQuery(conn, r, q, true);
 }
 
 int

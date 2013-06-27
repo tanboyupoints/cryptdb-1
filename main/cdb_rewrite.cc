@@ -3031,6 +3031,7 @@ mp_update_init(LEX *lex, Analysis &a)
     }
 }
 
+/*
 static void
 stalefy(FieldMeta * fm, const EncSet &  es) {
     for (auto o_l : fm->onions) {
@@ -3039,6 +3040,19 @@ stalefy(FieldMeta * fm, const EncSet &  es) {
             fm->onions[o]->stale = true;
         }
     }
+}
+*/
+
+static bool
+invalidates(FieldMeta * fm, const EncSet &  es) {
+    for (auto o_l : fm->onions) {
+        onion o = o_l.first;
+        if (es.osl.find(o) == es.osl.end()) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static LEX *
@@ -3061,6 +3075,8 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     set_select_lex(new_lex, rewrite_filters_lex(&new_lex->select_lex, a));
 
     // Rewrite SET values
+    bool invalids = false;
+
     assert(lex->select_lex.item_list.head());
     assert(lex->value_list.head());
 
@@ -3132,8 +3148,8 @@ rewrite_update_lex(LEX *lex, Analysis &a)
             res_vals.push_back(itemTypes.do_rewrite(val, olk, rp_val, a));
         }
 
-        // Make stale all onions that were not updated
-        stalefy(fm, r_es);
+        // Determine if the query invalidates onions.
+        invalids |= invalidates(fm, r_es);
 
 	// Add the salt field
         if (add_salt) {
@@ -3149,6 +3165,54 @@ rewrite_update_lex(LEX *lex, Analysis &a)
 
     new_lex->select_lex.item_list = res_items;
     new_lex->value_list = res_vals;
+
+    // TODO(burrows): This should support multiple tabls in a single UPDATE.
+    // TODO(burrows): Should be a transaction.
+    if (invalids) {
+        /*
+        // DBResult *dbres;
+        // string anonymous_table =
+        //    new_lex->select_lex.top_join_list.head().table_name;
+        string plain_table = 
+            lex->select_lex.top_join_list.head()->table_name;
+        string where_clause = "broken";
+
+        // Retrieve rows from database.
+        // FIXME(burrows): This query should use the main pipeline.
+        ostringstream select_stream;
+        select_stream << " SELECT * FROM " << plain_table
+                      << " WHERE " << whereclause << ";";
+        assert(a.ps->conn->execute(select_stream.str(), dbres));
+
+        // Push the plaintext rows to the embedded database.
+        ostreamstream push_stream;
+        push_stream << " INSERT INTO " << <plaintable>
+                    << " VALUES " << <rows> << ";"; 
+        assert(a.ps->e_conn->execute(push_stream.str()));
+
+        // Run the original (unmodified) query on the data in the embedded
+        // database.
+        ostringstream query_stream;
+        query_stream << *lex;
+        assert(a.ps->e_conn->execute(query_stream.str()));
+
+        // Remove the rows fitting the WHERE clause from the database.
+        ostringstream delete_stream;
+        delete_stream << " DELETE * FROM " << <plaintable>
+                      << " WHERE " << <whereclause> << ";";
+        assert(a.ps->conn->execute(delete_stream.str()));
+
+        // Add each row from the embedded database to the data database.
+        ostringstream select_results_stream;
+        select_results_stream << " SELECT * FROM " << <plaintable> << ";";
+        assert(a.ps->e_conn->execute(select_results_stream.str()));
+                    
+        ostringstream push_results_stream;
+        push_results_stream << " INSERT INTO " << <anonymous-table>
+                            << " VALUES " << <output-rows> << ";";
+        assert(a.ps->conn->execute(push_results_stream.str()));
+        */
+    }
 
     return new_lex;
 }
@@ -3890,6 +3954,61 @@ Rewriter::decryptResults(ResType & dbres,
 
     return res;
 }
+
+ResType *
+executeQuery(Connect &conn, Rewriter &r, const string &q, bool show=false)
+{
+    try {
+        DBResult *dbres;
+        string curdb(conn.getCurDBName());
+
+        QueryRewrite qr = r.rewrite(q, &curdb);
+        //only last query should return anything
+        if (qr.queries.size() != 1) {
+          return NULL;
+        }
+        
+        if (show) {
+            cerr << endl
+                 << RED_BEGIN << "ENCRYPTED QUERY:" << COLOR_END << endl
+                 << qr.queries.back() << endl;
+        }
+
+        assert(conn.execute(qr.queries.back(), dbres));
+        if (!dbres) {
+          return NULL;
+        }
+
+        ResType res = dbres->unpack();
+
+        if (!res.ok) {
+          return NULL;
+        }
+
+        if (show) {
+            cerr << endl << RED_BEGIN << "ENCRYPTED RESULTS FROM DB:"
+                 << COLOR_END << endl;
+            printRes(res);
+            cerr << endl;
+        }
+
+        ResType dec_res = r.decryptResults(res, qr.rmeta);
+
+        if (show) {
+            cerr << endl << RED_BEGIN << "DECRYPTED RESULTS:" << COLOR_END << endl;
+            printRes(dec_res);
+        }
+
+        return new ResType(dec_res);
+    } catch (runtime_error &e) {
+        cout << "Unexpected Error: " << e.what() << " in query " << q << endl;
+        return NULL;
+    } catch (CryptDBError &e) {
+        cout << "Internal Error: " << e.msg << " in query " << q << endl;
+        return NULL;
+    }
+}
+
 
 
 void
