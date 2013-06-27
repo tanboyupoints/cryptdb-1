@@ -28,8 +28,13 @@ Connect::Connect(const string &server, const string &user, const string &passwd,
 {
     do_connect(server, user, passwd, port);
     
-    if(dbname.size() == 0)
+    if (dbname.size() == 0) {
         LOG(warn) << "database name not set";
+    } else {
+        if (!select_db(dbname)) {
+            throw CryptDBError("cannot select dbname " + dbname);
+        }
+    }
 
     cur_db_name(dbname);
 }
