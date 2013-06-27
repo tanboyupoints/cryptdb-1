@@ -8,7 +8,9 @@ EncSet::EncSet() : osl(FULL_EncSet.osl) {}
 EncSet::EncSet(FieldMeta * fm) {
     osl.clear();
     for (auto pair : fm->onions) {
-	osl[pair.first] = LevelFieldPair(pair.second->getSecLevel(), fm);
+        if (!fm->onions[pair.first]->stale) {
+	    osl[pair.first] = LevelFieldPair(pair.second->getSecLevel(), fm);
+        }
     }
 }
 
@@ -35,13 +37,12 @@ EncSet::intersect(const EncSet & es2) const
                     (int)it2->second.first);
 	    onion o = it->first;
 
-            if (fm == NULL) {
-                m[o] = LevelFieldPair(
-                        sl, fm2);
-            } else if (fm2 == NULL) {
-                m[it->first] = LevelFieldPair(
-                        sl, fm);
-            } else if (fm != NULL && fm2 != NULL) {
+            if (fm == NULL && !fm2->onions[o]->stale) {
+                m[o] = LevelFieldPair(sl, fm2);
+            } else if (fm2 == NULL && !fm->onions[o]->stale) {
+                m[it->first] = LevelFieldPair(sl, fm);
+            } else if (fm != NULL && fm2 != NULL &&
+                       !fm->onions[o]->stale && !fm2->onions[o]->stale) {
                 // TODO(burrows): Guarentee that the keys are the same.
 		if (sl == SECLEVEL::DETJOIN) {
 		    m[o] = LevelFieldPair(sl, fm);
