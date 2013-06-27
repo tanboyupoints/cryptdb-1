@@ -7,7 +7,7 @@
  * - Parse ALL fields in STRUCTURE. Some of then are missing.
  * - Get rid of descriptive text that mysqldump prints.
  * - Implement query creation.
- * - Cleanup code and interfaces, get rid of some of then.
+ * - Cleanup code and interfaces, get rid of some of then. Done! more?
  * - Simplify loadXmlStructure(): Way too far obfuscate.
  * - Improve code reuse: fill*() & write*() functions.
  * - Re-think the whole interface, too many functions.
@@ -56,65 +56,17 @@ createEmptyDB(XMLParser& xml, Connect & conn, string dbname)
 }
 
 /**
- * Structure fields setup.
- */
-void    
-XMLParser::fillRIWO(string& dbname, string& tablename, 
-            string& fo, tableDataType_e type)
-{
-    //RIWO->type = type;
-    RIWO->fieldVec.push_back(fo);
-    RIWO->tablesStructMap[dbname].insert(make_pair(tablename, RIWO->fieldVec));
-}
-
-/**
- * Data fields setup.
- */
-void 
-XMLParser::fillRIWO(string& dbname, string& tablename, 
-            string& fo, string& value, tableDataType_e type)
-{
-    //RIWO->type = type;
-    RIWO->dataVecPair.push_back(make_pair(value, fo));
-    RIWO->tablesDataMap[dbname].insert(make_pair(tablename, RIWO->dataVecPair));
-}
-
-
-/**
  * Structure fields write out.
  */
 int
-XMLParser::writeStructureRIWO(void)
+XMLParser::writeRIWO(string& dbname, string& tablename,
+        string& field)
 {
     // TODO: Format query string, rewrite query, execute query
     // 
-    
-    //databases
-    for(StructDBMap_t::iterator itdb = RIWO->tablesStructMap.begin(); 
-            itdb != RIWO->tablesStructMap.end(); ++itdb)
-    {
-        //tables by database
-        for(TableMap_t::iterator ittables = itdb->second.begin(); 
-                ittables != itdb->second.end(); ++ittables)
-        {
-
-            //fields by table
-            for(FieldsVec_t::iterator itdata = ittables->second.begin(); 
-                    itdata != ittables->second.end(); ++itdata)
-            {
-                cout << "[TABLE_STRUCTURE] " << "db: " << itdb->first 
-                    << " table: " << ittables->first << " field: " << *itdata << endl;
-                //TODO: Ok, we've got almost all necessary fields, now let's create the query,
-                //rewrite it and write encrypted query in backend database.
-            }
-        }
-    }
-
-    RIWO->fieldVec.clear();
-    RIWO->tablesStructMap.clear();
-
+    cout << "[TABLE_STRUCTURE] " << "db: " << dbname 
+        << " table: " << tablename << " field: " << field << endl;
     return 0;
-
 }
 
 
@@ -122,31 +74,10 @@ XMLParser::writeStructureRIWO(void)
  * Data fields write out.
  */
 int
-XMLParser::writeDataRIWO(void)
+XMLParser::writeRIWO(string& dbname, string& tablename, string& field, string& value)
 {
-    //databases
-    for(DataDBMap_t::iterator itdb = RIWO->tablesDataMap.begin(); itdb != RIWO->tablesDataMap.end();
-            ++itdb)
-    {
-        //tables by database
-        for(DataTableMap_t::iterator ittables = itdb->second.begin(); 
-                ittables != itdb->second.end(); ++ittables)
-        {
-            // field/value pair by table
-            for(ValuesPair_t::iterator itvalues = ittables->second.begin(); itvalues != ittables->second.end();
-                    ++itvalues)
-            {
-                cout << "[TABLE_DATA] " << "db: " << itdb->first 
-                    << " table: " << ittables->first << " field: " << itvalues->first << " Value: " << itvalues->second << endl;
-                //TODO: Ok, we've got almost all necessary fields, now let's create the query,
-                //rewrite it and write encrypted query in backend database.
-            }
-        }
-    }
-
-    RIWO->dataVecPair.clear();
-    RIWO->tablesDataMap.clear();
-
+    cout << "[TABLE_DATA] " << "db: " << dbname
+        << " table: " << tablename << " field: " << field << " Value: " << value << endl;
     return 0;
 }
 
@@ -172,8 +103,8 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                 {
                     if(createEmptyDB(xml, conn, dbname) != 0)
                     {
-                        // Better error handling in TODO list.
-                        cout << "ERROR creating database " << dbname << endl;
+                        throw runtime_error(string("Error creating empty database: ") + 
+                                string(__PRETTY_FUNCTION__));
                     }
                 }           
 
@@ -197,10 +128,11 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                                 string options = (char*)attr3->children->content;
                                 if(options.size() > 0)
                                 {
-                                    //TODO/FIXME: Identify when we are working on filds, keys and options 
-                                    string fo = (char*)attr3->children->content;
-                                    xml.fillRIWO(dbname, tablename, fo, UNDEFINED);
-                                    assert(xml.writeStructureRIWO() != 1);
+                                    //TODO/FIXME: missing values
+                                    string field = (char*)attr3->children->content;
+                                    
+                                    // Write out on-demand
+                                    assert(xml.writeRIWO(dbname, tablename, field) != 1);
                                 }
                                 ch2->properties = ch2->properties->next;
                             }
@@ -227,14 +159,14 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                                         xmlAttrPtr attr3 = ch3->properties;
 
                                         // ROW_VALUE
-                                        unsigned char *name = xmlNodeListGetString(xml.getDoc(), ch3->xmlChildrenNode, 1);
-                                        string fo("");
-                                        if(name)
-                                            fo = (char*)name;
-                                        string value = (char*)attr3->children->content;
-                                        xml.fillRIWO(dbname, tablename, fo, value  , UNDEFINED);
-                                        assert(xml.writeDataRIWO() != 1);
+                                        unsigned char *_val = xmlNodeListGetString(xml.getDoc(), ch3->xmlChildrenNode, 1);
+                                        string value("");
+                                        if(_val)
+                                            value = (char*)_val;
+                                        string field = (char*)attr3->children->content;
 
+                                        // Write out on-demand
+                                        assert(xml.writeRIWO(dbname, tablename, field, value) != 1);
                                         ch3->properties = ch3->properties->next;
                                     }
                                     ch3 = ch3->next;
@@ -247,6 +179,7 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                 }
             }
         }
+        
         // Recursive
         loadXmlStructure(xml, conn, r, cur_node->children);
     }
@@ -254,6 +187,8 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
 
 static void do_display_help(const char *arg)
 {
+
+
     exit(0);
 }
 
