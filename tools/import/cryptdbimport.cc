@@ -42,7 +42,7 @@
 #include <cryptdbimport.hh>
     
 
-static int __attribute__((unused))
+static int 
 createEmptyDB(XMLParser& xml, Connect & conn, string dbname)
 {
     string q = "CREATE DATABASE IF NOT EXISTS " + dbname + ";";
@@ -168,7 +168,7 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                 dbname = (char*)attr->children->content; 
                 
                 // create database if not exists
-                if(!ch->next && dbname == "sepultura") 
+                if(!ch->next) 
                 {
                     if(createEmptyDB(xml, conn, dbname) != 0)
                     {
