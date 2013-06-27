@@ -3125,10 +3125,11 @@ rewrite_update_lex(LEX *lex, Analysis &a)
         // Rewrite field-value pair for every onion possible
         for (auto pair : r_es.osl) {
 	    OLK olk = {pair.first, pair.second.first, fm};
-            res_items.push_back(rew_fd = itemTypes.do_rewrite(i, olk,
-							      getAssert(a.rewritePlans, i), a));
-            res_vals.push_back(itemTypes.do_rewrite(val, olk,
-						    getAssert(a.rewritePlans, i), a));
+            RewritePlan *rp_i = getAssert(a.rewritePlans, i);
+            res_items.push_back(rew_fd = itemTypes.do_rewrite(i, olk, rp_i,
+                                                              a));
+            RewritePlan *rp_val = getAssert(a.rewritePlans, val);
+            res_vals.push_back(itemTypes.do_rewrite(val, olk, rp_val, a));
         }
 
         // Make stale all onions that were not updated
