@@ -546,7 +546,7 @@ HOM::HOM(const std::string & serial): EncLayer(NULL), seed_key(serial)
 
 Create_field *
 HOM::newCreateField(string anonname) {
-    return createFieldHelper(cf, 2*nbits/8, MYSQL_TYPE_VARCHAR, anonname, &my_charset_bin);
+    return createFieldHelper(cf, 2*nbits/8, MYSQL_TYPE_BLOB, anonname, &my_charset_bin);
 }
 
 static ZZ
