@@ -541,6 +541,7 @@ agg_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
     agg_state *as = new agg_state();
     as->rbuf = malloc(Paillier_len_bytes);
     initid->ptr = (char *) as;
+    initid->maybe_null = 1;
     cerr << "returning from agg_init \n";
     return 0;
 }
@@ -613,20 +614,28 @@ func_add_set(UDF_INIT *initid, UDF_ARGS *args,
     if (initid->ptr)
         free(initid->ptr);
 
-    uint64_t n2len = args->lengths[2];
-    ZZ field, val, n2;
-    ZZFromBytes(field, (const uint8_t *) args->args[0], args->lengths[0]);
-    ZZFromBytes(val, (const uint8_t *) args->args[1], args->lengths[1]);
-    ZZFromBytes(n2, (const uint8_t *) args->args[2], args->lengths[2]);
-
+    uint64_t out_len;
     ZZ res;
-    MulMod(res, field, val, n2);
+    if (NULL == ARGS->args[0]) {
+        out_len = 0;
+        *is_null = 1;
+        res = 0;
+    } else {
+        out_len = args->lengths[2];
 
-    void *rbuf = malloc((size_t)n2len);
+        ZZ field, val, n2;
+        ZZFromBytes(field, (const uint8_t *) args->args[0], args->lengths[0]);
+        ZZFromBytes(val, (const uint8_t *) args->args[1], args->lengths[1]);
+        ZZFromBytes(n2, (const uint8_t *) args->args[2], args->lengths[2]);
+
+        MulMod(res, field, val, n2);
+    }
+
+    void *rbuf = malloc((size_t)out_len);
     initid->ptr = (char *) rbuf;
-    BytesFromZZ((uint8_t *) rbuf, res, (size_t)n2len);
+    BytesFromZZ((uint8_t *) rbuf, res, (size_t)out_len);
 
-    *length = (long unsigned int) n2len;
+    *length = (long unsigned int) out_len;
     return initid->ptr;
 }
 
