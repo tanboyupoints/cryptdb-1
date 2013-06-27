@@ -6,13 +6,13 @@
  *
  * - Parse ALL fields in STRUCTURE. Some of then are missing.
  * - Get rid of descriptive text that mysqldump prints.
- * - Make possible to create empty tables by locating the xml field indicating empty tables.
  * - Implement query creation.
  * - Cleanup code and interfaces, get rid of some of then.
  * - Simplify loadXmlStructure(): Way too far obfuscate.
  * - Improve code reuse: fill*() & write*() functions.
  * - Re-think the whole interface, too many functions.
  * - Re-check xml parser for missing fields.
+ * - Error handling mechanism.
  * - Memory leak check.
  * - Use Rewriter.
  * - Use Connect. 
@@ -42,15 +42,18 @@
 #include <cryptdbimport.hh>
     
 
-//TODO: implement this
-static void __attribute__((unused))
-createEmptyDB(XMLParser& xml, Connect & conn, Rewriter& r, string dbname)
+static int __attribute__((unused))
+createEmptyDB(XMLParser& xml, Connect & conn, string dbname)
 {
-    //TODO: 
-    // - Format query;
-    // - Emulate cdb_test's handle_line
-}
+    string q = "CREATE DATABASE IF NOT EXISTS " + dbname + ";";
+    DBResult * dbres;
+    
+    assert(conn.execute(q, dbres));
+    if(!dbres)
+        return 1;
 
+    return 0;
+}
 
 /**
  * Structure fields setup.
@@ -164,10 +167,15 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                 xmlNode *ch = cur_node->xmlChildrenNode;
                 dbname = (char*)attr->children->content; 
                 
-                //TODO/FIXME:   discover if table is empty
-                //              so I can simply add such table.
-                //if(!ch->properties) //this is wrong!
-                //    cout << "empty" << endl;
+                // create database if not exists
+                if(!ch->next && dbname == "sepultura") 
+                {
+                    if(createEmptyDB(xml, conn, dbname) != 0)
+                    {
+                        // Better error handling in TODO list.
+                        cout << "ERROR creating database " << dbname << endl;
+                    }
+                }           
 
                 while(ch != NULL)
                 {
@@ -209,7 +217,7 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                         xmlNode *ch2 = ch->xmlChildrenNode;
                         while(ch2 != NULL)
                         {
-                            if ((!xmlStrcmp(ch2->name, (const xmlChar *)"row"))) 
+                            if((!xmlStrcmp(ch2->name, (const xmlChar *)"row"))) 
                             {
                                 xmlNode *ch3 = ch2->xmlChildrenNode;
                                 while(ch3 != NULL)
@@ -234,10 +242,6 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                             }
                             ch2 = ch2->next;
                         }
-                        /*
-                         * Here we add data into table
-                         *
-                         */
                     }
                     ch = ch->next;
                 }
