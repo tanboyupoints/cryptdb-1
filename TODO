@@ -3,22 +3,27 @@ wiki -- host it on git?
 
 Carlos:
 doxygen
-finish editing intersect
 
-Both:
+
+Both immediate future:
 unimplemented gather/rewrite for other functions, search through cdb_rewrite.cc
+left join, right join
+start looking into sql.mit.edu trace
+tests for combination of encrypted and unencrypted data
 date
 decimal
+data loading
 
 --------------
 
 Raluca:
+CryptoHandlers [done]
 partition cdb_rewrite.cc
 can we simplify EncSet/FieldMeta repetition?
 
 
 
-
+Old:
 
 
 * Make sure that constant expressions in queries (e.g., SELECT "mysecret";)
