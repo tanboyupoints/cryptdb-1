@@ -1,15 +1,35 @@
 #pragma once
+/*
+ * Author: ccarvalho
+ * Jun 25 19:44:52 BRT 2013
+ */
 
 using namespace std;
 
-/*
-typedef enum _tableDataType_e
+/**
+ * Identifier enum
+ */
+typedef enum _tableIdentifier_e
 {
-    FIELDS = 0,
+    FIELD = 0,
     OPTIONS,
     UNDEFINED
-}tableDataType_e;
-*/
+}tableIdentifier_e;
+
+/** 
+ * tsPacket_t is a vector (with pairs) of property + 
+ *      field OR options (identifiers) + value.
+ */
+typedef vector< pair<tableIdentifier_e, 
+        pair<string, string>>>tsPacket_t; 
+typedef tsPacket_t::iterator tsIt; 
+
+/**
+ * dataPacket_t is a vector or pairs 
+ *      of field + value.
+ */
+typedef vector< pair<string, string>>dataPacket_t;
+typedef dataPacket_t::iterator dataIt;
 
 /**
  * Import database tool main class.
@@ -47,9 +67,9 @@ class XMLParser
         vector<string>loadXmlDatabaseName(xmlNode *node);
 
         int writeRIWO(string& dbname, string& tablename, 
-                string& fo);
+            tsPacket_t ts);
         int writeRIWO(string& dbname, string& tablename, 
-                string& fo, string& value);
+            dataPacket_t td);
 
     private:
         xmlDoc *doc; 
