@@ -61,7 +61,8 @@ XMLParser::writeRIWO(string& dbname, string& tablename,
     //TODO: implement this
     assert(dbname.size() > 0);
     assert(tablename.size() > 0);
-    assert(ts.size() > 0);
+    if(ts.size() == 0)
+        return 1;
 
     for(tsIt it = ts.begin(); it != ts.end(); ++it)
     {
@@ -99,9 +100,10 @@ XMLParser::writeRIWO(string& dbname, string& tablename,
         dataPacket_t td)
 {
     //TODO: implement this
-    assert(dbname.size() > 0);
-    assert(tablename.size() > 0);
-    assert(td.size() > 0);
+    assert(dbname.size() != 0);
+    assert(tablename.size() != 0);
+    if(td.size() == 0)
+        return 1;
     
     for(dataIt it = td.begin(); it != td.end(); ++it)
     {
@@ -177,7 +179,13 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                             ch2 = ch2->next;
                         }
                         // Write out 
-                        xml.writeRIWO(dbname, tablename, ts); 
+                        if(xml.writeRIWO(dbname, tablename, ts) == 1)
+                        {
+                            // TODO: decide if this is an error or not. For table_data it isn't.
+                            // throw is here in case we find such case.
+                            throw runtime_error(string("Parsing error ?! ") + 
+                                string(__PRETTY_FUNCTION__));
+                        }
 
                         // Empty vector, shall not forget.
                         ts.clear();
@@ -220,7 +228,11 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                             ch2 = ch2->next;
                         }
                         // Write out 
-                        xml.writeRIWO(dbname, tablename, td); 
+                        if(xml.writeRIWO(dbname, tablename, td) == 1)
+                        {
+                            cout << "Info: " << dbname << "::" << tablename 
+                                << " has table_structure but table_data is empty." << endl;
+                        }
 
                         // Empty vector, shall not forget.
                         td.clear();
