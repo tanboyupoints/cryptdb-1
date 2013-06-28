@@ -3173,7 +3173,10 @@ rewrite_update_lex(LEX *lex, Analysis &a)
             new_lex->select_lex.top_join_list.head()->table_name;
         string plain_table = 
             lex->select_lex.top_join_list.head()->table_name;
-        string where_clause = ItemToString(new_lex->select_lex.where);
+        // HACK(burrows): Handling empty WHERE clause.
+        string where_clause =
+            new_lex->select_lex.where ?
+                ItemToString(new_lex->select_lex.where) : " TRUE ";
 
         // Retrieve rows from database.
         ostringstream select_stream;
@@ -3213,13 +3216,24 @@ rewrite_update_lex(LEX *lex, Analysis &a)
         }
         delete select_res_type;
 
+        string fields_string = "( ";
+        auto f_it = List_iterator<Item>(lex->select_lex.item_list);
+        Item *i = f_it++;
+        for (; i != NULL;) {
+            Item_field *item = static_cast<Item_field*>(i);
+            fields_string.append(item->field_name);
+
+            if ((i = f_it++) != NULL) {
+                fields_string.append(", ");
+            }
+        } 
+        fields_string.append(" ) ");
+
         // Push the plaintext rows to the embedded database.
-        // TODO(burrows): We need field names as well.
-        string fields_string;
         ostringstream push_stream;
         push_stream << " INSERT INTO " << plain_table << fields_string
                     << " VALUES " << values_string << ";";
-        assert(a.ps->conn->execute(push_stream.str()));
+        assert(a.ps->e_conn->execute(push_stream.str()));
 
         // Run the original (unmodified) query on the data in the embedded
         // database.
@@ -3229,9 +3243,12 @@ rewrite_update_lex(LEX *lex, Analysis &a)
 
         // DELETE the rows matching the WHERE clause from the database.
         ostringstream delete_stream;
-        delete_stream << " DELETE * FROM " << plain_table
+        delete_stream << " DELETE FROM " << plain_table
                       << " WHERE " << where_clause << ";";
-        assert(a.ps->conn->execute(delete_stream.str()));
+        ResType *delete_res_type =
+            executeQuery(*a.ps->conn, *a.rewriter, delete_stream.str(), true);
+        assert(delete_res_type);
+        delete delete_res_type;
 
         // > Add each row from the embedded database to the data database.
         // > This code relies on single threaded access to the database
@@ -3244,20 +3261,36 @@ rewrite_update_lex(LEX *lex, Analysis &a)
 
         ScopedMySQLRes r(dbres->n);
         MYSQL_ROW row;
-        string output_rows;
+        string output_rows = " ";
+        unsigned long field_count = r.res()->field_count;
         while ((row = mysql_fetch_row(r.res()))) {
             unsigned long *l = mysql_fetch_lengths(r.res());
             assert(l != NULL);
 
-            // TODO(burrows): Iterate through rows and create output values.
+            output_rows.append(" ( ");
+            for (unsigned long field_index = 0; field_index < field_count;
+                 ++field_index) {
+                string field_data(row[field_index], l[field_index]);
+                output_rows.append(field_data);
+                if (field_index + 1 < field_count) {
+                    output_rows.append(", ");
+                }
+            }
+            output_rows.append(" ) ,");
         }
+        output_rows = output_rows.substr(0, output_rows.length() - 1);
+
                     
         // FIXME(burrows): Instead of doing this INSERT here,
         // this should probably be LEXed and returned to the caller.
         ostringstream push_results_stream;
-        push_results_stream << " INSERT INTO " << anonymous_table
+        push_results_stream << " INSERT INTO " << plain_table
                             << " VALUES " << output_rows << ";";
-        assert(a.ps->conn->execute(push_results_stream.str()));
+        ResType *push_res_type = 
+           executeQuery(*a.ps->conn, *a.rewriter, push_results_stream.str(),
+                        true); 
+        assert(push_res_type);
+        delete push_res_type;
 
         // Cleanup the embedded database.
         ostringstream cleanup_stream;
