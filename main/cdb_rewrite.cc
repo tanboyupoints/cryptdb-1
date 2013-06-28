@@ -3169,26 +3169,60 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     // TODO(burrows): This should support multiple tabls in a single UPDATE.
     // TODO(burrows): Should be a transaction.
     if (invalids) {
-        /*
-        // DBResult *dbres;
-        // string anonymous_table =
-        //    new_lex->select_lex.top_join_list.head().table_name;
+        string anonymous_table =
+            new_lex->select_lex.top_join_list.head()->table_name;
         string plain_table = 
             lex->select_lex.top_join_list.head()->table_name;
-        string where_clause = "broken";
+        string where_clause = ItemToString(new_lex->select_lex.where);
 
         // Retrieve rows from database.
-        // FIXME(burrows): This query should use the main pipeline.
+        // FIXME(burrows): Get where clause.
         ostringstream select_stream;
         select_stream << " SELECT * FROM " << plain_table
-                      << " WHERE " << whereclause << ";";
-        assert(a.ps->conn->execute(select_stream.str(), dbres));
+                      << " WHERE " << where_clause << ";";
+        ResType *select_res_type =
+            executeQuery(*a.ps->conn, *a.rewriter, select_stream.str(), true);
+        assert(select_res_type);
+        if (select_res_type->rows.size() == 0) { // No work to be done.
+            return new_lex;
+        }
+
+        string values_string;
+        // FIXME(burrows): Can do a cleaner implementation of this with
+        // std::copy but it requires implicit conversion from Item* to
+        // std::string.
+        for (std::vector<std::vector<Item*>>::iterator row_it =
+                select_res_type->rows.begin();
+             row_it != select_res_type->rows.end();
+             ++row_it) {
+            std::vector<Item*> row = (std::vector<Item*>)*row_it;
+            values_string.append("(");
+            for (std::vector<Item*>::iterator item_it = row.begin();
+                 item_it != row.end();
+                 ++item_it) {
+                Item* value = (Item*)*item_it; 
+                values_string.append(ItemToString(value));
+                if (item_it + 1 != row.end()) {
+                    values_string.append(", ");
+                }
+            }
+
+            values_string.append(") ");
+            if (row_it + 1 != select_res_type->rows.end()) {
+                values_string.append(", ");
+            }
+        }
+        delete select_res_type;
 
         // Push the plaintext rows to the embedded database.
-        ostreamstream push_stream;
-        push_stream << " INSERT INTO " << <plaintable>
-                    << " VALUES " << <rows> << ";"; 
-        assert(a.ps->e_conn->execute(push_stream.str()));
+        // TODO(burrows): We need field names as well.
+        ostringstream push_stream;
+        push_stream << " INSERT INTO " << plain_table
+                    << " VALUES " << values_string << ";";
+        ResType *push_res_type =
+            executeQuery(*a.ps->conn, *a.rewriter, push_stream.str(), true);
+        assert(push_res_type);
+        delete push_res_type;
 
         // Run the original (unmodified) query on the data in the embedded
         // database.
@@ -3198,20 +3232,33 @@ rewrite_update_lex(LEX *lex, Analysis &a)
 
         // Remove the rows fitting the WHERE clause from the database.
         ostringstream delete_stream;
-        delete_stream << " DELETE * FROM " << <plaintable>
-                      << " WHERE " << <whereclause> << ";";
+        delete_stream << " DELETE * FROM " << plain_table
+                      << " WHERE " << where_clause << ";";
         assert(a.ps->conn->execute(delete_stream.str()));
 
-        // Add each row from the embedded database to the data database.
+        // > Add each row from the embedded database to the data database.
+        // > This code relies on single threaded access to the database
+        // and on the fact that the database is cleaned up after every such
+        // operation.
+        DBResult *dbres;
         ostringstream select_results_stream;
-        select_results_stream << " SELECT * FROM " << <plaintable> << ";";
-        assert(a.ps->e_conn->execute(select_results_stream.str()));
+        select_results_stream << " SELECT * FROM " << plain_table << ";";
+        assert(a.ps->e_conn->execute(select_results_stream.str(), dbres));
+
+        ScopedMySQLRes r(dbres->n);
+        MYSQL_ROW row;
+        string output_rows;
+        while ((row = mysql_fetch_row(r.res()))) {
+            unsigned long *l = mysql_fetch_lengths(r.res());
+            assert(l != NULL);
+
+            // TODO(burrows): Iterate through rows and create output values.
+        }
                     
         ostringstream push_results_stream;
-        push_results_stream << " INSERT INTO " << <anonymous-table>
-                            << " VALUES " << <output-rows> << ";";
+        push_results_stream << " INSERT INTO " << anonymous_table
+                            << " VALUES " << output_rows << ";";
         assert(a.ps->conn->execute(push_results_stream.str()));
-        */
     }
 
     return new_lex;
@@ -3842,6 +3889,8 @@ Rewriter::rewrite(const string & q, string *cur_db)
     //for as long as there are onion adjustments
     while (true) {
 	Analysis analysis = Analysis(&ps);
+        // HACK(burrows): Until redesign.
+        analysis.rewriter = this;
 	try {
 	    res.queries = rewrite_helper(q, analysis, p, *cur_db);
 	} catch (OnionAdjustExcept e) {
@@ -4008,8 +4057,6 @@ executeQuery(Connect &conn, Rewriter &r, const string &q, bool show=false)
         return NULL;
     }
 }
-
-
 
 void
 printRes(const ResType & r) {

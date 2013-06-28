@@ -256,6 +256,8 @@ typedef struct ProxyState {
 } ProxyState;
 
 
+class Rewriter;
+
 class Analysis {
 public:
     Analysis(ProxyState * ps) : ps(ps), pos(0), rmeta(new ReturnMeta()) {}
@@ -279,6 +281,9 @@ public:
     bool addAlias(std::string alias, std::string table);
     FieldMeta *getFieldMeta(std::string table, std::string field);
     TableMeta *getTableMeta(std::string table);
+
+    // HACK(burrows): This is a temporary solution until I redesign.
+    Rewriter *rewriter;
 
 private:
     MYSQL * m;
