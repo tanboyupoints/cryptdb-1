@@ -3272,21 +3272,12 @@ rewrite_update_lex(LEX *lex, Analysis &a)
 
     Analysis insert_analysis = Analysis(a.ps);
     a.rewriter = a.rewriter;
-    SqlHandler *sql_handler = SqlHandler::getHandler(SQLCOM_INSERT);
-    // FIXME(burrows): This should actually check to see that the
-    // updateMeta is a noop.
-    assert(sql_handler && true == sql_handler->updateAfter());
-
     query_parse parse(a.ps->e_conn->getCurDBName(),
                       push_results_stream.str());
-    LEX *insert_lex = parse.lex();
-
-    process_table_list(&insert_lex->select_lex.top_join_list,
-                       insert_analysis);
-
-    (*sql_handler->query_analyze)(insert_lex, insert_analysis);
     LEX *final_insert_lex =
-        (*sql_handler->lex_rewrite)(insert_lex, insert_analysis);
+        SqlHandler::rewriteLex(parse.lex(), insert_analysis, 
+                               push_results_stream.str());
+    assert(final_insert_lex);
 
     // Cleanup the embedded database.
     ostringstream cleanup_stream;
@@ -3444,12 +3435,6 @@ process_update_lex(LEX * lex, Analysis & a) {
 
     process_filters_lex(&lex->select_lex, a);
 
-
-}
-
-static void
-noopUpdateMeta(const string &q, LEX *lex, Analysis &a)
-{
 
 }
 
@@ -3821,41 +3806,16 @@ rewrite_helper(const string & q, Analysis & analysis,
     LOG(cdb_v) << "q " << q;
     list<string> queries;
 
-   
     if (p.annot) {
         return processAnnotation(*p.annot, analysis);
     }
 
     LEX *lex = p.lex();
 
-    //login/logout command; nothing needs to be passed on
-    if ((lex->sql_command == SQLCOM_DELETE || lex->sql_command == SQLCOM_INSERT)
-        && analysis.ps->mp && analysis.ps->mp->checkPsswd(lex)){
-	LOG(cdb_v) << "login/logout " << *lex;
-        return queries;
-    }
     LOG(cdb_v) << "pre-analyze " << *lex;
 
-    SqlHandler *sql_handler = SqlHandler::getHandler(lex->sql_command);
-    assert(sql_handler);
-    
-    // TODO(burrows): Where should this call be?
-    // - In each analysis function?
-    // - Here?
-    process_table_list(&lex->select_lex.top_join_list, analysis);
-
-    //TODO: is db neededs as param in all these funcs?
-    (*sql_handler->query_analyze)(lex, analysis);
-
-    if (false == sql_handler->updateAfter()) {
-        (*sql_handler->update_meta)(q, lex, analysis);
-    }
-
-    LEX * new_lex = (*sql_handler->lex_rewrite)(lex, analysis);
-
-    if (true == sql_handler->updateAfter()) {
-        (*sql_handler->update_meta)(q, lex, analysis);
-    }
+    LEX *new_lex = SqlHandler::rewriteLexAndUpdateMeta(lex, analysis, q);
+    assert(new_lex);
 
     stringstream ss;
     ss << *new_lex;
@@ -4242,6 +4202,51 @@ bool SqlHandler::addHandler(SqlHandler *handler)
     return true;
 }
 
+LEX *SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
+                                         const string &q)
+{
+    SqlHandler *sql_handler = SqlHandler::getHandler(lex->sql_command);
+    if (!sql_handler) {
+        return NULL;
+    }
+    
+    // TODO(burrows): Where should this call be?
+    // - In each analysis function?
+    // - Here?
+    process_table_list(&lex->select_lex.top_join_list, analysis);
+
+    //TODO: is db neededs as param in all these funcs?
+    (*sql_handler->query_analyze)(lex, analysis);
+
+    if (true == sql_handler->hasUpdateMeta() &&
+        false == sql_handler->updateAfter()) {
+        (*sql_handler->update_meta)(q, lex, analysis);
+    }
+
+    LEX * new_lex = (*sql_handler->lex_rewrite)(lex, analysis);
+
+    if (true == sql_handler->hasUpdateMeta() &&
+        true == sql_handler->updateAfter()) {
+        (*sql_handler->update_meta)(q, lex, analysis);
+    }
+
+    return new_lex;
+}
+
+LEX *SqlHandler::rewriteLex(LEX *lex, Analysis &analysis, const string &q)
+{
+    SqlHandler *sql_handler = SqlHandler::getHandler(lex->sql_command);
+    if (!sql_handler) {
+        return NULL;
+    }
+
+    if (true == sql_handler->hasUpdateMeta()) {
+        return NULL;
+    }
+
+    return SqlHandler::rewriteLexAndUpdateMeta(lex, analysis, q);
+}
+
 static void buildSqlHandlers()
 {
     SqlHandler *h;
@@ -4250,11 +4255,11 @@ static void buildSqlHandlers()
                        add_table_update_meta, rewrite_create_lex); 
     assert(SqlHandler::addHandler(h));
 
-    h = new SqlHandler(SQLCOM_INSERT, process_select_lex, noopUpdateMeta,
+    h = new SqlHandler(SQLCOM_INSERT, process_select_lex, NULL,
                        rewrite_insert_lex, true);
     assert(SqlHandler::addHandler(h));
 
-    h = new SqlHandler(SQLCOM_REPLACE, process_select_lex, noopUpdateMeta,
+    h = new SqlHandler(SQLCOM_REPLACE, process_select_lex, NULL,
                        rewrite_insert_lex, true);
     assert(SqlHandler::addHandler(h));
 
@@ -4263,15 +4268,15 @@ static void buildSqlHandlers()
                        true);
     assert(SqlHandler::addHandler(h));
 
-    h = new SqlHandler(SQLCOM_UPDATE, process_update_lex, noopUpdateMeta,
+    h = new SqlHandler(SQLCOM_UPDATE, process_update_lex, NULL,
                        rewrite_update_lex, true);
     assert(SqlHandler::addHandler(h));
 
-    h = new SqlHandler(SQLCOM_DELETE, process_select_lex, noopUpdateMeta,
+    h = new SqlHandler(SQLCOM_DELETE, process_select_lex, NULL,
                        rewrite_delete_lex, true);
     assert(SqlHandler::addHandler(h));
 
-    h = new SqlHandler(SQLCOM_SELECT, process_select_lex, noopUpdateMeta,
+    h = new SqlHandler(SQLCOM_SELECT, process_select_lex, NULL,
                        rewrite_select_lex, true);
     assert(SqlHandler::addHandler(h));
 

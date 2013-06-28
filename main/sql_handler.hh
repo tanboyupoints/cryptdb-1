@@ -16,6 +16,8 @@ class SqlHandler {
     static std::map<enum_sql_command, SqlHandler *> handlers;
     enum_sql_command sql_cmd;
 
+    bool hasUpdateMeta() {return update_meta;}
+
 public:
     QueryAnalyze query_analyze;
     UpdateMeta update_meta;
@@ -32,6 +34,9 @@ public:
 
     static SqlHandler *getHandler(enum_sql_command cmd);
     static bool addHandler(SqlHandler *handler);
+    static LEX *rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
+                                        const string &q);
+    static LEX *rewriteLex(LEX *lex, Analysis &analysis, const string &q);
 };
 
 std::map<enum_sql_command, SqlHandler *> SqlHandler::handlers;
