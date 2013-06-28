@@ -35,6 +35,9 @@ using namespace std;
                         string(__PRETTY_FUNCTION__))
 
 // FIXME: Placement.
+static LEX *
+rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a);
+
 static void buildSqlHandlers();
 
 static void
@@ -3040,6 +3043,16 @@ invalidates(FieldMeta * fm, const EncSet &  es) {
     return false;
 }
 
+static std::string *
+output_hack(LEX *lex)
+{
+    // HACK(burrows): Output hack. Fields and values are no longer good
+    // values after return? Not sure why.
+    stringstream ss;
+    ss << *lex;
+    return new string(ss.str());
+}
+
 static LEX *
 rewrite_update_lex(LEX *lex, Analysis &a)
 {
@@ -3149,9 +3162,20 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     new_lex->value_list = res_vals;
 
     if (false == invalids) {
-        return new_lex;
+        return (LEX *)output_hack(new_lex);
+    } else {
+        return rewrite_update_lex_refresh_onions(lex, new_lex, a);
     }
+}
 
+// FIXME(burrows): This code can break database consistency.  If we DELETE
+// the old entries from the table and then the INSERT query later fails,
+// the table will be in a bad state.  We can't prevent this from happening
+// with a TRANSACTion because the INSERT happens at the caller's discretion.
+// This means we probably need a method other than DELETEing the old entries.
+static LEX *
+rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a)
+{
     // TODO(burrows): Should support multiple tables in a single UPDATE.
     // TODO(burrows): Should be a transaction.
     string plain_table = 
@@ -3166,7 +3190,7 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     select_stream << " SELECT * FROM " << plain_table
                   << " WHERE " << where_clause << ";";
     ResType *select_res_type =
-        executeQuery(*a.ps->conn, *a.rewriter, select_stream.str(), true);
+        executeQuery(*a.ps->conn, *a.rewriter, select_stream.str());
     assert(select_res_type);
     if (select_res_type->rows.size() == 0) { // No work to be done.
         return new_lex;
@@ -3229,7 +3253,7 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     delete_stream << " DELETE FROM " << plain_table
                   << " WHERE " << where_clause << ";";
     ResType *delete_res_type =
-        executeQuery(*a.ps->conn, *a.rewriter, delete_stream.str(), true);
+        executeQuery(*a.ps->conn, *a.rewriter, delete_stream.str());
     assert(delete_res_type);
     delete delete_res_type;
 
@@ -3271,10 +3295,10 @@ rewrite_update_lex(LEX *lex, Analysis &a)
                         << " VALUES " << output_rows << ";";
 
     Analysis insert_analysis = Analysis(a.ps);
-    a.rewriter = a.rewriter;
+    insert_analysis.rewriter = a.rewriter;
     query_parse parse(a.ps->e_conn->getCurDBName(),
                       push_results_stream.str());
-    LEX *final_insert_lex =
+    std::string *final_insert_lex =
         SqlHandler::rewriteLex(parse.lex(), insert_analysis, 
                                push_results_stream.str());
     assert(final_insert_lex);
@@ -3284,7 +3308,7 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     cleanup_stream << "DELETE FROM " << plain_table << ";";
     assert(a.ps->e_conn->execute(cleanup_stream.str()));
 
-    return final_insert_lex;
+    return (LEX*)final_insert_lex;
 }
 
 static void
@@ -3814,13 +3838,13 @@ rewrite_helper(const string & q, Analysis & analysis,
 
     LOG(cdb_v) << "pre-analyze " << *lex;
 
-    LEX *new_lex = SqlHandler::rewriteLexAndUpdateMeta(lex, analysis, q);
-    assert(new_lex);
+    std::string *output_query =
+        SqlHandler::rewriteLexAndUpdateMeta(lex, analysis, q);
+    assert(output_query);
 
-    stringstream ss;
-    ss << *new_lex;
-    LOG(cdb_v) << "FINAL QUERY: " << *new_lex << endl;
-    queries.push_back(ss.str());
+    LOG(cdb_v) << "FINAL QUERY: " << output_query << endl;
+    queries.push_back(*output_query);
+    delete output_query;
     return queries;
 }
 
@@ -3995,8 +4019,9 @@ Rewriter::decryptResults(ResType & dbres,
     return res;
 }
 
+// @show defaults to false.
 ResType *
-executeQuery(Connect &conn, Rewriter &r, const string &q, bool show=false)
+executeQuery(Connect &conn, Rewriter &r, const string &q, bool show)
 {
     try {
         DBResult *dbres;
@@ -4202,8 +4227,9 @@ bool SqlHandler::addHandler(SqlHandler *handler)
     return true;
 }
 
-LEX *SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
-                                         const string &q)
+std::string *
+SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
+                                    const string &q)
 {
     SqlHandler *sql_handler = SqlHandler::getHandler(lex->sql_command);
     if (!sql_handler) {
@@ -4230,10 +4256,18 @@ LEX *SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
         (*sql_handler->update_meta)(q, lex, analysis);
     }
 
-    return new_lex;
+    // HACK(burrows): Output HACK.
+    if (SQLCOM_UPDATE == lex->sql_command) {
+       return (std::string*)new_lex; 
+    }
+
+    stringstream ss;
+    ss << *new_lex;
+    return new string(ss.str());
 }
 
-LEX *SqlHandler::rewriteLex(LEX *lex, Analysis &analysis, const string &q)
+std::string *
+SqlHandler::rewriteLex(LEX *lex, Analysis &analysis, const string &q)
 {
     SqlHandler *sql_handler = SqlHandler::getHandler(lex->sql_command);
     if (!sql_handler) {

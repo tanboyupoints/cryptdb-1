@@ -83,7 +83,7 @@ private:
 };
 
 ResType *
-executeQuery(Connect &conn, Rewriter &r, const string &q, bool show);
+executeQuery(Connect &conn, Rewriter &r, const string &q, bool show=false);
 
 const string BOLD_BEGIN = "\033[1m";
 const string RED_BEGIN = "\033[1;31m";
