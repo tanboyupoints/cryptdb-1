@@ -3091,7 +3091,7 @@ rewrite_update_lex(LEX *lex, Analysis &a)
 	assert(val != NULL);
 
 	if (!fm->isEncrypted()) { // not encrypted field
-	    res_items.push_back(i);
+	    res_items.push_back(fd);
 	    res_vals.push_back(val);
 	    continue;
 	}
