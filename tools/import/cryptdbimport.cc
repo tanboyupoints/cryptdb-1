@@ -7,10 +7,7 @@
  * - Parse ALL fields in STRUCTURE. Some of then are missing.
  * - Get rid of descriptive text that mysqldump prints.
  * - Implement query creation.
- * - Cleanup code and interfaces, get rid of some of then. Done! more?
  * - Simplify loadXmlStructure(): Way too far obfuscate.
- * - Improve code reuse: fill*() & write*() functions.
- * - Re-think the whole interface, too many functions.
  * - Re-check xml parser for missing fields.
  * - Error handling mechanism.
  * - Memory leak check.
@@ -40,7 +37,6 @@
 #include <Connect.hh>
 #include <field.h>
 #include <cryptdbimport.hh>
-    
 
 static int 
 createEmptyDB(XMLParser& xml, Connect & conn, string dbname)
@@ -59,13 +55,38 @@ createEmptyDB(XMLParser& xml, Connect & conn, string dbname)
  * Structure fields write out.
  */
 int
-XMLParser::writeRIWO(string& dbname, string& tablename,
-        string& field)
+XMLParser::writeRIWO(string& dbname, string& tablename, 
+        tsPacket_t ts)
 {
-    // TODO: Format query string, rewrite query, execute query
-    // 
-    cout << "[TABLE_STRUCTURE] " << "db: " << dbname 
-        << " table: " << tablename << " field: " << field << endl;
+    //TODO: implement this
+    assert(dbname.size() > 0);
+    assert(tablename.size() > 0);
+    assert(ts.size() > 0);
+
+    for(tsIt it = ts.begin(); it != ts.end(); ++it)
+    {
+        switch(it->first)
+        {
+            case FIELD:
+                {
+                    cout << "[TABLE_STRUCTURE] " << "db: " << dbname 
+                        << " table: " << tablename << " <field> " << "prop: " << 
+                        it->second.first << " value: " << it->second.second << endl;
+                }
+                break;
+            case OPTIONS:
+                {
+                    cout << "[TABLE_STRUCTURE] " << "db: " << dbname 
+                        << " table: " << tablename << " <options> " << "prop: " << 
+                        it->second.first << " value: " << it->second.second << endl;
+                }
+                break;
+            default:
+                throw runtime_error(string("Parsing error: ") + 
+                    string(__PRETTY_FUNCTION__));
+                abort();
+        }
+    }
     return 0;
 }
 
@@ -74,10 +95,19 @@ XMLParser::writeRIWO(string& dbname, string& tablename,
  * Data fields write out.
  */
 int
-XMLParser::writeRIWO(string& dbname, string& tablename, string& field, string& value)
+XMLParser::writeRIWO(string& dbname, string& tablename, 
+        dataPacket_t td)
 {
-    cout << "[TABLE_DATA] " << "db: " << dbname
-        << " table: " << tablename << " field: " << field << " Value: " << value << endl;
+    //TODO: implement this
+    assert(dbname.size() > 0);
+    assert(tablename.size() > 0);
+    assert(td.size() > 0);
+    
+    for(dataIt it = td.begin(); it != td.end(); ++it)
+    {
+        cout << "[TABLE_DATA] " << "db: " << dbname
+            << " table: " << tablename << " field: " << it->first << " Value: " << it->second << endl;
+    }
     return 0;
 }
 
@@ -92,7 +122,9 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
         {
             if ((!xmlStrcmp(cur_node->name, (const xmlChar *)"database"))) 
             {
+                // DATABASE
                 string dbname("");
+
                 xmlAttrPtr attr = cur_node->properties;
                 cout << "[" << attr->children->content << "]" << endl;
                 xmlNode *ch = cur_node->xmlChildrenNode;
@@ -110,36 +142,47 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
 
                 while(ch != NULL)
                 {
-                    // TABLE_STRUCTURE
                     string tablename("");
+
+                    // table_structure
+                    tsPacket_t ts; 
+
+                    // table_data
+                    dataPacket_t td; 
+
+                    // table_structure
                     if ((!xmlStrcmp(ch->name, (const xmlChar *)"table_structure"))) 
                     {
+
                         // Here we create if not exists
-                        string tablename("");
                         xmlAttrPtr attr2 = ch->properties;
                         tablename = (char*)attr2->children->content;
-                        //cout << "\t" << "[" << dbname << "::" << tablename << "](structure)" << endl;
                         xmlNode *ch2 = ch->xmlChildrenNode;
                         while(ch2 != NULL)
                         {
+                            string type = (char*)ch2->name; 
                             while(ch2->properties != NULL)
                             {
+                                //prop
+                                string prop = (char*)ch2->properties->name;
+
                                 xmlAttrPtr attr3 = ch2->properties;
-                                string options = (char*)attr3->children->content;
-                                if(options.size() > 0)
-                                {
-                                    //TODO/FIXME: missing values
-                                    string field = (char*)attr3->children->content;
-                                    
-                                    // Write out on-demand
-                                    assert(xml.writeRIWO(dbname, tablename, field) != 1);
-                                }
+                                assert(attr3 != NULL);
+
+                                string value = (char*)attr3->children->content;
+                                ts.push_back( make_pair(type == "field" ? FIELD : OPTIONS, make_pair(prop, value)));
+
                                 ch2->properties = ch2->properties->next;
                             }
                             ch2 = ch2->next;
                         }
+                        // Write out 
+                        xml.writeRIWO(dbname, tablename, ts); 
 
-                    // TABLE_DATA
+                        // Empty vector, shall not forget.
+                        ts.clear();
+
+                    // table_data
                     } else if ((!xmlStrcmp(ch->name, (const xmlChar *)"table_data"))) 
                     {
                         // No need to create table here
@@ -166,7 +209,9 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                                         string field = (char*)attr3->children->content;
 
                                         // Write out on-demand
-                                        assert(xml.writeRIWO(dbname, tablename, field, value) != 1);
+                                        //assert(xml.writeRIWO(dbname, tablename, field, value) != 1);
+                                        td.push_back(make_pair(field, value));
+
                                         ch3->properties = ch3->properties->next;
                                     }
                                     ch3 = ch3->next;
@@ -174,12 +219,16 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                             }
                             ch2 = ch2->next;
                         }
+                        // Write out 
+                        xml.writeRIWO(dbname, tablename, td); 
+
+                        // Empty vector, shall not forget.
+                        td.clear();
                     }
                     ch = ch->next;
                 }
             }
         }
-        
         // Recursive
         loadXmlStructure(xml, conn, r, cur_node->children);
     }
@@ -187,8 +236,17 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
 
 static void do_display_help(const char *arg)
 {
-
-
+    // under development
+#if 0
+    cout << "CryptDBImport - CryptDB's MySQL import database tool" << endl;
+    cout << "Use: " << arg << " [OPTIONS]" << endl; 
+    cout << "OPTIONS are:" << endl;
+    cout << "-u<username>: MySQL server username" << endl;
+    cout << "-p<password>: MySQL server password" << endl;
+    cout << "-s<file>: MySQL's .sql dump file, originated from \"mysqldump\" tool." << endl;
+    cout << "To generate DB's dump file use mysqldump, e.g.:" << endl;
+    cout << "$ mysqldump -u root -pletmein --all-databases --xml  --no-tablespaces --skip-comments --complete-insert" << endl;
+#endif
     exit(0);
 }
 
@@ -199,18 +257,12 @@ do_init(XMLParser & xml, Connect & conn, Rewriter& r, const char *filename)
     xmlNode *node = NULL;
 
     assert(filename != NULL);
-
     doc = xmlReadFile(filename, NULL, 0);
     assert(doc != NULL);
 
     xml.setDoc(doc);
-
     node = xmlDocGetRootElement(xml.getDoc());
-
     loadXmlStructure(xml, conn, r, node);
-    
-    //assert(xml.writeStructureRIWO() != 1);
-
     xmlFreeDoc(xml.getDoc());
 }
 
