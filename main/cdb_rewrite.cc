@@ -3166,7 +3166,7 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     new_lex->select_lex.item_list = res_items;
     new_lex->value_list = res_vals;
 
-    // TODO(burrows): This should support multiple tabls in a single UPDATE.
+    // TODO(burrows): Should support multiple tables in a single UPDATE.
     // TODO(burrows): Should be a transaction.
     if (invalids) {
         string anonymous_table =
@@ -3176,7 +3176,6 @@ rewrite_update_lex(LEX *lex, Analysis &a)
         string where_clause = ItemToString(new_lex->select_lex.where);
 
         // Retrieve rows from database.
-        // FIXME(burrows): Get where clause.
         ostringstream select_stream;
         select_stream << " SELECT * FROM " << plain_table
                       << " WHERE " << where_clause << ";";
@@ -3187,10 +3186,10 @@ rewrite_update_lex(LEX *lex, Analysis &a)
             return new_lex;
         }
 
-        string values_string;
         // FIXME(burrows): Can do a cleaner implementation of this with
         // std::copy but it requires implicit conversion from Item* to
         // std::string.
+        string values_string;
         for (std::vector<std::vector<Item*>>::iterator row_it =
                 select_res_type->rows.begin();
              row_it != select_res_type->rows.end();
@@ -3216,13 +3215,11 @@ rewrite_update_lex(LEX *lex, Analysis &a)
 
         // Push the plaintext rows to the embedded database.
         // TODO(burrows): We need field names as well.
+        string fields_string;
         ostringstream push_stream;
-        push_stream << " INSERT INTO " << plain_table
+        push_stream << " INSERT INTO " << plain_table << fields_string
                     << " VALUES " << values_string << ";";
-        ResType *push_res_type =
-            executeQuery(*a.ps->conn, *a.rewriter, push_stream.str(), true);
-        assert(push_res_type);
-        delete push_res_type;
+        assert(a.ps->conn->execute(push_stream.str()));
 
         // Run the original (unmodified) query on the data in the embedded
         // database.
@@ -3230,7 +3227,7 @@ rewrite_update_lex(LEX *lex, Analysis &a)
         query_stream << *lex;
         assert(a.ps->e_conn->execute(query_stream.str()));
 
-        // Remove the rows fitting the WHERE clause from the database.
+        // DELETE the rows matching the WHERE clause from the database.
         ostringstream delete_stream;
         delete_stream << " DELETE * FROM " << plain_table
                       << " WHERE " << where_clause << ";";
@@ -3255,10 +3252,17 @@ rewrite_update_lex(LEX *lex, Analysis &a)
             // TODO(burrows): Iterate through rows and create output values.
         }
                     
+        // FIXME(burrows): Instead of doing this INSERT here,
+        // this should probably be LEXed and returned to the caller.
         ostringstream push_results_stream;
         push_results_stream << " INSERT INTO " << anonymous_table
                             << " VALUES " << output_rows << ";";
         assert(a.ps->conn->execute(push_results_stream.str()));
+
+        // Cleanup the embedded database.
+        ostringstream cleanup_stream;
+        cleanup_stream << "DELETE FROM " << plain_table << ";";
+        assert(a.ps->e_conn->execute(cleanup_stream.str()));
     }
 
     return new_lex;
