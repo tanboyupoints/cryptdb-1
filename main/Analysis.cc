@@ -8,9 +8,7 @@ EncSet::EncSet() : osl(FULL_EncSet.osl) {}
 EncSet::EncSet(FieldMeta * fm) {
     osl.clear();
     for (auto pair : fm->onions) {
-        if (!fm->onions[pair.first]->stale) {
-	    osl[pair.first] = LevelFieldPair(pair.second->getSecLevel(), fm);
-        }
+	osl[pair.first] = LevelFieldPair(pair.second->getSecLevel(), fm);
     }
 }
 
@@ -18,9 +16,6 @@ EncSet::EncSet(const OLK & olk) {
     osl[olk.o] = LevelFieldPair(olk.l, olk.key);
 }
 
-// FIXME(burrows): This function can (and will) return stale onions.
-// Situation will resolve itself after the idea of _staleness_ is 
-// abandoned.
 EncSet
 EncSet::intersect(const EncSet & es2) const
 {
@@ -37,12 +32,11 @@ EncSet::intersect(const EncSet & es2) const
                     (int)it2->second.first);
 	    onion o = it->first;
 
-            if (fm == NULL && !fm2->onions[o]->stale) {
+            if (fm == NULL) {
                 m[o] = LevelFieldPair(sl, fm2);
-            } else if (fm2 == NULL && !fm->onions[o]->stale) {
+            } else if (fm2 == NULL) {
                 m[it->first] = LevelFieldPair(sl, fm);
-            } else if (fm != NULL && fm2 != NULL &&
-                       !fm->onions[o]->stale && !fm2->onions[o]->stale) {
+            } else if (fm != NULL && fm2 != NULL) {
                 // TODO(burrows): Guarentee that the keys are the same.
 		if (sl == SECLEVEL::DETJOIN) {
 		    m[o] = LevelFieldPair(sl, fm);

@@ -129,7 +129,6 @@ createMetaTablesIfNotExists(ProxyState & ps)
       << " " << TypeText<onion>::parenList() << " NOT NULL,"
       << "  current_level enum"
       << " " << TypeText<SECLEVEL>::parenList() << " NOT NULL,"
-      << "  stale boolean,"
       << " sql_type enum"
       << " " << TypeText<enum enum_field_types>::parenList() <<" NOT NULL,"
       << "  id SERIAL PRIMARY KEY)"
@@ -295,7 +294,7 @@ static void
 buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
 {
 
-    string q = " SELECT o.name, o.type, o.current_level, o.stale," 
+    string q = " SELECT o.name, o.type, o.current_level," 
                "        o.sql_type, o.id"
                " FROM pdb.onion_info o, pdb.field_info f"
                " WHERE o.field_info_id = " + std::to_string(field_id) +";";
@@ -312,15 +311,13 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
         string onion_name(row[0], l[0]);
         string onion_type(row[1], l[1]);
         string onion_current_level(row[2], l[2]);
-        string onion_stale(row[3], l[3]);
-        string onion_sql_type(row[4], l[4]);
-        string onion_id(row[5], l[5]);
+        string onion_sql_type(row[3], l[3]);
+        string onion_id(row[4], l[4]);
 
         OnionMeta *om = new OnionMeta();
         om->onionname = onion_name;
         om->sql_type  =
             TypeText<enum enum_field_types>::toType(onion_sql_type);
-        om->stale = string_to_bool(onion_stale);
 
         onion o = TypeText<onion>::toType(onion_type);
         fm->onions[o] = om;
@@ -3031,18 +3028,6 @@ mp_update_init(LEX *lex, Analysis &a)
     }
 }
 
-/*
-static void
-stalefy(FieldMeta * fm, const EncSet &  es) {
-    for (auto o_l : fm->onions) {
-        onion o = o_l.first;
-        if (es.osl.find(o) == es.osl.end()) {
-            fm->onions[o]->stale = true;
-        }
-    }
-}
-*/
-
 static bool
 invalidates(FieldMeta * fm, const EncSet &  es) {
     for (auto o_l : fm->onions) {
@@ -3084,9 +3069,6 @@ rewrite_update_lex(LEX *lex, Analysis &a)
 
     auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
     auto val_it = List_iterator<Item>(lex->value_list);
-
-    //TODO: need to make stale certain onions and not allow operations
-    // to those onions any more; reset this after an update set
 
     // Look through all pairs in set: fd = val
     for (;;) {
@@ -3586,7 +3568,6 @@ add_table_update_meta(const string &q,
               << " '" << om->onionname << "', "
               << " '" << str_onion << "', "
               << " '" << str_seclevel << "', "
-              << " " << bool_to_string(om->stale) << ", "
               << " '" << TypeText<enum enum_field_types>::toText(om->sql_type) << "', "
               << " 0);";
             

@@ -55,7 +55,6 @@ operator<<(std::ostream &out, const OnionLevelFieldPair &p);
 
 typedef struct OnionMeta {
     std::string onionname;
-    bool stale;
     enum enum_field_types sql_type;
     std::vector<EncLayer *> layers; //first in list is lowest layer
 
@@ -64,7 +63,7 @@ typedef struct OnionMeta {
         return layers.back()->level();
     }
 
-    OnionMeta(): onionname(""), stale(false) {};
+    OnionMeta(): onionname("")  {};
 } OnionMeta;
 
 struct TableMeta;
