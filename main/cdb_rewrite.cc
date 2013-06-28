@@ -3148,139 +3148,152 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     new_lex->select_lex.item_list = res_items;
     new_lex->value_list = res_vals;
 
+    if (false == invalids) {
+        return new_lex;
+    }
+
     // TODO(burrows): Should support multiple tables in a single UPDATE.
     // TODO(burrows): Should be a transaction.
-    if (invalids) {
-        string anonymous_table =
-            new_lex->select_lex.top_join_list.head()->table_name;
-        string plain_table = 
-            lex->select_lex.top_join_list.head()->table_name;
-        // HACK(burrows): Handling empty WHERE clause.
-        string where_clause =
-            new_lex->select_lex.where ?
-                ItemToString(new_lex->select_lex.where) : " TRUE ";
+    string plain_table = 
+        lex->select_lex.top_join_list.head()->table_name;
+    // HACK(burrows): Handling empty WHERE clause.
+    string where_clause =
+        new_lex->select_lex.where ?
+            ItemToString(new_lex->select_lex.where) : " TRUE ";
 
-        // Retrieve rows from database.
-        ostringstream select_stream;
-        select_stream << " SELECT * FROM " << plain_table
-                      << " WHERE " << where_clause << ";";
-        ResType *select_res_type =
-            executeQuery(*a.ps->conn, *a.rewriter, select_stream.str(), true);
-        assert(select_res_type);
-        if (select_res_type->rows.size() == 0) { // No work to be done.
-            return new_lex;
-        }
+    // Retrieve rows from database.
+    ostringstream select_stream;
+    select_stream << " SELECT * FROM " << plain_table
+                  << " WHERE " << where_clause << ";";
+    ResType *select_res_type =
+        executeQuery(*a.ps->conn, *a.rewriter, select_stream.str(), true);
+    assert(select_res_type);
+    if (select_res_type->rows.size() == 0) { // No work to be done.
+        return new_lex;
+    }
 
-        // FIXME(burrows): Can do a cleaner implementation of this with
-        // std::copy but it requires implicit conversion from Item* to
-        // std::string.
-        string values_string;
-        for (std::vector<std::vector<Item*>>::iterator row_it =
-                select_res_type->rows.begin();
-             row_it != select_res_type->rows.end();
-             ++row_it) {
-            std::vector<Item*> row = (std::vector<Item*>)*row_it;
-            values_string.append("(");
-            for (std::vector<Item*>::iterator item_it = row.begin();
-                 item_it != row.end();
-                 ++item_it) {
-                Item* value = (Item*)*item_it; 
-                values_string.append(ItemToString(value));
-                if (item_it + 1 != row.end()) {
-                    values_string.append(", ");
-                }
-            }
-
-            values_string.append(") ");
-            if (row_it + 1 != select_res_type->rows.end()) {
+    // FIXME(burrows): Can do a cleaner implementation of this with
+    // std::copy but it requires implicit conversion from Item* to
+    // std::string.
+    string values_string;
+    for (std::vector<std::vector<Item*>>::iterator row_it =
+            select_res_type->rows.begin();
+         row_it != select_res_type->rows.end();
+         ++row_it) {
+        std::vector<Item*> row = (std::vector<Item*>)*row_it;
+        values_string.append("(");
+        for (std::vector<Item*>::iterator item_it = row.begin();
+             item_it != row.end();
+             ++item_it) {
+            Item* value = (Item*)*item_it; 
+            values_string.append(ItemToString(value));
+            if (item_it + 1 != row.end()) {
                 values_string.append(", ");
             }
         }
-        delete select_res_type;
 
-        string fields_string = "( ";
-        auto f_it = List_iterator<Item>(lex->select_lex.item_list);
-        Item *i = f_it++;
-        for (; i != NULL;) {
-            Item_field *item = static_cast<Item_field*>(i);
-            fields_string.append(item->field_name);
-
-            if ((i = f_it++) != NULL) {
-                fields_string.append(", ");
-            }
-        } 
-        fields_string.append(" ) ");
-
-        // Push the plaintext rows to the embedded database.
-        ostringstream push_stream;
-        push_stream << " INSERT INTO " << plain_table << fields_string
-                    << " VALUES " << values_string << ";";
-        assert(a.ps->e_conn->execute(push_stream.str()));
-
-        // Run the original (unmodified) query on the data in the embedded
-        // database.
-        ostringstream query_stream;
-        query_stream << *lex;
-        assert(a.ps->e_conn->execute(query_stream.str()));
-
-        // DELETE the rows matching the WHERE clause from the database.
-        ostringstream delete_stream;
-        delete_stream << " DELETE FROM " << plain_table
-                      << " WHERE " << where_clause << ";";
-        ResType *delete_res_type =
-            executeQuery(*a.ps->conn, *a.rewriter, delete_stream.str(), true);
-        assert(delete_res_type);
-        delete delete_res_type;
-
-        // > Add each row from the embedded database to the data database.
-        // > This code relies on single threaded access to the database
-        // and on the fact that the database is cleaned up after every such
-        // operation.
-        DBResult *dbres;
-        ostringstream select_results_stream;
-        select_results_stream << " SELECT * FROM " << plain_table << ";";
-        assert(a.ps->e_conn->execute(select_results_stream.str(), dbres));
-
-        ScopedMySQLRes r(dbres->n);
-        MYSQL_ROW row;
-        string output_rows = " ";
-        unsigned long field_count = r.res()->field_count;
-        while ((row = mysql_fetch_row(r.res()))) {
-            unsigned long *l = mysql_fetch_lengths(r.res());
-            assert(l != NULL);
-
-            output_rows.append(" ( ");
-            for (unsigned long field_index = 0; field_index < field_count;
-                 ++field_index) {
-                string field_data(row[field_index], l[field_index]);
-                output_rows.append(field_data);
-                if (field_index + 1 < field_count) {
-                    output_rows.append(", ");
-                }
-            }
-            output_rows.append(" ) ,");
+        values_string.append(") ");
+        if (row_it + 1 != select_res_type->rows.end()) {
+            values_string.append(", ");
         }
-        output_rows = output_rows.substr(0, output_rows.length() - 1);
-
-                    
-        // FIXME(burrows): Instead of doing this INSERT here,
-        // this should probably be LEXed and returned to the caller.
-        ostringstream push_results_stream;
-        push_results_stream << " INSERT INTO " << plain_table
-                            << " VALUES " << output_rows << ";";
-        ResType *push_res_type = 
-           executeQuery(*a.ps->conn, *a.rewriter, push_results_stream.str(),
-                        true); 
-        assert(push_res_type);
-        delete push_res_type;
-
-        // Cleanup the embedded database.
-        ostringstream cleanup_stream;
-        cleanup_stream << "DELETE FROM " << plain_table << ";";
-        assert(a.ps->e_conn->execute(cleanup_stream.str()));
     }
+    delete select_res_type;
 
-    return new_lex;
+    string fields_string = "( ";
+    auto f_it = List_iterator<Item>(lex->select_lex.item_list);
+    Item *i = f_it++;
+    for (; i != NULL;) {
+        Item_field *item = static_cast<Item_field*>(i);
+        fields_string.append(item->field_name);
+
+        if ((i = f_it++) != NULL) {
+            fields_string.append(", ");
+        }
+    } 
+    fields_string.append(" ) ");
+
+    // Push the plaintext rows to the embedded database.
+    ostringstream push_stream;
+    push_stream << " INSERT INTO " << plain_table << fields_string
+                << " VALUES " << values_string << ";";
+    assert(a.ps->e_conn->execute(push_stream.str()));
+
+    // Run the original (unmodified) query on the data in the embedded
+    // database.
+    ostringstream query_stream;
+    query_stream << *lex;
+    assert(a.ps->e_conn->execute(query_stream.str()));
+
+    // DELETE the rows matching the WHERE clause from the database.
+    ostringstream delete_stream;
+    delete_stream << " DELETE FROM " << plain_table
+                  << " WHERE " << where_clause << ";";
+    ResType *delete_res_type =
+        executeQuery(*a.ps->conn, *a.rewriter, delete_stream.str(), true);
+    assert(delete_res_type);
+    delete delete_res_type;
+
+    // > Add each row from the embedded database to the data database.
+    // > This code relies on single threaded access to the database
+    // and on the fact that the database is cleaned up after every such
+    // operation.
+    DBResult *dbres;
+    ostringstream select_results_stream;
+    select_results_stream << " SELECT * FROM " << plain_table << ";";
+    assert(a.ps->e_conn->execute(select_results_stream.str(), dbres));
+
+    ScopedMySQLRes r(dbres->n);
+    MYSQL_ROW row;
+    string output_rows = " ";
+    unsigned long field_count = r.res()->field_count;
+    while ((row = mysql_fetch_row(r.res()))) {
+        unsigned long *l = mysql_fetch_lengths(r.res());
+        assert(l != NULL);
+
+        output_rows.append(" ( ");
+        for (unsigned long field_index = 0; field_index < field_count;
+             ++field_index) {
+            string field_data(row[field_index], l[field_index]);
+            output_rows.append(field_data);
+            if (field_index + 1 < field_count) {
+                output_rows.append(", ");
+            }
+        }
+        output_rows.append(" ) ,");
+    }
+    output_rows = output_rows.substr(0, output_rows.length() - 1);
+
+    // FIXME(burrows): Instead of doing this INSERT here,
+    // this should probably be LEXed and returned to the caller.
+    ostringstream push_results_stream;
+    push_results_stream << " INSERT INTO " << plain_table
+                        << " " << fields_string
+                        << " VALUES " << output_rows << ";";
+
+    Analysis insert_analysis = Analysis(a.ps);
+    a.rewriter = a.rewriter;
+    SqlHandler *sql_handler = SqlHandler::getHandler(SQLCOM_INSERT);
+    // FIXME(burrows): This should actually check to see that the
+    // updateMeta is a noop.
+    assert(sql_handler && true == sql_handler->updateAfter());
+
+    query_parse parse(a.ps->e_conn->getCurDBName(),
+                      push_results_stream.str());
+    LEX *insert_lex = parse.lex();
+
+    process_table_list(&insert_lex->select_lex.top_join_list,
+                       insert_analysis);
+
+    (*sql_handler->query_analyze)(insert_lex, insert_analysis);
+    LEX *final_insert_lex =
+        (*sql_handler->lex_rewrite)(insert_lex, insert_analysis);
+
+    // Cleanup the embedded database.
+    ostringstream cleanup_stream;
+    cleanup_stream << "DELETE FROM " << plain_table << ";";
+    assert(a.ps->e_conn->execute(cleanup_stream.str()));
+
+    return final_insert_lex;
 }
 
 static void
@@ -4238,11 +4251,11 @@ static void buildSqlHandlers()
     assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_INSERT, process_select_lex, noopUpdateMeta,
-                       rewrite_insert_lex);
+                       rewrite_insert_lex, true);
     assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_REPLACE, process_select_lex, noopUpdateMeta,
-                       rewrite_insert_lex);
+                       rewrite_insert_lex, true);
     assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_DROP_TABLE, process_select_lex,
@@ -4251,19 +4264,19 @@ static void buildSqlHandlers()
     assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_UPDATE, process_update_lex, noopUpdateMeta,
-                       rewrite_update_lex);
+                       rewrite_update_lex, true);
     assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_DELETE, process_select_lex, noopUpdateMeta,
-                       rewrite_delete_lex);
+                       rewrite_delete_lex, true);
     assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_SELECT, process_select_lex, noopUpdateMeta,
-                       rewrite_select_lex);
+                       rewrite_select_lex, true);
     assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_CHANGE_DB, process_select_lex,
-                       changeDBUpdateMeta, rewrite_select_lex);
+                       changeDBUpdateMeta, rewrite_select_lex, true);
     assert(SqlHandler::addHandler(h));
 
 }
