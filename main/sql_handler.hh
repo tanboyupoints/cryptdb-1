@@ -34,9 +34,9 @@ public:
 
     static SqlHandler *getHandler(enum_sql_command cmd);
     static bool addHandler(SqlHandler *handler);
-    static std::string *rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
+    static LEX *rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
                                         const string &q);
-    static std::string *rewriteLex(LEX *lex, Analysis &analysis, const string &q);
+    static LEX *rewriteLex(LEX *lex, Analysis &analysis, const string &q);
 };
 
 std::map<enum_sql_command, SqlHandler *> SqlHandler::handlers;

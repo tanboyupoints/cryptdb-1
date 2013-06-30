@@ -3043,16 +3043,6 @@ invalidates(FieldMeta * fm, const EncSet &  es) {
     return false;
 }
 
-static std::string *
-output_hack(LEX *lex)
-{
-    // HACK(burrows): Output hack. Fields and values are no longer good
-    // values after return? Not sure why.
-    stringstream ss;
-    ss << *lex;
-    return new string(ss.str());
-}
-
 static LEX *
 rewrite_update_lex(LEX *lex, Analysis &a)
 {
@@ -3162,7 +3152,7 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     new_lex->value_list = res_vals;
 
     if (false == invalids) {
-        return (LEX *)output_hack(new_lex);
+        return new_lex;
     } else {
         return rewrite_update_lex_refresh_onions(lex, new_lex, a);
     }
@@ -3287,8 +3277,6 @@ rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a)
     }
     output_rows = output_rows.substr(0, output_rows.length() - 1);
 
-    // FIXME(burrows): Instead of doing this INSERT here,
-    // this should probably be LEXed and returned to the caller.
     ostringstream push_results_stream;
     push_results_stream << " INSERT INTO " << plain_table
                         << " " << fields_string
@@ -3296,10 +3284,18 @@ rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a)
 
     Analysis insert_analysis = Analysis(a.ps);
     insert_analysis.rewriter = a.rewriter;
-    query_parse parse(a.ps->e_conn->getCurDBName(),
-                      push_results_stream.str());
-    std::string *final_insert_lex =
-        SqlHandler::rewriteLex(parse.lex(), insert_analysis, 
+    // FIXME(burrows): Memleak.
+    // Freeing the query_parse (or using an automatic variable and letting
+    // it cleanup itself) will call the query_parse destructor which calls
+    // THD::cleanup_after_query which results in all of our Items_* being
+    // freed.
+    // THD::cleanup_after_query
+    //     Query_arena::free_items
+    //         Item::delete_self).
+    query_parse *parse = new query_parse(a.ps->e_conn->getCurDBName(),
+                                         push_results_stream.str());
+    LEX *final_insert_lex =
+        SqlHandler::rewriteLex(parse->lex(), insert_analysis, 
                                push_results_stream.str());
     assert(final_insert_lex);
 
@@ -3308,7 +3304,7 @@ rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a)
     cleanup_stream << "DELETE FROM " << plain_table << ";";
     assert(a.ps->e_conn->execute(cleanup_stream.str()));
 
-    return (LEX*)final_insert_lex;
+    return final_insert_lex;
 }
 
 static void
@@ -3838,13 +3834,15 @@ rewrite_helper(const string & q, Analysis & analysis,
 
     LOG(cdb_v) << "pre-analyze " << *lex;
 
-    std::string *output_query =
+    LEX *new_lex =
         SqlHandler::rewriteLexAndUpdateMeta(lex, analysis, q);
-    assert(output_query);
+    assert(new_lex);
 
-    LOG(cdb_v) << "FINAL QUERY: " << output_query << endl;
-    queries.push_back(*output_query);
-    delete output_query;
+    LOG(cdb_v) << "FINAL QUERY: " << *new_lex << endl;
+
+    stringstream ss;
+    ss << *new_lex;
+    queries.push_back(ss.str());
     return queries;
 }
 
@@ -4227,7 +4225,7 @@ bool SqlHandler::addHandler(SqlHandler *handler)
     return true;
 }
 
-std::string *
+LEX *
 SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
                                     const string &q)
 {
@@ -4256,17 +4254,10 @@ SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
         (*sql_handler->update_meta)(q, lex, analysis);
     }
 
-    // HACK(burrows): Output HACK.
-    if (SQLCOM_UPDATE == lex->sql_command) {
-       return (std::string*)new_lex; 
-    }
-
-    stringstream ss;
-    ss << *new_lex;
-    return new string(ss.str());
+    return new_lex;
 }
 
-std::string *
+LEX *
 SqlHandler::rewriteLex(LEX *lex, Analysis &analysis, const string &q)
 {
     SqlHandler *sql_handler = SqlHandler::getHandler(lex->sql_command);
