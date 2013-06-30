@@ -9,7 +9,8 @@ typedef void (*QueryAnalyze)(LEX *lex, Analysis &a);
                              */
 
 typedef void (*UpdateMeta)(const string &q, LEX *lex, Analysis &a);
-typedef LEX *(*LexRewrite)(LEX *lex, Analysis &analysis);
+typedef LEX **(*LexRewrite)(LEX *lex, Analysis &analysis, 
+                            unsigned *out_lex_count);
 
 class SqlHandler {
     bool update_after_rewrite;
@@ -34,9 +35,11 @@ public:
 
     static SqlHandler *getHandler(enum_sql_command cmd);
     static bool addHandler(SqlHandler *handler);
-    static LEX *rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
-                                        const string &q);
-    static LEX *rewriteLex(LEX *lex, Analysis &analysis, const string &q);
+    static LEX **rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
+                                         const string &q,
+                                         unsigned *out_lex_count);
+    static LEX **rewriteLex(LEX *lex, Analysis &analysis, const string &q,
+                            unsigned *out_lex_count);
 };
 
 std::map<enum_sql_command, SqlHandler *> SqlHandler::handlers;
