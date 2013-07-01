@@ -3182,6 +3182,30 @@ commit_transaction_lex(Analysis a) {
     return commit_parse->lex();
 }
 
+// FIXME(burrows): Generalize to support any container with next AND end
+// semantics.
+template <typename T>
+std::string vector_join(std::vector<T> v, std::string delim,
+                        std::string (*finalize)(T))
+{
+    std::string accum;
+    for (typename std::vector<T>::iterator it = v.begin();
+         it != v.end(); ++it) {
+        std::string element = (*finalize)((T)*it);
+        accum.append(element);
+        accum.append(delim);
+    } 
+
+    std::string output;
+    if (accum.size() > 0) {
+        output = accum.substr(0, accum.size() - 1);
+    } else {
+        output = accum;
+    }
+
+    return output;
+}
+
 static LEX **
 rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a,
                                   unsigned *out_lex_count)
@@ -3208,49 +3232,19 @@ rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a,
         return out_lex;
     }
 
-    // FIXME(burrows): Can do a cleaner implementation of this with
-    // std::copy but it requires implicit conversion from Item* to
-    // std::string.
-    string values_string;
-    for (std::vector<std::vector<Item*>>::iterator row_it =
-            select_res_type->rows.begin();
-         row_it != select_res_type->rows.end();
-         ++row_it) {
-        std::vector<Item*> row = (std::vector<Item*>)*row_it;
-        values_string.append("(");
-        for (std::vector<Item*>::iterator item_it = row.begin();
-             item_it != row.end();
-             ++item_it) {
-            Item* value = (Item*)*item_it; 
-            values_string.append(ItemToString(value));
-            if (item_it + 1 != row.end()) {
-                values_string.append(", ");
-            }
+    struct _ {
+        static std::string itemJoin(std::vector<Item*> row) {
+            return "(" + vector_join<Item*>(row, ",", ItemToString) + ")";
         }
-
-        values_string.append(") ");
-        if (row_it + 1 != select_res_type->rows.end()) {
-            values_string.append(", ");
-        }
-    }
+    };
+    string values_string =
+        vector_join<std::vector<Item*>>(select_res_type->rows, ",",
+                                        _::itemJoin);
     delete select_res_type;
-
-    string fields_string = "( ";
-    auto f_it = List_iterator<Item>(lex->select_lex.item_list);
-    Item *i = f_it++;
-    for (; i != NULL;) {
-        Item_field *item = static_cast<Item_field*>(i);
-        fields_string.append(item->field_name);
-
-        if ((i = f_it++) != NULL) {
-            fields_string.append(", ");
-        }
-    } 
-    fields_string.append(" ) ");
 
     // Push the plaintext rows to the embedded database.
     ostringstream push_stream;
-    push_stream << " INSERT INTO " << plain_table << fields_string
+    push_stream << " INSERT INTO " << plain_table
                 << " VALUES " << values_string << ";";
     assert(a.ps->e_conn->execute(push_stream.str()));
 
@@ -3269,6 +3263,7 @@ rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a,
     select_results_stream << " SELECT * FROM " << plain_table << ";";
     assert(a.ps->e_conn->execute(select_results_stream.str(), dbres));
 
+    // FIXME(burrows): Use general join.
     ScopedMySQLRes r(dbres->n);
     MYSQL_ROW row;
     string output_rows = " ";
@@ -3298,9 +3293,7 @@ rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a,
     // > Add each row from the embedded database to the data database.
     ostringstream push_results_stream;
     push_results_stream << " INSERT INTO " << plain_table
-                        << " " << fields_string
                         << " VALUES " << output_rows << ";";
-
     Analysis insert_analysis = Analysis(a.ps);
     insert_analysis.rewriter = a.rewriter;
     // FIXME(burrows): Memleak.
