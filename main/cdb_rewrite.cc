@@ -3077,7 +3077,6 @@ rewrite_alter_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
                     }
                     return out_list;
                 });
-
     }
     
     // TODO: Rewrite alter column list.
@@ -3613,27 +3612,13 @@ drop_table_update_meta(const string &q,
 
 	assert(a.ps->e_conn->execute(s.str()));
 
-        a.ps->schema->totalTables--;
-        // Using a loop because we need to look up the table by it's
-        // normal name, which isn't available otherwise?
-        for (auto it: a.ps->schema->tableMetaMap) {
-            std::string normalTableName = it.first;
-            if (normalTableName == string(table)) {
-                for (auto it2: it.second->fieldMetaMap) {
-                    for (auto it3: it2.second->onions) {
-                        it2.second->onions.erase(it3.first);
-                    } 
-                    it.second->fieldMetaMap.erase(it2.first);
-                }
-                a.ps->schema->tableMetaMap.erase(normalTableName);
+        ostringstream ds;
+        ds << " DROP TABLE " << dbname << "." << table
+           << ";";
+        assert(a.ps->e_conn->execute(ds.str()));
 
-                ostringstream ds;
-                ds << " DROP TABLE " << dbname << "." << normalTableName
-                   << ";";
-                assert(a.ps->e_conn->execute(ds.str()));
-                break;
-            }
-        }
+        // Remove from *Meta structures.
+        assert(a.destroyTableMeta(table));
     }
 
     assert(a.ps->e_conn->execute("COMMIT"));
@@ -3764,8 +3749,9 @@ add_table_update_meta(const string &q,
 static inline void
 alter_table_update_meta(const string &q, LEX *lex, Analysis &a)
 {
-    // const string &table =
-        // lex->select_lex.table_list.first->table_name;
+    const string &table =
+        lex->select_lex.table_list.first->table_name;
+    const string &dbname = lex->select_lex.table_list.first->db;
 
     // TODO: Rewrite create list.
     if (lex->alter_info.flags & ALTER_ADD_COLUMN) {
@@ -3785,11 +3771,24 @@ alter_table_update_meta(const string &q, LEX *lex, Analysis &a)
             // FIXME: Possibly this should be an assert as mixed clauses
             // are not supported?
             if (adrop->type == Alter_drop::COLUMN) {
-                // FieldMeta *fm = a.getFieldMeta(table, adrop->name);
-
                 // Remove from embedded database.
+                ostringstream s;
+                s << " DELETE FROM pdb.field_info, pdb.onion_info, "
+                  << "             pdb.layer_key"
+                  << " USING pdb.table_info INNER JOIN pdb.field_info "
+                  << "       INNER JOIN pdb.onion_info INNER JOIN "
+                  << "       pdb.layer_key"
+                  << " ON  pdb.table_info.id = pdb.field_info.table_info_id"
+                  << " AND pdb.field_info.id = pdb.onion_info.field_info_id"
+                  << " AND pdb.onion_info.id = pdb.layer_key.onion_info_id "
+                  << " WHERE pdb.table_info.name = '" << table << "' "
+                  << " AND pdb.table_info.database_name = '" << dbname << "';";
+
+                cout << "QUERY: " << s.str() << endl;
+                assert(a.ps->e_conn->execute(s.str()));
                  
                 // Remove from *Meta structures.
+                assert(a.destroyFieldMeta(table, adrop->name));
             }
         }
     }
@@ -4468,10 +4467,14 @@ static void buildSqlHandlers()
 {
     SqlHandler *h;
 
+    // Must update after rewrite, otherwise you will delete FieldMeta that
+    // must be looked up in rewrite.
     h = new SqlHandler(SQLCOM_ALTER_TABLE, process_select_lex,
                        alter_table_update_meta, rewrite_alter_lex, true);
     assert(SqlHandler::addHandler(h));
 
+    // Must rewrite after update, otherwise TableMeta and FieldMeta
+    // will not exist during rewrite.
     h = new SqlHandler(SQLCOM_CREATE_TABLE, process_select_lex,
                        add_table_update_meta, rewrite_create_lex); 
     assert(SqlHandler::addHandler(h));
@@ -4484,6 +4487,8 @@ static void buildSqlHandlers()
                        rewrite_insert_lex, true);
     assert(SqlHandler::addHandler(h));
 
+    // Must update after rewrite, otherwise you will delete TableMeta
+    // and FieldMeta that is needed during rewrite.
     h = new SqlHandler(SQLCOM_DROP_TABLE, process_select_lex,
                        drop_table_update_meta, rewrite_drop_table_lex,
                        true);
@@ -4530,6 +4535,7 @@ mapList(List_iterator<T> it, F op) {
     return newList;
 }
 
+// A bit off.
 template <typename T, typename F, typename O> O
 reduceList(List_iterator<T> it, O init, F op) {
     List<T> newList;

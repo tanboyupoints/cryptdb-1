@@ -42,6 +42,19 @@ FieldMeta::FieldMeta()
 
 }
 
+FieldMeta::~FieldMeta()
+{
+    for (auto onion_it : onions) {
+        delete onion_it.second;
+    }
+}
+
+bool TableMeta::destroyFieldMeta(std::string field)
+{
+    // FIXME: Remove name from @fieldNames.
+    return 1 == fieldMetaMap.erase(field);
+}
+
 TableMeta::TableMeta() {
     anonTableName = "";
     tableNo = 0;
@@ -68,4 +81,11 @@ SchemaInfo::getFieldMeta(const string & table, const string & field) {
     assert_s(it != tm->fieldMetaMap.end(), "could not find field " + field + " in table " +  table );
     assert_s(it->second != NULL, "field " + table + "." + field + " not present in proxy schema ");
     return it->second;
+}
+
+bool
+SchemaInfo::destroyTableMeta(std::string table)
+{
+    --totalTables;
+    return 1 == tableMetaMap.erase(table);
 }

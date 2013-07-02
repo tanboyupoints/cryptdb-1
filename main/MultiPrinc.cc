@@ -425,7 +425,8 @@ MultiPrinc::insertLex(LEX *lex, SchemaInfo * schema, TMKM &tmkm) {
     } else {
         auto it = schema->tableMetaMap.find(table);
         assert(it != schema->tableMetaMap.end());
-        field_names = it->second->fieldNames;
+        // FIXME: Clean.
+        // field_names = it->second->fieldNames;
     }
 
     //construct map from fieldname to values

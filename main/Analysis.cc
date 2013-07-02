@@ -199,6 +199,20 @@ TableMeta *Analysis::getTableMeta(std::string table) const
     return ps->schema->getTableMeta(real_table_name);
 }
 
+// FIXME: Field aliasing.
+bool Analysis::destroyFieldMeta(std::string table, std::string field)
+{
+    string real_table_name = unAliasTable(table);
+    TableMeta *tm = ps->schema->getTableMeta(real_table_name);
+    return tm->destroyFieldMeta(field);
+}
+
+bool Analysis::destroyTableMeta(std::string table)
+{
+    string real_table_name = unAliasTable(table);
+    return ps->schema->destroyTableMeta(table);
+}
+
 std::string Analysis::unAliasTable(std::string table) const
 {
     auto alias_pair = table_aliases.find(table);

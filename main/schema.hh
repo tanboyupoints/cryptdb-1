@@ -83,6 +83,7 @@ typedef struct FieldMeta {
     std::string salt_name;
 
     FieldMeta();
+    ~FieldMeta();
 
     bool hasOnion(onion o) const {
         return onions.find(o) !=
@@ -122,7 +123,7 @@ typedef struct FieldMeta {
 
 typedef struct TableMeta {
 
-    std::list<std::string> fieldNames;     //in order field names                     
+    std::vector<std::string> fieldNames;     //in order field names                     
     unsigned int tableNo;
     std::string anonTableName;
 
@@ -135,6 +136,11 @@ typedef struct TableMeta {
 
     TableMeta();
     ~TableMeta();
+
+    friend class Analysis;
+
+protected:
+    bool destroyFieldMeta(std::string field);
 } TableMeta;
 
 
@@ -152,5 +158,6 @@ private:
     // and Analysis::getFieldMeta.
     TableMeta * getTableMeta(const std::string & table);
     FieldMeta * getFieldMeta(const std::string & table, const std::string & field);
+    bool destroyTableMeta(std::string table);
 } SchemaInfo;
 
