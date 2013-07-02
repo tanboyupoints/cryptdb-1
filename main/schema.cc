@@ -51,7 +51,7 @@ FieldMeta::~FieldMeta()
 
 bool TableMeta::destroyFieldMeta(std::string field)
 {
-    // FIXME: Remove name from @fieldNames.
+    fieldNames.remove(field);
     return 1 == fieldMetaMap.erase(field);
 }
 

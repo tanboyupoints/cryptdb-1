@@ -3613,8 +3613,7 @@ drop_table_update_meta(const string &q,
 	assert(a.ps->e_conn->execute(s.str()));
 
         ostringstream ds;
-        ds << " DROP TABLE " << dbname << "." << table
-           << ";";
+        ds << " DROP TABLE " << dbname << "." << table << ";";
         assert(a.ps->e_conn->execute(ds.str()));
 
         // Remove from *Meta structures.
@@ -3761,36 +3760,34 @@ alter_table_update_meta(const string &q, LEX *lex, Analysis &a)
     // Rewrite drop list.
     if (lex->alter_info.flags & ALTER_DROP_COLUMN) {
         auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
+        eachList<Alter_drop>(drop_it,
+            [table, dbname, &a] (Alter_drop *adrop) {
+                // FIXME: Possibly this should be an assert as mixed clauses
+                // are not supported?
+                if (adrop->type == Alter_drop::COLUMN) {
+                    // Remove from embedded database.
+                    ostringstream s;
+                    s << " DELETE FROM pdb.field_info, pdb.onion_info, "
+                      << "             pdb.layer_key"
+                      << " USING pdb.table_info INNER JOIN pdb.field_info "
+                      << "       INNER JOIN pdb.onion_info INNER JOIN "
+                      << "       pdb.layer_key"
+                      << " ON  pdb.table_info.id = pdb.field_info.table_info_id"
+                      << " AND pdb.field_info.id = pdb.onion_info.field_info_id"
+                      << " AND pdb.onion_info.id = pdb.layer_key.onion_info_id "
+                      << " WHERE pdb.table_info.name = '" << table << "' "
+                      << " AND pdb.table_info.database_name = '" << dbname << "';";
 
-        for (;;) {
-            Alter_drop *adrop = drop_it++;
-            if (!adrop) {
-                break;
-            }
+                    assert(a.ps->e_conn->execute(s.str()));
 
-            // FIXME: Possibly this should be an assert as mixed clauses
-            // are not supported?
-            if (adrop->type == Alter_drop::COLUMN) {
-                // Remove from embedded database.
-                ostringstream s;
-                s << " DELETE FROM pdb.field_info, pdb.onion_info, "
-                  << "             pdb.layer_key"
-                  << " USING pdb.table_info INNER JOIN pdb.field_info "
-                  << "       INNER JOIN pdb.onion_info INNER JOIN "
-                  << "       pdb.layer_key"
-                  << " ON  pdb.table_info.id = pdb.field_info.table_info_id"
-                  << " AND pdb.field_info.id = pdb.onion_info.field_info_id"
-                  << " AND pdb.onion_info.id = pdb.layer_key.onion_info_id "
-                  << " WHERE pdb.table_info.name = '" << table << "' "
-                  << " AND pdb.table_info.database_name = '" << dbname << "';";
-
-                cout << "QUERY: " << s.str() << endl;
-                assert(a.ps->e_conn->execute(s.str()));
-                 
-                // Remove from *Meta structures.
-                assert(a.destroyFieldMeta(table, adrop->name));
-            }
-        }
+                    ostringstream as;
+                    as << " ALTER TABLE " << dbname << "." << table
+                       << " DROP COLUMN " << adrop->name << ";";
+                    assert(a.ps->e_conn->execute(as.str()));
+                     
+                    // Remove from *Meta structures.
+                    assert(a.destroyFieldMeta(table, adrop->name));
+                }});
     }
     
     // TODO: Rewrite alter column list.

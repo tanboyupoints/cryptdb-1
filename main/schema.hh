@@ -123,7 +123,7 @@ typedef struct FieldMeta {
 
 typedef struct TableMeta {
 
-    std::vector<std::string> fieldNames;     //in order field names                     
+    std::list<std::string> fieldNames;     //in order field names                     
     unsigned int tableNo;
     std::string anonTableName;
 
