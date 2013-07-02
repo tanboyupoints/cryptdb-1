@@ -35,8 +35,9 @@ using namespace std;
                         string(__PRETTY_FUNCTION__))
 
 // FIXME: Placement.
-static LEX *
-rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a);
+static LEX **
+rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a,
+                                  unsigned *out_lex_count);
 
 static void buildSqlHandlers();
 
@@ -2961,8 +2962,8 @@ create_table_embedded(Connect * e_conn, const string & cur_db,
     assert(e_conn->execute(create_q));
 }
 
-static LEX *
-rewrite_create_lex(LEX *lex, Analysis &a)
+static LEX **
+rewrite_create_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
 {
     LEX * new_lex = copy(lex);
 
@@ -3010,7 +3011,10 @@ rewrite_create_lex(LEX *lex, Analysis &a)
         new_lex->alter_info.key_list = newList0;
     }
 
-    return new_lex;
+    LEX **out_lex = new LEX*[1];
+    out_lex[0] = new_lex;
+    *out_lex_count = 1;
+    return out_lex;
 }
 
 static void
@@ -3043,18 +3047,8 @@ invalidates(FieldMeta * fm, const EncSet &  es) {
     return false;
 }
 
-static std::string *
-output_hack(LEX *lex)
-{
-    // HACK(burrows): Output hack. Fields and values are no longer good
-    // values after return? Not sure why.
-    stringstream ss;
-    ss << *lex;
-    return new string(ss.str());
-}
-
-static LEX *
-rewrite_update_lex(LEX *lex, Analysis &a)
+static LEX **
+rewrite_update_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
 {
     LEX * new_lex = copy(lex);
 
@@ -3162,22 +3156,61 @@ rewrite_update_lex(LEX *lex, Analysis &a)
     new_lex->value_list = res_vals;
 
     if (false == invalids) {
-        return (LEX *)output_hack(new_lex);
+        LEX **out_lex = new LEX*[1];
+        out_lex[0] = new_lex;
+        *out_lex_count = 1;
+        return out_lex;
     } else {
-        return rewrite_update_lex_refresh_onions(lex, new_lex, a);
+        return rewrite_update_lex_refresh_onions(lex, new_lex, a,
+                                                 out_lex_count);
     }
 }
 
-// FIXME(burrows): This code can break database consistency.  If we DELETE
-// the old entries from the table and then the INSERT query later fails,
-// the table will be in a bad state.  We can't prevent this from happening
-// with a TRANSACTion because the INSERT happens at the caller's discretion.
-// This means we probably need a method other than DELETEing the old entries.
 static LEX *
-rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a)
+begin_transaction_lex(Analysis a) {
+    string query = "START TRANSACTION;";
+    query_parse *begin_parse = new query_parse(a.ps->conn->getCurDBName(),
+                                               query);
+    return begin_parse->lex();
+}
+
+static LEX *
+commit_transaction_lex(Analysis a) {
+    string query = "COMMIT;";
+    query_parse *commit_parse = new query_parse(a.ps->conn->getCurDBName(),
+                                                query);
+    return commit_parse->lex();
+}
+
+// FIXME(burrows): Generalize to support any container with next AND end
+// semantics.
+template <typename T>
+std::string vector_join(std::vector<T> v, std::string delim,
+                        std::string (*finalize)(T))
+{
+    std::string accum;
+    for (typename std::vector<T>::iterator it = v.begin();
+         it != v.end(); ++it) {
+        std::string element = (*finalize)((T)*it);
+        accum.append(element);
+        accum.append(delim);
+    } 
+
+    std::string output;
+    if (accum.size() > 0) {
+        output = accum.substr(0, accum.size() - 1);
+    } else {
+        output = accum;
+    }
+
+    return output;
+}
+
+static LEX **
+rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a,
+                                  unsigned *out_lex_count)
 {
     // TODO(burrows): Should support multiple tables in a single UPDATE.
-    // TODO(burrows): Should be a transaction.
     string plain_table = 
         lex->select_lex.top_join_list.head()->table_name;
     // HACK(burrows): Handling empty WHERE clause.
@@ -3193,52 +3226,25 @@ rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a)
         executeQuery(*a.ps->conn, *a.rewriter, select_stream.str());
     assert(select_res_type);
     if (select_res_type->rows.size() == 0) { // No work to be done.
-        return new_lex;
+        LEX **out_lex = new LEX*[1];
+        out_lex[0] = new_lex;
+        *out_lex_count = 1;
+        return out_lex;
     }
 
-    // FIXME(burrows): Can do a cleaner implementation of this with
-    // std::copy but it requires implicit conversion from Item* to
-    // std::string.
-    string values_string;
-    for (std::vector<std::vector<Item*>>::iterator row_it =
-            select_res_type->rows.begin();
-         row_it != select_res_type->rows.end();
-         ++row_it) {
-        std::vector<Item*> row = (std::vector<Item*>)*row_it;
-        values_string.append("(");
-        for (std::vector<Item*>::iterator item_it = row.begin();
-             item_it != row.end();
-             ++item_it) {
-            Item* value = (Item*)*item_it; 
-            values_string.append(ItemToString(value));
-            if (item_it + 1 != row.end()) {
-                values_string.append(", ");
-            }
+    struct _ {
+        static std::string itemJoin(std::vector<Item*> row) {
+            return "(" + vector_join<Item*>(row, ",", ItemToString) + ")";
         }
-
-        values_string.append(") ");
-        if (row_it + 1 != select_res_type->rows.end()) {
-            values_string.append(", ");
-        }
-    }
+    };
+    string values_string =
+        vector_join<std::vector<Item*>>(select_res_type->rows, ",",
+                                        _::itemJoin);
     delete select_res_type;
-
-    string fields_string = "( ";
-    auto f_it = List_iterator<Item>(lex->select_lex.item_list);
-    Item *i = f_it++;
-    for (; i != NULL;) {
-        Item_field *item = static_cast<Item_field*>(i);
-        fields_string.append(item->field_name);
-
-        if ((i = f_it++) != NULL) {
-            fields_string.append(", ");
-        }
-    } 
-    fields_string.append(" ) ");
 
     // Push the plaintext rows to the embedded database.
     ostringstream push_stream;
-    push_stream << " INSERT INTO " << plain_table << fields_string
+    push_stream << " INSERT INTO " << plain_table
                 << " VALUES " << values_string << ";";
     assert(a.ps->e_conn->execute(push_stream.str()));
 
@@ -3248,24 +3254,16 @@ rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a)
     query_stream << *lex;
     assert(a.ps->e_conn->execute(query_stream.str()));
 
-    // DELETE the rows matching the WHERE clause from the database.
-    ostringstream delete_stream;
-    delete_stream << " DELETE FROM " << plain_table
-                  << " WHERE " << where_clause << ";";
-    ResType *delete_res_type =
-        executeQuery(*a.ps->conn, *a.rewriter, delete_stream.str());
-    assert(delete_res_type);
-    delete delete_res_type;
-
-    // > Add each row from the embedded database to the data database.
+    // > Collect the results from the embedded database.
     // > This code relies on single threaded access to the database
-    // and on the fact that the database is cleaned up after every such
-    // operation.
+    //   and on the fact that the database is cleaned up after every such
+    //   operation.
     DBResult *dbres;
     ostringstream select_results_stream;
     select_results_stream << " SELECT * FROM " << plain_table << ";";
     assert(a.ps->e_conn->execute(select_results_stream.str(), dbres));
 
+    // FIXME(burrows): Use general join.
     ScopedMySQLRes r(dbres->n);
     MYSQL_ROW row;
     string output_rows = " ";
@@ -3287,28 +3285,60 @@ rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a)
     }
     output_rows = output_rows.substr(0, output_rows.length() - 1);
 
-    // FIXME(burrows): Instead of doing this INSERT here,
-    // this should probably be LEXed and returned to the caller.
-    ostringstream push_results_stream;
-    push_results_stream << " INSERT INTO " << plain_table
-                        << " " << fields_string
-                        << " VALUES " << output_rows << ";";
-
-    Analysis insert_analysis = Analysis(a.ps);
-    insert_analysis.rewriter = a.rewriter;
-    query_parse parse(a.ps->e_conn->getCurDBName(),
-                      push_results_stream.str());
-    std::string *final_insert_lex =
-        SqlHandler::rewriteLex(parse.lex(), insert_analysis, 
-                               push_results_stream.str());
-    assert(final_insert_lex);
-
     // Cleanup the embedded database.
     ostringstream cleanup_stream;
     cleanup_stream << "DELETE FROM " << plain_table << ";";
     assert(a.ps->e_conn->execute(cleanup_stream.str()));
 
-    return (LEX*)final_insert_lex;
+    // > Add each row from the embedded database to the data database.
+    ostringstream push_results_stream;
+    push_results_stream << " INSERT INTO " << plain_table
+                        << " VALUES " << output_rows << ";";
+    Analysis insert_analysis = Analysis(a.ps);
+    insert_analysis.rewriter = a.rewriter;
+    // FIXME(burrows): Memleak.
+    // Freeing the query_parse (or using an automatic variable and letting
+    // it cleanup itself) will call the query_parse destructor which calls
+    // THD::cleanup_after_query which results in all of our Items_* being
+    // freed.
+    // THD::cleanup_after_query
+    //     Query_arena::free_items
+    //         Item::delete_self).
+    query_parse *parse = new query_parse(a.ps->conn->getCurDBName(),
+                                         push_results_stream.str());
+    unsigned final_insert_out_lex_count;
+    LEX **final_insert_lex_arr =
+        SqlHandler::rewriteLex(parse->lex(), insert_analysis, 
+                               push_results_stream.str(),
+                               &final_insert_out_lex_count);
+    assert(final_insert_lex_arr && 1 == final_insert_out_lex_count);
+    LEX *final_insert_lex = final_insert_lex_arr[0];
+
+    // DELETE the rows matching the WHERE clause from the database.
+    ostringstream delete_stream;
+    delete_stream << " DELETE FROM " << plain_table
+                  << " WHERE " << where_clause << ";";
+    Analysis delete_analysis = Analysis(a.ps);
+    delete_analysis.rewriter = a.rewriter;
+    // FIXME(burrows): Identical memleak.
+    query_parse *delete_parse =
+        new query_parse(a.ps->conn->getCurDBName(),
+                        delete_stream.str());
+    unsigned delete_out_lex_count;
+    LEX **delete_lex_arr =
+        SqlHandler::rewriteLex(delete_parse->lex(), delete_analysis,
+                               delete_stream.str(), &delete_out_lex_count);
+    assert(delete_lex_arr && 1 == delete_out_lex_count);
+    LEX *delete_lex = delete_lex_arr[0];
+
+    // FIXME(burrows): Order matters, how to enforce?
+    LEX **out_lex = new LEX*[4];
+    out_lex[0] = begin_transaction_lex(a);
+    out_lex[1] = delete_lex;
+    out_lex[2] = final_insert_lex;
+    out_lex[3] = commit_transaction_lex(a);
+    *out_lex_count = 4;
+    return out_lex;
 }
 
 static void
@@ -3320,8 +3350,8 @@ mp_insert_init(LEX *lex, Analysis &a)
     a.ps->mp->insertLex(lex, a.ps->schema, a.tmkm);
 }
 
-static LEX *
-rewrite_insert_lex(LEX *lex, Analysis &a)
+static LEX **
+rewrite_insert_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
 {
     LEX * new_lex = copy(lex);
 
@@ -3405,36 +3435,48 @@ rewrite_insert_lex(LEX *lex, Analysis &a)
         new_lex->many_values = newList;
     }
 
-    return new_lex;
+    LEX **out_lex = new LEX*[1];
+    out_lex[0] = new_lex;
+    *out_lex_count = 1;
+    return out_lex;
 }
 
-static LEX *
-rewrite_drop_table_lex(LEX *lex, Analysis &a)
+static LEX **
+rewrite_drop_table_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
 {
     LEX * new_lex = copy(lex);
     new_lex->select_lex.table_list = rewrite_table_list(lex->select_lex.table_list, a);
 
-    return new_lex;
+    LEX **out_lex = new LEX*[1];
+    out_lex[0] = new_lex;
+    *out_lex_count = 1;
+    return out_lex;;
 }
 
-static LEX *
-rewrite_delete_lex(LEX *lex, Analysis &a)
+static LEX **
+rewrite_delete_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
 {
     LEX * new_lex = copy(lex);
     new_lex->query_tables = rewrite_table_list(lex->query_tables, a);
     set_select_lex(new_lex, rewrite_select_lex(&new_lex->select_lex, a));
 
-    return new_lex;
+    LEX **out_lex = new LEX*[1];
+    out_lex[0] = new_lex;
+    *out_lex_count = 1;
+    return out_lex;
 }
 
-static LEX *
-rewrite_select_lex(LEX *lex, Analysis &a)
+static LEX **
+rewrite_select_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
 {
     LEX * new_lex = copy(lex);
     new_lex->select_lex.top_join_list = rewrite_table_list(lex->select_lex.top_join_list, a);
     set_select_lex(new_lex, rewrite_select_lex(&new_lex->select_lex, a));
 
-    return new_lex;
+    LEX **out_lex = new LEX*[1];
+    out_lex[0] = new_lex;
+    *out_lex_count = 1;
+    return out_lex;
 }
 
 static void
@@ -3828,7 +3870,6 @@ static list<string>
 rewrite_helper(const string & q, Analysis & analysis,
 	       query_parse & p, const string & cur_db) {
     LOG(cdb_v) << "q " << q;
-    list<string> queries;
 
     if (p.annot) {
         return processAnnotation(*p.annot, analysis);
@@ -3838,13 +3879,20 @@ rewrite_helper(const string & q, Analysis & analysis,
 
     LOG(cdb_v) << "pre-analyze " << *lex;
 
-    std::string *output_query =
-        SqlHandler::rewriteLexAndUpdateMeta(lex, analysis, q);
-    assert(output_query);
+    unsigned out_lex_count = 0;
+    LEX **new_lexes =
+        SqlHandler::rewriteLexAndUpdateMeta(lex, analysis, q, &out_lex_count);
+    assert(new_lexes && out_lex_count != 0);
 
-    LOG(cdb_v) << "FINAL QUERY: " << output_query << endl;
-    queries.push_back(*output_query);
-    delete output_query;
+    list<string> queries;
+    for (unsigned i = 0; i < out_lex_count; ++i) {
+        LOG(cdb_v) << "FINAL QUERY [" << i+1 << "/" << out_lex_count
+                   << "]: " << new_lexes[i] << endl;
+        stringstream ss;
+        ss << *new_lexes[i];
+        queries.push_back(ss.str());
+    }
+
     return queries;
 }
 
@@ -4028,22 +4076,25 @@ executeQuery(Connect &conn, Rewriter &r, const string &q, bool show)
         string curdb(conn.getCurDBName());
 
         QueryRewrite qr = r.rewrite(q, &curdb);
-        //only last query should return anything
-        if (qr.queries.size() != 1) {
+        if (qr.queries.size() == 0) {
           return NULL;
+        }
+
+        unsigned i = 0;
+        for (auto query : qr.queries) {
+            if (show) {
+                cerr << endl
+                     << RED_BEGIN << "ENCRYPTED QUERY [" << i+1 << "/"
+                     << qr.queries.size() << "]:" << COLOR_END << endl
+                     << query << endl;
+            }
+            assert(conn.execute(query, dbres));
+            if (!dbres) {
+                return NULL;
+            }
+            ++i;
         }
         
-        if (show) {
-            cerr << endl
-                 << RED_BEGIN << "ENCRYPTED QUERY:" << COLOR_END << endl
-                 << qr.queries.back() << endl;
-        }
-
-        assert(conn.execute(qr.queries.back(), dbres));
-        if (!dbres) {
-          return NULL;
-        }
-
         ResType res = dbres->unpack();
 
         if (!res.ok) {
@@ -4227,9 +4278,9 @@ bool SqlHandler::addHandler(SqlHandler *handler)
     return true;
 }
 
-std::string *
+LEX **
 SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
-                                    const string &q)
+                                    const string &q, unsigned *out_lex_count)
 {
     SqlHandler *sql_handler = SqlHandler::getHandler(lex->sql_command);
     if (!sql_handler) {
@@ -4249,25 +4300,20 @@ SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
         (*sql_handler->update_meta)(q, lex, analysis);
     }
 
-    LEX * new_lex = (*sql_handler->lex_rewrite)(lex, analysis);
+    LEX **new_lexes =
+        (*sql_handler->lex_rewrite)(lex, analysis, out_lex_count);
 
     if (true == sql_handler->hasUpdateMeta() &&
         true == sql_handler->updateAfter()) {
         (*sql_handler->update_meta)(q, lex, analysis);
     }
 
-    // HACK(burrows): Output HACK.
-    if (SQLCOM_UPDATE == lex->sql_command) {
-       return (std::string*)new_lex; 
-    }
-
-    stringstream ss;
-    ss << *new_lex;
-    return new string(ss.str());
+    return new_lexes;
 }
 
-std::string *
-SqlHandler::rewriteLex(LEX *lex, Analysis &analysis, const string &q)
+LEX **
+SqlHandler::rewriteLex(LEX *lex, Analysis &analysis, const string &q,
+                       unsigned *out_lex_count)
 {
     SqlHandler *sql_handler = SqlHandler::getHandler(lex->sql_command);
     if (!sql_handler) {
@@ -4278,7 +4324,8 @@ SqlHandler::rewriteLex(LEX *lex, Analysis &analysis, const string &q)
         return NULL;
     }
 
-    return SqlHandler::rewriteLexAndUpdateMeta(lex, analysis, q);
+    return SqlHandler::rewriteLexAndUpdateMeta(lex, analysis, q,
+                                               out_lex_count);
 }
 
 static void buildSqlHandlers()

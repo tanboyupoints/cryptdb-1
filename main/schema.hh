@@ -145,8 +145,11 @@ typedef struct SchemaInfo {
 
     SchemaInfo():totalTables(0) {};
     ~SchemaInfo() { tableMetaMap.clear();}
-    // TODO(burrows): getTableMeta/getFieldMeta should be private with
-    // Analysis::getFieldMeta as a friend.
+    friend class Analysis;
+
+private:
+    // These functions do not support Aliasing, use Analysis::getTableMeta
+    // and Analysis::getFieldMeta.
     TableMeta * getTableMeta(const std::string & table);
     FieldMeta * getFieldMeta(const std::string & table, const std::string & field);
 } SchemaInfo;

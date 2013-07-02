@@ -1,8 +1,6 @@
 Aaron:
 wiki -- host it on git?
 TRANSACT on stale onions after UPDATE
- - Fix DELETE anti-TRANSACT hack.
- - Fix string to lex hack.
  - Support multiple tables.
 Subqueries
 DECIMAL
