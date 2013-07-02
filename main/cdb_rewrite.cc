@@ -3017,6 +3017,57 @@ rewrite_create_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
     return out_lex;
 }
 
+static LEX **
+rewrite_alter_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
+{
+    LEX *new_lex = copy(lex);
+
+    const string &table =
+        lex->select_lex.table_list.first->table_name;
+
+    new_lex->select_lex.table_list =
+        rewrite_table_list(lex->select_lex.table_list, a);
+
+    assert(lex->alter_info.flags & ALTER_DROP_COLUMN);
+
+    List<Alter_drop> new_drop_list;
+
+    auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
+
+    for (;;) {
+        Alter_drop *adrop = drop_it++;
+        if (!adrop) {
+            break;
+        }
+
+        assert(adrop->type == Alter_drop::COLUMN);
+
+        FieldMeta *fm = a.getFieldMeta(table, adrop->name);
+
+        for (auto onion_pair : fm->onions) {
+            Alter_drop *new_adrop =
+                new Alter_drop(Alter_drop::COLUMN,
+                               onion_pair.second->onionname.c_str());
+            new_drop_list.push_back(new_adrop);
+        }
+
+        if (fm->has_salt) {
+            Alter_drop *new_adrop =
+                new Alter_drop(Alter_drop::COLUMN,
+                               fm->salt_name.c_str());
+            new_drop_list.push_back(new_adrop);
+        }
+
+    }
+    
+    new_lex->alter_info.drop_list = new_drop_list;
+
+    LEX **out_lex = new LEX*[1];
+    out_lex[0] = new_lex;
+    *out_lex_count = 1;
+    return out_lex;
+}
+
 static void
 mp_update_init(LEX *lex, Analysis &a)
 {
@@ -3676,6 +3727,14 @@ add_table_update_meta(const string &q,
    
 }
 
+// TODO.
+static inline void
+alter_table_update_meta(const string &q, LEX *lex, Analysis &a)
+{
+    // assert(false);
+    return;
+}
+
 static void
 changeDBUpdateMeta(const string &q, LEX *lex, Analysis &a)
 {
@@ -3886,7 +3945,7 @@ rewrite_helper(const string & q, Analysis & analysis,
 
     list<string> queries;
     for (unsigned i = 0; i < out_lex_count; ++i) {
-        LOG(cdb_v) << "FINAL QUERY [" << i+1 << "/" << out_lex_count
+        cout << "FINAL QUERY [" << i+1 << "/" << out_lex_count
                    << "]: " << new_lexes[i] << endl;
         stringstream ss;
         ss << *new_lexes[i];
@@ -4331,7 +4390,11 @@ SqlHandler::rewriteLex(LEX *lex, Analysis &analysis, const string &q,
 static void buildSqlHandlers()
 {
     SqlHandler *h;
-    
+
+    h = new SqlHandler(SQLCOM_ALTER_TABLE, process_select_lex,
+                       alter_table_update_meta, rewrite_alter_lex, true);
+    assert(SqlHandler::addHandler(h));
+
     h = new SqlHandler(SQLCOM_CREATE_TABLE, process_select_lex,
                        add_table_update_meta, rewrite_create_lex); 
     assert(SqlHandler::addHandler(h));
