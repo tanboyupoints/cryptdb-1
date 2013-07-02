@@ -3138,7 +3138,7 @@ rewrite_update_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
         }
 
         // Determine if the query invalidates onions.
-        invalids |= invalidates(fm, r_es);
+        invalids = invalids || invalidates(fm, r_es);
 
 	// Add the salt field
         if (add_salt) {
