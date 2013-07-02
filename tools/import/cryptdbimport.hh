@@ -57,22 +57,6 @@ struct table_structure
             m_ts[pkeys].push_back(pvalues);
         }
 
-        inline const string get_field(pairKeys_t pkeys, string prop, tsMap_t ts)
-        {
-            if(ts.find(pkeys) != ts.end())
-            {
-                for(tsVpIt_t it = ts[pkeys].begin(); 
-                        it != ts[pkeys].end(); ++it)
-                {
-                    if(it->first == prop)
-                    {
-                        return it->second;
-                    }
-                }
-            }
-            return "";
-        }
-
         inline const tsMap_t get_data(void) {return m_ts;}
 
         inline void clear(void)

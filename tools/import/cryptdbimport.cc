@@ -33,7 +33,7 @@
  *
  * The next two static functions 'format_create_database_query' and
  *  'format_insert_table_query' are inconsistent. Both are parsing queries
- *  based on too unnecessary complicate schemas.
+ *  based on unnecessary too much complex schemas.
  *
  * - 'format_create_database_query' is using a "heavy" std::map to
  *   locate some of its _own_ fields. It should instead be called from 
@@ -44,12 +44,16 @@
  *   Both funcions are error prone and some queries are not being well 
  *   formatted and some SQL syntax mistakes made by me.
  *
- *   To execute this program only to stdout queries and not actually executing then:
+ *   To execute this program only to stdout queries and not actually executing them:
  *
  *   ./obj/tools/import/cryptdbimport -u root -p letmein -n -sqlfile_name(dump sql file)
  *
  *   Help:  ./obj/tools/import/cryptdbimport -h 
  */
+
+static pthread_mutex_t __attribute__((unused)) 
+    _mutex = PTHREAD_MUTEX_INITIALIZER;
+
 static string
 format_create_database_query(const string dbname, 
         const string tablename, table_structure ts, tsMap_t& tsmap)
@@ -62,80 +66,84 @@ format_create_database_query(const string dbname,
     vector<string>fieldVec;
     vector<string>optionsVec;
 
-    for(tsIt_t it = tsmap.begin(); it != tsmap.end(); ++it)
+    int i = 0;
+    for(tsIt_t it = tsmap.begin(); it != tsmap.end(); ++it, ++i)
     {
         pairKeys_t p0 = it->first;
+        size_t vpsiz = it->second.size();
+
         if(p0.first == "field")
         {
             string s = p0.second + " ";
             fieldVec.push_back(s);
-            // field name
-            s = ts.get_field(make_pair("field", p0.second), "Type", tsmap);
-            if(s.size() > 0)
+
+            if(vpsiz > 0)
             {
-                fieldVec.push_back(s);
+                //Type
+                fieldVec.push_back(it->second.at(1).second);
                 fieldVec.push_back("_fg_");
             }
 
-            s = ts.get_field(make_pair("field", p0.second), "Null", tsmap);
-            if(s.size() > 0 && s == "NO") 
+            if(vpsiz < 2) 
             {
-                fieldVec.push_back(" NOT NULL");
-                fieldVec.push_back("_fg_");
+                //Null
+                if(it->second.at(2).second == "NO")
+                {
+                    fieldVec.push_back(" NOT NULL");
+                    fieldVec.push_back("_fg_");
+                }
             }
 
-
-            s = ts.get_field(make_pair("field", p0.second), "Key", tsmap);
-            if(s.size() > 0) 
+            if(vpsiz < 3) 
             {
+                //Key
                 if(s == "PRI")
                 {
                     s = " PRIMARY KEY(" + p0.second + ")";
-                    fieldVec.push_back(s); 
+                    fieldVec.push_back(it->second.at(3).second); 
                     fieldVec.push_back("_fg_");
                 }else if(s == "MUL")
                 {
                     s = " MULTIPLE KEY(" + p0.second + ")";
-                    fieldVec.push_back(s); 
+                    fieldVec.push_back(it->second.at(3).second); 
                     fieldVec.push_back("_fg_");
                 }else if(s == "UNI")
                 {
                     s = " UNIQUE KEY(" + p0.second + ")";
-                    fieldVec.push_back(s); 
+                    fieldVec.push_back(it->second.at(3).second); 
                     fieldVec.push_back("_fg_");
                 }
             }
-            s = ts.get_field(make_pair("field", p0.second), "Default", tsmap);
-            if(s.size() > 0) 
+            if(vpsiz < 4) 
             {
-                string tmp = "DEFAULT '" + s + "'";
+                //Default
+                string tmp = "DEFAULT '" + it->second.at(4).second + "'";
                 fieldVec.push_back(tmp);
                 fieldVec.push_back("_fg_");
             }
 
-            s = ts.get_field(make_pair("field", p0.second), "Extra", tsmap);
-            if(s.size() > 0) 
+            if(vpsiz < 5) 
             {
-                fieldVec.push_back(s);
+                //Extra
+                fieldVec.push_back(it->second.at(5).second);
                 fieldVec.push_back("_fg_");
             }
 
-            s = ts.get_field(make_pair("field", p0.second), "Comment", tsmap);
-            if(s.size() > 0) 
+            if(vpsiz < 6) 
             {
-                fieldVec.push_back(s);
+                //Comment
+                fieldVec.push_back(it->second.at(6).second );
                 fieldVec.push_back("_fg_");
             }
 
         } else if(p0.first == "key")
         {
-            //TODO: Extend to get all keys
+        //TODO: Extend to get all keys
         } else if(p0.first == "options")
         {
-            // field name
-            string s = ts.get_field(make_pair("options", p0.second), "Engine", tsmap);
-            assert(s.size() > 0);
-            s = ") ENGINE=" + s + ";";
+            // Engine
+            assert(vpsiz > 0);
+            string s = ") ENGINE=" + it->second.at(1).second + ";";
             optionsVec.push_back(s);
             //TODO: Extend to get all options
         }
@@ -273,10 +281,11 @@ XMLParser::writeRIWO(const string& dbname, const string& tablename,
     {
         QueryRewrite qr = r.rewrite(q, &_dbname);
 
-        if (qr.queries.size() == 0) {
+        if (qr.queries.size() == 0) 
             return 1;
-        }
-        for (auto new_q = qr.queries.begin(); new_q != qr.queries.end(); new_q++) {
+        
+        for (auto new_q = qr.queries.begin(); new_q != qr.queries.end(); new_q++) 
+        {
             cerr << "ENCRYPTED QUERY:" << endl
                 << *new_q << endl;
             assert(conn.execute(*new_q, dbres));
@@ -459,7 +468,6 @@ int main(int argc, char **argv)
 
         switch(c)
         {
-            //TODO: implement this
             case 'h': 
                 do_display_help(argv[0]);
             case 's':
