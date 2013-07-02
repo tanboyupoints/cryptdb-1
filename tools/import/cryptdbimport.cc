@@ -43,6 +43,12 @@
  *
  *   Both funcions are error prone and some queries are not being well 
  *   formatted and some SQL syntax mistakes made by me.
+ *
+ *   To execute this program only to stdout queries and not actually executing then:
+ *
+ *   ./obj/tools/import/cryptdbimport -u root -p letmein -n -sqlfile_name(dump sql file)
+ *
+ *   Help:  ./obj/tools/import/cryptdbimport -h 
  */
 static string
 format_create_database_query(const string dbname, 

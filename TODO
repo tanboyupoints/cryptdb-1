@@ -7,7 +7,11 @@ DECIMAL
 VARCHAR
 
 Carlos:
-finish editing intersect
+Import tool fixes:
+ - fix query syntax errors.
+ - use lex or XML parser to parse _all_ fields insteand of doing it myself.
+ - check possible memory leaks.
+ - reduce C++ containers impact by executing out queries as soon as they are parsed. 
 
 Both:
 unimplemented gather/rewrite for other functions, search through cdb_rewrite.cc
