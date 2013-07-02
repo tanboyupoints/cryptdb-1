@@ -3138,7 +3138,7 @@ rewrite_update_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
         }
 
         // Determine if the query invalidates onions.
-        invalids |= invalidates(fm, r_es);
+        invalids = invalids || invalidates(fm, r_es);
 
 	// Add the salt field
         if (add_salt) {
@@ -3197,8 +3197,8 @@ std::string vector_join(std::vector<T> v, std::string delim,
     } 
 
     std::string output;
-    if (accum.size() > 0) {
-        output = accum.substr(0, accum.size() - 1);
+    if (accum.length() > 0) {
+        output = accum.substr(0, accum.length() - delim.length());
     } else {
         output = accum;
     }
