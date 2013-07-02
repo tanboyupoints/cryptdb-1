@@ -2,18 +2,6 @@
  * Author: ccarvalho
  * Jun 25 19:44:52 BRT 2013
  *
- * TODO/Missing impl. list:
- *
- * - Parse ALL fields in STRUCTURE. Some of then are missing.
- * - Get rid of descriptive text that mysqldump prints.
- * - Implement query creation.
- * - Simplify loadXmlStructure(): Way too far obfuscate.
- * - Re-check xml parser for missing fields.
- * - Error handling mechanism.
- * - Memory leak check.
- * - Use Rewriter.
- * - Use Connect. 
- * - Test, test and test.
  */
 #include <string>
 #include <stdio.h>
@@ -28,6 +16,7 @@
 #include <stdlib.h>
 #include <typeinfo>
 #include <pthread.h>
+
 #include <getopt.h>
 
 #include <list>
@@ -38,8 +27,174 @@
 #include <field.h>
 #include <cryptdbimport.hh>
 
+
+/*
+ * TODO:FIXME:
+ *
+ * The next two static functions 'format_create_database_query' and
+ *  'format_insert_table_query' are inconsistent. Both are parsing queries
+ *  based on too unnecessary complicate schemas.
+ *
+ * - 'format_create_database_query' is using a "heavy" std::map to
+ *   locate some of its _own_ fields. It should instead be called from 
+ *   XML loop and execute query by query and not keeping track of data.
+ *
+ * - 'format_insert_table_query' is the same case though its map is lighter.
+ *
+ *   Both funcions are error prone and some queries are not being well 
+ *   formatted and some SQL syntax mistakes made by me.
+ */
+static string
+format_create_database_query(const string dbname, 
+        const string tablename, table_structure ts, tsMap_t& tsmap)
+{
+    assert(tsmap.size() > 0);
+    
+    ostringstream q;
+    q << "CREATE TABLE IF NOT EXISTS " << dbname << "." << tablename << " (";
+
+    vector<string>fieldVec;
+    vector<string>optionsVec;
+
+    for(tsIt_t it = tsmap.begin(); it != tsmap.end(); ++it)
+    {
+        pairKeys_t p0 = it->first;
+        if(p0.first == "field")
+        {
+            string s = p0.second + " ";
+            fieldVec.push_back(s);
+            // field name
+            s = ts.get_field(make_pair("field", p0.second), "Type", tsmap);
+            if(s.size() > 0)
+            {
+                fieldVec.push_back(s);
+                fieldVec.push_back("_fg_");
+            }
+
+            s = ts.get_field(make_pair("field", p0.second), "Null", tsmap);
+            if(s.size() > 0 && s == "NO") 
+            {
+                fieldVec.push_back(" NOT NULL");
+                fieldVec.push_back("_fg_");
+            }
+
+
+            s = ts.get_field(make_pair("field", p0.second), "Key", tsmap);
+            if(s.size() > 0) 
+            {
+                if(s == "PRI")
+                {
+                    s = " PRIMARY KEY(" + p0.second + ")";
+                    fieldVec.push_back(s); 
+                    fieldVec.push_back("_fg_");
+                }else if(s == "MUL")
+                {
+                    s = " MULTIPLE KEY(" + p0.second + ")";
+                    fieldVec.push_back(s); 
+                    fieldVec.push_back("_fg_");
+                }else if(s == "UNI")
+                {
+                    s = " UNIQUE KEY(" + p0.second + ")";
+                    fieldVec.push_back(s); 
+                    fieldVec.push_back("_fg_");
+                }
+            }
+            s = ts.get_field(make_pair("field", p0.second), "Default", tsmap);
+            if(s.size() > 0) 
+            {
+                string tmp = "DEFAULT '" + s + "'";
+                fieldVec.push_back(tmp);
+                fieldVec.push_back("_fg_");
+            }
+
+            s = ts.get_field(make_pair("field", p0.second), "Extra", tsmap);
+            if(s.size() > 0) 
+            {
+                fieldVec.push_back(s);
+                fieldVec.push_back("_fg_");
+            }
+
+            s = ts.get_field(make_pair("field", p0.second), "Comment", tsmap);
+            if(s.size() > 0) 
+            {
+                fieldVec.push_back(s);
+                fieldVec.push_back("_fg_");
+            }
+
+        } else if(p0.first == "key")
+        {
+            //TODO: Extend to get all keys
+        } else if(p0.first == "options")
+        {
+            // field name
+            string s = ts.get_field(make_pair("options", p0.second), "Engine", tsmap);
+            assert(s.size() > 0);
+            s = ") ENGINE=" + s + ";";
+            optionsVec.push_back(s);
+            //TODO: Extend to get all options
+        }
+    }
+            
+    for(uint i = 0; i < fieldVec.size(); ++i)
+    {
+        if(fieldVec.at(i) == "_fg_" && i != fieldVec.size()-1)
+        {
+            q << ", ";
+            continue;
+        }
+        if(fieldVec.at(i) != "_fg_")
+            q << fieldVec.at(i) << " ";
+
+        if(i < fieldVec.size()-1 && i > 0)
+            if(fieldVec.at(i) == "_fg_")
+                q << ", ";
+    }
+
+    for(uint i = 0; i < optionsVec.size(); ++i)
+    {
+        q << optionsVec.at(i);
+    }
+
+    fieldVec.clear();
+    optionsVec.clear();
+    return q.str();
+}
+
+static string  
+format_insert_table_query(const string dbname, 
+        const string tablename, table_structure ts, table_data td)
+{
+    tdVec_t data = td.get_data();
+
+    ostringstream q;
+    q << "INSERT INTO " << dbname << "." << tablename << " VALUES(";
+    for(tdVec_t::iterator it = data.begin(); it != data.end(); ++it)
+    {
+        char *p;
+        strtol(it->second.c_str(), &p, 10);
+            
+        if(it->second.size() == 0)
+        {
+            q << "NULL";
+        }else
+        {
+            if(*p)
+                q << "'" << it->second << "'";
+            else
+                q << it->second;
+        }
+        if (it+1 == data.end())
+            break;
+
+        q << ", ";
+
+    }
+    q << ");";
+
+    return q.str();
+}
 static int 
-createEmptyDB(XMLParser& xml, Connect & conn, string dbname)
+createEmptyDB(XMLParser& xml, Connect & conn, const string dbname)
 {
     string q = "CREATE DATABASE IF NOT EXISTS " + dbname + ";";
     DBResult * dbres;
@@ -51,41 +206,36 @@ createEmptyDB(XMLParser& xml, Connect & conn, string dbname)
     return 0;
 }
 
+
 /**
  * Structure fields write out.
  */
 int
-XMLParser::writeRIWO(string& dbname, string& tablename, 
-        tsPacket_t ts)
+XMLParser::writeRIWO(const string& dbname, const string& tablename, 
+        Rewriter& r, Connect& conn, bool exec, table_structure& ts)
 {
-    //TODO: implement this
     assert(dbname.size() > 0);
     assert(tablename.size() > 0);
-    if(ts.size() == 0)
-        return 1;
 
-    for(tsIt it = ts.begin(); it != ts.end(); ++it)
+    tsMap_t tsmap = ts.get_data();
+    string q = format_create_database_query(dbname, tablename, ts, tsmap);
+    cout << q << endl;
+
+    if(exec == true)
     {
-        switch(it->first)
-        {
-            case FIELD:
-                {
-                    cout << "[TABLE_STRUCTURE] " << "db: " << dbname 
-                        << " table: " << tablename << " <field> " << "prop: " << 
-                        it->second.first << " value: " << it->second.second << endl;
-                }
-                break;
-            case OPTIONS:
-                {
-                    cout << "[TABLE_STRUCTURE] " << "db: " << dbname 
-                        << " table: " << tablename << " <options> " << "prop: " << 
-                        it->second.first << " value: " << it->second.second << endl;
-                }
-                break;
-            default:
-                throw runtime_error(string("Parsing error: ") + 
-                    string(__PRETTY_FUNCTION__));
-                abort();
+        DBResult * dbres;
+
+        // HACK(ccarvalho) Removes const, rewrite is non-const. Check why later.
+        string _dbname = const_cast<string&>(dbname);
+        QueryRewrite qr = r.rewrite(q, &_dbname);
+
+        if (qr.queries.size() == 0) {
+            return 1;
+        }
+        for (auto new_q = qr.queries.begin(); new_q != qr.queries.end(); new_q++) {
+            cerr << "ENCRYPTED QUERY:" << endl
+                << *new_q << endl;
+            assert(conn.execute(*new_q, dbres));
         }
     }
     return 0;
@@ -96,44 +246,57 @@ XMLParser::writeRIWO(string& dbname, string& tablename,
  * Data fields write out.
  */
 int
-XMLParser::writeRIWO(string& dbname, string& tablename, 
-        dataPacket_t td)
+XMLParser::writeRIWO(const string& dbname, const string& tablename, 
+        Rewriter& r, Connect& conn, bool exec, table_structure& ts, table_data& td)
 {
-    //TODO: implement this
     assert(dbname.size() != 0);
     assert(tablename.size() != 0);
-    if(td.size() == 0)
+  
+    if(td.get_size() == 0)
         return 1;
-    
-    for(dataIt it = td.begin(); it != td.end(); ++it)
+
+    string q = format_insert_table_query(dbname, tablename, ts, td);
+    td.clear();
+
+    // HACK(ccarvalho) Removes const, rewrite is non-const. Check why later.
+    string _dbname = const_cast<string&>(dbname);
+    cout << q << endl;
+
+    DBResult * dbres;
+    if(exec == true)
     {
-        cout << "[TABLE_DATA] " << "db: " << dbname
-            << " table: " << tablename << " field: " << it->first << " Value: " << it->second << endl;
+        QueryRewrite qr = r.rewrite(q, &_dbname);
+
+        if (qr.queries.size() == 0) {
+            return 1;
+        }
+        for (auto new_q = qr.queries.begin(); new_q != qr.queries.end(); new_q++) {
+            cerr << "ENCRYPTED QUERY:" << endl
+                << *new_q << endl;
+            assert(conn.execute(*new_q, dbres));
+        }
     }
     return 0;
 }
 
-// TODO: add sanity checks make it more OO
 static void
-loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
+loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, bool exec, xmlNode *node)
 {
     xmlNode *cur_node = NULL;
     for (cur_node = node; cur_node; cur_node = cur_node->next) 
     {
         if (cur_node->type == XML_ELEMENT_NODE) 
         {
+            // TODO: use XML native types to avoid casting
             if ((!xmlStrcmp(cur_node->name, (const xmlChar *)"database"))) 
             {
                 // DATABASE
-                string dbname("");
-
                 xmlAttrPtr attr = cur_node->properties;
-                cout << "[" << attr->children->content << "]" << endl;
                 xmlNode *ch = cur_node->xmlChildrenNode;
-                dbname = (char*)attr->children->content; 
+                string dbname = (char*)attr->children->content; 
                 
                 // create database if not exists
-                if(!ch->next) 
+                if(!ch->next && exec == true) 
                 {
                     if(createEmptyDB(xml, conn, dbname) != 0)
                     {
@@ -144,50 +307,42 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
 
                 while(ch != NULL)
                 {
-                    string tablename("");
-
-                    // table_structure
-                    tsPacket_t ts; 
-
-                    // table_data
-                    dataPacket_t td; 
+                    table_structure ts;
+                    table_data td;
 
                     // table_structure
                     if ((!xmlStrcmp(ch->name, (const xmlChar *)"table_structure"))) 
                     {
-
                         // Here we create if not exists
                         xmlAttrPtr attr2 = ch->properties;
-                        tablename = (char*)attr2->children->content;
+                        string tablename = (char*)attr2->children->content;
                         xmlNode *ch2 = ch->xmlChildrenNode;
                         while(ch2 != NULL)
                         {
-                            string type = (char*)ch2->name; 
+                            keyMNG mng;
+                            ident_t ident = (char*)ch2->name; 
                             while(ch2->properties != NULL)
                             {
-                                //prop
-                                string prop = (char*)ch2->properties->name;
+                                prop_t prop = (char*)ch2->properties->name;
 
                                 xmlAttrPtr attr3 = ch2->properties;
                                 assert(attr3 != NULL);
 
-                                string value = (char*)attr3->children->content;
-                                ts.push_back( make_pair(type == "field" ? FIELD : OPTIONS, make_pair(prop, value)));
-
+                                value_t value = (char*)attr3->children->content;
+                                ts.add(make_pair(ident, mng.getKey(value)), make_pair(prop, value));
                                 ch2->properties = ch2->properties->next;
                             }
+                            mng.unsetKey();
                             ch2 = ch2->next;
                         }
                         // Write out 
-                        if(xml.writeRIWO(dbname, tablename, ts) == 1)
+                        if(xml.writeRIWO(dbname, tablename, r, conn, exec, ts) == 1)
                         {
                             // TODO: decide if this is an error or not. For table_data it isn't.
                             // throw is here in case we find such case.
                             throw runtime_error(string("Parsing error ?! ") + 
                                 string(__PRETTY_FUNCTION__));
                         }
-
-                        // Empty vector, shall not forget.
                         ts.clear();
 
                     // table_data
@@ -210,15 +365,13 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                                         xmlAttrPtr attr3 = ch3->properties;
 
                                         // ROW_VALUE
-                                        unsigned char *_val = xmlNodeListGetString(xml.getDoc(), ch3->xmlChildrenNode, 1);
-                                        string value("");
+                                        unsigned char *_val = xmlNodeListGetString(xml.doc, ch3->xmlChildrenNode, 1);
+
+                                        value_t value("");
                                         if(_val)
                                             value = (char*)_val;
-                                        string field = (char*)attr3->children->content;
-
-                                        // Write out on-demand
-                                        //assert(xml.writeRIWO(dbname, tablename, field, value) != 1);
-                                        td.push_back(make_pair(field, value));
+                                        ident_t ident = (char*)attr3->children->content;
+                                        td.add(ident, value);
 
                                         ch3->properties = ch3->properties->next;
                                     }
@@ -226,44 +379,38 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, xmlNode *node)
                                 }
                             }
                             ch2 = ch2->next;
+                            // Write out 
+                            if(xml.writeRIWO(dbname, tablename, r, conn, exec, ts, td) == 1)
+                            {
+                                //cout << "Info: " << dbname << "::" << tablename 
+                                //    << " has table_structure but table_data is empty." << endl;
+                            }
                         }
-                        // Write out 
-                        if(xml.writeRIWO(dbname, tablename, td) == 1)
-                        {
-                            cout << "Info: " << dbname << "::" << tablename 
-                                << " has table_structure but table_data is empty." << endl;
-                        }
-
-                        // Empty vector, shall not forget.
-                        td.clear();
                     }
                     ch = ch->next;
                 }
             }
         }
-        // Recursive
-        loadXmlStructure(xml, conn, r, cur_node->children);
+        loadXmlStructure(xml, conn, r, exec, cur_node->children);
     }
 }
 
 static void do_display_help(const char *arg)
 {
-    // under development
-#if 0
-    cout << "CryptDBImport - CryptDB's MySQL import database tool" << endl;
+    cout << "CryptDBImport" << endl;
     cout << "Use: " << arg << " [OPTIONS]" << endl; 
     cout << "OPTIONS are:" << endl;
     cout << "-u<username>: MySQL server username" << endl;
     cout << "-p<password>: MySQL server password" << endl;
+    cout << "-n: Do not execute queries. Only show stdout." << endl;
     cout << "-s<file>: MySQL's .sql dump file, originated from \"mysqldump\" tool." << endl;
     cout << "To generate DB's dump file use mysqldump, e.g.:" << endl;
     cout << "$ mysqldump -u root -pletmein --all-databases --xml  --no-tablespaces --skip-comments --complete-insert" << endl;
-#endif
     exit(0);
 }
 
 static void 
-do_init(XMLParser & xml, Connect & conn, Rewriter& r, const char *filename)
+do_init(XMLParser & xml, Connect & conn, Rewriter& r, bool exec, const char *filename)
 {
     xmlDoc *doc = NULL;
     xmlNode *node = NULL;
@@ -272,10 +419,11 @@ do_init(XMLParser & xml, Connect & conn, Rewriter& r, const char *filename)
     doc = xmlReadFile(filename, NULL, 0);
     assert(doc != NULL);
 
-    xml.setDoc(doc);
-    node = xmlDocGetRootElement(xml.getDoc());
-    loadXmlStructure(xml, conn, r, node);
-    xmlFreeDoc(xml.getDoc());
+
+    xml.doc = doc;
+    node = xmlDocGetRootElement(xml.doc);
+    loadXmlStructure(xml, conn, r, exec, node);
+    xmlFreeDoc(xml.doc);
 }
 
 
@@ -289,13 +437,17 @@ int main(int argc, char **argv)
         {"show", required_argument, 0, 's'},
         {"password", required_argument, 0, 'p'},
         {"user", required_argument, 0, 'u'},
+        {"noexec", required_argument, 0, 'n'},
         {"threads", required_argument, 0, 't'},
         {NULL, 0, 0, 0},
     };
 
+    string username("");
+    string password("");
+    bool exec = true;
     while(1)
     {
-        c = getopt_long(argc, argv, "hs:p:u:t:", long_options, &optind);
+        c = getopt_long(argc, argv, "hs:p:u:t:n", long_options, &optind);
         if(c == -1)
             break;
 
@@ -306,21 +458,24 @@ int main(int argc, char **argv)
                 do_display_help(argv[0]);
             case 's':
                 {
-                    ConnectionInfo ci("localhost", xml.getUsername(), xml.getPassword());
+                    ConnectionInfo ci("localhost", username, password);
                     Rewriter r(ci, "/var/lib/shadow-mysql", false, true);
-                    Connect conn("localhost", xml.getUsername(), xml.getPassword(), "");
-                    do_init(xml, conn, r, optarg);
+                    Connect conn("localhost", username, password, "");
+                    do_init(xml, conn, r, exec, optarg);
                 }
                 break;
             case 'p':
-                xml.setPassword(optarg);
+                password = optarg;
                 break;
             case 'u':
-                xml.setUsername(optarg);
+                username = optarg;
                 break;
             case 't':
                 threads = atoi(optarg);
                 (void)threads;
+                break;
+            case 'n':
+                exec = false;
                 break;
             case '?':
                 break;
