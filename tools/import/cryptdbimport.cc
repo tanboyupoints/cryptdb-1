@@ -77,6 +77,7 @@ format_create_database_query(const string dbname,
             string s = p0.second + " ";
             fieldVec.push_back(s);
 
+            // TODO:FIXME: Weird logic, check these if's later;
             if(vpsiz > 0)
             {
                 //Type
