@@ -3017,6 +3017,35 @@ rewrite_create_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
     return out_lex;
 }
 
+static LEX **
+rewrite_alter_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
+{
+    LEX *new_lex = copy(lex);
+
+    const string &table =
+        lex->select_lex.table_list.first->table_name;
+
+    new_lex->select_lex.table_list =
+        rewrite_table_list(lex->select_lex.table_list, a);
+
+    assert(lex->alter_info.flags & ALTER_DROP_COLUMN);
+
+    auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
+    for (;;) {
+        Alter_drop *adrop = drop_it++;
+        if (!adrop) {
+            break;
+        }
+
+        assert(adrop->type == COLUMN};
+        
+
+    }
+    lex->alter_info.drop_list;
+
+    return NULL;
+}
+
 static void
 mp_update_init(LEX *lex, Analysis &a)
 {
@@ -3676,6 +3705,13 @@ add_table_update_meta(const string &q,
    
 }
 
+static inline void
+alter_table_update_meta(const string &q, LEX *lex, Analysis &a)
+{
+    assert(false);
+    return;
+}
+
 static void
 changeDBUpdateMeta(const string &q, LEX *lex, Analysis &a)
 {
@@ -4331,7 +4367,11 @@ SqlHandler::rewriteLex(LEX *lex, Analysis &analysis, const string &q,
 static void buildSqlHandlers()
 {
     SqlHandler *h;
-    
+
+    h = new SqlHandler(SQLCOM_ALTER_TABLE, process_select_lex,
+                       alter_table_update_meta, rewrite_alter_lex); 
+    assert(SqlHandler::addHandler(h));
+
     h = new SqlHandler(SQLCOM_CREATE_TABLE, process_select_lex,
                        add_table_update_meta, rewrite_create_lex); 
     assert(SqlHandler::addHandler(h));
