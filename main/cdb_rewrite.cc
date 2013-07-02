@@ -211,12 +211,11 @@ buildTableMeta(ProxyState &ps)
         string table_salt_name(row[5], l[5]);
         string table_database_name(row[6], l[6]);
 
-        TableMeta *tm = new TableMeta;
-        tm->tableNo = (unsigned int)atoi(table_number.c_str());
-        tm->anonTableName = table_anonymous_name;
-        tm->hasSensitive = string_to_bool(table_has_sensitive);
-        tm->has_salt = string_to_bool(table_has_salt);
-        tm->salt_name = table_salt_name;
+        TableMeta *tm =
+            new TableMeta((unsigned int)atoi(table_number.c_str()),
+                          table_anonymous_name,
+                          string_to_bool(table_has_sensitive),
+                          string_to_bool(table_has_salt), table_salt_name);
                         
         ps.schema->tableMetaMap[table_name] = tm;
         ps.schema->totalTables++;
@@ -2854,8 +2853,37 @@ check_table_not_exists(Analysis & a, LEX * lex, string table) {
         return;
     }
 }
+
+static bool
+create_field_meta(TableMeta *tm, Create_field *field, uint index, 
+                  const Analysis a, bool encByDefault)
+{
+    FieldMeta * fm = new FieldMeta();
+
+    fm->tm            = tm;
+    fm->sql_field     = field->clone(current_thd->mem_root);
+    fm->fname         = string(fm->sql_field->field_name);
+    fm->index         = index;
+
+    if (encByDefault) {
+        init_onions(a.ps->masterKey, fm, field, index);
+    } else {
+        init_onions(NULL, fm, field);
+    }
+
+    if (tm->fieldMetaMap.find(fm->fname) != tm->fieldMetaMap.end()) {
+        return false;
+    }
+
+    tm->fieldMetaMap[fm->fname] = fm;
+    tm->fieldNames.push_back(fm->fname);//TODO: do we need fieldNames?
+
+    return true;
+}
+
 static void
-add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
+create_table_meta(Analysis & a, const string & table, LEX *lex,
+                  bool encByDefault) {
     assert(lex->sql_command == SQLCOM_CREATE_TABLE);
 
     LOG(cdb_v) << "add_table encByDefault " << encByDefault;
@@ -2874,34 +2902,11 @@ add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
     }
 
     uint index =  0;
-    for (auto it = List_iterator<Create_field>(lex->alter_info.create_list);;) {
-        Create_field * field = it++;
-
-        if (!field) {
-            break;
-        }
-
-        FieldMeta * fm = new FieldMeta();
-
-        fm->tm            = tm;
-        fm->sql_field     = field->clone(current_thd->mem_root);
-        fm->fname         = string(fm->sql_field->field_name);
-        fm->index         = index;
-
-        if (encByDefault) {
-            init_onions(a.ps->masterKey, fm, field, index);
-        } else {
-            init_onions(NULL, fm, field);
-        }
-
-        assert(tm->fieldMetaMap.find(fm->fname) == tm->fieldMetaMap.end());
-        tm->fieldMetaMap[fm->fname] = fm;
-        tm->fieldNames.push_back(fm->fname);//TODO: do we need fieldNames?
-
+    auto it = List_iterator<Create_field>(lex->alter_info.create_list);
+    eachList<Create_field>(it, [tm, &index, a, encByDefault] (Create_field *cf) {
+        create_field_meta(tm, cf, index, a, encByDefault);
         index++;
-
-    }
-
+    });
 }
 
 //TODO: no need to pass create_field to this
@@ -2974,6 +2979,35 @@ create_table_embedded(Connect * e_conn, const string & cur_db,
     assert(e_conn->execute(create_q));
 }
 
+static void
+do_field_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
+{
+    // TODO(stephentu): template this pattern away
+    // (borrowed from rewrite_select_lex())
+    auto cl_it = List_iterator<Create_field>(lex->alter_info.create_list);
+    List<Create_field> newList;
+    new_lex->alter_info.create_list =
+        reduceList<Create_field>(cl_it, newList, [table, &a] (List<Create_field> out_list, Create_field *cf) {
+            vector<Create_field *> l;
+            rewrite_create_field(table, cf, a, l);
+            List<Create_field> temp_list = vectorToList(l);
+            out_list.concat(&temp_list);
+            return out_list; /* lambda */
+         });
+
+    auto k_it = List_iterator<Key>(lex->alter_info.key_list);
+    List<Key> newList0;
+    new_lex->alter_info.key_list =
+        reduceList<Key>(k_it, newList0, [table, &a] (List<Key> out_list,
+                                                     Key *k) {
+            vector<Key *> l;
+            rewrite_key(table, k, a, l);
+            List<Key> temp_list = vectorToList(l);
+            out_list.concat(&temp_list);
+            return out_list; /* lambda */
+        });
+}
+
 static LEX **
 rewrite_create_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
 {
@@ -2991,34 +3025,7 @@ rewrite_create_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
         cryptdb_err() << "No support for create table like yet. " <<
                    "If you see this, please implement me";
     } else {
-        // TODO(stephentu): template this pattern away
-        // (borrowed from rewrite_select_lex())
-        auto cl_it = List_iterator<Create_field>(lex->alter_info.create_list);
-        List<Create_field> newList;
-        new_lex->alter_info.create_list =
-            reduceList<Create_field>(cl_it, newList,
-                [table, a] (List<Create_field> out_list, Create_field *cf) {
-                vector<Create_field *> l;
-                rewrite_create_field(table, cf, a, l);
-                List<Create_field> temp_list = vectorToList(l);
-                out_list.concat(&temp_list);
-                return out_list;
-             });
-
-        auto k_it = List_iterator<Key>(lex->alter_info.key_list);
-
-        List<Key> newList0;
-        for (;;) {
-            Key *k = k_it++;
-            if (!k)
-                break;
-            vector<Key *> l;
-            rewrite_key(table, k, a, l);
-            for (auto it = l.begin(); it != l.end(); ++it) {
-                newList0.push_back(*it);
-            }
-        }
-        new_lex->alter_info.key_list = newList0;
+        do_field_rewriting(lex, new_lex, table, a);
     }
 
     LEX **out_lex = new LEX*[1];
@@ -3042,7 +3049,7 @@ rewrite_alter_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
 
     // TODO: Rewrite create list.
     if (lex->alter_info.flags & ALTER_ADD_COLUMN) {
-        assert(false);
+        do_field_rewriting(lex, new_lex, table, a);
     }
     
     // Rewrite drop list.
@@ -3075,7 +3082,7 @@ rewrite_alter_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
                         }
 
                     }
-                    return out_list;
+                    return out_list; /* lambda */
                 });
     }
     
@@ -3633,46 +3640,42 @@ bool_to_string(bool b)
     }
 }
 
-static inline void
-add_table_update_meta(const string &q,
-                      LEX *lex,
-                      Analysis &a)
-{   
-    char* dbname = lex->select_lex.table_list.first->db;
-    char* table  = lex->select_lex.table_list.first->table_name;
-
-    // TODO(burrows): This should be a seperate step.
-    create_table_embedded(a.ps->e_conn, dbname, q);
-    add_table(a, std::string(table), lex, a.ps->encByDefault);
-
-    TableMeta *tm = a.ps->schema->tableMetaMap[table];
-    assert(tm != NULL);
-
-    a.ps->e_conn->execute("START TRANSACTION");
-
-    {
+static bool
+do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
+             unsigned long long *tid=NULL)
+{
+    unsigned long long table_id;
+    if (NULL == tid) {
+        DBResult *dbres;
         ostringstream s;
-        s << " INSERT INTO pdb.table_info VALUES ("
-          << " " << tm->tableNo << ", "
-          << " '" << tm->anonTableName << "', "
-          << " '" << table << "', "
-          << " " << bool_to_string(tm->hasSensitive) << ", "
-          << " " << bool_to_string(tm->has_salt) << ", "
-          << " '" << tm->salt_name << "', "
-          << " '" << dbname << "',"
-          << " 0"
-          << " );";
+        s << " SELECT id FROM pdb.table_info "
+          << " WHERE pdb.table_info.database_name = '" << dbname << "'"
+          << "   AND pdb.table_info.anonymous_name = '" << tm->anonTableName << "';";
+        cout << "Q: " << s.str() << endl;
+        assert(a.ps->e_conn->execute(s.str(), dbres));
+        ScopedMySQLRes r(dbres->n);
+        MYSQL_ROW row;
 
-        assert(a.ps->e_conn->execute(s.str()));
+        if (1 != mysql_num_rows(r.res())) {
+            return false;
+        }
+
+        while ((row = mysql_fetch_row(r.res()))) {
+            unsigned long *l = mysql_fetch_lengths(r.res());
+            assert(l != NULL);
+
+            string table_id(row[0], l[0]);
+            table_id = (unsigned long long)atoi(table_id.c_str());
+        }
+    } else {
+        table_id = *tid;
     }
-
-    unsigned long long tableID = a.ps->e_conn->last_insert_id();
 
     for (std::pair<std::string, FieldMeta *> fm_pair: tm->fieldMetaMap) {
         FieldMeta *fm = fm_pair.second;
         ostringstream s;
         s << " INSERT INTO pdb.field_info VALUES ("
-          << " " << tableID << ", "
+          << " " << table_id << ", "
           << " '" << fm->fname << "', "
           << " " << fm->index << ", "
           << " " << bool_to_string(fm->has_salt) << ", "
@@ -3729,8 +3732,7 @@ add_table_update_meta(const string &q,
                   << " 0"
                   << " );";
 
-                assert(a.ps->e_conn->execute(s.str()));
-
+                assert(a.ps->e_conn->execute(s.str())); 
                 // The last iteration should get us to the current
                 // security level.
                 if (current_sec_level == level) {
@@ -3739,6 +3741,49 @@ add_table_update_meta(const string &q,
             }
         }
     }
+
+    return true;
+}
+
+static inline void
+add_table_update_meta(const string &q,
+                      LEX *lex,
+                      Analysis &a)
+{   
+    char* dbname = lex->select_lex.table_list.first->db;
+    char* table  = lex->select_lex.table_list.first->table_name;
+
+    // TODO(burrows): This should be a seperate step.
+    // Create *Meta objects.
+    create_table_meta(a, std::string(table), lex, a.ps->encByDefault);
+
+    // Add to embedded database.
+    create_table_embedded(a.ps->e_conn, dbname, q);
+
+    TableMeta *tm = a.ps->schema->tableMetaMap[table];
+    assert(tm != NULL);
+
+    a.ps->e_conn->execute("START TRANSACTION");
+
+    {
+        ostringstream s;
+        s << " INSERT INTO pdb.table_info VALUES ("
+          << " " << tm->tableNo << ", "
+          << " '" << tm->anonTableName << "', "
+          << " '" << table << "', "
+          << " " << bool_to_string(tm->hasSensitive) << ", "
+          << " " << bool_to_string(tm->has_salt) << ", "
+          << " '" << tm->salt_name << "', "
+          << " '" << dbname << "',"
+          << " 0"
+          << " );";
+
+        assert(a.ps->e_conn->execute(s.str()));
+    }
+
+    // Add field.
+    unsigned long long tableID = a.ps->e_conn->last_insert_id();
+    do_add_field(tm, a, dbname, &tableID);
 
     a.ps->e_conn->execute("COMMIT");
    
@@ -3752,9 +3797,19 @@ alter_table_update_meta(const string &q, LEX *lex, Analysis &a)
         lex->select_lex.table_list.first->table_name;
     const string &dbname = lex->select_lex.table_list.first->db;
 
-    // TODO: Rewrite create list.
+    // Rewrite create list.
     if (lex->alter_info.flags & ALTER_ADD_COLUMN) {
-        assert(false);
+        TableMeta *tm = a.getTableMeta(table);
+
+        // Create *Meta objects.
+        auto add_it =
+            List_iterator<Create_field>(lex->alter_info.create_list);
+        eachList<Create_field>(add_it, [tm, a] (Create_field *cf) {
+            create_field_meta(tm, cf, ++tm->tableNo, a, a.ps->encByDefault);
+        });
+
+        // Add field to embedded database.
+        do_add_field(tm, a, dbname);
     }
     
     // Rewrite drop list.
@@ -4427,16 +4482,23 @@ SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
     //TODO: is db neededs as param in all these funcs?
     (*sql_handler->query_analyze)(lex, analysis);
 
-    if (true == sql_handler->hasUpdateMeta() &&
-        false == sql_handler->updateAfter()) {
+    // HACK: SQLCOM_ALTER_TABLE 
+    if ((true == sql_handler->hasUpdateMeta() &&
+         false == sql_handler->updateAfter()) ||
+        (lex->sql_command == SQLCOM_ALTER_TABLE &&
+         lex->alter_info.flags & ALTER_ADD_COLUMN)) {
+
         (*sql_handler->update_meta)(q, lex, analysis);
     }
 
     LEX **new_lexes =
         (*sql_handler->lex_rewrite)(lex, analysis, out_lex_count);
 
-    if (true == sql_handler->hasUpdateMeta() &&
-        true == sql_handler->updateAfter()) {
+    if ((true == sql_handler->hasUpdateMeta() &&
+         true == sql_handler->updateAfter()) ||
+        (lex->sql_command == SQLCOM_ALTER_TABLE &&
+         lex->alter_info.flags & ALTER_DROP_COLUMN)) {
+
         (*sql_handler->update_meta)(q, lex, analysis);
     }
 
@@ -4464,8 +4526,11 @@ static void buildSqlHandlers()
 {
     SqlHandler *h;
 
-    // Must update after rewrite, otherwise you will delete FieldMeta that
-    // must be looked up in rewrite.
+    // HACK: This handler requires a hack.
+    // * ADDing a COLUMN requires that we updateMeta _before_ we rewriteLex
+    // * DROPing a COLUMN requires that we updateMeta _after_ we rewriteLex
+    // Our current SqlHandler therefore does not offer control that is
+    // fine grain enough.
     h = new SqlHandler(SQLCOM_ALTER_TABLE, process_select_lex,
                        alter_table_update_meta, rewrite_alter_lex, true);
     assert(SqlHandler::addHandler(h));

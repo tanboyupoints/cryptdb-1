@@ -138,12 +138,6 @@ std::string ListJoin(List<T> lst, std::string delim,
     return output;
 }
 
-static std::string prefix_drop_column(Alter_drop adrop) {
-    std::ostringstream ss;
-    ss << "DROP COLUMN " << adrop;
-    return ss.str();
-}
-
 static const char *
 sql_type_to_string(enum_field_types tpe, CHARSET_INFO *charset)
 {
@@ -495,6 +489,18 @@ do_create_table(std::ostream &out, LEX &lex)
     }
 }
 
+static std::string prefix_drop_column(Alter_drop adrop) {
+    std::ostringstream ss;
+    ss << "DROP COLUMN " << adrop;
+    return ss.str();
+}
+
+static std::string prefix_add_column(Create_field cf) {
+    std::ostringstream ss;
+    ss << "ADD COLUMN " << cf;
+    return ss.str();
+}
+
 static inline std::ostream&
 operator<<(std::ostream &out, LEX &lex)
 {
@@ -750,8 +756,9 @@ operator<<(std::ostream &out, LEX &lex)
         if (lex.alter_info.flags & ALTER_DROP_COLUMN) {
             out << " " << ListJoin<Alter_drop>(lex.alter_info.drop_list, ",",
                                                prefix_drop_column);
-        } else {
-            assert(false);
+        } else if (lex.alter_info.flags & ALTER_ADD_COLUMN) {
+            out << " " << ListJoin<Create_field>(lex.alter_info.create_list,
+                                                 ",", prefix_add_column);
         }
 
         break;

@@ -135,6 +135,11 @@ typedef struct TableMeta {
     std::string salt_name;
 
     TableMeta();
+    TableMeta(unsigned int table_no, std::string anon_table_name,
+              bool has_sensitive, bool has_salt, std::string salt_name)
+        : tableNo(table_no), anonTableName(anon_table_name), 
+          hasSensitive(has_sensitive), has_salt(has_salt),
+          salt_name(salt_name) {}
     ~TableMeta();
 
     friend class Analysis;
