@@ -37,6 +37,7 @@ typedef map<pairKeys_t, tsVecPairValues_t> tsMap_t;
 typedef tsMap_t::iterator tsIt_t;
 typedef tsVecPairValues_t::iterator tsVpIt_t;
 
+
 /**
  * TODO/FIXME: Both structures 'table_structure' and 'table_data'
  * are under a serious risk of becaming deprected. We should get _all_
@@ -109,6 +110,9 @@ struct table_data
 
 typedef vector< pair<string, string>>dataPacket_t;
 
+/**
+ * Cycle through ID's. 
+ */ 
 class keyMNG 
 {
     public:
@@ -116,6 +120,8 @@ class keyMNG
         keyMNG() 
             : m_flag(false) 
         {}
+
+        ~keyMNG(){}
 
         const myKey_t getKey(string key)
         {
@@ -157,8 +163,6 @@ class XMLParser
             Rewriter& r, Connect& conn, bool exec, table_structure& ts, table_data& _td);
 
     private:
-        //string username;
-        //string password;
         Connect *conn;
 };
 };
