@@ -35,6 +35,18 @@ using namespace std;
                         string(__PRETTY_FUNCTION__))
 
 // FIXME: Placement.
+template <typename T> List<T>
+vectorToList(std::vector<T*> v);
+
+template <typename T, typename F> void
+eachList(List_iterator<T> it, F op);
+
+template <typename T, typename F> List<T>
+mapList(List_iterator<T> it, F op);
+
+template <typename T, typename F, typename O> O
+reduceList(List_iterator<T> it, O init, F op);
+
 static LEX **
 rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a,
                                   unsigned *out_lex_count);
@@ -2895,7 +2907,7 @@ add_table(Analysis & a, const string & table, LEX *lex, bool encByDefault) {
 //TODO: no need to pass create_field to this
 static void rewrite_create_field(const string &table_name,
                                  Create_field *f,
-                                 Analysis &a,
+                                 const Analysis &a,
                                  vector<Create_field *> &l)
 {
     LOG(cdb_v) << "in rewrite create field for " << *f;
@@ -2983,17 +2995,15 @@ rewrite_create_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
         // (borrowed from rewrite_select_lex())
         auto cl_it = List_iterator<Create_field>(lex->alter_info.create_list);
         List<Create_field> newList;
-        for (;;) {
-            Create_field *cf = cl_it++;
-            if (!cf)
-                break;
-            vector<Create_field *> l;
-            rewrite_create_field(table, cf, a, l);
-            for (auto it = l.begin(); it != l.end(); ++it) {
-                newList.push_back(*it);
-            }
-        }
-        new_lex->alter_info.create_list = newList;
+        new_lex->alter_info.create_list =
+            reduceList<Create_field>(cl_it, newList,
+                [table, a] (List<Create_field> out_list, Create_field *cf) {
+                vector<Create_field *> l;
+                rewrite_create_field(table, cf, a, l);
+                List<Create_field> temp_list = vectorToList(l);
+                out_list.concat(&temp_list);
+                return out_list;
+             });
 
         auto k_it = List_iterator<Key>(lex->alter_info.key_list);
 
@@ -3017,6 +3027,8 @@ rewrite_create_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
     return out_lex;
 }
 
+// TODO: Write a dispatcher that will guarentee we aren't mixing ALTER
+// actions.
 static LEX **
 rewrite_alter_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
 {
@@ -3028,39 +3040,60 @@ rewrite_alter_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
     new_lex->select_lex.table_list =
         rewrite_table_list(lex->select_lex.table_list, a);
 
-    assert(lex->alter_info.flags & ALTER_DROP_COLUMN);
+    // TODO: Rewrite create list.
+    if (lex->alter_info.flags & ALTER_ADD_COLUMN) {
+        assert(false);
+    }
+    
+    // Rewrite drop list.
+    if (lex->alter_info.flags & ALTER_DROP_COLUMN) {
+        List<Alter_drop> new_drop_list;
+        auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
+        new_lex->alter_info.drop_list = 
+            reduceList<Alter_drop>(drop_it, new_drop_list,
+                [table, a] (List<Alter_drop> out_list, Alter_drop *adrop) {
+                    // FIXME: Possibly this should be an assert as mixed
+                    // clauses are not supported?
+                    if (adrop->type == Alter_drop::COLUMN) {
+                        FieldMeta *fm = a.getFieldMeta(table, adrop->name);
+                        THD *thd = current_thd;
 
-    List<Alter_drop> new_drop_list;
+                        for (auto onion_pair : fm->onions) {
+                            Alter_drop *new_adrop =
+                                adrop->clone(thd->mem_root);
+                            new_adrop->name =
+                                thd->strdup(onion_pair.second->onionname.c_str());
+                            out_list.push_back(new_adrop);
+                        }
 
-    auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
+                        if (fm->has_salt) {
+                            Alter_drop *new_adrop =
+                                adrop->clone(thd->mem_root);
+                            new_adrop->name =
+                                thd->strdup(fm->salt_name.c_str());
+                            out_list.push_back(new_adrop);
+                        }
 
-    for (;;) {
-        Alter_drop *adrop = drop_it++;
-        if (!adrop) {
-            break;
-        }
-
-        assert(adrop->type == Alter_drop::COLUMN);
-
-        FieldMeta *fm = a.getFieldMeta(table, adrop->name);
-
-        for (auto onion_pair : fm->onions) {
-            Alter_drop *new_adrop =
-                new Alter_drop(Alter_drop::COLUMN,
-                               onion_pair.second->onionname.c_str());
-            new_drop_list.push_back(new_adrop);
-        }
-
-        if (fm->has_salt) {
-            Alter_drop *new_adrop =
-                new Alter_drop(Alter_drop::COLUMN,
-                               fm->salt_name.c_str());
-            new_drop_list.push_back(new_adrop);
-        }
+                    }
+                    return out_list;
+                });
 
     }
     
-    new_lex->alter_info.drop_list = new_drop_list;
+    // TODO: Rewrite alter column list.
+    if (lex->alter_info.flags & ALTER_CHANGE_COLUMN) {
+        assert(false);
+    }
+    
+    // TODO: Rewrite key list.
+    if (lex->alter_info.flags & ALTER_FOREIGN_KEY) {
+
+    }
+
+    // TODO: Rewrite indices.
+    if (lex->alter_info.flags & (ALTER_ADD_INDEX | ALTER_DROP_INDEX)) {
+
+    }
 
     LEX **out_lex = new LEX*[1];
     out_lex[0] = new_lex;
@@ -3731,7 +3764,51 @@ add_table_update_meta(const string &q,
 static inline void
 alter_table_update_meta(const string &q, LEX *lex, Analysis &a)
 {
-    // assert(false);
+    // const string &table =
+        // lex->select_lex.table_list.first->table_name;
+
+    // TODO: Rewrite create list.
+    if (lex->alter_info.flags & ALTER_ADD_COLUMN) {
+        assert(false);
+    }
+    
+    // Rewrite drop list.
+    if (lex->alter_info.flags & ALTER_DROP_COLUMN) {
+        auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
+
+        for (;;) {
+            Alter_drop *adrop = drop_it++;
+            if (!adrop) {
+                break;
+            }
+
+            // FIXME: Possibly this should be an assert as mixed clauses
+            // are not supported?
+            if (adrop->type == Alter_drop::COLUMN) {
+                // FieldMeta *fm = a.getFieldMeta(table, adrop->name);
+
+                // Remove from embedded database.
+                 
+                // Remove from *Meta structures.
+            }
+        }
+    }
+    
+    // TODO: Rewrite alter column list.
+    if (lex->alter_info.flags & ALTER_CHANGE_COLUMN) {
+        assert(false);
+    }
+    
+    // TODO: Rewrite key list.
+    if (lex->alter_info.flags & ALTER_FOREIGN_KEY) {
+        assert(false);
+    }
+
+    // TODO: Rewrite indices.
+    if (lex->alter_info.flags & (ALTER_ADD_INDEX | ALTER_DROP_INDEX)) {
+        assert(false);
+    }
+
     return;
 }
 
@@ -3945,7 +4022,7 @@ rewrite_helper(const string & q, Analysis & analysis,
 
     list<string> queries;
     for (unsigned i = 0; i < out_lex_count; ++i) {
-        cout << "FINAL QUERY [" << i+1 << "/" << out_lex_count
+        LOG(cdb_v) << "FINAL QUERY [" << i+1 << "/" << out_lex_count
                    << "]: " << new_lexes[i] << endl;
         stringstream ss;
         ss << *new_lexes[i];
@@ -4428,4 +4505,50 @@ static void buildSqlHandlers()
                        changeDBUpdateMeta, rewrite_select_lex, true);
     assert(SqlHandler::addHandler(h));
 
+}
+
+// Helper functions for doing functional things to List<T> structures.
+// MySQL may have already implemented these somewhere?
+template <typename T, typename F> void
+eachList(List_iterator<T> it, F op) {
+    T* element = it++;
+    for (; element ; element = it++) {
+        op(element);
+    }
+
+    return;
+}
+
+template <typename T, typename F> List<T>
+mapList(List_iterator<T> it, F op) {
+    List<T> newList;
+    T* element = it++;
+    for (; element ; element = it++) {
+        newList.push_back(op(element));
+    }
+
+    return newList;
+}
+
+template <typename T, typename F, typename O> O
+reduceList(List_iterator<T> it, O init, F op) {
+    List<T> newList;
+    O accum = init;
+    T* element = it++;
+
+    for (; element ; element = it++) {
+        accum = op(accum, element);
+    }
+
+    return accum;
+}
+
+template <typename T> List<T>
+vectorToList(std::vector<T*> v) {
+    List<T> lst;
+    for (auto it : v) {
+        lst.push_back(it);
+    }
+
+    return lst;
 }

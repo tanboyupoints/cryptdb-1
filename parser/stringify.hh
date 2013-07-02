@@ -113,6 +113,7 @@ operator<<(std::ostream &out, SELECT_LEX_UNIT &select_lex_unit)
     return out << s;
 }
 
+// FIXME: Combine with vector_join.
 template <typename T>
 std::string ListJoin(List<T> lst, std::string delim,
                      std::string (*finalize)(T))
