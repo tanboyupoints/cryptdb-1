@@ -361,6 +361,7 @@ operator<<(std::ostream &out, enum legacy_db_type db_type) {
     case DB_TYPE_INNODB: {out << "InnoDB"; break;}
     case DB_TYPE_ISAM: {out << "ISAM"; break;}
     case DB_TYPE_MYISAM: {out << "MYISAM"; break;}
+    case DB_TYPE_CSV_DB: {out << "CSV"; break;}
     default:
 	assert_s(false,
 		 "stringify does not know how to print db_type "
