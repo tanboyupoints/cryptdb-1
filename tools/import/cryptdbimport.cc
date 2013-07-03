@@ -157,7 +157,7 @@ format_create_database_query(const string dbname,
             if(vit != it->second.end())
             {
                 assert(vit->second.size() > 0);
-                string s = ") ENGINE=" + it->second.at(1).second + ";";
+                string s = ") ENGINE=" + vit->second + ";";
                 optionsVec.push_back(s);
             }
             //TODO: Extend to get all options
