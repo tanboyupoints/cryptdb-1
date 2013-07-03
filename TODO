@@ -11,6 +11,11 @@ ALTER TABLE
 Subqueries
 DECIMAL
 VARCHAR
+Misc Bugs
+    * Connect can get into an inconsistent state because it claims to know
+    the current database (getCurDBName), but a rogue USE statement will
+    make it a liar.
+
 
 Carlos:
 Import tool fixes:

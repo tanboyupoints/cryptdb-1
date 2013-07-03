@@ -259,7 +259,7 @@ XMLParser::writeRIWO(const string& dbname, const string& tablename,
     cout << q << endl;
 
     if(exec == true)
-        return (bool)executeQuery(conn, r, q, true);
+        return (bool)executeQuery(r, q, true);
 
     return true;
 }
@@ -284,7 +284,7 @@ XMLParser::writeRIWO(const string& dbname, const string& tablename,
     cout << q << endl;
 
     if(exec == true)
-        return (bool)executeQuery(conn, r, q, true);
+        return (bool)executeQuery(r, q, true);
 
     return true;
 }
@@ -468,7 +468,7 @@ int main(int argc, char **argv)
             case 's':
                 {
                     ConnectionInfo ci("localhost", username, password);
-                    Rewriter r(ci, "/var/lib/shadow-mysql", false, true);
+                    Rewriter r(ci, "/var/lib/shadow-mysql", "cryptdbtest", false, true);
                     Connect conn("localhost", username, password, "cryptdbtest");
                     do_init(xml, conn, r, exec, optarg);
                 }

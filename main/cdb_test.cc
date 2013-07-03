@@ -62,7 +62,7 @@ static inline string &trim(string &s) {
 }
 
 /** returns true if should stop, to keep looping */
-static bool handle_line(Connect& conn, Rewriter& r, const string& q)
+static bool handle_line(Rewriter& r, const string& q)
 {
   if (q == "\\q") {
     cerr << "Goodbye!\n";
@@ -86,7 +86,7 @@ static bool handle_line(Connect& conn, Rewriter& r, const string& q)
       if (line.empty())
         continue;
       cerr << GREEN_BEGIN << line << COLOR_END << endl;
-      if (!handle_line(conn, r, line)) {
+      if (!handle_line(r, line)) {
         f.close();
         return false;
       }
@@ -96,7 +96,7 @@ static bool handle_line(Connect& conn, Rewriter& r, const string& q)
   }
 
 
-  return (bool)executeQuery(conn, r, q, true);
+  return (bool)executeQuery(r, q, true);
 }
 
 int
@@ -114,10 +114,7 @@ main(int ac, char **av)
 
     ConnectionInfo ci("localhost", "root", "letmein");
 
-    Rewriter r(ci, av[1], Multi, encByDefault);
-    //TODO: conn creation has to occur after rewriter creation
-    //because rewriter inits mysql library; fix this
-    Connect conn("localhost", "root", "letmein", "cryptdbtest");
+    Rewriter r(ci, av[1], "cryptdbtest", Multi, encByDefault);
 
     r.setMasterKey("2392834");
 
@@ -130,7 +127,7 @@ main(int ac, char **av)
         string q(input);
         if (q.empty()) continue;
         else{
-            if (!handle_line(conn, r, q))
+            if (!handle_line(r, q))
                 break;
         }
     }

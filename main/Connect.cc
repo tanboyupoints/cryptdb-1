@@ -16,15 +16,8 @@
 using namespace std;
 
 Connect::Connect(const string &server, const string &user, const string &passwd,
-                 uint port)
-    : conn(nullptr), close_on_destroy(true)
-{
-    do_connect(server, user, passwd, port);
-}
-
-Connect::Connect(const string &server, const string &user, const string &passwd,
                  const string &dbname, uint port)
-    : conn(nullptr), close_on_destroy(true)
+    : conn(nullptr), dbname(dbname), close_on_destroy(true)
 {
     do_connect(server, user, passwd, port);
 
@@ -35,8 +28,6 @@ Connect::Connect(const string &server, const string &user, const string &passwd,
             throw CryptDBError("cannot select dbname " + dbname);
         }
     }
-
-    cur_db_name(dbname);
 }
 
 void
@@ -67,36 +58,31 @@ Connect::do_connect(const string &server, const string &user,
     if (!mysql_real_connect(conn, server.c_str(), user.c_str(),
                             passwd.c_str(), 0, port, 0, 0)) {
         LOG(warn) << "connecting to server " << server
+                  << " db " << getCurDBName()
                   << " user " << user
                   << " pwd " << passwd
                   << " port " << port;
         LOG(warn) << "mysql_real_connect: " << mysql_error(conn);
         throw runtime_error("cannot connect");
     }
+
+    // We create and set the database here because the database will
+    // not exist if it is our first time connecting to it.
+    assert(execute("CREATE DATABASE IF NOT EXISTS " + getCurDBName() + ";"));
+    setCurDBName(getCurDBName());
+}
+
+void
+Connect::setCurDBName(const string & db)
+{
+    dbname = db;
+    assert(execute("USE " + db + ";"));
 }
 
 std::string
-Connect::cur_db_name(const string & dbname)
+Connect::getCurDBName()
 {
-    /*
-     * <ccarvalho>
-     * Perhaps a more sophisticated (better!)
-     * way than static string to be shared by multiple
-     * instances..
-     */
-    static std::string s_cur_db("");
-
-    if(dbname.size() > 0)
-        s_cur_db = dbname;
-
-    return s_cur_db;
-}
-
-// Wrapper
-std::string
-Connect::cur_db_name()
-{
-    return cur_db_name("");
+    return dbname;
 }
 
 bool
@@ -105,7 +91,8 @@ Connect::select_db(const std::string &dbname)
     return mysql_select_db(conn, dbname.c_str()) ? false : true;
 }
 
-Connect * Connect::getEmbedded(const string & embed_db) {
+Connect * Connect::getEmbedded(const string & embed_db,
+                               const string & dbname) {
 
     init_mysql(embed_db);
 
@@ -114,7 +101,8 @@ Connect * Connect::getEmbedded(const string & embed_db) {
 
     mysql_options(m, MYSQL_OPT_USE_EMBEDDED_CONNECTION, 0);
 
-    if (!mysql_real_connect(m, 0, 0, 0, 0, 0, 0, CLIENT_MULTI_STATEMENTS)) {
+    if (!mysql_real_connect(m, 0, 0, 0, 0, 0, 0,
+                            CLIENT_MULTI_STATEMENTS)) {
         mysql_close(m);
         cryptdb_err() << "mysql_real_connect: " << mysql_error(m);
     }
@@ -122,9 +110,18 @@ Connect * Connect::getEmbedded(const string & embed_db) {
     Connect * conn = new Connect(m);
     conn->close_on_destroy = true;
 
+    // We build the database here instead of initially connecting to it
+    // because it may be our first time accessing that database and 
+    // it will not exist yet.
+    assert(conn->execute("CREATE DATABASE IF NOT EXISTS " + dbname + ";"));
+    conn->setCurDBName(dbname);
+
     return conn;
 }
 
+// FIXME: There is no guarentee that the query will actually be executed
+// in the database context (Connect::getCurDBName) that the caller
+// would expect. A rogue USE will lead to an inconsistent state.
 bool
 Connect::execute(const string &query, DBResult * & res)
 {
