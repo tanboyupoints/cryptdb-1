@@ -129,13 +129,13 @@ Basic(const TestConfig &tc, Connect *conn) {
                  {"3", "4", "Queens Play"},
                  {"1", "2", "Checkmate"} });
 
-    
+
 }
 
 void
 TestProxy::run(const TestConfig &tc, int argc, char ** argv)
 {
-    
+
     if (argc > 2 || ((argc == 2) && (strncmp(argv[1], "help", 4) == 0))) {
         cerr << "Command should be    $EDBDIR/tests/test proxy [ single | multi | plain ]\nDefault is to test plain" << endl;
         return;
@@ -155,7 +155,7 @@ TestProxy::run(const TestConfig &tc, int argc, char ** argv)
         sleep(1);
         Connect *conn;
         conn = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
-        
+
         if (argc == 2) {
             if (strncmp(argv[1], "single", 6) == 0) {
                 cerr << "Creating single principle tables" << endl;
@@ -171,12 +171,12 @@ TestProxy::run(const TestConfig &tc, int argc, char ** argv)
             cerr << "Creating plain principle tables" << endl;
             CreatePlain(conn);
         }
-        
+
         cerr << "Test simple queries..." << endl;
         Basic(tc, conn);
         //cerr << "Test simple queries (multi principle)..." << endl;
         //BasicMulti();
-    
+
         conn->execute("DROP TABLE t1, t2");
         conn->~Connect();
 

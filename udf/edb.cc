@@ -23,7 +23,7 @@
 
 #define DEBUG 1
 
-#include <crypto/BasicCrypto.hh> 
+#include <crypto/BasicCrypto.hh>
 #include <crypto/blowfish.hh>
 #include <crypto/SWPSearch.hh>
 #include <crypto/paillier.hh>
@@ -45,7 +45,7 @@ my_bool  decrypt_int_sem_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
 ulonglong decrypt_int_sem(UDF_INIT *initid, UDF_ARGS *args, char *is_null,
                          char *error);
 
-    
+
 my_bool  decrypt_int_det_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
 ulonglong decrypt_int_det(UDF_INIT *initid, UDF_ARGS *args, char *is_null,
                          char *error);
@@ -212,7 +212,7 @@ decrypt_int_sem(PG_FUNCTION_ARGS)
         uint64_t keyLen;
         char * keyBytes = getba(args, 1, keyLen);
         string key = string(keyBytes, keyLen);
-        
+
         uint64_t salt = getui(args, 2);
 
         blowfish bf(key);
@@ -221,7 +221,7 @@ decrypt_int_sem(PG_FUNCTION_ARGS)
 
     //cerr << "udf: encVal " << eValue << " key " << (int)key[0] << " " << (int)key[1] << " " << (int) key[3]  << " salt " << salt  << " obtains: " << value << " and cast to ulonglong " << (ulonglong) value << "\n";
 
-   
+
 #if MYSQL_S
      return (ulonglong) value;
 #else /* postgres */
@@ -230,7 +230,7 @@ decrypt_int_sem(PG_FUNCTION_ARGS)
 }
 
 
-    
+
 #if MYSQL_S
 my_bool
 decrypt_int_det_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
@@ -256,7 +256,7 @@ decrypt_int_det(PG_FUNCTION_ARGS)
         uint64_t keyLen;
         char * keyBytes = getba(args, 1, keyLen);
         string key = string(keyBytes, keyLen);
-        
+
         blowfish bf(key);
         value = bf.decrypt(eValue);
     }
@@ -305,26 +305,26 @@ decrypt_text_sem(UDF_INIT *initid, UDF_ARGS *args,
         uint64_t keyLen;
         char * keyBytes = getba(args, 1, keyLen);
         string key = string(keyBytes, keyLen);
-        
+
         uint64_t salt = getui(ARGS, 2);
 
         AES_KEY *aesKey = get_AES_dec_key(key);
         value = decrypt_SEM((unsigned char *)eValueBytes, eValueLen, aesKey, salt);
         delete aesKey;
     }
-    
+
     // NOTE: This is not creating a proper C string, no guarentee of NUL
     // termination.
     char * res = new char[value.length()];
     initid->ptr = res;
     memcpy(res, value.data(), value.length());
     *length =  value.length();
-  
+
     return (char*) initid->ptr;
 }
-    
 
-    
+
+
 #if MYSQL_S
 my_bool
 encrypt_int_det_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
@@ -344,7 +344,7 @@ decrypt_int_det(PG_FUNCTION_ARGS)
     uint64_t keyLen;
     char * keyBytes = getba(args, 1, keyLen);
     string key = string(keyBytes, keyLen);
-   
+
     blowfish bf(key);
     uint64_t value = bf.encrypt(eValue);
 
@@ -390,7 +390,7 @@ decrypt_text_det(PG_FUNCTION_ARGS)
     uint64_t keyLen;
     char *keyBytes = getba(args, 1, keyLen);
     string key = string(keyBytes, keyLen);
-    
+
     AES_KEY * aesKey = get_AES_dec_key(key);
     string value = decrypt_AES_CMC(string(eValueBytes, (unsigned int)eValueLen), aesKey, false);
     delete aesKey;
@@ -417,7 +417,7 @@ decrypt_text_det(PG_FUNCTION_ARGS)
  * the length of the word body
  */
 
-    
+
 #if MYSQL_S
 my_bool
 search_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
@@ -525,8 +525,8 @@ searchSWP(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
 #endif
 
 
-   
-    
+
+
 struct agg_state {
     ZZ sum;
     ZZ n2;
@@ -576,7 +576,7 @@ agg_add(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
 	//cerr << "n2 is " << as->n2 << "\n";
         as->n2_set = 1;
     }
-  
+
     ZZ e;
     ZZFromBytes(e, (const uint8_t *) args->args[0], args->lengths[0]);
 
@@ -640,5 +640,5 @@ func_add_set(UDF_INIT *initid, UDF_ARGS *args,
 }
 
 
-    
+
 } /* extern "C" */

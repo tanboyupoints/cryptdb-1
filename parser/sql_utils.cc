@@ -27,9 +27,9 @@ init_mysql(const string & embed_db)
 
     assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
 				   (char**) mysql_av, 0));
-  
+
     assert(0 == mysql_thread_init());
-    
+
     lib_initialized = true;
 }
 

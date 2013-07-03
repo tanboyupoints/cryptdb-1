@@ -242,7 +242,7 @@ void ZZFromStringFast(ZZ& x, const string& s) {
 // TODO: figure out how to pad non-8-byte aligned p
 void ZZFromBytesFast(ZZ& x, const unsigned char *p, long n) {
     if (n % sizeof(mp_limb_t) != 0) {
-        x = ZZFromBytes((const uint8_t *) p, n); 
+        x = ZZFromBytes((const uint8_t *) p, n);
         return;
     }
     _ntl_gcopy_mp(
@@ -309,7 +309,7 @@ valFromStr(const string &str)
    stringstream ss(str);
    uint64_t val;
    ss >> val;
-        
+
     return  val;
 }
 

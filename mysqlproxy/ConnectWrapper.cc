@@ -95,7 +95,7 @@ connect(lua_State *L)
     string user = xlua_tolstring(L, 4);
     string psswd = xlua_tolstring(L, 5);
     string embed_dir = xlua_tolstring(L, 6);
-    
+
     ConnectionInfo ci = ConnectionInfo(server, user, psswd, port);
 
     WrapperState *ws = new WrapperState();
@@ -105,7 +105,7 @@ connect(lua_State *L)
     }
 
     clients[client] = ws;
-    
+
     if (!r) {
         cerr << "starting proxy\n";
         //cryptdb_logger::setConf(string(getenv("CRYPTDB_LOG")?:""));
@@ -125,13 +125,13 @@ connect(lua_State *L)
 		cerr << "\n\nenc by default true" << "\n\n";
 		r = new Rewriter(ci, embed_dir, false, true);
 	    }
-            
+
 	} else if (mode == "multi") {
             r = new Rewriter(ci, embed_dir, true, false);
         } else {
             r = new Rewriter(ci, embed_dir);
         }
-	
+
         uint64_t mkey = 113341234;  // XXX do not change as it's used for tpcc exps
         r->setMasterKey(BytesFromInt(mkey, AES_KEY_BYTES));
 
@@ -251,7 +251,7 @@ rewrite(lua_State *L)
 
     list<string> new_queries;
 
-    
+
     t.lap_ms();
     if (EXECUTE_QUERIES) {
         if (!DO_CRYPT) {

@@ -18,6 +18,6 @@ class TestProxy {
     TestProxy();
     virtual
     ~TestProxy();
-    
+
     static void run(const TestConfig &tc, int argc, char ** argv);
 };

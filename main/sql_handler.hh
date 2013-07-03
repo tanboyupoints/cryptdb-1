@@ -9,7 +9,7 @@ typedef void (*QueryAnalyze)(LEX *lex, Analysis &a);
                              */
 
 typedef void (*UpdateMeta)(const string &q, LEX *lex, Analysis &a);
-typedef LEX **(*LexRewrite)(LEX *lex, Analysis &analysis, 
+typedef LEX **(*LexRewrite)(LEX *lex, Analysis &analysis,
                             unsigned *out_lex_count);
 
 class SqlHandler {

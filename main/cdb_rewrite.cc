@@ -122,7 +122,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
                 "  database_name varchar(64) NOT NULL,"
                 "  id SERIAL PRIMARY KEY)"
                 " ENGINE=InnoDB;"));
-    
+
     s << " CREATE TABLE IF NOT EXISTS pdb.field_info"
       << " (table_info_id bigint NOT NULL," // Foreign key.
       << "  name varchar(64) NOT NULL,"
@@ -220,7 +220,7 @@ buildTableMeta(ProxyState &ps)
                                        string_to_bool(table_has_salt),
                                        table_salt_name,
                                        &int_table_number);
-                        
+
         buildFieldMeta(ps, tm, table_database_name);
     }
 
@@ -310,7 +310,7 @@ static void
 buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
 {
 
-    string q = " SELECT o.name, o.type, o.current_level," 
+    string q = " SELECT o.name, o.type, o.current_level,"
                "        o.sql_type, o.id"
                " FROM pdb.onion_info o, pdb.field_info f"
                " WHERE o.field_info_id = " + std::to_string(field_id) +";";
@@ -337,14 +337,14 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
 
         onion o = TypeText<onion>::toType(onion_type);
         fm->onions[o] = om;
-        
+
         // Then, build EncLayer subclasses.
         string uniqueFieldName = fullName(om->onionname,
                                          fm->tm->anonTableName);
-       
+
         // Add elements to OnionMeta.layers starting with the bottom layer
         // and stopping at the current level.
-        std::map<SECLEVEL, std::string> layer_serial = 
+        std::map<SECLEVEL, std::string> layer_serial =
             get_layer_keys(ps, o, atoi(onion_id.c_str()));
         std::vector<SECLEVEL> layers = fm->onion_layout[o];
         SECLEVEL current_level =
@@ -366,7 +366,7 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
             }
         }
      }
-          
+
      return;
 }
 
@@ -476,13 +476,13 @@ buildTypeTextTranslator()
                      (onionlayout *)onion_layouts, count);
 
     // Geometry type.
-    const char *geometry_type_chars[] = 
+    const char *geometry_type_chars[] =
     {
         "GEOM_GEOMETRY", "GEOM_POINT", "GEOM_LINESTRING", "GEOM_POLYGON",
         "GEOM_MULTIPOINT", "GEOM_MULTILINESTRING", "GEOM_MULTIPOLYGON",
         "GEOM_GEOMETRYCOLLECTION"
     };
-    Field::geometry_type geometry_types[] = 
+    Field::geometry_type geometry_types[] =
     {
         Field::GEOM_GEOMETRY, Field::GEOM_POINT, Field::GEOM_LINESTRING,
         Field::GEOM_POLYGON, Field::GEOM_MULTIPOINT,
@@ -643,7 +643,7 @@ decrypt_item_layers(Item * i, onion o, vector<EncLayer *> & layers, uint64_t IV,
     Item * prev_dec = NULL;
 
     for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
-    
+
         dec = (*it)->decrypt(dec, IV);
         LOG(cdb_v) << "dec okay";
         //need to free space for all decs except last
@@ -1666,7 +1666,7 @@ template<const char *NAME>
 class CItemMath : public CItemSubtypeFN<Item_func, NAME> {
     virtual RewritePlan * do_gather_type(Item_func *i, /* TODO reason not necessary */ reason &tr, Analysis & a) const {
 	 Item **args = i->arguments();
-        for (uint x = 0; x < i->argument_count(); x++) 
+        for (uint x = 0; x < i->argument_count(); x++)
             analyze(args[x], a);
 	    return a.rewritePlans.find(i)->second;
     }
@@ -2698,7 +2698,7 @@ static inline TABLE_LIST *
 rewrite_table_list(TABLE_LIST *t, Analysis &a)
 {
     TABLE_LIST * new_t = copy(t);
-    
+
     // Table name can only be empty when grouping a nested join.
     assert(t->table_name || t->nested_join);
     if (t->table_name) {
@@ -2778,7 +2778,7 @@ static void
 init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf, onionlayout ol) {
 
     fm->onions.clear();
-    
+
     // This additional reflection is needed as we must rebuild the
     // OnionMeta's (and their layers) after a restart.
     fm->onion_layout = ol;
@@ -2856,7 +2856,7 @@ check_table_not_exists(Analysis & a, LEX * lex, string table) {
 }
 
 static bool
-create_field_meta(TableMeta *tm, Create_field *field, 
+create_field_meta(TableMeta *tm, Create_field *field,
                   const Analysis a, bool encByDefault)
 {
     FieldMeta * fm = new FieldMeta();
@@ -3052,12 +3052,12 @@ rewrite_alter_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
     if (lex->alter_info.flags & ALTER_ADD_COLUMN) {
         do_field_rewriting(lex, new_lex, table, a);
     }
-    
+
     // Rewrite drop list.
     if (lex->alter_info.flags & ALTER_DROP_COLUMN) {
         List<Alter_drop> new_drop_list;
         auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
-        new_lex->alter_info.drop_list = 
+        new_lex->alter_info.drop_list =
             reduceList<Alter_drop>(drop_it, new_drop_list,
                 [table, a] (List<Alter_drop> out_list, Alter_drop *adrop) {
                     // FIXME: Possibly this should be an assert as mixed
@@ -3086,12 +3086,12 @@ rewrite_alter_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
                     return out_list; /* lambda */
                 });
     }
-    
+
     // TODO: Rewrite alter column list.
     if (lex->alter_info.flags & ALTER_CHANGE_COLUMN) {
         assert(false);
     }
-    
+
     // TODO: Rewrite key list.
     if (lex->alter_info.flags & ALTER_FOREIGN_KEY) {
 
@@ -3285,7 +3285,7 @@ std::string vector_join(std::vector<T> v, std::string delim,
         std::string element = (*finalize)((T)*it);
         accum.append(element);
         accum.append(delim);
-    } 
+    }
 
     std::string output;
     if (accum.length() > 0) {
@@ -3302,7 +3302,7 @@ rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a,
                                   unsigned *out_lex_count)
 {
     // TODO(burrows): Should support multiple tables in a single UPDATE.
-    string plain_table = 
+    string plain_table =
         lex->select_lex.top_join_list.head()->table_name;
     // HACK(burrows): Handling empty WHERE clause.
     string where_clause =
@@ -3399,7 +3399,7 @@ rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a,
                                          push_results_stream.str());
     unsigned final_insert_out_lex_count;
     LEX **final_insert_lex_arr =
-        SqlHandler::rewriteLex(parse->lex(), insert_analysis, 
+        SqlHandler::rewriteLex(parse->lex(), insert_analysis,
                                push_results_stream.str(),
                                &final_insert_out_lex_count);
     assert(final_insert_lex_arr && 1 == final_insert_out_lex_count);
@@ -3505,7 +3505,7 @@ rewrite_insert_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
                 if (!i)
                     break;
                 vector<Item *> l;
-                // Prevent the dereferencing of a bad iterator if 
+                // Prevent the dereferencing of a bad iterator if
                 // the user supplies more values than fields and the parser
                 // fails to throw an error.
                 // TODO(burrows): It seems like the expected behavior is
@@ -3683,7 +3683,7 @@ do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
           << " " << bool_to_string(fm->has_salt) << ", "
           << " '" << fm->salt_name << "',"
           << " '" << TypeText<onionlayout>::toText(fm->onion_layout)<< "',"
-          << " 0" 
+          << " 0"
           << " );";
 
         assert(a.ps->e_conn->execute(s.str()));
@@ -3698,7 +3698,7 @@ do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
             SECLEVEL current_sec_level = fm->getOnionLevel(o);
             assert(current_sec_level != SECLEVEL::INVALID);
             std::string str_seclevel =
-                TypeText<SECLEVEL>::toText(current_sec_level); 
+                TypeText<SECLEVEL>::toText(current_sec_level);
             std::string str_onion  = TypeText<onion>::toText(o);
             s << " INSERT INTO pdb.onion_info VALUES ("
               << " " << std::to_string(fieldID) << ", "
@@ -3707,17 +3707,17 @@ do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
               << " '" << str_seclevel << "', "
               << " '" << TypeText<enum enum_field_types>::toText(om->sql_type) << "', "
               << " 0);";
-            
+
             assert(a.ps->e_conn->execute(s.str()));
 
             unsigned long long onionID = a.ps->e_conn->last_insert_id();
             for (unsigned int i = 0; i < onion_pair.second->layers.size(); ++i) {
                 SECLEVEL level = fm->onion_layout[o][i];
-                std::string str_level =  
-                    TypeText<SECLEVEL>::toText(level); 
+                std::string str_level =
+                    TypeText<SECLEVEL>::toText(level);
 
                 std::string crypto_key = onion_pair.second->layers[i]->serialize();
-		
+
                 unsigned int escaped_length = crypto_key.size() * 2 + 1;
                 char escaped_key[escaped_length];
                 a.ps->e_conn->real_escape_string(escaped_key,
@@ -3734,7 +3734,7 @@ do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
                   << " 0"
                   << " );";
 
-                assert(a.ps->e_conn->execute(s.str())); 
+                assert(a.ps->e_conn->execute(s.str()));
                 // The last iteration should get us to the current
                 // security level.
                 if (current_sec_level == level) {
@@ -3751,7 +3751,7 @@ static inline void
 add_table_update_meta(const string &q,
                       LEX *lex,
                       Analysis &a)
-{   
+{
     char* dbname = lex->select_lex.table_list.first->db;
     char* table  = lex->select_lex.table_list.first->table_name;
 
@@ -3788,7 +3788,7 @@ add_table_update_meta(const string &q,
     do_add_field(tm, a, dbname, table, &tableID);
 
     a.ps->e_conn->execute("COMMIT");
-   
+
 }
 
 // TODO.
@@ -3817,7 +3817,7 @@ alter_table_update_meta(const string &q, LEX *lex, Analysis &a)
         // Add metadata to embedded database.
         do_add_field(tm, a, dbname, table);
     }
-    
+
     // Rewrite drop list.
     if (lex->alter_info.flags & ALTER_DROP_COLUMN) {
         auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
@@ -3841,19 +3841,19 @@ alter_table_update_meta(const string &q, LEX *lex, Analysis &a)
 
                 assert(a.ps->e_conn->execute(s.str()));
 
-                    
+
                 // Remove from *Meta structures.
                 assert(a.destroyFieldMeta(table, adrop->name));});
 
         // Remove column from embedded database.
         assert(a.ps->e_conn->execute(q));
     }
-    
+
     // TODO: Rewrite alter column list.
     if (lex->alter_info.flags & ALTER_CHANGE_COLUMN) {
         assert(false);
     }
-    
+
     // TODO: Rewrite key list.
     if (lex->alter_info.flags & ALTER_FOREIGN_KEY) {
         assert(false);
@@ -3872,7 +3872,7 @@ changeDBUpdateMeta(const string &q, LEX *lex, Analysis &a)
 {
     assert(lex->select_lex.db);
     char* dbname = lex->select_lex.db;
-    
+
     // new dbname is saved for next queries
     (void)a.ps->conn->setCurDBName(dbname);
 
@@ -4128,7 +4128,7 @@ Rewriter::rewrite(const string & q, string *cur_db)
      */
     //optimization: do not process queries that we will not rewrite
     if (noRewrite(p.lex())) {
-        // HACK(burrows): This 'Analysis' is dummy as we never call 
+        // HACK(burrows): This 'Analysis' is dummy as we never call
         // addToReturn. But it works because this optimized cases don't
         // have anything to do in addToReturn anyways.
 	Analysis analysis = Analysis(&ps);
@@ -4203,7 +4203,7 @@ Rewriter::decryptResults(ResType & dbres,
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
     unsigned int cols = dbres.names.size();
-    
+
     ResType res = ResType();
 
     unsigned int index = 0;
@@ -4285,7 +4285,7 @@ executeQuery(Connect &conn, Rewriter &r, const string &q, bool show)
             }
             ++i;
         }
-        
+
         ResType res = dbres->unpack();
 
         if (!res.ok) {
@@ -4426,7 +4426,7 @@ std::string TypeText<_type>::getText(_type e)
         }
     }
 
-    throw "enum does not exist!"; 
+    throw "enum does not exist!";
 }
 
 template <typename _type>
@@ -4438,7 +4438,7 @@ _type TypeText<_type>::getEnum(std::string t)
         }
     }
 
-    throw "text does not exist!"; 
+    throw "text does not exist!";
 }
 
 /*
@@ -4448,7 +4448,7 @@ _type TypeText<_type>::getEnum(std::string t)
 SqlHandler *SqlHandler::getHandler(enum_sql_command cmd)
 {
     std::map<enum_sql_command, SqlHandler *>::iterator h =
-        handlers.find(cmd); 
+        handlers.find(cmd);
     if (handlers.end() == h) {
         return NULL;
     }
@@ -4477,7 +4477,7 @@ SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
     if (!sql_handler) {
         return NULL;
     }
-    
+
     // TODO(burrows): Where should this call be?
     // - In each analysis function?
     // - Here?
@@ -4486,7 +4486,7 @@ SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
     //TODO: is db neededs as param in all these funcs?
     (*sql_handler->query_analyze)(lex, analysis);
 
-    // HACK: SQLCOM_ALTER_TABLE 
+    // HACK: SQLCOM_ALTER_TABLE
     if ((lex->sql_command != SQLCOM_ALTER_TABLE &&
          true == sql_handler->hasUpdateMeta() &&
          false == sql_handler->updateAfter()) ||
@@ -4544,7 +4544,7 @@ static void buildSqlHandlers()
     // Must rewrite after update, otherwise TableMeta and FieldMeta
     // will not exist during rewrite.
     h = new SqlHandler(SQLCOM_CREATE_TABLE, process_select_lex,
-                       add_table_update_meta, rewrite_create_lex); 
+                       add_table_update_meta, rewrite_create_lex);
     assert(SqlHandler::addHandler(h));
 
     h = new SqlHandler(SQLCOM_INSERT, process_select_lex, NULL,

@@ -450,7 +450,7 @@ tester::testClientParser()
 
     exit();
     cerr << "TEST TRANSLATOR PASSED \n";
-    
+
 }
 */
 /*
@@ -764,7 +764,7 @@ interactiveTest(const TestConfig &tc, int ac, char **av)
 
             //GENERAL MULTI-KEY DEBUGGING
 
-            
+
                cl->plain_execute("DROP TABLE IF EXISTS t1, users,
                   pwdcryptdb__users, cryptdb_public, cryptdb_active0;");
                assert_res(cl->execute("CREATE TABLE t1 (id integer, post encfor
@@ -799,7 +799,7 @@ interactiveTest(const TestConfig &tc, int ac, char **av)
                   'raluca');"), "failed");
                assert_res(cl->execute("INSERT INTO t1 VALUES (2, 'my text',
                   5);"), "failed");
-             
+
 
             //PRIVATE MESSAGES EXAMPLE
                 cl->plain_execute("DROP TABLE IF EXISTS users, msgs,
@@ -836,7 +836,7 @@ interactiveTest(const TestConfig &tc, int ac, char **av)
                     assert_res(cl->execute("SELECT msgtext from msgs, privmsg,
                        users WHERE username = 'alice' AND userid = recid AND
                        msgs.msgid = privmsg.msgid;"), "failed");
-             
+
             //private messages without orphans
              cl->plain_execute("DROP TABLE IF EXISTS users, msgs,
                privmsg;");
@@ -870,7 +870,7 @@ interactiveTest(const TestConfig &tc, int ac, char **av)
                assert_res(cl->execute("SELECT msgtext from msgs, privmsg, users
                   WHERE username = 'alice' AND userid = recid AND msgs.msgid =
                   privmsg.msgid;"), "failed");
-             
+
 
             //USERID, GROUP, FORUM, SQL PRED EXAMPLE
             //    cl->plain_execute("DROP TABLE IF EXISTS users, usergroup,
@@ -1277,7 +1277,7 @@ testPaillier(const TestConfig &tc, int ac, char **av)
     res = readTimer();
     cerr << "decryption takes " << res/noTests << " ms \n";
 }
-  
+
 static void
 testUtils(const TestConfig &tc, int ac, char **av)
 {
@@ -4187,7 +4187,7 @@ startProxy(const TestConfig & tc, string host, uint port) {
 static void
 testTrace(const TestConfig &tc, int argc, char ** argv)
 {
-    cerr << "testTrace uses old EDBProxy -- not run" << endl;    
+    cerr << "testTrace uses old EDBProxy -- not run" << endl;
     /*
     string masterKey =  BytesFromInt(mkey, AES_KEY_BYTES);
 

@@ -50,7 +50,7 @@ make_order(ORDER * old_order, Item * i) {
     new_order->next = NULL;
     new_order->item_ptr = i;
     new_order->item = (Item **)malloc(sizeof(Item *));
-    *new_order->item = i; 
+    *new_order->item = i;
 
     return new_order;
 }

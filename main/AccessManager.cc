@@ -260,7 +260,7 @@ MetaAccess::addGivesCheck(string gen)
     //since gives has no effect on the access tables, no need to do anything else
     return 0;
 }
-    
+
 
 void
 MetaAccess::addGives(string gen)
@@ -374,7 +374,7 @@ MetaAccess::getGenHasAccessTo(string gen)
             can_access.insert(*it);
         }
     }
-    
+
     return can_access;
 }
 
@@ -503,7 +503,7 @@ MetaAccess::CreateTables()
     if (execute(sql) < 0) {
         return -1;
     }
-    sql = "CREATE TABLE " + access_table + " (hasAccessType " + 
+    sql = "CREATE TABLE " + access_table + " (hasAccessType " +
           SQL_PRINCTYPE + ", hasAccessValue " SQL_PRINCVALUE
           ", accessToType " + SQL_PRINCTYPE + ", accessToValue "
           SQL_PRINCVALUE ", Sym_Key " TN_SYM_KEY ", Salt " TN_SALT
@@ -672,7 +672,7 @@ void
 KeyAccess::updateMaps(string old1, string old2, string gen) {
     //note that we only really need to check for old2, since addEquals
     // links both prins to the first prin's generic if both existed befor
-    
+
     assert_s((old1 != "" && old1 == gen) || (old1 == "" && old2 != "" && old2 == gen) || (old1 == "" && old2 == ""), "addEquals chose teh wrong gen...");
 
     //keys
@@ -711,7 +711,7 @@ KeyAccess::updateMaps(string old1, string old2, string gen) {
             }
         }
     }
-        
+
 
     //orphansToParents
     set<Prin> first_tier;
@@ -850,13 +850,13 @@ KeyAccess::Print()
 
 int
 KeyAccess::insert(Prin hasAccess, Prin accessTo)
-{    
+{
     if (!meta_finished) {
         LOG(am) << "meta concluded" << endl;
         if(CreateTables() < 0) {
             return -1;
         }
-    }    
+    }
 
     if (VERBOSE) {
         LOG(am_v) << "insert(" << hasAccess.type << "=" << hasAccess.value <<
@@ -943,7 +943,7 @@ KeyAccess::insert(Prin hasAccess, Prin accessTo)
         encrypted_accessToKey = encrypt_AES_CBC(accessToKey, aes, BytesFromInt(salt, SALT_LEN_BYTES));
         string string_salt = strFromVal(salt);
         string_encrypted_accessToKey = marshallBinary(encrypted_accessToKey);
-        sql = "INSERT INTO " + table + "(hasAccessType, hasAccessValue, " + 
+        sql = "INSERT INTO " + table + "(hasAccessType, hasAccessValue, " +
               "accessToType, accessToValue, Sym_Key, Salt) VALUES ('" +
               hasAccess.gen + "', '" + hasAccess.value + "', '" +
               accessTo.gen + "', '" + accessTo.value + "', " +
@@ -959,7 +959,7 @@ KeyAccess::insert(Prin hasAccess, Prin accessTo)
         sql = "INSERT INTO " + table + "(hasAccessType, hasAccessValue, " +
               "accessToType, accessToValue, Asym_Key) VALUES ('" +
               hasAccess.gen + "', '" + hasAccess.value + "', '" +
-              accessTo.gen + "', '" + accessTo.value + "', " + 
+              accessTo.gen + "', '" + accessTo.value + "', " +
               string_encrypted_accessToKey + ");";
     }
 
@@ -1166,7 +1166,7 @@ KeyAccess::write_log() {
         f << i->gen << " " << i->value << "\n";
     }
     f.close();
-    
+
     log_set.clear();
     log_time = now;
 }
@@ -1741,7 +1741,7 @@ ResType
 KeyAccess::SelectPublicCol(Prin prin, string column)
 {
     assert_s(prin.gen != "", "prin argument to SelectPublic or SelectPublicCount has no gen");
-    string sql = "SELECT " + column + " FROM " + meta->publicTableName() + 
+    string sql = "SELECT " + column + " FROM " + meta->publicTableName() +
                  " WHERE Type = '" + prin.gen + "' AND Value = '" + prin.value + "'";
     return execute(sql);
 }
@@ -1752,8 +1752,8 @@ KeyAccess::RemoveRow(Prin hasAccess, Prin accessTo)
 {
     assert_s(hasAccess.gen != "", "hasAccess input to RemoveRow has no gen");
     assert_s(accessTo.gen != "", "accessTo input to RemoveRow has no gen");
-    string sql = "DELETE FROM " + meta->accessTableName() + " WHERE hasAccessType = '" 
-                 + hasAccess.gen + "' AND hasAccessValue ='" + hasAccess.value + 
+    string sql = "DELETE FROM " + meta->accessTableName() + " WHERE hasAccessType = '"
+                 + hasAccess.gen + "' AND hasAccessValue ='" + hasAccess.value +
                  "' AND accessToType = '" + accessTo.gen + "' AND accessToValue ='" +
                  accessTo.value + "';";
     if(!conn->execute(sql)) {
@@ -1880,7 +1880,7 @@ KeyAccess::getUncached(Prin prin)
          set_it++) {
         Prin empty_prin;
         res = SelectAccess(empty_prin, prin);
-        
+
         for (auto row = res.rows.begin(); row != res.rows.end(); row++) {
             string sym = ItemToStr(row->at(4));
             string salt = ItemToString(row->at(5));

@@ -82,10 +82,10 @@ EncSet::chooseOne() const
         oOPE,
         oAGG,
         oSWP,
-	oPLAIN, 
+	oPLAIN,
     };
 
-    
+
     static size_t onion_size = sizeof(onion_order) / sizeof(onion_order[0]);
     for (size_t i = 0; i < onion_size; i++) {
 	onion o = onion_order[i];
@@ -135,7 +135,7 @@ operator<<(ostream &out, const reason &r)
 {
     out << r.why_t_item << " PRODUCES encset " << r.encset << "\n" \
 	<< " BECAUSE " << r.why_t << "\n";
-    
+
     if (r.childr->size()) {
 	out << " AND CHILDREN: {" << "\n";
 	for (reason ch : *r.childr) {
@@ -172,7 +172,7 @@ operator<<(ostream &out, const RewritePlan * rp)
     }
 
     out << " RewritePlan: \n---> out encset " << rp->es_out << "\n---> reason " << rp->r << "\n";
-    
+
     return out;
 }
 

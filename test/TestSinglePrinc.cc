@@ -883,7 +883,7 @@ testUpdate(const TestConfig &tc, EDBProxy * cl)
     qUpdateSelect(tc, cl, "UPDATE t1 SET address = 'Neverland' WHERE id = 1", "SELECT * FROM t1 WHERE address < 'fml'",
           {"id", "age", "salary", "address", "name"},
           { {"5", "32", "55000", "221B Baker Street", "Sherlock Holmes"} });
-    
+
     if (!PLAIN) {
         assert_res(cl->execute("DROP TABLE t1"), "testUpdate can't drop t1");
     } else {

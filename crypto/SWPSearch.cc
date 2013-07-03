@@ -89,12 +89,12 @@ SWP::encryptSym(const string & key, const string & val, const string & iv)
     string val2 = pad(val, AES_BLOCK_SIZE);
 
     unsigned int newlen = val2.length();
-    
+
     auto result = vector<unsigned char>(newlen);
 
     unsigned char * newiv = new unsigned char[iv.length()];
     memcpy(newiv, iv.c_str(), iv.length());
-    
+
     AES_cbc_encrypt((unsigned char *)val2.c_str(), &result[0], newlen, &aes_key,
                     newiv, AES_ENCRYPT);
 
@@ -117,7 +117,7 @@ SWP::decryptSym(const string & key, const string & ciph, const string & iv)
 
     unsigned char * newiv = new unsigned char[iv.length()];
     memcpy(newiv, iv.c_str(), iv.length());
-    
+
     AES_cbc_encrypt((const unsigned char*)ciph.c_str(), result, ciphlen, &aes_key,
                     newiv, AES_DECRYPT);
 
@@ -186,7 +186,7 @@ bytewise_xor(const string & a, const string & b) {
     assert_s(a.length() == b.length(), "bytewise_xor expects equal lengths");
 
     unsigned int len = a.length();
-    
+
     char * res = new char[len];
     for (unsigned int i = 0; i < len; i++) {
 	res[i] = a[i] xor b[i];

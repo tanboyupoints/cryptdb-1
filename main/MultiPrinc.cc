@@ -65,7 +65,7 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
 
         assert_s(accMan->addSpeaksFor(annot.getLeft().princtype, annot.getRight().princtype) >= 0, "access manager could not add " + annot.getLeftStr() + " speaks for " + annot.getRightStr());
         encryptfield = false;
-        
+
         Predicate *pred = annot.getPredicate();
         if(pred) {
             mkm.condAccess[AccessRelation(annot.getLeft().column, annot.getRight().column)] = pred;
@@ -113,7 +113,7 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
 
             stringstream query;
             query << "ALTER TABLE " + prim_table;
-        
+
             if (prev_onion == "") {
                 query << " CHANGE " << fm->fname << " " << *cf << ";";
             } else {
@@ -240,7 +240,7 @@ MultiPrinc::checkPsswd(LEX *lex) {
         assert(i->type() == Item::FIELD_ITEM);
         Item_field *ifd = static_cast<Item_field*>(i);
         type = fullName(ifd->field_name, pw_table);
-        
+
         //values for fieldname and password
         assert_s(lex->many_values.head(), "login does not have values");
         auto it_l = List_iterator<List_item>(lex->many_values);
@@ -307,7 +307,7 @@ MultiPrinc::checkPsswd(LEX *lex) {
 MultiPrinc::checkPsswd(command comm, list<string> & words)
 {
     //ANON_REGION(__func__, &perf_cg);
-    
+
     list<string>::iterator wordsIt = words.begin();
     string table;
 
@@ -444,8 +444,8 @@ MultiPrinc::insertLex(LEX *lex, SchemaInfo * schema, TMKM &tmkm) {
         String *s_ptr = v->val_str(&s);
         vals[*it_f] = string(s_ptr->ptr(), s_ptr->length());
     }
-    
-    for(auto it = vals.begin(); it != vals.end(); it++) {        
+
+    for(auto it = vals.begin(); it != vals.end(); it++) {
         string speaks = fullName(it->first, table);
         //cerr << "speaks " << speaks << endl;
         //if current field has an ENC_FOR, note that it needs to be encrypted
@@ -457,7 +457,7 @@ MultiPrinc::insertLex(LEX *lex, SchemaInfo * schema, TMKM &tmkm) {
         if (accMan->isType(speaks)) {
             std::set<string> speaks_for = accMan->getTypesHasAccessTo(speaks);
             for (auto accIt = speaks_for.begin(); accIt != speaks_for.end(); accIt++) {
-                string spoken = *accIt; 
+                string spoken = *accIt;
                 //cerr << " spoken " << spoken << endl;
                 if (getTable(spoken) != table) {
                     //this link in the chain is not in this table, so won't touch this insert
@@ -479,7 +479,7 @@ MultiPrinc::insertLex(LEX *lex, SchemaInfo * schema, TMKM &tmkm) {
 //TODO pass values as pointers, rather than copying them
 void
 MultiPrinc::insertRelations(const list<pair<string, bool> > & values, string table,
-                            list<string> fields, TMKM &tmkm) 
+                            list<string> fields, TMKM &tmkm)
 {
     //ANON_REGION(__func__, &perf_cg);
 

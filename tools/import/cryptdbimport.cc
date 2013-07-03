@@ -36,30 +36,30 @@
  *  based on unnecessary too much complex schemas.
  *
  * - 'format_create_database_query' is using a "heavy" std::map to
- *   locate some of its _own_ fields. It should instead be called from 
+ *   locate some of its _own_ fields. It should instead be called from
  *   XML loop and execute query by query and not keeping track of data.
  *
  * - 'format_insert_table_query' is the same case though its map is lighter.
  *
- *   Both funcions are error prone and some queries are not being well 
+ *   Both funcions are error prone and some queries are not being well
  *   formatted and some SQL syntax mistakes made by me.
  *
  *   To execute this program only to stdout queries and not actually executing them:
  *
  *   ./obj/tools/import/cryptdbimport -u root -p letmein -n -sqlfile_name(dump sql file)
  *
- *   Help:  ./obj/tools/import/cryptdbimport -h 
+ *   Help:  ./obj/tools/import/cryptdbimport -h
  */
 
-static pthread_mutex_t __attribute__((unused)) 
+static pthread_mutex_t __attribute__((unused))
     _mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static string
-format_create_database_query(const string dbname, 
+format_create_database_query(const string dbname,
         const string tablename, table_structure ts, tsMap_t& tsmap)
 {
     assert(tsmap.size() > 0);
-    
+
     ostringstream q;
     q << "CREATE TABLE IF NOT EXISTS " << dbname << "." << tablename << " (";
 
@@ -163,7 +163,7 @@ format_create_database_query(const string dbname,
             //TODO: Extend to get all options
         }
     }
-            
+
     for(uint i = 0; i < fieldVec.size(); ++i)
     {
         if(fieldVec.at(i) == "_fg_" && i != fieldVec.size()-1)
@@ -189,8 +189,8 @@ format_create_database_query(const string dbname,
     return q.str();
 }
 
-static string  
-format_insert_table_query(const string dbname, 
+static string
+format_insert_table_query(const string dbname,
         const string tablename, table_structure ts, table_data td)
 {
     tdVec_t data = td.get_data();
@@ -201,7 +201,7 @@ format_insert_table_query(const string dbname,
     {
         char *p;
         strtol(it->second.c_str(), &p, 10);
-            
+
         if(it->second.size() == 0)
         {
             q << "NULL";
@@ -222,12 +222,12 @@ format_insert_table_query(const string dbname,
 
     return q.str();
 }
-static int 
+static int
 createEmptyDB(XMLParser& xml, Connect & conn, const string dbname)
 {
     string q = "CREATE DATABASE IF NOT EXISTS " + dbname + ";";
     DBResult * dbres;
-    
+
     //TODO/FIXME: Use executeQuery() instead.
     // I am not using it because of 'Unexpected Error: unhandled sql command 36'
     assert(conn.execute(q, dbres));
@@ -242,7 +242,7 @@ createEmptyDB(XMLParser& xml, Connect & conn, const string dbname)
  * Structure fields write out.
  */
 bool
-XMLParser::writeRIWO(const string& dbname, const string& tablename, 
+XMLParser::writeRIWO(const string& dbname, const string& tablename,
         Rewriter& r, Connect& conn, bool exec, table_structure& ts)
 {
     assert(dbname.size() > 0);
@@ -263,20 +263,18 @@ XMLParser::writeRIWO(const string& dbname, const string& tablename,
  * Data fields write out.
  */
 bool
-XMLParser::writeRIWO(const string& dbname, const string& tablename, 
+XMLParser::writeRIWO(const string& dbname, const string& tablename,
         Rewriter& r, Connect& conn, bool exec, table_structure& ts, table_data& td)
 {
     assert(dbname.size() != 0);
     assert(tablename.size() != 0);
-  
+
     if(td.get_size() == 0)
         return false;
 
     string q = format_insert_table_query(dbname, tablename, ts, td);
     td.clear();
 
-    // HACK(ccarvalho) Removes const, rewrite is non-const. Check why later.
-    string _dbname = const_cast<string&>(dbname);
     cout << q << endl;
 
     if(exec == true)
@@ -289,27 +287,27 @@ static void
 loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, bool exec, xmlNode *node)
 {
     xmlNode *cur_node = NULL;
-    for (cur_node = node; cur_node; cur_node = cur_node->next) 
+    for (cur_node = node; cur_node; cur_node = cur_node->next)
     {
-        if (cur_node->type == XML_ELEMENT_NODE) 
+        if (cur_node->type == XML_ELEMENT_NODE)
         {
             // TODO: use XML native types to avoid casting
-            if ((!xmlStrcmp(cur_node->name, (const xmlChar *)"database"))) 
+            if ((!xmlStrcmp(cur_node->name, (const xmlChar *)"database")))
             {
                 // DATABASE
                 xmlAttrPtr attr = cur_node->properties;
                 xmlNode *ch = cur_node->xmlChildrenNode;
-                string dbname = (char*)attr->children->content; 
-                
+                string dbname = (char*)attr->children->content;
+
                 // create database if not exists
-                if(!ch->next && exec == true) 
+                if(!ch->next && exec == true)
                 {
                     if(createEmptyDB(xml, conn, dbname) != 0)
                     {
-                        throw runtime_error(string("Error creating empty database: ") + 
+                        throw runtime_error(string("Error creating empty database: ") +
                                 string(__PRETTY_FUNCTION__));
                     }
-                }           
+                }
 
                 while(ch != NULL)
                 {
@@ -317,7 +315,7 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, bool exec, xmlNode
                     table_data td;
 
                     // table_structure
-                    if ((!xmlStrcmp(ch->name, (const xmlChar *)"table_structure"))) 
+                    if ((!xmlStrcmp(ch->name, (const xmlChar *)"table_structure")))
                     {
                         // Here we create if not exists
                         xmlAttrPtr attr2 = ch->properties;
@@ -326,7 +324,7 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, bool exec, xmlNode
                         while(ch2 != NULL)
                         {
                             keyMNG mng;
-                            ident_t ident = (char*)ch2->name; 
+                            ident_t ident = (char*)ch2->name;
                             while(ch2->properties != NULL)
                             {
                                 prop_t prop = (char*)ch2->properties->name;
@@ -341,18 +339,18 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, bool exec, xmlNode
                             mng.unsetKey();
                             ch2 = ch2->next;
                         }
-                        // Write out 
+                        // Write out
                         if(xml.writeRIWO(dbname, tablename, r, conn, exec, ts) == false)
                         {
                             //TODO/FIXME: ignoring this error for while.
                             // throw is here in case we find such case.
-                            //throw runtime_error(string("Parsing error ?! ") + 
+                            //throw runtime_error(string("Parsing error ?! ") +
                             //    string(__PRETTY_FUNCTION__));
                         }
                         ts.clear();
 
                     // table_data
-                    } else if ((!xmlStrcmp(ch->name, (const xmlChar *)"table_data"))) 
+                    } else if ((!xmlStrcmp(ch->name, (const xmlChar *)"table_data")))
                     {
                         // No need to create table here
                         xmlAttrPtr attr2 = ch->properties;
@@ -361,7 +359,7 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, bool exec, xmlNode
                         xmlNode *ch2 = ch->xmlChildrenNode;
                         while(ch2 != NULL)
                         {
-                            if((!xmlStrcmp(ch2->name, (const xmlChar *)"row"))) 
+                            if((!xmlStrcmp(ch2->name, (const xmlChar *)"row")))
                             {
                                 xmlNode *ch3 = ch2->xmlChildrenNode;
                                 while(ch3 != NULL)
@@ -385,10 +383,10 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, bool exec, xmlNode
                                 }
                             }
                             ch2 = ch2->next;
-                            // Write out 
+                            // Write out
                             if(xml.writeRIWO(dbname, tablename, r, conn, exec, ts, td) == false)
                             {
-                                //cout << "Info: " << dbname << "::" << tablename 
+                                //cout << "Info: " << dbname << "::" << tablename
                                 //    << " has table_structure but table_data is empty." << endl;
                             }
                         }
@@ -404,7 +402,7 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, bool exec, xmlNode
 static void do_display_help(const char *arg)
 {
     cout << "CryptDBImport" << endl;
-    cout << "Use: " << arg << " [OPTIONS]" << endl; 
+    cout << "Use: " << arg << " [OPTIONS]" << endl;
     cout << "OPTIONS are:" << endl;
     cout << "-u<username>: MySQL server username" << endl;
     cout << "-p<password>: MySQL server password" << endl;
@@ -415,7 +413,7 @@ static void do_display_help(const char *arg)
     exit(0);
 }
 
-static void 
+static void
 do_init(XMLParser & xml, Connect & conn, Rewriter& r, bool exec, const char *filename)
 {
     xmlDoc *doc = NULL;
@@ -459,7 +457,7 @@ int main(int argc, char **argv)
 
         switch(c)
         {
-            case 'h': 
+            case 'h':
                 do_display_help(argv[0]);
             case 's':
                 {

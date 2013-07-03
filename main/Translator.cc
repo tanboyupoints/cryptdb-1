@@ -44,7 +44,7 @@ anonymizeTableName(unsigned int tableNo, string tableName)
 string
 anonymizeFieldName(unsigned int index, onion o, string origname, bool multiPrinc)
 {
-    
+
     switch (o) {
     case oPLAIN:
 	return origname;
@@ -59,22 +59,22 @@ anonymizeFieldName(unsigned int index, onion o, string origname, bool multiPrinc
         if (multiPrinc) {
             return origname + "OPE";
         } else {
-            return string("field") + strFromVal(index) + "OPE"; 
+            return string("field") + strFromVal(index) + "OPE";
         }
     }
     case oAGG: {
         if (multiPrinc) {
             return origname + "AGG";
         } else {
-            return string("field") + strFromVal(index) + "AGG"; 
+            return string("field") + strFromVal(index) + "AGG";
         }
     }
     case oSWP: {
         if (multiPrinc) {
             return origname + "SWP";
         } else {
-            return string("field") + strFromVal(index) + "SWP"; 
-        }        
+            return string("field") + strFromVal(index) + "SWP";
+        }
     }
     default: {assert_s(false, "invalid onion in anonymizeFieldName"); }
     }

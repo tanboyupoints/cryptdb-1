@@ -56,6 +56,6 @@ oneElemList(T * elem) {
     res->elements = 1;
     res->first = elem;
     res->next = NULL;
-   
+
     return res;
 }

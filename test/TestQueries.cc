@@ -26,14 +26,14 @@ static Connection * control;
 static Connection * test;
 
 static QueryList Insert = QueryList("SingleInsert",
-    { "CREATE TABLE test_insert (id integer primary key auto_increment, age integer, salary integer, address text, name text)", 
+    { "CREATE TABLE test_insert (id integer primary key auto_increment, age integer, salary integer, address text, name text)",
       "", "", "" },
     { "CREATE TABLE test_insert (id integer primary key auto_increment, age integer, salary integer, address text, name text)",
       "CRYPTDB test_insert.age ENC",
       "CRYPTDB test_insert.salary ENC",
       "CRYPTDB test_insert.address ENC" },
                                     // TODO parser currently has no KEY functionality
-    { "CREATE TABLE test_insert (id integer auto_increment, age integer, salary integer, address text, name text, PRIMARY KEY (id))", 
+    { "CREATE TABLE test_insert (id integer auto_increment, age integer, salary integer, address text, name text, PRIMARY KEY (id))",
       "", "", "" },
       { Query("INSERT INTO test_insert VALUES (1, 21, 100, '24 Rosedale, Toronto, ONT', 'Pat Carlson')", false),
       Query("SELECT * FROM test_insert", false),
@@ -59,9 +59,9 @@ static QueryList Insert = QueryList("SingleInsert",
 
 //migrated from TestSinglePrinc TestSelect
 static QueryList Select = QueryList("SingleSelect",
-    { "CREATE TABLE test_select (id integer, age integer, salary integer, address text, name text)", 
+    { "CREATE TABLE test_select (id integer, age integer, salary integer, address text, name text)",
       "", "", "" },
-    { "CREATE TABLE test_select (id integer, age integer, salary integer, address text, name text)", 
+    { "CREATE TABLE test_select (id integer, age integer, salary integer, address text, name text)",
       "CRYPTDB test_select.age ENC",
       "CRYPTDB test_select.salary ENC",
       "CRYPTDB test_select.address ENC" },
@@ -122,7 +122,7 @@ static QueryList Join = QueryList("SingleJoin",
      "CRYPTDB test_join1.age ENC",
      "CRYPTDB test_join1.salary ENC",
      "CRYPTDB test_join1.address ENC",
-     "CREATE TABLE test_join2 (id integer, books integer, name text)", 
+     "CREATE TABLE test_join2 (id integer, books integer, name text)",
      "CRYPTDB test_join2.books ENC",
      "CRYPTDB test_join2.name ENC" },
     { "CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)",
@@ -161,7 +161,7 @@ static QueryList Join = QueryList("SingleJoin",
 static QueryList Update = QueryList("SingleUpdate",
     { "CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)",
       "", "", "", "" },
-    { "CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)", 
+    { "CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)",
       "CRYPTDB test_update.age ENC",
       "CRYPTDB test_update.salary ENC",
       "CRYPTDB test_update.address ENC",
@@ -208,7 +208,7 @@ static QueryList Update = QueryList("SingleUpdate",
 static QueryList Delete = QueryList("SingleDelete",
     { "CREATE TABLE test_delete (id integer, age integer, salary integer, address text, name text)",
       "", "", "", "" },
-    { "CREATE TABLE test_delete (id integer, age integer, salary integer, address text, name text)", 
+    { "CREATE TABLE test_delete (id integer, age integer, salary integer, address text, name text)",
       "CRYPTDB test_delete.age ENC",
       "CRYPTDB test_delete.salary ENC",
       "CRYPTDB test_delete.address ENC",
@@ -244,7 +244,7 @@ static QueryList Delete = QueryList("SingleDelete",
 //migrated from TestSearch
 static QueryList Search = QueryList("SingleSearch",
     { "CREATE TABLE test_search (id integer, searchable text)", "" },
-    { "CREATE TABLE test_search (id integer, searchable text)", 
+    { "CREATE TABLE test_search (id integer, searchable text)",
       "CRYPTDB test_search.seachable ENC" },
     { "CREATE TABLE test_search (id integer, searchable text)", "" },
     { Query("INSERT INTO test_search VALUES (1, 'short text')", false),
@@ -437,7 +437,7 @@ static QueryList UserGroupForum = QueryList("UserGroupForum",
       Query("SELECT forumtext FROM forum WHERE forumid=1",false),
       //create an orphaned forum
       Query("INSERT INTO forum VALUES (2, 'orphaned text! everyone should be able to see me')",false),
-      //only Alice logged in and she should see text in orphaned forum 2                       
+      //only Alice logged in and she should see text in orphaned forum 2
       Query("SELECT forumtext FROM forum WHERE forumid=2",false),
       Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'",false),
 
@@ -570,7 +570,7 @@ static QueryList Null = QueryList("Null",
       "CRYPTDB PRINCTYPE username",
       "CREATE TABLE test_null (uid integer, age integer, address text)",
       "CREATE TABLE u_null (uid equals test_null.uid integer, username givespsswd uid text)",
-      "CRYPTDB u_null.username username SPEAKSFOR u_null.uid uid" },                                  
+      "CRYPTDB u_null.username username SPEAKSFOR u_null.uid uid" },
     { Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_null (username, password) VALUES ('alice', 'secretA')", false),
       Query("INSERT INTO u_null VALUES (1, 'alice')",false),
       Query("INSERT INTO test_null (uid, age) VALUES (1, 20)",false),
@@ -686,7 +686,7 @@ static QueryList ManyConnections = QueryList("Multiple connections",
       "DROP TABLE post",
       "DROP TABLE u_conn",
       ""} );
-    
+
 
 
 
@@ -751,7 +751,7 @@ void
 Connection::start() {
     cerr << "start " << tc.db << endl;
     uint64_t mkey = 1133421234;
-    string masterKey = BytesFromInt(mkey, AES_KEY_BYTES); 
+    string masterKey = BytesFromInt(mkey, AES_KEY_BYTES);
     switch (type) {
         //plain -- new connection straight to the DB
     case UNENCRYPTED:
@@ -851,7 +851,7 @@ Connection::start() {
     default:
         assert_s(false, "invalid type passed to Connection");
     }
-}    
+}
 
 void
 Connection::stop() {
@@ -914,7 +914,7 @@ Connection::executeEDBProxy(string query) {
     }
     return res;
     }*/
-    
+
 ResType
 Connection::executeConn(string query) {
     DBResult * dbres = 0;
@@ -942,14 +942,14 @@ Connection::executeRewriter(string query) {
     Analysis analysis;
     string curdb("cryptdbtest");
     QueryRewrite qr = re->rewrite(query, &curdb);
-    
+
     //execute
     // only the last query should actually have a useful result
     ResType enc_res;
     for (auto q = qr.queries.begin(); q != qr.queries.end(); q++) {
         enc_res = executeConn(*q);
     }
-    
+
     //decrypt results
     return re->decryptResults(enc_res, qr.rmeta);
 }
@@ -1223,7 +1223,7 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
              << "num_conn is the number of conns made to a single db (default 1)" << endl
              << "    for num_conn > 1, control and test should both be proxy-* for valid results" << endl;
         return;
-    }        
+    }
 
     if (no_conn > 1) {
         switch(test_type) {
@@ -1255,7 +1255,7 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
 
     TestConfig control_tc = TestConfig();
     control_tc.db = control_tc.db+"_control";
- 
+
     Connection test_(tc, test_type);
     test = &test_;
 

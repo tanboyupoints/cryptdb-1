@@ -58,7 +58,7 @@ vector<Query> QueryList = {
 
     Query("SELECT * FROM uncrypt, post", true),
     Query("SELECT postid FROM forum, post WHERE forum.formid = post.forumid",true),
-    
+
     Query("UPDATE uncrypt SET t = 'weeeeeee' WHERE id = 3",false),
     Query("UPDATE privmsg SET msgid = 4",true),
 
