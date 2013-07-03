@@ -83,6 +83,7 @@ typedef struct FieldMeta {
     std::string salt_name;
 
     FieldMeta();
+    ~FieldMeta();
 
     bool hasOnion(onion o) const {
         return onions.find(o) !=
@@ -134,7 +135,17 @@ typedef struct TableMeta {
     std::string salt_name;
 
     TableMeta();
+    TableMeta(unsigned int table_no, std::string anon_table_name,
+              bool has_sensitive, bool has_salt, std::string salt_name)
+        : tableNo(table_no), anonTableName(anon_table_name), 
+          hasSensitive(has_sensitive), has_salt(has_salt),
+          salt_name(salt_name) {}
     ~TableMeta();
+
+    friend class Analysis;
+
+protected:
+    bool destroyFieldMeta(std::string field);
 } TableMeta;
 
 
@@ -145,6 +156,15 @@ typedef struct SchemaInfo {
 
     SchemaInfo():totalTables(0) {};
     ~SchemaInfo() { tableMetaMap.clear();}
+
+    // Parameters should match TableMeta constructor, except for tableNo
+    // which we derive from SchemaInfo and the addition of the plaintext
+    // table name.
+    TableMeta *createTableMeta(std::string table_name,
+                               std::string anon_table_name,
+                               bool has_sensitive, bool has_salt,
+                               std::string salt_name,
+                               const unsigned int *table_no=NULL);
     friend class Analysis;
 
 private:
@@ -152,5 +172,6 @@ private:
     // and Analysis::getFieldMeta.
     TableMeta * getTableMeta(const std::string & table);
     FieldMeta * getFieldMeta(const std::string & table, const std::string & field);
+    bool destroyTableMeta(std::string table);
 } SchemaInfo;
 

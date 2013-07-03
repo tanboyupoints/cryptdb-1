@@ -279,15 +279,17 @@ public:
     ReturnMeta * rmeta;
 
     bool addAlias(std::string alias, std::string table);
-    FieldMeta *getFieldMeta(std::string table, std::string field);
-    TableMeta *getTableMeta(std::string table);
+    FieldMeta *getFieldMeta(std::string table, std::string field) const;
+    TableMeta *getTableMeta(std::string table) const;
+    bool destroyFieldMeta(std::string table, std::string field);
+    bool destroyTableMeta(std::string table);
 
     // HACK(burrows): This is a temporary solution until I redesign.
     Rewriter *rewriter;
 
 private:
     MYSQL * m;
-    std::string unAliasTable(std::string table);
+    std::string unAliasTable(std::string table) const;
 
 };
 

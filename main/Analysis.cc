@@ -187,19 +187,33 @@ bool Analysis::addAlias(std::string alias, std::string table)
     return true;
 }
 
-FieldMeta *Analysis::getFieldMeta(std::string table, std::string field)
+FieldMeta *Analysis::getFieldMeta(std::string table, std::string field) const
 {
     string real_table_name = unAliasTable(table);
     return ps->schema->getFieldMeta(real_table_name, field);
 }
 
-TableMeta *Analysis::getTableMeta(std::string table)
+TableMeta *Analysis::getTableMeta(std::string table) const
 {
     string real_table_name = unAliasTable(table);
     return ps->schema->getTableMeta(real_table_name);
 }
 
-std::string Analysis::unAliasTable(std::string table)
+// FIXME: Field aliasing.
+bool Analysis::destroyFieldMeta(std::string table, std::string field)
+{
+    string real_table_name = unAliasTable(table);
+    TableMeta *tm = ps->schema->getTableMeta(real_table_name);
+    return tm->destroyFieldMeta(field);
+}
+
+bool Analysis::destroyTableMeta(std::string table)
+{
+    string real_table_name = unAliasTable(table);
+    return ps->schema->destroyTableMeta(table);
+}
+
+std::string Analysis::unAliasTable(std::string table) const
 {
     auto alias_pair = table_aliases.find(table);
     if (table_aliases.end() != alias_pair) {

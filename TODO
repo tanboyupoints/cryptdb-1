@@ -2,6 +2,12 @@ Aaron:
 wiki -- host it on git?
 TRANSACT on stale onions after UPDATE
  - Support multiple tables.
+ALTER TABLE
+ - FOREIGN KEY
+ - ADD INDEX
+ - DROP INDEX
+ - RENAME
+ - CHANGE COLUMN
 Subqueries
 DECIMAL
 VARCHAR
