@@ -30,14 +30,13 @@ class DBResult {
 class Connect {
  public:
     Connect(const std::string &server, const std::string &user,
-            const std::string &passwd, uint port = 0);
-    Connect(const std::string &server, const std::string &user,
             const std::string &passwd, const std::string &dbname, uint port = 0);
 
     Connect(MYSQL* _conn) : conn(_conn), close_on_destroy(false) { }
 
     //returns Connect for the embedded server
-    static Connect * getEmbedded(const std::string & embed_dir);
+    static Connect * getEmbedded(const std::string & embed_dir,
+                                 const std::string & dbname);
 
     // returns true if execution was ok; caller must delete DBResult
     bool execute(const std::string &query, DBResult *&);
@@ -51,29 +50,21 @@ class Connect {
     unsigned long real_escape_string(char *to, const char *from,
                                      unsigned long length);
 
-	// Sets current database name (after the "USE" query.
+    // Sets current database name (after the "USE" query.
     // dbname is static string
-    std::string setCurDBName(const std::string &dbname) {
-        static std::string s_cur_db("");
-
-        if(dbname.size() > 0)
-            s_cur_db = dbname;
-
-        return s_cur_db;
-    };
+    void setCurDBName(const std::string &dbname);
 
     // Returns current database name
-    std::string getCurDBName(void) {
-        return setCurDBName("");
-    };
+    std::string getCurDBName(void);
 
     ~Connect();
 
  private:
-    MYSQL *  conn;
+    MYSQL * conn;
+    std::string dbname;
 
     void do_connect(const std::string &server, const std::string &user,
                     const std::string &passwd, uint port);
 
-    bool     close_on_destroy;
+    bool close_on_destroy;
 };

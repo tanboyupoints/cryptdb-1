@@ -56,13 +56,18 @@ class Rewriter {
 public:
     Rewriter(ConnectionInfo ci,
              const std::string &embed_dir,
+             const std::string &dbname,
              bool MultiPrinc = false,
              bool encByDefault = true);
     ~Rewriter();
 
     void setMasterKey(const std::string &mkey);
-    QueryRewrite rewrite(const std::string &q, std::string *cur_db);
+    QueryRewrite rewrite(const std::string &q);
     ResType decryptResults(ResType & dbres, ReturnMeta * rm);
+
+    // HACK: ps probably shouldn't be embedded in Rewriter if it is going
+    // to carry around Connect objects.
+    Connect *getConnection() {return ps.conn;}
 
 private:
     ProxyState ps;
@@ -83,7 +88,7 @@ private:
 };
 
 ResType *
-executeQuery(Connect &conn, Rewriter &r, const string &q, bool show=false);
+executeQuery(Rewriter &r, const string &q, bool show=false);
 
 const string BOLD_BEGIN = "\033[1m";
 const string RED_BEGIN = "\033[1;31m";
