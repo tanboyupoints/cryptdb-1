@@ -92,7 +92,7 @@ format_create_database_query(const string dbname,
                 if(vit->second == "NO")
                 {
                     //HACK(ccarvalho) Removes previous ','
-                    // 'NOT NULL' must not be preceded by ','
+                    // 'NOT NULL' must not be preceded by such character.
                     if(fieldVec.back() == "_fg_"){
                         fieldVec.pop_back();
                     }
@@ -126,10 +126,12 @@ format_create_database_query(const string dbname,
             ++vit; 
             if(vit != it->second.end() && vit->second.size() > 0)
             {
+                //HACK(ccarvalho) Removes previous ','
+                // 'NOT NULL' must not be preceded by such character.
                 if(fieldVec.back() == "_fg_"){
                     fieldVec.pop_back();
                 }
-                string tmp = "DEFAULT '" + vit->second + "'";
+                string tmp = "DEFAULT " + vit->second;
                 fieldVec.push_back(tmp);
                 fieldVec.push_back("_fg_");
             }
