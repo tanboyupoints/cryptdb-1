@@ -214,6 +214,8 @@ createEmptyDB(XMLParser& xml, Connect & conn, const string dbname)
     string q = "CREATE DATABASE IF NOT EXISTS " + dbname + ";";
     DBResult * dbres;
     
+    //TODO/FIXME: Use executeQuery() instead.
+    // I am not using it because of 'Unexpected Error: unhandled sql command 36'
     assert(conn.execute(q, dbres));
     if(!dbres)
         return 1;
@@ -225,7 +227,7 @@ createEmptyDB(XMLParser& xml, Connect & conn, const string dbname)
 /**
  * Structure fields write out.
  */
-int
+bool
 XMLParser::writeRIWO(const string& dbname, const string& tablename, 
         Rewriter& r, Connect& conn, bool exec, table_structure& ts)
 {
@@ -237,30 +239,16 @@ XMLParser::writeRIWO(const string& dbname, const string& tablename,
     cout << q << endl;
 
     if(exec == true)
-    {
-        DBResult * dbres;
+        return (bool)executeQuery(conn, r, q, true);
 
-        // HACK(ccarvalho) Removes const, rewrite is non-const. Check why later.
-        string _dbname = const_cast<string&>(dbname);
-        QueryRewrite qr = r.rewrite(q, &_dbname);
-
-        if (qr.queries.size() == 0) {
-            return 1;
-        }
-        for (auto new_q = qr.queries.begin(); new_q != qr.queries.end(); new_q++) {
-            cerr << "ENCRYPTED QUERY:" << endl
-                << *new_q << endl;
-            assert(conn.execute(*new_q, dbres));
-        }
-    }
-    return 0;
+    return true;
 }
 
 
 /**
  * Data fields write out.
  */
-int
+bool
 XMLParser::writeRIWO(const string& dbname, const string& tablename, 
         Rewriter& r, Connect& conn, bool exec, table_structure& ts, table_data& td)
 {
@@ -268,7 +256,7 @@ XMLParser::writeRIWO(const string& dbname, const string& tablename,
     assert(tablename.size() != 0);
   
     if(td.get_size() == 0)
-        return 1;
+        return false;
 
     string q = format_insert_table_query(dbname, tablename, ts, td);
     td.clear();
@@ -277,22 +265,11 @@ XMLParser::writeRIWO(const string& dbname, const string& tablename,
     string _dbname = const_cast<string&>(dbname);
     cout << q << endl;
 
-    DBResult * dbres;
+    //DBResult * dbres;
     if(exec == true)
-    {
-        QueryRewrite qr = r.rewrite(q, &_dbname);
+        return (bool)executeQuery(conn, r, q, true);
 
-        if (qr.queries.size() == 0) 
-            return 1;
-        
-        for (auto new_q = qr.queries.begin(); new_q != qr.queries.end(); new_q++) 
-        {
-            cerr << "ENCRYPTED QUERY:" << endl
-                << *new_q << endl;
-            assert(conn.execute(*new_q, dbres));
-        }
-    }
-    return 0;
+    return true;
 }
 
 static void
@@ -352,12 +329,12 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, bool exec, xmlNode
                             ch2 = ch2->next;
                         }
                         // Write out 
-                        if(xml.writeRIWO(dbname, tablename, r, conn, exec, ts) == 1)
+                        if(xml.writeRIWO(dbname, tablename, r, conn, exec, ts) == false)
                         {
-                            // TODO: decide if this is an error or not. For table_data it isn't.
+                            //TODO/FIXME: ignoring this error for while.
                             // throw is here in case we find such case.
-                            throw runtime_error(string("Parsing error ?! ") + 
-                                string(__PRETTY_FUNCTION__));
+                            //throw runtime_error(string("Parsing error ?! ") + 
+                            //    string(__PRETTY_FUNCTION__));
                         }
                         ts.clear();
 
@@ -396,7 +373,7 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, bool exec, xmlNode
                             }
                             ch2 = ch2->next;
                             // Write out 
-                            if(xml.writeRIWO(dbname, tablename, r, conn, exec, ts, td) == 1)
+                            if(xml.writeRIWO(dbname, tablename, r, conn, exec, ts, td) == false)
                             {
                                 //cout << "Info: " << dbname << "::" << tablename 
                                 //    << " has table_structure but table_data is empty." << endl;
@@ -475,7 +452,7 @@ int main(int argc, char **argv)
                 {
                     ConnectionInfo ci("localhost", username, password);
                     Rewriter r(ci, "/var/lib/shadow-mysql", false, true);
-                    Connect conn("localhost", username, password, "");
+                    Connect conn("localhost", username, password, "cryptdbtest");
                     do_init(xml, conn, r, exec, optarg);
                 }
                 break;

@@ -141,9 +141,9 @@ class XMLParser
 
         vector<string>loadXmlDatabaseName(xmlNode *node);
 
-        int writeRIWO(const string& dbname, const string& tablename, 
+        bool writeRIWO(const string& dbname, const string& tablename, 
             Rewriter& r, Connect& conn, bool exec, table_structure& _ts);
-        int writeRIWO(const string& dbname, const string& tablename, 
+        bool writeRIWO(const string& dbname, const string& tablename, 
             Rewriter& r, Connect& conn, bool exec, table_structure& ts, table_data& _td);
 
     private:
