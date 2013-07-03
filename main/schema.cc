@@ -114,6 +114,10 @@ SchemaInfo::getFieldMeta(const string & table, const string & field) {
 bool
 SchemaInfo::destroyTableMeta(std::string table)
 {
+    if (totalTables <= 0) {
+        throw CryptDBError("SchemaInfo::totalTables can't be less than zero");
+    }
+
     --totalTables;
     return 1 == tableMetaMap.erase(table);
 }
