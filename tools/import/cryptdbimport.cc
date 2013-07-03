@@ -126,6 +126,9 @@ format_create_database_query(const string dbname,
             ++vit; 
             if(vit != it->second.end() && vit->second.size() > 0)
             {
+                if(fieldVec.back() == "_fg_"){
+                    fieldVec.pop_back();
+                }
                 string tmp = "DEFAULT '" + vit->second + "'";
                 fieldVec.push_back(tmp);
                 fieldVec.push_back("_fg_");
@@ -134,6 +137,9 @@ format_create_database_query(const string dbname,
             ++vit; 
             if(vit != it->second.end() && vit->second.size() > 0)
             {
+                if(fieldVec.back() == "_fg_"){
+                    fieldVec.pop_back();
+                }
                 //Extra
                 fieldVec.push_back(vit->second);
                 fieldVec.push_back("_fg_");
