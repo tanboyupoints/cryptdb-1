@@ -230,19 +230,23 @@ format_insert_table_query(const string dbname,
 
     return q.str();
 }
-static int
-createEmptyDB(XMLParser& xml, Connect & conn, const string dbname)
+static bool
+createEmptyDB(XMLParser& xml, Connect & conn, const string dbname, bool exec)
 {
     string q = "CREATE DATABASE IF NOT EXISTS " + dbname + ";";
     DBResult * dbres;
 
-    //TODO/FIXME: Use executeQuery() instead.
-    // I am not using it because of 'Unexpected Error: unhandled sql command 36'
-    assert(conn.execute(q, dbres));
-    if(!dbres)
-        return 1;
+    cout << q << endl;
+    if(exec == true)
+    {
+        //TODO/FIXME: Use executeQuery() instead.
+        // I am not using it because of 'Unexpected Error: unhandled sql command 36'
+        assert(conn.execute(q, dbres));
+        if(!dbres)
+            return false;
+    }
 
-    return 0;
+    return true;
 }
 
 
@@ -310,7 +314,7 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, bool exec, xmlNode
                 // create database if not exists
                 if(!ch->next && exec == true)
                 {
-                    if(createEmptyDB(xml, conn, dbname) != 0)
+                    if(createEmptyDB(xml, conn, dbname, exec) != 0)
                     {
                         throw runtime_error(string("Error creating empty database: ") +
                                 string(__PRETTY_FUNCTION__));
