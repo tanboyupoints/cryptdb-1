@@ -234,13 +234,13 @@ static bool
 createEmptyDB(XMLParser& xml, Connect & conn, const string dbname, bool exec)
 {
     string q = "CREATE DATABASE IF NOT EXISTS " + dbname + ";";
-    DBResult * dbres;
 
     cout << q << endl;
     if(exec == true)
     {
         //TODO/FIXME: Use executeQuery() instead.
         // I am not using it because of 'Unexpected Error: unhandled sql command 36'
+        DBResult * dbres;
         assert(conn.execute(q, dbres));
         if(!dbres)
             return false;
