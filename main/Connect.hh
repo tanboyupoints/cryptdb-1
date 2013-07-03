@@ -50,11 +50,7 @@ class Connect {
     unsigned long real_escape_string(char *to, const char *from,
                                      unsigned long length);
 
-    // Sets current database name (after the "USE" query.
-    // dbname is static string
     void setCurDBName(const std::string &dbname);
-
-    // Returns current database name
     std::string getCurDBName(void);
 
     ~Connect();
