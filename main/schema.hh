@@ -93,7 +93,7 @@ typedef struct FieldMeta {
     SECLEVEL getOnionLevel(onion o) const {
         auto it = onions.find(o);
         if (it == onions.end()) return SECLEVEL::INVALID;
-        
+
         return it->second->getSecLevel();
     }
 
@@ -113,7 +113,7 @@ typedef struct FieldMeta {
     }
 
     std::string stringify();
-    
+
     bool isEncrypted() {
         return ((onions.size() != 1) ||  (onions.find(oPLAIN) == onions.end()));
     }
@@ -123,7 +123,7 @@ typedef struct FieldMeta {
 
 typedef struct TableMeta {
 
-    std::list<std::string> fieldNames;     //in order field names                     
+    std::list<std::string> fieldNames;     //in order field names
     unsigned int tableNo;
     std::string anonTableName;
 
@@ -137,7 +137,7 @@ typedef struct TableMeta {
     TableMeta();
     TableMeta(unsigned int table_no, std::string anon_table_name,
               bool has_sensitive, bool has_salt, std::string salt_name)
-        : tableNo(table_no), anonTableName(anon_table_name), 
+        : tableNo(table_no), anonTableName(anon_table_name),
           hasSensitive(has_sensitive), has_salt(has_salt),
           salt_name(salt_name) {}
     ~TableMeta();

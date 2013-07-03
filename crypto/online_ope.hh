@@ -36,14 +36,14 @@ class ope_server {
 
     ope_server();
     ~ope_server();
-  
+
  private:
-    tree_node<EncT> *root; 
+    tree_node<EncT> *root;
 
     tree_node<EncT> * tree_lookup(tree_node<EncT> *root, uint64_t v, uint64_t nbits) const;
     void tree_insert(tree_node<EncT> **np, uint64_t v, const EncT &encval,
 		     uint64_t nbits, uint64_t pathlen);
-    
+
     //relabels the tree rooted at the node whose parent is "parent"
     // size indicates the size of the subtree of the node rooted at parent
     void relabel(tree_node<EncT> * parent, bool isLeft, uint64_t size);
@@ -70,9 +70,9 @@ class ope_client {
 
     V decrypt(uint64_t ct) const {
 	uint64_t nbits = 64 - ffsl((uint64_t)ct);
-	
+
         return block_decrypt(s->lookup(ct>>(64-nbits), nbits));
-	
+
     }
 
     uint64_t encrypt(V pt) const {
@@ -82,7 +82,7 @@ class ope_client {
             for (;;) {
 		V xct = s->lookup(v, nbits);
 		V xpt = block_decrypt(xct);
-		
+
                 if (pt == xpt) {
 		    break;
 		}

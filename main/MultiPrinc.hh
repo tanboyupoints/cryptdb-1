@@ -45,7 +45,7 @@ class MultiPrinc {
     bool checkPsswd(LEX *lex);
     //bool checkPsswd(command comm, std::list<std::string> & words);
 
-  
+
     bool hasEncFor(std::string field);
 
     // fills tmkm.encForReturned and decides if the next field was added by us
@@ -57,7 +57,7 @@ class MultiPrinc {
     bool checkPredicate(const AccessRelation & accRel, std::map<std::string, std::string> & vals);
 
     /*** INSERT tasks ***/
-    
+
     void insertLex(LEX *lex, SchemaInfo * schema, TMKM &tmkm);
     //wordsIt points to the first value
     void insertRelations(const std::list<std::pair<std::string, bool> > & values, std::string table,

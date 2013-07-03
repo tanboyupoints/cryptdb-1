@@ -27,7 +27,7 @@ typedef vector<tsPairValues_t>tsVecPairValues_t;
 
 
 /**
- * table_structure 
+ * table_structure
  */
 typedef myKey_t ident_t;
 typedef myKey_t value_t;
@@ -69,25 +69,25 @@ struct table_structure
  * table_data
  */
 typedef pair<myTdId_t, myTdValue_t>tdPair_t;
-typedef vector<tdPair_t>tdVec_t; 
+typedef vector<tdPair_t>tdVec_t;
 struct table_data
 {
     private:
         tdVec_t m_td;
-        
+
     public:
         inline void add(ident_t ident, value_t value)
         {
             m_td.push_back(make_pair(ident, value));
         }
-            
+
         inline void clear(void)
         {
             m_td.clear();
         }
 
         inline const tdVec_t get_data(void){return m_td;}
-        
+
         inline size_t get_size(void) { return m_td.size();}
 };
 
@@ -95,14 +95,14 @@ struct table_data
 typedef vector< pair<string, string>>dataPacket_t;
 
 /**
- * Cycle through ID's. 
- */ 
-class keyMNG 
+ * Cycle through ID's.
+ */
+class keyMNG
 {
     public:
 
-        keyMNG() 
-            : m_flag(false) 
+        keyMNG()
+            : m_flag(false)
         {}
 
         ~keyMNG(){}
@@ -128,7 +128,7 @@ class keyMNG
 /**
  * Import database tool main class.
  */
-class XMLParser 
+class XMLParser
 {
     public:
         XMLParser(){
@@ -137,13 +137,13 @@ class XMLParser
             xmlCleanupParser();
         }
 
-        xmlDoc *doc; 
+        xmlDoc *doc;
 
         vector<string>loadXmlDatabaseName(xmlNode *node);
 
-        bool writeRIWO(const string& dbname, const string& tablename, 
+        bool writeRIWO(const string& dbname, const string& tablename,
             Rewriter& r, Connect& conn, bool exec, table_structure& _ts);
-        bool writeRIWO(const string& dbname, const string& tablename, 
+        bool writeRIWO(const string& dbname, const string& tablename,
             Rewriter& r, Connect& conn, bool exec, table_structure& ts, table_data& _td);
 
     private:

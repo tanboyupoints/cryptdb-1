@@ -38,7 +38,7 @@ class Connect {
 
     //returns Connect for the embedded server
     static Connect * getEmbedded(const std::string & embed_dir);
-    
+
     // returns true if execution was ok; caller must delete DBResult
     bool execute(const std::string &query, DBResult *&);
     bool execute(const std::string &query);
@@ -50,15 +50,15 @@ class Connect {
     my_ulonglong last_insert_id();
     unsigned long real_escape_string(char *to, const char *from,
                                      unsigned long length);
-        
+
 	// Sets current database name (after the "USE" query.
     // dbname is static string
-    std::string setCurDBName(const std::string &dbname) { 
+    std::string setCurDBName(const std::string &dbname) {
         return cur_db_name(dbname);
     };
 
     // Returns current database name
-    std::string getCurDBName(void) { 
+    std::string getCurDBName(void) {
         return cur_db_name();
     };
 

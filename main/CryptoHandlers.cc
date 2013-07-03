@@ -1,7 +1,7 @@
 #include <main/CryptoHandlers.hh>
 #include <crypto/ope.hh>
 #include <crypto/BasicCrypto.hh>
-#include <crypto/SWPSearch.hh> 
+#include <crypto/SWPSearch.hh>
 #include <util/util.hh>
 #include <util/cryptdb_log.hh>
 #include <crypto/arc4.hh>
@@ -29,20 +29,20 @@ createFieldHelper(const Create_field *f, int field_length,
         f0->length = field_length;
     }
     f0->sql_type = type;
-    
+
     if (charset != NULL) {
         f0->charset = charset;
     } else {
         //encryption is always unsigned
-        f0->flags = f0->flags | UNSIGNED_FLAG; 
+        f0->flags = f0->flags | UNSIGNED_FLAG;
     }
 
     if (anonname.size() > 0) {
         f0->field_name = make_thd_string(anonname);
     }
-    
+
     return f0;
-    
+
 }
 
 static Item *
@@ -94,7 +94,7 @@ EncLayerFactory<type>::encLayer(onion o, SECLEVEL sl, Create_field * cf,
             return new Search(cf, key);
         }
         default:{
-            
+
         }
     }
     thrower() << "unknown or unimplemented security level \n";
@@ -143,7 +143,7 @@ EncLayerFactory<type>::encLayerFromSerial(onion o, SECLEVEL sl,
             return new Search(serial);
         }
         default:{
-            
+
         }
     }
     thrower() << "unknown or unimplemented security level \n";
@@ -151,7 +151,7 @@ EncLayerFactory<type>::encLayerFromSerial(onion o, SECLEVEL sl,
 
 template class EncLayerFactory<std::string>;
 
-                        
+
 /****************** RND *********************/
 
 RND_int::RND_int(Create_field * f, const string & seed_key)
@@ -206,15 +206,15 @@ static udf_func u_decRNDInt = {
 };
 
 
-Item * 
+Item *
 RND_int::decryptUDF(Item * col, Item * ivcol) {
     List<Item> l;
     l.push_back(col);
-    
+
     l.push_back(get_key_item(key));
-    
+
     l.push_back(ivcol);
-    
+
     Item * udfdec = new Item_func_udf_int(&u_decRNDInt, l);
     udfdec->name = NULL; //no alias
 
@@ -273,7 +273,7 @@ RND_str::decrypt(Item * ctext, uint64_t IV) {
 	false);
     LOG(encl) << "RND_str decrypt " << ItemToString(ctext) << " IV " << IV << "-->"
 	      << "len of dec " << dec.length() << " dec: " << dec;
- 
+
     return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
 }
 
@@ -300,8 +300,8 @@ RND_str::decryptUDF(Item * col, Item * ivcol) {
     l.push_back(col);
     l.push_back(get_key_item(rawkey));
     l.push_back(ivcol);
-    
-    return new Item_func_udf_str(&u_decRNDString, l);	
+
+    return new Item_func_udf_str(&u_decRNDString, l);
 }
 
 
@@ -325,7 +325,7 @@ DET_int::newCreateField(string anonname) {
     return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
 }
 
- 
+
 //TODO: may want to do more specialized crypto for lengths
 Item *
 DET_int::encrypt(Item * ptext, uint64_t IV) {
@@ -368,10 +368,10 @@ DET_int::decryptUDF(Item * col, Item * ivcol) {
     l.push_back(col);
 
     l.push_back(get_key_item(key));
-    
+
     Item * udfdec = new Item_func_udf_int(&u_decDETInt, l);
     udfdec->name = NULL;
-    
+
     //add encompassing CAST for unsigned
     Item * udf = new Item_func_unsigned(udfdec);
     udf->name = NULL;
@@ -395,7 +395,7 @@ DET_str::DET_str(const std::string & serial): EncLayer(NULL),
 			     enckey(get_AES_enc_key(rawkey)),
 			     deckey(get_AES_dec_key(rawkey))
 {}
-			     
+
 
 Create_field *
 DET_str::newCreateField(string anonname) {
@@ -480,14 +480,14 @@ Item *
 OPE_int::decrypt(Item * ctext, uint64_t IV) {
     ulonglong cval = (ulonglong) static_cast<Item_int*>(ctext)->value;
     ulonglong dec = uint64FromZZ(ope.decrypt(ZZFromUint64(cval)));
-    LOG(encl) << "OPE_int decrypt " << cval << " IV " << IV << "--->" << dec; 
+    LOG(encl) << "OPE_int decrypt " << cval << " IV " << IV << "--->" << dec;
 
     return new Item_int(dec);
 }
 
 
 OPE_str::OPE_str(Create_field * f, string seed_key)
-    : EncLayer(f), key(prng_expand(seed_key, key_bytes)), 
+    : EncLayer(f), key(prng_expand(seed_key, key_bytes)),
       ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
 
@@ -512,7 +512,7 @@ OPE_str::encrypt(Item * ptext, uint64_t IV) {
     for (uint i = 0; i < plain_size; i++) {
 	pv = pv * 256 + (int)ps[i];
     }
-    
+
     ZZ enc = ope.encrypt(to_ZZ(pv));
 
     return new Item_int((ulonglong) uint64FromZZ(enc));
@@ -530,7 +530,7 @@ OPE_str::decrypt(Item * ctext, uint64_t IV) {
 
 
 HOM::HOM(Create_field * f, string seed_key) : EncLayer(f),
-					      seed_key(seed_key) 
+					      seed_key(seed_key)
 {
     streamrng<arc4> * prng = new streamrng<arc4>(seed_key);
     sk =  new Paillier_priv(Paillier_priv::keygen(prng, nbits));
@@ -586,7 +586,7 @@ Item *
 HOM::decrypt(Item * ctext, uint64_t IV) {
     ZZ enc = ItemStrToZZ(ctext);
     ZZ dec = sk->decrypt(enc);
-    LOG(encl) << "HOM ciph " << enc << "---->" << dec; 
+    LOG(encl) << "HOM ciph " << enc << "---->" << dec;
     return ZZToItemInt(dec);
 }
 
@@ -732,8 +732,8 @@ Search::encrypt(Item * ptext, uint64_t IV) {
     string ciph = encryptSWP(key, *tokens);
 
     LOG(encl) << "SEARCH encrypt " << plainstr << " --> " << ciph;
-  
-    return new Item_string(newmem(ciph), ciph.length(), &my_charset_bin);	
+
+    return new Item_string(newmem(ciph), ciph.length(), &my_charset_bin);
 }
 
 Item *
@@ -778,18 +778,18 @@ Search::searchUDF(Item * field, Item * expr) {
     l.push_back(field);
 
     // Add token
-    
+
     Token t = token(key, string(searchstrip(ItemToString(expr))));
     Item_string * t1 =  new Item_string(newmem(t.ciph),
 					t.ciph.length(), &my_charset_bin);
     t1->name = NULL; //no alias
     l.push_back(t1);
-    
+
     Item_string * t2 = new Item_string(newmem(t.wordKey),
 				       t.wordKey.length(), &my_charset_bin);
     t2->name = NULL;
     l.push_back(t2);
-    
+
     return new Item_func_udf_int(&u_search, l);
 }
 

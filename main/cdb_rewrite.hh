@@ -54,7 +54,7 @@ public:
 // Main class processing rewriting
 class Rewriter {
 public:
-    Rewriter(ConnectionInfo ci, 
+    Rewriter(ConnectionInfo ci,
              const std::string &embed_dir,
              bool MultiPrinc = false,
              bool encByDefault = true);

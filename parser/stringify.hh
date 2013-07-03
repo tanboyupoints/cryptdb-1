@@ -27,7 +27,7 @@ operator<<(std::ostream &out, Item &i)
 {
     String s;
     i.print(&s, QT_ORDINARY);
-    
+
     return out << s;
 }
 
@@ -171,7 +171,7 @@ sql_type_to_string(enum_field_types tpe, CHARSET_INFO *charset)
     case MYSQL_TYPE_TINY_BLOB   : return "TINYBLOB";
     case MYSQL_TYPE_MEDIUM_BLOB : return "MEDIUMBLOB";
     case MYSQL_TYPE_LONG_BLOB   : return "LONGBLOB";
-    case MYSQL_TYPE_BLOB        : 
+    case MYSQL_TYPE_BLOB        :
         if (charset == &my_charset_bin) {
             return "BLOB";
         } else {
@@ -196,7 +196,7 @@ operator<<(std::ostream &out, CHARSET_INFO & ci) {
 static std::ostream&
 operator<<(std::ostream &out, Create_field &f)
 {
-    
+
     // emit field name + type definition
     out << f.field_name << " " << sql_type_to_string(f.sql_type, f.charset);
 
@@ -485,7 +485,7 @@ do_create_table(std::ostream &out, LEX &lex)
 	if (lex.create_info.default_table_charset) {
 	    out << " DEFAULT CHARSET=" << *lex.create_info.default_table_charset;
 	}
-	
+
     }
 }
 
@@ -738,7 +738,7 @@ operator<<(std::ostream &out, LEX &lex)
         break;
 
     /*
-     * You can issue multiple ADD, ALTER, DROP, and CHANGE clauses in a 
+     * You can issue multiple ADD, ALTER, DROP, and CHANGE clauses in a
      * single ALTER TABLE statement seperated by columns.  This is a MySQL
      * extension to standard SQL, which permits only one of each clause
      * per ALTER TABLE statement.
@@ -749,7 +749,7 @@ operator<<(std::ostream &out, LEX &lex)
         out << "ALTER TABLE";
         lex.select_lex.table_list.first->print(t, &s, QT_ORDINARY);
         out << " " << s;
-        
+
         // TODO: Support other flags.
         // ALTER_ADD_COLUMN, ALTER_CHANGE_COLUMN, ALTER_ADD_INDEX,
         // ALTER_DROP_INDEX, ALTER_FOREIGN_KEY

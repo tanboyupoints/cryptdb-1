@@ -18,7 +18,7 @@
  *  values
  *
  *
- * ASSUMPTION: only terminal (does not have access to anything) principals 
+ * ASSUMPTION: only terminal (does not have access to anything) principals
  *  have > THRESHOLD keys
  *
  *

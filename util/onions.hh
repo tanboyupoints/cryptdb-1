@@ -12,7 +12,7 @@ typedef enum onion {
     oOPE,
     oAGG,
     oSWP,
-    oPLAIN, 
+    oPLAIN,
     oINVALID,
 } onion;
 
@@ -74,7 +74,7 @@ static onionlayout MP_NUM_ONION_LAYOUT = {
     {oDET, std::vector<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
     {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})}
 };
-    
+
 static onionlayout STR_ONION_LAYOUT = {
     {oDET, std::vector<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET, SECLEVEL::RND})},
     {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
