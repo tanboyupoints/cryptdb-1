@@ -54,12 +54,17 @@ class Connect {
 	// Sets current database name (after the "USE" query.
     // dbname is static string
     std::string setCurDBName(const std::string &dbname) {
-        return cur_db_name(dbname);
+        static std::string s_cur_db("");
+
+        if(dbname.size() > 0)
+            s_cur_db = dbname;
+
+        return s_cur_db;
     };
 
     // Returns current database name
     std::string getCurDBName(void) {
-        return cur_db_name();
+        return setCurDBName("");
     };
 
     ~Connect();
@@ -69,9 +74,6 @@ class Connect {
 
     void do_connect(const std::string &server, const std::string &user,
                     const std::string &passwd, uint port);
-
-    std::string cur_db_name(const std::string & dbname);
-    std::string cur_db_name(void);
 
     bool     close_on_destroy;
 };

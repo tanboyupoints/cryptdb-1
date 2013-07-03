@@ -36,7 +36,7 @@ Connect::Connect(const string &server, const string &user, const string &passwd,
         }
     }
 
-    cur_db_name(dbname);
+    setCurDBName(dbname);
 }
 
 void
@@ -75,29 +75,6 @@ Connect::do_connect(const string &server, const string &user,
     }
 }
 
-std::string
-Connect::cur_db_name(const string & dbname)
-{
-    /*
-     * <ccarvalho>
-     * Perhaps a more sophisticated (better!)
-     * way than static string to be shared by multiple
-     * instances..
-     */
-    static std::string s_cur_db("");
-
-    if(dbname.size() > 0)
-        s_cur_db = dbname;
-
-    return s_cur_db;
-}
-
-// Wrapper
-std::string
-Connect::cur_db_name()
-{
-    return cur_db_name("");
-}
 
 bool
 Connect::select_db(const std::string &dbname)
