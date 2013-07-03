@@ -27,8 +27,15 @@ operator<<(std::ostream &out, Item &i)
 {
     String s;
     i.print(&s, QT_ORDINARY);
-    
+
     return out << s;
+}
+
+static inline std::ostream&
+operator<<(std::ostream &out, Alter_drop &adrop)
+{
+    // FIXME: Needs to support escapes.
+    return out << adrop.name;
 }
 
 template<class T>
@@ -106,6 +113,31 @@ operator<<(std::ostream &out, SELECT_LEX_UNIT &select_lex_unit)
     return out << s;
 }
 
+// FIXME: Combine with vector_join.
+template <typename T>
+std::string ListJoin(List<T> lst, std::string delim,
+                     std::string (*finalize)(T))
+{
+    std::ostringstream accum;
+
+    auto it = List_iterator<T>(lst);
+    T *element = it++;
+    for (;element; element = it++) {
+        std::string finalized_element = (*finalize)(*element);
+        accum << finalized_element;
+        accum << delim;
+    }
+
+    std::string output, str_accum = accum.str();
+    if (str_accum.length() > 0) {
+        output = str_accum.substr(0, str_accum.length() - delim.length());
+    } else {
+        output = str_accum;
+    }
+
+    return output;
+}
+
 static const char *
 sql_type_to_string(enum_field_types tpe, CHARSET_INFO *charset)
 {
@@ -139,7 +171,7 @@ sql_type_to_string(enum_field_types tpe, CHARSET_INFO *charset)
     case MYSQL_TYPE_TINY_BLOB   : return "TINYBLOB";
     case MYSQL_TYPE_MEDIUM_BLOB : return "MEDIUMBLOB";
     case MYSQL_TYPE_LONG_BLOB   : return "LONGBLOB";
-    case MYSQL_TYPE_BLOB        : 
+    case MYSQL_TYPE_BLOB        :
         if (charset == &my_charset_bin) {
             return "BLOB";
         } else {
@@ -164,7 +196,7 @@ operator<<(std::ostream &out, CHARSET_INFO & ci) {
 static std::ostream&
 operator<<(std::ostream &out, Create_field &f)
 {
-    
+
     // emit field name + type definition
     out << f.field_name << " " << sql_type_to_string(f.sql_type, f.charset);
 
@@ -329,6 +361,7 @@ operator<<(std::ostream &out, enum legacy_db_type db_type) {
     case DB_TYPE_INNODB: {out << "InnoDB"; break;}
     case DB_TYPE_ISAM: {out << "ISAM"; break;}
     case DB_TYPE_MYISAM: {out << "MYISAM"; break;}
+    case DB_TYPE_CSV_DB: {out << "CSV"; break;}
     default:
 	assert_s(false,
 		 "stringify does not know how to print db_type "
@@ -453,8 +486,20 @@ do_create_table(std::ostream &out, LEX &lex)
 	if (lex.create_info.default_table_charset) {
 	    out << " DEFAULT CHARSET=" << *lex.create_info.default_table_charset;
 	}
-	
+
     }
+}
+
+static std::string prefix_drop_column(Alter_drop adrop) {
+    std::ostringstream ss;
+    ss << "DROP COLUMN " << adrop;
+    return ss.str();
+}
+
+static std::string prefix_add_column(Create_field cf) {
+    std::ostringstream ss;
+    ss << "ADD COLUMN " << cf;
+    return ss.str();
 }
 
 static inline std::ostream&
@@ -691,6 +736,32 @@ operator<<(std::ostream &out, LEX &lex)
             out << " AND" << (lex.tx_chain == TVL_NO ? " NO" : "") << " CHAIN";
         if (lex.tx_release != TVL_UNKNOWN)
             out << (lex.tx_release == TVL_NO ? " NO" : "") << " RELEASE";
+        break;
+
+    /*
+     * You can issue multiple ADD, ALTER, DROP, and CHANGE clauses in a
+     * single ALTER TABLE statement seperated by columns.  This is a MySQL
+     * extension to standard SQL, which permits only one of each clause
+     * per ALTER TABLE statement.
+     *
+     * ALTER TABLE t DROP COLUMN c, DROP COLUMN d;
+     */
+    case SQLCOM_ALTER_TABLE:
+        out << "ALTER TABLE";
+        lex.select_lex.table_list.first->print(t, &s, QT_ORDINARY);
+        out << " " << s;
+
+        // TODO: Support other flags.
+        // ALTER_ADD_COLUMN, ALTER_CHANGE_COLUMN, ALTER_ADD_INDEX,
+        // ALTER_DROP_INDEX, ALTER_FOREIGN_KEY
+        if (lex.alter_info.flags & ALTER_DROP_COLUMN) {
+            out << " " << ListJoin<Alter_drop>(lex.alter_info.drop_list, ",",
+                                               prefix_drop_column);
+        } else if (lex.alter_info.flags & ALTER_ADD_COLUMN) {
+            out << " " << ListJoin<Create_field>(lex.alter_info.create_list,
+                                                 ",", prefix_add_column);
+        }
+
         break;
 
     case SQLCOM_SET_OPTION:

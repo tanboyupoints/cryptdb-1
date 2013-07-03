@@ -26,10 +26,21 @@ make_item(Item_string * i) {
     return new Item_string(make_thd_string(s), s.length(), i->default_charset());
 }
 
-
 Item_int *
 make_item(Item_int * i) {
     return new Item_int(i->value);
+}
+
+Item_int *
+make_item(Item_num *i)
+{
+    return make_item((Item_int *)i);
+}
+
+Item_null *
+make_item(Item_null *i)
+{
+    return new Item_null(i->name);
 }
 
 ORDER *
@@ -39,7 +50,7 @@ make_order(ORDER * old_order, Item * i) {
     new_order->next = NULL;
     new_order->item_ptr = i;
     new_order->item = (Item **)malloc(sizeof(Item *));
-    *new_order->item = i; 
+    *new_order->item = i;
 
     return new_order;
 }

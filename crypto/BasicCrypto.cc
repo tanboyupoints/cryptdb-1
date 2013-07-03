@@ -92,10 +92,10 @@ get_AES_dec_key(const string &key)
     AES_KEY * aes_key = new AES_KEY();
 
     assert(key.size() == AES_KEY_BYTES);
-    
+
     assert(AES_set_decrypt_key((const unsigned char*)key.c_str(), AES_KEY_BYTES*8,
                                aes_key) >= 0);
-    
+
     return aes_key;
 
 }
@@ -422,7 +422,7 @@ string
 getLayerKey(AES_KEY * mKey, string uniqueFieldName, SECLEVEL l) {
     if (l == SECLEVEL::DETJOIN) {
 	return getKey(mKey, "joinjoin", l);
-    } 
+    }
     return getKey(mKey, uniqueFieldName, l);
- 
+
 }

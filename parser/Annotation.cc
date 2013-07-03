@@ -205,7 +205,7 @@ Annotation::getRightStr() {
     }
     //LOG(error) << "Annotation asked for left when not SPEAKSFOR";
     return "";
-}    
+}
 
 void
 Annotation::parse() {
@@ -344,7 +344,7 @@ Annotation::parse() {
         for(auto field = pred_fields.begin(); field != pred_fields.end(); field++) {
             pred->fields.push_back(*field);
         }
-        
+
     }
     return;
 }

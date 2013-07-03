@@ -42,6 +42,19 @@ FieldMeta::FieldMeta()
 
 }
 
+FieldMeta::~FieldMeta()
+{
+    for (auto onion_it : onions) {
+        delete onion_it.second;
+    }
+}
+
+bool TableMeta::destroyFieldMeta(std::string field)
+{
+    fieldNames.remove(field);
+    return 1 == fieldMetaMap.erase(field);
+}
+
 TableMeta::TableMeta() {
     anonTableName = "";
     tableNo = 0;
@@ -52,6 +65,34 @@ TableMeta::~TableMeta()
     for (auto i = fieldMetaMap.begin(); i != fieldMetaMap.end(); i++)
         delete i->second;
 
+}
+
+// table_no: defaults to NULL indicating we are to generate it ourselves.
+TableMeta *
+SchemaInfo::createTableMeta(std::string table_name,
+                            std::string anon_table_name, bool has_sensitive,
+                            bool has_salt, std::string salt_name,
+                            const unsigned int *table_no)
+{
+    // Make sure a table with this name does not already exist.
+    std::map<std::string, TableMeta *>::iterator it =
+        tableMetaMap.find(table_name);
+    if (tableMetaMap.end() != it) {
+        return NULL;
+    }
+
+    unsigned int table_number;
+    if (NULL == table_no) {
+        table_number = ++totalTables;
+    } else {
+        // TODO: Make sure no other tables with this number exist.
+        ++totalTables;
+        table_number = *table_no;
+    }
+    TableMeta *tm = new TableMeta(table_number, anon_table_name,
+                                  has_sensitive, has_salt, salt_name);
+    tableMetaMap[table_name] = tm;
+    return tm;
 }
 
 TableMeta *
@@ -68,4 +109,15 @@ SchemaInfo::getFieldMeta(const string & table, const string & field) {
     assert_s(it != tm->fieldMetaMap.end(), "could not find field " + field + " in table " +  table );
     assert_s(it->second != NULL, "field " + table + "." + field + " not present in proxy schema ");
     return it->second;
+}
+
+bool
+SchemaInfo::destroyTableMeta(std::string table)
+{
+    if (totalTables <= 0) {
+        throw CryptDBError("SchemaInfo::totalTables can't be less than zero");
+    }
+
+    --totalTables;
+    return 1 == tableMetaMap.erase(table);
 }

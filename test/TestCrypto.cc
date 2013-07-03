@@ -71,7 +71,7 @@ testBasics()
 static void
 testOnions () {
 
-   
+
 
 }
 
@@ -95,19 +95,19 @@ testOPE()
         LOG(crypto) << "-- testing plaintext size " << ptextsize << " and ciphertext size " << ctextsize;
 
         OPE * ope = new OPE(string(key, AES_KEY_BYTES), ptextsize, ctextsize);
-	
+
         //Test it on "noValues" random values
         for (unsigned int j = 0; j < noValues; j++) {
 
             string data = randomBytes(ptextsize/bitsPerByte);
 
 	    // cerr << "data is " << stringToByteInts(data) << "\n";
-	      
+
             string enc = ope->encrypt(data);
 	    //cerr << "enc\n";
 	    string dec = ope->decrypt(enc);
 	    //cerr << "Dec \n";
-          
+
             //cerr << "enc is " << stringToByteInts(enc) << "\n";
             //cerr << "dec is " << stringToByteInts(dec) << "\n";
             assert_s(valFromStr(dec) == valFromStr(data), "decryption does not match original data "  + StringFromVal(ptextsize) + " " + StringFromVal(ctextsize));

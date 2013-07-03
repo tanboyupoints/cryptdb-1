@@ -107,7 +107,7 @@ class Paillier {
 
 class Paillier_priv : public Paillier {
  public:
-    Paillier_priv() : fast(false) {} //HACK: should not need this 
+    Paillier_priv() : fast(false) {} //HACK: should not need this
     Paillier_priv(const std::vector<NTL::ZZ> &sk);
     std::vector<NTL::ZZ> privkey() const { return { p, q, g, a }; }
 

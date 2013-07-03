@@ -79,7 +79,7 @@ ope_server<EncT>::tree_lookup(tree_node<EncT> *root, uint64_t v, uint64_t nbits)
 /////////////////////////////////////////////////////
 
 /*
- * Rivest and Galperin's tree balancing: log n memory 
+ * Rivest and Galperin's tree balancing: log n memory
  */
 
 template<class EncT>
@@ -103,7 +103,7 @@ build_tree(uint64_t n, tree_node<EncT> * x) {
     }
     tree_node<EncT> * r = build_tree(ceil(1.0 * (n-1)/2.0), x);
     tree_node<EncT> * s = build_tree(floor(1.0 * (n-1)/2.0), r->right);
-  
+
     r->right = s->left;
     s->left = r;
 
@@ -120,7 +120,7 @@ ope_server<EncT>::relabel(tree_node<EncT> * parent, bool isLeft, uint64_t size) 
     } else {
 	scapegoat = (isLeft == 1) ? parent->left : parent->right;
     }
-    
+
     tree_node<EncT> * w = new tree_node<EncT>(0);
     tree_node<EncT> * z = flatten(scapegoat, w);
 
@@ -143,7 +143,7 @@ ope_server<EncT>::relabel(tree_node<EncT> * parent, bool isLeft, uint64_t size) 
 
 ////////////////////////////////////////////////////
 
-    
+
 template<class EncT>
 void
 ope_server<EncT>::tree_insert(tree_node<EncT> **np, uint64_t v,
@@ -175,7 +175,7 @@ static bool
 isWeightUnbalanced(uint64_t left, uint64_t right, double alpha) {
 
     uint64_t total = left + 1 + right;
-    
+
     if ((left > total * alpha) || (right > total * alpha)) {
 	return true;
     }
@@ -188,7 +188,7 @@ static tree_node<EncT> *
 unbalanced_node(tree_node<EncT> * parent, tree_node<EncT> * current,
 		const uint64_t v, const uint64_t nbits,const double alpha,
 		bool & isLeft, uint64_t & child_size, bool & found, uint64_t & total_size) {
- 
+
     if (nbits == 0) {//found v node
 	child_size = 1;
 	return current;
@@ -219,7 +219,7 @@ unbalanced_node(tree_node<EncT> * parent, tree_node<EncT> * current,
     } else {
 	other_child_size = (current->right == NULL) ? 0 : current->right->count();
     }
-    
+
     if (isWeightUnbalanced(child_size, other_child_size, alpha)) {
 	found = true;
 	total_size = child_size + other_child_size + 1;
@@ -232,7 +232,7 @@ unbalanced_node(tree_node<EncT> * parent, tree_node<EncT> * current,
         child_size = child_size + 1 + other_child_size;
 	return res;
     }
-     
+
 }
 
 
@@ -248,14 +248,14 @@ ope_server<EncT>::node_to_balance(uint64_t v, uint64_t nbits,  bool & isLeft, ui
 					    isLeft, child_size, found, subtree_size);
 
     assert(found); //math guarantees an unbalanced node on v's path to root exists
-   
+
     return unb;
 }
 
 
 template<class EncT>
 void
-ope_server<EncT>::update_tree_stats(uint64_t path_len) 
+ope_server<EncT>::update_tree_stats(uint64_t path_len)
 {
     num_nodes++;
 }
@@ -282,7 +282,7 @@ ope_server<EncT>::lookup(uint64_t v, uint64_t nbits) const
     if (!n) {
         throw ope_lookup_failure();
     }
-    
+
     return n->enc_val;
 
 }
@@ -292,7 +292,7 @@ void
 ope_server<EncT>::insert(uint64_t v, uint64_t nbits, const EncT &encval)
 {
     tree_insert(&root, v, encval, nbits, nbits);
-    
+
 }
 
 template<class EncT>

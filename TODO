@@ -1,29 +1,37 @@
 Aaron:
 wiki -- host it on git?
+TRANSACT on stale onions after UPDATE
+ - Support multiple tables.
+ALTER TABLE
+ - FOREIGN KEY
+ - ADD INDEX
+ - DROP INDEX
+ - RENAME
+ - CHANGE COLUMN
+Subqueries
+DECIMAL
+VARCHAR
 
 Carlos:
-doxygen
+Import tool fixes:
+ - fix query syntax errors.
+ - use lex or XML parser to parse _all_ fields insteand of doing it myself.
+ - check possible memory leaks.
+ - reduce C++ containers impact by executing out queries as soon as they are parsed. 
 
-
-Both immediate future:
+Both:
 unimplemented gather/rewrite for other functions, search through cdb_rewrite.cc
-left join, right join
-start looking into sql.mit.edu trace
-tests for combination of encrypted and unencrypted data
 date
-decimal
-data loading
 
 --------------
 
 Raluca:
-CryptoHandlers [done]
 partition cdb_rewrite.cc
 can we simplify EncSet/FieldMeta repetition?
 
 
 
-Old:
+
 
 
 * Make sure that constant expressions in queries (e.g., SELECT "mysecret";)

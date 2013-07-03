@@ -21,39 +21,31 @@ EncSet::intersect(const EncSet & es2) const
 {
     OnionLevelFieldMap m;
     for (auto it2 = es2.osl.begin();
-         it2 != es2.osl.end();
-         it2++) {
+            it2 != es2.osl.end(); ++it2) {
         auto it = osl.find(it2->first);
-        if (it == osl.end()) {
-            continue;
-        }
 
         FieldMeta *fm = it->second.second;
         FieldMeta *fm2 = it2->second.second;
 
-        SECLEVEL sl = (SECLEVEL)min((int)it->second.first,
-                (int)it2->second.first);
-        onion o = it->first;
+        if (it != osl.end()) {
+            SECLEVEL sl = (SECLEVEL)min((int)it->second.first,
+                    (int)it2->second.first);
+	    onion o = it->first;
 
-        if (fm == NULL) {
-            m[o] = LevelFieldPair(sl, fm2);
-        } else if (fm2 == NULL) {
-            m[o] = LevelFieldPair(sl, fm);
-        } else if (fm != fm2) {
-            // Ensure that the keys actually match.
-            OnionMeta *om = fm->onions[o];
-            OnionMeta *om2 = fm2->onions[o];
-            assert(om && om2 && om->layers.size() > 0 &&
-                   om2->layers.size() > 0);
-            if (om->layers.back()->serialize() ==
-                om2->layers.back()->serialize()) {
-                m[o] = LevelFieldPair(sl, fm);
+            if (fm == NULL) {
+                m[o] = LevelFieldPair(sl, fm2);
+            } else if (fm2 == NULL) {
+                m[it->first] = LevelFieldPair(sl, fm);
+            } else if (fm != NULL && fm2 != NULL) {
+                // TODO(burrows): Guarentee that the keys are the same.
+		if (sl == SECLEVEL::DETJOIN) {
+		    m[o] = LevelFieldPair(sl, fm);
+		} else if (sl == SECLEVEL::HOM) {
+                    m[o] = LevelFieldPair(sl, fm);
+                }
             }
-        } else {
-            m[o] = LevelFieldPair(sl, fm);
         }
     }
-
     return EncSet(m);
 }
 
@@ -90,10 +82,10 @@ EncSet::chooseOne() const
         oOPE,
         oAGG,
         oSWP,
-	oPLAIN, 
+	oPLAIN,
     };
 
-    
+
     static size_t onion_size = sizeof(onion_order) / sizeof(onion_order[0]);
     for (size_t i = 0; i < onion_size; i++) {
 	onion o = onion_order[i];
@@ -143,7 +135,7 @@ operator<<(ostream &out, const reason &r)
 {
     out << r.why_t_item << " PRODUCES encset " << r.encset << "\n" \
 	<< " BECAUSE " << r.why_t << "\n";
-    
+
     if (r.childr->size()) {
 	out << " AND CHILDREN: {" << "\n";
 	for (reason ch : *r.childr) {
@@ -180,7 +172,54 @@ operator<<(ostream &out, const RewritePlan * rp)
     }
 
     out << " RewritePlan: \n---> out encset " << rp->es_out << "\n---> reason " << rp->r << "\n";
-    
+
     return out;
+}
+
+bool Analysis::addAlias(std::string alias, std::string table)
+{
+    auto alias_pair = table_aliases.find(alias);
+    if (table_aliases.end() != alias_pair) {
+        return false;
+    }
+
+    table_aliases[alias] = table;
+    return true;
+}
+
+FieldMeta *Analysis::getFieldMeta(std::string table, std::string field) const
+{
+    string real_table_name = unAliasTable(table);
+    return ps->schema->getFieldMeta(real_table_name, field);
+}
+
+TableMeta *Analysis::getTableMeta(std::string table) const
+{
+    string real_table_name = unAliasTable(table);
+    return ps->schema->getTableMeta(real_table_name);
+}
+
+// FIXME: Field aliasing.
+bool Analysis::destroyFieldMeta(std::string table, std::string field)
+{
+    string real_table_name = unAliasTable(table);
+    TableMeta *tm = ps->schema->getTableMeta(real_table_name);
+    return tm->destroyFieldMeta(field);
+}
+
+bool Analysis::destroyTableMeta(std::string table)
+{
+    string real_table_name = unAliasTable(table);
+    return ps->schema->destroyTableMeta(table);
+}
+
+std::string Analysis::unAliasTable(std::string table) const
+{
+    auto alias_pair = table_aliases.find(table);
+    if (table_aliases.end() != alias_pair) {
+        return alias_pair->second;
+    } else {
+        return table;
+    }
 }
 

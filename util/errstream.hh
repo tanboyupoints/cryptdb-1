@@ -23,7 +23,7 @@ class fatal : public std::stringstream {
 
 class cryptdb_err : public std::stringstream {
  public:
-    ~cryptdb_err() throw (CryptDBError) {
+    ~cryptdb_err() /*throw (CryptDBError)*/ {
         std::cerr << str() << std::endl;
         throw CryptDBError(str());
     }

@@ -17,6 +17,6 @@ $(OBJDIR)/libedbparser.so: $(EDBPARSER_OBJS) $(OBJDIR)/libedbutil.so \
 			   $(OBJDIR)/libedbcrypto.so 
 	$(CXX) -shared -o $@ $(EDBPARSER_OBJS) $(LDFLAGS) -ledbutil -ledbcrypto \
 	       -Wl,--whole-archive -L$(MYBUILD)/libmysqld -lmysqld \
-	       -Wl,--no-whole-archive $(LDFLAGS)
+	       -Wl,--no-whole-archive -laio $(LDFLAGS)
 
 # vim: set noexpandtab:

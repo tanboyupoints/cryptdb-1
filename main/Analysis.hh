@@ -19,14 +19,14 @@ public:
     EncSet(); // TODO(stephentu): move ctor here
     EncSet(FieldMeta * fm);
     EncSet(const OLK & olk);
-    
+
     /**
      * decides which encryption scheme to use out of multiple in a set
      */
     OLK chooseOne() const;
 
     bool contains(const OLK & olk) const;
-    
+
     EncSet intersect(const EncSet & es2) const;
 
     bool empty() const { return osl.empty(); }
@@ -40,7 +40,7 @@ public:
     }
 
     void setFieldForOnion(onion o, FieldMeta * fm);
-    
+
     OnionLevelFieldMap osl; //max level on each onion
 };
 
@@ -171,12 +171,12 @@ public:
     void add_child(const reason & ch) {
 	childr->push_back(ch);
     }
-    
-    EncSet encset;    
+
+    EncSet encset;
 
     std::string why_t;
     Item *why_t_item;
-    
+
     std::list<reason> * childr;
 };
 
@@ -193,7 +193,7 @@ public:
 
     RewritePlan(const EncSet & es, reason r) : r(r), es_out(es) {};
     RewritePlan() {};
-    
+
     //only keep plans that have parent_olk in es
 //    void restrict(const EncSet & es);
 
@@ -207,7 +207,7 @@ public:
     OLK olk;
     // the following store how to rewrite children
     RewritePlan ** childr_rp;
-    
+
     RewritePlanOneOLK(const EncSet & es_out,
 		      const OLK & olk,
 		      RewritePlan ** childr_rp,
@@ -222,11 +222,11 @@ public:
     uint port;
     std::string user;
     std::string passwd;
-   
+
     ConnectionInfo(std::string s, std::string u, std::string p, uint port = 0) :
 	server(s), port(port), user(u), passwd(p) {};
     ConnectionInfo() : server(""), port(0), user(""), passwd("") {};
-    
+
 } ConnectionInfo;
 
 ostream&
@@ -246,7 +246,7 @@ typedef struct ProxyState {
 
     bool           encByDefault;
     AES_KEY*       masterKey;
-    
+
     SchemaInfo*    schema;
     unsigned int   totalTables;
 
@@ -256,27 +256,40 @@ typedef struct ProxyState {
 } ProxyState;
 
 
+class Rewriter;
+
 class Analysis {
 public:
     Analysis(ProxyState * ps) : ps(ps), pos(0), rmeta(new ReturnMeta()) {}
-    
+
     Analysis(): ps(NULL), pos(0), rmeta(new ReturnMeta()) {}
- 
-    // pointer to proxy metadata 
+
+    // pointer to proxy metadata
     ProxyState * ps;
 
     /* Temporary structures for processing one query */
-   
-    unsigned int pos; //a counter indicating how many projection fields have been analyzed so far                                                                    
+
+    unsigned int pos; //a counter indicating how many projection fields have been analyzed so far
     std::map<FieldMeta *, salt_type>    salts;
     TMKM                                tmkm; //for multi princ
     std::map<Item *, RewritePlan *>     rewritePlans;
+    std::map<std::string, std::string>  table_aliases;
 
-    // information for decrypting results 
+    // information for decrypting results
     ReturnMeta * rmeta;
+
+    bool addAlias(std::string alias, std::string table);
+    FieldMeta *getFieldMeta(std::string table, std::string field) const;
+    TableMeta *getTableMeta(std::string table) const;
+    bool destroyFieldMeta(std::string table, std::string field);
+    bool destroyTableMeta(std::string table);
+
+    // HACK(burrows): This is a temporary solution until I redesign.
+    Rewriter *rewriter;
 
 private:
     MYSQL * m;
+    std::string unAliasTable(std::string table) const;
 
 };
 

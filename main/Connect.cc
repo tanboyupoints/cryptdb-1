@@ -27,8 +27,14 @@ Connect::Connect(const string &server, const string &user, const string &passwd,
     : conn(nullptr), close_on_destroy(true)
 {
     do_connect(server, user, passwd, port);
-    if (!select_db(dbname))
-        thrower() << "cannot select dbname " << dbname;
+
+    if (dbname.size() == 0) {
+        LOG(warn) << "database name not set";
+    } else {
+        if (!select_db(dbname)) {
+            throw CryptDBError("cannot select dbname " + dbname);
+        }
+    }
 
     cur_db_name(dbname);
 }
@@ -100,14 +106,14 @@ Connect::select_db(const std::string &dbname)
 }
 
 Connect * Connect::getEmbedded(const string & embed_db) {
-    
+
     init_mysql(embed_db);
 
     MYSQL * m = mysql_init(0);
     assert(m);
-    
+
     mysql_options(m, MYSQL_OPT_USE_EMBEDDED_CONNECTION, 0);
-    
+
     if (!mysql_real_connect(m, 0, 0, 0, 0, 0, 0, CLIENT_MULTI_STATEMENTS)) {
         mysql_close(m);
         cryptdb_err() << "mysql_real_connect: " << mysql_error(m);
@@ -140,7 +146,7 @@ Connect::execute(const string &query, DBResult * & res)
 
     void* ret = create_embedded_thd(0);
     if (!ret) assert(false);
-    
+
     return success;
 }
 
@@ -212,7 +218,7 @@ getItem(char * content, enum_field_types type, uint len) {
     } else {
         i = new Item_string(make_thd_string(content_str), len, &my_charset_bin);
     }
-    
+
     return i;
 }
 

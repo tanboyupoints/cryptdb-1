@@ -1,7 +1,7 @@
 #pragma once
 
 /***************************************************/
-//for multi-princ annoation parsing                                            
+//for multi-princ annoation parsing
 
 #include <util/util.hh>
 #include <util/onions.hh>
@@ -32,7 +32,7 @@ std::list<std::string> split(std::string &s, char c);
  *  CRYPTDB PRINCTYPE princtypename EXTERNAL;
  *  CRYPTDB primitive ENCFOR right [enclevel];
  *  CRYPTDB left SPEAKSFOR right [IF predicate];
- *  
+ *
  *  CRYPTDB primitive ENC
  *
  * primitive := tablename.columnname
@@ -63,9 +63,9 @@ public:
     //PrincType converted to strings: princtype=column
     std::string getLeftStr();
     std::string getRightStr();
-    
+
     //accessor methods for the table names for various fields
-    //requires: fields requested (primitive or princtype.column) to be of the 
+    //requires: fields requested (primitive or princtype.column) to be of the
     //          form tablename.fieldname
     std::string getLeftTableName();
     std::string getLeftFieldName();

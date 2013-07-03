@@ -15,7 +15,7 @@
 #include <sql_update.h>
 
 
-// An enc layer encrypts and decrypts data for a certain onion layer. It also 
+// An enc layer encrypts and decrypts data for a certain onion layer. It also
 // knows how to transform the data type of some plain data to the data type of
 // encrypted data in the DBMS.
 //TODO: currently, we have one such object per onion layer per field
@@ -28,17 +28,17 @@ class EncLayer {
  public:
     EncLayer(Create_field * f) : cf(f) {}
     //  EncLayer(Create_field * f, std::string key) : cf(f) {}
-    
+
 
     virtual SECLEVEL level() = 0;
 
     // returns a rewritten create field to include in rewritten query
     virtual Create_field * newCreateField(std::string anonname = "") = 0;
-    
+
     virtual Item * encrypt(Item * ptext, uint64_t IV = 0) = 0;
     virtual Item * decrypt(Item * ctext, uint64_t IV = 0) = 0;
 
-    // returns the decryptUDF to remove the onion layer 
+    // returns the decryptUDF to remove the onion layer
     virtual Item * decryptUDF(Item * col, Item * ivcol = NULL) {
         thrower() << "decryptUDF not supported";
     }
@@ -56,10 +56,10 @@ public:
     // serialize and deserialize
     virtual std::string serialize() {return key;}
     RND_int(const std::string & serial);
-    
+
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField(std::string anonname = "");
-    
+
     Item * encrypt(Item * ptext, uint64_t IV);
     Item * decrypt(Item * ctext, uint64_t IV);
     Item * decryptUDF(Item * col, Item * ivcol);
@@ -67,7 +67,7 @@ public:
 private:
     std::string key;
     blowfish bf;
-    static const int key_bytes = 16;    
+    static const int key_bytes = 16;
     static const int ciph_size = 8;
 
 };
@@ -79,11 +79,11 @@ public:
     // serialize and deserialize
     std::string serialize() {return rawkey; }
     RND_str(const std::string & serial);
- 
+
 
     SECLEVEL level() {return SECLEVEL::RND;}
     Create_field * newCreateField(std::string anonname = "");
-    
+
     Item * encrypt(Item * ptext, uint64_t IV);
     Item * decrypt(Item * ctext, uint64_t IV);
     Item * decryptUDF(Item * col, Item * ivcol);
@@ -103,7 +103,7 @@ public:
     std::string serialize() {return key; }
     // create object from serialized contents
     DET_int(const std::string & serial);
- 
+
 
     SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField(std::string anonname = "");
@@ -111,8 +111,8 @@ public:
     Item * encrypt(Item * ptext, uint64_t IV = 0);
     Item * decrypt(Item * ctext, uint64_t IV = 0);
     Item * decryptUDF(Item * col, Item * ivcol = NULL);
-  
-      
+
+
 protected:
     std::string key;
     blowfish bf;
@@ -128,15 +128,15 @@ public:
     // serialize and deserialize
     std::string serialize() {return rawkey;}
     DET_str(const std::string & serial);
- 
+
 
     SECLEVEL level() {return SECLEVEL::DET;}
     Create_field * newCreateField(std::string anonname = "");
-    
+
     Item * encrypt(Item * ptext, uint64_t IV = 0);
     Item * decrypt(Item * ctext, uint64_t IV = 0);
     Item * decryptUDF(Item * col, Item * = NULL);
-    
+
 protected:
     std::string rawkey;
     static const int key_bytes = 16;
@@ -154,10 +154,10 @@ public:
     // serialize from parent;  unserialize:
     DETJOIN_int(std::string serial) : DET_int(serial) {}
 
-    
+
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
 
-    
+
 };
 
 
@@ -181,7 +181,7 @@ public:
     // serialize and deserialize
     std::string serialize() {return key;}
     OPE_int(const std::string & serial);
- 
+
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField(std::string anonname = "");
 
@@ -206,14 +206,14 @@ public:
     // serialize and deserialize
     std::string serialize() {return key;}
     OPE_str(const std::string & serial);
- 
+
 
     SECLEVEL level() {return SECLEVEL::OPE;}
     Create_field * newCreateField(std::string anonname = "");
 
     Item * encrypt(Item * p, uint64_t IV = 0);
     Item * decrypt(Item * c, uint64_t IV = 0)__attribute__((noreturn));
-  
+
 private:
     std::string key;
     OPE ope;
@@ -226,19 +226,19 @@ private:
 class HOM : public EncLayer {
 public:
     HOM(Create_field * cf, std::string seed_key);
-    
+
     // serialize and deserialize
     std::string serialize() {return seed_key;}
     HOM(const std::string & serial);
- 
-    
+
+
     SECLEVEL level() {return SECLEVEL::HOM;}
     Create_field * newCreateField(std::string anonname = "");
 
     //TODO needs multi encrypt and decrypt
     Item * encrypt(Item * p, uint64_t IV = 0);
     Item * decrypt(Item * c, uint64_t IV = 0);
-    
+
     //expr is the expression (e.g. a field) over which to sum
     Item * sumUDA(Item * expr);
     Item * sumUDF(Item * i1, Item * i2);
@@ -258,8 +258,8 @@ public:
     // serialize and deserialize
     std::string serialize() {return key;}
     Search(const std::string & serial);
- 
-   
+
+
     SECLEVEL level() {return SECLEVEL::SEARCH;}
     Create_field * newCreateField(std::string anonname = "");
 
@@ -268,7 +268,7 @@ public:
 
     //expr is the expression (e.g. a field) over which to sum
     Item * searchUDF(Item * field, Item * expr);
-    
+
 
 private:
     static const uint key_bytes = 16;

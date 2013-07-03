@@ -296,7 +296,7 @@ UserGroupForum(const TestConfig &tc, EDBProxy * cl) {
            { {"success-- you can see forum text"} } );
     assert_res(myCreate(cl,"DELETE FROM "+ PWD_TABLE_PREFIX + "u WHERE username='alice';",
          "DELETE FROM plain_users WHERE username='alice'"), "alice cannot log out");
-    
+
     //bob
     assert_res(myCreate(cl,"INSERT INTO "+ PWD_TABLE_PREFIX + "u (username, psswd) VALUES ('bob','secretbob');",
          "INSERT INTO plain_users (username, psswd) VALUES ('bob','secretbob');"), "bob cannot log in");
@@ -453,7 +453,7 @@ UserGroupForum_incFunction(const TestConfig &tc, EDBProxy * cl) {
            { {"success-- you can see forum text"} } );
     assert_res(myCreate(cl,"DELETE FROM "+ PWD_TABLE_PREFIX + "u WHERE username='alice';",
          "DELETE FROM plain_users WHERE username='alice'"), "alice can't log out");
-    
+
     // Alice logged out
     //bob
     assert_res(myCreate(cl,"INSERT INTO "+ PWD_TABLE_PREFIX + "u (username, psswd) VALUES ('bob','secretbob');",
