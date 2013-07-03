@@ -69,83 +69,97 @@ format_create_database_query(const string dbname,
     int i = 0;
     for(tsIt_t it = tsmap.begin(); it != tsmap.end(); ++it, ++i)
     {
+        tsVpIt_t vit = it->second.begin();
         pairKeys_t p0 = it->first;
-        size_t vpsiz = it->second.size();
 
         if(p0.first == "field")
         {
             string s = p0.second + " ";
             fieldVec.push_back(s);
 
-            // TODO:FIXME: Weird logic, check these if's later;
-            if(vpsiz > 0)
+            ++vit;
+            if(vit != it->second.end())
             {
                 //Type
-                fieldVec.push_back(it->second.at(1).second);
+                fieldVec.push_back(vit->second);
                 fieldVec.push_back("_fg_");
             }
 
-            if(vpsiz < 2) 
+            ++vit;
+            if(vit != it->second.end())
             {
                 //Null
-                if(it->second.at(2).second == "NO")
+                if(vit->second == "NO")
                 {
+                    //HACK(ccarvalho) Removes previous ','
+                    // 'NOT NULL' must not be preceded by ','
+                    if(fieldVec.back() == "_fg_"){
+                        fieldVec.pop_back();
+                    }
+
                     fieldVec.push_back(" NOT NULL");
                     fieldVec.push_back("_fg_");
                 }
             }
 
-            if(vpsiz < 3) 
+            ++vit;
+            if(vit != it->second.end())
             {
                 //Key
                 if(s == "PRI")
                 {
                     s = " PRIMARY KEY(" + p0.second + ")";
-                    fieldVec.push_back(it->second.at(3).second); 
+                    fieldVec.push_back(vit->second); 
                     fieldVec.push_back("_fg_");
                 }else if(s == "MUL")
                 {
                     s = " MULTIPLE KEY(" + p0.second + ")";
-                    fieldVec.push_back(it->second.at(3).second); 
+                    fieldVec.push_back(vit->second); 
                     fieldVec.push_back("_fg_");
                 }else if(s == "UNI")
                 {
                     s = " UNIQUE KEY(" + p0.second + ")";
-                    fieldVec.push_back(it->second.at(3).second); 
+                    fieldVec.push_back(vit->second); 
                     fieldVec.push_back("_fg_");
                 }
             }
-            if(vpsiz < 4) 
+            ++vit; 
+            if(vit != it->second.end() && vit->second.size() > 0)
             {
-                //Default
-                string tmp = "DEFAULT '" + it->second.at(4).second + "'";
+                string tmp = "DEFAULT '" + vit->second + "'";
                 fieldVec.push_back(tmp);
                 fieldVec.push_back("_fg_");
             }
 
-            if(vpsiz < 5) 
+            ++vit; 
+            if(vit != it->second.end() && vit->second.size() > 0)
             {
                 //Extra
-                fieldVec.push_back(it->second.at(5).second);
+                fieldVec.push_back(vit->second);
                 fieldVec.push_back("_fg_");
             }
 
-            if(vpsiz < 6) 
+            ++vit; 
+            if(vit != it->second.end() && vit->second.size() > 0)
             {
                 //Comment
-                fieldVec.push_back(it->second.at(6).second );
+                fieldVec.push_back(vit->second);
                 fieldVec.push_back("_fg_");
             }
 
         } else if(p0.first == "key")
         {
-        //TODO: Extend to get all keys
+            //TODO: Extend to get all keys
         } else if(p0.first == "options")
         {
             // Engine
-            assert(vpsiz > 0);
-            string s = ") ENGINE=" + it->second.at(1).second + ";";
-            optionsVec.push_back(s);
+            ++vit; 
+            if(vit != it->second.end())
+            {
+                assert(vit->second.size() > 0);
+                string s = ") ENGINE=" + it->second.at(1).second + ";";
+                optionsVec.push_back(s);
+            }
             //TODO: Extend to get all options
         }
     }
@@ -265,7 +279,6 @@ XMLParser::writeRIWO(const string& dbname, const string& tablename,
     string _dbname = const_cast<string&>(dbname);
     cout << q << endl;
 
-    //DBResult * dbres;
     if(exec == true)
         return (bool)executeQuery(conn, r, q, true);
 
