@@ -261,8 +261,6 @@ XMLParser::writeRIWO(const string& dbname, const string& tablename,
     string q = format_insert_table_query(dbname, tablename, ts, td);
     td.clear();
 
-    // HACK(ccarvalho) Removes const, rewrite is non-const. Check why later.
-    string _dbname = const_cast<string&>(dbname);
     cout << q << endl;
 
     //DBResult * dbres;
