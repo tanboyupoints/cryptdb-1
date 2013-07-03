@@ -2970,6 +2970,7 @@ static void rewrite_key(const string &table_name,
 }
 
 
+// FIXME: This usage of 'USE' seems sneaky.
 static void
 create_table_embedded(Connect * e_conn, const string & cur_db,
     const string & create_q) {
@@ -3620,13 +3621,12 @@ drop_table_update_meta(const string &q,
 
 	assert(a.ps->e_conn->execute(s.str()));
 
-        ostringstream ds;
-        ds << " DROP TABLE " << dbname << "." << table << ";";
-        assert(a.ps->e_conn->execute(ds.str()));
-
         // Remove from *Meta structures.
         assert(a.destroyTableMeta(table));
     }
+    
+    // Remove table(s) from embedded database.
+    assert(a.ps->e_conn->execute(q));
 
     assert(a.ps->e_conn->execute("COMMIT"));
 }
