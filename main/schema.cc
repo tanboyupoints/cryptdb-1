@@ -67,6 +67,34 @@ TableMeta::~TableMeta()
 
 }
 
+// table_no: defaults to NULL indicating we are to generate it ourselves.
+TableMeta *
+SchemaInfo::createTableMeta(std::string table_name,
+                            std::string anon_table_name, bool has_sensitive,
+                            bool has_salt, std::string salt_name,
+                            const unsigned int *table_no)
+{
+    // Make sure a table with this name does not already exist.
+    std::map<std::string, TableMeta *>::iterator it =
+        tableMetaMap.find(table_name);
+    if (tableMetaMap.end() != it) {
+        return NULL;
+    }
+
+    unsigned int table_number;
+    if (NULL == table_no) {
+        table_number = ++totalTables;
+    } else {
+        // TODO: Make sure no other tables with this number exist.
+        ++totalTables;
+        table_number = *table_no;
+    }
+    TableMeta *tm = new TableMeta(table_number, anon_table_name,
+                                  has_sensitive, has_salt, salt_name);
+    tableMetaMap[table_name] = tm;
+    return tm;
+}
+
 TableMeta *
 SchemaInfo::getTableMeta(const string & table) {
     auto it = tableMetaMap.find(table);

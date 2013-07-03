@@ -156,6 +156,15 @@ typedef struct SchemaInfo {
 
     SchemaInfo():totalTables(0) {};
     ~SchemaInfo() { tableMetaMap.clear();}
+
+    // Parameters should match TableMeta constructor, except for tableNo
+    // which we derive from SchemaInfo and the addition of the plaintext
+    // table name.
+    TableMeta *createTableMeta(std::string table_name,
+                               std::string anon_table_name,
+                               bool has_sensitive, bool has_salt,
+                               std::string salt_name,
+                               const unsigned int *table_no=NULL);
     friend class Analysis;
 
 private:

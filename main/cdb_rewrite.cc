@@ -211,15 +211,16 @@ buildTableMeta(ProxyState &ps)
         string table_salt_name(row[5], l[5]);
         string table_database_name(row[6], l[6]);
 
+        // FIXME: Signed to unsigned conversion.
+        unsigned int int_table_number = atoi(table_number.c_str());
         TableMeta *tm =
-            new TableMeta((unsigned int)atoi(table_number.c_str()),
-                          table_anonymous_name,
-                          string_to_bool(table_has_sensitive),
-                          string_to_bool(table_has_salt), table_salt_name);
+            ps.schema->createTableMeta(table_name,
+                                       table_anonymous_name,
+                                       string_to_bool(table_has_sensitive),
+                                       string_to_bool(table_has_salt),
+                                       table_salt_name,
+                                       &int_table_number);
                         
-        ps.schema->tableMetaMap[table_name] = tm;
-        ps.schema->totalTables++;
-
         buildFieldMeta(ps, tm, table_database_name);
     }
 
@@ -2855,7 +2856,7 @@ check_table_not_exists(Analysis & a, LEX * lex, string table) {
 }
 
 static bool
-create_field_meta(TableMeta *tm, Create_field *field, uint index, 
+create_field_meta(TableMeta *tm, Create_field *field, 
                   const Analysis a, bool encByDefault)
 {
     FieldMeta * fm = new FieldMeta();
@@ -2863,10 +2864,10 @@ create_field_meta(TableMeta *tm, Create_field *field, uint index,
     fm->tm            = tm;
     fm->sql_field     = field->clone(current_thd->mem_root);
     fm->fname         = string(fm->sql_field->field_name);
-    fm->index         = index;
+    fm->index         = tm->fieldNames.size();
 
     if (encByDefault) {
-        init_onions(a.ps->masterKey, fm, field, index);
+        init_onions(a.ps->masterKey, fm, field, fm->index);
     } else {
         init_onions(NULL, fm, field);
     }
@@ -2890,6 +2891,7 @@ create_table_meta(Analysis & a, const string & table, LEX *lex,
 
     check_table_not_exists(a, lex, table);
 
+    // FIXME: Use SchemaInfo::createTableMeta.
     TableMeta *tm = new TableMeta();
     a.ps->schema->tableMetaMap[table] = tm;
 
@@ -2901,11 +2903,9 @@ create_table_meta(Analysis & a, const string & table, LEX *lex,
         tm->anonTableName = table;
     }
 
-    uint index =  0;
     auto it = List_iterator<Create_field>(lex->alter_info.create_list);
-    eachList<Create_field>(it, [tm, &index, a, encByDefault] (Create_field *cf) {
-        create_field_meta(tm, cf, index, a, encByDefault);
-        index++;
+    eachList<Create_field>(it, [tm, a, encByDefault] (Create_field *cf) {
+        create_field_meta(tm, cf, a, encByDefault);
     });
 }
 
@@ -3047,7 +3047,7 @@ rewrite_alter_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
     new_lex->select_lex.table_list =
         rewrite_table_list(lex->select_lex.table_list, a);
 
-    // TODO: Rewrite create list.
+    // Rewrite create list.
     if (lex->alter_info.flags & ALTER_ADD_COLUMN) {
         do_field_rewriting(lex, new_lex, table, a);
     }
@@ -3642,7 +3642,7 @@ bool_to_string(bool b)
 
 static bool
 do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
-             unsigned long long *tid=NULL)
+             std::string table, unsigned long long *tid=NULL)
 {
     unsigned long long table_id;
     if (NULL == tid) {
@@ -3650,9 +3650,10 @@ do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
         ostringstream s;
         s << " SELECT id FROM pdb.table_info "
           << " WHERE pdb.table_info.database_name = '" << dbname << "'"
-          << "   AND pdb.table_info.anonymous_name = '" << tm->anonTableName << "';";
-        cout << "Q: " << s.str() << endl;
+          << "   AND pdb.table_info.name = '" << table << "';";
+
         assert(a.ps->e_conn->execute(s.str(), dbres));
+
         ScopedMySQLRes r(dbres->n);
         MYSQL_ROW row;
 
@@ -3783,7 +3784,7 @@ add_table_update_meta(const string &q,
 
     // Add field.
     unsigned long long tableID = a.ps->e_conn->last_insert_id();
-    do_add_field(tm, a, dbname, &tableID);
+    do_add_field(tm, a, dbname, table, &tableID);
 
     a.ps->e_conn->execute("COMMIT");
    
@@ -3801,48 +3802,50 @@ alter_table_update_meta(const string &q, LEX *lex, Analysis &a)
     if (lex->alter_info.flags & ALTER_ADD_COLUMN) {
         TableMeta *tm = a.getTableMeta(table);
 
+        // FIXME: This does not properly support multiple column adds.
         // Create *Meta objects.
         auto add_it =
             List_iterator<Create_field>(lex->alter_info.create_list);
         eachList<Create_field>(add_it, [tm, a] (Create_field *cf) {
-            create_field_meta(tm, cf, ++tm->tableNo, a, a.ps->encByDefault);
+            create_field_meta(tm, cf, a, a.ps->encByDefault);
         });
 
         // Add field to embedded database.
-        do_add_field(tm, a, dbname);
+        assert(a.ps->e_conn->execute(q));
+
+        // Add metadata to embedded database.
+        do_add_field(tm, a, dbname, table);
     }
     
     // Rewrite drop list.
     if (lex->alter_info.flags & ALTER_DROP_COLUMN) {
         auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
         eachList<Alter_drop>(drop_it,
-            [table, dbname, &a] (Alter_drop *adrop) {
+            [table, dbname, &a, q] (Alter_drop *adrop) {
                 // FIXME: Possibly this should be an assert as mixed clauses
                 // are not supported?
-                if (adrop->type == Alter_drop::COLUMN) {
-                    // Remove from embedded database.
-                    ostringstream s;
-                    s << " DELETE FROM pdb.field_info, pdb.onion_info, "
-                      << "             pdb.layer_key"
-                      << " USING pdb.table_info INNER JOIN pdb.field_info "
-                      << "       INNER JOIN pdb.onion_info INNER JOIN "
-                      << "       pdb.layer_key"
-                      << " ON  pdb.table_info.id = pdb.field_info.table_info_id"
-                      << " AND pdb.field_info.id = pdb.onion_info.field_info_id"
-                      << " AND pdb.onion_info.id = pdb.layer_key.onion_info_id "
-                      << " WHERE pdb.table_info.name = '" << table << "' "
-                      << " AND pdb.table_info.database_name = '" << dbname << "';";
+                assert(adrop->type == Alter_drop::COLUMN);
+                // Remove metadata from embedded database.
+                ostringstream s;
+                s << " DELETE FROM pdb.field_info, pdb.onion_info, "
+                  << "             pdb.layer_key"
+                  << " USING pdb.table_info INNER JOIN pdb.field_info "
+                  << "       INNER JOIN pdb.onion_info INNER JOIN "
+                  << "       pdb.layer_key"
+                  << " ON  pdb.table_info.id = pdb.field_info.table_info_id"
+                  << " AND pdb.field_info.id = pdb.onion_info.field_info_id"
+                  << " AND pdb.onion_info.id = pdb.layer_key.onion_info_id "
+                  << " WHERE pdb.table_info.name = '" << table << "' "
+                  << " AND pdb.table_info.database_name = '" << dbname << "';";
 
-                    assert(a.ps->e_conn->execute(s.str()));
+                assert(a.ps->e_conn->execute(s.str()));
 
-                    ostringstream as;
-                    as << " ALTER TABLE " << dbname << "." << table
-                       << " DROP COLUMN " << adrop->name << ";";
-                    assert(a.ps->e_conn->execute(as.str()));
-                     
-                    // Remove from *Meta structures.
-                    assert(a.destroyFieldMeta(table, adrop->name));
-                }});
+                    
+                // Remove from *Meta structures.
+                assert(a.destroyFieldMeta(table, adrop->name));});
+
+        // Remove column from embedded database.
+        assert(a.ps->e_conn->execute(q));
     }
     
     // TODO: Rewrite alter column list.
@@ -4483,7 +4486,8 @@ SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
     (*sql_handler->query_analyze)(lex, analysis);
 
     // HACK: SQLCOM_ALTER_TABLE 
-    if ((true == sql_handler->hasUpdateMeta() &&
+    if ((lex->sql_command != SQLCOM_ALTER_TABLE &&
+         true == sql_handler->hasUpdateMeta() &&
          false == sql_handler->updateAfter()) ||
         (lex->sql_command == SQLCOM_ALTER_TABLE &&
          lex->alter_info.flags & ALTER_ADD_COLUMN)) {
@@ -4494,7 +4498,8 @@ SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
     LEX **new_lexes =
         (*sql_handler->lex_rewrite)(lex, analysis, out_lex_count);
 
-    if ((true == sql_handler->hasUpdateMeta() &&
+    if ((lex->sql_command != SQLCOM_ALTER_TABLE &&
+         true == sql_handler->hasUpdateMeta() &&
          true == sql_handler->updateAfter()) ||
         (lex->sql_command == SQLCOM_ALTER_TABLE &&
          lex->alter_info.flags & ALTER_DROP_COLUMN)) {
