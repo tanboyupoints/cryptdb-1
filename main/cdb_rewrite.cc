@@ -2892,6 +2892,7 @@ create_table_meta(Analysis & a, const string & table, LEX *lex,
     check_table_not_exists(a, lex, table);
 
     // FIXME: Use SchemaInfo::createTableMeta.
+    // What is the role of has_salt, has_sensitive and salt_name?
     TableMeta *tm = new TableMeta();
     a.ps->schema->tableMetaMap[table] = tm;
 
