@@ -1,3 +1,5 @@
+#pragma once
+
 #include <map>
 
 typedef void (*QueryAnalyze)(LEX *lex, Analysis &a);

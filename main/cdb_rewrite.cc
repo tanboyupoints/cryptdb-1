@@ -12,6 +12,7 @@
 #include <typeinfo>
 
 #include <main/cdb_rewrite.hh>
+#include <main/rewrite_util.hh>
 #include <util/cryptdb_log.hh>
 #include <main/CryptoHandlers.hh>
 #include <parser/lex_util.hh>
@@ -24,15 +25,22 @@
 
 using namespace std;
 
+
+
+
+extern CItemTypesDir itemTypes;
+extern CItemFuncDir funcTypes;
+extern CItemSumFuncDir sumFuncTypes;
+extern CItemFuncNameDir funcNames;
+
+
+
+
 //TODO: potential inconsistency problem because we update state,
 //but only the proxy is responsible for WRT to updateMeta
 
 //TODO: use getAssert in more places
 //TODO: replace table/field with FieldMeta * for speed and conciseness
-
-#define UNIMPLEMENTED \
-        throw runtime_error(string("Unimplemented: ") + \
-                        string(__PRETTY_FUNCTION__))
 
 // FIXME: Placement.
 template <typename T> List<T>
@@ -695,113 +703,6 @@ decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV, Analysis &a, vector
 }
 
 
-// anonymizes table name based on the information in a.schema
-// TODO(burrows): Do we want to handle aliasing here, or up a level?
-static string
-anonymize_table_name(const string &tname,
-                     Analysis & a)
-{
-    TableMeta *tm = a.getTableMeta(tname);
-    assert(tm);
-
-    return tm->anonTableName;
-}
-
-class CItemType {
- public:
-    virtual RewritePlan * do_gather(Item *, reason&, Analysis &) const = 0;
-    virtual Item * do_optimize(Item *, Analysis &) const = 0;
-    virtual Item * do_rewrite(Item *,
-			      const OLK & constr, const RewritePlan * rp,
-			      Analysis &) const = 0;
-    virtual void   do_rewrite_insert(Item *, Analysis &, vector<Item *> &, FieldMeta *fm) const = 0;
-};
-
-
-/*
- * Directories for locating an appropriate CItemType for a given Item.
- */
-template <class T>
-class CItemTypeDir : public CItemType {
- public:
-    void reg(T t, CItemType *ct) {
-        auto x = types.find(t);
-        if (x != types.end())
-            thrower() << "duplicate key " << t;
-        types[t] = ct;
-    }
-
-    RewritePlan * do_gather(Item *i, reason &tr, Analysis &a) const {
-        return lookup(i)->do_gather(i, tr, a);
-    }
-
-    Item* do_optimize(Item *i, Analysis &a) const {
-        return lookup(i)->do_optimize(i, a);
-    }
-
-    Item* do_rewrite(Item *i,
-		     const OLK & constr, const RewritePlan * rp,
-		     Analysis &a) const {
-        return lookup(i)->do_rewrite(i, constr, rp, a);
-    }
-
-    void do_rewrite_insert(Item *i, Analysis &a, vector<Item *> &l, FieldMeta *fm) const {
-        lookup(i)->do_rewrite_insert(i, a, l, fm);
-    }
-
-
- protected:
-    virtual CItemType *lookup(Item *i) const = 0;
-
-    CItemType *do_lookup(Item *i, T t, const char *errname) const {
-        auto x = types.find(t);
-        if (x == types.end())
-            thrower() << "missing " << errname << " " << t << " in " << *i;
-        return x->second;
-    }
-
- private:
-    std::map<T, CItemType*> types;
-};
-
-static class ANON : public CItemTypeDir<Item::Type> {
-    CItemType *lookup(Item *i) const {
-        return do_lookup(i, i->type(), "type");
-    }
-} itemTypes;
-
-static class CItemFuncDir : public CItemTypeDir<Item_func::Functype> {
-    CItemType *lookup(Item *i) const {
-        return do_lookup(i, ((Item_func *) i)->functype(), "func type");
-    }
- public:
-    CItemFuncDir() {
-        itemTypes.reg(Item::Type::FUNC_ITEM, this);
-        itemTypes.reg(Item::Type::COND_ITEM, this);
-    }
-} funcTypes;
-
-static class CItemSumFuncDir : public CItemTypeDir<Item_sum::Sumfunctype> {
-    CItemType *lookup(Item *i) const {
-        return do_lookup(i, ((Item_sum *) i)->sum_func(), "sumfunc type");
-    }
- public:
-    CItemSumFuncDir() {
-        itemTypes.reg(Item::Type::SUM_FUNC_ITEM, this);
-    }
-} sumFuncTypes;
-
-static class CItemFuncNameDir : public CItemTypeDir<std::string> {
-    CItemType *lookup(Item *i) const {
-        return do_lookup(i, ((Item_func *) i)->func_name(), "func name");
-    }
- public:
-    CItemFuncNameDir() {
-        funcTypes.reg(Item_func::Functype::UNKNOWN_FUNC, this);
-        funcTypes.reg(Item_func::Functype::NOW_FUNC, this);
-    }
-} funcNames;
-
 
 /*
  * Helper functions to look up via directory & invoke method.
@@ -923,6 +824,7 @@ rewrite(Item *i, const OLK & constr, Analysis &a, string context = "")
     return itemTypes.do_rewrite(i, constr, rp, a);
 }
 
+
 template <class T>
 static Item *
 do_optimize_const_item(T *i, Analysis &a) {
@@ -1015,6 +917,7 @@ do_optimize_const_item(T *i, Analysis &a) {
     */
 }
 
+
 template <class T>
 static Item *
 do_optimize_type_self_and_args(T *i, Analysis &a) {
@@ -1100,67 +1003,6 @@ typical_rewrite_insert_type(ItemType *i, Analysis &a, vector<Item *> &l,
     }
 }
 
-/*
- * CItemType classes for supported Items: supporting machinery.
- */
-template<class T>
-class CItemSubtype : public CItemType {
-    virtual RewritePlan * do_gather(Item *i, reason &tr, Analysis & a) const {
-        return do_gather_type((T*) i, tr, a);
-    }
-    virtual Item* do_optimize(Item *i, Analysis & a) const {
-        return do_optimize_type((T*) i, a);
-    }
-    virtual Item* do_rewrite(Item *i,
-			     const OLK & constr, const RewritePlan * rp,
-			     Analysis & a) const {
-        return do_rewrite_type((T*) i, constr, rp, a);
-    }
-    virtual void  do_rewrite_insert(Item *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const {
-        do_rewrite_insert_type((T*) i, a, l, fm);
-    }
- private:
-    virtual RewritePlan * do_gather_type(T *, reason&, Analysis & a) const = 0;
-    virtual Item * do_optimize_type(T *i, Analysis & a) const {
-        return do_optimize_const_item(i, a);
-    }
-    virtual Item * do_rewrite_type(T *i,
-				   const OLK & constr, const RewritePlan * rp,
-				   Analysis & a) const {
-        LOG(cdb_v) << "do_rewrite_type L676 " << *i;
-	assert_s(false, "why is this rewrite called?");
-        return i;
-    }
-    virtual void   do_rewrite_insert_type(T *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const {
-        // default is un-implemented. we'll implement these as they come
-        UNIMPLEMENTED;
-    }
-};
-
-template<class T, Item::Type TYPE>
-class CItemSubtypeIT : public CItemSubtype<T> {
- public:
-    CItemSubtypeIT() { itemTypes.reg(TYPE, this); }
-};
-
-template<class T, Item_func::Functype TYPE>
-class CItemSubtypeFT : public CItemSubtype<T> {
- public:
-    CItemSubtypeFT() { funcTypes.reg(TYPE, this); }
-};
-
-template<class T, Item_sum::Sumfunctype TYPE>
-class CItemSubtypeST : public CItemSubtype<T> {
- public:
-    CItemSubtypeST() { sumFuncTypes.reg(TYPE, this); }
-};
-
-template<class T, const char *TYPE>
-class CItemSubtypeFN : public CItemSubtype<T> {
- public:
-    CItemSubtypeFN() { funcNames.reg(std::string(TYPE), this); }
-};
-
 // returns the intersection of the es and fm.encdesc
 // by also taking into account what onions are stale
 // on fm
@@ -1190,110 +1032,6 @@ static void process_select_lex(st_select_lex *select_lex,
 static void optimize_select_lex(st_select_lex *select_lex, Analysis & a);
 
 static st_select_lex * rewrite_select_lex(st_select_lex *select_lex, Analysis & a);
-
-static class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
-
-    virtual RewritePlan * do_gather_type(Item_field *i, reason &tr, Analysis & a) const {
-        LOG(cdb_v) << "FIELD_ITEM do_gather " << *i;
-
-        string fieldname = i->field_name;
-        string table = i->table_name;
-	string fullname = fullName(fieldname, table);
-        if (a.ps->mp && a.ps->mp->hasEncFor(fullname)) {
-	    a.tmkm.encForVal[fullname] = "";
-        }
-
-        FieldMeta * fm = a.getFieldMeta(table, fieldname);
-
-	EncSet es  = EncSet(fm);
-
-	tr = reason(es, "is a field", i);
-
-	return new RewritePlan(es, tr);
-
-    }
-
-    virtual Item *
-    do_rewrite_type(Item_field *i,
-		    const OLK & constr, const RewritePlan * rp,
-		    Analysis & a) const
-    {
-        LOG(cdb_v) << "do_rewrite_type FIELD_ITEM " << *i;
-
-	FieldMeta *fm = a.getFieldMeta(i->table_name, i->field_name);
-	//assert(constr.key == fm);
-
-	//check if we need onion adjustment
-        SECLEVEL onion_level = fm->getOnionLevel(constr.o);
-        assert(onion_level != SECLEVEL::INVALID);
-	if (constr.l < onion_level) {
-	    //need adjustment, throw exception
-	    throw OnionAdjustExcept(constr.o, fm, constr.l, i);
-	}
-
-	Item_field * res = make_item(i);
-
-	if (!fm->isEncrypted()) { // Not encrypted
-	    return res;
-	}
-
-	// Encrypted item
-
-	res->table_name = make_thd_string(anonymize_table_name(i->table_name, a));
-	res->field_name = make_thd_string(fm->onions[constr.o]->onionname);
-
-        return res;
-    }
-/*
-    static OLK
-    chooseProj(FieldMeta * fm) {
-	SECLEVEL l;
-	if (contains_get(fm->encdesc.olm, oDET, l)) {
-	    return OLK(oDET, l, fm);
-	}
-	if (contains_get(fm->encdesc.olm, oOPE, l)) {
-	    return OLK(oOPE, l, fm);
-	}
-	if (contains_get(fm->encdesc.olm, oAGG, l)) {
-	    return OLK(oAGG, l, fm);
-	}
-	assert_s(false, "field " + fm->fname + " does not have any decryptable onions for projection");
-	return OLK();
-    }
-*/
-
-    //do we need do_rewrite_insert?
-    virtual void
-    do_rewrite_insert_type(Item_field *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
-    {
-	assert(fm==NULL);
-        fm = a.getFieldMeta(i->table_name, i->field_name);
-
-	if (!fm->isEncrypted()) {
-	    l.push_back(make_item(i, fm->fname));
-	    return;
-	}
-
-	// Encrypted field
-
-	Item_field * new_field = NULL;
-        for (auto it = fm->onions.begin();
-             it != fm->onions.end(); ++it) {
-            string name = it->second->onionname;
-	    new_field = make_item(i, name);
-            new_field->table_name =
-                make_thd_string(anonymize_table_name(i->table_name, a));
-            l.push_back(new_field);
-        }
-        if (fm->has_salt) {
-            assert(!fm->salt_name.empty());
-	    assert(new_field); //need an anonymized field as template to create
-			       //salt item
-            l.push_back(make_item(new_field, fm->salt_name));
-        }
-    }
-
-} ANON;
 
 static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> {
     virtual RewritePlan * do_gather_type(Item_string *i, reason &tr, Analysis & a) const {
@@ -4580,6 +4318,7 @@ static void buildSqlHandlers()
 
 }
 
+
 // Helper functions for doing functional things to List<T> structures.
 // MySQL may have already implemented these somewhere?
 template <typename T, typename F> void
@@ -4626,3 +4365,4 @@ vectorToList(std::vector<T*> v) {
 
     return lst;
 }
+ 
