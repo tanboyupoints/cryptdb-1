@@ -98,7 +98,6 @@ SchemaInfo::createTableMeta(std::string table_name,
 TableMeta *
 SchemaInfo::getTableMeta(const string & table) {
     auto it = tableMetaMap.find(table);
-    assert_s(it != tableMetaMap.end(), "could not find table " + table);
     if (tableMetaMap.end() == it) {
         return NULL;
     } else {
