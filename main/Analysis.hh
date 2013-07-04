@@ -283,6 +283,7 @@ public:
     TableMeta *getTableMeta(std::string table) const;
     bool destroyFieldMeta(std::string table, std::string field);
     bool destroyTableMeta(std::string table);
+    bool tableMetaExists(std::string table) const;
 
     // HACK(burrows): This is a temporary solution until I redesign.
     Rewriter *rewriter;

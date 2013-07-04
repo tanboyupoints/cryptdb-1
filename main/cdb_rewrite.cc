@@ -3009,13 +3009,20 @@ rewrite_create_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
 
     new_lex->select_lex.table_list =
 	rewrite_table_list(lex->select_lex.table_list, a);
+    
+    
 
     //TODO: support for "create table like"
     if (lex->create_info.options & HA_LEX_CREATE_TABLE_LIKE) {
         cryptdb_err() << "No support for create table like yet. " <<
                    "If you see this, please implement me";
     } else {
-        do_field_rewriting(lex, new_lex, table, a);
+        // If we are only creating the table if it doesn't exist,
+        // we must forgo the duplication of meta objects and such.
+        if (!(lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS &&
+            a.tableMetaExists(table))) {
+            do_field_rewriting(lex, new_lex, table, a);
+        }
     }
 
     LEX **out_lex = new LEX*[1];
@@ -3742,6 +3749,14 @@ add_table_update_meta(const string &q,
 {
     char* dbname = lex->select_lex.table_list.first->db;
     char* table  = lex->select_lex.table_list.first->table_name;
+
+    // If we are only creating the table if it doesn't exist,
+    // we must forgo the duplication of meta objects and such.
+    if (lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS) {
+        if (a.tableMetaExists(table)) {
+            return;
+        }
+    }
 
     // TODO(burrows): This should be a seperate step.
     // Create *Meta objects.
