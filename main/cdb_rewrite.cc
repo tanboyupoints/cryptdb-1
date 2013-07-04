@@ -2571,16 +2571,6 @@ init_onions(AES_KEY * mKey, FieldMeta * fm, Create_field * cf, uint index = 0) {
     }
 }
 
-//XXX temporary hack until I've worked out how to set the AGG key in mp
-static void
-init_onions_mp(AES_KEY * mKey, FieldMeta * fm, Create_field * cf, uint index) {
-    if (IsMySQLTypeNumeric(cf->sql_type)) {
-        init_onions_layout(mKey, fm, index, cf, MP_NUM_ONION_LAYOUT);
-    } else {
-        init_onions_layout(mKey, fm, index, cf, STR_ONION_LAYOUT);
-    }
-}
-
 static void
 check_table_not_exists(Analysis & a, LEX * lex, string table) {
     auto it = a.ps->schema->tableMetaMap.find(table);
@@ -2842,24 +2832,6 @@ rewrite_alter_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
     return out_lex;
 }
 
-static void
-mp_update_init(LEX *lex, Analysis &a)
-{
-    if (!a.ps->mp) {return;}
-    auto it = List_iterator<Item>(lex->select_lex.item_list);
-    for (;;) {
-        Item_field *i = (Item_field *) it++;
-        if (!i) {
-            break;
-        }
-        string fname = fullName(i->field_name, i->table_name);
-        LOG(cdb_v) << fname;
-        if (a.ps->mp->hasEncFor(fname)) {
-            assert_s(false, "cannot update changes to access tree");
-	    }
-    }
-}
-
 static bool
 invalidates(FieldMeta * fm, const EncSet &  es) {
     for (auto o_l : fm->onions) {
@@ -2880,9 +2852,6 @@ rewrite_update_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
     LOG(cdb_v) << "rewriting update \n";
 
     assert_s(lex->select_lex.item_list.head(), "update needs to have item_list");
-
-    // multi-princ init
-    mp_update_init(lex, a);
 
     // Rewrite table name
     new_lex->select_lex.top_join_list =
@@ -3166,21 +3135,10 @@ rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a,
     return out_lex;
 }
 
-static void
-mp_insert_init(LEX *lex, Analysis &a)
-{
-    if (!a.ps->mp) {return; }
-    //if this is MultiPrinc, insert may need keys; certainly needs to update AccMan
-    a.tmkm.processingQuery = true;
-    a.ps->mp->insertLex(lex, a.ps->schema, a.tmkm);
-}
-
 static LEX **
 rewrite_insert_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
 {
     LEX * new_lex = copy(lex);
-
-    mp_insert_init(lex, a);
 
     const string &table =
             lex->select_lex.table_list.first->table_name;
@@ -3693,12 +3651,6 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
     loadUDFs(ps.conn);
 
-    if (multi) {
-        ps.mp = new MultiPrinc(ps.conn);
-    } else {
-        ps.mp = NULL;
-    }
-
     // HACK: This is necessary because above functions use a USE statement.
     // ie, loadUDFs.
     ps.conn->setCurDBName(dbname);
@@ -3707,10 +3659,6 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
 ProxyState::~ProxyState()
 {
-    if (mp) {
-        delete mp;
-        mp = NULL;
-    }
     if (conn) {
         delete conn;
         conn = NULL;
@@ -3733,14 +3681,6 @@ Rewriter::setMasterKey(const string &mkey)
 static list<string>
 processAnnotation(Annotation annot, Analysis &a)
 {
-    MultiPrinc * mp = a.ps->mp;
-    SchemaInfo * schema = a.ps->schema;
-
-    if (mp && annot.type != ENCFOR) {
-        bool encryptField;
-        return mp->processAnnotation(annot, encryptField, schema);
-    }
-
     //TODO: use EncLayer CreateField information
     assert_s(annot.type == SINGLE_ENC || annot.type == ENCFOR,
 	     "parser is in single principal mode, but annotations are for multiple principals");
@@ -3750,16 +3690,7 @@ processAnnotation(Annotation annot, Analysis &a)
 
     FieldMeta * fm = a.getFieldMeta(annot.getPrimitiveTableName(), annot.getPrimitiveFieldName());
 
-    if (mp) {
-        init_onions_mp(a.ps->masterKey, fm, fm->sql_field, fm->index);
-    } else {
-        init_onions(a.ps->masterKey, fm, fm->sql_field, fm->index);
-    }
-
-    if (mp) {
-        bool encryptField;
-        return mp->processAnnotation(annot, encryptField, schema);
-    }
+    init_onions(a.ps->masterKey, fm, fm->sql_field, fm->index);
 
     list<string> query_list;
     string onionname = "";
@@ -3928,18 +3859,6 @@ string ReturnMeta::stringify() {
     }
     return res.str();
 }
-static void
-mp_init_decrypt(MultiPrinc * mp, Analysis & a) {
-    if (!mp) {return;}
-
-    a.tmkm.processingQuery = false;
-    LOG(cdb_v) << a.rmeta->stringify() << "\n";
-    for (auto i = a.rmeta->rfmeta.begin(); i != a.rmeta->rfmeta.end(); i++) {
-        if (!i->second.is_salt) {
-            a.tmkm.encForReturned[fullName(i->second.olk.key->fname, i->second.olk.key->tm->anonTableName)] = i->first;
-        }
-    }
-}
 
 ResType
 Rewriter::decryptResults(ResType & dbres,
@@ -3949,7 +3868,6 @@ Rewriter::decryptResults(ResType & dbres,
     a.rmeta = rmeta;
     a.tmkm = rmeta->tmkm;
 
-    mp_init_decrypt(ps.mp, a);
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
     unsigned int cols = dbres.names.size();
