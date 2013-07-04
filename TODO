@@ -15,6 +15,10 @@ Misc Bugs
     * Connect can get into an inconsistent state because it claims to know
     the current database (getCurDBName), but a rogue USE statement will
     make it a liar.
+    * Crash while displaying encrypted query (executeQuery)
+      > CREATE TABLE t (x integer, y varchar(100), z integer);
+      > INSERT INTO t values (1, 'alice', NULL);
+      # Crash doesn't happen if we build another table first.
 
 
 Carlos:
