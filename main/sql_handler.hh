@@ -40,8 +40,6 @@ public:
     static LEX **rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
                                          const string &q,
                                          unsigned *out_lex_count);
-    static LEX **rewriteLex(LEX *lex, Analysis &analysis, const string &q,
-                            unsigned *out_lex_count);
 };
 
 std::map<enum_sql_command, SqlHandler *> SqlHandler::handlers;

@@ -2119,48 +2119,6 @@ optimize_table_list(List<TABLE_LIST> *tll, Analysis &a)
     }
 }
 
-static void
-process_table_list(List<TABLE_LIST> *tll, Analysis & a)
-{
-    /*
-     * later, need to rewrite different joins, e.g.
-     * SELECT g2_ChildEntity.g_id, IF(ai0.g_id IS NULL, 1, 0) AS albumsFirst, g2_Item.g_originationTimestamp FROM g2_ChildEntity LEFT JOIN g2_AlbumItem AS ai0 ON g2_ChildEntity.g_id = ai0.g_id INNER JOIN g2_Item ON g2_ChildEntity.g_id = g2_Item.g_id INNER JOIN g2_AccessSubscriberMap ON g2_ChildEntity.g_id = g2_AccessSubscriberMap.g_itemId ...
-     */
-
-    /*
-    List_iterator<TABLE_LIST> join_it(*tll);
-    for (;;) {
-        TABLE_LIST *t = join_it++;
-        if (!t)
-            break;
-
-        if (t->nested_join) {
-            process_table_list(&t->nested_join->join_list, a);
-            return;
-        }
-
-        if (t->on_expr)
-            analyze(t->on_expr, a);
-
-        //std::string db(t->db, t->db_length);
-        //std::string table_name(t->table_name, t->table_name_length);
-        //std::string alias(t->alias);
-
-        if (t->is_alias)
-            assert(a.addAlias(t->alias, t->table_name));
-
-        // Handles SUBSELECTs in table clause.
-        if (t->derived) {
-            st_select_lex_unit *u = t->derived;
-             // Not quite right, in terms of softness:
-             // should really come from the items that eventually
-             // reference columns in this derived table.
-            process_select_lex(u->first_select(), a);
-        }
-    }
-    */
-}
-
 // If mkey == NULL, the field is not encrypted
 static void
 init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf, onionlayout ol) {
@@ -2853,6 +2811,7 @@ Rewriter::Rewriter(ConnectionInfo ci,
     initSchema(ps);
 
     buildSqlHandlers();
+    DMLHandler::buildAll();
 
     loadUDFs(ps.conn);
 
@@ -3344,16 +3303,16 @@ SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
 {
     SqlHandler *sql_handler = SqlHandler::getHandler(lex->sql_command);
     if (!sql_handler) {
-        return NULL;
+        return DMLHandler::rewriteLex(lex, analysis, q, out_lex_count);
     }
 
     // TODO(burrows): Where should this call be?
     // - In each analysis function?
     // - Here?
-    process_table_list(&lex->select_lex.top_join_list, analysis);
+    // process_table_list(&lex->select_lex.top_join_list, analysis);
 
     //TODO: is db neededs as param in all these funcs?
-    (*sql_handler->query_analyze)(lex, analysis);
+    // (*sql_handler->query_analyze)(lex, analysis);
 
     // HACK: SQLCOM_ALTER_TABLE
     if ((lex->sql_command != SQLCOM_ALTER_TABLE &&
@@ -3365,8 +3324,15 @@ SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
         (*sql_handler->update_meta)(q, lex, analysis);
     }
 
-    LEX **new_lexes =
-        (*sql_handler->lex_rewrite)(lex, analysis, out_lex_count);
+    LEX **new_lexes;
+    if (sql_handler->lex_rewrite) {
+        new_lexes = (*sql_handler->lex_rewrite)(lex, analysis,
+                                                out_lex_count);
+    } else {
+        new_lexes = new LEX*[1];
+        new_lexes[0] = lex;
+        *out_lex_count = 1;
+    }
 
     if ((lex->sql_command != SQLCOM_ALTER_TABLE &&
          true == sql_handler->hasUpdateMeta() &&
@@ -3378,23 +3344,6 @@ SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
     }
 
     return new_lexes;
-}
-
-LEX **
-SqlHandler::rewriteLex(LEX *lex, Analysis &analysis, const string &q,
-                       unsigned *out_lex_count)
-{
-    SqlHandler *sql_handler = SqlHandler::getHandler(lex->sql_command);
-    if (!sql_handler) {
-        return NULL;
-    }
-
-    if (true == sql_handler->hasUpdateMeta()) {
-        return NULL;
-    }
-
-    return SqlHandler::rewriteLexAndUpdateMeta(lex, analysis, q,
-                                               out_lex_count);
 }
 
 static void buildSqlHandlers()

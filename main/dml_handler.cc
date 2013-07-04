@@ -30,6 +30,9 @@ needsSalt(OLK olk);
 static st_select_lex *
 rewrite_select_lex(st_select_lex *select_lex, Analysis & a);
 
+static void
+process_table_list(List<TABLE_LIST> *tll, Analysis & a);
+
 class InsertHandler : public DMLHandler {
     virtual void gather(LEX *lex, Analysis &a) const {
         process_select_lex(lex, a);
@@ -147,7 +150,6 @@ class UpdateHandler : public DMLHandler {
     }
 
     virtual LEX **rewrite(LEX *lex, Analysis &a, unsigned *out_lex_count) const {
-        assert(false);
         LEX * new_lex = copy(lex);
 
         LOG(cdb_v) << "rewriting update \n";
@@ -476,6 +478,21 @@ void DMLHandler::buildAll()
     handlers[SQLCOM_SELECT] = h;
 }
 
+LEX **DMLHandler::rewriteLex(LEX *lex, Analysis &analysis,
+                             const string &q, unsigned *out_lex_count)
+{
+    const DMLHandler *handler = DMLHandler::dispatch(lex->sql_command);
+    if (!handler) {
+        return NULL;
+    }
+
+    process_table_list(&lex->select_lex.top_join_list, analysis);
+
+    handler->gather(lex, analysis);
+
+    return handler->rewrite(lex, analysis, out_lex_count);
+}
+
 // Helpers.
 
 static void
@@ -672,6 +689,46 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
 static bool
 needsSalt(OLK olk) {
     return olk.key && olk.key->has_salt && needsSalt(olk.l);
+}
+
+static void
+process_table_list(List<TABLE_LIST> *tll, Analysis & a)
+{
+    /*
+     * later, need to rewrite different joins, e.g.
+     * SELECT g2_ChildEntity.g_id, IF(ai0.g_id IS NULL, 1, 0) AS albumsFirst, g2_Item.g_originationTimestamp FROM g2_ChildEntity LEFT JOIN g2_AlbumItem AS ai0 ON g2_ChildEntity.g_id = ai0.g_id INNER JOIN g2_Item ON g2_ChildEntity.g_id = g2_Item.g_id INNER JOIN g2_AccessSubscriberMap ON g2_ChildEntity.g_id = g2_AccessSubscriberMap.g_itemId ...
+     */
+
+    List_iterator<TABLE_LIST> join_it(*tll);
+    for (;;) {
+        TABLE_LIST *t = join_it++;
+        if (!t)
+            break;
+
+        if (t->nested_join) {
+            process_table_list(&t->nested_join->join_list, a);
+            return;
+        }
+
+        if (t->on_expr)
+            analyze(t->on_expr, a);
+
+        //std::string db(t->db, t->db_length);
+        //std::string table_name(t->table_name, t->table_name_length);
+        //std::string alias(t->alias);
+
+        if (t->is_alias)
+            assert(a.addAlias(t->alias, t->table_name));
+
+        // Handles SUBSELECTs in table clause.
+        if (t->derived) {
+            st_select_lex_unit *u = t->derived;
+             // Not quite right, in terms of softness:
+             // should really come from the items that eventually
+             // reference columns in this derived table.
+            process_select_lex(u->first_select(), a);
+        }
+    }
 }
 
 

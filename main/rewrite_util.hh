@@ -40,3 +40,4 @@ commit_transaction_lex(Analysis a);
 template <typename T>
 std::string vector_join(std::vector<T> v, std::string delim,
                         std::string (*finalize)(T));
+
