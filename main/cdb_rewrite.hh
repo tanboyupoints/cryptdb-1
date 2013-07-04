@@ -56,6 +56,8 @@ public:
 };
 
 // Main class processing rewriting
+// TODO: Remove the MultiPrinc parameter. Requires changes to testing 
+// idioms.
 class Rewriter {
 public:
     Rewriter(ConnectionInfo ci,
