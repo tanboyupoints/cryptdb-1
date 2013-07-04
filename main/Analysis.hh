@@ -145,7 +145,6 @@ typedef struct ReturnField {
 typedef struct ReturnMeta {
     map<int, ReturnField> rfmeta;
     string stringify();
-    TMKM tmkm;
 } ReturnMeta;
 
 
@@ -269,7 +268,6 @@ public:
 
     unsigned int pos; //a counter indicating how many projection fields have been analyzed so far
     std::map<FieldMeta *, salt_type>    salts;
-    TMKM                                tmkm; //for multi princ
     std::map<Item *, RewritePlan *>     rewritePlans;
     std::map<std::string, std::string>  table_aliases;
 

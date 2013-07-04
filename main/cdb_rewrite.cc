@@ -1037,14 +1037,6 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     virtual RewritePlan * do_gather_type(Item_string *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << " String item do_gather " << *i;
         /* constant strings are always ok */
-        for (auto it = a.tmkm.encForVal.begin(); it != a.tmkm.encForVal.end(); it++) {
-            if (it->second == "") {
-                stringstream temp;
-                temp << *i;
-                it->second = temp.str();
-            }
-        }
-
 	tr = reason(FULL_EncSet, "is a constant", i);
 	return new RewritePlan(FULL_EncSet_Str, tr);
 
@@ -1072,14 +1064,6 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     virtual RewritePlan * do_gather_type(Item_num *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << "CItemSubtypeIT (L966) num do_gather " << *i;
         /* constant ints are always ok */
-        for (auto it = a.tmkm.encForVal.begin(); it != a.tmkm.encForVal.end(); it++) {
-            if (it->second == "") {
-                stringstream temp;
-                temp << *i;
-                it->second = temp.str();
-            }
-        }
-
 	tr = reason(FULL_EncSet, "is a constant", i);
 	return new RewritePlan(FULL_EncSet_Int, tr);
 
@@ -3801,7 +3785,7 @@ Rewriter::rewrite(const string & q)
 
     /*
      * At minimum we must create a valid Analysis object here because we
-     * res requires valid rmeta and tmkm objects.
+     * res requires a valid rmeta object.
      *
      * The optimization is dubious however as we may still want to
      * updateMeta or something.
@@ -3816,7 +3800,6 @@ Rewriter::rewrite(const string & q)
 	res.wasRew = false;
 	res.queries.push_back(q);
         res.rmeta = analysis.rmeta;
-	res.rmeta->tmkm = analysis.tmkm;
 	return res;
     }
 
@@ -3836,7 +3819,6 @@ Rewriter::rewrite(const string & q)
 	}
         res.wasRew = true;
 	res.rmeta = analysis.rmeta;
-	res.rmeta->tmkm = analysis.tmkm;
 	return res;
     }
 }
@@ -3866,7 +3848,6 @@ Rewriter::decryptResults(ResType & dbres,
 
     Analysis a = Analysis(&ps);
     a.rmeta = rmeta;
-    a.tmkm = rmeta->tmkm;
 
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
