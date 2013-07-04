@@ -1,6 +1,6 @@
 OBJDIRS	+= main
 
-CRYPTDB_SRCS := schema.cc Translator.cc Connect.cc MultiPrinc.cc AccessManager.cc mysqld-filler.cc Analysis.cc CryptoHandlers.cc rewrite_util.cc rewrite_field.cc cdb_rewrite.cc
+CRYPTDB_SRCS := schema.cc Translator.cc Connect.cc MultiPrinc.cc AccessManager.cc mysqld-filler.cc Analysis.cc CryptoHandlers.cc rewrite_util.cc rewrite_field.cc dml_handler.cc cdb_rewrite.cc
 
 CRYPTDB_PROGS:= cdb_test
 
