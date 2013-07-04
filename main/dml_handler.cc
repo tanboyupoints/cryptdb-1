@@ -266,8 +266,6 @@ private:
     LEX ** refresh_onions(LEX *lex, LEX *new_lex, Analysis &a,
                           unsigned *out_lex_count) const
     {
-        /*
-         * FIXME: Requires rewriteLex.
         // TODO(burrows): Should support multiple tables in a single UPDATE.
         string plain_table =
             lex->select_lex.top_join_list.head()->table_name;
@@ -366,7 +364,7 @@ private:
                                              push_results_stream.str());
         unsigned final_insert_out_lex_count;
         LEX **final_insert_lex_arr =
-            SqlHandler::rewriteLex(parse->lex(), insert_analysis,
+            DMLHandler::rewriteLex(parse->lex(), insert_analysis,
                                    push_results_stream.str(),
                                    &final_insert_out_lex_count);
         assert(final_insert_lex_arr && 1 == final_insert_out_lex_count);
@@ -384,7 +382,7 @@ private:
                             delete_stream.str());
         unsigned delete_out_lex_count;
         LEX **delete_lex_arr =
-            SqlHandler::rewriteLex(delete_parse->lex(), delete_analysis,
+            DMLHandler::rewriteLex(delete_parse->lex(), delete_analysis,
                                    delete_stream.str(), &delete_out_lex_count);
         assert(delete_lex_arr && 1 == delete_out_lex_count);
         LEX *delete_lex = delete_lex_arr[0];
@@ -397,8 +395,6 @@ private:
         out_lex[3] = commit_transaction_lex(a);
         *out_lex_count = 4;
         return out_lex;
-        */
-        return NULL;
     }
 
     bool invalidates(FieldMeta * fm, const EncSet & es) const {

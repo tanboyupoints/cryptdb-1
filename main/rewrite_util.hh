@@ -37,7 +37,28 @@ begin_transaction_lex(Analysis a);
 LEX *
 commit_transaction_lex(Analysis a);
 
+// FIXME(burrows): Generalize to support any container with next AND end
+// semantics.
 template <typename T>
 std::string vector_join(std::vector<T> v, std::string delim,
-                        std::string (*finalize)(T));
+                        std::string (*finalize)(T))
+{
+    std::string accum;
+    for (typename std::vector<T>::iterator it = v.begin();
+         it != v.end(); ++it) {
+        std::string element = (*finalize)((T)*it);
+        accum.append(element);
+        accum.append(delim);
+    }
+
+    std::string output;
+    if (accum.length() > 0) {
+        output = accum.substr(0, accum.length() - delim.length());
+    } else {
+        output = accum;
+    }
+
+    return output;
+}
+
 
