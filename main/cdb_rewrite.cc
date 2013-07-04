@@ -2707,18 +2707,6 @@ static void rewrite_key(const string &table_name,
     l.push_back(k);
 }
 
-
-// FIXME: This usage of 'USE' seems sneaky.
-static void
-create_table_embedded(Connect * e_conn, const string & cur_db,
-    const string & create_q) {
-
-    assert(e_conn->execute("create database if not exists " + cur_db + ";"));
-
-    assert(e_conn->execute("use " + cur_db + ";"));
-    assert(e_conn->execute(create_q));
-}
-
 static void
 do_field_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
 {
@@ -2759,13 +2747,20 @@ rewrite_create_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
 
     new_lex->select_lex.table_list =
 	rewrite_table_list(lex->select_lex.table_list, a);
+    
+    
 
     //TODO: support for "create table like"
     if (lex->create_info.options & HA_LEX_CREATE_TABLE_LIKE) {
         cryptdb_err() << "No support for create table like yet. " <<
                    "If you see this, please implement me";
     } else {
-        do_field_rewriting(lex, new_lex, table, a);
+        // If we are only creating the table if it doesn't exist,
+        // we must forgo the duplication of meta objects and such.
+        if (!(lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS &&
+            a.tableMetaExists(table))) {
+            do_field_rewriting(lex, new_lex, table, a);
+        }
     }
 
     LEX **out_lex = new LEX*[1];
@@ -3053,7 +3048,7 @@ rewrite_update_lex_refresh_onions(LEX *lex, LEX *new_lex, Analysis &a,
     select_stream << " SELECT * FROM " << plain_table
                   << " WHERE " << where_clause << ";";
     ResType *select_res_type =
-        executeQuery(*a.ps->conn, *a.rewriter, select_stream.str());
+        executeQuery(*a.rewriter, select_stream.str());
     assert(select_res_type);
     if (select_res_type->rows.size() == 0) { // No work to be done.
         LEX **out_lex = new LEX*[1];
@@ -3493,12 +3488,20 @@ add_table_update_meta(const string &q,
     char* dbname = lex->select_lex.table_list.first->db;
     char* table  = lex->select_lex.table_list.first->table_name;
 
+    // If we are only creating the table if it doesn't exist,
+    // we must forgo the duplication of meta objects and such.
+    if (lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS) {
+        if (a.tableMetaExists(table)) {
+            return;
+        }
+    }
+
     // TODO(burrows): This should be a seperate step.
     // Create *Meta objects.
     create_table_meta(a, std::string(table), lex, a.ps->encByDefault);
 
-    // Add to embedded database.
-    create_table_embedded(a.ps->e_conn, dbname, q);
+    // Add table to embedded database.
+    assert(a.ps->e_conn->execute(q));
 
     TableMeta *tm = a.ps->schema->tableMetaMap[table];
     assert(tm != NULL);
@@ -3612,8 +3615,8 @@ changeDBUpdateMeta(const string &q, LEX *lex, Analysis &a)
     char* dbname = lex->select_lex.db;
 
     // new dbname is saved for next queries
-    (void)a.ps->conn->setCurDBName(dbname);
-
+    a.ps->conn->setCurDBName(dbname);
+    a.ps->e_conn->setCurDBName(dbname);
 }
 
 static void
@@ -3658,6 +3661,7 @@ loadUDFs(Connect * conn) {
 
 Rewriter::Rewriter(ConnectionInfo ci,
                    const std::string &embed_dir,
+                   const std::string &dbname,
                    bool multi,
 		   bool encByDefault)
 {
@@ -3674,9 +3678,9 @@ Rewriter::Rewriter(ConnectionInfo ci,
 	ps.encByDefault = false;
     }
 
-    ps.e_conn = Connect::getEmbedded(embed_dir);
+    ps.e_conn = Connect::getEmbedded(embed_dir, dbname);
 
-    ps.conn = new Connect(ci.server, ci.user, ci.passwd, ci.port);
+    ps.conn = new Connect(ci.server, ci.user, ci.passwd, dbname, ci.port);
 
     ps.schema = new SchemaInfo();
     ps.totalTables = 0;
@@ -3694,6 +3698,11 @@ Rewriter::Rewriter(ConnectionInfo ci,
     } else {
         ps.mp = NULL;
     }
+
+    // HACK: This is necessary because above functions use a USE statement.
+    // ie, loadUDFs.
+    ps.conn->setCurDBName(dbname);
+    ps.e_conn->setCurDBName(dbname);
 }
 
 ProxyState::~ProxyState()
@@ -3797,7 +3806,7 @@ processAnnotation(Annotation annot, Analysis &a)
 
 static list<string>
 rewrite_helper(const string & q, Analysis & analysis,
-	       query_parse & p, const string & cur_db) {
+	       query_parse & p) {
     LOG(cdb_v) << "q " << q;
 
     if (p.annot) {
@@ -3846,7 +3855,7 @@ noRewrite(LEX * lex) {
 
 // TODO: we don't need to pass analysis, enough to pass returnmeta
 QueryRewrite
-Rewriter::rewrite(const string & q, string *cur_db)
+Rewriter::rewrite(const string & q)
 {
 
     assert(0 == mysql_thread_init());
@@ -3854,7 +3863,9 @@ Rewriter::rewrite(const string & q, string *cur_db)
 
     // printEmbeddedState(ps);
 
-    query_parse p(*cur_db, q);
+    // TODO: Possibly database name should be in Analysis.
+    assert(ps.conn->getCurDBName() == ps.e_conn->getCurDBName());
+    query_parse p(ps.conn->getCurDBName(), q);
     QueryRewrite res;
 
     /*
@@ -3884,11 +3895,12 @@ Rewriter::rewrite(const string & q, string *cur_db)
         // HACK(burrows): Until redesign.
         analysis.rewriter = this;
 	try {
-	    res.queries = rewrite_helper(q, analysis, p, *cur_db);
+	    res.queries = rewrite_helper(q, analysis, p);
 	} catch (OnionAdjustExcept e) {
 	    LOG(cdb_v) << "caught onion adjustment";
             cout << "Adjusting onion!" << endl;
-	    adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis, *cur_db);
+	    adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis,
+                        ps.conn->getCurDBName());
 	    continue;
 	}
         res.wasRew = true;
@@ -3998,13 +4010,12 @@ Rewriter::decryptResults(ResType & dbres,
 
 // @show defaults to false.
 ResType *
-executeQuery(Connect &conn, Rewriter &r, const string &q, bool show)
+executeQuery(Rewriter &r, const string &q, bool show)
 {
     try {
         DBResult *dbres;
-        string curdb(conn.getCurDBName());
 
-        QueryRewrite qr = r.rewrite(q, &curdb);
+        QueryRewrite qr = r.rewrite(q);
         if (qr.queries.size() == 0) {
           return NULL;
         }
@@ -4017,7 +4028,7 @@ executeQuery(Connect &conn, Rewriter &r, const string &q, bool show)
                      << qr.queries.size() << "]:" << COLOR_END << endl
                      << query << endl;
             }
-            assert(conn.execute(query, dbres));
+            assert(r.getConnection()->execute(query, dbres));
             if (!dbres) {
                 return NULL;
             }

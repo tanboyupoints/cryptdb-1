@@ -190,13 +190,17 @@ bool Analysis::addAlias(std::string alias, std::string table)
 FieldMeta *Analysis::getFieldMeta(std::string table, std::string field) const
 {
     string real_table_name = unAliasTable(table);
-    return ps->schema->getFieldMeta(real_table_name, field);
+    FieldMeta *fm = ps->schema->getFieldMeta(real_table_name, field);
+    assert(fm);
+    return fm;
 }
 
 TableMeta *Analysis::getTableMeta(std::string table) const
 {
     string real_table_name = unAliasTable(table);
-    return ps->schema->getTableMeta(real_table_name);
+    TableMeta *tm = ps->schema->getTableMeta(real_table_name);
+    assert(tm);
+    return tm;
 }
 
 // FIXME: Field aliasing.
@@ -204,6 +208,10 @@ bool Analysis::destroyFieldMeta(std::string table, std::string field)
 {
     string real_table_name = unAliasTable(table);
     TableMeta *tm = ps->schema->getTableMeta(real_table_name);
+    if (!tm) {
+        return false;
+    }
+
     return tm->destroyFieldMeta(field);
 }
 
@@ -211,6 +219,12 @@ bool Analysis::destroyTableMeta(std::string table)
 {
     string real_table_name = unAliasTable(table);
     return ps->schema->destroyTableMeta(table);
+}
+
+bool Analysis::tableMetaExists(std::string table) const
+{
+    string real_table_name = unAliasTable(table);
+    return ps->schema->getTableMeta(real_table_name);
 }
 
 std::string Analysis::unAliasTable(std::string table) const

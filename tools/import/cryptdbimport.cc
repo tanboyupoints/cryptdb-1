@@ -27,33 +27,19 @@
 #include <field.h>
 #include <cryptdbimport.hh>
 
+//for future use
+//static pthread_mutex_t __attribute__((unused))
+//    _mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*
  * TODO:FIXME:
  *
- * The next two static functions 'format_create_database_query' and
- *  'format_insert_table_query' are inconsistent. Both are parsing queries
- *  based on unnecessary too much complex schemas.
+ * format_create_database_query() TODO:
  *
- * - 'format_create_database_query' is using a "heavy" std::map to
- *   locate some of its _own_ fields. It should instead be called from
- *   XML loop and execute query by query and not keeping track of data.
- *
- * - 'format_insert_table_query' is the same case though its map is lighter.
- *
- *   Both funcions are error prone and some queries are not being well
- *   formatted and some SQL syntax mistakes made by me.
- *
- *   To execute this program only to stdout queries and not actually executing them:
- *
- *   ./obj/tools/import/cryptdbimport -u root -p letmein -n -sqlfile_name(dump sql file)
- *
- *   Help:  ./obj/tools/import/cryptdbimport -h
+ * - 1 Eliminate comma hacks.
+ * - 2 Make it generic and then get rid of format_insert_table_query().
+ * - 3 In a future not so far, analyze other options like boost::spirit and others.
  */
-
-static pthread_mutex_t __attribute__((unused))
-    _mutex = PTHREAD_MUTEX_INITIALIZER;
-
 static string
 format_create_database_query(const string dbname,
         const string tablename, table_structure ts, tsMap_t& tsmap)
@@ -234,18 +220,20 @@ static bool
 createEmptyDB(XMLParser& xml, Connect & conn, const string dbname, bool exec)
 {
     string q = "CREATE DATABASE IF NOT EXISTS " + dbname + ";";
-    DBResult * dbres;
-
+    //TODO: This is commented out because 'create database' is a working in progress 
+    //in CryptDB core and may be available soon.
+#if 0
     cout << q << endl;
     if(exec == true)
     {
         //TODO/FIXME: Use executeQuery() instead.
         // I am not using it because of 'Unexpected Error: unhandled sql command 36'
+        DBResult * dbres;
         assert(conn.execute(q, dbres));
         if(!dbres)
             return false;
     }
-
+#endif
     return true;
 }
 
@@ -265,7 +253,7 @@ XMLParser::writeRIWO(const string& dbname, const string& tablename,
     cout << q << endl;
 
     if(exec == true)
-        return (bool)executeQuery(conn, r, q, true);
+        return (bool)executeQuery(r, q, true);
 
     return true;
 }
@@ -290,7 +278,7 @@ XMLParser::writeRIWO(const string& dbname, const string& tablename,
     cout << q << endl;
 
     if(exec == true)
-        return (bool)executeQuery(conn, r, q, true);
+        return (bool)executeQuery(r, q, true);
 
     return true;
 }
@@ -314,7 +302,7 @@ loadXmlStructure(XMLParser& xml, Connect & conn, Rewriter& r, bool exec, xmlNode
                 // create database if not exists
                 if(!ch->next && exec == true)
                 {
-                    if(createEmptyDB(xml, conn, dbname, exec) != 0)
+                    if(createEmptyDB(xml, conn, dbname, exec) == false)
                     {
                         throw runtime_error(string("Error creating empty database: ") +
                                 string(__PRETTY_FUNCTION__));
@@ -474,7 +462,8 @@ int main(int argc, char **argv)
             case 's':
                 {
                     ConnectionInfo ci("localhost", username, password);
-                    Rewriter r(ci, "/var/lib/shadow-mysql", false, true);
+                    Rewriter r(ci, "/var/lib/shadow-mysql", "cryptdbtest", false, true);
+                    //TODO:FIXME: This instance is wrong. 
                     Connect conn("localhost", username, password, "cryptdbtest");
                     do_init(xml, conn, r, exec, optarg);
                 }

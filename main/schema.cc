@@ -98,17 +98,22 @@ SchemaInfo::createTableMeta(std::string table_name,
 TableMeta *
 SchemaInfo::getTableMeta(const string & table) {
     auto it = tableMetaMap.find(table);
-    assert_s(it != tableMetaMap.end(), "could not find table " + table);
-    return it->second;
+    if (tableMetaMap.end() == it) {
+        return NULL;
+    } else {
+        return it->second;
+    }
 }
 
 FieldMeta *
 SchemaInfo::getFieldMeta(const string & table, const string & field) {
     TableMeta * tm = getTableMeta(table);
     auto it = tm->fieldMetaMap.find(field);
-    assert_s(it != tm->fieldMetaMap.end(), "could not find field " + field + " in table " +  table );
-    assert_s(it->second != NULL, "field " + table + "." + field + " not present in proxy schema ");
-    return it->second;
+    if (tm->fieldMetaMap.end() == it) {
+        return NULL;
+    } else {
+        return it->second;
+    }
 }
 
 bool

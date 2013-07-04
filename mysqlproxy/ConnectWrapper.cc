@@ -82,6 +82,7 @@ xlua_pushlstring(lua_State *l, const string &s)
     lua_pushlstring(l, s.data(), s.length());
 }
 
+// FIXME: Specify database name.
 static int
 connect(lua_State *L)
 {
@@ -115,21 +116,23 @@ connect(lua_State *L)
                      << "user = " << user << "; "
                      << "password = " << psswd;
 
+        // HACK: This code may require the support of databaseless 'Connect'
+        // objects.  If so, use a derived type to make it clear that the 
+        // Connect object supports this property.
+        string dbname = "cryptdbtest";
         string mode = getenv("CRYPTDB_MODE")?:"";
         if (mode == "single") {
 	    string encbydefault = getenv("ENC_BY_DEFAULT");
 	    if (encbydefault == "false") {
 		cerr << "\n\n enc by default false " << "\n\n";
-		r = new Rewriter(ci, embed_dir, false, false);
+		r = new Rewriter(ci, embed_dir, dbname, false, false);
 	    } else {
 		cerr << "\n\nenc by default true" << "\n\n";
-		r = new Rewriter(ci, embed_dir, false, true);
+		r = new Rewriter(ci, embed_dir, dbname, false, true);
 	    }
 
-	} else if (mode == "multi") {
-            r = new Rewriter(ci, embed_dir, true, false);
-        } else {
-            r = new Rewriter(ci, embed_dir);
+	} else {
+            throw CryptDBError("Unsupported cryptdb mode!");
         }
 
         uint64_t mkey = 113341234;  // XXX do not change as it's used for tpcc exps
@@ -141,8 +144,8 @@ connect(lua_State *L)
             string trainQuery = ev;
             LOG(wrapper) << "proxy trains using " << trainQuery;
             if (trainQuery != "") {
-                string curdb;   // unknown
-                QueryRewrite qr = r->rewrite(trainQuery, &curdb);
+                // TODO: May need to set current database in ProxyState.
+                r->rewrite(trainQuery);
             } else {
                 cerr << "empty training!\n";
             }
@@ -258,9 +261,8 @@ rewrite(lua_State *L)
             new_queries.push_back(query);
         } else {
             try {
-		string cur_db = "cryptdbtest"; //TODO: remove
-                QueryRewrite rew = r->rewrite(query,
-                                              &cur_db);
+                // TODO: May need to set current db in ProxyState.
+                QueryRewrite rew = r->rewrite(query);
 		new_queries = rew.queries;
 		clients[client]->rmeta = rew.rmeta;
 		clients[client]->considered = rew.wasRew;

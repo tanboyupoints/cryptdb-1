@@ -784,7 +784,7 @@ Connection::start() {
         conn_set.insert(c);
         this->conn = conn_set.begin();
         ConnectionInfo ci = ConnectionInfo(tc.host, tc.user, tc.pass, tc.port);
-        re = new Rewriter(ci, tc.shadowdb_dir, (type == MULTI), false);
+        re = new Rewriter(ci, tc.shadowdb_dir, tc.db, (type == MULTI), false);
         re->setMasterKey("2392834");
         break;
     }
@@ -940,8 +940,8 @@ Connection::executeRewriter(string query) {
         conn = conn_set.begin();
     }
     Analysis analysis;
-    string curdb("cryptdbtest");
-    QueryRewrite qr = re->rewrite(query, &curdb);
+    // TODO: May need to set database on our ProxyState object.
+    QueryRewrite qr = re->rewrite(query);
 
     //execute
     // only the last query should actually have a useful result
