@@ -25,11 +25,40 @@ Finish removing MultiPrincipal code.
 
 
 Carlos:
-Import tool fixes:
- - fix query syntax errors.
- - use lex or XML parser to parse _all_ fields insteand of doing it myself.
- - check possible memory leaks.
- - reduce C++ containers impact by executing out queries as soon as they are parsed. 
+Import tool notes:
+    1 - The following strings (queries) are valid in MYSQL >= 3.23.12:
+        /*!40000 ALTER TABLE `t1` ENABLE KEYS */;
+        CREATE DATABASE /*!32312 IF NOT EXISTS*/ `cryptdbtest_control` /*!40100 DEFAULT CHARACTER SET latin1 */;
+        /*!40101 SET @saved_cs_client     = @@character_set_client */;
+        /*!40000 ALTER TABLE `columns_priv` DISABLE KEYS */;
+
+    Queries enclosed by "/*!" and "*/" indicate MySQL server that commands in between must _not_ be executed in versions
+    prior to 3.23.12, in our MySQL Server (5.5.14) when such commands are present they are supposed to be execute:
+    
+    In MySQL > 3.23.12 they are converted:
+    
+    from:
+         /*!40101 SET @saved_cs_client     = @@character_set_client */;
+    to:
+        SET @saved_cs_client     = @@character_set_client;
+
+    It is possible to run a script against the dump file and eliminate such 
+    identifiers in advance, but the best scenario is to support as is.
+
+    2 - Some queries are failing, at least in my environment, they are:
+        - CREATE DATABASE
+        - DROP TABLE
+        - LOCK
+        - UNLOCK
+        - maybe others..
+
+        MySQL dump file usually include these queries, one or another may be included or excluded manually by mysqldump, somehow,
+        but in general CryptDB should support the whole set otherwise importing databases wouldn't be much feasible in real scenarios. 
+ 
+    3 - New import tool version.
+        - Took the wrong path and much some time trying to use XML database dump format, not feasible, complex and error prone,
+        switched to plain (default) dump file format and parser took less than 20 lines of code, very simple. 
+
 
 Both:
 unimplemented gather/rewrite for other functions, search through cdb_rewrite.cc
