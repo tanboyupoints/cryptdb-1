@@ -27,6 +27,10 @@
 using namespace std;
 
 
+// class/object names we don't care to know the name of
+#define ANON                ANON_CONCAT(__anon_id_const_, __COUNTER__)
+
+
 //TODO: which encrypt/decrypt should handle null?
 static Item *
 encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers, Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0) {
@@ -116,7 +120,7 @@ typical_rewrite_insert_type(ItemType *i, Analysis &a, vector<Item *> &l,
 }
 
 
-static class ANOND : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> {
+static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> {
     virtual RewritePlan * do_gather_type(Item_string *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << " String item do_gather " << *i;
         /* constant strings are always ok */
@@ -142,9 +146,9 @@ static class ANOND : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM>
     {
         typical_rewrite_insert_type(i, a, l, fm);
     }
-} ANOND;
+} ANON;
 
-static class ANOND : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
+static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     virtual RewritePlan * do_gather_type(Item_num *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << "CItemSubtypeIT (L966) num do_gather " << *i;
         /* constant ints are always ok */
@@ -170,9 +174,9 @@ static class ANOND : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     {
         typical_rewrite_insert_type(i, a, l, fm);
     }
-} ANOND;
+} ANON;
 
-static class ANOND : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITEM> {
+static class ANON : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITEM> {
     virtual RewritePlan * do_gather_type(Item_decimal *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << "CItemSubtypeIT (L1024) decimal do_gather " << *i;
 	UNIMPLEMENTED;
@@ -212,4 +216,4 @@ static class ANOND : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITE
             l.push_back(new Item_hex_string(buf, sizeof(buf)));
         }
     }
-} ANOND;
+} ANON;

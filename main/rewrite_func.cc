@@ -23,6 +23,8 @@
 
 #include <main/MultiPrinc.hh>
 
+// gives names to classes and objects we don't care to know the name of 
+#define ANON                ANON_CONCAT(__anon_id_func_, __COUNTER__)
 
 template <class T>
 static Item *
@@ -109,23 +111,23 @@ typical_gather(Analysis & a, Item_func * i,
 }
 
 
-static class ANONU : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NEG_FUNC> {
+static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NEG_FUNC> {
     virtual RewritePlan * do_gather_type(Item_func_neg *i, reason &tr, Analysis & a) const {
         return gather(i->arguments()[0], tr, a);
     }
     virtual Item * do_optimize_type(Item_func_neg *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-} ANONU;
+} ANON;
 
-static class ANONU : public CItemSubtypeFT<Item_func_not, Item_func::Functype::NOT_FUNC> {
+static class ANON : public CItemSubtypeFT<Item_func_not, Item_func::Functype::NOT_FUNC> {
     virtual RewritePlan * do_gather_type(Item_func_not *i, reason &tr, Analysis & a) const {
         return gather(i->arguments()[0], tr, a);
     }
     virtual Item * do_optimize_type(Item_func_not *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-} ANONU;
+} ANON;
 
 
 template<Item_func::Functype FT, class IT>
@@ -174,13 +176,13 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
     }
 };
 
-static CItemCompare<Item_func::Functype::EQ_FUNC,    Item_func_eq>    ANONU;
-static CItemCompare<Item_func::Functype::EQUAL_FUNC, Item_func_equal> ANONU;
-static CItemCompare<Item_func::Functype::NE_FUNC,    Item_func_ne>    ANONU;
-static CItemCompare<Item_func::Functype::GT_FUNC,    Item_func_gt>    ANONU;
-static CItemCompare<Item_func::Functype::GE_FUNC,    Item_func_ge>    ANONU;
-static CItemCompare<Item_func::Functype::LT_FUNC,    Item_func_lt>    ANONU;
-static CItemCompare<Item_func::Functype::LE_FUNC,    Item_func_le>    ANONU;
+static CItemCompare<Item_func::Functype::EQ_FUNC,    Item_func_eq>    ANON;
+static CItemCompare<Item_func::Functype::EQUAL_FUNC, Item_func_equal> ANON;
+static CItemCompare<Item_func::Functype::NE_FUNC,    Item_func_ne>    ANON;
+static CItemCompare<Item_func::Functype::GT_FUNC,    Item_func_gt>    ANON;
+static CItemCompare<Item_func::Functype::GE_FUNC,    Item_func_ge>    ANON;
+static CItemCompare<Item_func::Functype::LT_FUNC,    Item_func_lt>    ANON;
+static CItemCompare<Item_func::Functype::LE_FUNC,    Item_func_le>    ANON;
 
 template<Item_func::Functype FT, class IT>
 class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
@@ -221,8 +223,8 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
     }
 };
 
-static CItemCond<Item_func::Functype::COND_AND_FUNC, Item_cond_and> ANONU;
-static CItemCond<Item_func::Functype::COND_OR_FUNC,  Item_cond_or>  ANONU;
+static CItemCond<Item_func::Functype::COND_AND_FUNC, Item_cond_and> ANON;
+static CItemCond<Item_func::Functype::COND_OR_FUNC,  Item_cond_or>  ANON;
 
 template<Item_func::Functype FT>
 class CItemNullcheck : public CItemSubtypeFT<Item_bool_func, FT> {
@@ -258,10 +260,10 @@ class CItemNullcheck : public CItemSubtypeFT<Item_bool_func, FT> {
 
 };
 
-static CItemNullcheck<Item_func::Functype::ISNULL_FUNC> ANONU;
-static CItemNullcheck<Item_func::Functype::ISNOTNULL_FUNC> ANONU;
+static CItemNullcheck<Item_func::Functype::ISNULL_FUNC> ANON;
+static CItemNullcheck<Item_func::Functype::ISNOTNULL_FUNC> ANON;
 
-static class ANONU : public CItemSubtypeFT<Item_func_get_system_var, Item_func::Functype::GSYSVAR_FUNC> {
+static class ANON : public CItemSubtypeFT<Item_func_get_system_var, Item_func::Functype::GSYSVAR_FUNC> {
 
     virtual RewritePlan * do_gather_type(Item_func_get_system_var *i, reason &tr, Analysis & a) const {
 	reason r = reason(PLAIN_EncSet, "system var", i);
@@ -273,7 +275,7 @@ static class ANONU : public CItemSubtypeFT<Item_func_get_system_var, Item_func::
 	                           Analysis & a) const {
 	return i;
     }
-} ANONU;
+} ANON;
 
 
 template<const char *NAME>
@@ -311,10 +313,10 @@ class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
 };
 
 extern const char str_plus[] = "+";
-static CItemAdditive<str_plus> ANONU;
+static CItemAdditive<str_plus> ANON;
 
 extern const char str_minus[] = "-";
-static CItemAdditive<str_minus> ANONU;
+static CItemAdditive<str_minus> ANON;
 
 template<const char *NAME>
 class CItemMath : public CItemSubtypeFN<Item_func, NAME> {
@@ -330,37 +332,37 @@ class CItemMath : public CItemSubtypeFN<Item_func, NAME> {
 };
 
 extern const char str_mul[] = "*";
-static CItemMath<str_mul> ANONU;
+static CItemMath<str_mul> ANON;
 
 extern const char str_div[] = "/";
-static CItemMath<str_div> ANONU;
+static CItemMath<str_div> ANON;
 
 extern const char str_idiv[] = "div";
-static CItemMath<str_idiv> ANONU;
+static CItemMath<str_idiv> ANON;
 
 extern const char str_sqrt[] = "sqrt";
-static CItemMath<str_sqrt> ANONU;
+static CItemMath<str_sqrt> ANON;
 
 extern const char str_round[] = "round";
-static CItemMath<str_round> ANONU;
+static CItemMath<str_round> ANON;
 
 extern const char str_sin[] = "sin";
-static CItemMath<str_sin> ANONU;
+static CItemMath<str_sin> ANON;
 
 extern const char str_cos[] = "cos";
-static CItemMath<str_cos> ANONU;
+static CItemMath<str_cos> ANON;
 
 extern const char str_acos[] = "acos";
-static CItemMath<str_acos> ANONU;
+static CItemMath<str_acos> ANON;
 
 extern const char str_pow[] = "pow";
-static CItemMath<str_pow> ANONU;
+static CItemMath<str_pow> ANON;
 
 extern const char str_log[] = "log";
-static CItemMath<str_log> ANONU;
+static CItemMath<str_log> ANON;
 
 extern const char str_radians[] = "radians";
-static CItemMath<str_radians> ANONU;
+static CItemMath<str_radians> ANON;
 
 
 template<const char *NAME>
@@ -371,19 +373,19 @@ class CItemLeafFunc : public CItemSubtypeFN<Item_func, NAME> {
 };
 
 extern const char str_found_rows[] = "found_rows";
-static CItemLeafFunc<str_found_rows> ANONU;
+static CItemLeafFunc<str_found_rows> ANON;
 
 extern const char str_last_insert_id[] = "last_insert_id";
-static CItemLeafFunc<str_last_insert_id> ANONU;
+static CItemLeafFunc<str_last_insert_id> ANON;
 
 extern const char str_rand[] = "rand";
-static CItemLeafFunc<str_rand> ANONU;
+static CItemLeafFunc<str_rand> ANON;
 
 extern const char str_database[] = "database";
-static CItemLeafFunc<str_database> ANONU;
+static CItemLeafFunc<str_database> ANON;
 
 
-static class ANONU : public CItemSubtypeFT<Item_extract, Item_func::Functype::EXTRACT_FUNC> {
+static class ANON : public CItemSubtypeFT<Item_extract, Item_func::Functype::EXTRACT_FUNC> {
     virtual RewritePlan * do_gather_type(Item_extract *i, reason &tr, Analysis & a) const {
 	/* analyze(i->arguments()[0], reason(EMPTY_EncSet, "extract", i, &tr), a);
         return tr.encset;
@@ -393,7 +395,7 @@ static class ANONU : public CItemSubtypeFT<Item_extract, Item_func::Functype::EX
     virtual Item * do_optimize_type(Item_extract *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-} ANONU;
+} ANON;
 
 template<const char *NAME>
 class CItemDateExtractFunc : public CItemSubtypeFN<Item_int_func, NAME> {
@@ -428,18 +430,18 @@ class CItemBitfunc : public CItemSubtypeFN<Item_func_bit, NAME> {
 };
 
 extern const char str_bit_not[] = "~";
-static CItemBitfunc<str_bit_not> ANONU;
+static CItemBitfunc<str_bit_not> ANON;
 
 extern const char str_bit_or[] = "|";
-static CItemBitfunc<str_bit_or> ANONU;
+static CItemBitfunc<str_bit_or> ANON;
 
 extern const char str_bit_xor[] = "^";
-static CItemBitfunc<str_bit_xor> ANONU;
+static CItemBitfunc<str_bit_xor> ANON;
 
 extern const char str_bit_and[] = "&";
-static CItemBitfunc<str_bit_and> ANONU;
+static CItemBitfunc<str_bit_and> ANON;
 
-static class ANONU : public CItemSubtypeFT<Item_func_like, Item_func::Functype::LIKE_FUNC> {
+static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::LIKE_FUNC> {
     virtual RewritePlan * do_gather_type(Item_func_like *i, reason &tr,
 					 Analysis & a) const {
 
@@ -547,18 +549,18 @@ static class ANONU : public CItemSubtypeFT<Item_func_like, Item_func::Functype::
 	return NULL;
 
     }
-} ANONU;
+} ANON;
 
 
-static class ANONU : public CItemSubtypeFT<Item_func, Item_func::Functype::FUNC_SP> {
+static class ANON : public CItemSubtypeFT<Item_func, Item_func::Functype::FUNC_SP> {
     void error(Item_func *i) const __attribute__((noreturn)) {
         thrower() << "unsupported store procedure call " << *i;
     }
 
     virtual RewritePlan * do_gather_type(Item_func *i, reason &tr, Analysis & a) const __attribute__((noreturn)) { error(i); }
-} ANONU;
+} ANON;
 
-static class ANONU : public CItemSubtypeFT<Item_func_in, Item_func::Functype::IN_FUNC> {
+static class ANON : public CItemSubtypeFT<Item_func_in, Item_func::Functype::IN_FUNC> {
     virtual RewritePlan * do_gather_type(Item_func_in *i, reason &tr, Analysis & a) const {
 	/*  Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++)
@@ -570,9 +572,9 @@ static class ANONU : public CItemSubtypeFT<Item_func_in, Item_func::Functype::IN
     virtual Item * do_optimize_type(Item_func_in *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-} ANONU;
+} ANON;
 
-static class ANONU : public CItemSubtypeFT<Item_func_in, Item_func::Functype::BETWEEN> {
+static class ANON : public CItemSubtypeFT<Item_func_in, Item_func::Functype::BETWEEN> {
     virtual RewritePlan * do_gather_type(Item_func_in *i, reason &tr, Analysis & a) const {
 	/*  Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++)
@@ -584,7 +586,7 @@ static class ANONU : public CItemSubtypeFT<Item_func_in, Item_func::Functype::BE
     virtual Item * do_optimize_type(Item_func_in *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-} ANONU;
+} ANON;
 
 //TODO: use this func in other places as well
 /*static List<Item> *
@@ -678,14 +680,14 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
 //TODO: do we still need the file analyze.cc?
 
 extern const char str_greatest[] = "greatest";
-static CItemMinMax<str_greatest, Item_func_max> ANONU;
+static CItemMinMax<str_greatest, Item_func_max> ANON;
 
 extern const char str_least[] = "least";
-static CItemMinMax<str_least, Item_func_min> ANONU;
+static CItemMinMax<str_least, Item_func_min> ANON;
 
 
 extern const char str_strcmp[] = "strcmp";
-static class ANONU : public CItemSubtypeFN<Item_func_strcmp, str_strcmp> {
+static class ANON : public CItemSubtypeFN<Item_func_strcmp, str_strcmp> {
     virtual RewritePlan * do_gather_type(Item_func_strcmp *i, reason &tr, Analysis & a) const {
         //cerr << "do_a_t Item_func_strcmp reason " << tr << "\n";
 	/* Item **args = i->arguments();
@@ -698,13 +700,13 @@ static class ANONU : public CItemSubtypeFN<Item_func_strcmp, str_strcmp> {
     virtual Item * do_optimize_type(Item_func_strcmp *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-} ANONU;
+} ANON;
 
 
 
 extern const char str_if[] = "if";
 
-static class ANONU : public CItemSubtypeFN<Item_func_if, str_if> {
+static class ANON : public CItemSubtypeFN<Item_func_if, str_if> {
     virtual RewritePlan * do_gather_type(Item_func_if *i, reason &tr, Analysis & a) const {
         /*
         Item **args = i->arguments();
@@ -719,10 +721,10 @@ static class ANONU : public CItemSubtypeFN<Item_func_if, str_if> {
     virtual Item * do_optimize_type(Item_func_if *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-} ANONU;
+} ANON;
 
 extern const char str_nullif[] = "nullif";
-static class ANONU : public CItemSubtypeFN<Item_func_nullif, str_nullif> {
+static class ANON : public CItemSubtypeFN<Item_func_nullif, str_nullif> {
     virtual RewritePlan * do_gather_type(Item_func_nullif *i, reason &tr, Analysis & a) const {
         /*
 	    Item **args = i->arguments();
@@ -735,11 +737,11 @@ static class ANONU : public CItemSubtypeFN<Item_func_nullif, str_nullif> {
     virtual Item * do_optimize_type(Item_func_nullif *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-} ANONU;
+} ANON;
 
 
 extern const char str_coalesce[] = "coalesce";
-static class ANONU : public CItemSubtypeFN<Item_func_coalesce, str_coalesce> {
+static class ANON : public CItemSubtypeFN<Item_func_coalesce, str_coalesce> {
     virtual RewritePlan * do_gather_type(Item_func_coalesce *i, reason &tr, Analysis & a) const {
         /*
 	 Item **args = i->arguments();
@@ -752,10 +754,10 @@ static class ANONU : public CItemSubtypeFN<Item_func_coalesce, str_coalesce> {
     virtual Item * do_optimize_type(Item_func_coalesce *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-} ANONU;
+} ANON;
 
 extern const char str_case[] = "case";
-static class ANONU : public CItemSubtypeFN<Item_func_case, str_case> {
+static class ANON : public CItemSubtypeFN<Item_func_case, str_case> {
     virtual RewritePlan * do_gather_type(Item_func_case *i, reason &tr, Analysis & a) const {
 	/*     Item **args = i->arguments();
         int first_expr_num = i->*rob<Item_func_case, int,
@@ -787,12 +789,12 @@ static class ANONU : public CItemSubtypeFN<Item_func_case, str_case> {
     virtual Item * do_optimize_type(Item_func_case *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-} ANONU;
+} ANON;
 
 
 
 extern const char str_in_optimizer[] = "<in_optimizer>";
-static class ANONU : public CItemSubtypeFN<Item_in_optimizer, str_in_optimizer> {
+static class ANON : public CItemSubtypeFN<Item_in_optimizer, str_in_optimizer> {
     virtual RewritePlan * do_gather_type(Item_in_optimizer *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << "CItemSubtypeFN (L1107) do_gather " << *i;
 
@@ -805,7 +807,7 @@ static class ANONU : public CItemSubtypeFN<Item_in_optimizer, str_in_optimizer> 
     virtual Item * do_optimize_type(Item_in_optimizer *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-} ANONU;
+} ANON;
 
 
 
@@ -825,61 +827,61 @@ class CItemStrconv : public CItemSubtypeFN<Item_str_conv, NAME> {
 };
 
 extern const char str_lcase[] = "lcase";
-static CItemStrconv<str_lcase> ANONU;
+static CItemStrconv<str_lcase> ANON;
 
 extern const char str_ucase[] = "ucase";
-static CItemStrconv<str_ucase> ANONU;
+static CItemStrconv<str_ucase> ANON;
 
 extern const char str_length[] = "length";
-static CItemStrconv<str_length> ANONU;
+static CItemStrconv<str_length> ANON;
 
 extern const char str_char_length[] = "char_length";
-static CItemStrconv<str_char_length> ANONU;
+static CItemStrconv<str_char_length> ANON;
 
 extern const char str_substr[] = "substr";
-static CItemStrconv<str_substr> ANONU;
+static CItemStrconv<str_substr> ANON;
 
 extern const char str_concat[] = "concat";
-static CItemStrconv<str_concat> ANONU;
+static CItemStrconv<str_concat> ANON;
 
 extern const char str_concat_ws[] = "concat_ws";
-static CItemStrconv<str_concat_ws> ANONU;
+static CItemStrconv<str_concat_ws> ANON;
 
 extern const char str_md5[] = "md5";
-static CItemStrconv<str_md5> ANONU;
+static CItemStrconv<str_md5> ANON;
 
 extern const char str_left[] = "left";
-static CItemStrconv<str_left> ANONU;
+static CItemStrconv<str_left> ANON;
 
 extern const char str_regexp[] = "regexp";
-static CItemStrconv<str_regexp> ANONU;
+static CItemStrconv<str_regexp> ANON;
  
 extern const char str_second[] = "second";
-static CItemDateExtractFunc<str_second> ANONU;
+static CItemDateExtractFunc<str_second> ANON;
 
 extern const char str_minute[] = "minute";
-static CItemDateExtractFunc<str_minute> ANONU;
+static CItemDateExtractFunc<str_minute> ANON;
 
 extern const char str_hour[] = "hour";
-static CItemDateExtractFunc<str_hour> ANONU;
+static CItemDateExtractFunc<str_hour> ANON;
 
 extern const char str_to_days[] = "to_days";
-static CItemDateExtractFunc<str_to_days> ANONU;
+static CItemDateExtractFunc<str_to_days> ANON;
 
 extern const char str_year[] = "year";
-static CItemDateExtractFunc<str_year> ANONU;
+static CItemDateExtractFunc<str_year> ANON;
 
 extern const char str_month[] = "month";
-static CItemDateExtractFunc<str_month> ANONU;
+static CItemDateExtractFunc<str_month> ANON;
 
 extern const char str_dayofmonth[] = "dayofmonth";
-static CItemDateExtractFunc<str_dayofmonth> ANONU;
+static CItemDateExtractFunc<str_dayofmonth> ANON;
 
 extern const char str_unix_timestamp[] = "unix_timestamp";
-static CItemDateExtractFunc<str_unix_timestamp> ANONU;
+static CItemDateExtractFunc<str_unix_timestamp> ANON;
 
 extern const char str_date_add_interval[] = "date_add_interval";
-static class ANONU : public CItemSubtypeFN<Item_date_add_interval, str_date_add_interval> {
+static class ANON : public CItemSubtypeFN<Item_date_add_interval, str_date_add_interval> {
     virtual RewritePlan * do_gather_type(Item_date_add_interval *i, reason &tr, Analysis & a) const {
 	/* Item **args = i->arguments();
         for (uint x = 0; x < i->argument_count(); x++) {
@@ -893,7 +895,7 @@ static class ANONU : public CItemSubtypeFN<Item_date_add_interval, str_date_add_
     virtual Item * do_optimize_type(Item_date_add_interval *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-} ANONU;
+} ANON;
 
 template<const char *NAME>
 class CItemDateNow : public CItemSubtypeFN<Item_func_now, NAME> {
@@ -903,25 +905,25 @@ class CItemDateNow : public CItemSubtypeFN<Item_func_now, NAME> {
 };
 
 extern const char str_now[] = "now";
-static CItemDateNow<str_now> ANONU;
+static CItemDateNow<str_now> ANON;
 
 extern const char str_utc_timestamp[] = "utc_timestamp";
-static CItemDateNow<str_utc_timestamp> ANONU;
+static CItemDateNow<str_utc_timestamp> ANON;
 
 extern const char str_sysdate[] = "sysdate";
-static CItemDateNow<str_sysdate> ANONU;
+static CItemDateNow<str_sysdate> ANON;
 
 
 
-static class ANONU: public CItemSubtypeFT<Item_char_typecast, Item_func::Functype::CHAR_TYPECAST_FUNC> {
+static class ANON: public CItemSubtypeFT<Item_char_typecast, Item_func::Functype::CHAR_TYPECAST_FUNC> {
     virtual RewritePlan * do_gather_type(Item_char_typecast *i, reason &tr, Analysis & a) const {
         thrower() << "what does Item_char_typecast do?";
         UNIMPLEMENTED;
     }
-} ANONU;
+} ANON;
 
 extern const char str_cast_as_signed[] = "cast_as_signed";
-static class ANONU : public CItemSubtypeFN<Item_func_signed, str_cast_as_signed> {
+static class ANON : public CItemSubtypeFN<Item_func_signed, str_cast_as_signed> {
     virtual RewritePlan * do_gather_type(Item_func_signed *i, reason &tr, Analysis & a) const {
         /*LOG(cdb_v) << "do_a_t Item_func_signed reason " << tr;
         analyze(i->arguments()[0], tr, a);
@@ -932,4 +934,4 @@ static class ANONU : public CItemSubtypeFN<Item_func_signed, str_cast_as_signed>
     virtual Item * do_optimize_type(Item_func_signed *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
-} ANONU;
+} ANON;

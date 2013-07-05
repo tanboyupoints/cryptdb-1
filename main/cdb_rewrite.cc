@@ -31,7 +31,7 @@ extern CItemFuncDir funcTypes;
 extern CItemSumFuncDir sumFuncTypes;
 extern CItemFuncNameDir funcNames;
 
-
+#define ANON                ANON_CONCAT(__anon_id_, __COUNTER__)
 
 
 //TODO: potential inconsistency problem because we update state,

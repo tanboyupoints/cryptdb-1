@@ -24,7 +24,8 @@
 
 #include <main/MultiPrinc.hh>
 
-
+// gives names to classes and objects we don't care to know the name of 
+#define ANON                ANON_CONCAT(__anon_id_f_, __COUNTER__)
 
 using namespace std;
 
@@ -35,7 +36,7 @@ CItemFuncNameDir funcNames = CItemFuncNameDir();
 CItemSumFuncDir sumFuncTypes = CItemSumFuncDir();
 
 
-class ANONF : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
+class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
     virtual RewritePlan * do_gather_type(Item_field *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << "FIELD_ITEM do_gather " << *i;
@@ -134,4 +135,4 @@ class ANONF : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         }
     }
 
-} ANONF;
+} ANON;

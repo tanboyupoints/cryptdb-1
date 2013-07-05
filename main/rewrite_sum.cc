@@ -25,6 +25,8 @@
 #include <main/MultiPrinc.hh>
 
 
+// gives names to classes and objects we don't care to know the name of 
+#define ANON                ANON_CONCAT(__anon_id_sum_, __COUNTER__ )
 
 static void
 check_if_empty(const EncSet & sol, Item * i, const EncSet & my_es, const reason & child_r) {
@@ -93,8 +95,8 @@ class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
     }
 };
 
-static CItemCount<Item_sum::Sumfunctype::COUNT_FUNC> ANONS;
-static CItemCount<Item_sum::Sumfunctype::COUNT_DISTINCT_FUNC> ANONS;
+static CItemCount<Item_sum::Sumfunctype::COUNT_FUNC> ANON;
+static CItemCount<Item_sum::Sumfunctype::COUNT_DISTINCT_FUNC> ANON;
 
 
 
@@ -125,8 +127,8 @@ class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
     }
 };
 
-static CItemChooseOrder<Item_sum::Sumfunctype::MIN_FUNC, Item_sum_min> ANONS;
-static CItemChooseOrder<Item_sum::Sumfunctype::MAX_FUNC, Item_sum_max> ANONS;
+static CItemChooseOrder<Item_sum::Sumfunctype::MIN_FUNC, Item_sum_min> ANON;
+static CItemChooseOrder<Item_sum::Sumfunctype::MAX_FUNC, Item_sum_max> ANON;
 
 template<Item_sum::Sumfunctype SFT>
 class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
@@ -177,12 +179,12 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
 
 //TODO: field OPE should not be blob for text either
 
-static CItemSum<Item_sum::Sumfunctype::SUM_FUNC> ANONS;
-static CItemSum<Item_sum::Sumfunctype::SUM_DISTINCT_FUNC> ANONS;
-static CItemSum<Item_sum::Sumfunctype::AVG_FUNC> ANONS;
-static CItemSum<Item_sum::Sumfunctype::AVG_DISTINCT_FUNC> ANONS;
+static CItemSum<Item_sum::Sumfunctype::SUM_FUNC> ANON;
+static CItemSum<Item_sum::Sumfunctype::SUM_DISTINCT_FUNC> ANON;
+static CItemSum<Item_sum::Sumfunctype::AVG_FUNC> ANON;
+static CItemSum<Item_sum::Sumfunctype::AVG_DISTINCT_FUNC> ANON;
 
-static class ANONS : public CItemSubtypeST<Item_sum_bit, Item_sum::Sumfunctype::SUM_BIT_FUNC> {
+static class ANON : public CItemSubtypeST<Item_sum_bit, Item_sum::Sumfunctype::SUM_BIT_FUNC> {
     virtual RewritePlan * do_gather_type(Item_sum_bit *i, reason &tr, Analysis & a) const {
 	/* LOG(cdb_v) << "do_a_t Item_sum_bit reason " << tr;
         analyze(i->get_arg(0), reason(EMPTY_EncSet, "bitagg", i, &tr, false), a);
@@ -190,11 +192,11 @@ static class ANONS : public CItemSubtypeST<Item_sum_bit, Item_sum::Sumfunctype::
 	*/
 	UNIMPLEMENTED;
     }
-} ANONS;
+} ANON;
 
 
 
-static class ANONS : public CItemSubtypeST<Item_func_group_concat, Item_sum::Sumfunctype::GROUP_CONCAT_FUNC> {
+static class ANON : public CItemSubtypeST<Item_func_group_concat, Item_sum::Sumfunctype::GROUP_CONCAT_FUNC> {
     virtual RewritePlan * do_gather_type(Item_func_group_concat *i, reason &tr, Analysis & a) const {
 	/*  LOG(cdb_v) << "do_a_t Item_func_group reason " << tr;
         uint arg_count_field = i->*rob<Item_func_group_concat, uint,
@@ -210,9 +212,9 @@ static class ANONS : public CItemSubtypeST<Item_func_group_concat, Item_sum::Sum
 	UNIMPLEMENTED;
     }
     // TODO(stephentu): figure out how to rob the arg fields for optimization
-} ANONS;
+} ANON;
 
-static class ANONS : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
+static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
     virtual RewritePlan * do_gather_type(Item_ref *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << "do_a_t Item_ref reason " << tr;
 	/* if (i->ref) {
@@ -224,9 +226,9 @@ static class ANONS : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
 	    }*/
 	UNIMPLEMENTED;
     }
-} ANONS;
+} ANON;
 
-static class ANONS : public CItemSubtypeIT<Item_null, Item::Type::NULL_ITEM> {
+static class ANON : public CItemSubtypeIT<Item_null, Item::Type::NULL_ITEM> {
     virtual RewritePlan * do_gather_type(Item_null *i, reason &tr, Analysis & a) const {
         tr = reason(FULL_EncSet, "is a constant", i);
         return new RewritePlan(FULL_EncSet, tr);
@@ -248,5 +250,5 @@ static class ANONS : public CItemSubtypeIT<Item_null, Item::Type::NULL_ITEM> {
             l.push_back(new Item_int((ulonglong) salt));
         }
     }
-} ANONS;
+} ANON;
 

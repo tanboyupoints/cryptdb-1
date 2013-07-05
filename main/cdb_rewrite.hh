@@ -32,6 +32,7 @@
 using namespace std;
 
 
+
 class FieldReturned {
 public:
     bool encrypted;
