@@ -47,7 +47,6 @@ Import tool notes:
 
     2 - Some queries are failing, at least in my environment, they are:
         - CREATE DATABASE
-        - DROP TABLE
         - LOCK
         - UNLOCK
         - maybe others..
