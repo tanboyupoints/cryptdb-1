@@ -12,9 +12,11 @@ public:
     static const DDLHandler *dispatch(enum_sql_command sql_cmd);
     static void buildAll();
     static void destroyAll();
+    static LEX** transformLex(LEX *lex, Analysis &analysis,
+                              const string &q, unsigned *out_lex_count);
 
 private:
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
+    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const = 0;
 
 protected:

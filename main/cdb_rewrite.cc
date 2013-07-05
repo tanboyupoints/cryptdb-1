@@ -20,6 +20,7 @@
 #include <main/sql_handler.hh>
 #include <main/dml_handler.hh>
 #include <main/ddl_handler.hh>
+#include <main/List_helpers.hh>
 
 #include "field.h"
 
@@ -2180,18 +2181,6 @@ init_onions(AES_KEY * mKey, FieldMeta * fm, Create_field * cf, uint index = 0) {
     }
 }
 
-static void
-check_table_not_exists(Analysis & a, LEX * lex, string table) {
-    auto it = a.ps->schema->tableMetaMap.find(table);
-    if (it != a.ps->schema->tableMetaMap.end()) {
-        if (!(lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS)) {
-            LOG(warn) << "ERROR: Table exists. Embedded DB possibly"
-		"out of sync with regular DB (or, just programmer error)";
-        }
-        return;
-    }
-}
-
 static bool
 create_field_meta(TableMeta *tm, Create_field *field,
                   const Analysis a, bool encByDefault)
@@ -2217,34 +2206,6 @@ create_field_meta(TableMeta *tm, Create_field *field,
     tm->fieldNames.push_back(fm->fname);//TODO: do we need fieldNames?
 
     return true;
-}
-
-static void
-create_table_meta(Analysis & a, const string & table, LEX *lex,
-                  bool encByDefault) {
-    assert(lex->sql_command == SQLCOM_CREATE_TABLE);
-
-    LOG(cdb_v) << "add_table encByDefault " << encByDefault;
-
-    check_table_not_exists(a, lex, table);
-
-    // FIXME: Use SchemaInfo::createTableMeta.
-    // What is the role of has_salt, has_sensitive and salt_name?
-    TableMeta *tm = new TableMeta();
-    a.ps->schema->tableMetaMap[table] = tm;
-
-    if (encByDefault) { //anonymize name
-	// such increment may cause problem with multiple proxies
-        tm->tableNo = a.ps->schema->totalTables++;
-        tm->anonTableName = anonymizeTableName(tm->tableNo, table);
-    } else {
-        tm->anonTableName = table;
-    }
-
-    auto it = List_iterator<Create_field>(lex->alter_info.create_list);
-    eachList<Create_field>(it, [tm, a, encByDefault] (Create_field *cf) {
-        create_field_meta(tm, cf, a, encByDefault);
-    });
 }
 
 //TODO: no need to pass create_field to this
@@ -2335,37 +2296,6 @@ do_field_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
         });
 }
 
-static LEX **
-rewrite_create_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
-{
-    LEX * new_lex = copy(lex);
-
-    // table name
-    const string &table =
-        lex->select_lex.table_list.first->table_name;
-
-    new_lex->select_lex.table_list =
-	rewrite_table_list(lex->select_lex.table_list, a);
-    
-    //TODO: support for "create table like"
-    if (lex->create_info.options & HA_LEX_CREATE_TABLE_LIKE) {
-        cryptdb_err() << "No support for create table like yet. " <<
-                   "If you see this, please implement me";
-    } else {
-        // If we are only creating the table if it doesn't exist,
-        // we must forgo the duplication of meta objects and such.
-        if (!(lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS &&
-            a.tableMetaExists(table))) {
-            do_field_rewriting(lex, new_lex, table, a);
-        }
-    }
-
-    LEX **out_lex = new LEX*[1];
-    out_lex[0] = new_lex;
-    *out_lex_count = 1;
-    return out_lex;
-}
-
 // TODO: Write a dispatcher that will guarentee we aren't mixing ALTER
 // actions.
 static LEX **
@@ -2437,61 +2367,6 @@ rewrite_alter_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
     out_lex[0] = new_lex;
     *out_lex_count = 1;
     return out_lex;
-}
-
-static LEX **
-rewrite_drop_table_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
-{
-    LEX * new_lex = copy(lex);
-    new_lex->select_lex.table_list =
-        rewrite_table_list(lex->select_lex.table_list, a, true);
-
-    LEX **out_lex = new LEX*[1];
-    out_lex[0] = new_lex;
-    *out_lex_count = 1;
-    return out_lex;;
-}
-
-static inline void
-drop_table_update_meta(const string &q,
-                       LEX *lex,
-                       Analysis &a)
-{
-    assert(a.ps->e_conn->execute("START TRANSACTION;"));
-
-    TABLE_LIST *tbl = lex->select_lex.table_list.first;
-    for (; tbl; tbl = tbl->next_local) {
-        char* dbname = tbl->db;
-        char* table  = tbl->table_name;
-
-        if (lex->drop_if_exists) {
-            if (false == a.tableMetaExists(table)) {
-                continue;
-            }
-        }
-
-        ostringstream s;
-
-        s << " DELETE FROM pdb.table_info, pdb.field_info, "
-          << "             pdb.onion_info, pdb.layer_key"
-          << " USING pdb.table_info INNER JOIN pdb.field_info"
-          << "       INNER JOIN pdb.onion_info INNER JOIN pdb.layer_key"
-          << " WHERE  pdb.table_info.name = '" << table << "' "
-          << " AND    pdb.table_info.database_name = '" << dbname << "' "
-          << " AND    pdb.table_info.id = pdb.field_info.table_info_id"
-          << " AND    pdb.field_info.id = pdb.onion_info.field_info_id"
-          << " AND    pdb.onion_info.id = pdb.layer_key.onion_info_id;";
-
-	assert(a.ps->e_conn->execute(s.str()));
-
-        // Remove from *Meta structures.
-        assert(a.destroyTableMeta(table));
-    }
-    
-    // Remove table(s) from embedded database.
-    assert(a.ps->e_conn->execute(q));
-
-    assert(a.ps->e_conn->execute("COMMIT"));
 }
 
 static std::string
@@ -2610,58 +2485,6 @@ do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
     return true;
 }
 
-static inline void
-add_table_update_meta(const string &q,
-                      LEX *lex,
-                      Analysis &a)
-{
-    char* dbname = lex->select_lex.table_list.first->db;
-    char* table  = lex->select_lex.table_list.first->table_name;
-
-    // If we are only creating the table if it doesn't exist,
-    // we must forgo the duplication of meta objects and such.
-    if (lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS) {
-        if (a.tableMetaExists(table)) {
-            return;
-        }
-    }
-
-    // TODO(burrows): This should be a seperate step.
-    // Create *Meta objects.
-    create_table_meta(a, std::string(table), lex, a.ps->encByDefault);
-
-    // Add table to embedded database.
-    assert(a.ps->e_conn->execute(q));
-
-    TableMeta *tm = a.ps->schema->tableMetaMap[table];
-    assert(tm != NULL);
-
-    a.ps->e_conn->execute("START TRANSACTION");
-
-    {
-        ostringstream s;
-        s << " INSERT INTO pdb.table_info VALUES ("
-          << " " << tm->tableNo << ", "
-          << " '" << tm->anonTableName << "', "
-          << " '" << table << "', "
-          << " " << bool_to_string(tm->hasSensitive) << ", "
-          << " " << bool_to_string(tm->has_salt) << ", "
-          << " '" << tm->salt_name << "', "
-          << " '" << dbname << "',"
-          << " 0"
-          << " );";
-
-        assert(a.ps->e_conn->execute(s.str()));
-    }
-
-    // Add field.
-    unsigned long long tableID = a.ps->e_conn->last_insert_id();
-    do_add_field(tm, a, dbname, table, &tableID);
-
-    a.ps->e_conn->execute("COMMIT");
-
-}
-
 // TODO.
 static inline void
 alter_table_update_meta(const string &q, LEX *lex, Analysis &a)
@@ -2739,17 +2562,6 @@ alter_table_update_meta(const string &q, LEX *lex, Analysis &a)
 }
 
 static void
-changeDBUpdateMeta(const string &q, LEX *lex, Analysis &a)
-{
-    assert(lex->select_lex.db);
-    char* dbname = lex->select_lex.db;
-
-    // new dbname is saved for next queries
-    a.ps->conn->setCurDBName(dbname);
-    a.ps->e_conn->setCurDBName(dbname);
-}
-
-static void
 dropAll(Connect * conn)
 {
     for (udf_func* u: udf_list) {
@@ -2821,6 +2633,7 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
     buildSqlHandlers();
     DMLHandler::buildAll();
+    DDLHandler::buildAll();
 
     loadUDFs(ps.conn);
 
@@ -3312,7 +3125,13 @@ SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
 {
     SqlHandler *sql_handler = SqlHandler::getHandler(lex->sql_command);
     if (!sql_handler) {
-        return DMLHandler::rewriteLex(lex, analysis, q, out_lex_count);
+        // HACK.
+        LEX **out_lex = DMLHandler::rewriteLex(lex, analysis, q, out_lex_count);
+        if (NULL == out_lex) {
+            return DDLHandler::transformLex(lex, analysis, q, out_lex_count);
+        } else {
+            return out_lex;
+        }
     }
 
     // TODO(burrows): Where should this call be?
@@ -3368,11 +3187,13 @@ static void buildSqlHandlers()
                        alter_table_update_meta, rewrite_alter_lex, true);
     assert(SqlHandler::addHandler(h));
 
+    /*
     // Must rewrite after update, otherwise TableMeta and FieldMeta
     // will not exist during rewrite.
     h = new SqlHandler(SQLCOM_CREATE_TABLE, NULL,
                        add_table_update_meta, rewrite_create_lex);
     assert(SqlHandler::addHandler(h));
+    */
 
     /*
     h = new SqlHandler(SQLCOM_INSERT, process_select_lex, NULL,
@@ -3386,12 +3207,14 @@ static void buildSqlHandlers()
     assert(SqlHandler::addHandler(h));
     */
 
+    /*
     // Must update after rewrite, otherwise you will delete TableMeta
     // and FieldMeta that is needed during rewrite.
     h = new SqlHandler(SQLCOM_DROP_TABLE, NULL,
                        drop_table_update_meta, rewrite_drop_table_lex,
                        true);
     assert(SqlHandler::addHandler(h));
+    */
 
     /*
     h = new SqlHandler(SQLCOM_UPDATE, process_update_lex, NULL,
@@ -3411,57 +3234,11 @@ static void buildSqlHandlers()
     assert(SqlHandler::addHandler(h));
     */
 
+    /*
     // FIXME: This NULL will break.
     h = new SqlHandler(SQLCOM_CHANGE_DB, NULL,
                        changeDBUpdateMeta, NULL, true);
     assert(SqlHandler::addHandler(h));
-
+    */
 }
 
-// Helper functions for doing functional things to List<T> structures.
-// MySQL may have already implemented these somewhere?
-template <typename T, typename F> void
-eachList(List_iterator<T> it, F op) {
-    T* element = it++;
-    for (; element ; element = it++) {
-        op(element);
-    }
-
-    return;
-}
-
-template <typename T, typename F> List<T>
-mapList(List_iterator<T> it, F op) {
-    List<T> newList;
-    T* element = it++;
-    for (; element ; element = it++) {
-        newList.push_back(op(element));
-    }
-
-    return newList;
-}
-
-// A bit off.
-template <typename T, typename F, typename O> O
-reduceList(List_iterator<T> it, O init, F op) {
-    List<T> newList;
-    O accum = init;
-    T* element = it++;
-
-    for (; element ; element = it++) {
-        accum = op(accum, element);
-    }
-
-    return accum;
-}
-
-template <typename T> List<T>
-vectorToList(std::vector<T*> v) {
-    List<T> lst;
-    for (auto it : v) {
-        lst.push_back(it);
-    }
-
-    return lst;
-}
- 
