@@ -24,8 +24,6 @@
 
 #include <main/MultiPrinc.hh>
 
-
-
 using namespace std;
 
 
