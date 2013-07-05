@@ -53,20 +53,35 @@ rewrite_table_list(TABLE_LIST *t, Analysis &a)
     return new_t;
 }
 
+// @if_exists: defaults to false.
 SQL_I_List<TABLE_LIST>
-rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a)
+rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
+                   bool if_exists)
 {
     if (!tlist.elements) {
 	return SQL_I_List<TABLE_LIST>();
     }
-    TABLE_LIST * tl = rewrite_table_list(tlist.first, a);
+
+    TABLE_LIST * tl;
+    if (if_exists && (false == a.tableMetaExists(tlist.first->table_name))) {
+       tl = copy(tlist.first);
+    } else {
+       tl = rewrite_table_list(tlist.first, a);
+    }
 
     SQL_I_List<TABLE_LIST> * new_tlist = oneElemList<TABLE_LIST>(tl);
 
     TABLE_LIST * prev = tl;
     for (TABLE_LIST *tbl = tlist.first->next_local;
 	 tbl; tbl = tbl->next_local) {
-	TABLE_LIST * new_tbl = rewrite_table_list(tbl, a);
+
+        TABLE_LIST * new_tbl;
+        if (if_exists && (false == a.tableMetaExists(tbl->table_name))) {
+            new_tbl = copy(tbl);
+        } else {
+            new_tbl = rewrite_table_list(tbl, a);
+        }
+
 	prev->next_local = new_tbl;
 	prev = new_tbl;
     }

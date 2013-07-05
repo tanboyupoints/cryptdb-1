@@ -20,7 +20,8 @@ TABLE_LIST *
 rewrite_table_list(TABLE_LIST *t, Analysis &a);
 
 SQL_I_List<TABLE_LIST>
-rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a);
+rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
+                   bool if_exists=false);
 
 List<TABLE_LIST>
 rewrite_table_list(List<TABLE_LIST> tll, Analysis & a);
