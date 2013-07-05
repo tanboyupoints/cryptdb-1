@@ -36,7 +36,18 @@ date
 
 Raluca:
 partition cdb_rewrite.cc
-can we simplify EncSet/FieldMeta repetition?
+by monday: finish reorganizing crypto handlers to allow different data types like decimal, varchar
+
+
+Raluca & Aaron:
+tue: deicmal + varchar
+wed: timestamp and date
+
+Thur - Sun:
+work on proxy, concurrency, connections 
+
+All:
+Monday 15 start on sql.mit.edu
 
 
 

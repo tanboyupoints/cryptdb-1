@@ -14,6 +14,7 @@
 // rewrite_field
 // we would only have one ANON if  __FILE__ would not print whole path
 #define ANONF                ANON_CONCAT(__anon_id_f_, __COUNTER__)
+#define ANONU                ANON_CONCAT(__anon_id_func_, __COUNTER__)
 
 /*
  * Cleanup handler object: invokes the supplied function in its
