@@ -31,8 +31,8 @@ using namespace std;
 
 CItemTypesDir itemTypes = CItemTypesDir();
 CItemFuncDir funcTypes = CItemFuncDir();
-CItemSumFuncDir sumFuncTypes = CItemSumFuncDir();
 CItemFuncNameDir funcNames = CItemFuncNameDir();
+CItemSumFuncDir sumFuncTypes = CItemSumFuncDir();
 
 
 class ANONF : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
