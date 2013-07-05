@@ -2442,7 +2442,8 @@ static LEX **
 rewrite_drop_table_lex(LEX *lex, Analysis &a, unsigned *out_lex_count)
 {
     LEX * new_lex = copy(lex);
-    new_lex->select_lex.table_list = rewrite_table_list(lex->select_lex.table_list, a);
+    new_lex->select_lex.table_list =
+        rewrite_table_list(lex->select_lex.table_list, a, true);
 
     LEX **out_lex = new LEX*[1];
     out_lex[0] = new_lex;
@@ -2461,6 +2462,13 @@ drop_table_update_meta(const string &q,
     for (; tbl; tbl = tbl->next_local) {
         char* dbname = tbl->db;
         char* table  = tbl->table_name;
+
+        if (lex->drop_if_exists) {
+            if (false == a.tableMetaExists(table)) {
+                continue;
+            }
+        }
+
         ostringstream s;
 
         s << " DELETE FROM pdb.table_info, pdb.field_info, "
