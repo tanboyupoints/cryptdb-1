@@ -16,6 +16,7 @@
 #define ANONF                ANON_CONCAT(__anon_id_f_, __COUNTER__)
 #define ANONU                ANON_CONCAT(__anon_id_func_, __COUNTER__)
 #define ANONS                ANON_CONCAT(__anon_id_sum_, __COUNTER__ )
+#define ANOND                ANON_CONCAT(__anon_id_const_, __COUNTER__)
 
 /*
  * Cleanup handler object: invokes the supplied function in its
