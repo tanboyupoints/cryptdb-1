@@ -120,14 +120,7 @@ static class ANOND : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM>
     virtual RewritePlan * do_gather_type(Item_string *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << " String item do_gather " << *i;
         /* constant strings are always ok */
-        for (auto it = a.tmkm.encForVal.begin(); it != a.tmkm.encForVal.end(); it++) {
-            if (it->second == "") {
-                stringstream temp;
-                temp << *i;
-                it->second = temp.str();
-            }
-        }
-
+       
 	tr = reason(FULL_EncSet, "is a constant", i);
 	return new RewritePlan(FULL_EncSet_Str, tr);
 
@@ -155,15 +148,7 @@ static class ANOND : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     virtual RewritePlan * do_gather_type(Item_num *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << "CItemSubtypeIT (L966) num do_gather " << *i;
         /* constant ints are always ok */
-        for (auto it = a.tmkm.encForVal.begin(); it != a.tmkm.encForVal.end(); it++) {
-            if (it->second == "") {
-                stringstream temp;
-                temp << *i;
-                it->second = temp.str();
-            }
-        }
-
-	tr = reason(FULL_EncSet, "is a constant", i);
+  	tr = reason(FULL_EncSet, "is a constant", i);
 	return new RewritePlan(FULL_EncSet_Int, tr);
 
     }

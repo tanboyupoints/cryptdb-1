@@ -16,6 +16,22 @@ anonymize_table_name(const string &tname,
     return tm->anonTableName;
 }
 
+
+void
+optimize(Item **i, Analysis &a) {
+   //TODO
+/*Item *i0 = itemTypes.do_optimize(*i, a);
+    if (i0 != *i) {
+        // item i was optimized (replaced) by i0
+        if (a.itemRewritePlans.find(*i) != a.itemRewritePlans.end()) {
+            a.itemRewritePlans[i0] = a.itemRewritePlans[*i];
+            a.itemRewritePlans.erase(*i);
+        }
+        *i = i0;
+    } */
+}
+
+
 // this function should be called at the root of a tree of items
 // that should be rewritten
 // @context defaults to empty string.
