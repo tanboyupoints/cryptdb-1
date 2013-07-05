@@ -42,6 +42,8 @@ Import tool notes:
     to:
         SET @saved_cs_client     = @@character_set_client;
 
+        *ps: above queries are running OK. To do more tests before removing this item.
+
     It is possible to run a script against the dump file and eliminate such 
     identifiers in advance, but the best scenario is to support as is.
 
