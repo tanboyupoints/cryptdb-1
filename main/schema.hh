@@ -122,7 +122,6 @@ typedef struct FieldMeta {
 
 
 typedef struct TableMeta {
-
     std::list<std::string> fieldNames;     //in order field names
     unsigned int tableNo;
     std::string anonTableName;
@@ -144,11 +143,15 @@ typedef struct TableMeta {
 
     friend class Analysis;
 
+    FieldMeta *getFieldMeta(std::string field);
+
 protected:
     bool destroyFieldMeta(std::string field);
 } TableMeta;
 
 
+// AWARE: Table/Field aliases __WILL NOT__ be looked up when calling from
+// this level or below. Use Analysis::* if you need aliasing.
 typedef struct SchemaInfo {
     std::map<std::string, TableMeta *> tableMetaMap;
     unsigned int totalTables;

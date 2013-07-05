@@ -51,8 +51,26 @@ FieldMeta::~FieldMeta()
 
 bool TableMeta::destroyFieldMeta(std::string field)
 {
+    FieldMeta *fm = this->getFieldMeta(field);
+    if (NULL == fm) {
+        return false;
+    }
+
+    auto erase_count = fieldMetaMap.erase(field);
     fieldNames.remove(field);
-    return 1 == fieldMetaMap.erase(field);
+
+    delete fm;
+    return 1 == erase_count;
+}
+
+FieldMeta *TableMeta::getFieldMeta(std::string field)
+{
+    auto it = fieldMetaMap.find(field);
+    if (fieldMetaMap.end() == it) {
+        return NULL;
+    } else {
+        return it->second;
+    }
 }
 
 TableMeta::TableMeta() {
@@ -108,21 +126,28 @@ SchemaInfo::getTableMeta(const string & table) {
 FieldMeta *
 SchemaInfo::getFieldMeta(const string & table, const string & field) {
     TableMeta * tm = getTableMeta(table);
-    auto it = tm->fieldMetaMap.find(field);
-    if (tm->fieldMetaMap.end() == it) {
+    if (NULL == tm) {
         return NULL;
-    } else {
-        return it->second;
     }
+
+    return tm->getFieldMeta(field);
 }
 
 bool
 SchemaInfo::destroyTableMeta(std::string table)
 {
+    TableMeta *tm = this->getTableMeta(table);
+    if (NULL == tm) {
+        return false;
+    }
+
     if (totalTables <= 0) {
         throw CryptDBError("SchemaInfo::totalTables can't be less than zero");
     }
 
     --totalTables;
+    delete tm;
+
     return 1 == tableMetaMap.erase(table);
 }
+

@@ -12,6 +12,7 @@ class DMLHandler {
 public:
     static const DMLHandler *dispatch(enum_sql_command sql_cmd);
     static void buildAll();
+    static void destroyAll();
     static LEX** rewriteLex(LEX *lex, Analysis &analysis,
                             const string &q, unsigned *out_lex_count);
 
@@ -22,7 +23,7 @@ private:
      
 protected:
     DMLHandler() {;}
-    ~DMLHandler() {;}
+    virtual ~DMLHandler() {;}
 
     // AWARE: Stateful.
     static std::map<enum_sql_command, DMLHandler *> handlers;

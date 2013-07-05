@@ -19,6 +19,7 @@
 #include <main/enum_text.hh>
 #include <main/sql_handler.hh>
 #include <main/dml_handler.hh>
+#include <main/ddl_handler.hh>
 
 #include "field.h"
 

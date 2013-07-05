@@ -474,6 +474,15 @@ void DMLHandler::buildAll()
     handlers[SQLCOM_SELECT] = h;
 }
 
+void DMLHandler::destroyAll()
+{
+    for (auto it : handlers) {
+        delete it.second;
+    }
+
+    handlers.clear();
+}
+
 LEX **DMLHandler::rewriteLex(LEX *lex, Analysis &analysis,
                              const string &q, unsigned *out_lex_count)
 {
