@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <typeinfo>
 
-#include <main/cdb_rewrite.hh>
+#include <main/rewrite_main.hh>
 #include <main/rewrite_util.hh>
 #include <util/cryptdb_log.hh>
 #include <main/CryptoHandlers.hh>
@@ -24,7 +24,7 @@
 #include <main/MultiPrinc.hh>
 
 // gives names to classes and objects we don't care to know the name of 
-#define ANON                ANON_CONCAT(__anon_id_func_, __COUNTER__)
+#define ANON                ANON_NAME(__anon_id_func_)
 
 template <class T>
 static Item *

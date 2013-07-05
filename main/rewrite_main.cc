@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <typeinfo>
 
-#include <main/cdb_rewrite.hh>
+#include <main/rewrite_main.hh>
 #include <main/rewrite_util.hh>
 #include <util/cryptdb_log.hh>
 #include <main/CryptoHandlers.hh>
@@ -31,7 +31,7 @@ extern CItemFuncDir funcTypes;
 extern CItemSumFuncDir sumFuncTypes;
 extern CItemFuncNameDir funcNames;
 
-#define ANON                ANON_CONCAT(__anon_id_, __COUNTER__)
+#define ANON                ANON_NAME(__anon_id_)
 
 
 //TODO: potential inconsistency problem because we update state,

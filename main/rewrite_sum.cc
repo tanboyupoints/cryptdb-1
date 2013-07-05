@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <typeinfo>
 
-#include <main/cdb_rewrite.hh>
+#include <main/rewrite_main.hh>
 #include <main/rewrite_util.hh>
 #include <util/cryptdb_log.hh>
 #include <main/CryptoHandlers.hh>
@@ -26,7 +26,7 @@
 
 
 // gives names to classes and objects we don't care to know the name of 
-#define ANON                ANON_CONCAT(__anon_id_sum_, __COUNTER__ )
+#define ANON                ANON_NAME(__anon_id_sum_)
 
 static void
 check_if_empty(const EncSet & sol, Item * i, const EncSet & my_es, const reason & child_r) {

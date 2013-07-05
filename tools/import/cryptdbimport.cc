@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <getopt.h>
-#include <cdb_rewrite.hh>
+#include <rewrite_main.hh>
 #include <Connect.hh>
 #include <cryptdbimport.hh>
 

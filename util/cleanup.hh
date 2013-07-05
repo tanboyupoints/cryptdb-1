@@ -9,7 +9,7 @@
 
 #define ANON_CONCAT2(a, b)  a ## b
 #define ANON_CONCAT(a, b)   ANON_CONCAT2(a, b)
-
+#define ANON_NAME(name) ANON_CONCAT(name, __COUNTER__)
 
 /*
  * Cleanup handler object: invokes the supplied function in its

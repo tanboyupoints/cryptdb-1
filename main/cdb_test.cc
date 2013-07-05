@@ -22,7 +22,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
-#include "main/cdb_rewrite.hh"
+#include "main/rewrite_main.hh"
 #include "parser/embedmysql.hh"
 #include "parser/stringify.hh"
 #include "crypto/ecjoin.hh"

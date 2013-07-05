@@ -1,5 +1,5 @@
 #include <main/rewrite_util.hh>
-#include <main/cdb_rewrite.hh>
+#include <main/rewrite_main.hh>
 #include <parser/lex_util.hh>
 
 using namespace std;
