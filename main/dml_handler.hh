@@ -3,18 +3,16 @@
 #include <map>
 
 #include <main/Analysis.hh>
-#include <main/rewrite_util.hh>
+#include <main/sql_handler.hh>
+#include <main/dispatcher.hh>
 
 #include <sql_lex.h>
 
 // Abstract base class for query handler.
-class DMLHandler {
+class DMLHandler : public SQLHandler {
 public:
-    static const DMLHandler *dispatch(enum_sql_command sql_cmd);
-    static void buildAll();
-    static void destroyAll();
-    static LEX** rewriteLex(LEX *lex, Analysis &analysis,
-                            const string &q, unsigned *out_lex_count);
+    virtual LEX** transformLex(LEX *lex, Analysis &analysis,
+                               const string &q, unsigned *out_lex_count) const;
 
 private:
     virtual void gather(LEX *lex, Analysis &a) const = 0;
@@ -24,8 +22,7 @@ private:
 protected:
     DMLHandler() {;}
     virtual ~DMLHandler() {;}
-
-    // AWARE: Stateful.
-    static std::map<enum_sql_command, DMLHandler *> handlers;
 };
+
+SQLDispatcher *buildDMLDispatcher();
 

@@ -2,8 +2,7 @@
 #include <main/cdb_rewrite.hh>
 #include <parser/lex_util.hh>
 #include <main/rewrite_util.hh>
-
-std::map<enum_sql_command, DMLHandler *> DMLHandler::handlers;
+#include <main/dispatcher.hh>
 
 extern CItemTypesDir itemTypes;
 
@@ -127,6 +126,8 @@ class InsertHandler : public DMLHandler {
 
 class UpdateHandler : public DMLHandler {
     virtual void gather(LEX *lex, Analysis &a) const {
+        process_table_list(&lex->select_lex.top_join_list, a);
+
         if (lex->select_lex.item_list.head()) {
             assert(lex->value_list.head());
 
@@ -363,9 +364,10 @@ private:
                                              push_results_stream.str());
         unsigned final_insert_out_lex_count;
         LEX **final_insert_lex_arr =
-            DMLHandler::rewriteLex(parse->lex(), insert_analysis,
-                                   push_results_stream.str(),
-                                   &final_insert_out_lex_count);
+            a.rewriter->dml_dispatcher->call(parse->lex(),
+                                             insert_analysis,
+                                             push_results_stream.str(),
+                                             &final_insert_out_lex_count);
         assert(final_insert_lex_arr && 1 == final_insert_out_lex_count);
         LEX *final_insert_lex = final_insert_lex_arr[0];
 
@@ -381,8 +383,10 @@ private:
                             delete_stream.str());
         unsigned delete_out_lex_count;
         LEX **delete_lex_arr =
-            DMLHandler::rewriteLex(delete_parse->lex(), delete_analysis,
-                                   delete_stream.str(), &delete_out_lex_count);
+            a.rewriter->dml_dispatcher->call(delete_parse->lex(),
+                                             delete_analysis,
+                                             delete_stream.str(),
+                                             &delete_out_lex_count);
         assert(delete_lex_arr && 1 == delete_out_lex_count);
         LEX *delete_lex = delete_lex_arr[0];
 
@@ -442,59 +446,12 @@ class SelectHandler : public DMLHandler {
     }
 };
 
-const DMLHandler *DMLHandler::dispatch(enum_sql_command sql_cmd)
+LEX **DMLHandler::transformLex(LEX *lex, Analysis &analysis,
+                               const string &q, unsigned *out_lex_count) const
 {
-    std::map<enum_sql_command, DMLHandler *>::iterator it = 
-        handlers.find(sql_cmd);
-    if (handlers.end() == it) {
-        return NULL;
-    }
+    this->gather(lex, analysis);
 
-    return it->second;
-}
-
-// AWARE: If you want your new handler to be accessible, you must add it
-// to this function.
-void DMLHandler::buildAll()
-{
-    DMLHandler *h;
-
-    h = new InsertHandler();
-    handlers[SQLCOM_INSERT] = h;
-    handlers[SQLCOM_REPLACE] = h;
-
-    h = new UpdateHandler;
-    handlers[SQLCOM_UPDATE] = h;
-
-    h = new DeleteHandler;
-    handlers[SQLCOM_DELETE] = h;
-
-    h = new SelectHandler;
-    handlers[SQLCOM_SELECT] = h;
-}
-
-void DMLHandler::destroyAll()
-{
-    for (auto it : handlers) {
-        delete it.second;
-    }
-
-    handlers.clear();
-}
-
-LEX **DMLHandler::rewriteLex(LEX *lex, Analysis &analysis,
-                             const string &q, unsigned *out_lex_count)
-{
-    const DMLHandler *handler = DMLHandler::dispatch(lex->sql_command);
-    if (!handler) {
-        return NULL;
-    }
-
-    process_table_list(&lex->select_lex.top_join_list, analysis);
-
-    handler->gather(lex, analysis);
-
-    return handler->rewrite(lex, analysis, out_lex_count);
+    return this->rewrite(lex, analysis, out_lex_count);
 }
 
 // Helpers.
@@ -533,6 +490,7 @@ process_filters_lex(st_select_lex * select_lex, Analysis & a) {
 static void
 process_select_lex(LEX *lex, Analysis & a)
 {
+    process_table_list(&lex->select_lex.top_join_list, a);
     process_select_lex(&lex->select_lex, a);
 }
 
@@ -735,4 +693,23 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
     }
 }
 
+SQLDispatcher *buildDMLDispatcher()
+{
+    DMLHandler *h;
+    SQLDispatcher *dispatcher = new SQLDispatcher();
+    
+    h = new InsertHandler();
+    dispatcher->addHandler(SQLCOM_INSERT, h);
+    dispatcher->addHandler(SQLCOM_REPLACE, h);
 
+    h = new UpdateHandler;
+    dispatcher->addHandler(SQLCOM_UPDATE, h);
+
+    h = new DeleteHandler;
+    dispatcher->addHandler(SQLCOM_DELETE, h);
+
+    h = new SelectHandler;
+    dispatcher->addHandler(SQLCOM_SELECT, h);
+
+    return dispatcher;
+}

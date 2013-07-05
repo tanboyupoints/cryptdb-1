@@ -3,29 +3,23 @@
 #include <map>
 
 #include <main/Analysis.hh>
+#include <main/sql_handler.hh>
+#include <main/dispatcher.hh>
 
 #include <sql_lex.h>
 
-class AlterSubHandler {
+class AlterSubHandler : public SQLHandler {
 public:
-    static const AlterSubHandler *dispatch(long flags);
-    static void buildAll();
-    static void destroyAll();
-    static LEX **transformLex(LEX *lex, Analysis &a, const string &q,
-                              unsigned *out_lex_count);
+    virtual LEX **transformLex(LEX *lex, Analysis &a, const string &q,
+                               unsigned *out_lex_count) const;
 
 private:
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const = 0;
-    static long calculateMask();
 
 protected:
     AlterSubHandler() {;}
     virtual ~AlterSubHandler() {;}
-
-    // AWARE: Stateful.
-    static std::map<long, AlterSubHandler *> handlers;
-
-    typedef LEX **(*subHandler)(LEX *lex, Analysis &a, const string &q,   
-                                unsigned *out_lex_count);
 };
+
+AlterDispatcher *buildAlterSubDispatcher();

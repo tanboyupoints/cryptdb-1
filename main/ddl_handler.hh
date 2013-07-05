@@ -3,17 +3,16 @@
 #include <map>
 
 #include <main/Analysis.hh>
+#include <main/sql_handler.hh>
+#include <main/dispatcher.hh>
 
 #include <sql_lex.h>
 
 // Abstract base class for command handler.
-class DDLHandler {
+class DDLHandler : public SQLHandler {
 public:
-    static const DDLHandler *dispatch(enum_sql_command sql_cmd);
-    static void buildAll();
-    static void destroyAll();
-    static LEX** transformLex(LEX *lex, Analysis &analysis,
-                              const string &q, unsigned *out_lex_count);
+    virtual LEX **transformLex(LEX *lex, Analysis &analysis,
+                               const string &q, unsigned *out_lex_count) const;
 
 private:
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
@@ -22,8 +21,7 @@ private:
 protected:
     DDLHandler() {;}
     virtual ~DDLHandler() {;}
-
-    // AWARE: Stateful.
-    static std::map<enum_sql_command, DDLHandler *> handlers;
 };
+
+SQLDispatcher *buildDDLDispatcher();
 

@@ -12,6 +12,7 @@
 #include <main/Translator.hh>
 #include <main/Connect.hh>
 #include <main/MultiPrinc.hh>
+#include <main/dispatcher.hh>
 
 #include <sql_select.h>
 #include <sql_delete.h>
@@ -74,6 +75,12 @@ public:
     // HACK: ps probably shouldn't be embedded in Rewriter if it is going
     // to carry around Connect objects.
     Connect *getConnection() {return ps.conn;}
+
+    LEX **dispatchAndTransformOnLex(LEX *lex, Analysis &a, const string &q,
+                                    unsigned *out_lex_count);
+
+    SQLDispatcher *dml_dispatcher;
+    SQLDispatcher *ddl_dispatcher;
 
 private:
     ProxyState ps;

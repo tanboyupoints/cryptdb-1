@@ -5,8 +5,7 @@
 #include <main/List_helpers.hh>
 #include <main/cdb_rewrite.hh>
 #include <main/alter_sub_handler.hh>
-
-std::map<enum_sql_command, DDLHandler *> DDLHandler::handlers;
+#include <main/dispatcher.hh>
 
 // Prototypes.
 static void
@@ -14,24 +13,18 @@ create_table_meta(Analysis & a, const string & table, LEX *lex,
                   bool encByDefault);
 
 class AlterHandler : public DDLHandler {
-public:
-    AlterHandler() {
-        if (!sub_handlers_built) {
-            AlterSubHandler::buildAll();
-        }
-    }
-
-private:
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {
-        return AlterSubHandler::transformLex(lex, a, q, out_lex_count);
+        return sub_dispatcher->call(lex, a, q, out_lex_count);
     }
     
-    // AWARE: Stateful.
-    static bool sub_handlers_built;
+    AlterDispatcher *sub_dispatcher;
+    
+public:
+    AlterHandler() {
+        sub_dispatcher = buildAlterSubDispatcher();
+    }
 };
-
-bool AlterHandler::sub_handlers_built = false;
 
 class CreateHandler : public DDLHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
@@ -193,54 +186,9 @@ class ChangeDBHandler : public DDLHandler {
     }
 };
 
-const DDLHandler *DDLHandler::dispatch(enum_sql_command sql_cmd)
-{
-    std::map<enum_sql_command, DDLHandler *>::iterator it =
-        handlers.find(sql_cmd);
-    if (handlers.end() == it) {
-        return NULL;
-    }
-
-    return it->second;
-}
-
-// AWARE: If you want your new handler to be accessible, you must add it
-// to this function.
-void DDLHandler::buildAll()
-{
-    DDLHandler *h;
-
-    h = new AlterHandler();
-    handlers[SQLCOM_ALTER_TABLE] = h;
-
-    h = new CreateHandler();
-    handlers[SQLCOM_CREATE_TABLE] = h;
-    
-    h = new DropHandler();
-    handlers[SQLCOM_DROP_TABLE] = h;
-
-    h = new ChangeDBHandler();
-    handlers[SQLCOM_CHANGE_DB] = h;
-}
-
-void DDLHandler::destroyAll()
-{
-    auto cp = handlers;
-    handlers.clear();
-
-    for (auto it : cp) {
-        delete it.second;
-    }
-}
-
 LEX** DDLHandler::transformLex(LEX *lex, Analysis &analysis,
-                                      const string &q, unsigned *out_lex_count) {
-    const DDLHandler *handler = DDLHandler::dispatch(lex->sql_command);
-    if (!handler) {
-        return NULL;
-    }
-
-    return handler->rewriteAndUpdate(lex, analysis, q, out_lex_count);
+                                      const string &q, unsigned *out_lex_count) const {
+    return this->rewriteAndUpdate(lex, analysis, q, out_lex_count);
 }
 
 static void
@@ -284,3 +232,22 @@ create_table_meta(Analysis & a, const string & table, LEX *lex,
     });
 }
 
+SQLDispatcher *buildDDLDispatcher()
+{
+    DDLHandler *h;
+    SQLDispatcher *dispatcher = new SQLDispatcher();
+
+    h = new AlterHandler();
+    dispatcher->addHandler(SQLCOM_ALTER_TABLE, h);
+
+    h = new CreateHandler();
+    dispatcher->addHandler(SQLCOM_CREATE_TABLE, h);
+    
+    h = new DropHandler();
+    dispatcher->addHandler(SQLCOM_DROP_TABLE, h);
+
+    h = new ChangeDBHandler();
+    dispatcher->addHandler(SQLCOM_CHANGE_DB, h);
+
+    return dispatcher;
+}

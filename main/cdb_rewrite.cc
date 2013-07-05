@@ -2174,8 +2174,8 @@ Rewriter::Rewriter(ConnectionInfo ci,
     buildTypeTextTranslator();
     initSchema(ps);
 
-    DMLHandler::buildAll();
-    DDLHandler::buildAll();
+    dml_dispatcher = buildDMLDispatcher();
+    ddl_dispatcher = buildDDLDispatcher();
 
     loadUDFs(ps.conn);
 
@@ -2183,6 +2183,18 @@ Rewriter::Rewriter(ConnectionInfo ci,
     // ie, loadUDFs.
     ps.conn->setCurDBName(dbname);
     ps.e_conn->setCurDBName(dbname);
+}
+
+LEX **
+Rewriter::dispatchAndTransformOnLex(LEX *lex, Analysis &a, const string &q,
+                                    unsigned *out_lex_count) {
+    if (dml_dispatcher->canDo(lex->sql_command)) {
+        return dml_dispatcher->call(lex, a, q, out_lex_count);
+    } else if (ddl_dispatcher->canDo(lex->sql_command)) {
+        return ddl_dispatcher->call(lex, a, q, out_lex_count);
+    } else {
+        throw CryptDBError("Rewriter can not dispatch bad lex");
+    }
 }
 
 ProxyState::~ProxyState()
@@ -2278,8 +2290,10 @@ rewrite_helper(const string & q, Analysis & analysis,
     LOG(cdb_v) << "pre-analyze " << *lex;
 
     unsigned out_lex_count = 0;
+    // FIXME.
     LEX **new_lexes =
-        SqlHandler::rewriteLexAndUpdateMeta(lex, analysis, q, &out_lex_count);
+        analysis.rewriter->dml_dispatcher->call(lex, analysis, q,
+                                                &out_lex_count);
     assert(new_lexes && out_lex_count != 0);
 
     list<string> queries;
@@ -2539,45 +2553,4 @@ printRes(const ResType & r) {
     }
 }
 
-/*
- * SQL Handlers
- */
-
-SqlHandler *SqlHandler::getHandler(enum_sql_command cmd)
-{
-    std::map<enum_sql_command, SqlHandler *>::iterator h =
-        handlers.find(cmd);
-    if (handlers.end() == h) {
-        return NULL;
-    }
-
-    return h->second;
-}
-
-bool SqlHandler::addHandler(SqlHandler *handler)
-{
-    enum_sql_command cmd = handler->getSqlCmd();
-    std::map<enum_sql_command, SqlHandler *>::iterator h =
-        SqlHandler::handlers.find(cmd);
-    if (SqlHandler::handlers.end() != h) {
-        return false;
-    }
-
-    SqlHandler::handlers[cmd] = handler;
-    return true;
-}
-
-LEX **
-SqlHandler::rewriteLexAndUpdateMeta(LEX *lex, Analysis &analysis,
-                                    const string &q, unsigned *out_lex_count)
-{
-    // HACK.
-    LEX **out_lex =
-        DMLHandler::rewriteLex(lex, analysis, q, out_lex_count);
-    if (NULL == out_lex) {
-        return DDLHandler::transformLex(lex, analysis, q, out_lex_count);
-    } else {
-        return out_lex;
-    }
-}
 
