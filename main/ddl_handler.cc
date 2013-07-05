@@ -5,6 +5,7 @@
 #include <main/List_helpers.hh>
 #include <main/cdb_rewrite.hh>
 #include <main/enum_text.hh>
+#include <main/alter_sub_handler.hh>
 
 std::map<enum_sql_command, DDLHandler *> DDLHandler::handlers;
 
@@ -28,13 +29,25 @@ create_table_meta(Analysis & a, const string & table, LEX *lex,
 static std::string
 bool_to_string(bool b);
 
-// TODO: Write a dispatcher.
 class AlterHandler : public DDLHandler {
+public:
+    AlterHandler() {
+        if (!sub_handlers_built) {
+            AlterSubHandler::buildAll();
+        }
+    }
+
+private:
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {
-        assert(false);
+        return AlterSubHandler::transformLex(lex, a, q, out_lex_count);
     }
+    
+    // AWARE: Stateful.
+    static bool sub_handlers_built;
 };
+
+bool AlterHandler::sub_handlers_built = false;
 
 class CreateHandler : public DDLHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
@@ -228,11 +241,12 @@ void DDLHandler::buildAll()
 
 void DDLHandler::destroyAll()
 {
-    for (auto it : handlers) {
+    auto cp = handlers;
+    handlers.clear();
+
+    for (auto it : cp) {
         delete it.second;
     }
-
-    handlers.clear();
 }
 
 LEX** DDLHandler::transformLex(LEX *lex, Analysis &analysis,
