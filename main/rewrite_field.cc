@@ -43,9 +43,6 @@ class ANONF : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         string fieldname = i->field_name;
         string table = i->table_name;
 	string fullname = fullName(fieldname, table);
-        if (a.ps->mp && a.ps->mp->hasEncFor(fullname)) {
-	    a.tmkm.encForVal[fullname] = "";
-        }
 
         FieldMeta * fm = a.getFieldMeta(table, fieldname);
 

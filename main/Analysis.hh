@@ -145,7 +145,6 @@ typedef struct ReturnField {
 typedef struct ReturnMeta {
     map<int, ReturnField> rfmeta;
     string stringify();
-    TMKM tmkm;
 } ReturnMeta;
 
 
@@ -237,7 +236,7 @@ operator<<(ostream &out, const RewritePlan * rp);
 typedef struct ProxyState {
 
     ProxyState(): conn(NULL), e_conn(NULL), encByDefault(true),
-		  masterKey(NULL), schema(NULL), totalTables(0), mp(NULL) {}
+		  masterKey(NULL), schema(NULL), totalTables(0) {}
     ConnectionInfo ci;
 
     // connection to remote and embedded server
@@ -249,8 +248,6 @@ typedef struct ProxyState {
 
     SchemaInfo*    schema;
     unsigned int   totalTables;
-
-    MultiPrinc*    mp;
 
     ~ProxyState();
 } ProxyState;
@@ -271,7 +268,6 @@ public:
 
     unsigned int pos; //a counter indicating how many projection fields have been analyzed so far
     std::map<FieldMeta *, salt_type>    salts;
-    TMKM                                tmkm; //for multi princ
     std::map<Item *, RewritePlan *>     rewritePlans;
     std::map<std::string, std::string>  table_aliases;
 
