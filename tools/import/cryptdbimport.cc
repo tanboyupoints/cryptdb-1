@@ -19,7 +19,7 @@ static void do_display_help(const char *arg)
     cout << "-u<username>: MySQL server username" << endl;
     cout << "-p<password>: MySQL server password" << endl;
     cout << "-n: Do not execute queries. Only show stdout." << endl;
-    cout << "-s<file>: MySQL's .sql dump file, originated from \"mysqldump\" tool." << endl;
+    cout << "-f <file>: MySQL's .sql dump file, originated from \"mysqldump\" tool." << endl;
     cout << "To generate DB's dump file use mysqldump, e.g.:" << endl;
     cout << "$ mysqldump -u user -ppassword --all-databases >dumpfile.sql" << endl;
     exit(0);
