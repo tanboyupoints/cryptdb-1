@@ -31,7 +31,7 @@ ignore_line(const string& line)
 {
     static const string begin_match("--");
 
-    return (line.compare(0,2,begin_match) == 0); 
+    return(line.compare(0,2,begin_match) == 0); 
 }
 
 void
@@ -107,7 +107,7 @@ int main(int argc, char **argv)
 
     static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
-        {"show", required_argument, 0, 's'},
+        {"inputfile", required_argument, 0, 'f'},
         {"password", required_argument, 0, 'p'},
         {"user", required_argument, 0, 'u'},
         {"noexec", required_argument, 0, 'n'},
@@ -121,7 +121,7 @@ int main(int argc, char **argv)
 
     while(1)
     {
-        c = getopt_long(argc, argv, "hs:p:u:t:n", long_options, &optind);
+        c = getopt_long(argc, argv, "hf:p:u:t:n", long_options, &optind);
         if(c == -1)
             break;
 
@@ -129,12 +129,16 @@ int main(int argc, char **argv)
         {
             case 'h':
                 do_display_help(argv[0]);
-            case 's':
+            case 'f':
                 {
                     Import import(optarg);
                     if(exec == true){
                         ConnectionInfo ci("localhost", username, password);
                         Rewriter r(ci, "/var/lib/shadow-mysql", "cryptdbtest", false, true);
+
+                        // Onion layer keys are derived from master key.
+                        // here using the same as cdb_test.
+                        r.setMasterKey("2392834");
 
                         // Execute queries
                         import.executeQueries(r);
