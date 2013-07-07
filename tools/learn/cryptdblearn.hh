@@ -39,14 +39,15 @@ class Learn
             //TODO: setenv is just a sugestion took from test, but need to be
             //better than this.
             //We must somehow inform CryptDB that we are in training mode for security
-            //and performance matters.
+            //and performance matters, if necessary.
             setenv("TRAIN_QUERY", modes[m_mode].envname, 1);
         }
 
         ~Learn(){
             unsetenv("TRAIN_QUERY");
-            cout << "Executed queries: " << m_totalnum << endl;
-            cout << "Errors: " << m_errnum << endl;
+            //cout << "Executed queries: " << m_totalnum << endl;
+            //cout << "Errors: " << m_errnum << endl;
+            //TODO: Generate onions enc. layout 
         }
 
         void trainFromFile(void);

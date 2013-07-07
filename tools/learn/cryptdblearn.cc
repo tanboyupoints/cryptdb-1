@@ -1,3 +1,6 @@
+/*
+ * prototype
+ */
 #include <cryptdblearn.hh>
 #include <iostream>
 #include <sstream>
@@ -34,26 +37,22 @@ Learn::trainFromFile(void)
             char lastChar = *line.rbegin();
             if(lastChar == ';'){
                 s += line;
-                
+
                 /*
                  * During rewrite EncLayers are computed
-                 * and intersect is then invoked(). After that adjustOnion()
-                 * may call removeOnionLayer() if needed. 
+                 * and intersect is then invoked(). Ideally 
+                 * we do all steps until we have encryption schema
+                 * and provide to application developer the resulting
+                 * onion encryption layers for each field.
                  *
-                 * The point is that we should have the tables present 
-                 * beforehand otherwise how could we ajustOnions() if onions
-                 * modify columns encryption schema?
-                 *
-                 * Other important point is that we may have to avoid adjustOnios and
-                 * instead provide the application developer annotations about columns 
-                 * encryption setup only so the intrusive approach below would be 
-                 * skipped. It also may answer the tables question, no execution (adjustments), 
-                 * no tables needed beforehand.
+                 * It is possible to effectivelly adjust 
+                 * onions but this is not the goal and the lines of 
+                 * code below is commented.
                  */
-                QueryRewrite qr = this->m_r.rewrite(s);
-                if(qr.queries.size() == 0)
-                    this->m_errnum++;
-                this->m_totalnum++;
+                //QueryRewrite qr = this->m_r.rewrite(s);
+                //if(qr.queries.size() == 0)
+                //    this->m_errnum++;
+                //this->m_totalnum++;
 
                 s.clear();
                 continue;
@@ -69,10 +68,8 @@ Learn::trainFromScratch(void)
     //TODO: implement this
     /*
      *
-     * OK, here we have no queries at all and we should 
-     * train using as most secure onions layout as possible, 
-     * but the question about tables to be already present 
-     * remains.
+     * OK, here we have no queries tracing file at all and we should 
+     * train using as most secure onions layout as possible.
      */
 }
 
