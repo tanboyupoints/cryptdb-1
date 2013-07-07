@@ -128,7 +128,7 @@ int main(int argc, char **argv)
         learn = new Learn(MODE_FILE, r, filename);
         learn->trainFromFile();
     }else{
-        learn = new Learn(MODE_FILE, r, "");
+        learn = new Learn(MODE_FROM_SCRATCH, r, "");
         learn->trainFromScratch();
     }
    
