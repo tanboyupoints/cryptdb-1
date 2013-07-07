@@ -232,6 +232,7 @@ create_table_meta(Analysis & a, const string & table, LEX *lex,
     });
 }
 
+// FIXME: Add test to make sure handler added successfully.
 SQLDispatcher *buildDDLDispatcher()
 {
     DDLHandler *h;

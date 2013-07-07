@@ -693,6 +693,7 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
     }
 }
 
+// FIXME: Add test to make sure handlers added successfully.
 SQLDispatcher *buildDMLDispatcher()
 {
     DMLHandler *h;

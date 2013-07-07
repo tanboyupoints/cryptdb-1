@@ -13,7 +13,7 @@ LEX **Dispatcher::call(LEX *lex, Analysis &a, const string &q,
 
 bool Dispatcher::addHandler(long long cmd, SQLHandler *h) {
     auto it = handlers.find(cmd);
-    if (handlers.end() == it) {
+    if (handlers.end() != it) {
         return false;
     }
 
@@ -21,8 +21,8 @@ bool Dispatcher::addHandler(long long cmd, SQLHandler *h) {
     return true;
 }
 
-bool Dispatcher::canDo(long long cmd) {
-    return handlers.end() != handlers.find(cmd);
+bool Dispatcher::canDo(LEX *lex) const {
+    return handlers.end() != handlers.find(extract(lex));
 }
 
 Dispatcher::~Dispatcher()
@@ -35,25 +35,25 @@ Dispatcher::~Dispatcher()
     }
 }
 
-const SQLHandler *SQLDispatcher::dispatch(LEX *lex) const
+const SQLHandler *Dispatcher::dispatch(LEX *lex) const
 {
-    auto it = handlers.find(lex->sql_command);
+    auto it = handlers.find(extract(lex));
     if (handlers.end() == it) {
         return NULL;
     } else {
         return it->second;
     }
-}   
+}
 
-const SQLHandler *AlterDispatcher::dispatch(LEX *lex) const
+long long SQLDispatcher::extract(LEX *lex) const
+{
+    return lex->sql_command;
+}
+
+long long AlterDispatcher::extract(LEX *lex) const
 {
     static long mask = calculateMask();
-    auto it = handlers.find(lex->alter_info.flags & mask);
-    if (handlers.end() == it) {
-        return NULL;
-    } else {
-        return it->second;
-    }
+    return lex->alter_info.flags & mask;
 }
 
 long AlterDispatcher::calculateMask() const {

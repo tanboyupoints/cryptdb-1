@@ -2188,9 +2188,9 @@ Rewriter::Rewriter(ConnectionInfo ci,
 LEX **
 Rewriter::dispatchAndTransformOnLex(LEX *lex, Analysis &a, const string &q,
                                     unsigned *out_lex_count) {
-    if (dml_dispatcher->canDo(lex->sql_command)) {
+    if (dml_dispatcher->canDo(lex)) {
         return dml_dispatcher->call(lex, a, q, out_lex_count);
-    } else if (ddl_dispatcher->canDo(lex->sql_command)) {
+    } else if (ddl_dispatcher->canDo(lex)) {
         return ddl_dispatcher->call(lex, a, q, out_lex_count);
     } else {
         throw CryptDBError("Rewriter can not dispatch bad lex");
@@ -2290,10 +2290,9 @@ rewrite_helper(const string & q, Analysis & analysis,
     LOG(cdb_v) << "pre-analyze " << *lex;
 
     unsigned out_lex_count = 0;
-    // FIXME.
     LEX **new_lexes =
-        analysis.rewriter->dml_dispatcher->call(lex, analysis, q,
-                                                &out_lex_count);
+        analysis.rewriter->dispatchAndTransformOnLex(lex, analysis, q,
+                                                     &out_lex_count);
     assert(new_lexes && out_lex_count != 0);
 
     list<string> queries;
