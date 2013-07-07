@@ -8,7 +8,6 @@
 #include <onions.hh> //layout
 #include <Analysis.hh> //for intersect()
 #include <rewrite_main.hh>
-#include <Connect.hh>
 
 static bool 
 ignore_line(const string& line)
@@ -44,6 +43,12 @@ Learn::trainFromFile(void)
                  * The point is that we should have the tables present 
                  * beforehand otherwise how could we ajustOnions() if onions
                  * modify columns encryption schema?
+                 *
+                 * Other important point is that we may have to avoid adjustOnios and
+                 * instead provide the application developer annotations about columns 
+                 * encryption setup only so the intrusive approach below would be 
+                 * skipped. It also may answer the tables question, no execution (adjustments), 
+                 * no tables needed beforehand.
                  */
                 QueryRewrite qr = this->m_r.rewrite(s);
                 if(qr.queries.size() == 0)

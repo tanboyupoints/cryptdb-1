@@ -8,7 +8,6 @@
 #include <pthread.h>
 #include <getopt.h>
 #include <rewrite_main.hh>
-#include <Connect.hh>
 #include <cryptdbimport.hh>
 
 static void do_display_help(const char *arg)
