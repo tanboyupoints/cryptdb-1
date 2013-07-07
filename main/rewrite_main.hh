@@ -1,7 +1,7 @@
 #pragma once
 
 /*
- * cdb_rewrite.hh
+ * rewrite_main.hh
  *
  *
  *  TODO: need to integrate it with util.h: some declarations are repeated
