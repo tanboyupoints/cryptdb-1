@@ -2188,13 +2188,16 @@ Rewriter::Rewriter(ConnectionInfo ci,
 LEX **
 Rewriter::dispatchAndTransformOnLex(LEX *lex, Analysis &a, const string &q,
                                     unsigned *out_lex_count) {
+    const SQLHandler *handler;
     if (dml_dispatcher->canDo(lex)) {
-        return dml_dispatcher->call(lex, a, q, out_lex_count);
+        assert(handler = dml_dispatcher->dispatch(lex));
     } else if (ddl_dispatcher->canDo(lex)) {
-        return ddl_dispatcher->call(lex, a, q, out_lex_count);
+        assert(handler = ddl_dispatcher->dispatch(lex));
     } else {
         throw CryptDBError("Rewriter can not dispatch bad lex");
     }
+
+    return handler->transformLex(lex, a, q, out_lex_count);
 }
 
 ProxyState::~ProxyState()

@@ -15,7 +15,10 @@ create_table_meta(Analysis & a, const string & table, LEX *lex,
 class AlterHandler : public DDLHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {
-        return sub_dispatcher->call(lex, a, q, out_lex_count);
+        const AlterSubHandler *handler;
+        assert(sub_dispatcher->canDo(lex));
+        assert(handler = (const AlterSubHandler*)sub_dispatcher->dispatch(lex));
+        return handler->transformLex(lex, a, q, out_lex_count);
     }
     
     AlterDispatcher *sub_dispatcher;

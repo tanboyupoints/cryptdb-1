@@ -1,16 +1,5 @@
 #include <main/dispatcher.hh>
 
-LEX **Dispatcher::call(LEX *lex, Analysis &a, const string &q,
-                       unsigned *out_lex_count) const
-{
-    const SQLHandler *h = dispatch(lex); 
-    if (!h) {
-        return NULL;
-    } else {
-        return h->transformLex(lex, a, q, out_lex_count);
-    }
-}
-
 bool Dispatcher::addHandler(long long cmd, SQLHandler *h) {
     auto it = handlers.find(cmd);
     if (handlers.end() != it) {

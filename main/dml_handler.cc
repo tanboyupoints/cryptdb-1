@@ -362,12 +362,13 @@ private:
         //         Item::delete_self).
         query_parse *parse = new query_parse(a.ps->conn->getCurDBName(),
                                              push_results_stream.str());
+        const SQLHandler *handler =
+            a.rewriter->dml_dispatcher->dispatch(parse->lex());
         unsigned final_insert_out_lex_count;
         LEX **final_insert_lex_arr =
-            a.rewriter->dml_dispatcher->call(parse->lex(),
-                                             insert_analysis,
-                                             push_results_stream.str(),
-                                             &final_insert_out_lex_count);
+            handler->transformLex(parse->lex(), insert_analysis,
+                                  push_results_stream.str(),
+                                  &final_insert_out_lex_count);
         assert(final_insert_lex_arr && 1 == final_insert_out_lex_count);
         LEX *final_insert_lex = final_insert_lex_arr[0];
 
@@ -381,12 +382,14 @@ private:
         query_parse *delete_parse =
             new query_parse(a.ps->conn->getCurDBName(),
                             delete_stream.str());
+        const SQLHandler *delete_handler =
+            a.rewriter->dml_dispatcher->dispatch(delete_parse->lex());
         unsigned delete_out_lex_count;
         LEX **delete_lex_arr =
-            a.rewriter->dml_dispatcher->call(delete_parse->lex(),
-                                             delete_analysis,
-                                             delete_stream.str(),
-                                             &delete_out_lex_count);
+            delete_handler->transformLex(delete_parse->lex(),
+                                         delete_analysis,
+                                         delete_stream.str(),
+                                         &delete_out_lex_count);
         assert(delete_lex_arr && 1 == delete_out_lex_count);
         LEX *delete_lex = delete_lex_arr[0];
 
