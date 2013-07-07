@@ -3,6 +3,7 @@
 #include <main/rewrite_util.hh>
 #include <main/enum_text.hh>
 #include <parser/lex_util.hh>
+#include <main/dispatcher.hh>
 
 // Prototypes.
 static LEX **single_lex_output(LEX *out_me, unsigned *out_lex_count);

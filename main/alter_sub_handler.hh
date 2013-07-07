@@ -4,7 +4,6 @@
 
 #include <main/Analysis.hh>
 #include <main/sql_handler.hh>
-#include <main/dispatcher.hh>
 
 #include <sql_lex.h>
 
@@ -12,6 +11,7 @@ class AlterSubHandler : public SQLHandler {
 public:
     virtual LEX **transformLex(LEX *lex, Analysis &a, const string &q,
                                unsigned *out_lex_count) const;
+    virtual ~AlterSubHandler() {;}
 
 private:
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
@@ -19,7 +19,7 @@ private:
 
 protected:
     AlterSubHandler() {;}
-    virtual ~AlterSubHandler() {;}
 };
 
+class AlterDispatcher;
 AlterDispatcher *buildAlterSubDispatcher();
