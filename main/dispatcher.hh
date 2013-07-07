@@ -36,7 +36,6 @@ public:
 
     std::map<long long, FetchMe> handlers; 
 
-protected:
     virtual ~Dispatcher() {
         auto cp = handlers;
         handlers.clear();
@@ -52,14 +51,10 @@ private:
 
 class SQLDispatcher : public Dispatcher<LEX*, SQLHandler*> {
     virtual long long extract(LEX* lex) const;
-public:
-    virtual ~SQLDispatcher() {;}
 };
 
 class AlterDispatcher : public Dispatcher<LEX*, AlterSubHandler*> {
     virtual long long extract(LEX* lex) const;
     long calculateMask() const;
-public:
-    virtual ~AlterDispatcher() {;}
 };
 

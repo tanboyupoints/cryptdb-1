@@ -2212,6 +2212,7 @@ ProxyState::~ProxyState()
     }
 }
 
+// TODO: Cleanup resources.
 Rewriter::~Rewriter()
 {
 }
