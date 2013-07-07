@@ -19,6 +19,8 @@ Misc Bugs
       > CREATE TABLE t (x integer, y varchar(100), z integer);
       > INSERT INTO t values (1, 'alice', NULL);
       # Crash doesn't happen if we build another table first.
+    * ALTER TABLE ... occasionally locks in
+      mysql_execute_query => pthread_cond_timedwait
 Finish removing MultiPrincipal code.
  - Test stuff.
  - Rewriter constructor.
