@@ -1,5 +1,5 @@
 #include <main/dml_handler.hh>
-#include <main/cdb_rewrite.hh>
+#include <main/rewrite_main.hh>
 #include <parser/lex_util.hh>
 #include <main/rewrite_util.hh>
 #include <main/dispatcher.hh>

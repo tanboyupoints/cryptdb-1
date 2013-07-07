@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <typeinfo>
 
-#include <main/cdb_rewrite.hh>
+#include <main/rewrite_main.hh>
 #include <main/rewrite_util.hh>
 #include <util/cryptdb_log.hh>
 #include <main/CryptoHandlers.hh>
@@ -24,18 +24,19 @@
 
 #include <main/MultiPrinc.hh>
 
-
+// gives names to classes and objects we don't care to know the name of 
+#define ANON                ANON_NAME(__anon_id_f_)
 
 using namespace std;
 
 
 CItemTypesDir itemTypes = CItemTypesDir();
 CItemFuncDir funcTypes = CItemFuncDir();
-CItemSumFuncDir sumFuncTypes = CItemSumFuncDir();
 CItemFuncNameDir funcNames = CItemFuncNameDir();
+CItemSumFuncDir sumFuncTypes = CItemSumFuncDir();
 
 
-class ANONF : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
+class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
     virtual RewritePlan * do_gather_type(Item_field *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << "FIELD_ITEM do_gather " << *i;
@@ -134,4 +135,4 @@ class ANONF : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         }
     }
 
-} ANONF;
+} ANON;

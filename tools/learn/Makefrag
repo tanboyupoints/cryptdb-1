@@ -14,6 +14,6 @@ $(OBJDIR)/tools/learn/$(EXECFILE): $(LEARN_OBJS) \
 	$(CXX) -o $@ $(LEARN_OBJS) $(LDFLAGS) \
 	       -ledbcrypto -ledbutil -ledbparser -lcryptdb
 
-CXXFLAGS += -Itools/learn -Imain/ 
+CXXFLAGS += -Itools/learn -Imain/ -Iutil/ 
 
 # vim: set noexpandtab:

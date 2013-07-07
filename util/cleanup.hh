@@ -9,11 +9,7 @@
 
 #define ANON_CONCAT2(a, b)  a ## b
 #define ANON_CONCAT(a, b)   ANON_CONCAT2(a, b)
-#define ANON                ANON_CONCAT(__anon_id_, __COUNTER__)
-// counter is file specific so need to define a differnet anonf for
-// rewrite_field
-// we would only have one ANON if  __FILE__ would not print whole path
-#define ANONF                ANON_CONCAT(__anon_id_f_, __COUNTER__)
+#define ANON_NAME(name) ANON_CONCAT(name, __COUNTER__)
 
 /*
  * Cleanup handler object: invokes the supplied function in its

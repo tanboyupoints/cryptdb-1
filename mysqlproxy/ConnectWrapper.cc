@@ -7,7 +7,7 @@
 #include <util/cryptdb_log.hh>
 #include <util/scoped_lock.hh>
 
-#include <main/cdb_rewrite.hh>
+#include <main/rewrite_main.hh>
 #include <parser/sql_utils.hh>
 
 

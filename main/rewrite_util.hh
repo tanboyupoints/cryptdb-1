@@ -32,6 +32,10 @@ gather(Item *i, reason &tr, Analysis & a);
 void
 analyze(Item *i, Analysis & a);
 
+
+void
+optimize(Item **i, Analysis &a);
+
 LEX *
 begin_transaction_lex(Analysis a);
 

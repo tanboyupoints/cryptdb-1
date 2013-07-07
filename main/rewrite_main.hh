@@ -33,6 +33,7 @@
 using namespace std;
 
 
+
 class FieldReturned {
 public:
     bool encrypted;
@@ -280,4 +281,6 @@ class CItemSubtypeFN : public CItemSubtype<T> {
  public:
     CItemSubtypeFN() { funcNames.reg(std::string(TYPE), this); }
 };
+
+
 

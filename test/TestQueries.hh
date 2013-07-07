@@ -8,7 +8,7 @@
 #include <signal.h>
 #include <stdlib.h>
 
-#include <main/cdb_rewrite.hh>
+#include <main/rewrite_main.hh>
 
 #include <test/test_utils.hh>
 

@@ -62,7 +62,7 @@ include util/Makefrag
 include udf/Makefrag
 include mysqlproxy/Makefrag
 include tools/import/Makefrag
-#include tools/learn/Makefrag
+include tools/learn/Makefrag
 
 $(OBJDIR)/.deps: $(foreach dir, $(OBJDIRS), $(wildcard $(OBJDIR)/$(dir)/*.d))
 	@mkdir -p $(@D)
