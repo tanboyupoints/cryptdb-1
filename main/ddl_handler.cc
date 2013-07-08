@@ -64,7 +64,6 @@ class CreateHandler : public DDLHandler {
             ostringstream s;
             s << " INSERT INTO pdb.table_info VALUES ("
               << " " << tm->tableNo << ", "
-              << " '" << tm->anonTableName << "', "
               << " '" << table << "', "
               << " " << bool_to_string(tm->hasSensitive) << ", "
               << " " << bool_to_string(tm->has_salt) << ", "
@@ -224,9 +223,6 @@ create_table_meta(Analysis & a, const string & table, LEX *lex,
     if (encByDefault) { //anonymize name
 	// such increment may cause problem with multiple proxies
         tm->tableNo = a.ps->schema->totalTables++;
-        tm->anonTableName = anonymizeTableName(tm->tableNo, table);
-    } else {
-        tm->anonTableName = table;
     }
 
     auto it = List_iterator<Create_field>(lex->alter_info.create_list);

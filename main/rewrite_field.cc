@@ -81,7 +81,7 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
 	// Encrypted item
 
-	res->table_name = make_thd_string(anonymize_table_name(i->table_name, a));
+	res->table_name = make_thd_string(a.getAnonTableName(i->table_name));
 	res->field_name = make_thd_string(fm->onions[constr.o]->onionname);
 
         return res;
@@ -124,14 +124,13 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
             string name = it->second->onionname;
 	    new_field = make_item(i, name);
             new_field->table_name =
-                make_thd_string(anonymize_table_name(i->table_name, a));
+                make_thd_string(a.getAnonTableName(i->table_name));
             l.push_back(new_field);
         }
         if (fm->has_salt) {
-            assert(!fm->salt_name.empty());
 	    assert(new_field); //need an anonymized field as template to create
 			       //salt item
-            l.push_back(make_item(new_field, fm->salt_name));
+            l.push_back(make_item(new_field, fm->saltName()));
         }
     }
 

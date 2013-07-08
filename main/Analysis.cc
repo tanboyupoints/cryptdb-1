@@ -227,6 +227,12 @@ bool Analysis::tableMetaExists(std::string table) const
     return ps->schema->getTableMeta(real_table_name);
 }
 
+std::string Analysis::getAnonTableName(const string &table) const
+{
+    TableMeta *tm = this->getTableMeta(table);
+    return tm->anonTableName();
+}
+
 std::string Analysis::unAliasTable(std::string table) const
 {
     auto alias_pair = table_aliases.find(table);

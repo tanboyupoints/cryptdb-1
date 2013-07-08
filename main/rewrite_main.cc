@@ -55,7 +55,7 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id);
 //TODO: rewrite_proj may not need to be part of each class;
 // it just does gather, choos and then rewrite
 
-static Item *
+static Item_field *
 stringToItemField(string field, string table, Item_field * itf) {
 
     THD * thd = current_thd;
@@ -104,7 +104,6 @@ createMetaTablesIfNotExists(ProxyState & ps)
     assert(ps.e_conn->execute(
                 " CREATE TABLE IF NOT EXISTS pdb.table_info"
                 " (number bigint NOT NULL UNIQUE,"
-                "  anonymous_name varchar(64) NOT NULL UNIQUE,"
                 "  name varchar(64) NOT NULL UNIQUE,"
                 "  has_sensitive boolean,"
                 "  has_salt boolean,"
@@ -118,7 +117,6 @@ createMetaTablesIfNotExists(ProxyState & ps)
       << "  name varchar(64) NOT NULL,"
       << "  ndex bigint NOT NULL,"
       << "  has_salt boolean,"
-      << "  salt_name varchar(64),"
       << "  onion_layout enum"
       << " " << TypeText<onionlayout>::parenList().c_str() << " NOT NULL,"
       << "  id SERIAL PRIMARY KEY)"
@@ -184,7 +182,7 @@ buildTableMeta(ProxyState &ps)
 
     DBResult *dbres;
     assert(ps.e_conn->execute(
-                " SELECT number, anonymous_name, name, has_sensitive,"
+                " SELECT number, name, has_sensitive,"
                 "        has_salt, salt_name, database_name"
                 " FROM pdb.table_info", dbres));
     ScopedMySQLRes r(dbres->n);
@@ -194,18 +192,16 @@ buildTableMeta(ProxyState &ps)
         assert(l != NULL);
 
         string table_number(row[0], l[0]);
-        string table_anonymous_name(row[1], l[1]);
-        string table_name(row[2], l[2]);
-        string table_has_sensitive(row[3], l[3]);
-        string table_has_salt(row[4], l[4]);
-        string table_salt_name(row[5], l[5]);
-        string table_database_name(row[6], l[6]);
+        string table_name(row[1], l[1]);
+        string table_has_sensitive(row[2], l[2]);
+        string table_has_salt(row[3], l[3]);
+        string table_salt_name(row[4], l[4]);
+        string table_database_name(row[5], l[5]);
 
         // FIXME: Signed to unsigned conversion.
         unsigned int int_table_number = atoi(table_number.c_str());
         TableMeta *tm =
             ps.schema->createTableMeta(table_name,
-                                       table_anonymous_name,
                                        string_to_bool(table_has_sensitive),
                                        string_to_bool(table_has_salt),
                                        table_salt_name,
@@ -221,8 +217,7 @@ static void
 buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
 {
 
-    string q = " SELECT f.name, f.ndex, f.has_salt, f.salt_name,"
-               "        f.onion_layout, f.id"
+    string q = " SELECT f.name, f.ndex, f.has_salt, f.onion_layout, f.id"
                " FROM pdb.table_info t, pdb.field_info f"
                " WHERE t.database_name = '" + database_name + "' "
                "   AND t.number = " + std::to_string(tm->tableNo) +
@@ -240,16 +235,14 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
         string field_name(row[0], l[0]);
         string field_ndex(row[1], l[1]);
         string field_has_salt(row[2], l[2]);
-        string field_salt_name(row[3], l[3]);
-        string field_onion_layout(row[4], l[4]);
-        string field_id(row[5], l[5]);
+        string field_onion_layout(row[3], l[3]);
+        string field_id(row[4], l[4]);
 
         FieldMeta *fm = new FieldMeta;
         fm->tm = tm;
         fm->fname = field_name;
         fm->index = atoi(field_ndex.c_str());
         fm->has_salt = string_to_bool(field_has_salt);
-        fm->salt_name = field_salt_name;
         fm->onion_layout =
             TypeText<onionlayout>::toType(field_onion_layout);
 
@@ -328,10 +321,6 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
         onion o = TypeText<onion>::toType(onion_type);
         fm->onions[o] = om;
 
-        // Then, build EncLayer subclasses.
-        string uniqueFieldName = fullName(om->onionname,
-                                         fm->tm->anonTableName);
-
         // Add elements to OnionMeta.layers starting with the bottom layer
         // and stopping at the current level.
         std::map<SECLEVEL, std::string> layer_serial =
@@ -340,12 +329,8 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
         SECLEVEL current_level =
             TypeText<SECLEVEL>::toType(onion_current_level);
         for (auto it: layers) {
-            EncLayer *enc_layer;
-            string uniqueFieldName = fullName(om->onionname,
-                                              fm->tm->anonTableName);
-
-	    enc_layer =
-		EncLayerFactory<std::string>::encLayerFromSerial(o, it, om->sql_type, layer_serial[it]);
+            EncLayer *enc_layer =
+		EncLayerFactory::encLayerFromSerial(o, it, om->sql_type, layer_serial[it]);
 
             om->layers.push_back(enc_layer);
             SECLEVEL onion_level = fm->getOnionLevel(o);
@@ -506,14 +491,15 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
 
     OnionMeta * om    = getAssert(fm->onions, o);
     string fieldanon  = om->onionname;
-    string tableanon  = fm->tm->anonTableName;
+    string tableanon  = fm->tm->anonTableName();
 
     //removes onion layer at the DB
     stringstream query;
     query << "UPDATE " << tableanon << " SET " << fieldanon  << " = ";
 
-    Item * decUDF = om->layers.back()->decryptUDF(stringToItemField(fieldanon,     tableanon, itf),
-		  				  stringToItemField(fm->salt_name, tableanon, itf));
+    Item_field *field = stringToItemField(fieldanon, tableanon, itf);
+    Item_field *salt = stringToItemField(fm->saltName(), tableanon, itf);
+    Item * decUDF = om->layers.back()->decryptUDF(field, salt);
 
     query << *decUDF << ";";
 
@@ -953,7 +939,7 @@ processAnnotation(Annotation annot, Analysis &a)
         Create_field * cf = fm->onions[o]->layers.back()->newCreateField(onionname);
 
         stringstream query;
-        query << "ALTER TABLE " << fm->tm->anonTableName;
+        query << "ALTER TABLE " << fm->tm->anonTableName();
 
         switch (o) {
         case oDET:
@@ -979,8 +965,8 @@ processAnnotation(Annotation annot, Analysis &a)
         query_list.push_back(query.str());
     }
 
-    query_list.push_back("ALTER TABLE " + fm->tm->anonTableName  +
-                         " ADD " + fm->salt_name + " " + TN_SALT +
+    query_list.push_back("ALTER TABLE " + fm->tm->anonTableName()  +
+                         " ADD " + fm->saltName() + " " + TN_SALT +
                          " AFTER " + onionname + ";");
 
     return query_list;

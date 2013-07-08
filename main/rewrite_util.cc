@@ -8,17 +8,6 @@ using namespace std;
 
 extern CItemTypesDir itemTypes;
 
-string
-anonymize_table_name(const string &tname,
-                     Analysis & a)
-{
-    TableMeta *tm = a.getTableMeta(tname);
-    assert(tm);
-
-    return tm->anonTableName;
-}
-
-
 void
 optimize(Item **i, Analysis &a) {
    //TODO
@@ -61,8 +50,8 @@ rewrite_table_list(TABLE_LIST *t, Analysis &a)
     // Table name can only be empty when grouping a nested join.
     assert(t->table_name || t->nested_join);
     if (t->table_name) {
-        string anon_name = anonymize_table_name(string(t->table_name,
-                                                       t->table_name_length), a);
+        string anon_name = a.getAnonTableName(string(t->table_name,
+                                                     t->table_name_length));
         new_t->table_name = make_thd_string(anon_name, &new_t->table_name_length);
         new_t->alias = make_thd_string(anon_name);
         new_t->next_local = NULL;
@@ -180,11 +169,55 @@ commit_transaction_lex(Analysis a) {
     return commit_parse->lex();
 }
 
-static void
-rewrite_key(const string &table_name, Key *k, Analysis &a, vector<Key*> &l)
+//TODO: no need to pass create_field to this
+static vector<Create_field *>
+rewrite_create_field(const string &table_name, Create_field *f,
+                     const Analysis &a)
 {
-    //TODO
-    l.push_back(k);
+    LOG(cdb_v) << "in rewrite create field for " << *f;
+
+    vector<Create_field *> output_cfields;
+    FieldMeta *fm = a.getFieldMeta(table_name, f->field_name);
+
+    if (!fm->isEncrypted()) {
+        // Unencrypted field
+        output_cfields.push_back(f);
+        return output_cfields;
+    }
+
+    // Encrypted field
+
+    //check if field is not encrypted
+    if (fm->onions.empty()) {
+        output_cfields.push_back(f);
+        //cerr << "onions were empty" << endl;
+        return output_cfields;
+    }
+
+    // create each onion column
+    for (auto oit = fm->onions.begin();
+         oit != fm->onions.end();
+         ++oit) {
+	EncLayer * last_layer = oit->second->layers.back();
+	//create field with anonymous name
+	Create_field * new_cf = last_layer->newCreateField(oit->second->onionname.c_str());
+
+        output_cfields.push_back(new_cf);
+    }
+
+    // create salt column
+    if (fm->has_salt) {
+        //cerr << fm->salt_name << endl;
+        THD *thd         = current_thd;
+        Create_field *f0 = f->clone(thd->mem_root);
+        f0->field_name   = thd->strdup(fm->saltName().c_str());
+	f0->flags = f0->flags | UNSIGNED_FLAG;//salt is unsigned
+        f0->sql_type     = MYSQL_TYPE_LONGLONG;
+	f0->length       = 8;
+        output_cfields.push_back(f0);
+    }
+
+    return output_cfields;
 }
 
 void
@@ -196,24 +229,50 @@ do_field_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
     List<Create_field> newList;
     new_lex->alter_info.create_list =
         reduceList<Create_field>(cl_it, newList, [table, &a] (List<Create_field> out_list, Create_field *cf) {
-            vector<Create_field *> l;
-            rewrite_create_field(table, cf, a, l);
-            List<Create_field> temp_list = vectorToList(l);
-            out_list.concat(&temp_list);
+            out_list.concat(vectorToList(rewrite_create_field(table, cf, a)));
             return out_list; /* lambda */
          });
+}
 
-    auto k_it = List_iterator<Key>(lex->alter_info.key_list);
-    List<Key> newList0;
+// TODO: Add Key for oDET onion as well.
+// TODO: Anonymize index name (key->name).
+static vector<Key*>
+rewrite_key(const string &table, Key *key, const Analysis &a)
+{
+    vector<Key*> output_keys;
+    Key *new_key = key->clone(current_thd->mem_root);    
+    auto col_it =
+        List_iterator<Key_part_spec>(key->columns);
+    new_key->columns = 
+        reduceList<Key_part_spec>(col_it,
+                                  List<Key_part_spec>(),
+            [table, a] (List<Key_part_spec> out_field_list,
+                        Key_part_spec *key_part) {
+                string field_name =
+                    convert_lex_str(key_part->field_name);
+                FieldMeta *fm =
+                    a.getFieldMeta(table, field_name);
+                key_part->field_name = 
+                    string_to_lex_str(fm->onions[oOPE]->onionname);
+                out_field_list.push_back(key_part);
+                return out_field_list;
+            });
+    output_keys.push_back(new_key);
+
+    return output_keys;
+}
+
+void
+do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
+{
+    // Rewrite the index names and choose the onion to apply it too.
+    auto key_it = List_iterator<Key>(lex->alter_info.key_list);
     new_lex->alter_info.key_list =
-        reduceList<Key>(k_it, newList0, [table, &a] (List<Key> out_list,
-                                                     Key *k) {
-            vector<Key *> l;
-            rewrite_key(table, k, a, l);
-            List<Key> temp_list = vectorToList(l);
-            out_list.concat(&temp_list);
-            return out_list; /* lambda */
-        });
+        reduceList<Key>(key_it, List<Key>(),
+            [table, a] (List<Key> out_list, Key *key) {
+                out_list.concat(vectorToList(rewrite_key(table, key, a)));
+                return out_list;
+            });
 }
 
 // If mkey == NULL, the field is not encrypted
@@ -237,14 +296,11 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
 
         if (mKey) {
             //generate enclayers for encrypted field
+            string uniqueFieldName = fm->fullName(o);
             for (auto l: it.second) {
                 string key;
-
-                // TODO(burrows): This can be pulled out of loop.
-                string uniqueFieldName = fullName(om->onionname,
-                                                  fm->tm->anonTableName);
                 key = getLayerKey(mKey, uniqueFieldName, l);
-                om->layers.push_back(EncLayerFactory<string>::encLayer(o, l, cf, key));
+                om->layers.push_back(EncLayerFactory::encLayer(o, l, cf, key));
             }
         }
 
@@ -268,7 +324,6 @@ init_onions(AES_KEY * mKey, FieldMeta * fm, Create_field * cf, uint index) {
     // Encrypted field
 
     fm->has_salt = true;
-    fm->salt_name = getFieldSalt(index, fm->tm->anonTableName);
 
     if (IsMySQLTypeNumeric(cf->sql_type)) {
         init_onions_layout(mKey, fm, index, cf, NUM_ONION_LAYOUT);
@@ -277,6 +332,7 @@ init_onions(AES_KEY * mKey, FieldMeta * fm, Create_field * cf, uint index) {
     }
 }
 
+// TODO: Should be constructor.
 bool
 create_field_meta(TableMeta *tm, Create_field *field,
                   const Analysis a, bool encByDefault)
@@ -346,7 +402,6 @@ do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
           << " '" << fm->fname << "', "
           << " " << fm->index << ", "
           << " " << bool_to_string(fm->has_salt) << ", "
-          << " '" << fm->salt_name << "',"
           << " '" << TypeText<onionlayout>::toText(fm->onion_layout)<< "',"
           << " 0"
           << " );";
@@ -410,54 +465,6 @@ do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
     }
 
     return true;
-}
-
-//TODO: no need to pass create_field to this
-void rewrite_create_field(const string &table_name, Create_field *f,
-                          const Analysis &a, vector<Create_field *> &l)
-{
-    LOG(cdb_v) << "in rewrite create field for " << *f;
-
-    FieldMeta *fm = a.getFieldMeta(table_name, f->field_name);
-
-    if (!fm->isEncrypted()) {
-        // Unencrypted field
-        l.push_back(f);
-        return;
-    }
-
-    // Encrypted field
-
-    //check if field is not encrypted
-    if (fm->onions.empty()) {
-        l.push_back(f);
-        //cerr << "onions were empty" << endl;
-        return;
-    }
-
-    // create each onion column
-    for (auto oit = fm->onions.begin();
-         oit != fm->onions.end();
-         ++oit) {
-	EncLayer * last_layer = oit->second->layers.back();
-	//create field with anonymous name
-	Create_field * new_cf = last_layer->newCreateField(oit->second->onionname.c_str());
-
-        l.push_back(new_cf);
-    }
-
-    // create salt column
-    if (fm->has_salt) {
-        //cerr << fm->salt_name << endl;
-        assert(!fm->salt_name.empty());
-        THD *thd         = current_thd;
-        Create_field *f0 = f->clone(thd->mem_root);
-        f0->field_name   = thd->strdup(fm->salt_name.c_str());
-	f0->flags = f0->flags | UNSIGNED_FLAG;//salt is unsigned
-        f0->sql_type     = MYSQL_TYPE_LONGLONG;
-	f0->length       = 8;
-        l.push_back(f0);
-    }
 }
 
 std::string

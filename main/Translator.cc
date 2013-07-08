@@ -8,38 +8,7 @@
 #include <main/Translator.hh>
 #include <util/cryptdb_log.hh>
 
-
 using namespace std;
-
-/* moved to edb/sql_utils
-string
-fullName(string field, string table)
-{
-    if (isTableField(field)) {
-        return field;
-    } else {
-        return table + "." + field;
-    }
-}
-
-bool
-isTableField(string token)
-{
-    size_t pos = token.find(".");
-
-    if (pos == string::npos) {
-        return false;
-    } else {
-        return true;
-    }
-}
-*/
-
-string
-anonymizeTableName(unsigned int tableNo, string tableName)
-{
-    return string("table") + strFromVal((uint32_t)tableNo);
-}
 
 string
 anonymizeFieldName(unsigned int index, onion o, string origname, bool multiPrinc)
@@ -103,11 +72,6 @@ string
 getTableSalt(string anonTableName) {
     return BASE_SALT_NAME + "_t_" + anonTableName;
 }
-string
-getFieldSalt(unsigned int index, string anonTableName) {
-    return BASE_SALT_NAME + "_f_" + StringFromVal(index)+"_"+anonTableName;
-}
-
 
 bool
 isSalt(string id, bool & isTableSalt)

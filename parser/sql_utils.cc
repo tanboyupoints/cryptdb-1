@@ -33,8 +33,6 @@ init_mysql(const string & embed_db)
     lib_initialized = true;
 }
 
-
-
 bool
 isTableField(string token)
 {
@@ -47,6 +45,8 @@ isTableField(string token)
     }
 }
 
+// NOTE: Use FieldMeta::fullName if you know what onion's full name you
+// need.
 string
 fullName(string field, string table)
 {

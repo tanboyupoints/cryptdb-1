@@ -7,12 +7,6 @@
 #include <sql_list.h>
 #include <sql_table.h>
 
-// anonymizes table name based on the information in a.schema
-// TODO(burrows): Do we want to handle aliasing here, or up a level?
-std::string
-anonymize_table_name(const std::string &tname,
-                     Analysis & a);
-
 Item *
 rewrite(Item *i, const OLK & constr, Analysis &a, string context = "");
 
@@ -32,7 +26,6 @@ gather(Item *i, reason &tr, Analysis & a);
 void
 analyze(Item *i, Analysis & a);
 
-
 void
 optimize(Item **i, Analysis &a);
 
@@ -45,6 +38,9 @@ commit_transaction_lex(Analysis a);
 void
 do_field_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a);
 
+void
+do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a);
+
 bool
 create_field_meta(TableMeta *tm, Create_field *field,
                   const Analysis a, bool encByDefault);
@@ -52,10 +48,6 @@ create_field_meta(TableMeta *tm, Create_field *field,
 bool
 do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
              std::string table, unsigned long long *tid=NULL);
-
-void
-rewrite_create_field(const string &table_name, Create_field *f,
-                     const Analysis &a, vector<Create_field *> &l);
 
 std::string
 bool_to_string(bool b);

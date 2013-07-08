@@ -39,11 +39,12 @@ reduceList(List_iterator<T> it, O init, F op) {
     return accum;
 }
 
-template <typename T> List<T>
+// FIXME: Concating this into a mysql List is likely introducting a memleak.
+template <typename T> List<T> *
 vectorToList(std::vector<T*> v) {
-    List<T> lst;
+    List<T> *lst = new List<T>;
     for (auto it : v) {
-        lst.push_back(it);
+        lst->push_back(it);
     }
 
     return lst;
