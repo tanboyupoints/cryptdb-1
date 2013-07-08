@@ -108,7 +108,7 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
                 assert_s(fm->setOnionLevel(o, level), "cannot set onion to requested level");
             }
 
-            string onionname = fm->onions[o]->onionname;
+            string onionname = fm->onions[o]->getAnonOnionName();
             Create_field * cf = fm->onions[o]->layers.back()->newCreateField(onionname);
 
             stringstream query;
@@ -120,7 +120,7 @@ MultiPrinc::processAnnotation(Annotation &annot, bool &encryptfield,
                 query << " ADD " << *cf << " AFTER " << prev_onion << ";";
             }
 
-            prev_onion = fm->onions[o]->onionname;
+            prev_onion = fm->onions[o]->getAnonOnionName();
             query_list.push_back(query.str());
         }
      }

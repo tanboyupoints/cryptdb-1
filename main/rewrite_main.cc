@@ -307,18 +307,18 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
         unsigned long *l = mysql_fetch_lengths(r.res());
         assert(l != NULL);
 
-        string onion_name(row[0], l[0]);
+        // FIXME: Remove.
+        // string onion_name(row[0], l[0]);
         string onion_type(row[1], l[1]);
         string onion_current_level(row[2], l[2]);
         string onion_sql_type(row[3], l[3]);
         string onion_id(row[4], l[4]);
 
-        OnionMeta *om = new OnionMeta();
-        om->onionname = onion_name;
+        onion o = TypeText<onion>::toType(onion_type);
+        OnionMeta *om = new OnionMeta(o, fm->index, fm->fname);
         om->sql_type  =
             TypeText<enum enum_field_types>::toType(onion_sql_type);
 
-        onion o = TypeText<onion>::toType(onion_type);
         fm->onions[o] = om;
 
         // Add elements to OnionMeta.layers starting with the bottom layer
@@ -490,7 +490,7 @@ static void
 removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEVEL & new_level, const string & cur_db) {
 
     OnionMeta * om    = getAssert(fm->onions, o);
-    string fieldanon  = om->onionname;
+    string fieldanon  = om->getAnonOnionName();
     string tableanon  = fm->tm->anonTableName();
 
     //removes onion layer at the DB
@@ -935,7 +935,7 @@ processAnnotation(Annotation annot, Analysis &a)
 
     for (auto pr : fm->onions) {
         onion o = pr.first;
-        onionname = fm->onions[o]->onionname;
+        onionname = fm->onions[o]->getAnonOnionName();
         Create_field * cf = fm->onions[o]->layers.back()->newCreateField(onionname);
 
         stringstream query;
@@ -948,15 +948,15 @@ processAnnotation(Annotation annot, Analysis &a)
             break;
         case oOPE:
             LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets OPE onion";
-            query << " ADD " << *cf << " AFTER " << fm->onions[oDET]->onionname << ";";
+            query << " ADD " << *cf << " AFTER " << fm->onions[oDET]->getAnonOnionName() << ";";
             break;
         case oAGG:
             LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets AGG onion";
-            query << " ADD " << *cf <<  " AFTER " << fm->onions[oOPE]->onionname << ";";
+            query << " ADD " << *cf <<  " AFTER " << fm->onions[oOPE]->getAnonOnionName() << ";";
             break;
         case oSWP:
             LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets SWP onion";
-            query << " ADD " << *cf << " AFTER " << fm->onions[oOPE]->onionname << ";";
+            query << " ADD " << *cf << " AFTER " << fm->onions[oOPE]->getAnonOnionName() << ";";
             break;
         default:
             assert_s(false, "unknown onion type");

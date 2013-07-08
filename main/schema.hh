@@ -3,7 +3,7 @@
 #include <parser/embedmysql.hh>
 #include <parser/stringify.hh>
 #include <main/CryptoHandlers.hh>
-
+#include <main/Translator.hh>
 
 #include <string>
 #include <map>
@@ -54,7 +54,6 @@ operator<<(std::ostream &out, const OnionLevelFieldPair &p);
 
 
 typedef struct OnionMeta {
-    std::string onionname;
     enum enum_field_types sql_type;
     std::vector<EncLayer *> layers; //first in list is lowest layer
 
@@ -63,7 +62,12 @@ typedef struct OnionMeta {
         return layers.back()->level();
     }
 
-    OnionMeta(): onionname("")  {};
+    OnionMeta(onion o, unsigned int field_index, std::string field_name) 
+        : onionname(anonymizeFieldName(field_index, o, field_name))  {};
+    std::string getAnonOnionName() const;
+
+private:
+    const std::string onionname;
 } OnionMeta;
 
 struct TableMeta;

@@ -200,7 +200,8 @@ rewrite_create_field(const string &table_name, Create_field *f,
          ++oit) {
 	EncLayer * last_layer = oit->second->layers.back();
 	//create field with anonymous name
-	Create_field * new_cf = last_layer->newCreateField(oit->second->onionname.c_str());
+	Create_field * new_cf =
+            last_layer->newCreateField(oit->second->getAnonOnionName().c_str());
 
         output_cfields.push_back(new_cf);
     }
@@ -253,7 +254,7 @@ rewrite_key(const string &table, Key *key, const Analysis &a)
                 FieldMeta *fm =
                     a.getFieldMeta(table, field_name);
                 key_part->field_name = 
-                    string_to_lex_str(fm->onions[oOPE]->onionname);
+                    string_to_lex_str(fm->onions[oOPE]->getAnonOnionName());
                 out_field_list.push_back(key_part);
                 return out_field_list;
             });
@@ -287,10 +288,9 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
 
     for (auto it: ol) {
         onion o = it.first;
-        OnionMeta * om = new OnionMeta();
+        OnionMeta * om = new OnionMeta(o, index, fm->fname);
         fm->onions[o] = om;
 
-        om->onionname = anonymizeFieldName(index, o, fm->fname, false);
         // HACK(burrows)
         om->sql_type = cf->sql_type;
 
@@ -304,7 +304,7 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
             }
         }
 
-        LOG(cdb_v) << "adding onion layer " << om->onionname << " for " << fm->fname;
+        LOG(cdb_v) << "adding onion layer " << om->getAnonOnionName() << " for " << fm->fname;
 
         //set outer layer
         // fm->setCurrentOnionLevel(o, it.second.back());
@@ -422,7 +422,8 @@ do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
             std::string str_onion  = TypeText<onion>::toText(o);
             s << " INSERT INTO pdb.onion_info VALUES ("
               << " " << std::to_string(fieldID) << ", "
-              << " '" << om->onionname << "', "
+              // FIXME: Remove.
+              << " '" << om->getAnonOnionName() << "', "
               << " '" << str_onion << "', "
               << " '" << str_seclevel << "', "
               << " '" << TypeText<enum enum_field_types>::toText(om->sql_type) << "', "
