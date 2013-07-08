@@ -12,6 +12,10 @@ static void
 create_table_meta(Analysis & a, const string & table, LEX *lex,
                   bool encByDefault);
 
+// > TODO: mysql permits a single ALTER TABLE command to invoke _multiple_
+//   and _different_ subcommands.
+//   ie, ALTER TABLE t ADD COLUMN x integer, ADD INDEX i (z);
+//   Currently we do not support mixed operations.
 class AlterHandler : public DDLHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {

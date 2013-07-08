@@ -227,10 +227,11 @@ do_field_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
     // TODO(stephentu): template this pattern away
     // (borrowed from rewrite_select_lex())
     auto cl_it = List_iterator<Create_field>(lex->alter_info.create_list);
-    List<Create_field> newList;
     new_lex->alter_info.create_list =
-        reduceList<Create_field>(cl_it, newList, [table, &a] (List<Create_field> out_list, Create_field *cf) {
-            out_list.concat(vectorToList(rewrite_create_field(table, cf, a)));
+        reduceList<Create_field>(cl_it, List<Create_field>(),
+            [table, &a] (List<Create_field> out_list, Create_field *cf) {
+                out_list.concat(vectorToList(rewrite_create_field(table, cf,
+                                                                  a)));
             return out_list; /* lambda */
          });
 }
@@ -245,8 +246,7 @@ rewrite_key(const string &table, Key *key, const Analysis &a)
     auto col_it =
         List_iterator<Key_part_spec>(key->columns);
     new_key->columns = 
-        reduceList<Key_part_spec>(col_it,
-                                  List<Key_part_spec>(),
+        reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
             [table, a] (List<Key_part_spec> out_field_list,
                         Key_part_spec *key_part) {
                 string field_name =

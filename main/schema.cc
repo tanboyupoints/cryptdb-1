@@ -36,10 +36,8 @@ std::string FieldMeta::saltName() const
 {
     assert(has_salt);
 
-    static std::string sname = 
-        BASE_SALT_NAME + "_f_"+StringFromVal(index)+"_"+tm->anonTableName();
-
-    return sname;
+    return BASE_SALT_NAME + "_f_" + StringFromVal(index) + "_" +
+           tm->anonTableName();
 }
 
 std::string FieldMeta::fullName(onion o) const
@@ -107,10 +105,7 @@ TableMeta::~TableMeta()
 // FIXME: May run into problems where a plaintext table expects the regular
 // name, but it shouldn't get that name from 'anonTableName' anyways.
 std::string TableMeta::anonTableName() const {
-    static std::string tname =
-        std::string("table") + strFromVal((uint32_t)tableNo);
-
-    return tname;
+    return std::string("table") + strFromVal((uint32_t)tableNo);
 }
 
 // table_no: defaults to NULL indicating we are to generate it ourselves.
