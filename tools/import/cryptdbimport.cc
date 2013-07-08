@@ -74,15 +74,13 @@ Import::executeQueries(Rewriter& r)
 #define TMP_HACK
 #ifdef TMP_HACK
         // Avoid SQL statements that are under impl. & fixes
-        if(line.compare(0,15,"CREATE DATABASE") == 0)
+        if(line.compare(0,strlen("CREATE DATABASE"),"CREATE DATABASE") == 0)
             continue;
-        if(line.compare(0,3,"USE") == 0)
+        if(line.compare(0,strlen("DROP DATABASE"),"DROP DATABASE") == 0)
             continue;
-        if(line.compare(0,13,"DROP DATABASE") == 0)
+        if(line.compare(0,strlen("LOCK"),"LOCK") == 0)
             continue;
-        if(line.compare(0,4,"LOCK") == 0)
-            continue;
-        if(line.compare(0,6,"UNLOCK") == 0)
+        if(line.compare(0,strlen("UNLOCK"),"UNLOCK") == 0)
             continue;
 #endif
         if (!line.empty()){
