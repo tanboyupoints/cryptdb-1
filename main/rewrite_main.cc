@@ -128,7 +128,6 @@ createMetaTablesIfNotExists(ProxyState & ps)
 
     s << " CREATE TABLE IF NOT EXISTS pdb.onion_info"
       << " (field_info_id bigint NOT NULL," // Foreign key.
-      << "  name varchar(64) NOT NULL,"
       << "  type enum"
       << " " << TypeText<onion>::parenList() << " NOT NULL,"
       << "  current_level enum"
@@ -293,8 +292,7 @@ static void
 buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
 {
 
-    string q = " SELECT o.name, o.type, o.current_level,"
-               "        o.sql_type, o.id"
+    string q = " SELECT o.type, o.current_level, o.sql_type, o.id"
                " FROM pdb.onion_info o, pdb.field_info f"
                " WHERE o.field_info_id = " + std::to_string(field_id) +";";
 
@@ -307,12 +305,10 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
         unsigned long *l = mysql_fetch_lengths(r.res());
         assert(l != NULL);
 
-        // FIXME: Remove.
-        // string onion_name(row[0], l[0]);
-        string onion_type(row[1], l[1]);
-        string onion_current_level(row[2], l[2]);
-        string onion_sql_type(row[3], l[3]);
-        string onion_id(row[4], l[4]);
+        string onion_type(row[0], l[0]);
+        string onion_current_level(row[1], l[1]);
+        string onion_sql_type(row[2], l[2]);
+        string onion_id(row[3], l[3]);
 
         onion o = TypeText<onion>::toType(onion_type);
         OnionMeta *om = new OnionMeta(o, fm->index, fm->fname);

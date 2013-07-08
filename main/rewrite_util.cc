@@ -422,8 +422,6 @@ do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
             std::string str_onion  = TypeText<onion>::toText(o);
             s << " INSERT INTO pdb.onion_info VALUES ("
               << " " << std::to_string(fieldID) << ", "
-              // FIXME: Remove.
-              << " '" << om->getAnonOnionName() << "', "
               << " '" << str_onion << "', "
               << " '" << str_seclevel << "', "
               << " '" << TypeText<enum enum_field_types>::toText(om->sql_type) << "', "
