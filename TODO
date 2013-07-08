@@ -63,27 +63,34 @@ Import tool notes:
         switched to plain (default) dump file format and parser took less than 20 lines of code, very simple. 
 
 
-Both:
-unimplemented gather/rewrite for other functions, search through cdb_rewrite.cc
-date
-
---------------
+    4. Testing:
+      -- make old tests work again
+      -- test aliases
+      -- join
+      -- update + increment
+      (by Wed)
+      -- soon: decimal, varchar, char[lengths], (should be ready by Wed)
+      
 
 Raluca:
-partition cdb_rewrite.cc
-by monday: finish reorganizing crypto handlers to allow different data types like decimal, varchar
+by monday: finish reorganizing crypto handlers to allow different data types like varchar
++ bug in loading tool
+by tue: decimal
+
+Aaron:
+tue: put proxy back, rewriter not execute onion lowering any more, but just return as list of queries
 
 
-Raluca & Aaron:
-tue: deicmal + varchar
-wed: timestamp and date
 
-Thur - Sun:
+
+All: Thur - Sun:
 work on proxy, concurrency, connections 
+testing
+wed: timestamp and date
 
 All:
 Monday 15 start on sql.mit.edu
-
+proxy back up and setup for sql.mit.edu
 
 
 

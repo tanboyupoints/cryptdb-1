@@ -1,2 +1,12 @@
--- is it really needed to convert to int integers and salt when we can work with binaries in mysql as well?
--- 
+
+Carlos:
+loading,
+training,
+! testing by end of this week 
+
+Aaron:
+Monday + Tue : setup proxy & fix connections
+Wed: time stamp and date
+
+others:
+setup proxy to talk to us
