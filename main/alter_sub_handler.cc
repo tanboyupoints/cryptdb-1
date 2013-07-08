@@ -46,6 +46,8 @@ class AddColumnSubHandler : public AlterSubHandler {
             rewrite_table_list(lex->select_lex.table_list, a);
 
         do_field_rewriting(lex, new_lex, table, a);
+        // TODO: Should this be here?
+        do_key_rewriting(lex, new_lex, table, a);
         return single_lex_output(new_lex, out_lex_count);
     }
 };
@@ -170,33 +172,7 @@ class AddIndexSubHandler : public AlterSubHandler {
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a);
 
-        // Rewrite the index names and choose the onion to apply it too.
-        auto key_it = List_iterator<Key>(lex->alter_info.key_list);
-        new_lex->alter_info.key_list =
-            reduceList<Key>(key_it, List<Key>(),
-                [table, a] (List<Key> out_list, Key *key) {
-                    // TODO: key->name;
-                    auto col_it =
-                        List_iterator<Key_part_spec>(key->columns);
-                    key->columns = 
-                        reduceList<Key_part_spec>(col_it,
-                                                  List<Key_part_spec>(),
-                            [table, a] (List<Key_part_spec> out_field_list,
-                                        Key_part_spec *key_part) {
-                                string field_name =
-                                    convert_lex_str(key_part->field_name);
-                                FieldMeta *fm =
-                                    a.getFieldMeta(table, field_name);
-                                // TODO: Algorithm for determimining which
-                                // onion to apply the index to.
-                                key_part->field_name = 
-                                    string_to_lex_str(fm->onions[oOPE]->onionname);
-                                out_field_list.push_back(key_part);
-                                return out_field_list;
-                            }); 
-                    out_list.push_back(key);
-                    return out_list;
-                });
+        do_key_rewriting(lex, new_lex, table, a);
 
         return single_lex_output(new_lex, out_lex_count);
     }

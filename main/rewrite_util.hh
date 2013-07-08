@@ -45,6 +45,9 @@ commit_transaction_lex(Analysis a);
 void
 do_field_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a);
 
+void
+do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a);
+
 bool
 create_field_meta(TableMeta *tm, Create_field *field,
                   const Analysis a, bool encByDefault);

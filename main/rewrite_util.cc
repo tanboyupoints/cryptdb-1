@@ -180,12 +180,14 @@ commit_transaction_lex(Analysis a) {
     return commit_parse->lex();
 }
 
+/*
 static void
 rewrite_key(const string &table_name, Key *k, Analysis &a, vector<Key*> &l)
 {
-    //TODO
-    l.push_back(k);
+    // TODO
+    // l.push_back(k);
 }
+*/
 
 void
 do_field_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
@@ -202,18 +204,39 @@ do_field_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
             out_list.concat(&temp_list);
             return out_list; /* lambda */
          });
+}
 
-    auto k_it = List_iterator<Key>(lex->alter_info.key_list);
-    List<Key> newList0;
+// TODO: Use rewrite_key.
+void
+do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
+{
+    // Rewrite the index names and choose the onion to apply it too.
+    auto key_it = List_iterator<Key>(lex->alter_info.key_list);
     new_lex->alter_info.key_list =
-        reduceList<Key>(k_it, newList0, [table, &a] (List<Key> out_list,
-                                                     Key *k) {
-            vector<Key *> l;
-            rewrite_key(table, k, a, l);
-            List<Key> temp_list = vectorToList(l);
-            out_list.concat(&temp_list);
-            return out_list; /* lambda */
-        });
+        reduceList<Key>(key_it, List<Key>(),
+            [table, a] (List<Key> out_list, Key *key) {
+                // TODO: key->name;
+                auto col_it =
+                    List_iterator<Key_part_spec>(key->columns);
+                key->columns = 
+                    reduceList<Key_part_spec>(col_it,
+                                              List<Key_part_spec>(),
+                        [table, a] (List<Key_part_spec> out_field_list,
+                                    Key_part_spec *key_part) {
+                            string field_name =
+                                convert_lex_str(key_part->field_name);
+                            FieldMeta *fm =
+                                a.getFieldMeta(table, field_name);
+                            // TODO: Algorithm for determimining which
+                            // onion to apply the index to.
+                            key_part->field_name = 
+                                string_to_lex_str(fm->onions[oOPE]->onionname);
+                            out_field_list.push_back(key_part);
+                            return out_field_list;
+                        }); 
+                out_list.push_back(key);
+                return out_list;
+            });
 }
 
 // If mkey == NULL, the field is not encrypted
