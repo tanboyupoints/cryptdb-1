@@ -15,13 +15,19 @@
 #include <sql_update.h>
 
 
-// An enc layer encrypts and decrypts data for a certain onion layer. It also
-// knows how to transform the data type of some plain data to the data type of
-// encrypted data in the DBMS.
-//TODO: currently, we have one such object per onion layer per field
-// optimize storage by sharing these handlers among objects with same type
-//TODO: need to implement cleanup & destructors
-//TODO(burrows): Make getKey virtual.
+/* Class hierarchy:
+ * EncLayer:  
+ * -  encrypts and decrypts data for a certain onion layer. It also
+ *    knows how to transform the data type of some plain data to the data type of
+ *    encrypted data in the DBMS.
+ * 
+ * HOM: a more specialized type of EncLayer 
+ *
+ * EncLayerFactory: creates EncLayer-s for SECLEVEL-s of interest 
+ */
+
+
+//TODO(burrows): need to implement cleanup & destructors
 
 
 /*
@@ -60,55 +66,6 @@ class EncLayer {
     Create_field *cf;
 };
 
-
-class DET_int : public EncLayer {
-public:
-    DET_int(Create_field *,  const std::string & seed_key);
-
-    std::string serialize() {return key; }
-    // create object from serialized contents
-    DET_int(const std::string & serial);
-
-
-    SECLEVEL level() {return SECLEVEL::DET;}
-    Create_field * newCreateField(std::string anonname = "");
-
-    Item * encrypt(Item * ptext, uint64_t IV = 0);
-    Item * decrypt(Item * ctext, uint64_t IV = 0);
-    Item * decryptUDF(Item * col, Item * ivcol = NULL);
-
-
-protected:
-    std::string key;
-    blowfish bf;
-    static const int bf_key_size = 16;
-    static const int ciph_size = 8;
-
-};
-
-class DET_str : public EncLayer {
-public:
-    DET_str(Create_field *cf, std::string seed_key);
-
-    // serialize and deserialize
-    std::string serialize() {return rawkey;}
-    DET_str(const std::string & serial);
-
-
-    SECLEVEL level() {return SECLEVEL::DET;}
-    Create_field * newCreateField(std::string anonname = "");
-
-    Item * encrypt(Item * ptext, uint64_t IV = 0);
-    Item * decrypt(Item * ctext, uint64_t IV = 0);
-    Item * decryptUDF(Item * col, Item * = NULL);
-
-protected:
-    std::string rawkey;
-    static const int key_bytes = 16;
-    AES_KEY * enckey;
-    AES_KEY * deckey;
-
-};
 
 
 class DETJOIN_int : public DET_int {
