@@ -27,6 +27,23 @@ operator<<(std::ostream &out, const OLK &olk)
     return out;
 }
 
+std::string FieldMeta::saltName() const
+{
+    assert(has_salt);
+
+    static std::string sname = 
+        BASE_SALT_NAME + "_f_"+StringFromVal(index)+"_"+tm->anonTableName();
+
+    return sname;
+}
+
+std::string FieldMeta::fullName(onion o) const
+{
+    auto it = onions.find(o);
+    OnionMeta *om = it->second;
+    assert(om);
+    return tm->anonTableName() + "." + om->onionname;
+}
 
 string FieldMeta::stringify() {
     string res = " [FieldMeta " + fname + "]";
@@ -37,9 +54,7 @@ FieldMeta::FieldMeta()
 {
     fname = "";
     sql_field = NULL;
-    salt_name = "";
     has_salt = true;
-
 }
 
 FieldMeta::~FieldMeta()
@@ -74,7 +89,6 @@ FieldMeta *TableMeta::getFieldMeta(std::string field)
 }
 
 TableMeta::TableMeta() {
-    anonTableName = "";
     tableNo = 0;
 }
 
@@ -85,11 +99,20 @@ TableMeta::~TableMeta()
 
 }
 
+// FIXME: May run into problems where a plaintext table expects the regular
+// name, but it shouldn't get that name from 'anonTableName' anyways.
+std::string TableMeta::anonTableName() const {
+    static std::string tname =
+        std::string("table") + strFromVal((uint32_t)tableNo);
+
+    return tname;
+}
+
 // table_no: defaults to NULL indicating we are to generate it ourselves.
 TableMeta *
 SchemaInfo::createTableMeta(std::string table_name,
-                            std::string anon_table_name, bool has_sensitive,
-                            bool has_salt, std::string salt_name,
+                            bool has_sensitive, bool has_salt,
+                            std::string salt_name,
                             const unsigned int *table_no)
 {
     // Make sure a table with this name does not already exist.
@@ -107,8 +130,8 @@ SchemaInfo::createTableMeta(std::string table_name,
         ++totalTables;
         table_number = *table_no;
     }
-    TableMeta *tm = new TableMeta(table_number, anon_table_name,
-                                  has_sensitive, has_salt, salt_name);
+    TableMeta *tm = new TableMeta(table_number, has_sensitive, has_salt,
+                                  salt_name);
     tableMetaMap[table_name] = tm;
     return tm;
 }

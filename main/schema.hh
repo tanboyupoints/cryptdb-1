@@ -70,6 +70,7 @@ struct TableMeta;
 //TODO: FieldMeta and TableMeta are partly duplicates with the original
 // FieldMetadata an TableMetadata
 // which contains data we want to add to this structure soon
+// FIXME: index should be const.
 typedef struct FieldMeta {
     TableMeta * tm; //point to table belonging in
     std::string fname;
@@ -80,10 +81,13 @@ typedef struct FieldMeta {
     std::map<onion, OnionMeta *> onions;
 
     bool has_salt; //whether this field has its own salt
-    std::string salt_name;
 
     FieldMeta();
     ~FieldMeta();
+
+    std::string saltName() const;
+
+    std::string fullName(onion o) const;
 
     bool hasOnion(onion o) const {
         return onions.find(o) !=
@@ -124,7 +128,6 @@ typedef struct FieldMeta {
 typedef struct TableMeta {
     std::list<std::string> fieldNames;     //in order field names
     unsigned int tableNo;
-    std::string anonTableName;
 
     std::map<std::string, FieldMeta *> fieldMetaMap;
 
@@ -134,19 +137,23 @@ typedef struct TableMeta {
     std::string salt_name;
 
     TableMeta();
-    TableMeta(unsigned int table_no, std::string anon_table_name,
-              bool has_sensitive, bool has_salt, std::string salt_name)
-        : tableNo(table_no), anonTableName(anon_table_name),
-          hasSensitive(has_sensitive), has_salt(has_salt),
-          salt_name(salt_name) {}
+    TableMeta(unsigned int table_no, bool has_sensitive,
+              bool has_salt, std::string salt_name)
+        : tableNo(table_no), hasSensitive(has_sensitive),
+          has_salt(has_salt), salt_name(salt_name) {}
     ~TableMeta();
-
-    friend class Analysis;
 
     FieldMeta *getFieldMeta(std::string field);
 
+    friend class Analysis;
+    friend class FieldMeta;
+
+    // TODO: Make protected, requires changes in processAnnotation.
+    std::string anonTableName() const;
+
 protected:
     bool destroyFieldMeta(std::string field);
+    
 } TableMeta;
 
 
@@ -164,7 +171,6 @@ typedef struct SchemaInfo {
     // which we derive from SchemaInfo and the addition of the plaintext
     // table name.
     TableMeta *createTableMeta(std::string table_name,
-                               std::string anon_table_name,
                                bool has_sensitive, bool has_salt,
                                std::string salt_name,
                                const unsigned int *table_no=NULL);

@@ -91,7 +91,7 @@ class DropColumnSubHandler : public AlterSubHandler {
                             Alter_drop *new_adrop =
                                 adrop->clone(thd->mem_root);
                             new_adrop->name =
-                                thd->strdup(fm->salt_name.c_str());
+                                thd->strdup(fm->saltName().c_str());
                             out_list.push_back(new_adrop);
                         }
 

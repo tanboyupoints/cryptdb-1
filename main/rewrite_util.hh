@@ -7,12 +7,6 @@
 #include <sql_list.h>
 #include <sql_table.h>
 
-// anonymizes table name based on the information in a.schema
-// TODO(burrows): Do we want to handle aliasing here, or up a level?
-std::string
-anonymize_table_name(const std::string &tname,
-                     Analysis & a);
-
 Item *
 rewrite(Item *i, const OLK & constr, Analysis &a, string context = "");
 

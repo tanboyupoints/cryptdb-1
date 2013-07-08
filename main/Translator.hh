@@ -39,8 +39,6 @@ bool isField(std::string token);
 std::string getField(std::string tablefield);
 std::string getTable(std::string tablefield);
 
-//returns the name of the salt for a field with index in the table
-std::string getFieldSalt(unsigned int index, std::string anontablename);
 //returns true if "id" is the name of salt; isTableSalt set to true  if it is
 std::string
 getTableSalt(std::string anonTableName);
@@ -60,5 +58,4 @@ std::string fieldNameForResponse(std::string table, std::string field, std::stri
 // fetches the next auto increment value for fullname and updates autoInc
 std::string nextAutoInc(std::map<std::string, unsigned int> & autoInc, std::string fullname);
 
-std::string anonymizeTableName(unsigned int tableNo, std::string tableName);
 std::string anonymizeFieldName(unsigned int index, onion o, std::string origname, bool multiPrinc);

@@ -8,17 +8,6 @@ using namespace std;
 
 extern CItemTypesDir itemTypes;
 
-string
-anonymize_table_name(const string &tname,
-                     Analysis & a)
-{
-    TableMeta *tm = a.getTableMeta(tname);
-    assert(tm);
-
-    return tm->anonTableName;
-}
-
-
 void
 optimize(Item **i, Analysis &a) {
    //TODO
@@ -61,8 +50,8 @@ rewrite_table_list(TABLE_LIST *t, Analysis &a)
     // Table name can only be empty when grouping a nested join.
     assert(t->table_name || t->nested_join);
     if (t->table_name) {
-        string anon_name = anonymize_table_name(string(t->table_name,
-                                                       t->table_name_length), a);
+        string anon_name = a.getAnonTableName(string(t->table_name,
+                                                     t->table_name_length));
         new_t->table_name = make_thd_string(anon_name, &new_t->table_name_length);
         new_t->alias = make_thd_string(anon_name);
         new_t->next_local = NULL;
@@ -219,10 +208,9 @@ rewrite_create_field(const string &table_name, Create_field *f,
     // create salt column
     if (fm->has_salt) {
         //cerr << fm->salt_name << endl;
-        assert(!fm->salt_name.empty());
         THD *thd         = current_thd;
         Create_field *f0 = f->clone(thd->mem_root);
-        f0->field_name   = thd->strdup(fm->salt_name.c_str());
+        f0->field_name   = thd->strdup(fm->saltName().c_str());
 	f0->flags = f0->flags | UNSIGNED_FLAG;//salt is unsigned
         f0->sql_type     = MYSQL_TYPE_LONGLONG;
 	f0->length       = 8;
@@ -308,12 +296,9 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
 
         if (mKey) {
             //generate enclayers for encrypted field
+            string uniqueFieldName = fm->fullName(o);
             for (auto l: it.second) {
                 string key;
-
-                // TODO(burrows): This can be pulled out of loop.
-                string uniqueFieldName = fullName(om->onionname,
-                                                  fm->tm->anonTableName);
                 key = getLayerKey(mKey, uniqueFieldName, l);
                 om->layers.push_back(EncLayerFactory<string>::encLayer(o, l, cf, key));
             }
@@ -339,7 +324,6 @@ init_onions(AES_KEY * mKey, FieldMeta * fm, Create_field * cf, uint index) {
     // Encrypted field
 
     fm->has_salt = true;
-    fm->salt_name = getFieldSalt(index, fm->tm->anonTableName);
 
     if (IsMySQLTypeNumeric(cf->sql_type)) {
         init_onions_layout(mKey, fm, index, cf, NUM_ONION_LAYOUT);
@@ -348,6 +332,7 @@ init_onions(AES_KEY * mKey, FieldMeta * fm, Create_field * cf, uint index) {
     }
 }
 
+// TODO: Should be constructor.
 bool
 create_field_meta(TableMeta *tm, Create_field *field,
                   const Analysis a, bool encByDefault)
@@ -417,7 +402,6 @@ do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
           << " '" << fm->fname << "', "
           << " " << fm->index << ", "
           << " " << bool_to_string(fm->has_salt) << ", "
-          << " '" << fm->salt_name << "',"
           << " '" << TypeText<onionlayout>::toText(fm->onion_layout)<< "',"
           << " 0"
           << " );";
