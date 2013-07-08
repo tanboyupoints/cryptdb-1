@@ -715,6 +715,77 @@ DETJOINFactory::deserialize(const std::string & serial) {
 
 /**************** OPE **************************/
 
+
+class OPE_int : public EncLayer {
+public:
+    OPE_int(Create_field *, std::string seed_key);
+
+    // serialize and deserialize
+    std::string serialize() {return serial_pack(level(), name(), key);}
+    OPE_int(const std::string & serial);
+
+    SECLEVEL level() {return SECLEVEL::OPE;}
+    string name() {return "OPE_int";}
+    Create_field * newCreateField(std::string anonname = "");
+
+    Item * encrypt(Item * p, uint64_t IV);
+    Item * decrypt(Item * c, uint64_t IV);
+
+
+private:
+    std::string key;
+    OPE ope;
+    static const size_t key_bytes = 16;
+    static const size_t plain_size = 4;
+    static const size_t ciph_size = 8;
+
+};
+
+
+class OPE_str : public EncLayer {
+public:
+    OPE_str(Create_field *, std::string seed_key);
+
+    // serialize and deserialize
+    std::string serialize() {return serial_pack(level(), name(), key);}
+    OPE_str(const std::string & serial);
+
+
+    SECLEVEL level() {return SECLEVEL::OPE;}
+    string name() {return "OPE_str";}
+    Create_field * newCreateField(std::string anonname = "");
+
+    Item * encrypt(Item * p, uint64_t IV = 0);
+    Item * decrypt(Item * c, uint64_t IV = 0)__attribute__((noreturn));
+
+private:
+    std::string key;
+    OPE ope;
+    static const size_t key_bytes = 16;
+    static const size_t plain_size = 4;
+    static const size_t ciph_size = 8;
+};
+
+
+EncLayer *
+OPEFactory::create(Create_field * cf, std::string key) {
+    if (IsMySQLTypeNumeric(cf->sql_type)) { // the ope case as well 
+	 return new OPE_int(cf, key);
+     } else {
+	 return new OPE_str(cf, key);
+     }
+}
+
+EncLayer *
+OPEFactory::deserialize(const std::string & serial) {
+    if (get_impl_type(serial) == "OPE_int") {
+	return new OPE_int(serial);
+    } else {
+	return new OPE_str(serial);
+    }
+}
+
+
 OPE_int::OPE_int(Create_field * f, string seed_key)
     : EncLayer(f), key(prng_expand(seed_key, key_bytes)),
       ope(OPE(key, plain_size * 8, ciph_size * 8))
@@ -722,7 +793,7 @@ OPE_int::OPE_int(Create_field * f, string seed_key)
 
 OPE_int::OPE_int(const std::string & serial) :
     EncLayer(NULL),
-    key(serial), ope(OPE(key, plain_size * 8, ciph_size * 8))
+    key(get_layer_info(serial, level(), name())), ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
 
 Create_field *
@@ -755,8 +826,8 @@ OPE_str::OPE_str(Create_field * f, string seed_key)
 {}
 
 OPE_str::OPE_str(const std::string & serial) : EncLayer(NULL),
-				       key(serial),
-				       ope(OPE(key, plain_size * 8, ciph_size * 8))
+					       key(get_layer_info(serial, level(), name())),
+					       ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
 
 Create_field *
