@@ -68,6 +68,7 @@ Import tool notes:
       -- test aliases
       -- join
       -- update + increment
+      -- test persistency
       (by Wed)
       -- soon: decimal, varchar, char[lengths], (should be ready by Wed)
       

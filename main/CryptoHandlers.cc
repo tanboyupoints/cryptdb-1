@@ -240,7 +240,6 @@ EncLayerFactory::encLayerFromSerial(onion o, SECLEVEL sl,
     bool is_num = IsMySQLTypeNumeric(sql_type);
     switch (sl) {
         case SECLEVEL::RND: {
-	    cerr << "serial is " << serial << "\n";
 	    return RNDFactory::deserialize(serial);
         }
         case SECLEVEL::DET: {
@@ -290,16 +289,7 @@ RND_int::RND_int(const std::string & serial)
     : EncLayer(NULL),
       key(get_layer_info(serial, level(), name())),
       bf(key)
-{
-    string impl_type, layer_info;
-    SECLEVEL l;
-    serial_unpack(serial, l, impl_type, layer_info);
-
-    assert_s(l == level() && impl_type == name(), "inconsistency in RND_int");
-
-    key = serial;
-    bf = blowfish(key);
-}
+{}
 
 Create_field *
 RND_int::newCreateField(string anonname) {
