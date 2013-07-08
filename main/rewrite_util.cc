@@ -300,7 +300,7 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
             for (auto l: it.second) {
                 string key;
                 key = getLayerKey(mKey, uniqueFieldName, l);
-                om->layers.push_back(EncLayerFactory<string>::encLayer(o, l, cf, key));
+                om->layers.push_back(EncLayerFactory::encLayer(o, l, cf, key));
             }
         }
 
