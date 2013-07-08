@@ -146,9 +146,8 @@ typedef struct TableMeta {
     FieldMeta *getFieldMeta(std::string field);
 
     friend class Analysis;
-    friend class FieldMeta;
-
-    // TODO: Make protected, requires changes in processAnnotation.
+    // TODO: Make FieldMeta a friend and deal with the other uses of this
+    // function.
     std::string anonTableName() const;
 
 protected:
