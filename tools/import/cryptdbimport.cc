@@ -71,7 +71,7 @@ Import::executeQueries(Rewriter& r)
         if(ignore_line(line))
             continue;
 
-#define TMP_HACK
+//#define TMP_HACK
 #ifdef TMP_HACK
         // Avoid SQL statements that are under impl. & fixes
         if(line.compare(0,strlen("CREATE DATABASE"),"CREATE DATABASE") == 0)
