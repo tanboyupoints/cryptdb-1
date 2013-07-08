@@ -68,34 +68,6 @@ class EncLayer {
 
 
 
-class DETJOIN_int : public DET_int {
-    //TODO
-public:
-    DETJOIN_int(Create_field * cf, std::string seed_key) : DET_int(cf, seed_key) {}
-
-    // serialize from parent;  unserialize:
-    DETJOIN_int(std::string serial) : DET_int(serial) {}
-
-
-    SECLEVEL level() {return SECLEVEL::DETJOIN;}
-
-
-};
-
-
-class DETJOIN_str : public DET_str {
-    //TODO
-public:
-    DETJOIN_str(Create_field * cf, std::string seed_key) : DET_str(cf, seed_key) {}
-
-    // serialize from parent; unserialize:
-    DETJOIN_str(std::string serial) : DET_str(serial) {}
-
-    SECLEVEL level() {return SECLEVEL::DETJOIN;}
-
-};
-
-
 class OPE_int : public EncLayer {
 public:
     OPE_int(Create_field *, std::string seed_key);
