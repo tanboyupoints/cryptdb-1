@@ -22,7 +22,6 @@ class AddColumnSubHandler : public AlterSubHandler {
 
         TableMeta *tm = a.getTableMeta(table);
 
-        // FIXME: This does not properly support multiple column adds.
         // Create *Meta objects.
         auto add_it =
             List_iterator<Create_field>(lex->alter_info.create_list);
@@ -108,27 +107,25 @@ class DropColumnSubHandler : public AlterSubHandler {
         auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
         eachList<Alter_drop>(drop_it,
             [table, dbname, &a, q] (Alter_drop *adrop) {
-                // FIXME: Possibly this should be an assert as mixed clauses
-                // are not supported?
-                assert(adrop->type == Alter_drop::COLUMN);
-                // Remove metadata from embedded database.
-                ostringstream s;
-                s << " DELETE FROM pdb.field_info, pdb.onion_info, "
-                  << "             pdb.layer_key"
-                  << " USING pdb.table_info INNER JOIN pdb.field_info "
-                  << "       INNER JOIN pdb.onion_info INNER JOIN "
-                  << "       pdb.layer_key"
-                  << " ON  pdb.table_info.id = pdb.field_info.table_info_id"
-                  << " AND pdb.field_info.id = pdb.onion_info.field_info_id"
-                  << " AND pdb.onion_info.id = pdb.layer_key.onion_info_id "
-                  << " WHERE pdb.table_info.name = '" << table << "' "
-                  << " AND pdb.table_info.database_name = '" << dbname << "';";
+                if (adrop->type == Alter_drop::COLUMN) {
+                    // Remove metadata from embedded database.
+                    ostringstream s;
+                    s << " DELETE FROM pdb.field_info, pdb.onion_info, "
+                      << "             pdb.layer_key"
+                      << " USING pdb.table_info INNER JOIN pdb.field_info "
+                      << "       INNER JOIN pdb.onion_info INNER JOIN "
+                      << "       pdb.layer_key"
+                      << " ON  pdb.table_info.id = pdb.field_info.table_info_id"
+                      << " AND pdb.field_info.id = pdb.onion_info.field_info_id"
+                      << " AND pdb.onion_info.id = pdb.layer_key.onion_info_id "
+                      << " WHERE pdb.table_info.name = '" << table << "' "
+                      << " AND pdb.table_info.database_name = '" << dbname << "';";
 
-                assert(a.ps->e_conn->execute(s.str()));
+                    assert(a.ps->e_conn->execute(s.str()));
 
-
-                // Remove from *Meta structures.
-                assert(a.destroyFieldMeta(table, adrop->name));});
+                    // Remove from *Meta structures.
+                    assert(a.destroyFieldMeta(table, adrop->name));
+                }});
 
         // Remove column from embedded database.
         assert(a.ps->e_conn->execute(q));
@@ -179,7 +176,28 @@ class AddIndexSubHandler : public AlterSubHandler {
 class DropIndexSubHandler : public AlterSubHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {
-        assert(false);
+        LEX *new_lex = copy(lex);
+        const string &table =
+            lex->select_lex.table_list.first->table_name;
+        new_lex->select_lex.table_list =
+            rewrite_table_list(lex->select_lex.table_list, a);
+
+        auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
+        new_lex->alter_info.drop_list =
+            reduceList<Alter_drop>(drop_it, List<Alter_drop>(),
+                [table, a] (List<Alter_drop> out_list, Alter_drop *adrop) {
+                    if (adrop->type == Alter_drop::KEY) {
+                        // TODO: Once we anonymize key name it must be
+                        // accounted for here.
+                        THD *thd = current_thd;
+                        Alter_drop *new_adrop =
+                            adrop->clone(thd->mem_root);  
+                        out_list.push_back(new_adrop);
+                    }
+                    return out_list;    /* lambda */
+                });
+
+        return single_lex_output(new_lex, out_lex_count);
     }
 };
 

@@ -501,6 +501,12 @@ static std::string prefix_drop_column(Alter_drop adrop) {
     return ss.str();
 }
 
+static std::string prefix_drop_key(Alter_drop adrop) {
+    std::ostringstream ss;
+    ss << "DROP KEY " << adrop;
+    return ss.str();
+}
+
 static std::string prefix_add_column(Create_field cf) {
     std::ostringstream ss;
     ss << "ADD COLUMN " << cf;
@@ -764,6 +770,9 @@ operator<<(std::ostream &out, LEX &lex)
         break;
 
     /*
+     * TODO: Support mixed operations.
+     * > Will likely require a filter.
+     *
      * You can issue multiple ADD, ALTER, DROP, and CHANGE clauses in a
      * single ALTER TABLE statement seperated by columns.  This is a MySQL
      * extension to standard SQL, which permits only one of each clause
@@ -780,14 +789,17 @@ operator<<(std::ostream &out, LEX &lex)
         // ALTER_ADD_COLUMN, ALTER_CHANGE_COLUMN, ALTER_ADD_INDEX,
         // ALTER_DROP_INDEX, ALTER_FOREIGN_KEY
         if (lex.alter_info.flags & ALTER_DROP_COLUMN) {
-            out << " " << ListJoin<Alter_drop>(lex.alter_info.drop_list, ",",
-                                               prefix_drop_column);
+            out << " " << ListJoin<Alter_drop>(lex.alter_info.drop_list,
+                                               ",", prefix_drop_column);
         } else if (lex.alter_info.flags & ALTER_ADD_COLUMN) {
             out << " " << ListJoin<Create_field>(lex.alter_info.create_list,
                                                  ",", prefix_add_column);
         } else if (lex.alter_info.flags & ALTER_ADD_INDEX) {
             out << " " << ListJoin<Key>(lex.alter_info.key_list, ",",
                                         prefix_add_index);
+        } else if (lex.alter_info.flags & ALTER_DROP_INDEX) {
+            out << " " << ListJoin<Alter_drop>(lex.alter_info.drop_list,
+                                               ",", prefix_drop_key);
         } else {
             throw CryptDBError("Unsupported ALTER in stringify");
         }
