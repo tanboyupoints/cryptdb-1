@@ -244,7 +244,7 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
                 string uniqueFieldName = fullName(om->onionname,
                                                   fm->tm->anonTableName);
                 key = getLayerKey(mKey, uniqueFieldName, l);
-                om->layers.push_back(EncLayerFactory<string>::encLayer(o, l, cf, key));
+                om->layers.push_back(EncLayerFactory::encLayer(o, l, cf, key));
             }
         }
 

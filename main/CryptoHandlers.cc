@@ -16,13 +16,18 @@ using namespace NTL;
 
 class LayerFactory {
 public:
-    virtual EncLayer * create(Create_field * cf, std::string key) = 0;
-    virtual EncLayer * deserialize(const std::string & serial) = 0;
+    static EncLayer * create(Create_field * cf, std::string key) {
+	throw "needs to be inherited";
+    };
+    static EncLayer * deserialize(const std::string & serial) {
+	throw "needs to be inherited";
+    };
 };
 
 class RNDFactory : public LayerFactory {
-    EncLayer * create(Create_field * cf, std::string key);
-    EncLayer * deserialize(const std::string & serial);
+public:
+    static EncLayer * create(Create_field * cf, std::string key);
+    static EncLayer * deserialize(const std::string & serial);
 };
 
 

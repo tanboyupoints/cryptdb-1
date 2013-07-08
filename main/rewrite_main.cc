@@ -345,7 +345,7 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
                                               fm->tm->anonTableName);
 
 	    enc_layer =
-		EncLayerFactory<std::string>::encLayerFromSerial(o, it, om->sql_type, layer_serial[it]);
+		EncLayerFactory::encLayerFromSerial(o, it, om->sql_type, layer_serial[it]);
 
             om->layers.push_back(enc_layer);
             SECLEVEL onion_level = fm->getOnionLevel(o);
