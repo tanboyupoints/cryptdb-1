@@ -674,7 +674,7 @@ public:
 
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
-
+    string name() {return "DETJOIN_int";}
 
 };
 
@@ -688,8 +688,28 @@ public:
     DETJOIN_str(std::string serial) : DET_str(serial) {}
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
+    string name() {return "DETJOIN_str";}
 
 };
+
+
+EncLayer *
+DETJOINFactory::create(Create_field * cf, std::string key) {
+    if (IsMySQLTypeNumeric(cf->sql_type)) { // the ope case as well 
+	 return new DETJOIN_int(cf, key);
+     } else {
+	 return new DETJOIN_str(cf, key);
+     }
+}
+
+EncLayer *
+DETJOINFactory::deserialize(const std::string & serial) {
+    if (get_impl_type(serial) == "DETJOIN_int") {
+	return new DETJOIN_int(serial);
+    } else {
+	return new DETJOIN_str(serial);
+    }
+}
 
 
 
