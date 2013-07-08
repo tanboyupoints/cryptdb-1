@@ -57,6 +57,7 @@ serial_unpack(const string & serial, SECLEVEL & l, string & layer_impl_type, str
     string levelname;
     ss >> levelname;
     l = string_to_sec_level(levelname);
+    ss >> layer_impl_type;
     layer_info = serial.substr(serial.size()-len, len);
 }
 
@@ -78,7 +79,7 @@ get_impl_type(const string & serial) {
     SECLEVEL ll;
     serial_unpack(serial, ll, impl_type, layer_info);
 
-    return layer_info;
+    return impl_type;
 }
 
 class RND_int : public EncLayer {
@@ -239,6 +240,7 @@ EncLayerFactory::encLayerFromSerial(onion o, SECLEVEL sl,
     bool is_num = IsMySQLTypeNumeric(sql_type);
     switch (sl) {
         case SECLEVEL::RND: {
+	    cerr << "serial is " << serial << "\n";
 	    return RNDFactory::deserialize(serial);
         }
         case SECLEVEL::DET: {
