@@ -12,6 +12,138 @@
 using namespace std;
 using namespace NTL;
 
+
+
+class LayerFactory {
+public:
+    virtual EncLayer * create(Create_field * cf, std::string key) = 0;
+    virtual EncLayer * deserialize(const std::string & serial) = 0;
+};
+
+class RNDFactory : public LayerFactory {
+    EncLayer * create(Create_field * cf, std::string key);
+    EncLayer * deserialize(const std::string & serial);
+};
+
+
+/*
+ * EncLayer->serialize outputs a string of the form [LEN SECLEVEL LAYER_IMPL_TYPE
+ * LAYER_INFO]
+ * LEN indicates the length of LAYER_INFO
+ * LAYER_IMPL_TYPE is a readable string
+ * LAYER_INFO could be binary
+ * LayerFactory->deserialize gets as input such a string
+ */
+static string
+serial_pack(SECLEVEL l, const string & layer_impl_type, const string & layer_info) {
+    stringstream ss;
+    ss.clear();
+
+    ss << layer_info.length() << " " << levelnames[(uint)l] << " " << layer_impl_type << " " << layer_info;
+
+    return ss.str();
+}
+
+static void
+serial_unpack(const string & serial, SECLEVEL & l, string & layer_impl_type, string & layer_info) {
+    stringstream ss(serial);
+    uint len;
+    ss >> len;
+    string levelname;
+    ss >> levelname;
+    l = string_to_sec_level(levelname);
+    layer_info = serial.substr(serial.size()-len, len);
+}
+
+
+static string
+get_layer_info(const string & serial, SECLEVEL l, const string & name) {
+    string impl_type, layer_info;
+    SECLEVEL ll;
+    serial_unpack(serial, ll, impl_type, layer_info);
+
+    assert_s(ll == l && impl_type == name, "inconsistency in RND_int");
+
+    return layer_info;
+}
+
+static string
+get_impl_type(const string & serial) {
+    string impl_type, layer_info;
+    SECLEVEL ll;
+    serial_unpack(serial, ll, impl_type, layer_info);
+
+    return layer_info;
+}
+
+class RND_int : public EncLayer {
+public:
+    RND_int(Create_field *cf, const std::string & seed_key);
+
+    // serialize and deserialize
+    virtual std::string serialize() {return serial_pack(level(), name(), key);}
+    RND_int(const std::string & serial);
+
+    SECLEVEL level() {return SECLEVEL::RND;}
+    string name() {return "RND_int";}
+    
+    Create_field * newCreateField(std::string anonname = "");
+
+    Item * encrypt(Item * ptext, uint64_t IV);
+    Item * decrypt(Item * ctext, uint64_t IV);
+    Item * decryptUDF(Item * col, Item * ivcol);
+
+private:
+    std::string key;
+    blowfish bf;
+    static const int key_bytes = 16;
+    static const int ciph_size = 8;
+
+};
+
+class RND_str : public EncLayer {
+public:
+    RND_str(Create_field *, const std::string & seed_key);
+
+    // serialize and deserialize
+    std::string serialize() {return serial_pack(level(), name(), rawkey); }
+    RND_str(const std::string & serial);
+
+
+    SECLEVEL level() {return SECLEVEL::RND;}
+    string name() {return "RND_str";}
+    Create_field * newCreateField(std::string anonname = "");
+
+    Item * encrypt(Item * ptext, uint64_t IV);
+    Item * decrypt(Item * ctext, uint64_t IV);
+    Item * decryptUDF(Item * col, Item * ivcol);
+
+private:
+    std::string rawkey;
+    static const int key_bytes = 16;
+    AES_KEY * enckey;
+    AES_KEY * deckey;
+
+};
+
+EncLayer *
+RNDFactory::create(Create_field * cf, std::string key) {
+    if (IsMySQLTypeNumeric(cf->sql_type)) { // the ope case as well 
+	 return new RND_int(cf, key);
+     } else {
+	 return new RND_str(cf, key);
+     }
+}
+
+EncLayer *
+RNDFactory::deserialize(const std::string & serial) {
+    if (get_impl_type(serial) == "RND_int") {
+	return new RND_int(serial);
+    } else {
+	return new RND_str(serial);
+    }
+}
+
 static
 string prng_expand(string seed_key, uint key_bytes) {
     streamrng<arc4> prng(seed_key);
@@ -53,18 +185,13 @@ get_key_item(const string & key) {
     return keyI;
 }
 
-template <typename type>
 EncLayer *
-EncLayerFactory<type>::encLayer(onion o, SECLEVEL sl, Create_field * cf,
-                                type key)
+EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf,
+                                string key)
 {
     switch (sl) {
         case SECLEVEL::RND: {
-            if (IsMySQLTypeNumeric(cf->sql_type) || (o == oOPE)) {
-                return new RND_int(cf, key);
-            } else {
-                return new RND_str(cf, key);
-            }
+	    return RNDFactory::create(cf, key);
         }
         case SECLEVEL::DET: {
             if (IsMySQLTypeNumeric(cf->sql_type)) {
@@ -100,20 +227,14 @@ EncLayerFactory<type>::encLayer(onion o, SECLEVEL sl, Create_field * cf,
     thrower() << "unknown or unimplemented security level \n";
 }
 
-
-template <typename type>
 EncLayer *
-EncLayerFactory<type>::encLayerFromSerial(onion o, SECLEVEL sl,
+EncLayerFactory::encLayerFromSerial(onion o, SECLEVEL sl,
 				enum enum_field_types sql_type, const string & serial)
 {
     bool is_num = IsMySQLTypeNumeric(sql_type);
     switch (sl) {
         case SECLEVEL::RND: {
-            if (is_num || (o == oOPE)) {
-                return new RND_int(serial);
-            } else {
-                return new RND_str(serial);
-            }
+	    return RNDFactory::deserialize(serial);
         }
         case SECLEVEL::DET: {
             if (is_num) {
@@ -149,8 +270,6 @@ EncLayerFactory<type>::encLayerFromSerial(onion o, SECLEVEL sl,
     thrower() << "unknown or unimplemented security level \n";
 }
 
-template class EncLayerFactory<std::string>;
-
 
 /****************** RND *********************/
 
@@ -162,9 +281,18 @@ RND_int::RND_int(Create_field * f, const string & seed_key)
 
 RND_int::RND_int(const std::string & serial)
     : EncLayer(NULL),
-      key(serial),
+      key(get_layer_info(serial, level(), name())),
       bf(key)
-{}
+{
+    string impl_type, layer_info;
+    SECLEVEL l;
+    serial_unpack(serial, l, impl_type, layer_info);
+
+    assert_s(l == level() && impl_type == name(), "inconsistency in RND_int");
+
+    key = serial;
+    bf = blowfish(key);
+}
 
 Create_field *
 RND_int::newCreateField(string anonname) {
@@ -237,7 +365,7 @@ RND_str::RND_str(Create_field * f,  const string & seed_key)
 
 RND_str::RND_str(const std::string & serial)
   : EncLayer(NULL),
-    rawkey(serial),
+    rawkey(get_layer_info(serial, level(), name())),
     enckey(get_AES_enc_key(rawkey)),
     deckey(get_AES_dec_key(rawkey))
  {}

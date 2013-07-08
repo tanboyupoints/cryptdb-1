@@ -24,6 +24,16 @@
 //TODO(burrows): Make getKey virtual.
 
 
+/*
+ * Requirements & TODO:
+ *  -- want to have RND_int and RND_str specialized
+ *  -- only see RND and others in interface
+ *  -- need to call HOM->sumUDF and UDA with specific arguments
+ *  -- chain create fields
+ *  -- anon name should not be in EncLayers
+ *  -- RNDFactory are part of implementation
+ */
+
 class EncLayer {
  public:
     EncLayer(Create_field * f) : cf(f) {}
@@ -43,58 +53,13 @@ class EncLayer {
         thrower() << "decryptUDF not supported";
     }
 
+    // can be deserialized by corresponding factory
     virtual std::string serialize() = 0;
 
  protected:
     Create_field *cf;
 };
 
-class RND_int : public EncLayer {
-public:
-    RND_int(Create_field *cf, const std::string & seed_key);
-
-    // serialize and deserialize
-    virtual std::string serialize() {return key;}
-    RND_int(const std::string & serial);
-
-    SECLEVEL level() {return SECLEVEL::RND;}
-    Create_field * newCreateField(std::string anonname = "");
-
-    Item * encrypt(Item * ptext, uint64_t IV);
-    Item * decrypt(Item * ctext, uint64_t IV);
-    Item * decryptUDF(Item * col, Item * ivcol);
-
-private:
-    std::string key;
-    blowfish bf;
-    static const int key_bytes = 16;
-    static const int ciph_size = 8;
-
-};
-
-class RND_str : public EncLayer {
-public:
-    RND_str(Create_field *, const std::string & seed_key);
-
-    // serialize and deserialize
-    std::string serialize() {return rawkey; }
-    RND_str(const std::string & serial);
-
-
-    SECLEVEL level() {return SECLEVEL::RND;}
-    Create_field * newCreateField(std::string anonname = "");
-
-    Item * encrypt(Item * ptext, uint64_t IV);
-    Item * decrypt(Item * ctext, uint64_t IV);
-    Item * decryptUDF(Item * col, Item * ivcol);
-
-private:
-    std::string rawkey;
-    static const int key_bytes = 16;
-    AES_KEY * enckey;
-    AES_KEY * deckey;
-
-};
 
 class DET_int : public EncLayer {
 public:
@@ -277,13 +242,13 @@ private:
 };
 
 
+
 extern const std::vector<udf_func*> udf_list;
 
-template <typename type>
 class EncLayerFactory {
 public:
     static EncLayer * encLayer(onion o, SECLEVEL sl, Create_field *cf,
-                               type key);
+                               std::string key);
 
     // creates EncLayer from its serialization
     static EncLayer * encLayerFromSerial(onion o, SECLEVEL sl,
