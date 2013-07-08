@@ -32,12 +32,8 @@
 
 /*
  * Requirements & TODO:
- *  -- want to have RND_int and RND_str specialized
- *  -- only see RND and others in interface
- *  -- need to call HOM->sumUDF and UDA with specific arguments
  *  -- chain create fields
  *  -- anon name should not be in EncLayers
- *  -- RNDFactory are part of implementation
  */
 
 class EncLayer {
@@ -66,55 +62,6 @@ class EncLayer {
     Create_field *cf;
 };
 
-
-
-class OPE_int : public EncLayer {
-public:
-    OPE_int(Create_field *, std::string seed_key);
-
-    // serialize and deserialize
-    std::string serialize() {return key;}
-    OPE_int(const std::string & serial);
-
-    SECLEVEL level() {return SECLEVEL::OPE;}
-    Create_field * newCreateField(std::string anonname = "");
-
-    Item * encrypt(Item * p, uint64_t IV);
-    Item * decrypt(Item * c, uint64_t IV);
-
-
-private:
-    std::string key;
-    OPE ope;
-    static const size_t key_bytes = 16;
-    static const size_t plain_size = 4;
-    static const size_t ciph_size = 8;
-
-};
-
-
-class OPE_str : public EncLayer {
-public:
-    OPE_str(Create_field *, std::string seed_key);
-
-    // serialize and deserialize
-    std::string serialize() {return key;}
-    OPE_str(const std::string & serial);
-
-
-    SECLEVEL level() {return SECLEVEL::OPE;}
-    Create_field * newCreateField(std::string anonname = "");
-
-    Item * encrypt(Item * p, uint64_t IV = 0);
-    Item * decrypt(Item * c, uint64_t IV = 0)__attribute__((noreturn));
-
-private:
-    std::string key;
-    OPE ope;
-    static const size_t key_bytes = 16;
-    static const size_t plain_size = 4;
-    static const size_t ciph_size = 8;
-};
 
 
 class HOM : public EncLayer {

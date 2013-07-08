@@ -55,13 +55,6 @@ public:
     static EncLayer * deserialize(const std::string & serial);
 };
 
-class DETJOINFactory : public LayerFactory {
-public:
-    static EncLayer * create(Create_field * cf, std::string key);
-    static EncLayer * deserialize(const std::string & serial);
-};
-
-
 class OPEFactory : public LayerFactory {
 public:
     static EncLayer * create(Create_field * cf, std::string key);
@@ -74,25 +67,24 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf,
                                 string key)
 {
     switch (sl) {
-        case SECLEVEL::RND: {
-	    return RNDFactory::create(cf, key);
-	}
-        case SECLEVEL::DET: {
-	    return DETFactory::create(cf, key);
-        }
-        case SECLEVEL::DETJOIN: {
-	    return DETJOINFactory::create(cf, key);
-        }
-        case SECLEVEL::OPE: {
-	    return OPEFactory::create(cf, key);
-        }
-        case SECLEVEL::HOM: {
-            return new HOM(cf, key);
-        }
-        case SECLEVEL::SEARCH: {
-            return new Search(cf, key);
-        }
-        default:{}
+    case SECLEVEL::RND: {
+	return RNDFactory::create(cf, key);
+    }
+    case SECLEVEL::DET:
+    case SECLEVEL::DETJOIN: {
+	return DETFactory::create(cf, key);
+    }
+	
+    case SECLEVEL::OPE: {
+	return OPEFactory::create(cf, key);
+    }
+    case SECLEVEL::HOM: {
+	return new HOM(cf, key);
+    }
+    case SECLEVEL::SEARCH: {
+	return new Search(cf, key);
+    }
+    default:{}
     }
     thrower() << "unknown or unimplemented security level \n";
 }
@@ -101,16 +93,13 @@ EncLayer *
 EncLayerFactory::encLayerFromSerial(onion o, SECLEVEL sl,
 				enum enum_field_types sql_type, const string & serial)
 {
-    bool is_num = IsMySQLTypeNumeric(sql_type);
     switch (sl) {
     case SECLEVEL::RND: 
 	return RNDFactory::deserialize(serial);
 	
     case SECLEVEL::DET: 
-	return DETFactory::deserialize(serial);
-	
     case SECLEVEL::DETJOIN: 
-	return DETJOINFactory::deserialize(serial);    
+	return DETFactory::deserialize(serial);
 	
     case SECLEVEL::OPE: 
 	return OPEFactory::deserialize(serial);
@@ -482,7 +471,7 @@ public:
     DET_str(Create_field *cf, std::string seed_key);
 
     // serialize and deserialize
-    std::string serialize() {return serial_pack(level(), name, rawkey);}
+    std::string serialize() {return serial_pack(level(), name(), rawkey);}
     DET_str(const std::string & serial);
 
 
@@ -670,47 +659,29 @@ public:
     DETJOIN_int(Create_field * cf, std::string seed_key) : DET_int(cf, seed_key) {}
 
     // serialize from parent;  unserialize:
-    DETJOIN_int(std::string serial) : DET_int(serial) {}
-
+    DETJOIN_int(const std::string & serial);
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
-    string name() {return "DETJOIN_int";}
-
 };
 
 
 class DETJOIN_str : public DET_str {
-    //TODO
 public:
     DETJOIN_str(Create_field * cf, std::string seed_key) : DET_str(cf, seed_key) {}
 
     // serialize from parent; unserialize:
-    DETJOIN_str(std::string serial) : DET_str(serial) {}
+    DETJOIN_str(const std::string & serial);
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
-    string name() {return "DETJOIN_str";}
-
 };
 
 
-EncLayer *
-DETJOINFactory::create(Create_field * cf, std::string key) {
-    if (IsMySQLTypeNumeric(cf->sql_type)) { // the ope case as well 
-	 return new DETJOIN_int(cf, key);
-     } else {
-	 return new DETJOIN_str(cf, key);
-     }
-}
+DETJOIN_int::DETJOIN_int(const string & serial) : DET_int(serial)
+{}
 
-EncLayer *
-DETJOINFactory::deserialize(const std::string & serial) {
-    if (get_impl_type(serial) == "DETJOIN_int") {
-	return new DETJOIN_int(serial);
-    } else {
-	return new DETJOIN_str(serial);
-    }
-}
 
+DETJOIN_str::DETJOIN_str(const std::string & serial) : DET_str(serial)
+{}
 
 
 /**************** OPE **************************/
