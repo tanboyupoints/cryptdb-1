@@ -27,6 +27,11 @@ operator<<(std::ostream &out, const OLK &olk)
     return out;
 }
 
+std::string OnionMeta::getAnonOnionName() const
+{
+    return onionname;
+}
+
 std::string FieldMeta::saltName() const
 {
     assert(has_salt);
@@ -42,7 +47,7 @@ std::string FieldMeta::fullName(onion o) const
     auto it = onions.find(o);
     OnionMeta *om = it->second;
     assert(om);
-    return tm->anonTableName() + "." + om->onionname;
+    return tm->anonTableName() + "." + om->getAnonOnionName();
 }
 
 string FieldMeta::stringify() {

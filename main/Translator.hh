@@ -58,4 +58,4 @@ std::string fieldNameForResponse(std::string table, std::string field, std::stri
 // fetches the next auto increment value for fullname and updates autoInc
 std::string nextAutoInc(std::map<std::string, unsigned int> & autoInc, std::string fullname);
 
-std::string anonymizeFieldName(unsigned int index, onion o, std::string origname, bool multiPrinc);
+std::string anonymizeFieldName(unsigned int index, onion o, std::string origname);
