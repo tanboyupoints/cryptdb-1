@@ -4,8 +4,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <iostream>
-
-
+#include <functional>
 
 template<class T>
 std::string stringify_ptr(T * x) {
@@ -116,14 +115,14 @@ operator<<(std::ostream &out, SELECT_LEX_UNIT &select_lex_unit)
 // FIXME: Combine with vector_join.
 template <typename T>
 std::string ListJoin(List<T> lst, std::string delim,
-                     std::string (*finalize)(T))
+                     std::function<std::string(T)> finalize)
 {
     std::ostringstream accum;
 
     auto it = List_iterator<T>(lst);
     T *element = it++;
     for (;element; element = it++) {
-        std::string finalized_element = (*finalize)(*element);
+        std::string finalized_element = finalize(*element);
         accum << finalized_element;
         accum << delim;
     }
@@ -355,6 +354,12 @@ convert_lex_str(const LEX_STRING &l)
     return std::string(l.str, l.length);
 }
 
+static inline LEX_STRING
+string_to_lex_str(const std::string &s)
+{
+    return (LEX_STRING){const_cast<char*>(s.c_str()), s.length()};
+}
+
 static std::ostream&
 operator<<(std::ostream &out, enum legacy_db_type db_type) {
     switch (db_type) {
@@ -502,6 +507,26 @@ static std::string prefix_add_column(Create_field cf) {
     return ss.str();
 }
 
+static std::function<std::string(Key_part_spec)>
+do_prefix_add_index(std::string index_name) {
+    std::function<std::string(Key_part_spec key_part)> fn =
+        [index_name](Key_part_spec key_part) {
+            std::ostringstream ss;
+            ss << " ADD INDEX " << index_name << " (" << key_part << ")";
+            return ss.str();
+        };
+
+    return fn;
+}
+
+static std::string
+prefix_add_index(Key key) {
+    std::string column_name = convert_lex_str(key.name);
+    std::ostringstream key_output;
+    key_output << ListJoin<Key_part_spec>(key.columns, ",",
+                                          do_prefix_add_index(column_name));
+    return key_output.str();
+}
 static inline std::ostream&
 operator<<(std::ostream &out, LEX &lex)
 {
@@ -760,6 +785,11 @@ operator<<(std::ostream &out, LEX &lex)
         } else if (lex.alter_info.flags & ALTER_ADD_COLUMN) {
             out << " " << ListJoin<Create_field>(lex.alter_info.create_list,
                                                  ",", prefix_add_column);
+        } else if (lex.alter_info.flags & ALTER_ADD_INDEX) {
+            out << " " << ListJoin<Key>(lex.alter_info.key_list, ",",
+                                        prefix_add_index);
+        } else {
+            throw CryptDBError("Unsupported ALTER in stringify");
         }
 
         break;

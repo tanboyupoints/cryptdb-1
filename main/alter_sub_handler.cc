@@ -67,10 +67,9 @@ class DropColumnSubHandler : public AlterSubHandler {
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a);
 
-        List<Alter_drop> new_drop_list;
         auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
         new_lex->alter_info.drop_list =
-            reduceList<Alter_drop>(drop_it, new_drop_list,
+            reduceList<Alter_drop>(drop_it, List<Alter_drop>(),
                 [table, a] (List<Alter_drop> out_list, Alter_drop *adrop) {
                     // FIXME: Possibly this should be an assert as mixed
                     // clauses are not supported?
@@ -153,7 +152,53 @@ class ForeignKeySubHandler : public AlterSubHandler {
 class AddIndexSubHandler : public AlterSubHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {
-        assert(false);
+        this->update(q, lex, a);
+        return this->rewrite(lex, a, q, out_lex_count);
+    }
+
+    // TODO: Add index metadata to persistency.
+    // TODO: Add index to embedded shallow mirror.
+    void update(const string &q, LEX *lex, Analysis &a) const {
+        return;
+    }
+
+    LEX **rewrite(LEX *lex, Analysis &a, const string &q,
+                  unsigned *out_lex_count) const {
+        LEX *new_lex = copy(lex);
+        const string &table =
+            lex->select_lex.table_list.first->table_name;
+        new_lex->select_lex.table_list =
+            rewrite_table_list(lex->select_lex.table_list, a);
+
+        // Rewrite the index names and choose the onion to apply it too.
+        auto key_it = List_iterator<Key>(lex->alter_info.key_list);
+        new_lex->alter_info.key_list =
+            reduceList<Key>(key_it, List<Key>(),
+                [table, a] (List<Key> out_list, Key *key) {
+                    // TODO: key->name;
+                    auto col_it =
+                        List_iterator<Key_part_spec>(key->columns);
+                    key->columns = 
+                        reduceList<Key_part_spec>(col_it,
+                                                  List<Key_part_spec>(),
+                            [table, a] (List<Key_part_spec> out_field_list,
+                                        Key_part_spec *key_part) {
+                                string field_name =
+                                    convert_lex_str(key_part->field_name);
+                                FieldMeta *fm =
+                                    a.getFieldMeta(table, field_name);
+                                // TODO: Algorithm for determimining which
+                                // onion to apply the index to.
+                                key_part->field_name = 
+                                    string_to_lex_str(fm->onions[oOPE]->onionname);
+                                out_field_list.push_back(key_part);
+                                return out_field_list;
+                            }); 
+                    out_list.push_back(key);
+                    return out_list;
+                });
+
+        return single_lex_output(new_lex, out_lex_count);
     }
 };
 
@@ -169,6 +214,7 @@ LEX **AlterSubHandler::transformLex(LEX *lex, Analysis &a, const string &q,
     return this->rewriteAndUpdate(lex, a, q, out_lex_count);
 }
 
+// TODO: Use this in other handlers.
 static LEX **single_lex_output(LEX *out_me, unsigned *out_lex_count)
 {
     LEX **out_lex = new LEX*[1];
