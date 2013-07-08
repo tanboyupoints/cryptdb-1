@@ -73,8 +73,6 @@ class DropColumnSubHandler : public AlterSubHandler {
         new_lex->alter_info.drop_list =
             reduceList<Alter_drop>(drop_it, List<Alter_drop>(),
                 [table, a] (List<Alter_drop> out_list, Alter_drop *adrop) {
-                    // FIXME: Possibly this should be an assert as mixed
-                    // clauses are not supported?
                     if (adrop->type == Alter_drop::COLUMN) {
                         FieldMeta *fm = a.getFieldMeta(table, adrop->name);
                         THD *thd = current_thd;

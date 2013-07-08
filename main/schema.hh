@@ -128,7 +128,7 @@ typedef struct FieldMeta {
 } FieldMeta;
 
 
-
+// TODO: tableNo, hasSalt, salt_name should be const.
 typedef struct TableMeta {
     std::list<std::string> fieldNames;     //in order field names
     unsigned int tableNo;
