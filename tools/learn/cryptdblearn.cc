@@ -20,6 +20,7 @@ ignore_line(const string& line)
     return(line.compare(0,2,begin_match) == 0); 
 }
 
+
 void
 Learn::trainFromFile(void)
 {
@@ -39,20 +40,40 @@ Learn::trainFromFile(void)
                 s += line;
 
                 /*
-                 * During rewrite EncLayers are computed
-                 * and intersect is then invoked(). Ideally 
-                 * we do all steps until we have encryption schema
-                 * and provide to application developer the resulting
-                 * onion encryption layers for each field.
-                 *
                  * It is possible to effectivelly adjust 
-                 * onions but this is not the goal and the lines of 
-                 * code below is commented.
+                 * onions but it doesn't seem to the goal and the lines of 
+                 * code below are commented.
                  */
                 //QueryRewrite qr = this->m_r.rewrite(s);
                 //if(qr.queries.size() == 0)
                 //    this->m_errnum++;
                 //this->m_totalnum++;
+                
+                query_parse q(this->m_dbname, s);
+                LEX *lex = q.lex();
+                //cout << "command: " << lex->sql_command << endl;
+                string db =  lex->select_lex.table_list.first->db;
+                //string table = lex->select_lex.table_list.first->table_name;
+
+                auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
+
+                // TODO: Possible approach:
+                // - check SQL operation, e.g., equality, order, search, add
+                // - get columns and their types
+                // - based on operation and column types:
+                //      - define EncSet for each field
+                //      - intersect to find a common encryption denominator: 
+                //          RND,DET,JOIN / RND,OPE,OPE-JOIN / Search and HOM(add)
+                for (;;) 
+                {
+                    Item *i = fd_it++;
+                    if (!i)
+                        break;
+                    assert(i->type() == Item::FIELD_ITEM);
+                    Item_field *ifd = static_cast<Item_field*>(i);
+                    cout << db << ":" << ifd->table_name << ": Column name: " << ifd->field_name << ", column type: " 
+                        << ifd->field_type() << endl;
+                }
 
                 s.clear();
                 continue;
@@ -85,11 +106,12 @@ int main(int argc, char **argv)
 
     string username("");
     string password("");
+    string dbname("");
     string filename("");
 
     while(1)
     {
-        c = getopt_long(argc, argv, "hf:u:p:", long_options, &optind);
+        c = getopt_long(argc, argv, "hf:u:p:d:", long_options, &optind);
         if(c == -1)
             break;
 
@@ -106,6 +128,9 @@ int main(int argc, char **argv)
             case 'u':
                 username = optarg;
                 break;
+            case 'd':
+                dbname = optarg;
+                break;
             case '?':
                 break;
             default:
@@ -115,9 +140,10 @@ int main(int argc, char **argv)
 
     assert(username != "");
     assert(password != "");
+    assert(dbname != "");
     
     ConnectionInfo ci("localhost", username, password);
-    Rewriter r(ci, "/var/lib/shadow-mysql", "cryptdbtest", false, true);
+    Rewriter r(ci, "/var/lib/shadow-mysql", dbname, false, true);
 
     // Onion layer keys are derived from master key.
     // here using the same as cdb_test.
@@ -127,10 +153,10 @@ int main(int argc, char **argv)
     
     if(filename != "")
     {
-        learn = new Learn(MODE_FILE, r, filename);
+        learn = new Learn(MODE_FILE, r, dbname, filename);
         learn->trainFromFile();
     }else{
-        learn = new Learn(MODE_FROM_SCRATCH, r, "");
+        learn = new Learn(MODE_FROM_SCRATCH, r, dbname, "");
         learn->trainFromScratch();
     }
    

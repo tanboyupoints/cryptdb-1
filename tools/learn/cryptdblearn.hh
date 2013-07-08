@@ -32,9 +32,9 @@ class Learn
 {
     public:
 
-        Learn(mode_e mode, Rewriter& r, const string& filename) 
+        Learn(mode_e mode, Rewriter& r, const string&dbname, const string& filename) 
             : m_totalnum(0), m_errnum(0), 
-            m_mode(mode), m_r(r), m_filename(filename)
+            m_mode(mode), m_r(r), m_dbname(dbname), m_filename(filename)
         {
             //TODO: setenv is just a sugestion took from test, but need to be
             //better than this.
@@ -59,7 +59,9 @@ class Learn
         int m_errnum;
         mode_e m_mode;
         Rewriter& m_r;
+        string m_dbname;
         string m_filename;
+        vector<query_parse*>qvec;
 
 };
 
