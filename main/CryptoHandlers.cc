@@ -178,6 +178,32 @@ string prng_expand(string seed_key, uint key_bytes) {
     return prng.rand_string(key_bytes);
 }
 
+// returns the length of output by AES encryption of a string of given type
+// and len
+static
+int
+len_for_AES_str(enum enum_field_types type, int len, bool pad) {
+
+    int res_len = -1;
+    
+    switch (type) {
+    case MYSQL_TYPE_TINY_BLOB:
+    case MYSQL_TYPE_MEDIUM_BLOB:
+    case MYSQL_TYPE_LONG_BLOB:
+    case MYSQL_TYPE_BLOB:
+	break;
+    case MYSQL_TYPE_VAR_STRING:
+	res_len = rounded_len(len, AES_BLOCK_BYTES, pad);
+	break;
+    default: {
+	assert_s(false, "unexpected sql_type");
+    }
+    }
+
+    return res_len;
+  
+}
+
 //TODO: remove above newcreatefield
 static Create_field*
 createFieldHelper(const Create_field *f, int field_length,
@@ -379,7 +405,12 @@ RND_str::RND_str(const std::string & serial)
 Create_field *
 RND_str::newCreateField(string anonname) {
 //TODO: use more precise sizes and types
-    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname, &my_charset_bin);
+    cerr << "RND str receives sql type " << cf->sql_type << " len " << cf->length << " charset " <<
+	cf->charset << "\n";
+
+    int len = len_for_AES_str(cf->sql_type, cf->length, false);
+  
+    return createFieldHelper(cf, len, cf->sql_type, anonname, &my_charset_bin);
 }
 
 
@@ -590,6 +621,7 @@ DET_str::DET_str(Create_field * f, string seed_key)
     enckey = get_AES_enc_key(rawkey);
     deckey = get_AES_dec_key(rawkey);
 
+    
 }
 
 DET_str::DET_str(const std::string & serial): EncLayer(NULL),
@@ -601,8 +633,13 @@ DET_str::DET_str(const std::string & serial): EncLayer(NULL),
 
 Create_field *
 DET_str::newCreateField(string anonname) {
-//TODO: use more precise sizes and types
-    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname, &my_charset_bin);
+
+    cerr << "DET str receives sql type " << cf->sql_type << " len " << cf->length << " charset " <<
+	cf->charset << "\n";
+
+    int len = len_for_AES_str(cf->sql_type, cf->length, true);
+    
+    return createFieldHelper(cf, len, cf->sql_type, anonname, &my_charset_bin);
 }
 
 Item *

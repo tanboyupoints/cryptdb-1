@@ -34,6 +34,7 @@
  * Requirements & TODO:
  *  -- chain create fields
  *  -- anon name should not be in EncLayers
+ *  -- remove unnecessary padding
  */
 
 class EncLayer {

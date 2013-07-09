@@ -33,6 +33,7 @@ AES_KEY * get_AES_KEY(const std::string &key);
 AES_KEY * get_AES_enc_key(const std::string & key);
 AES_KEY * get_AES_dec_key(const std::string & key);
 
+uint rounded_len(uint len, uint block_size, bool dopad);
 
 std::string marshallKey(const std::string &key);
 //std::string unmarshallKey(const std::string &key);
@@ -55,7 +56,6 @@ decrypt_AES_CBC(const std::string &ctext, const AES_KEY * deckey, std::string sa
 //only works for padding unit < 255 bytes
 //std::vector<unsigned char> pad(std::vector<unsigned char> data, unsigned int unit);
 //std::vector<unsigned char> unpad(std::vector<unsigned char> data);
-
 
 std::string
 encrypt_AES_CMC(const std::string &ptext, const AES_KEY * enckey, bool dopad = true);

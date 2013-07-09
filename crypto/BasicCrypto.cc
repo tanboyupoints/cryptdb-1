@@ -14,6 +14,15 @@
 using namespace std;
 
 
+uint rounded_len(uint len, uint block_size, bool dopad) {
+    if (dopad || (len % block_size)) {
+	return (len/block_size + 1) * block_size;
+    } else {
+	return len;
+    }
+}
+
+
 string
 getKey(AES_KEY * masterKeyArg, const string &uniqueFieldName,
                       SECLEVEL sec)
