@@ -86,7 +86,12 @@ typedef struct FieldMeta {
 
     bool has_salt; //whether this field has its own salt
 
-    FieldMeta();
+    // New field.
+    FieldMeta(TableMeta *tm, std::string name, unsigned int uniq,
+              Create_field *field, AES_KEY *mKey);
+    // Recovering field from proxy db.
+    FieldMeta(TableMeta *tm, std::string name, unsigned int uniq,
+              bool has_salt, onionlayout onion_layout);
     ~FieldMeta();
 
     std::string saltName() const;
@@ -144,10 +149,12 @@ typedef struct TableMeta {
     TableMeta(unsigned int table_no, bool has_sensitive,
               bool has_salt, std::string salt_name,
               std::map<std::string, std::string> index_map,
-              unsigned int index_counter=0)
+              unsigned int index_counter=0,
+              unsigned int uniq_counter=0)
         : tableNo(table_no), hasSensitive(has_sensitive),
           has_salt(has_salt), salt_name(salt_name),
-          index_map(index_map), index_counter(index_counter) {}
+          index_map(index_map), index_counter(index_counter),
+          uniq_counter(uniq_counter) {}
     ~TableMeta();
 
     FieldMeta *getFieldMeta(std::string field);
@@ -171,6 +178,7 @@ protected:
 private:
     std::map<std::string, std::string> index_map;
     unsigned int index_counter;
+    unsigned int uniq_counter;
 } TableMeta;
 
 

@@ -287,13 +287,13 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
         string field_onion_layout(row[3], l[3]);
         string field_id(row[4], l[4]);
 
-        FieldMeta *fm = new FieldMeta;
-        fm->tm = tm;
-        fm->fname = field_name;
-        fm->uniq = atoi(field_uniq.c_str());
-        fm->has_salt = string_to_bool(field_has_salt);
-        fm->onion_layout =
+        unsigned int uniq = atoi(field_uniq.c_str());
+        bool has_salt = string_to_bool(field_has_salt);
+        onionlayout onion_layout = 
             TypeText<onionlayout>::toType(field_onion_layout);
+
+        FieldMeta *fm =
+            new FieldMeta(tm, field_name, uniq, has_salt, onion_layout);
 
         tm->fieldMetaMap[fm->fname] = fm;
         tm->fieldNames.push_back(fm->fname);
