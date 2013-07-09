@@ -68,6 +68,8 @@ class InsertHandler : public DMLHandler {
         }
 
         if (fmVec.empty()) {
+            // Use the table order.
+
             TableMeta *tm = a.getTableMeta(table);
             //keep fields in order
             for (auto it0 = tm->fieldNames.begin(); it0 != tm->fieldNames.end(); it0++) {
