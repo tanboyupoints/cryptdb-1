@@ -25,15 +25,17 @@ class AddColumnSubHandler : public AlterSubHandler {
         // Create *Meta objects.
         auto add_it =
             List_iterator<Create_field>(lex->alter_info.create_list);
-        eachList<Create_field>(add_it, [tm, a] (Create_field *cf) {
-            create_field_meta(tm, cf, a, a.ps->encByDefault);
+        eachList<Create_field>(add_it,
+            [tm, a, dbname, table] (Create_field *cf) {
+                FieldMeta *fm =
+                    tm->createFieldMeta(cf, a, a.ps->encByDefault);
+
+                // Add metadata to embedded database.
+                assert(do_add_field(fm, a, dbname, table));
         });
 
         // Add field to embedded database.
         assert(a.ps->e_conn->execute(q));
-
-        // Add metadata to embedded database.
-        do_add_field(tm, a, dbname, table);
     }
 
     LEX **rewrite(LEX *lex, Analysis &a, const string &q,

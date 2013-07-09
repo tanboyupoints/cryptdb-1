@@ -1,3 +1,5 @@
+#pragma once
+
 #include <util/onions.hh>
 
 #include <parser/embedmysql.hh>
@@ -9,6 +11,7 @@
 #include <list>
 #include <iostream>
 
+class Analysis;
 struct FieldMeta;
 /**
  * Field here is either:
@@ -72,12 +75,12 @@ struct TableMeta;
 //TODO: FieldMeta and TableMeta are partly duplicates with the original
 // FieldMetadata an TableMetadata
 // which contains data we want to add to this structure soon
-// FIXME: index should be const.
+// FIXME: Make uniq const.
 typedef struct FieldMeta {
     TableMeta * tm; //point to table belonging in
     std::string fname;
     onionlayout onion_layout;
-    int index;
+    int uniq;
 
     std::map<onion, OnionMeta *> onions;
 
@@ -153,6 +156,8 @@ typedef struct TableMeta {
     // TODO: Make FieldMeta a friend and deal with the other uses of this
     // function.
     std::string getAnonTableName() const;
+    FieldMeta *createFieldMeta(Create_field *field, const Analysis &a,
+                               bool encByDefault);
 
     friend class Analysis;
 

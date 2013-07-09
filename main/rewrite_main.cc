@@ -119,7 +119,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
     s << " CREATE TABLE IF NOT EXISTS pdb.field_info"
       << " (table_info_id bigint NOT NULL," // Foreign key.
       << "  name varchar(64) NOT NULL,"
-      << "  ndex bigint NOT NULL,"
+      << "  uniq bigint NOT NULL,"
       << "  has_salt boolean,"
       << "  onion_layout enum"
       << " " << TypeText<onionlayout>::parenList().c_str() << " NOT NULL,"
@@ -266,7 +266,7 @@ static void
 buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
 {
 
-    string q = " SELECT f.name, f.ndex, f.has_salt, f.onion_layout, f.id"
+    string q = " SELECT f.name, f.uniq, f.has_salt, f.onion_layout, f.id"
                " FROM pdb.table_info t, pdb.field_info f"
                " WHERE t.database_name = '" + database_name + "' "
                "   AND t.number = " + std::to_string(tm->tableNo) +
@@ -282,7 +282,7 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
         assert(l != NULL);
 
         string field_name(row[0], l[0]);
-        string field_ndex(row[1], l[1]);
+        string field_uniq(row[1], l[1]);
         string field_has_salt(row[2], l[2]);
         string field_onion_layout(row[3], l[3]);
         string field_id(row[4], l[4]);
@@ -290,14 +290,12 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
         FieldMeta *fm = new FieldMeta;
         fm->tm = tm;
         fm->fname = field_name;
-        fm->index = atoi(field_ndex.c_str());
+        fm->uniq = atoi(field_uniq.c_str());
         fm->has_salt = string_to_bool(field_has_salt);
         fm->onion_layout =
             TypeText<onionlayout>::toType(field_onion_layout);
 
         tm->fieldMetaMap[fm->fname] = fm;
-        // Guarentee order.
-        assert(tm->fieldNames.size() == (unsigned long)fm->index);
         tm->fieldNames.push_back(fm->fname);
 
         buildOnionMeta(ps, fm, atoi(field_id.c_str()));
@@ -360,7 +358,7 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
         string onion_id(row[2], l[2]);
 
         onion o = TypeText<onion>::toType(onion_type);
-        OnionMeta *om = new OnionMeta(o, fm->index, fm->fname);
+        OnionMeta *om = new OnionMeta(o, fm->uniq, fm->fname);
         fm->onions[o] = om;
 
         // Add elements to OnionMeta.layers starting with the bottom layer

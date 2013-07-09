@@ -42,18 +42,11 @@ void
 do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a);
 
 bool
-create_field_meta(TableMeta *tm, Create_field *field,
-                  const Analysis a, bool encByDefault);
-
-bool
-do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
+do_add_field(FieldMeta *fm, const Analysis &a, std::string dbname,
              std::string table, unsigned long long *tid=NULL);
 
 std::string
 bool_to_string(bool b);
-
-void
-init_onions(AES_KEY * mKey, FieldMeta * fm, Create_field * cf, uint index = 0);
 
 // FIXME(burrows): Generalize to support any container with next AND end
 // semantics.

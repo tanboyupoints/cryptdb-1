@@ -85,7 +85,10 @@ class CreateHandler : public DDLHandler {
 
         // Add field.
         unsigned long long tableID = a.ps->e_conn->last_insert_id();
-        do_add_field(tm, a, dbname, table, &tableID);
+        for (std::pair<std::string, FieldMeta *> fm_pair: tm->fieldMetaMap) {
+            FieldMeta *fm = fm_pair.second;
+            assert(do_add_field(fm, a, dbname, table, &tableID));
+        }
 
         a.ps->e_conn->execute("COMMIT");
     }
@@ -235,7 +238,7 @@ create_table_meta(Analysis & a, const string & table, LEX *lex,
 
     auto it = List_iterator<Create_field>(lex->alter_info.create_list);
     eachList<Create_field>(it, [tm, a, encByDefault] (Create_field *cf) {
-        create_field_meta(tm, cf, a, encByDefault);
+        tm->createFieldMeta(cf, a, encByDefault);
     });
 }
 
