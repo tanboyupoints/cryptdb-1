@@ -144,8 +144,6 @@ typedef struct TableMeta {
     bool has_salt;
     std::string salt_name;
 
-    TableMeta()
-        : tableNo(0), uniq_counter(0) {}
     TableMeta(unsigned int table_no, bool has_sensitive,
               bool has_salt, std::string salt_name,
               std::map<std::string, std::string> index_map,
@@ -200,11 +198,9 @@ typedef struct SchemaInfo {
                                const unsigned int *table_no=NULL);
     friend class Analysis;
 
-    // TODO: Make private after consolidating create_table_meta with
-    // SchemaInfo::createTableMeta
+private:
     std::map<std::string, TableMeta *> tableMetaMap;
 
-private:
     // These functions do not support Aliasing, use Analysis::getTableMeta
     // and Analysis::getFieldMeta.
     TableMeta * getTableMeta(const std::string & table);
