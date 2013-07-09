@@ -280,7 +280,8 @@ do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
 
 // If mkey == NULL, the field is not encrypted
 static void
-init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf, onionlayout ol) {
+init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index,
+                   Create_field * cf, onionlayout ol) {
 
     fm->onions.clear();
 
@@ -350,8 +351,7 @@ create_field_meta(TableMeta *tm, Create_field *field,
     FieldMeta * fm = new FieldMeta();
 
     fm->tm            = tm;
-    fm->sql_field     = field->clone(current_thd->mem_root);
-    fm->fname         = string(fm->sql_field->field_name);
+    fm->fname         = string(field->field_name);
     // FIXME: This does not play nice with field deletion.
     fm->index         = tm->fieldNames.size();
 

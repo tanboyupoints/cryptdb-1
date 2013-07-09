@@ -56,7 +56,6 @@ string FieldMeta::stringify() {
 FieldMeta::FieldMeta()
 {
     fname = "";
-    sql_field = NULL;
     has_salt = true;
 }
 

@@ -76,7 +76,6 @@ struct TableMeta;
 typedef struct FieldMeta {
     TableMeta * tm; //point to table belonging in
     std::string fname;
-    Create_field * sql_field;
     onionlayout onion_layout;
     int index;
 
