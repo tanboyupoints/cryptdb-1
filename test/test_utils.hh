@@ -11,6 +11,7 @@
 #include <assert.h>
 #include <util/util.hh>
 #include <parser/sql_utils.hh>
+#include <main/rewrite_main.hh>
 
 class TestConfig {
  public:
@@ -20,7 +21,7 @@ class TestConfig {
         pass = "letmein";
         host = "localhost";
         db   = "cryptdbtest";
-        shadowdb_dir = "/home/cat/shadow-db";
+        shadowdb_dir = "/var/lib/shadow-mysql";
         port = 3306;
         stop_if_fail = false;
 
