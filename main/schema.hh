@@ -207,6 +207,7 @@ private:
     TableMeta * getTableMeta(const std::string & table);
     FieldMeta * getFieldMeta(const std::string & table,
                              const std::string & field);
+    bool tableMetaExists(std::string table) const;
     bool destroyTableMeta(std::string table);
 } SchemaInfo;
 

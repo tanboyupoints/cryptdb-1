@@ -205,26 +205,13 @@ LEX** DDLHandler::transformLex(LEX *lex, Analysis &analysis,
 }
 
 static void
-check_table_not_exists(Analysis & a, LEX * lex, string table) {
-    auto it = a.ps->schema->tableMetaMap.find(table);
-    if (it != a.ps->schema->tableMetaMap.end()) {
-        if (!(lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS)) {
-            LOG(warn) << "ERROR: Table exists. Embedded DB possibly"
-		"out of sync with regular DB (or, just programmer error)";
-        }
-        return;
-    }
-}
-
-static void
 create_table_meta(Analysis & a, const string & table, LEX *lex,
                   bool encByDefault) {
     assert(lex->sql_command == SQLCOM_CREATE_TABLE);
 
     LOG(cdb_v) << "add_table encByDefault " << encByDefault;
 
-    // FIXME: Stop using this function.
-    check_table_not_exists(a, lex, table);
+    assert(!a.tableMetaExists(table));
 
     // FIXME: Use SchemaInfo::createTableMeta.
     // What is the role of has_salt, has_sensitive and salt_name?

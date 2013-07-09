@@ -190,9 +190,7 @@ SchemaInfo::createTableMeta(std::string table_name,
                             const unsigned int *table_no)
 {
     // Make sure a table with this name does not already exist.
-    std::map<std::string, TableMeta *>::iterator it =
-        tableMetaMap.find(table_name);
-    if (tableMetaMap.end() != it) {
+    if (this->tableMetaExists(table_name)) {
         return NULL;
     }
 
@@ -228,6 +226,12 @@ SchemaInfo::getFieldMeta(const string & table, const string & field) {
     }
 
     return tm->getFieldMeta(field);
+}
+
+bool
+SchemaInfo::tableMetaExists(std::string table) const
+{
+    return tableMetaMap.find(table) != tableMetaMap.end();
 }
 
 bool

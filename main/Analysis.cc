@@ -224,7 +224,7 @@ bool Analysis::destroyTableMeta(std::string table)
 bool Analysis::tableMetaExists(std::string table) const
 {
     string real_table_name = unAliasTable(table);
-    return ps->schema->getTableMeta(real_table_name);
+    return ps->schema->tableMetaExists(real_table_name);
 }
 
 std::string Analysis::getAnonTableName(const string &table) const
