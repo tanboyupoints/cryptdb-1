@@ -407,10 +407,6 @@ RND_str::RND_str(const std::string & serial)
 
 Create_field *
 RND_str::newCreateField(string anonname) {
-//TODO: use more precise sizes and types
-    cerr << "RND str receives sql type " << cf->sql_type << " len " << cf->length << " charset " <<
-	cf->charset << "\n";
-
     auto typelen = type_len_for_AES_str(cf->sql_type, cf->length, false);
   
     return createFieldHelper(cf, typelen.second, typelen.first, anonname, &my_charset_bin);
@@ -637,10 +633,6 @@ DET_str::DET_str(const std::string & serial): EncLayer(NULL),
 
 Create_field *
 DET_str::newCreateField(string anonname) {
-
-    cerr << "DET str receives sql type " << cf->sql_type << " len " << cf->length << " charset " <<
-	cf->charset << "\n";
-
     auto typelen = type_len_for_AES_str(cf->sql_type, cf->length, true);
     
     return createFieldHelper(cf, typelen.second, typelen.first, anonname, &my_charset_bin);

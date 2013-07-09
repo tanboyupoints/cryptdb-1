@@ -54,8 +54,8 @@ Import tool notes:
       
 
 Raluca:
-by monday: finish reorganizing crypto handlers to allow different data types like varchar
-+ bug in loading tool
+by monday: finish reorganizing crypto handlers to allow different data types like varchar DONE
++ bug in loading tool DONE
 by tue: decimal
 
 Aaron:
