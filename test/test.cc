@@ -589,490 +589,7 @@ evalImproveSummations(const TestConfig &tc)
 
 }
 */
-static void
-interactiveTest(const TestConfig &tc, int ac, char **av)
-{
-    cerr << "interactiveTest uses old EDBProxy; please use obj/parser/cdb_test" << endl;
-    /*
-    cout << "\n ---------   CryptDB ---------- \n \n";
 
-    cout << "To exit, hit \\q\n";
-
-    string masterKey = BytesFromInt(mkey, AES_KEY_BYTES);
-    string host = tc.host;
-    string user = tc.user;
-    string db = tc.db;
-    string pwd = tc.pass;
-    cerr << "connecting to host " << host << " user " << user << " pwd " <<
-            pwd << " db " << db << endl;
-    EDBProxy * cl;
-
-    if (ac >= 2 && string(av[1]) == "multi") {
-        cl = new EDBProxy(host, user, pwd, db, 0, true);
-    } else {
-        cl = new EDBProxy(host, user, pwd, db,0, false);
-    }
-    cl->setMasterKey(masterKey);
-    cl->VERBOSE = true;
-
-    //cl->execute("CREATE TABLE phpbb_forums (forum_id mediumint(8) UNSIGNED NOT NULL auto_increment, parent_id mediumint(8) UNSIGNED DEFAULT '0' NOT NULL, left_id mediumint(8) UNSIGNED DEFAULT '0' NOT NULL,  right_id mediumint(8) UNSIGNED DEFAULT '0' NOT NULL, forum_parents mediumtext NOT NULL, forum_name encfor forum_id varchar(255) NOT NULL, forum_desc text NOT NULL, forum_desc_bitfield varchar(255) DEFAULT '' NOT NULL, forum_desc_options int(11) UNSIGNED DEFAULT '7' NOT NULL, forum_desc_uid varchar(8) DEFAULT '' NOT NULL, forum_link varchar(255) DEFAULT '' NOT NULL, forum_password varchar(40) DEFAULT '' NOT NULL, forum_style mediumint(8) UNSIGNED DEFAULT '0' NOT NULL, forum_image encfor forum_id varchar(255) NOT NULL, forum_rules text NOT NULL, forum_rules_link varchar(255) DEFAULT '' NOT NULL, forum_rules_bitfield varchar(255) DEFAULT '' NOT NULL, forum_rules_options int(11) UNSIGNED DEFAULT '7' NOT NULL, forum_rules_uid varchar(8) DEFAULT '' NOT NULL, forum_topics_per_page tinyint(4) DEFAULT '0' NOT NULL, forum_type tinyint(4) DEFAULT '0' NOT NULL, forum_status tinyint(4) DEFAULT '0' NOT NULL, forum_posts mediumint(8) UNSIGNED DEFAULT '0' NOT NULL, forum_topics mediumint(8) UNSIGNED DEFAULT '0' NOT NULL, forum_topics_real mediumint(8) UNSIGNED DEFAULT '0' NOT NULL, forum_last_post_id mediumint(8) UNSIGNED DEFAULT '0' NOT NULL, forum_last_poster_id mediumint(8) UNSIGNED DEFAULT '0' NOT NULL, forum_last_post_subject encfor forum_id det varchar(255) NOT NULL, forum_last_post_time int(11) UNSIGNED DEFAULT '0' NOT NULL, forum_last_poster_name varchar(255) DEFAULT '' NOT NULL, forum_last_poster_colour varchar(6) DEFAULT '' NOT NULL, forum_flags tinyint(4) DEFAULT '32' NOT NULL, forum_options int(20) UNSIGNED DEFAULT '0' NOT NULL, display_subforum_list tinyint(1) UNSIGNED DEFAULT '1' NOT NULL, display_on_index tinyint(1) UNSIGNED DEFAULT '1' NOT NULL, enable_indexing tinyint(1) UNSIGNED DEFAULT '1' NOT NULL, enable_icons tinyint(1) UNSIGNED DEFAULT '1' NOT NULL, enable_prune tinyint(1) UNSIGNED DEFAULT '0' NOT NULL, prune_next int(11) UNSIGNED DEFAULT '0' NOT NULL, prune_days mediumint(8) UNSIGNED DEFAULT '0' NOT NULL, prune_viewed mediumint(8) UNSIGNED DEFAULT '0' NOT NULL, prune_freq mediumint(8) UNSIGNED DEFAULT '0' NOT NULL, PRIMARY KEY (forum_id), KEY left_right_id (left_id, right_id), KEY forum_lastpost_id (forum_last_post_id));");
-    //cl->execute("INSERT INTO phpbb_forums (forum_name, forum_desc, left_id, right_id, parent_id, forum_type, forum_posts, forum_topics, forum_topics_real, forum_last_post_id, forum_last_poster_id, forum_last_poster_name, forum_last_poster_colour, forum_last_post_time, forum_link, forum_password, forum_image, forum_rules, forum_rules_link, forum_rules_uid, forum_desc_uid, prune_days, prune_viewed, forum_parents) VALUES ('Your first category', '', 1, 4, 0, 0, 1, 1, 1, 1, 2, 'Admin', 'AA0000', 972086460, '', '', '', '', '', '', '', 0, 0, '');");
-
-
-    streamsize len = 500;
-    char *cmd = new char[len];
-
-    for (;; ) {
-
-        cout << "CryptDB=# ";
-        cin.getline(cmd, len);
-        if (cin.eof())
-            break;
-
-        string commandS = string(cmd);
-        if (commandS == "") {
-            break;
-        }
-
-        if (commandS.compare("\\q") == 0) {
-            break;
-        } else if (commandS.compare("load cryptapp") == 0) {
-            cl->execute(
-                    "CREATE TABLE users (id integer accessto uname, uname text givespsswd); ");
-            cl->execute(
-                    "CREATE TABLE info (id integer equals users.id , creditcard integer encfor id); ");
-            cl->execute(
-                    "INSERT INTO activeusers VALUES ('alice', 'secretA');");
-            cl->execute("INSERT INTO activeusers VALUES ('bob', 'secretB');");
-            cl->execute(
-                    "INSERT INTO activeusers VALUES ('chris', 'secretC');");
-            cl->execute("INSERT INTO activeusers VALUES ('dan', 'secretD');");
-            cl->execute("INSERT INTO users VALUES (1, 'alice');");
-            cl->execute("INSERT INTO users VALUES (2, 'bob');");
-            cl->execute("INSERT INTO users VALUES (3, 'chris');");
-            cl->execute("INSERT INTO users VALUES (4, 'dan');");
-            cl->execute("INSERT INTO info VALUES (1, 111);");
-            cl->execute("INSERT INTO info VALUES (2, 222);");
-            cl->execute("INSERT INTO info VALUES (3, 333);");
-            cl->execute("INSERT INTO info VALUES (4, 444);");
-        } else if (commandS.compare("load people;") == 0) {
-            int noInserts = 15;
-            for (int i = 0; i < noInserts; i++) {
-                unsigned int val1 = rand() % 10;
-                unsigned int val2 = rand() % 10;
-                string qq = "INSERT INTO people VALUES ( " +
-                        strFromVal(val1) + ", " + strFromVal(val2) +
-                        ");";
-                cl->execute(qq);
-            }
-        } else if (commandS.compare("load all emp;") == 0) {
-            cl->execute("CREATE TABLE emp (id integer, jobid integer);");
-
-            int noInserts = 20;
-            for (int i = 0; i < noInserts; i++) {
-                unsigned int val1 = rand() % 10;
-                unsigned int val2 = rand() % 10;
-                string qq = "INSERT INTO emp VALUES ( " + strFromVal(val1) +
-                        ", " + strFromVal(val2) + ");";
-                cl->execute(qq);
-            }
-        } else if (commandS.find("login") == 0) {
-            list<string> words = parse(commandS, delimsStay, delimsGo,
-                    keepIntact);
-            list<string>::iterator wordsIt = words.begin();
-            wordsIt++;
-            string uname = getVal(wordsIt);
-            string p = getVal(wordsIt);
-            string query = "INSERT INTO activeusers VALUES ('" + uname +
-                    "' , '" + p + "' );";
-            cl->execute(query);
-        } else if (commandS.find("logout") == 0) {
-            list<string> words = parse(commandS, delimsStay, delimsGo,
-                    keepIntact);
-            list<string>::iterator wordsIt = words.begin();
-            wordsIt++;
-            string uname = getVal(wordsIt);
-            string query = "DELETE FROM activeusers WHERE uname = '" +
-                    uname + "';";
-            cl->execute(query);
-        } else if (commandS.compare("debug;") == 0) {
-            //assert_res(cl->execute(), "failed");
-
-            cl->plain_execute("DROP TABLE IF EXISTS table0, table1");
-            cerr << "here \n";
-            assert_res(cl->execute(
-                    "CREATE TABLE t(id enc integer, name enc text);"),
-                    "failed");
-
-            assert_res(cl->execute(
-                    "INSERT INTO t VALUES (1, '5');"), "failed");
-
-            assert_res(cl->execute(  "INSERT INTO t VALUES (2, 'alice');"), "failed");
-
-            assert_res(cl->execute( "UPDATE t SET id = 10;"),
-                    "failed");
-
-            assert_res(cl->execute( "SELECT * FROM t;"),
-                                                    "failed");
-
-            assert_res(cl->execute(  "CREATE TABLE t2 (age enc integer);"),
-                                                    "failed");
-            assert_res(cl->execute(  "INSERT INTO t2 VALUES (5);"), "failed");
-
-                        assert_res(cl->execute(
-                                        "SELECT t2.age FROM test_insert, t2 WHERE test_insert.age = t2.age;"), "failed");
-
-                        //assert_res(cl->execute("SELECT * FROM test_insert;"), "failed");
-
-            // assert_res(cl->execute(
-            //              "SELECT sum(id) FROM hi;"), "failed");
-
-
-             assert_res(cl->execute(
-                         "INSERT INTO hi VALUES (1, 'lauren');"), "failed");
-               assert_res(cl->execute(
-                         "INSERT INTO hi VALUES (1, 'aaa');"), "failed");
-               assert_res(cl->execute(
-                         "INSERT INTO hi VALUES (1, 'xxhello');"), "failed");
-               assert_res(cl->execute(
-                         "INSERT INTO hi VALUES (1, 'ydan');"), "failed");
-               assert_res(cl->execute(
-                         "INSERT INTO hi VALUES (1, 'blauren');"), "failed");
-               assert_res(cl->execute(
-                         "INSERT INTO hi VALUES (1, 'naaa');"), "failed");
-               assert_res(cl->execute(
-                         "INSERT INTO hi VALUES (1, 'hello');"), "failed");
-            assert_res(cl->execute(
-                         "SELECT * FROM hi, hi2 WHERE hi.name = hi2.name ;"),
-                     "failed");
-
-            //debugging of DECRYPTFIRST mode
-
-            //cl->plain_execute("DROP TABLE IF EXISTS hi;");
-            //assert_res(cl->execute("CREATE TABLE hi (id enc integer, name
-            // text);"), "failed");
-            //    assert_res(cl->execute("INSERT INTO hi VALUES (3, '5');"),
-            // "failed");
-            //    assert_res(cl->execute("SELECT * FROM hi;"), "failed");
-            //    assert_res(cl->execute("SELECT id, name AS n FROM hi WHERE id =
-            // 3;"), "failed");
-            //    assert_res(cl->execute("SELECT * FROM hi WHERE id > 2;"),
-            // "failed");
-            //assert_res(cl->execute("SELECT * FROM hi;"), "failed");
-
-            //GENERAL MULTI-KEY DEBUGGING
-
-
-               cl->plain_execute("DROP TABLE IF EXISTS t1, users,
-                  pwdcryptdb__users, cryptdb_public, cryptdb_active0;");
-               assert_res(cl->execute("CREATE TABLE t1 (id integer, post encfor
-                  id det text, age encfor id ope bigint);"), "failed");
-               assert_res(cl->execute("CREATE TABLE users (id equals t1.id
-                  integer, username givespsswd id text);"), "failed");
-               assert_res(cl->execute("COMMIT ANNOTATIONS;"), "issue when
-                  creating tables");
-               assert_res(cl->execute((string("INSERT INTO ") + PWD_TABLE_PREFIX
-             + "users (username, psswd) VALUES ('alice',
-                  'secretalice');")), "failed to log in user");
-               assert_res(cl->execute((string("DELETE FROM ") + PWD_TABLE_PREFIX
-             + "users  WHERE username = 'alice';")), "failed to
-                  logout user");
-               assert_res(cl->execute((string("INSERT INTO ") + PWD_TABLE_PREFIX
-             + "users (username, psswd) VALUES ('alice',
-                  'secretalice');")), "failed to log in user");
-               assert_res(cl->execute("INSERT INTO users VALUES (1, 'alice');"),
-                  "failed to add alice in users table");
-               assert_res(cl->execute("INSERT INTO t1 VALUES (1, 'there you go',
-                  23);"), "failed to insert");
-               assert_res(cl->execute("SELECT * FROM t1;"), "failed");
-
-               assert_res(cl->execute("SELECT post FROM t1 WHERE id = 1 AND age
-                  = 23;"), "failed");
-               assert_res(cl->execute("UPDATE t1 SET post = 'hello!' WHERE age >
-                  22 AND id = 1;"), "failed");
-               assert_res(cl->execute((string("INSERT INTO ") + PWD_TABLE_PREFIX
-             + "users (username, psswd) VALUES ('raluca',
-                  'secretraluca');")), "failed to log in user");
-               assert_res(cl->execute("INSERT INTO users VALUES (2,
-                  'raluca');"), "failed");
-               assert_res(cl->execute("INSERT INTO t1 VALUES (2, 'my text',
-                  5);"), "failed");
-
-
-            //PRIVATE MESSAGES EXAMPLE
-                cl->plain_execute("DROP TABLE IF EXISTS users, msgs,
-               privmsg;");
-                    assert_res(cl->execute("CREATE TABLE msgs (msgid equals
-                       privmsg.msgid integer, msgtext encfor msgid text);"),
-                       "failed");
-                    assert_res(cl->execute("CREATE TABLE privmsg (msgid integer,
-                       recid equals users.userid hasaccessto msgid integer,
-                       senderid hasaccessto msgid integer);"), "failed");
-                    assert_res(cl->execute("CREATE TABLE users (userid equals
-                       privmsg.senderid integer, username givespsswd userid
-                       text);"), "failed");
-                    assert_res(cl->execute("COMMIT ANNOTATIONS;"), "issue when
-                       creating tables");
-                    assert_res(cl->execute((string("INSERT INTO ") +
-                       PWD_TABLE_PREFIX + "users (username, psswd) VALUES
-                       ('alice', 'secretalice');")), "failed to log in
-                       user");
-                    assert_res(cl->execute((string("INSERT INTO ") +
-                       PWD_TABLE_PREFIX + "users (username, psswd) VALUES
-                       ('bob', 'secretbob');")), "failed to log in
-                       user");
-                    assert_res(cl->execute("INSERT INTO users VALUES (1,
-                       'alice');"), "failed");
-                    assert_res(cl->execute("INSERT INTO users VALUES (2,
-                       'bob');"), "failed");
-                    assert_res(cl->execute("INSERT INTO privmsg (msgid, recid,
-                       senderid) VALUES (9, 1, 2);"), "failed to send msg");
-                    assert_res(cl->execute("INSERT INTO msgs  VALUES (1, 'hello
-                       world');"), "failed to insert msg");
-                    assert_res(cl->execute("SELECT msgtext from msgs WHERE msgid
-                       = 1;"), "failed");
-                    assert_res(cl->execute("SELECT msgtext from msgs, privmsg,
-                       users WHERE username = 'alice' AND userid = recid AND
-                       msgs.msgid = privmsg.msgid;"), "failed");
-
-            //private messages without orphans
-             cl->plain_execute("DROP TABLE IF EXISTS users, msgs,
-               privmsg;");
-               assert_res(cl->execute("CREATE TABLE msgs (msgid equals
-                  privmsg.msgid integer, msgtext encfor msgid text);"),
-                  "failed");
-               assert_res(cl->execute("CREATE TABLE privmsg (msgid integer,
-                  recid equals users.userid hasaccessto msgid integer,
-                  senderid hasaccessto msgid integer);"), "failed");
-               assert_res(cl->execute("CREATE TABLE users (userid equals
-                  privmsg.senderid integer, username givespsswd userid
-                  text);"), "failed");
-               assert_res(cl->execute("COMMIT ANNOTATIONS;"), "issue when
-                  creating tables");
-               assert_res(cl->execute((string("INSERT INTO ") + PWD_TABLE_PREFIX
-             + "users (username, psswd) VALUES ('alice',
-                  'secretalice');")), "failed to log in user");
-               assert_res(cl->execute((string("INSERT INTO ") + PWD_TABLE_PREFIX
-             + "users (username, psswd) VALUES ('bob',
-                  'secretbob');")), "failed to log in user");
-               assert_res(cl->execute("INSERT INTO users VALUES (1, 'alice');"),
-                  "failed");
-               assert_res(cl->execute("INSERT INTO users VALUES (2, 'bob');"),
-                  "failed");
-               assert_res(cl->execute("INSERT INTO privmsg (msgid, recid,
-                  senderid) VALUES (1, 1, 2);"), "failed to send msg");
-               assert_res(cl->execute("INSERT INTO msgs  VALUES (1, 'hello
-                  world');"), "failed to insert msg");
-               assert_res(cl->execute("SELECT msgtext from msgs WHERE msgid =
-                  1;"), "failed");
-               assert_res(cl->execute("SELECT msgtext from msgs, privmsg, users
-                  WHERE username = 'alice' AND userid = recid AND msgs.msgid =
-                  privmsg.msgid;"), "failed");
-
-
-            //USERID, GROUP, FORUM, SQL PRED EXAMPLE
-            //    cl->plain_execute("DROP TABLE IF EXISTS users, usergroup,
-            // groupforum, forum;");
-            //    assert_res(cl->execute("CREATE TABLE users (userid integer,
-            // username givespsswd userid text);"), "failed");
-            //    assert_res(cl->execute("CREATE TABLE usergroup (userid equals
-            // users.userid hasaccessto groupid integer, groupid integer);"),
-            // "failed");
-            //    assert_res(cl->execute("CREATE TABLE groupforum (forumid equals
-            // forum.forumid integer, groupid equals usergroup.groupid
-            // hasaccessto forumid if test(optionid) integer, optionid
-            // integer);"), "failed");
-            //    assert_res(cl->execute("CREATE TABLE forum (forumid integer,
-            // forumtext encfor forumid text);"), "failed");
-            //    assert_s(cl->plain_execute("DROP FUNCTION IF EXISTS test;"),
-            // "failed");
-            //    assert_s(cl->plain_execute("CREATE FUNCTION test (optionid
-            // integer) RETURNS bool RETURN optionid=20;"), "failed");
-            //
-            //    //Alice is in group 1, Bob in group 2 and Chris is in group 1
-            // and group 2
-            //    //group 1 can see the forum text, group 2 cannot
-            //    assert_res(cl->execute("INSERT INTO "psswdtable" VALUES
-            // ('alice', 'secretalice');"), "failed to log in user");
-            //    assert_res(cl->execute("INSERT INTO "psswdtable" VALUES ('bob',
-            // 'secretbob');"), "failed to log in user");
-            //    assert_res(cl->execute("INSERT INTO "psswdtable" VALUES
-            // ('chris', 'secretbob');"), "failed to log in user");
-            //
-            //    assert_res(cl->execute("INSERT INTO users (username) VALUES
-            // ('alice');"), "failed");
-            //    assert_res(cl->execute("INSERT INTO users (username) VALUES
-            // ('bob');"), "failed");
-            //    assert_res(cl->execute("INSERT INTO users (username) VALUES
-            // ('chris');"), "failed");
-            //
-            //    assert_res(cl->execute("INSERT INTO usergroup VALUES (1, 1);"),
-            // "failed");
-            //    assert_res(cl->execute("INSERT INTO usergroup VALUES (2, 2);"),
-            // "failed");
-            //    assert_res(cl->execute("INSERT INTO usergroup VALUES (3, 1);"),
-            // "failed");
-            //    assert_res(cl->execute("INSERT INTO usergroup VALUES (3, 2);"),
-            // "failed");
-            //
-            //
-            //    assert_res(cl->execute("INSERT INTO groupforum VALUES (1, 1,
-            // 14);"), "failed");
-            //    assert_res(cl->execute("INSERT INTO groupforum VALUES (1, 1,
-            // 20);"), "failed");
-            //    assert_res(cl->execute("INSERT INTO groupforum VALUES (1, 2,
-            // 2);"), "failed");
-            //    assert_res(cl->execute("INSERT INTO groupforum VALUES (1, 2,
-            // 0);"), "failed");
-            //
-            //    assert_res(cl->execute("INSERT INTO forum (forumtext) VALUES
-            // ('success--you can see forum text');"), "failed");
-            //
-            //    //all users log out, then each log in to have their
-            // permissions tested
-            //    assert_res(cl->execute("DELETE FROM "psswdtable" WHERE  username
-            // = 'alice';"), "failed");
-            //    assert_res(cl->execute("DELETE FROM "psswdtable" WHERE  username
-            // = 'bob';"), "failed");
-            //    assert_res(cl->execute("DELETE FROM "psswdtable" WHERE  username
-            // = 'chris';"), "failed");
-            //
-            //
-            //    assert_res(cl->execute("INSERT INTO "psswdtable" VALUES
-            // ('alice', 'secretalice');"), "failed to log in user");
-            //
-            //    assert_res(cl->execute("SELECT forumtext from forum  WHERE
-            // forumid  = 1;"), "Alice should succeed");
-            //
-            //    assert_res(cl->execute("DELETE FROM "psswdtable" WHERE  username
-            // = 'alice';"), "failed");
-            //    assert_res(cl->execute("INSERT INTO "psswdtable" VALUES ('bob',
-            // 'secretbob');"), "failed to log in user");
-            //
-            //    assert_res(cl->execute("DELETE FROM "psswdtable" WHERE  username
-            // = 'bob';"), "failed");
-            //    assert_res(cl->execute("INSERT INTO "psswdtable" VALUES
-            // ('chris', 'secretchris');"), "failed to log in user");
-            //
-            //    assert_res(cl->execute("SELECT forumtext from forum  WHERE
-            // forumid  = 1;"), "chris should succeed");
-
-            //multi-key debugging
-
-                cl->plain_execute("DROP TABLE IF EXISTS hi, try, bye;");
-               //some single key debugging
-               assert_res(cl->execute("CREATE TABLE hi (id integer, age enc
-                  integer, name enc text);"), "q failed");
-               assert_res(cl->execute("INSERT INTO hi VALUES (3, 9,
-                  'raluca');"), "q failed");
-               assert_res(cl->execute("SELECT * FROM hi WHERE id = 4;"), "q
-                  failed");
-
-               assert_res(cl->execute("UPDATE hi SET age = age + 1, name = 'ana'
-                  WHERE id = 3;"), "q failed");
-
-               assert_res(cl->execute("CREATE TABLE try (id enc integer, age
-                  integer);"), "q failed");
-               assert_res(cl->execute("INSERT INTO try VALUES (5, 6);"), "q
-                  failed");
-               assert_res(cl->execute("SELECT u.*, v.* from hi u, try AS v;"),
-                  "q failed");
-
-               cl->outputOnionState();
-
-               assert_res(cl->execute("SELECT * FROM (hi u, try AS v);"),"q
-                  failed");
-
-               assert_res(cl->execute("SELECT MAX(id) AS h, MIN(id) as ll FROM
-                  try;"),"failed max");
-
-               assert_res(cl->execute("SELECT u.id FROM try t LEFT JOIN try u ON
-                  u.id = t.id;"),"");
-
-               assert_res(cl->execute("SELECT * FROM try WHERE id = 5"),"");
-
-               assert_res(cl->execute("SELECT * FROM try WHERE age IN
-                  (0,9);"),"");
-
-
-               assert_res(cl->execute("INSERT INTO try VALUES (3, 9), (5, 6),
-                  (7,8);"), "");
-               assert_res(cl->execute("SELECT * FROM try WHERE age in (6,8)
-                  ORDER BY age ASC LIMIT 2;"),"");
-               assert_res(cl->execute("SELECT * FROM try t WHERE t.age in (6,8)
-                  ORDER BY id DESC LIMIT 2;"),"");
-
-               assert_res(cl->execute("CREATE TABLE bye (id
-                  integer);"),"failed");
-               assert_res(cl->execute("INSERT INTO bye VALUES (3), (9),
-                  (10);"),"failed");
-               assert_res(cl->execute("SELECT * FROM bye WHERE id <>
-                  3;"),"failed");
-
-               assert_res(cl->execute("SELECT COUNT(id) AS my_count FROM
-                  try;"),"failed");
-               assert_res(cl->execute("SELECT COUNT(*) AS my_count  FROM
-                  try;"),"failed");
-               assert_res(cl->execute("SELECT count(distinct age) AS hello from
-                  hi;"),"failed");
-
-               assert_res(cl->execute("SELECT MAX(id) AS maximus, MIN(id) AS
-                  minimus FROM bye WHERE id > 3;"),"failed");
-
-               assert_res(cl->execute("INSERT INTO bye VALUES (3), (7), (13),
-                  (43524)"),"failed");
-
-               assert_res(cl->execute("SELECT id i FROM bye where id > 2 ORDER
-                  BY i ASC LIMIT 5; "),"failed");
-
-               assert_res(cl->execute("SELECT id i FROM bye WHERE id in
-                  (7,13,3,4) AND (id in (7, 13)) ORDER BY i DESC LIMIT 9;
-                  "),"failed");
-
-               assert_res(cl->execute("INSERT INTO bye (id) VALUES (4), (6),
-                  (-10)"),"failed");
-               //assert_res(cl->execute(""),"failed");
-
-               assert_res(cl->execute("DROP TABLE hi;"), "drop failed");
-               assert_res(cl->execute("CREATE TABLE hi (id enc integer, name enc
-                  text);"), "failed");
-               assert_res(cl->execute("INSERT INTO  hi VALUES (3, 'ra'), (4,
-                  'c');"), "failed");
-
-               assert_res(cl->execute("SELECT * FROM  hi ORDER BY id;"), "order
-                  by failed");
-
-               cl->outputOnionState();
-        } else {
-            ResType r = cl->execute(cmd);
-            if (r.ok && r.names.size() > 0) {
-                std::vector<size_t> width(r.names.size());
-                for (uint i = 0; i < r.names.size(); i++) {
-                    width[i] = r.names[i].length();;
-                    for (uint j = 0; j < r.rows.size(); j++)
-                        if (r.rows[j][i].to_string().length() > width[i])
-                            width[i] = r.rows[j][i].to_string().length();
-                }
-                {
-                    stringstream ss;
-                    for (unsigned int j = 0; j < r.names.size(); j++)
-                        ss << left << setw((int) (width[j] + 2)) << r.names[j];
-                    cout << ss.str() << endl;
-                }
-                for (unsigned int i = 0; i < r.rows.size(); i++) {
-                    stringstream ss;
-                    for (unsigned int j = 0; j < r.rows[i].size(); j++)
-                        ss << left << setw((int) (width[j] + 2)) << r.rows[i][j].to_string();
-                    cout << ss.str() << endl;
-                }
-            }
-        }
-    }
-
-    delete cl;
-    cout << "Goodbye!\n";
-            */
-}
 /*
 static void __attribute__((unused))
 microEvaluate(const TestConfig &tc, int argc, char ** argv)
@@ -3519,7 +3036,6 @@ static struct {
         { "pkcs",           "",                             &test_PKCS },
         //{ "proxy",          "proxy",                        &TestProxy::run },
         { "queries",        "queries",                      &TestQueries::run },
-        { "shell",          "interactive shell",            &interactiveTest },
         //{ "single",         "integration - single principal",&TestSinglePrinc::run },
         { "gen_enc_tables", "",                             &generateEncTables },
         { "test_enc_tables","",                             &testEncTables },
@@ -3562,57 +3078,59 @@ main(int argc, char ** argv)
 
     while ((c = getopt(argc, argv, "v:sh:u:p:d:t:e:")) != -1) {
         switch (c) {
-        case 'v':
-            if (log_name_to_group.find(optarg) == log_name_to_group.end()) {
+            case 'v':
+                if (log_name_to_group.find(optarg) == log_name_to_group.end()) {
+                    help(tc, argc, argv);
+                    exit(0);
+                }
+
+                cryptdb_logger::enable(log_name_to_group[optarg]);
+                break;
+
+            case 's':
+                tc.stop_if_fail = true;
+                break;
+
+            case 'u':
+                tc.user = optarg;
+                break;
+
+            case 'p':
+                tc.pass = optarg;
+                break;
+
+            case 'd':
+                tc.db = optarg;
+                break;
+
+            case 'h':
+                tc.host = optarg;
+                break;
+
+            case 't':
+                tc.port = atoi(optarg);
+                break;
+
+            case 'e':
+                tc.shadowdb_dir = optarg;
+                break;
+
+            default:
                 help(tc, argc, argv);
                 exit(0);
-            }
-
-            cryptdb_logger::enable(log_name_to_group[optarg]);
-            break;
-
-        case 's':
-            tc.stop_if_fail = true;
-            break;
-
-        case 'u':
-            tc.user = optarg;
-            break;
-
-        case 'p':
-            tc.pass = optarg;
-            break;
-
-        case 'd':
-            tc.db = optarg;
-            break;
-
-        case 'h':
-            tc.host = optarg;
-            break;
-
-        case 't':
-            tc.port = atoi(optarg);
-            break;
-
-	case 'e':
-	    tc.shadowdb_dir = optarg;
-	    break;
-
-        default:
-            help(tc, argc, argv);
-            exit(0);
         }
     }
 
+
     if (argc == optind) {
-        interactiveTest(tc, argc - optind, argv + optind);
+        cerr << "interactiveTest is deprecated; please use obj/parser/cdb_test" << endl;
         return 0;
     }
 
     for (uint i = 0; i < NELEM(tests); i++) {
         if (!strcasecmp(argv[optind], tests[i].name)) {
             tests[i].f(tc, argc - optind, argv + optind);
+            // TODO: Check if there are mem leaks before exiting.
             return 0;
         }
     }
