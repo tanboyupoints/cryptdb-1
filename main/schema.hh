@@ -75,11 +75,10 @@ struct TableMeta;
 //TODO: FieldMeta and TableMeta are partly duplicates with the original
 // FieldMetadata an TableMetadata
 // which contains data we want to add to this structure soon
-// FIXME: Make uniq const.
 typedef struct FieldMeta {
-    TableMeta * tm; //point to table belonging in
-    std::string fname;
-    int uniq;
+    TableMeta * const tm; //point to table belonging in
+    const std::string fname;
+    const int uniq;
     bool has_salt; //whether this field has its own salt
     onionlayout onion_layout;
 
@@ -131,18 +130,16 @@ typedef struct FieldMeta {
     }
 } FieldMeta;
 
-
-// TODO: tableNo, hasSalt, salt_name should be const.
 typedef struct TableMeta {
     std::list<std::string> fieldNames;     //in order field names
-    unsigned int tableNo;
+    const unsigned int tableNo;
 
     std::map<std::string, FieldMeta *> fieldMetaMap;
 
-    bool hasSensitive;
+    const bool hasSensitive;
 
-    bool has_salt;
-    std::string salt_name;
+    const bool has_salt;
+    const std::string salt_name;
 
     TableMeta(unsigned int table_no, bool has_sensitive,
               bool has_salt, std::string salt_name,

@@ -36,11 +36,8 @@ std::string OnionMeta::getAnonOnionName() const
 
 FieldMeta::FieldMeta(TableMeta *tm, std::string name, unsigned int uniq,
                      Create_field *field, AES_KEY *mKey)
+    : tm(tm), fname(name), uniq(uniq)
 {
-    this->tm = tm;
-    this->fname = name;
-    this->uniq = uniq;
-
     if (mKey) {
         init_onions(mKey, this, field, this->uniq);
     } else {
