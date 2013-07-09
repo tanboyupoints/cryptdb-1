@@ -12,7 +12,25 @@
 using namespace std;
 using namespace NTL;
 
+/* Implementation class hierarchy is as in .hh file plus:
 
+   - LayerFactory: creates EncLayer
+
+   To output an EncLayer specialized to work with certain cipher,
+   data length, data type, we have:
+
+   - RNDFactory: outputs a RND layer
+         - RND layers: RND_int for blowfish, RND_str for AES
+
+    -DETFactory: outputs a DET layer
+         - DET layers: DET_int, DET_str
+
+    -OPEFactory: outputs a OPE layer
+         - OPE layers: OPE_int, OPE_str
+  
+ */
+
+//============= FACTORIES ==========================//
 
 class LayerFactory {
 public:
@@ -29,6 +47,77 @@ public:
     static EncLayer * create(Create_field * cf, std::string key);
     static EncLayer * deserialize(const std::string & serial);
 };
+
+
+class DETFactory : public LayerFactory {
+public:
+    static EncLayer * create(Create_field * cf, std::string key);
+    static EncLayer * deserialize(const std::string & serial);
+};
+
+class OPEFactory : public LayerFactory {
+public:
+    static EncLayer * create(Create_field * cf, std::string key);
+    static EncLayer * deserialize(const std::string & serial);
+};
+
+
+EncLayer *
+EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf,
+                                string key)
+{
+    switch (sl) {
+    case SECLEVEL::RND: {
+	return RNDFactory::create(cf, key);
+    }
+    case SECLEVEL::DET:
+    case SECLEVEL::DETJOIN: {
+	return DETFactory::create(cf, key);
+    }
+	
+    case SECLEVEL::OPE: {
+	return OPEFactory::create(cf, key);
+    }
+    case SECLEVEL::HOM: {
+	return new HOM(cf, key);
+    }
+    case SECLEVEL::SEARCH: {
+	return new Search(cf, key);
+    }
+    default:{}
+    }
+    thrower() << "unknown or unimplemented security level \n";
+}
+
+EncLayer *
+EncLayerFactory::encLayerFromSerial(onion o, SECLEVEL sl,
+				enum enum_field_types sql_type, const string & serial)
+{
+    switch (sl) {
+    case SECLEVEL::RND: 
+	return RNDFactory::deserialize(serial);
+	
+    case SECLEVEL::DET: 
+    case SECLEVEL::DETJOIN: 
+	return DETFactory::deserialize(serial);
+	
+    case SECLEVEL::OPE: 
+	return OPEFactory::deserialize(serial);
+	
+    case SECLEVEL::HOM: 
+	return new HOM(serial);
+	
+    case SECLEVEL::SEARCH: 
+	return new Search(serial);
+	
+    default:{}
+    }
+    thrower() << "unknown or unimplemented security level \n";
+}
+
+
+
+/*===================== helpers =============================*/
 
 
 /*
@@ -81,6 +170,52 @@ get_impl_type(const string & serial) {
 
     return impl_type;
 }
+
+
+static
+string prng_expand(string seed_key, uint key_bytes) {
+    streamrng<arc4> prng(seed_key);
+    return prng.rand_string(key_bytes);
+}
+
+//TODO: remove above newcreatefield
+static Create_field*
+createFieldHelper(const Create_field *f, int field_length,
+		  enum enum_field_types type, string anonname = "",
+		  CHARSET_INFO * charset = NULL) {
+    THD *thd = current_thd;
+    Create_field *f0 = f->clone(thd->mem_root);
+    if (field_length != -1) {
+        f0->length = field_length;
+    }
+    f0->sql_type = type;
+
+    if (charset != NULL) {
+        f0->charset = charset;
+    } else {
+        //encryption is always unsigned
+        f0->flags = f0->flags | UNSIGNED_FLAG;
+    }
+
+    if (anonname.size() > 0) {
+        f0->field_name = make_thd_string(anonname);
+    }
+
+    return f0;
+
+}
+
+static Item *
+get_key_item(const string & key) {
+    Item_string * keyI = new Item_string(make_thd_string(key),
+					 key.length(), &my_charset_bin);
+    keyI->name = NULL; // no alias
+    return keyI;
+}
+
+
+
+/*********************** RND ************************************************/
 
 class RND_int : public EncLayer {
 public:
@@ -150,134 +285,6 @@ RNDFactory::deserialize(const std::string & serial) {
     }
 }
 
-static
-string prng_expand(string seed_key, uint key_bytes) {
-    streamrng<arc4> prng(seed_key);
-    return prng.rand_string(key_bytes);
-}
-
-//TODO: remove above newcreatefield
-static Create_field*
-createFieldHelper(const Create_field *f, int field_length,
-		  enum enum_field_types type, string anonname = "",
-		  CHARSET_INFO * charset = NULL) {
-    THD *thd = current_thd;
-    Create_field *f0 = f->clone(thd->mem_root);
-    if (field_length != -1) {
-        f0->length = field_length;
-    }
-    f0->sql_type = type;
-
-    if (charset != NULL) {
-        f0->charset = charset;
-    } else {
-        //encryption is always unsigned
-        f0->flags = f0->flags | UNSIGNED_FLAG;
-    }
-
-    if (anonname.size() > 0) {
-        f0->field_name = make_thd_string(anonname);
-    }
-
-    return f0;
-
-}
-
-static Item *
-get_key_item(const string & key) {
-    Item_string * keyI = new Item_string(make_thd_string(key),
-					 key.length(), &my_charset_bin);
-    keyI->name = NULL; // no alias
-    return keyI;
-}
-
-EncLayer *
-EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf,
-                                string key)
-{
-    switch (sl) {
-        case SECLEVEL::RND: {
-	    return RNDFactory::create(cf, key);
-        }
-        case SECLEVEL::DET: {
-            if (IsMySQLTypeNumeric(cf->sql_type)) {
-                return new DET_int(cf, key);
-            } else {
-                return new DET_str(cf, key);
-            }
-        }
-        case SECLEVEL::DETJOIN: {
-            if (IsMySQLTypeNumeric(cf->sql_type)) {
-                return new DETJOIN_int(cf, key);
-            } else {
-                return new DETJOIN_str(cf, key);
-            }
-        }
-        case SECLEVEL::OPE: {
-            if (IsMySQLTypeNumeric(cf->sql_type)) {
-                return new OPE_int(cf, key);
-            } else {
-                return new OPE_str(cf, key);
-            }
-        }
-        case SECLEVEL::HOM: {
-            return new HOM(cf, key);
-        }
-        case SECLEVEL::SEARCH: {
-            return new Search(cf, key);
-        }
-        default:{
-
-        }
-    }
-    thrower() << "unknown or unimplemented security level \n";
-}
-
-EncLayer *
-EncLayerFactory::encLayerFromSerial(onion o, SECLEVEL sl,
-				enum enum_field_types sql_type, const string & serial)
-{
-    bool is_num = IsMySQLTypeNumeric(sql_type);
-    switch (sl) {
-        case SECLEVEL::RND: {
-	    return RNDFactory::deserialize(serial);
-        }
-        case SECLEVEL::DET: {
-            if (is_num) {
-                return new DET_int(serial);
-            } else {
-                return new DET_str(serial);
-            }
-        }
-        case SECLEVEL::DETJOIN: {
-            if (is_num) {
-                return new DETJOIN_int(serial);
-            } else {
-                return new DETJOIN_str(serial);
-            }
-        }
-        case SECLEVEL::OPE: {
-            if (is_num) {
-                return new OPE_int(serial);
-            } else {
-                return new OPE_str(serial);
-            }
-        }
-        case SECLEVEL::HOM: {
-            return new HOM(serial);
-        }
-        case SECLEVEL::SEARCH: {
-            return new Search(serial);
-        }
-        default:{
-
-        }
-    }
-    thrower() << "unknown or unimplemented security level \n";
-}
-
-
-/****************** RND *********************/
 
 RND_int::RND_int(Create_field * f, const string & seed_key)
     : EncLayer(f),
@@ -433,6 +440,76 @@ RND_str::decryptUDF(Item * col, Item * ivcol) {
 /********** DET ************************/
 
 
+class DET_int : public EncLayer {
+public:
+    DET_int(Create_field *,  const std::string & seed_key);
+
+    std::string serialize() {return serial_pack(level(), name(), key); }
+    // create object from serialized contents
+    DET_int(const std::string & serial);
+
+
+    SECLEVEL level() {return SECLEVEL::DET;}
+    string name() {return "DET_int";}
+    Create_field * newCreateField(std::string anonname = "");
+
+    Item * encrypt(Item * ptext, uint64_t IV = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0);
+    Item * decryptUDF(Item * col, Item * ivcol = NULL);
+
+
+protected:
+    std::string key;
+    blowfish bf;
+    static const int bf_key_size = 16;
+    static const int ciph_size = 8;
+
+};
+
+class DET_str : public EncLayer {
+public:
+    DET_str(Create_field *cf, std::string seed_key);
+
+    // serialize and deserialize
+    std::string serialize() {return serial_pack(level(), name(), rawkey);}
+    DET_str(const std::string & serial);
+
+
+    SECLEVEL level() {return SECLEVEL::DET;}
+    string name() {return "DET_str";}
+    Create_field * newCreateField(std::string anonname = "");
+
+    Item * encrypt(Item * ptext, uint64_t IV = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0);
+    Item * decryptUDF(Item * col, Item * = NULL);
+
+protected:
+    std::string rawkey;
+    static const int key_bytes = 16;
+    AES_KEY * enckey;
+    AES_KEY * deckey;
+
+};
+
+
+EncLayer *
+DETFactory::create(Create_field * cf, std::string key) {
+    if (IsMySQLTypeNumeric(cf->sql_type)) { // the ope case as well 
+	 return new DET_int(cf, key);
+     } else {
+	 return new DET_str(cf, key);
+     }
+}
+
+EncLayer *
+DETFactory::deserialize(const std::string & serial) {
+    if (get_impl_type(serial) == "DET_int") {
+	return new DET_int(serial);
+    } else {
+	return new DET_str(serial);
+    }
+}
+
 
 DET_int::DET_int(Create_field * f, const string & seed_key)
     : EncLayer(f),
@@ -441,8 +518,8 @@ DET_int::DET_int(Create_field * f, const string & seed_key)
 {}
 
 DET_int::DET_int(const string & serial) : EncLayer(NULL),
-				  key(serial),
-				  bf(key)
+    key(get_layer_info(serial, level(), name())),
+    bf(key)
 {}
 
 Create_field *
@@ -516,9 +593,9 @@ DET_str::DET_str(Create_field * f, string seed_key)
 }
 
 DET_str::DET_str(const std::string & serial): EncLayer(NULL),
-			     rawkey(serial),
-			     enckey(get_AES_enc_key(rawkey)),
-			     deckey(get_AES_dec_key(rawkey))
+    rawkey(get_layer_info(serial, level(), name())),
+    enckey(get_AES_enc_key(rawkey)),
+    deckey(get_AES_dec_key(rawkey))
 {}
 
 
@@ -575,7 +652,110 @@ DET_str::decryptUDF(Item * col, Item * ivcol) {
 
 /*************** DETJOIN *********************/
 
+
+class DETJOIN_int : public DET_int {
+    //TODO
+public:
+    DETJOIN_int(Create_field * cf, std::string seed_key) : DET_int(cf, seed_key) {}
+
+    // serialize from parent;  unserialize:
+    DETJOIN_int(const std::string & serial);
+
+    SECLEVEL level() {return SECLEVEL::DETJOIN;}
+};
+
+
+class DETJOIN_str : public DET_str {
+public:
+    DETJOIN_str(Create_field * cf, std::string seed_key) : DET_str(cf, seed_key) {}
+
+    // serialize from parent; unserialize:
+    DETJOIN_str(const std::string & serial);
+
+    SECLEVEL level() {return SECLEVEL::DETJOIN;}
+};
+
+
+DETJOIN_int::DETJOIN_int(const string & serial) : DET_int(serial)
+{}
+
+
+DETJOIN_str::DETJOIN_str(const std::string & serial) : DET_str(serial)
+{}
+
+
 /**************** OPE **************************/
+
+
+class OPE_int : public EncLayer {
+public:
+    OPE_int(Create_field *, std::string seed_key);
+
+    // serialize and deserialize
+    std::string serialize() {return serial_pack(level(), name(), key);}
+    OPE_int(const std::string & serial);
+
+    SECLEVEL level() {return SECLEVEL::OPE;}
+    string name() {return "OPE_int";}
+    Create_field * newCreateField(std::string anonname = "");
+
+    Item * encrypt(Item * p, uint64_t IV);
+    Item * decrypt(Item * c, uint64_t IV);
+
+
+private:
+    std::string key;
+    OPE ope;
+    static const size_t key_bytes = 16;
+    static const size_t plain_size = 4;
+    static const size_t ciph_size = 8;
+
+};
+
+
+class OPE_str : public EncLayer {
+public:
+    OPE_str(Create_field *, std::string seed_key);
+
+    // serialize and deserialize
+    std::string serialize() {return serial_pack(level(), name(), key);}
+    OPE_str(const std::string & serial);
+
+
+    SECLEVEL level() {return SECLEVEL::OPE;}
+    string name() {return "OPE_str";}
+    Create_field * newCreateField(std::string anonname = "");
+
+    Item * encrypt(Item * p, uint64_t IV = 0);
+    Item * decrypt(Item * c, uint64_t IV = 0)__attribute__((noreturn));
+
+private:
+    std::string key;
+    OPE ope;
+    static const size_t key_bytes = 16;
+    static const size_t plain_size = 4;
+    static const size_t ciph_size = 8;
+};
+
+
+EncLayer *
+OPEFactory::create(Create_field * cf, std::string key) {
+    if (IsMySQLTypeNumeric(cf->sql_type)) { // the ope case as well 
+	 return new OPE_int(cf, key);
+     } else {
+	 return new OPE_str(cf, key);
+     }
+}
+
+EncLayer *
+OPEFactory::deserialize(const std::string & serial) {
+    if (get_impl_type(serial) == "OPE_int") {
+	return new OPE_int(serial);
+    } else {
+	return new OPE_str(serial);
+    }
+}
+
 
 OPE_int::OPE_int(Create_field * f, string seed_key)
     : EncLayer(f), key(prng_expand(seed_key, key_bytes)),
@@ -584,7 +764,7 @@ OPE_int::OPE_int(Create_field * f, string seed_key)
 
 OPE_int::OPE_int(const std::string & serial) :
     EncLayer(NULL),
-    key(serial), ope(OPE(key, plain_size * 8, ciph_size * 8))
+    key(get_layer_info(serial, level(), name())), ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
 
 Create_field *
@@ -617,8 +797,8 @@ OPE_str::OPE_str(Create_field * f, string seed_key)
 {}
 
 OPE_str::OPE_str(const std::string & serial) : EncLayer(NULL),
-				       key(serial),
-				       ope(OPE(key, plain_size * 8, ciph_size * 8))
+					       key(get_layer_info(serial, level(), name())),
+					       ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
 
 Create_field *
