@@ -2,6 +2,7 @@
 #include <main/enum_text.hh>
 #include <main/rewrite_main.hh>
 #include <parser/lex_util.hh>
+#include <parser/stringify.hh>
 #include <List_helpers.hh>
 
 using namespace std;
@@ -237,14 +238,15 @@ do_field_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
 }
 
 // TODO: Add Key for oDET onion as well.
-// TODO: Anonymize index name (key->name).
 static vector<Key*>
-rewrite_key(const string &table, Key *key, const Analysis &a)
+rewrite_key(const string &table, Key *key, Analysis &a)
 {
     vector<Key*> output_keys;
     Key *new_key = key->clone(current_thd->mem_root);    
     auto col_it =
         List_iterator<Key_part_spec>(key->columns);
+    new_key->name =
+        string_to_lex_str(a.addIndex(table, convert_lex_str(key->name)));
     new_key->columns = 
         reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
             [table, a] (List<Key_part_spec> out_field_list,
@@ -256,7 +258,7 @@ rewrite_key(const string &table, Key *key, const Analysis &a)
                 key_part->field_name = 
                     string_to_lex_str(fm->onions[oOPE]->getAnonOnionName());
                 out_field_list.push_back(key_part);
-                return out_field_list;
+                return out_field_list; /* lambda */
             });
     output_keys.push_back(new_key);
 
@@ -270,9 +272,9 @@ do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
     auto key_it = List_iterator<Key>(lex->alter_info.key_list);
     new_lex->alter_info.key_list =
         reduceList<Key>(key_it, List<Key>(),
-            [table, a] (List<Key> out_list, Key *key) {
+            [table, &a] (List<Key> out_list, Key *key) {
                 out_list.concat(vectorToList(rewrite_key(table, key, a)));
-                return out_list;
+                return out_list;    /* lambda */
             });
 }
 

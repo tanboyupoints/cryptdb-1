@@ -22,7 +22,6 @@ class AddColumnSubHandler : public AlterSubHandler {
 
         TableMeta *tm = a.getTableMeta(table);
 
-        // FIXME: This does not properly support multiple column adds.
         // Create *Meta objects.
         auto add_it =
             List_iterator<Create_field>(lex->alter_info.create_list);
@@ -108,27 +107,25 @@ class DropColumnSubHandler : public AlterSubHandler {
         auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
         eachList<Alter_drop>(drop_it,
             [table, dbname, &a, q] (Alter_drop *adrop) {
-                // FIXME: Possibly this should be an assert as mixed clauses
-                // are not supported?
-                assert(adrop->type == Alter_drop::COLUMN);
-                // Remove metadata from embedded database.
-                ostringstream s;
-                s << " DELETE FROM pdb.field_info, pdb.onion_info, "
-                  << "             pdb.layer_key"
-                  << " USING pdb.table_info INNER JOIN pdb.field_info "
-                  << "       INNER JOIN pdb.onion_info INNER JOIN "
-                  << "       pdb.layer_key"
-                  << " ON  pdb.table_info.id = pdb.field_info.table_info_id"
-                  << " AND pdb.field_info.id = pdb.onion_info.field_info_id"
-                  << " AND pdb.onion_info.id = pdb.layer_key.onion_info_id "
-                  << " WHERE pdb.table_info.name = '" << table << "' "
-                  << " AND pdb.table_info.database_name = '" << dbname << "';";
+                if (adrop->type == Alter_drop::COLUMN) {
+                    // Remove metadata from embedded database.
+                    ostringstream s;
+                    s << " DELETE FROM pdb.field_info, pdb.onion_info, "
+                      << "             pdb.layer_key"
+                      << " USING pdb.table_info INNER JOIN pdb.field_info "
+                      << "       INNER JOIN pdb.onion_info INNER JOIN "
+                      << "       pdb.layer_key"
+                      << " ON  pdb.table_info.id = pdb.field_info.table_info_id"
+                      << " AND pdb.field_info.id = pdb.onion_info.field_info_id"
+                      << " AND pdb.onion_info.id = pdb.layer_key.onion_info_id "
+                      << " WHERE pdb.table_info.name = '" << table << "' "
+                      << " AND pdb.table_info.database_name = '" << dbname << "';";
 
-                assert(a.ps->e_conn->execute(s.str()));
+                    assert(a.ps->e_conn->execute(s.str()));
 
-
-                // Remove from *Meta structures.
-                assert(a.destroyFieldMeta(table, adrop->name));});
+                    // Remove from *Meta structures.
+                    assert(a.destroyFieldMeta(table, adrop->name));
+                }});
 
         // Remove column from embedded database.
         assert(a.ps->e_conn->execute(q));
@@ -152,13 +149,50 @@ class ForeignKeySubHandler : public AlterSubHandler {
 class AddIndexSubHandler : public AlterSubHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {
+        LEX **out_lex = this->rewrite(lex, a, q, out_lex_count);
         this->update(q, lex, a);
-        return this->rewrite(lex, a, q, out_lex_count);
+
+        return out_lex;
     }
 
-    // TODO: Add index metadata to persistency.
+    // NOTE: This must be executed after 'this->rewrite' because it needs
+    // the TableMeta to update it's index_counter.
     // TODO: Add index to embedded shallow mirror.
     void update(const string &q, LEX *lex, Analysis &a) const {
+        const string &table =
+            lex->select_lex.table_list.first->table_name;
+        TableMeta *tm = a.getTableMeta(table);
+        
+        // Update the counter.
+        ostringstream s;
+        s << " UPDATE pdb.table_info"
+          << "    SET index_counter = " << tm->getIndexCounter()
+          << "  WHERE number = " << tm->tableNo
+          <<"    AND database_name = '"<<a.ps->e_conn->getCurDBName()<<"';";
+        assert(a.ps->e_conn->execute(s.str()));
+
+        // Add each new index.
+        auto key_it =
+            List_iterator<Key>(lex->alter_info.key_list);
+        eachList<Key>(key_it, [table, tm, a] (Key *key) {
+            std::string index_name = convert_lex_str(key->name);
+            std::string anon_name = a.getAnonIndexName(table, index_name);
+
+            ostringstream s;
+            s << " INSERT INTO pdb.index_info VALUES ("
+              << " (SELECT table_info.id "
+              << "    FROM pdb.table_info"
+              << "  WHERE number = " << tm->tableNo
+              << "    AND database_name = '"
+              <<          a.ps->e_conn->getCurDBName() << "'), "
+              << " '" << index_name << "', "
+              << " '" << anon_name << "', "
+              << " 0"
+              << " );";
+
+            assert(a.ps->e_conn->execute(s.str()));
+        });
+ 
         return;
     }
 
@@ -176,10 +210,62 @@ class AddIndexSubHandler : public AlterSubHandler {
     }
 };
 
+// TODO: Functionalize update/rewrite semantics and loop once.
 class DropIndexSubHandler : public AlterSubHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {
-        assert(false);
+        LEX *new_lex = copy(lex);
+        const string &table =
+            lex->select_lex.table_list.first->table_name;
+        TableMeta *tm = a.getTableMeta(table);
+        new_lex->select_lex.table_list =
+            rewrite_table_list(lex->select_lex.table_list, a);
+
+        // Remove the index_info record from the proxy db.
+        auto drop_it =
+            List_iterator<Alter_drop>(lex->alter_info.drop_list);
+        eachList<Alter_drop>(drop_it, [table, tm, a] (Alter_drop *adrop) {
+            if (adrop->type == Alter_drop::KEY) {
+                std::string index_name = adrop->name;
+                std::string anon_name = a.getAnonIndexName(table, index_name);
+
+                ostringstream s;
+                s << " DELETE FROM pdb.index_info "
+                  << " WHERE table_info_id = "
+                  << "       (SELECT table_info.id "
+                  << "          FROM pdb.table_info"
+                  << "         WHERE number = " << tm->tableNo
+                  << "           AND database_name = '"
+                  <<                 a.ps->e_conn->getCurDBName() << "') "
+                  << "   AND name = '" << index_name << "'"
+                  << "   AND anon_name = '" << anon_name << "';";
+
+                assert(a.ps->e_conn->execute(s.str()));
+            }
+        });
+
+
+        drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
+        new_lex->alter_info.drop_list =
+            reduceList<Alter_drop>(drop_it, List<Alter_drop>(),
+                [table, &a] (List<Alter_drop> out_list, Alter_drop *adrop) {
+                    if (adrop->type == Alter_drop::KEY) {
+                        THD *thd = current_thd;
+                        Alter_drop *new_adrop =
+                            adrop->clone(thd->mem_root);  
+                        new_adrop->name =
+                            make_thd_string(a.getAnonIndexName(table,
+                                                               adrop->name));
+                        // FIXME: If this query fails, we will be left in
+                        // an inconsistent state as we will have lost our
+                        // index record.
+                        a.destroyIndex(table, adrop->name);
+                        out_list.push_back(new_adrop);
+                    }
+                    return out_list;    /* lambda */
+                });
+
+        return single_lex_output(new_lex, out_lex_count);
     }
 };
 

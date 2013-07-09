@@ -46,6 +46,9 @@ extern CItemFuncNameDir funcNames;
 static void
 buildTableMeta(ProxyState &ps);
 
+static std::map<std::string, std::string>
+fetchIndexMap(ProxyState &ps, unsigned int table_no);
+
 static void
 buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name);
 
@@ -109,6 +112,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
                 "  has_salt boolean,"
                 "  salt_name varchar(64) NOT NULL,"
                 "  database_name varchar(64) NOT NULL,"
+                "  index_counter bigint NOT NULL,"
                 "  id SERIAL PRIMARY KEY)"
                 " ENGINE=InnoDB;"));
 
@@ -153,6 +157,17 @@ createMetaTablesIfNotExists(ProxyState & ps)
       << " ENGINE=InnoDB;";
 
     assert(ps.e_conn->execute(s.str()));
+    s.str("");
+    s.clear();
+
+    s << " CREATE TABLE IF NOT EXISTS pdb.index_info"
+      << " (table_info_id bigint NOT NULL," // Foreign Key.
+      << "  name varchar(64) NOT NULL,"
+      << "  anon_name varchar(64) NOT NULL,"
+      << "  id SERIAL PRIMARY KEY)"
+      << " ENGINE=InnoDB;";
+
+    assert(ps.e_conn->execute(s.str()));
     return;
 }
 
@@ -181,8 +196,8 @@ buildTableMeta(ProxyState &ps)
 
     DBResult *dbres;
     assert(ps.e_conn->execute(
-                " SELECT number, name, has_sensitive,"
-                "        has_salt, salt_name, database_name"
+                " SELECT number, name, has_sensitive, has_salt, salt_name, "
+                "        database_name, index_counter "
                 " FROM pdb.table_info", dbres));
     ScopedMySQLRes r(dbres->n);
     MYSQL_ROW row;
@@ -196,20 +211,57 @@ buildTableMeta(ProxyState &ps)
         string table_has_salt(row[3], l[3]);
         string table_salt_name(row[4], l[4]);
         string table_database_name(row[5], l[5]);
+        string table_index_counter(row[6], l[6]);
 
         // FIXME: Signed to unsigned conversion.
         unsigned int int_table_number = atoi(table_number.c_str());
+        std::map<std::string, std::string> index_map =
+            fetchIndexMap(ps, int_table_number);
+
         TableMeta *tm =
             ps.schema->createTableMeta(table_name,
                                        string_to_bool(table_has_sensitive),
                                        string_to_bool(table_has_salt),
                                        table_salt_name,
+                                       index_map,
+                                       atoi(table_index_counter.c_str()),
                                        &int_table_number);
 
         buildFieldMeta(ps, tm, table_database_name);
     }
 
     return;
+}
+
+static std::map<std::string, std::string>
+fetchIndexMap(ProxyState &ps, unsigned int table_no)
+{
+    const std::string dbname = ps.e_conn->getCurDBName();
+    std::map<std::string, std::string> index_map;
+
+    string q = " SELECT i.name, i.anon_name "
+               " FROM   pdb.index_info i, pdb.table_info t"
+               " WHERE  i.table_info_id = t.id "
+               "   AND  t.number = " + std::to_string(table_no) +
+               "   AND  t.database_name = '" + dbname + "';";
+
+    DBResult *dbRes;
+    assert(ps.e_conn->execute(q, dbRes));
+
+    ScopedMySQLRes r(dbRes->n);
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(r.res()))) {
+        unsigned long *l = mysql_fetch_lengths(r.res());
+        assert(l != NULL);
+
+        string index_name(row[0], l[0]);
+        string index_anon_name(row[1], l[1]);
+
+        assert(index_map.find(index_name) == index_map.end());
+        index_map[index_name] = index_anon_name;
+    }
+
+    return index_map;
 }
 
 static void
@@ -487,7 +539,7 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
 
     OnionMeta * om    = getAssert(fm->onions, o);
     string fieldanon  = om->getAnonOnionName();
-    string tableanon  = fm->tm->anonTableName();
+    string tableanon  = fm->tm->getAnonTableName();
 
     //removes onion layer at the DB
     stringstream query;
@@ -935,7 +987,7 @@ processAnnotation(Annotation annot, Analysis &a)
         Create_field * cf = fm->onions[o]->layers.back()->newCreateField(onionname);
 
         stringstream query;
-        query << "ALTER TABLE " << fm->tm->anonTableName();
+        query << "ALTER TABLE " << fm->tm->getAnonTableName();
 
         switch (o) {
         case oDET:
@@ -961,7 +1013,7 @@ processAnnotation(Annotation annot, Analysis &a)
         query_list.push_back(query.str());
     }
 
-    query_list.push_back("ALTER TABLE " + fm->tm->anonTableName()  +
+    query_list.push_back("ALTER TABLE " + fm->tm->getAnonTableName()  +
                          " ADD " + fm->saltName() + " " + TN_SALT +
                          " AFTER " + onionname + ";");
 

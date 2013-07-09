@@ -4,7 +4,6 @@
 #include <parser/stringify.hh>
 #include <main/CryptoHandlers.hh>
 #include <main/Translator.hh>
-
 #include <string>
 #include <map>
 #include <list>
@@ -142,21 +141,33 @@ typedef struct TableMeta {
 
     TableMeta();
     TableMeta(unsigned int table_no, bool has_sensitive,
-              bool has_salt, std::string salt_name)
+              bool has_salt, std::string salt_name,
+              std::map<std::string, std::string> index_map,
+              unsigned int index_counter=0)
         : tableNo(table_no), hasSensitive(has_sensitive),
-          has_salt(has_salt), salt_name(salt_name) {}
+          has_salt(has_salt), salt_name(salt_name),
+          index_map(index_map), index_counter(index_counter) {}
     ~TableMeta();
 
     FieldMeta *getFieldMeta(std::string field);
+    unsigned int getIndexCounter() const;
 
-    friend class Analysis;
     // TODO: Make FieldMeta a friend and deal with the other uses of this
     // function.
-    std::string anonTableName() const;
+    std::string getAnonTableName() const;
+
+    friend class Analysis;
 
 protected:
     bool destroyFieldMeta(std::string field);
-    
+    std::string addIndex(std::string index_name); 
+    std::string getAnonIndexName(std::string index_name) const;
+    std::string getIndexName(std::string anon_index_name) const;
+    bool destroyIndex(std::string index_name);
+   
+private:
+    std::map<std::string, std::string> index_map;
+    unsigned int index_counter;
 } TableMeta;
 
 
@@ -176,6 +187,8 @@ typedef struct SchemaInfo {
     TableMeta *createTableMeta(std::string table_name,
                                bool has_sensitive, bool has_salt,
                                std::string salt_name,
+                               std::map<std::string, std::string> index_map,
+                               unsigned int index_counter,
                                const unsigned int *table_no=NULL);
     friend class Analysis;
 

@@ -16,6 +16,9 @@ create_table_meta(Analysis & a, const string & table, LEX *lex,
 //   and _different_ subcommands.
 //   ie, ALTER TABLE t ADD COLUMN x integer, ADD INDEX i (z);
 //   Currently we do not support mixed operations.
+//   > Must guarentee that rewrite_table_list is only called one time.
+//   > If we drop Keys and Columns in the same query the order is probably
+//     going to get changed.
 class AlterHandler : public DDLHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {
@@ -73,6 +76,7 @@ class CreateHandler : public DDLHandler {
               << " " << bool_to_string(tm->has_salt) << ", "
               << " '" << tm->salt_name << "', "
               << " '" << dbname << "',"
+              << " " << tm->getIndexCounter() << ", "
               << " 0"
               << " );";
 
