@@ -12,6 +12,8 @@
 using namespace std;
 using namespace NTL;
 
+#include <utility>
+
 /* Implementation class hierarchy is as in .hh file plus:
 
    - LayerFactory: creates EncLayer
@@ -181,10 +183,11 @@ string prng_expand(string seed_key, uint key_bytes) {
 // returns the length of output by AES encryption of a string of given type
 // and len
 static
-int
-len_for_AES_str(enum enum_field_types type, int len, bool pad) {
+pair<enum enum_field_types, int>
+type_len_for_AES_str(enum enum_field_types type, int len, bool pad) {
 
     int res_len = -1;
+    enum enum_field_types res_type = type;
     
     switch (type) {
     case MYSQL_TYPE_TINY_BLOB:
@@ -192,7 +195,7 @@ len_for_AES_str(enum enum_field_types type, int len, bool pad) {
     case MYSQL_TYPE_LONG_BLOB:
     case MYSQL_TYPE_BLOB:
 	break;
-    case MYSQL_TYPE_VAR_STRING:
+    case MYSQL_TYPE_VARCHAR:
 	res_len = rounded_len(len, AES_BLOCK_BYTES, pad);
 	break;
     default: {
@@ -200,7 +203,7 @@ len_for_AES_str(enum enum_field_types type, int len, bool pad) {
     }
     }
 
-    return res_len;
+    return make_pair(res_type, res_len);
   
 }
 
@@ -408,9 +411,9 @@ RND_str::newCreateField(string anonname) {
     cerr << "RND str receives sql type " << cf->sql_type << " len " << cf->length << " charset " <<
 	cf->charset << "\n";
 
-    int len = len_for_AES_str(cf->sql_type, cf->length, false);
+    auto typelen = type_len_for_AES_str(cf->sql_type, cf->length, false);
   
-    return createFieldHelper(cf, len, cf->sql_type, anonname, &my_charset_bin);
+    return createFieldHelper(cf, typelen.second, typelen.first, anonname, &my_charset_bin);
 }
 
 
@@ -637,9 +640,9 @@ DET_str::newCreateField(string anonname) {
     cerr << "DET str receives sql type " << cf->sql_type << " len " << cf->length << " charset " <<
 	cf->charset << "\n";
 
-    int len = len_for_AES_str(cf->sql_type, cf->length, true);
+    auto typelen = type_len_for_AES_str(cf->sql_type, cf->length, true);
     
-    return createFieldHelper(cf, len, cf->sql_type, anonname, &my_charset_bin);
+    return createFieldHelper(cf, typelen.second, typelen.first, anonname, &my_charset_bin);
 }
 
 Item *

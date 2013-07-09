@@ -162,14 +162,34 @@ sql_type_to_string(enum_field_types tpe, CHARSET_INFO *charset)
     case MYSQL_TYPE_DATETIME    : return "DATETIME";
     case MYSQL_TYPE_YEAR        : return "YEAR";
     case MYSQL_TYPE_NEWDATE     : ASSERT_NOT_REACHED();
-    case MYSQL_TYPE_VARCHAR     : return "VARCHAR";
+    case MYSQL_TYPE_VARCHAR     :
+	if (charset == &my_charset_bin) {
+	    return "VARBINARY";
+	} else {
+	    return "VARCHAR";
+	}
     case MYSQL_TYPE_BIT         : return "BIT";
     case MYSQL_TYPE_NEWDECIMAL  : return "DECIMAL";
     case MYSQL_TYPE_ENUM        : return "ENUM";
     case MYSQL_TYPE_SET         : return "SET";
-    case MYSQL_TYPE_TINY_BLOB   : return "TINYBLOB";
-    case MYSQL_TYPE_MEDIUM_BLOB : return "MEDIUMBLOB";
-    case MYSQL_TYPE_LONG_BLOB   : return "LONGBLOB";
+    case MYSQL_TYPE_TINY_BLOB   :
+	if (charset == &my_charset_bin) {
+            return "TINYBLOB";
+        } else {
+            return "TINYTEXT";
+        }
+    case MYSQL_TYPE_MEDIUM_BLOB :
+	if (charset == &my_charset_bin) {
+            return "MEDIUMBLOB";
+        } else {
+            return "MEDIUMTEXT";
+        }
+    case MYSQL_TYPE_LONG_BLOB   :
+	if (charset == &my_charset_bin) {
+            return "LONGBLOB";
+        } else {
+            return "LONGTEXT";
+        }
     case MYSQL_TYPE_BLOB        :
         if (charset == &my_charset_bin) {
             return "BLOB";

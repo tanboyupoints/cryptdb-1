@@ -297,12 +297,23 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
         om->sql_type = cf->sql_type;
 
         if (mKey) {
+	    Create_field * newcf = cf;
             //generate enclayers for encrypted field
             string uniqueFieldName = fm->fullName(o);
             for (auto l: it.second) {
                 string key;
                 key = getLayerKey(mKey, uniqueFieldName, l);
-                om->layers.push_back(EncLayerFactory::encLayer(o, l, cf, key));
+
+		EncLayer * el = EncLayerFactory::encLayer(o, l, newcf, key);
+
+		Create_field * oldcf = newcf;
+		newcf = el->newCreateField();
+		
+                om->layers.push_back(el);
+
+		if (oldcf != cf) {
+		    delete oldcf;
+		}
             }
         }
 
