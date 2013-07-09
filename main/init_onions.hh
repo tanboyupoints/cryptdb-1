@@ -29,7 +29,7 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index,
 		EncLayer * el = EncLayerFactory::encLayer(o, l, newcf, key);
 
 		Create_field * oldcf = newcf;
-		newcf = el->newCreateField();
+		newcf = el->newCreateField(oldcf);
 		
                 om->layers.push_back(el);
 
@@ -37,6 +37,9 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index,
 		    delete oldcf;
 		}
             }
+	    if (newcf != cf) {
+		delete newcf;
+	    }
         }
 
         LOG(cdb_v) << "adding onion layer " << om->getAnonOnionName() << " for " << fm->fname;
