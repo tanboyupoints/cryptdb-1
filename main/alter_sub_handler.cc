@@ -54,81 +54,88 @@ class AddColumnSubHandler : public AlterSubHandler {
 class DropColumnSubHandler : public AlterSubHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {
-        LEX **out_lex = this->rewrite(lex, a, q, out_lex_count);
-        update(q, lex, a);
-
-        return out_lex;
-    }
-
-    LEX **rewrite(LEX *lex, Analysis &a, const string &q,
-                  unsigned *out_lex_count) const {
         LEX *new_lex = copy(lex);
         const string &table =
             lex->select_lex.table_list.first->table_name;
+        const std::string &dbname =
+            lex->select_lex.table_list.first->db;
+
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a);
+        
+        // Get the column drops.
+        auto drop_it =
+            List_iterator<Alter_drop>(lex->alter_info.drop_list);
+        List<Alter_drop> col_drop_list =
+            filterList(drop_it,
+                [](Alter_drop *adrop) {
+                    return Alter_drop::COLUMN == adrop->type;
+                });
 
-        auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
+        // Rewrite and Remove.
+        drop_it = List_iterator<Alter_drop>(col_drop_list);
         new_lex->alter_info.drop_list =
             reduceList<Alter_drop>(drop_it, List<Alter_drop>(),
-                [table, a] (List<Alter_drop> out_list, Alter_drop *adrop) {
-                    if (adrop->type == Alter_drop::COLUMN) {
-                        FieldMeta *fm = a.getFieldMeta(table, adrop->name);
-                        THD *thd = current_thd;
-
-                        for (auto onion_pair : fm->onions) {
-                            Alter_drop *new_adrop =
-                                adrop->clone(thd->mem_root);
-                            new_adrop->name =
-                                thd->strdup(onion_pair.second->getAnonOnionName().c_str());
-                            out_list.push_back(new_adrop);
-                        }
-
-                        if (fm->has_salt) {
-                            Alter_drop *new_adrop =
-                                adrop->clone(thd->mem_root);
-                            new_adrop->name =
-                                thd->strdup(fm->saltName().c_str());
-                            out_list.push_back(new_adrop);
-                        }
-
-                    }
+                [table, dbname, &a, this] (List<Alter_drop> out_list,
+                                           Alter_drop *adrop) {
+                    FieldMeta *fm = a.getFieldMeta(table, adrop->name);
+                    List<Alter_drop> lst = this->rewrite(fm, adrop);
+                    out_list.concat(&lst);
+                    this->update(a, table, dbname, adrop); 
                     return out_list; /* lambda */
                 });
+
+        // Remove column from embedded database.
+        assert(a.ps->e_conn->execute(q));
 
         return single_lex_output(new_lex, out_lex_count);
     }
 
-    void update(const string &q, LEX *lex, Analysis &a) const {
-        const string &table =
-            lex->select_lex.table_list.first->table_name;
-        const string &dbname = lex->select_lex.table_list.first->db;
+    List<Alter_drop> rewrite(FieldMeta *fm, Alter_drop *adrop) const
+    {
+        List<Alter_drop> out_list;
+        THD *thd = current_thd;
 
-        auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
-        eachList<Alter_drop>(drop_it,
-            [table, dbname, &a, q] (Alter_drop *adrop) {
-                if (adrop->type == Alter_drop::COLUMN) {
-                    // Remove metadata from embedded database.
-                    ostringstream s;
-                    s << " DELETE FROM pdb.field_info, pdb.onion_info, "
-                      << "             pdb.layer_key"
-                      << " USING pdb.table_info INNER JOIN pdb.field_info "
-                      << "       INNER JOIN pdb.onion_info INNER JOIN "
-                      << "       pdb.layer_key"
-                      << " ON  pdb.table_info.id = pdb.field_info.table_info_id"
-                      << " AND pdb.field_info.id = pdb.onion_info.field_info_id"
-                      << " AND pdb.onion_info.id = pdb.layer_key.onion_info_id "
-                      << " WHERE pdb.table_info.name = '" << table << "' "
-                      << " AND pdb.table_info.database_name = '" << dbname << "';";
+        // Rewrite each onion column.
+        for (auto onion_pair : fm->onions) {
+            Alter_drop *new_adrop =
+                adrop->clone(thd->mem_root);
+            new_adrop->name =
+                thd->strdup(onion_pair.second->getAnonOnionName().c_str());
+            out_list.push_back(new_adrop);
+        }
 
-                    assert(a.ps->e_conn->execute(s.str()));
+        // Rewrite the salt column.
+        if (fm->has_salt) {
+            Alter_drop *new_adrop = adrop->clone(thd->mem_root);
+            new_adrop->name =
+                thd->strdup(fm->saltName().c_str());
+            out_list.push_back(new_adrop);
+        }
 
-                    // Remove from *Meta structures.
-                    assert(a.destroyFieldMeta(table, adrop->name));
-                }});
+        return out_list;
+    }
 
-        // Remove column from embedded database.
-        assert(a.ps->e_conn->execute(q));
+    void update(Analysis &a, const std::string &table,
+                const std::string &dbname, Alter_drop *adrop) const
+    {
+        // Remove metadata from embedded database.
+        ostringstream s;
+        s << " DELETE FROM pdb.field_info, pdb.onion_info, "
+          << "             pdb.layer_key"
+          << " USING pdb.table_info INNER JOIN pdb.field_info "
+          << "       INNER JOIN pdb.onion_info INNER JOIN "
+          << "       pdb.layer_key"
+          << " ON  pdb.table_info.id = pdb.field_info.table_info_id"
+          << " AND pdb.field_info.id = pdb.onion_info.field_info_id"
+          << " AND pdb.onion_info.id = pdb.layer_key.onion_info_id "
+          << " WHERE pdb.table_info.name = '" << table << "' "
+          << " AND pdb.table_info.database_name = '" << dbname << "';";
+
+        assert(a.ps->e_conn->execute(s.str()));
+
+        // Remove from *Meta structures.
+        assert(a.destroyFieldMeta(table, adrop->name));
     }
 };
 
