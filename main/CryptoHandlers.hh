@@ -21,7 +21,7 @@
  *    knows how to transform the data type of some plain data to the data type of
  *    encrypted data in the DBMS.
  * 
- * HOM: a more specialized type of EncLayer 
+ * HOM, SEARCH : more specialized types of EncLayer
  *
  * EncLayerFactory: creates EncLayer-s for SECLEVEL-s of interest 
  */
@@ -31,22 +31,18 @@
 
 
 /*
- * Requirements & TODO:
- *  -- chain create fields
+ * TODO:
  *  -- anon name should not be in EncLayers
  *  -- remove unnecessary padding
  */
 
 class EncLayer {
  public:
-    EncLayer(Create_field * f) : cf(f) {}
-    //  EncLayer(Create_field * f, std::string key) : cf(f) {}
-
-
+    
     virtual SECLEVEL level() = 0;
 
     // returns a rewritten create field to include in rewritten query
-    virtual Create_field * newCreateField(std::string anonname = "") = 0;
+    virtual Create_field * newCreateField(Create_field * cf, std::string anonname = "") = 0;
 
     virtual Item * encrypt(Item * ptext, uint64_t IV = 0) = 0;
     virtual Item * decrypt(Item * ctext, uint64_t IV = 0) = 0;
@@ -59,8 +55,6 @@ class EncLayer {
     // can be deserialized by corresponding factory
     virtual std::string serialize() = 0;
 
- protected:
-    Create_field *cf;
 };
 
 
@@ -75,7 +69,7 @@ public:
 
 
     SECLEVEL level() {return SECLEVEL::HOM;}
-    Create_field * newCreateField(std::string anonname = "");
+    Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     //TODO needs multi encrypt and decrypt
     Item * encrypt(Item * p, uint64_t IV = 0);
@@ -103,7 +97,7 @@ public:
 
 
     SECLEVEL level() {return SECLEVEL::SEARCH;}
-    Create_field * newCreateField(std::string anonname = "");
+    Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV = 0);
     Item * decrypt(Item * ctext, uint64_t IV = 0)__attribute__((noreturn));

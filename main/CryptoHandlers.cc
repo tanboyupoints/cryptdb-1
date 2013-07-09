@@ -257,7 +257,7 @@ public:
     SECLEVEL level() {return SECLEVEL::RND;}
     string name() {return "RND_int";}
     
-    Create_field * newCreateField(std::string anonname = "");
+    Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV);
     Item * decrypt(Item * ctext, uint64_t IV);
@@ -282,7 +282,7 @@ public:
 
     SECLEVEL level() {return SECLEVEL::RND;}
     string name() {return "RND_str";}
-    Create_field * newCreateField(std::string anonname = "");
+    Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV);
     Item * decrypt(Item * ctext, uint64_t IV);
@@ -316,19 +316,17 @@ RNDFactory::deserialize(const std::string & serial) {
 
 
 RND_int::RND_int(Create_field * f, const string & seed_key)
-    : EncLayer(f),
-      key(prng_expand(seed_key, key_bytes)),
+    : key(prng_expand(seed_key, key_bytes)),
       bf(key)
 {}
 
 RND_int::RND_int(const std::string & serial)
-    : EncLayer(NULL),
-      key(get_layer_info(serial, level(), name())),
+    : key(get_layer_info(serial, level(), name())),
       bf(key)
 {}
 
 Create_field *
-RND_int::newCreateField(string anonname) {
+RND_int::newCreateField(Create_field * cf, string anonname) {
     return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
 }
 
@@ -389,7 +387,6 @@ RND_int::decryptUDF(Item * col, Item * ivcol) {
 ///////////////////////////////////////////////
 
 RND_str::RND_str(Create_field * f,  const string & seed_key)
-    : EncLayer(f)
 {
     rawkey = prng_expand(seed_key, key_bytes);
     enckey = get_AES_enc_key(rawkey);
@@ -397,8 +394,7 @@ RND_str::RND_str(Create_field * f,  const string & seed_key)
 }
 
 RND_str::RND_str(const std::string & serial)
-  : EncLayer(NULL),
-    rawkey(get_layer_info(serial, level(), name())),
+  : rawkey(get_layer_info(serial, level(), name())),
     enckey(get_AES_enc_key(rawkey)),
     deckey(get_AES_dec_key(rawkey))
  {}
@@ -406,7 +402,7 @@ RND_str::RND_str(const std::string & serial)
 
 
 Create_field *
-RND_str::newCreateField(string anonname) {
+RND_str::newCreateField(Create_field * cf, string anonname) {
     auto typelen = type_len_for_AES_str(cf->sql_type, cf->length, false);
   
     return createFieldHelper(cf, typelen.second, typelen.first, anonname, &my_charset_bin);
@@ -482,7 +478,7 @@ public:
 
     SECLEVEL level() {return SECLEVEL::DET;}
     string name() {return "DET_int";}
-    Create_field * newCreateField(std::string anonname = "");
+    Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV = 0);
     Item * decrypt(Item * ctext, uint64_t IV = 0);
@@ -508,7 +504,7 @@ public:
 
     SECLEVEL level() {return SECLEVEL::DET;}
     string name() {return "DET_str";}
-    Create_field * newCreateField(std::string anonname = "");
+    Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV = 0);
     Item * decrypt(Item * ctext, uint64_t IV = 0);
@@ -543,18 +539,17 @@ DETFactory::deserialize(const std::string & serial) {
 
 
 DET_int::DET_int(Create_field * f, const string & seed_key)
-    : EncLayer(f),
-      key(prng_expand(seed_key, bf_key_size)),
+    : key(prng_expand(seed_key, bf_key_size)),
       bf(key)
 {}
 
-DET_int::DET_int(const string & serial) : EncLayer(NULL),
+DET_int::DET_int(const string & serial) : 
     key(get_layer_info(serial, level(), name())),
     bf(key)
 {}
 
 Create_field *
-DET_int::newCreateField(string anonname) {
+DET_int::newCreateField(Create_field * cf, string anonname) {
     return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
 }
 
@@ -615,7 +610,6 @@ DET_int::decryptUDF(Item * col, Item * ivcol) {
 
 
 DET_str::DET_str(Create_field * f, string seed_key)
-    : EncLayer(f)
 {
     rawkey = prng_expand(seed_key, key_bytes);
     enckey = get_AES_enc_key(rawkey);
@@ -624,7 +618,7 @@ DET_str::DET_str(Create_field * f, string seed_key)
     
 }
 
-DET_str::DET_str(const std::string & serial): EncLayer(NULL),
+DET_str::DET_str(const std::string & serial): 
     rawkey(get_layer_info(serial, level(), name())),
     enckey(get_AES_enc_key(rawkey)),
     deckey(get_AES_dec_key(rawkey))
@@ -632,7 +626,7 @@ DET_str::DET_str(const std::string & serial): EncLayer(NULL),
 
 
 Create_field *
-DET_str::newCreateField(string anonname) {
+DET_str::newCreateField(Create_field * cf, string anonname) {
     auto typelen = type_len_for_AES_str(cf->sql_type, cf->length, true);
     
     return createFieldHelper(cf, typelen.second, typelen.first, anonname, &my_charset_bin);
@@ -730,7 +724,7 @@ public:
 
     SECLEVEL level() {return SECLEVEL::OPE;}
     string name() {return "OPE_int";}
-    Create_field * newCreateField(std::string anonname = "");
+    Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     Item * encrypt(Item * p, uint64_t IV);
     Item * decrypt(Item * c, uint64_t IV);
@@ -757,7 +751,7 @@ public:
 
     SECLEVEL level() {return SECLEVEL::OPE;}
     string name() {return "OPE_str";}
-    Create_field * newCreateField(std::string anonname = "");
+    Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     Item * encrypt(Item * p, uint64_t IV = 0);
     Item * decrypt(Item * c, uint64_t IV = 0)__attribute__((noreturn));
@@ -791,17 +785,16 @@ OPEFactory::deserialize(const std::string & serial) {
 
 
 OPE_int::OPE_int(Create_field * f, string seed_key)
-    : EncLayer(f), key(prng_expand(seed_key, key_bytes)),
+    : key(prng_expand(seed_key, key_bytes)),
       ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
 
 OPE_int::OPE_int(const std::string & serial) :
-    EncLayer(NULL),
     key(get_layer_info(serial, level(), name())), ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
 
 Create_field *
-OPE_int::newCreateField(string anonname) {
+OPE_int::newCreateField(Create_field * cf, string anonname) {
     return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname);
 }
 
@@ -825,17 +818,17 @@ OPE_int::decrypt(Item * ctext, uint64_t IV) {
 
 
 OPE_str::OPE_str(Create_field * f, string seed_key)
-    : EncLayer(f), key(prng_expand(seed_key, key_bytes)),
+    : key(prng_expand(seed_key, key_bytes)),
       ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
 
-OPE_str::OPE_str(const std::string & serial) : EncLayer(NULL),
-					       key(get_layer_info(serial, level(), name())),
-					       ope(OPE(key, plain_size * 8, ciph_size * 8))
+OPE_str::OPE_str(const std::string & serial) : 
+    key(get_layer_info(serial, level(), name())),
+    ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
 
 Create_field *
-OPE_str::newCreateField(string anonname) {
+OPE_str::newCreateField(Create_field * cf, string anonname) {
     return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname, &my_charset_bin);
 }
 
@@ -867,15 +860,15 @@ OPE_str::decrypt(Item * ctext, uint64_t IV) {
 
 
 
-HOM::HOM(Create_field * f, string seed_key) : EncLayer(f),
-					      seed_key(seed_key)
+HOM::HOM(Create_field * f, string seed_key) :
+    seed_key(seed_key)
 {
     streamrng<arc4> * prng = new streamrng<arc4>(seed_key);
     sk =  new Paillier_priv(Paillier_priv::keygen(prng, nbits));
     delete prng;
 }
 
-HOM::HOM(const std::string & serial): EncLayer(NULL), seed_key(serial)
+HOM::HOM(const std::string & serial): seed_key(serial)
 {
     streamrng<arc4> * prng = new streamrng<arc4>(seed_key);
     sk = new Paillier_priv(Paillier_priv::keygen(prng, nbits));
@@ -883,7 +876,7 @@ HOM::HOM(const std::string & serial): EncLayer(NULL), seed_key(serial)
 }
 
 Create_field *
-HOM::newCreateField(string anonname) {
+HOM::newCreateField(Create_field * cf, string anonname) {
     return createFieldHelper(cf, 2*nbits/8, MYSQL_TYPE_BLOB, anonname, &my_charset_bin);
 }
 
@@ -981,17 +974,16 @@ HOM::~HOM() {
 /******* SEARCH **************************/
 
 Search::Search(Create_field * f, string seed_key)
-    : EncLayer(f)
 {
     key = prng_expand(seed_key, key_bytes);
 }
 
-Search::Search(const std::string & serial) : EncLayer(NULL) {
+Search::Search(const std::string & serial) {
     key = prng_expand(serial, key_bytes);
 }
 
 Create_field *
-Search::newCreateField(string anonname) {
+Search::newCreateField(Create_field * cf, string anonname) {
     return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname, &my_charset_bin);
 }
 
