@@ -40,40 +40,15 @@ Learn::trainFromFile(void)
                 s += line;
 
                 /*
-                 * It is possible to effectivelly adjust 
-                 * onions but it doesn't seem to the goal and the lines of 
-                 * code below are commented.
+                 * Indeed rewrite is the cleaner solution 
+                 * Note that refactory refactory removing
+                 * query execution from rewrite is ongoing 
+                 * in CryptDB.
                  */
-                //QueryRewrite qr = this->m_r.rewrite(s);
-                //if(qr.queries.size() == 0)
-                //    this->m_errnum++;
-                //this->m_totalnum++;
-                
-                query_parse q(this->m_dbname, s);
-                LEX *lex = q.lex();
-                //cout << "command: " << lex->sql_command << endl;
-                string db =  lex->select_lex.table_list.first->db;
-                //string table = lex->select_lex.table_list.first->table_name;
-
-                auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
-
-                // TODO: Possible approach:
-                // - check SQL operation, e.g., equality, order, search, add
-                // - get columns and their types
-                // - based on operation and column types:
-                //      - define EncSet for each field
-                //      - intersect to find a common encryption denominator: 
-                //          RND,DET,JOIN / RND,OPE,OPE-JOIN / Search and HOM(add)
-                for (;;) 
-                {
-                    Item *i = fd_it++;
-                    if (!i)
-                        break;
-                    assert(i->type() == Item::FIELD_ITEM);
-                    Item_field *ifd = static_cast<Item_field*>(i);
-                    cout << db << ":" << ifd->table_name << ": Column name: " << ifd->field_name << ", column type: " 
-                        << ifd->field_type() << endl;
-                }
+                QueryRewrite qr = this->m_r.rewrite(s);
+                if(qr.queries.size() == 0)
+                    this->m_errnum++;
+                this->m_totalnum++;
 
                 s.clear();
                 continue;
