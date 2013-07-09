@@ -487,7 +487,7 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
 
     OnionMeta * om    = getAssert(fm->onions, o);
     string fieldanon  = om->getAnonOnionName();
-    string tableanon  = fm->tm->anonTableName();
+    string tableanon  = fm->tm->getAnonTableName();
 
     //removes onion layer at the DB
     stringstream query;
@@ -935,7 +935,7 @@ processAnnotation(Annotation annot, Analysis &a)
         Create_field * cf = fm->onions[o]->layers.back()->newCreateField(onionname);
 
         stringstream query;
-        query << "ALTER TABLE " << fm->tm->anonTableName();
+        query << "ALTER TABLE " << fm->tm->getAnonTableName();
 
         switch (o) {
         case oDET:
@@ -961,7 +961,7 @@ processAnnotation(Annotation annot, Analysis &a)
         query_list.push_back(query.str());
     }
 
-    query_list.push_back("ALTER TABLE " + fm->tm->anonTableName()  +
+    query_list.push_back("ALTER TABLE " + fm->tm->getAnonTableName()  +
                          " ADD " + fm->saltName() + " " + TN_SALT +
                          " AFTER " + onionname + ";");
 

@@ -37,7 +37,7 @@ std::string FieldMeta::saltName() const
     assert(has_salt);
 
     return BASE_SALT_NAME + "_f_" + StringFromVal(index) + "_" +
-           tm->anonTableName();
+           tm->getAnonTableName();
 }
 
 std::string FieldMeta::fullName(onion o) const
@@ -45,7 +45,7 @@ std::string FieldMeta::fullName(onion o) const
     auto it = onions.find(o);
     OnionMeta *om = it->second;
     assert(om);
-    return tm->anonTableName() + "." + om->getAnonOnionName();
+    return tm->getAnonTableName() + "." + om->getAnonOnionName();
 }
 
 string FieldMeta::stringify() {
@@ -93,6 +93,7 @@ FieldMeta *TableMeta::getFieldMeta(std::string field)
 
 TableMeta::TableMeta() {
     tableNo = 0;
+    index_counter = 0;
 }
 
 TableMeta::~TableMeta()
@@ -103,9 +104,46 @@ TableMeta::~TableMeta()
 }
 
 // FIXME: May run into problems where a plaintext table expects the regular
-// name, but it shouldn't get that name from 'anonTableName' anyways.
-std::string TableMeta::anonTableName() const {
+// name, but it shouldn't get that name from 'getAnonTableName' anyways.
+std::string TableMeta::getAnonTableName() const {
     return std::string("table") + strFromVal((uint32_t)tableNo);
+}
+
+std::string TableMeta::addIndex(std::string index_name)
+{
+    std::string anon_name =
+        std::string("index") + std::to_string(index_counter++) +
+        getAnonTableName();
+    auto it = index_map.find(index_name);
+    assert(index_map.end() == it);
+
+    return index_map[index_name] = anon_name;
+}
+
+std::string TableMeta::getAnonIndexName(std::string index_name) const
+{
+    auto it = index_map.find(index_name);
+    assert(index_map.end() != it);
+    return it->second;
+}
+
+std::string TableMeta::getIndexName(std::string anon_name) const
+{
+    for (auto it : index_map) {
+        if (it.second == anon_name) {
+            return it.first;
+        }
+    }
+
+    assert(false);
+}
+
+bool TableMeta::destroyIndex(std::string index_name)
+{
+    auto it = index_map.find(index_name);
+    assert(index_map.end() != it);
+
+    return 1 == index_map.erase(index_name);
 }
 
 // table_no: defaults to NULL indicating we are to generate it ourselves.

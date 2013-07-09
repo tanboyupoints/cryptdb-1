@@ -348,13 +348,13 @@ operator<<(std::ostream &out, Key_part_spec &k)
     return out;
 }
 
-static inline std::string
+inline std::string
 convert_lex_str(const LEX_STRING &l)
 {
     return std::string(l.str, l.length);
 }
 
-static inline LEX_STRING
+inline LEX_STRING
 string_to_lex_str(const std::string &s)
 {
     return (LEX_STRING){const_cast<char*>(s.c_str()), s.length()};
@@ -501,9 +501,9 @@ static std::string prefix_drop_column(Alter_drop adrop) {
     return ss.str();
 }
 
-static std::string prefix_drop_key(Alter_drop adrop) {
+static std::string prefix_drop_index(Alter_drop adrop) {
     std::ostringstream ss;
-    ss << "DROP KEY " << adrop;
+    ss << "DROP INDEX " << adrop;
     return ss.str();
 }
 
@@ -799,7 +799,7 @@ operator<<(std::ostream &out, LEX &lex)
                                         prefix_add_index);
         } else if (lex.alter_info.flags & ALTER_DROP_INDEX) {
             out << " " << ListJoin<Alter_drop>(lex.alter_info.drop_list,
-                                               ",", prefix_drop_key);
+                                               ",", prefix_drop_index);
         } else {
             throw CryptDBError("Unsupported ALTER in stringify");
         }

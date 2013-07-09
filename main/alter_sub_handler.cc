@@ -185,13 +185,18 @@ class DropIndexSubHandler : public AlterSubHandler {
         auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
         new_lex->alter_info.drop_list =
             reduceList<Alter_drop>(drop_it, List<Alter_drop>(),
-                [table, a] (List<Alter_drop> out_list, Alter_drop *adrop) {
+                [table, &a] (List<Alter_drop> out_list, Alter_drop *adrop) {
                     if (adrop->type == Alter_drop::KEY) {
-                        // TODO: Once we anonymize key name it must be
-                        // accounted for here.
                         THD *thd = current_thd;
                         Alter_drop *new_adrop =
                             adrop->clone(thd->mem_root);  
+                        new_adrop->name =
+                            make_thd_string(a.getAnonIndexName(table,
+                                                               adrop->name));
+                        // FIXME: If this query fails, we will be left in
+                        // an inconsistent state as we will have lost our
+                        // index record.
+                        a.destroyIndex(table, adrop->name);
                         out_list.push_back(new_adrop);
                     }
                     return out_list;    /* lambda */
