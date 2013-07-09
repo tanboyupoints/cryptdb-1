@@ -166,7 +166,7 @@ class AddIndexSubHandler : public AlterSubHandler {
     }
 
     // NOTE: This must be executed after 'this->rewrite' because it needs
-    // the TableMeta to update it's index_counter.
+    // the TableMeta to update it's uniq_counter.
     // TODO: Add index to embedded shallow mirror.
     void update(const string &q, LEX *lex, Analysis &a) const {
         const string &table =
@@ -176,7 +176,7 @@ class AddIndexSubHandler : public AlterSubHandler {
         // Update the counter.
         ostringstream s;
         s << " UPDATE pdb.table_info"
-          << "    SET index_counter = " << tm->getIndexCounter()
+          << "    SET uniq_counter = " << tm->getUniqCounter()
           << "  WHERE number = " << tm->tableNo
           <<"    AND database_name = '"<<a.ps->e_conn->getCurDBName()<<"';";
         assert(a.ps->e_conn->execute(s.str()));

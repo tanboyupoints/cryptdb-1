@@ -112,7 +112,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
                 "  has_salt boolean,"
                 "  salt_name varchar(64) NOT NULL,"
                 "  database_name varchar(64) NOT NULL,"
-                "  index_counter bigint NOT NULL,"
+                "  uniq_counter bigint NOT NULL,"
                 "  id SERIAL PRIMARY KEY)"
                 " ENGINE=InnoDB;"));
 
@@ -195,7 +195,7 @@ buildTableMeta(ProxyState &ps)
     DBResult *dbres;
     assert(ps.e_conn->execute(
                 " SELECT number, name, has_sensitive, has_salt, salt_name, "
-                "        database_name, index_counter "
+                "        database_name, uniq_counter "
                 " FROM pdb.table_info", dbres));
     ScopedMySQLRes r(dbres->n);
     MYSQL_ROW row;
@@ -209,7 +209,7 @@ buildTableMeta(ProxyState &ps)
         string table_has_salt(row[3], l[3]);
         string table_salt_name(row[4], l[4]);
         string table_database_name(row[5], l[5]);
-        string table_index_counter(row[6], l[6]);
+        string table_uniq_counter(row[6], l[6]);
 
         // FIXME: Signed to unsigned conversion.
         unsigned int int_table_number = atoi(table_number.c_str());
@@ -222,7 +222,7 @@ buildTableMeta(ProxyState &ps)
                                        string_to_bool(table_has_salt),
                                        table_salt_name,
                                        index_map,
-                                       atoi(table_index_counter.c_str()),
+                                       atoi(table_uniq_counter.c_str()),
                                        &int_table_number);
 
         buildFieldMeta(ps, tm, table_database_name);

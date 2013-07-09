@@ -89,7 +89,7 @@ TableMeta::createFieldMeta(Create_field *field, const Analysis &a,
                            bool encByDefault)
 {
     FieldMeta * fm = new FieldMeta(this, string(field->field_name),
-                                   this->uniq_counter++, field,
+                                   this->leaseUniqCounter(), field,
                                    a.ps->masterKey); 
 
     // FIXME: Use exists function.
@@ -113,9 +113,9 @@ FieldMeta *TableMeta::getFieldMeta(std::string field)
     }
 }
 
-unsigned int TableMeta::getIndexCounter() const
+unsigned int TableMeta::getUniqCounter() const
 {
-    return index_counter;
+    return uniq_counter;
 }
 
 // FIXME: May run into problems where a plaintext table expects the regular
@@ -141,7 +141,7 @@ bool TableMeta::destroyFieldMeta(std::string field)
 std::string TableMeta::addIndex(std::string index_name)
 {
     std::string anon_name =
-        std::string("index") + std::to_string(index_counter++) +
+        std::string("index") + std::to_string(leaseUniqCounter()) +
         getAnonTableName();
     auto it = index_map.find(index_name);
     assert(index_map.end() == it);
@@ -175,17 +175,20 @@ bool TableMeta::destroyIndex(std::string index_name)
     return 1 == index_map.erase(index_name);
 }
 
+unsigned int TableMeta::leaseUniqCounter()
+{
+    return uniq_counter++;
+}
+
 // table_no: defaults to NULL indicating we are to generate it ourselves.
 TableMeta *
 SchemaInfo::createTableMeta(std::string table_name,
                             bool has_sensitive, bool has_salt,
                             std::string salt_name,
                             std::map<std::string, std::string> index_map,
-                            unsigned int index_counter,
+                            unsigned int uniq_counter,
                             const unsigned int *table_no)
 {
-    assert(index_map.empty() || index_counter > 0);
-
     // Make sure a table with this name does not already exist.
     std::map<std::string, TableMeta *>::iterator it =
         tableMetaMap.find(table_name);
@@ -202,7 +205,7 @@ SchemaInfo::createTableMeta(std::string table_name,
         table_number = *table_no;
     }
     TableMeta *tm = new TableMeta(table_number, has_sensitive, has_salt,
-                                  salt_name, index_map, index_counter);
+                                  salt_name, index_map, uniq_counter);
     tableMetaMap[table_name] = tm;
     return tm;
 }

@@ -145,16 +145,14 @@ typedef struct TableMeta {
     std::string salt_name;
 
     TableMeta()
-        : tableNo(0), index_counter(0), uniq_counter(0) {}
+        : tableNo(0), uniq_counter(0) {}
     TableMeta(unsigned int table_no, bool has_sensitive,
               bool has_salt, std::string salt_name,
               std::map<std::string, std::string> index_map,
-              unsigned int index_counter=0,
               unsigned int uniq_counter=0)
         : tableNo(table_no), hasSensitive(has_sensitive),
           has_salt(has_salt), salt_name(salt_name),
-          index_map(index_map), index_counter(index_counter),
-          uniq_counter(uniq_counter) {}
+          index_map(index_map), uniq_counter(uniq_counter) {}
     ~TableMeta();
 
     // TODO: Make FieldMeta a friend and deal with the other uses of this
@@ -162,7 +160,7 @@ typedef struct TableMeta {
     FieldMeta *createFieldMeta(Create_field *field, const Analysis &a,
                                bool encByDefault);
     FieldMeta *getFieldMeta(std::string field);
-    unsigned int getIndexCounter() const;
+    unsigned int getUniqCounter() const;
     std::string getAnonTableName() const;
 
     friend class Analysis;
@@ -176,8 +174,9 @@ protected:
    
 private:
     std::map<std::string, std::string> index_map;
-    unsigned int index_counter;
     unsigned int uniq_counter;
+
+    unsigned int leaseUniqCounter();
 } TableMeta;
 
 
@@ -198,7 +197,7 @@ typedef struct SchemaInfo {
                                bool has_sensitive, bool has_salt,
                                std::string salt_name,
                                std::map<std::string, std::string> index_map,
-                               unsigned int index_counter,
+                               unsigned int uniq_counter,
                                const unsigned int *table_no=NULL);
     friend class Analysis;
 

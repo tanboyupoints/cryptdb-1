@@ -76,7 +76,7 @@ class CreateHandler : public DDLHandler {
               << " " << bool_to_string(tm->has_salt) << ", "
               << " '" << tm->salt_name << "', "
               << " '" << dbname << "',"
-              << " " << tm->getIndexCounter() << ", "
+              << " " << tm->getUniqCounter() << ", "
               << " 0"
               << " );";
 
