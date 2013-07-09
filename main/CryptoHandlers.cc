@@ -424,6 +424,7 @@ RND_str::encrypt(Item * ptext, uint64_t IV) {
                  enckey,
 		 BytesFromInt(IV, SALT_LEN_BYTES),
 		 false);
+    
     LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV " << IV << "--->"
 	      << "len of enc " << enc.length() << " enc " << enc;
 
