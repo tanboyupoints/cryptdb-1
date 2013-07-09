@@ -217,13 +217,14 @@ class AddIndexSubHandler : public AlterSubHandler {
     }
 };
 
-// TODO: Functionalize update/rewrite semantics and loop once.
 class DropIndexSubHandler : public AlterSubHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {
         LEX *new_lex = copy(lex);
         const string &table =
             lex->select_lex.table_list.first->table_name;
+        const string &dbname =
+            lex->select_lex.table_list.first->db;
         TableMeta *tm = a.getTableMeta(table);
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a);
@@ -238,47 +239,57 @@ class DropIndexSubHandler : public AlterSubHandler {
                 });
 
         // Update and Rewrite.
+        // FIXME: Handle oDET index as well.
         drop_it =
             List_iterator<Alter_drop>(key_drop_list);
         new_lex->alter_info.drop_list =
-            mapList<Alter_drop>(drop_it,
-                [table, tm, &a] (Alter_drop *adrop) {
-                    // Remove the index_info record from the proxy db.
-                    std::string index_name = adrop->name;
-                    std::string anon_name =
-                        a.getAnonIndexName(table, index_name);
-
-                    ostringstream s;
-                    s << " DELETE FROM pdb.index_info "
-                      << " WHERE table_info_id = "
-                      << "       (SELECT table_info.id "
-                      << "          FROM pdb.table_info"
-                      << "         WHERE number = " << tm->tableNo
-                      << "           AND database_name = '"
-                      <<                 a.ps->e_conn->getCurDBName()<< "')"
-                      << "   AND name = '" << index_name << "'"
-                      << "   AND anon_name = '" << anon_name << "';";
-
-                    assert(a.ps->e_conn->execute(s.str()));
-
-                    // Rewrite the Alter_drop data structure.
-                    THD *thd = current_thd;
-                    Alter_drop *new_adrop =
-                        adrop->clone(thd->mem_root);  
-                    new_adrop->name =
-                        make_thd_string(a.getAnonIndexName(table,
-                                                           adrop->name));
-                    // FIXME: If this query fails, we will be left in
-                    // an inconsistent state as we will have lost our
-                    // index record.
-                    //
-                    // Remove from *Meta.
-                    a.destroyIndex(table, adrop->name);
-
-                    return new_adrop;   /* lambda */
+            reduceList<Alter_drop>(drop_it, List<Alter_drop>(),
+                [table, dbname, tm, &a, this] (List<Alter_drop> out_list,
+                                               Alter_drop *adrop) {
+                    this->update(a, table, dbname, adrop);
+                    List<Alter_drop> lst = this->rewrite(a, adrop, table);
+                    out_list.concat(&lst); 
+                    return out_list;
                 });
 
         return single_lex_output(new_lex, out_lex_count);
+    }
+
+    void update(Analysis &a, const std::string &table,
+                const std::string &dbname, Alter_drop *adrop) const
+    {
+        // Remove the index_info record from the proxy db.
+        std::string index_name = adrop->name;
+        std::string anon_name = a.getAnonIndexName(table, index_name);
+
+        ostringstream s;
+        s << " DELETE FROM pdb.index_info "
+          << " WHERE table_info_id = "
+          << "       (SELECT table_info.id "
+          << "          FROM pdb.table_info"
+          << "         WHERE name = '" << table << "'"
+          << "           AND database_name = '" << dbname << "')"
+          << "   AND name = '" << index_name << "'"
+          << "   AND anon_name = '" << anon_name << "';";
+
+        assert(a.ps->e_conn->execute(s.str()));
+    }
+
+    List<Alter_drop> rewrite(Analysis a, Alter_drop *adrop,
+                             const std::string &table) const
+    {
+        // Rewrite the Alter_drop data structure.
+        List<Alter_drop> out_list;
+        THD *thd = current_thd;
+        Alter_drop *new_adrop = adrop->clone(thd->mem_root);  
+        new_adrop->name =
+            make_thd_string(a.getAnonIndexName(table, adrop->name));
+
+        // Remove from *Meta.
+        a.destroyIndex(table, adrop->name);
+
+        out_list.push_back(new_adrop);
+        return out_list;
     }
 };
 
