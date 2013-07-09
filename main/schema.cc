@@ -193,7 +193,7 @@ SchemaInfo::createTableMeta(std::string table_name,
 
     unsigned int table_number;
     if (NULL == table_no) {
-        table_number = ++totalTables;
+        table_number = totalTables++;
     } else {
         // TODO: Make sure no other tables with this number exist.
         ++totalTables;

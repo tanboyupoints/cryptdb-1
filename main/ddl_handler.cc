@@ -34,19 +34,28 @@ public:
 class CreateHandler : public DDLHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {
-        update(q, lex, a);
-        return rewrite(lex, a, out_lex_count);
+        bool new_table;
+
+        update(q, lex, a, &new_table);
+        return rewrite(lex, a, out_lex_count, new_table);
     }
 
-    void update(const string &q, LEX *lex, Analysis &a) const {
+    void update(const string &q, LEX *lex, Analysis &a,
+                bool *new_table) const
+    {
         char* dbname = lex->select_lex.table_list.first->db;
         char* table  = lex->select_lex.table_list.first->table_name;
 
         // If we are only creating the table if it doesn't exist,
         // we must forgo the duplication of meta objects and such.
-        if (lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS) {
-            if (a.tableMetaExists(table)) {
+        if (a.tableMetaExists(table)) {
+            if (lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS) {
+                *new_table = false;
                 return;
+            } else {
+                // User is trying to create a table that already exists.
+                // How to gracefully handle this?
+                assert(false);
             }
         }
 
@@ -88,16 +97,24 @@ class CreateHandler : public DDLHandler {
 
         // Add field.
         unsigned long long tableID = a.ps->e_conn->last_insert_id();
-        for (std::pair<std::string, FieldMeta *> fm_pair: tm->fieldMetaMap) {
+        for (std::pair<std::string, FieldMeta *> fm_pair: tm->fieldMetaMap){
             FieldMeta *fm = fm_pair.second;
             assert(do_add_field(fm, a, dbname, table, &tableID));
         }
 
         a.ps->e_conn->execute("COMMIT");
+        *new_table = true;
     }
 
-    LEX **rewrite(LEX *lex, Analysis &a, unsigned *out_lex_count) const {
+    LEX **rewrite(LEX *lex, Analysis &a, unsigned *out_lex_count,
+                  bool new_table) const
+    {
         LEX * new_lex = copy(lex);
+        // This table already exists, thus it's *Meta data already exists.
+        if (false == new_table) {
+            assert((lex->create_info.options &HA_LEX_CREATE_IF_NOT_EXISTS));
+            return single_lex_output(new_lex, out_lex_count);
+        }
 
         // table name
         const string &table =
@@ -110,19 +127,11 @@ class CreateHandler : public DDLHandler {
         if (lex->create_info.options & HA_LEX_CREATE_TABLE_LIKE) {
             cryptdb_err() << "No support for create table like yet. " <<
                        "If you see this, please implement me";
-        } else {
-            // If we are only creating the table if it doesn't exist,
-            // we must forgo the duplication of meta objects and such.
-            if (!(lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS &&
-                a.tableMetaExists(table))) {
-                do_field_rewriting(lex, new_lex, table, a);
-            }
         }
 
-        LEX **out_lex = new LEX*[1];
-        out_lex[0] = new_lex;
-        *out_lex_count = 1;
-        return out_lex;
+        do_field_rewriting(lex, new_lex, table, a);
+
+        return single_lex_output(new_lex, out_lex_count);
     }
 };
 
@@ -140,10 +149,7 @@ class DropHandler : public DDLHandler {
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a, true);
 
-        LEX **out_lex = new LEX*[1];
-        out_lex[0] = new_lex;
-        *out_lex_count = 1;
-        return out_lex;;
+        return single_lex_output(new_lex, out_lex_count);
     }
 
     void update(const string &q, LEX *lex, Analysis &a) const {
@@ -185,6 +191,7 @@ class DropHandler : public DDLHandler {
     }
 };
 
+// TODO: FIXME.
 class ChangeDBHandler : public DDLHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {
@@ -195,10 +202,7 @@ class ChangeDBHandler : public DDLHandler {
         a.ps->conn->setCurDBName(dbname);
         a.ps->e_conn->setCurDBName(dbname);
 
-        LEX **out_lex = new LEX*[1];
-        out_lex[0] = lex;
-        *out_lex_count = 1;
-        return out_lex;
+        return single_lex_output(lex, out_lex_count);
     }
 };
 

@@ -115,10 +115,7 @@ class InsertHandler : public DMLHandler {
             new_lex->many_values = newList;
         }
 
-        LEX **out_lex = new LEX*[1];
-        out_lex[0] = new_lex;
-        *out_lex_count = 1;
-        return out_lex;
+        return single_lex_output(new_lex, out_lex_count);
     }
 };
 
@@ -251,10 +248,7 @@ class UpdateHandler : public DMLHandler {
         new_lex->value_list = res_vals;
 
         if (false == invalids) {
-            LEX **out_lex = new LEX*[1];
-            out_lex[0] = new_lex;
-            *out_lex_count = 1;
-            return out_lex;
+            return single_lex_output(new_lex, out_lex_count);
         } else {
             return refresh_onions(lex, new_lex, a, out_lex_count);
         }
@@ -280,10 +274,7 @@ private:
             executeQuery(*a.rewriter, select_stream.str());
         assert(select_res_type);
         if (select_res_type->rows.size() == 0) { // No work to be done.
-            LEX **out_lex = new LEX*[1];
-            out_lex[0] = new_lex;
-            *out_lex_count = 1;
-            return out_lex;
+            return single_lex_output(new_lex, out_lex_count);
         }
 
         struct _ {
@@ -423,10 +414,7 @@ class DeleteHandler : public DMLHandler {
         new_lex->query_tables = rewrite_table_list(lex->query_tables, a);
         set_select_lex(new_lex, rewrite_select_lex(&new_lex->select_lex, a));
 
-        LEX **out_lex = new LEX*[1];
-        out_lex[0] = new_lex;
-        *out_lex_count = 1;
-        return out_lex;
+        return single_lex_output(new_lex, out_lex_count);
     }
 };
 
@@ -440,10 +428,7 @@ class SelectHandler : public DMLHandler {
         new_lex->select_lex.top_join_list = rewrite_table_list(lex->select_lex.top_join_list, a);
         set_select_lex(new_lex, rewrite_select_lex(&new_lex->select_lex, a));
 
-        LEX **out_lex = new LEX*[1];
-        out_lex[0] = new_lex;
-        *out_lex_count = 1;
-        return out_lex;
+        return single_lex_output(new_lex, out_lex_count);
     }
 };
 
