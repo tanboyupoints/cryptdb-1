@@ -3,11 +3,10 @@
 #include <util/onions.hh>
 #include <parser/embedmysql.hh>
 #include <parser/stringify.hh>
-#include <main/MultiPrinc.hh>
 #include <util/cryptdb_log.hh>
+#include <main/schema.hh>
 
 using namespace std;
-
 
 /**
  * Used to keep track of encryption constraints during
@@ -49,18 +48,18 @@ ostream&
 operator<<(ostream &out, const EncSet & es);
 
 const EncSet EQ_EncSet = {
-        {
-	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-            {oDET,   LevelFieldPair(SECLEVEL::DET, NULL)},
-            {oOPE,   LevelFieldPair(SECLEVEL::OPE, NULL)},
-        }
+    {
+        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+        {oDET,   LevelFieldPair(SECLEVEL::DET, NULL)},
+        {oOPE,   LevelFieldPair(SECLEVEL::OPE, NULL)},
+    }
 };
 
 const EncSet JOIN_EncSet = {
-        {
-	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-            {oDET,   LevelFieldPair(SECLEVEL::DETJOIN, NULL)},
-        }
+    {
+        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+        {oDET,   LevelFieldPair(SECLEVEL::DETJOIN, NULL)},
+    }
 };
 
 const EncSet ORD_EncSet = {
@@ -78,49 +77,49 @@ const EncSet PLAIN_EncSet = {
 
 //todo: there should be a map of FULL_EncSets depending on item type
 const EncSet FULL_EncSet = {
-        {
-	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-            {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
-            {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
-            {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
-            {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
-        }
+    {
+        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+        {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
+        {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
+        {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
+        {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
+    }
 };
 
 const EncSet FULL_EncSet_Str = {
-        {
-	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-            {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
-            {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
-            {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
-        }
+    {
+        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+        {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
+        {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
+        {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
+    }
 };
 
 const EncSet FULL_EncSet_Int = {
-        {
-	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-            {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
-            {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
-            {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
-        }
+    {
+        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+        {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
+        {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
+        {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
+    }
 };
 
 const EncSet Search_EncSet = {
-        {
-	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-            {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
-        }
+    {
+        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+        {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
+    }
 };
 
 const EncSet ADD_EncSet = {
-        {
-	    {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-            {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
-        }
+    {
+        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+        {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
+    }
 };
 
 const EncSet EMPTY_EncSet = {
-        {{}}
+    {{}}
 };
 
 

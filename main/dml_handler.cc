@@ -68,11 +68,7 @@ class InsertHandler : public DMLHandler {
         }
 
         if (fmVec.empty()) {
-            // use the table order now
-            auto itt = a.ps->schema->tableMetaMap.find(table);
-            assert(itt != a.ps->schema->tableMetaMap.end());
-
-            TableMeta *tm = itt->second;
+            TableMeta *tm = a.getTableMeta(table);
             //keep fields in order
             for (auto it0 = tm->fieldNames.begin(); it0 != tm->fieldNames.end(); it0++) {
                 fmVec.push_back(tm->fieldMetaMap[*it0]);

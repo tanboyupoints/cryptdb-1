@@ -2,7 +2,6 @@
  * Handlers for rewriting fields. 
  */
 
-
 #include <map>
 #include <iostream>
 #include <fstream>
@@ -21,8 +20,6 @@
 #include <main/CryptoHandlers.hh>
 #include <parser/lex_util.hh>
 #include <main/enum_text.hh>
-
-#include <main/MultiPrinc.hh>
 
 // gives names to classes and objects we don't care to know the name of 
 #define ANON                ANON_NAME(__anon_id_f_)

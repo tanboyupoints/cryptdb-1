@@ -11,7 +11,6 @@
 
 #include <main/Translator.hh>
 #include <main/Connect.hh>
-#include <main/MultiPrinc.hh>
 #include <main/dispatcher.hh>
 
 #include <sql_select.h>

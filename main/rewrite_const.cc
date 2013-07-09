@@ -2,7 +2,6 @@
  * Handlers for rewriting constants, integers, strings, decimals, date, etc. 
  */
 
-
 #include <map>
 #include <iostream>
 #include <fstream>
@@ -21,8 +20,6 @@
 #include <main/CryptoHandlers.hh>
 #include <parser/lex_util.hh>
 #include <main/enum_text.hh>
-
-#include <main/MultiPrinc.hh>
 
 using namespace std;
 

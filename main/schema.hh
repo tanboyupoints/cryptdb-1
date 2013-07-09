@@ -183,7 +183,6 @@ private:
 // AWARE: Table/Field aliases __WILL NOT__ be looked up when calling from
 // this level or below. Use Analysis::* if you need aliasing.
 typedef struct SchemaInfo {
-    std::map<std::string, TableMeta *> tableMetaMap;
     unsigned int totalTables;
     embedmysql * embed_db;
 
@@ -200,6 +199,10 @@ typedef struct SchemaInfo {
                                unsigned int uniq_counter,
                                const unsigned int *table_no=NULL);
     friend class Analysis;
+
+    // TODO: Make private after consolidating create_table_meta with
+    // SchemaInfo::createTableMeta
+    std::map<std::string, TableMeta *> tableMetaMap;
 
 private:
     // These functions do not support Aliasing, use Analysis::getTableMeta

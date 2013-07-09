@@ -62,8 +62,7 @@ class CreateHandler : public DDLHandler {
         // Add table to embedded database.
         assert(a.ps->e_conn->execute(q));
 
-        TableMeta *tm = a.ps->schema->tableMetaMap[table];
-        assert(tm != NULL);
+        TableMeta *tm = a.getTableMeta(table);
 
         a.ps->e_conn->execute("START TRANSACTION");
 

@@ -24,8 +24,6 @@
 
 #include "field.h"
 
-#include <main/MultiPrinc.hh>
-
 using namespace std;
 
 extern CItemTypesDir itemTypes;
