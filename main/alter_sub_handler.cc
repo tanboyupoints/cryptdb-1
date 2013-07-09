@@ -210,16 +210,42 @@ class AddIndexSubHandler : public AlterSubHandler {
     }
 };
 
+// TODO: Functionalize update/rewrite semantics and loop once.
 class DropIndexSubHandler : public AlterSubHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {
         LEX *new_lex = copy(lex);
         const string &table =
             lex->select_lex.table_list.first->table_name;
+        TableMeta *tm = a.getTableMeta(table);
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a);
 
-        auto drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
+        // Remove the index_info record from the proxy db.
+        auto drop_it =
+            List_iterator<Alter_drop>(lex->alter_info.drop_list);
+        eachList<Alter_drop>(drop_it, [table, tm, a] (Alter_drop *adrop) {
+            if (adrop->type == Alter_drop::KEY) {
+                std::string index_name = adrop->name;
+                std::string anon_name = a.getAnonIndexName(table, index_name);
+
+                ostringstream s;
+                s << " DELETE FROM pdb.index_info "
+                  << " WHERE table_info_id = "
+                  << "       (SELECT table_info.id "
+                  << "          FROM pdb.table_info"
+                  << "         WHERE number = " << tm->tableNo
+                  << "           AND database_name = '"
+                  <<                 a.ps->e_conn->getCurDBName() << "') "
+                  << "   AND name = '" << index_name << "'"
+                  << "   AND anon_name = '" << anon_name << "';";
+
+                assert(a.ps->e_conn->execute(s.str()));
+            }
+        });
+
+
+        drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
         new_lex->alter_info.drop_list =
             reduceList<Alter_drop>(drop_it, List<Alter_drop>(),
                 [table, &a] (List<Alter_drop> out_list, Alter_drop *adrop) {
