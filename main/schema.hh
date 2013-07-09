@@ -53,7 +53,6 @@ operator<<(std::ostream &out, const OnionLevelFieldPair &p);
 
 
 typedef struct OnionMeta {
-    enum enum_field_types sql_type;
     std::vector<EncLayer *> layers; //first in list is lowest layer
 
     SECLEVEL getSecLevel() {

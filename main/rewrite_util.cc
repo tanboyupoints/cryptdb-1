@@ -293,9 +293,6 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index, Create_field * cf
         OnionMeta * om = new OnionMeta(o, index, fm->fname);
         fm->onions[o] = om;
 
-        // HACK(burrows)
-        om->sql_type = cf->sql_type;
-
         if (mKey) {
 	    Create_field * newcf = cf;
             //generate enclayers for encrypted field
@@ -355,6 +352,7 @@ create_field_meta(TableMeta *tm, Create_field *field,
     fm->tm            = tm;
     fm->sql_field     = field->clone(current_thd->mem_root);
     fm->fname         = string(fm->sql_field->field_name);
+    // FIXME: This does not play nice with field deletion.
     fm->index         = tm->fieldNames.size();
 
     if (encByDefault) {
@@ -424,7 +422,6 @@ do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
         unsigned long long fieldID = a.ps->e_conn->last_insert_id();
 
         for (std::pair<onion, OnionMeta *> onion_pair: fm->onions) {
-            OnionMeta *om = onion_pair.second;
             onion o = onion_pair.first;
             ostringstream s;
 
@@ -437,7 +434,6 @@ do_add_field(TableMeta *tm, const Analysis &a, std::string dbname,
               << " " << std::to_string(fieldID) << ", "
               << " '" << str_onion << "', "
               << " '" << str_seclevel << "', "
-              << " '" << TypeText<enum enum_field_types>::toText(om->sql_type) << "', "
               << " 0);";
 
             assert(a.ps->e_conn->execute(s.str()));

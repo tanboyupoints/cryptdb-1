@@ -93,7 +93,7 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf,
 
 EncLayer *
 EncLayerFactory::encLayerFromSerial(onion o, SECLEVEL sl,
-				enum enum_field_types sql_type, const string & serial)
+                                    const string & serial)
 {
     switch (sl) {
     case SECLEVEL::RND: 

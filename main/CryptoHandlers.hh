@@ -129,7 +129,7 @@ public:
 
     // creates EncLayer from its serialization
     static EncLayer * encLayerFromSerial(onion o, SECLEVEL sl,
-					 enum enum_field_types sql_type, const std::string & serial);
+					 const std::string & serial);
 };
 
 

@@ -136,8 +136,6 @@ createMetaTablesIfNotExists(ProxyState & ps)
       << " " << TypeText<onion>::parenList() << " NOT NULL,"
       << "  current_level enum"
       << " " << TypeText<SECLEVEL>::parenList() << " NOT NULL,"
-      << " sql_type enum"
-      << " " << TypeText<enum enum_field_types>::parenList() <<" NOT NULL,"
       << "  id SERIAL PRIMARY KEY)"
       << " ENGINE=InnoDB;";
 
@@ -344,7 +342,7 @@ static void
 buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
 {
 
-    string q = " SELECT o.type, o.current_level, o.sql_type, o.id"
+    string q = " SELECT o.type, o.current_level, o.id"
                " FROM pdb.onion_info o, pdb.field_info f"
                " WHERE o.field_info_id = " + std::to_string(field_id) +";";
 
@@ -359,14 +357,10 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
 
         string onion_type(row[0], l[0]);
         string onion_current_level(row[1], l[1]);
-        string onion_sql_type(row[2], l[2]);
-        string onion_id(row[3], l[3]);
+        string onion_id(row[2], l[2]);
 
         onion o = TypeText<onion>::toType(onion_type);
         OnionMeta *om = new OnionMeta(o, fm->index, fm->fname);
-        om->sql_type  =
-            TypeText<enum enum_field_types>::toType(onion_sql_type);
-
         fm->onions[o] = om;
 
         // Add elements to OnionMeta.layers starting with the bottom layer
@@ -378,7 +372,8 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
             TypeText<SECLEVEL>::toType(onion_current_level);
         for (auto it: layers) {
             EncLayer *enc_layer =
-		EncLayerFactory::encLayerFromSerial(o, it, om->sql_type, layer_serial[it]);
+		EncLayerFactory::encLayerFromSerial(o, it,
+                                                    layer_serial[it]);
 
             om->layers.push_back(enc_layer);
             SECLEVEL onion_level = fm->getOnionLevel(o);
@@ -967,57 +962,8 @@ Rewriter::setMasterKey(const string &mkey)
 static list<string>
 processAnnotation(Annotation annot, Analysis &a)
 {
-    //TODO: use EncLayer CreateField information
-    assert_s(annot.type == SINGLE_ENC || annot.type == ENCFOR,
-	     "parser is in single principal mode, but annotations are for multiple principals");
-    assert_s(annot.getPrimitive() != "",
-	     "enc annotation has no primitive");
-    LOG(cdb_v) << "table is " << annot.getPrimitiveTableName() << "; field is " << annot.getPrimitiveFieldName();
-
-    FieldMeta * fm = a.getFieldMeta(annot.getPrimitiveTableName(), annot.getPrimitiveFieldName());
-
-    init_onions(a.ps->masterKey, fm, fm->sql_field, fm->index);
-
-    list<string> query_list;
-    string onionname = "";
-
-    for (auto pr : fm->onions) {
-        onion o = pr.first;
-        onionname = fm->onions[o]->getAnonOnionName();
-        Create_field * cf = fm->onions[o]->layers.back()->newCreateField(onionname);
-
-        stringstream query;
-        query << "ALTER TABLE " << fm->tm->getAnonTableName();
-
-        switch (o) {
-        case oDET:
-            LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets DET onion";
-            query << " CHANGE " << fm->fname << " " <<  *cf << ";";
-            break;
-        case oOPE:
-            LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets OPE onion";
-            query << " ADD " << *cf << " AFTER " << fm->onions[oDET]->getAnonOnionName() << ";";
-            break;
-        case oAGG:
-            LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets AGG onion";
-            query << " ADD " << *cf <<  " AFTER " << fm->onions[oOPE]->getAnonOnionName() << ";";
-            break;
-        case oSWP:
-            LOG(cdb_v) << fm->fname << " (" << fm->index << ") gets SWP onion";
-            query << " ADD " << *cf << " AFTER " << fm->onions[oOPE]->getAnonOnionName() << ";";
-            break;
-        default:
-            assert_s(false, "unknown onion type");
-        }
-
-        query_list.push_back(query.str());
-    }
-
-    query_list.push_back("ALTER TABLE " + fm->tm->getAnonTableName()  +
-                         " ADD " + fm->saltName() + " " + TN_SALT +
-                         " AFTER " + onionname + ";");
-
-    return query_list;
+    // TODO: Support ENC keyword in query.
+    assert(false);
 }
 
 
