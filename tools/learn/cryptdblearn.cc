@@ -41,7 +41,7 @@ Learn::trainFromFile(void)
 
                 /*
                  * Indeed rewrite is the cleaner solution 
-                 * Note that refactory refactory removing
+                 * Note that refactory removing
                  * query execution from rewrite is ongoing 
                  * in CryptDB.
                  */
