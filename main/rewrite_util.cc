@@ -274,7 +274,7 @@ do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
         reduceList<Key>(key_it, List<Key>(),
             [table, &a] (List<Key> out_list, Key *key) {
                 out_list.concat(vectorToList(rewrite_key(table, key, a)));
-                return out_list;
+                return out_list;    /* lambda */
             });
 }
 

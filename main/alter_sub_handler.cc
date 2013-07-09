@@ -149,13 +149,50 @@ class ForeignKeySubHandler : public AlterSubHandler {
 class AddIndexSubHandler : public AlterSubHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {
+        LEX **out_lex = this->rewrite(lex, a, q, out_lex_count);
         this->update(q, lex, a);
-        return this->rewrite(lex, a, q, out_lex_count);
+
+        return out_lex;
     }
 
-    // TODO: Add index metadata to persistency.
+    // NOTE: This must be executed after 'this->rewrite' because it needs
+    // the TableMeta to update it's index_counter.
     // TODO: Add index to embedded shallow mirror.
     void update(const string &q, LEX *lex, Analysis &a) const {
+        const string &table =
+            lex->select_lex.table_list.first->table_name;
+        TableMeta *tm = a.getTableMeta(table);
+        
+        // Update the counter.
+        ostringstream s;
+        s << " UPDATE pdb.table_info"
+          << "    SET index_counter = " << tm->getIndexCounter()
+          << "  WHERE number = " << tm->tableNo
+          <<"    AND database_name = '"<<a.ps->e_conn->getCurDBName()<<"';";
+        assert(a.ps->e_conn->execute(s.str()));
+
+        // Add each new index.
+        auto key_it =
+            List_iterator<Key>(lex->alter_info.key_list);
+        eachList<Key>(key_it, [table, tm, a] (Key *key) {
+            std::string index_name = convert_lex_str(key->name);
+            std::string anon_name = a.getAnonIndexName(table, index_name);
+
+            ostringstream s;
+            s << " INSERT INTO pdb.index_info VALUES ("
+              << " (SELECT table_info.id "
+              << "    FROM pdb.table_info"
+              << "  WHERE number = " << tm->tableNo
+              << "    AND database_name = '"
+              <<          a.ps->e_conn->getCurDBName() << "'), "
+              << " '" << index_name << "', "
+              << " '" << anon_name << "', "
+              << " 0"
+              << " );";
+
+            assert(a.ps->e_conn->execute(s.str()));
+        });
+ 
         return;
     }
 

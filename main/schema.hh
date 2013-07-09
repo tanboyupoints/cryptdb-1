@@ -4,7 +4,6 @@
 #include <parser/stringify.hh>
 #include <main/CryptoHandlers.hh>
 #include <main/Translator.hh>
-
 #include <string>
 #include <map>
 #include <list>
@@ -143,13 +142,15 @@ typedef struct TableMeta {
     TableMeta();
     TableMeta(unsigned int table_no, bool has_sensitive,
               bool has_salt, std::string salt_name,
+              std::map<std::string, std::string> index_map,
               unsigned int index_counter=0)
         : tableNo(table_no), hasSensitive(has_sensitive),
           has_salt(has_salt), salt_name(salt_name),
-          index_counter(index_counter) {}
+          index_map(index_map), index_counter(index_counter) {}
     ~TableMeta();
 
     FieldMeta *getFieldMeta(std::string field);
+    unsigned int getIndexCounter() const;
 
     // TODO: Make FieldMeta a friend and deal with the other uses of this
     // function.
@@ -186,6 +187,8 @@ typedef struct SchemaInfo {
     TableMeta *createTableMeta(std::string table_name,
                                bool has_sensitive, bool has_salt,
                                std::string salt_name,
+                               std::map<std::string, std::string> index_map,
+                               unsigned int index_counter,
                                const unsigned int *table_no=NULL);
     friend class Analysis;
 
