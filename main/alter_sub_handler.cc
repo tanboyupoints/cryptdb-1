@@ -221,48 +221,54 @@ class DropIndexSubHandler : public AlterSubHandler {
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a);
 
-        // Remove the index_info record from the proxy db.
+        // Get the key drops.
         auto drop_it =
             List_iterator<Alter_drop>(lex->alter_info.drop_list);
-        eachList<Alter_drop>(drop_it, [table, tm, a] (Alter_drop *adrop) {
-            if (adrop->type == Alter_drop::KEY) {
-                std::string index_name = adrop->name;
-                std::string anon_name = a.getAnonIndexName(table, index_name);
+        List<Alter_drop> key_drop_list =
+            filterList(drop_it,
+                [](Alter_drop *adrop) {
+                    return Alter_drop::KEY == adrop->type;
+                });
 
-                ostringstream s;
-                s << " DELETE FROM pdb.index_info "
-                  << " WHERE table_info_id = "
-                  << "       (SELECT table_info.id "
-                  << "          FROM pdb.table_info"
-                  << "         WHERE number = " << tm->tableNo
-                  << "           AND database_name = '"
-                  <<                 a.ps->e_conn->getCurDBName() << "') "
-                  << "   AND name = '" << index_name << "'"
-                  << "   AND anon_name = '" << anon_name << "';";
-
-                assert(a.ps->e_conn->execute(s.str()));
-            }
-        });
-
-
-        drop_it = List_iterator<Alter_drop>(lex->alter_info.drop_list);
+        // Update and Rewrite.
+        drop_it =
+            List_iterator<Alter_drop>(key_drop_list);
         new_lex->alter_info.drop_list =
-            reduceList<Alter_drop>(drop_it, List<Alter_drop>(),
-                [table, &a] (List<Alter_drop> out_list, Alter_drop *adrop) {
-                    if (adrop->type == Alter_drop::KEY) {
-                        THD *thd = current_thd;
-                        Alter_drop *new_adrop =
-                            adrop->clone(thd->mem_root);  
-                        new_adrop->name =
-                            make_thd_string(a.getAnonIndexName(table,
-                                                               adrop->name));
-                        // FIXME: If this query fails, we will be left in
-                        // an inconsistent state as we will have lost our
-                        // index record.
-                        a.destroyIndex(table, adrop->name);
-                        out_list.push_back(new_adrop);
-                    }
-                    return out_list;    /* lambda */
+            mapList<Alter_drop>(drop_it,
+                [table, tm, &a] (Alter_drop *adrop) {
+                    // Remove the index_info record from the proxy db.
+                    std::string index_name = adrop->name;
+                    std::string anon_name =
+                        a.getAnonIndexName(table, index_name);
+
+                    ostringstream s;
+                    s << " DELETE FROM pdb.index_info "
+                      << " WHERE table_info_id = "
+                      << "       (SELECT table_info.id "
+                      << "          FROM pdb.table_info"
+                      << "         WHERE number = " << tm->tableNo
+                      << "           AND database_name = '"
+                      <<                 a.ps->e_conn->getCurDBName()<< "')"
+                      << "   AND name = '" << index_name << "'"
+                      << "   AND anon_name = '" << anon_name << "';";
+
+                    assert(a.ps->e_conn->execute(s.str()));
+
+                    // Rewrite the Alter_drop data structure.
+                    THD *thd = current_thd;
+                    Alter_drop *new_adrop =
+                        adrop->clone(thd->mem_root);  
+                    new_adrop->name =
+                        make_thd_string(a.getAnonIndexName(table,
+                                                           adrop->name));
+                    // FIXME: If this query fails, we will be left in
+                    // an inconsistent state as we will have lost our
+                    // index record.
+                    //
+                    // Remove from *Meta.
+                    a.destroyIndex(table, adrop->name);
+
+                    return new_adrop;   /* lambda */
                 });
 
         return single_lex_output(new_lex, out_lex_count);

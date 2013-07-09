@@ -50,3 +50,16 @@ vectorToList(std::vector<T*> v) {
     return lst;
 }
 
+template <typename T, typename F> List<T>
+filterList(List_iterator<T> it, F op) {
+    List<T> new_list;
+    T* element = it++;
+
+    for (; element ; element = it++) {
+        if (true == op(element)) {
+            new_list.push_back(element);
+        }
+    }
+
+    return new_list;
+}
