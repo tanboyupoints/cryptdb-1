@@ -24,6 +24,34 @@ PrintRes(const ResType &res)
     cerr << endl;
 }
 
+void 
+displayLoading(bool mode)
+{
+    static const char *loading[] = {"|", "/", "-", "\\", "|", "/", "-", NULL};
+    static unsigned int i = 0;
+    static bool init = false;
+    if(!init)
+    {
+        init=true;
+        fprintf(stdout, "Wait.. ");
+    }
+
+    switch(mode)
+    {
+        case 1:
+            loading[i] == NULL ? i = 0 : 0;
+            fprintf(stdout, "%s\b", loading[i++]);
+            fflush(stdout);
+            break;
+
+        case 0:
+        default:
+            i = 0;
+            init = false;
+            break;
+    }
+}
+
 /*ResType
 myExecute(EDBProxy * cl, string query)
 {

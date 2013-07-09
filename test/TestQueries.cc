@@ -1054,7 +1054,7 @@ CheckAnnotatedQuery(const TestConfig &tc, string control_query, string test_quer
 
 static void
 CheckQuery(const TestConfig &tc, string query) {
-    cerr << "------------------------------------------------------------------" << endl;
+    displayLoading(true);
     my_ulonglong test_res;
     my_ulonglong control_res;
     //TODO: should be case insensitive

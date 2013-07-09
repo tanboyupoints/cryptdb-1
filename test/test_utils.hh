@@ -20,7 +20,7 @@ class TestConfig {
         pass = "letmein";
         host = "localhost";
         db   = "cryptdbtest";
-        shadowdb_dir = "/var/lib/shadow-mysql";
+        shadowdb_dir = "/home/cat/shadow-db";
         port = 3306;
         stop_if_fail = false;
 
@@ -66,6 +66,7 @@ struct Query {
 #define PLAIN 0
 
 void PrintRes(const ResType &res);
+void displayLoading(bool mode);
 
 template <int N> ResType convert(std::string rows[][N], int num_rows);
 
