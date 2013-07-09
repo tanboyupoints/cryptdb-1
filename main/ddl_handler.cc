@@ -238,7 +238,7 @@ create_table_meta(Analysis & a, const string & table, LEX *lex,
 
     auto it = List_iterator<Create_field>(lex->alter_info.create_list);
     eachList<Create_field>(it, [tm, a, encByDefault] (Create_field *cf) {
-        tm->createFieldMeta(cf, a, encByDefault);
+        assert(tm->createFieldMeta(cf, a, encByDefault));
     });
 }
 

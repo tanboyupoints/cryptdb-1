@@ -79,24 +79,25 @@ struct TableMeta;
 typedef struct FieldMeta {
     TableMeta * tm; //point to table belonging in
     std::string fname;
-    onionlayout onion_layout;
     int uniq;
+    bool has_salt; //whether this field has its own salt
+    onionlayout onion_layout;
 
     std::map<onion, OnionMeta *> onions;
-
-    bool has_salt; //whether this field has its own salt
 
     // New field.
     FieldMeta(TableMeta *tm, std::string name, unsigned int uniq,
               Create_field *field, AES_KEY *mKey);
     // Recovering field from proxy db.
     FieldMeta(TableMeta *tm, std::string name, unsigned int uniq,
-              bool has_salt, onionlayout onion_layout);
+              bool has_salt, onionlayout onion_layout)
+        : tm(tm), fname(name), uniq(uniq), has_salt(has_salt),
+          onion_layout(onion_layout) {}
     ~FieldMeta();
 
     std::string saltName() const;
-
     std::string fullName(onion o) const;
+    std::string stringify() const;
 
     bool hasOnion(onion o) const {
         return onions.find(o) !=
@@ -125,8 +126,6 @@ typedef struct FieldMeta {
         onions.erase(o);
     }
 
-    std::string stringify();
-
     bool isEncrypted() {
         return ((onions.size() != 1) ||  (onions.find(oPLAIN) == onions.end()));
     }
@@ -145,7 +144,8 @@ typedef struct TableMeta {
     bool has_salt;
     std::string salt_name;
 
-    TableMeta();
+    TableMeta()
+        : tableNo(0), index_counter(0), uniq_counter(0) {}
     TableMeta(unsigned int table_no, bool has_sensitive,
               bool has_salt, std::string salt_name,
               std::map<std::string, std::string> index_map,
@@ -157,14 +157,13 @@ typedef struct TableMeta {
           uniq_counter(uniq_counter) {}
     ~TableMeta();
 
-    FieldMeta *getFieldMeta(std::string field);
-    unsigned int getIndexCounter() const;
-
     // TODO: Make FieldMeta a friend and deal with the other uses of this
     // function.
-    std::string getAnonTableName() const;
     FieldMeta *createFieldMeta(Create_field *field, const Analysis &a,
                                bool encByDefault);
+    FieldMeta *getFieldMeta(std::string field);
+    unsigned int getIndexCounter() const;
+    std::string getAnonTableName() const;
 
     friend class Analysis;
 
@@ -207,7 +206,8 @@ private:
     // These functions do not support Aliasing, use Analysis::getTableMeta
     // and Analysis::getFieldMeta.
     TableMeta * getTableMeta(const std::string & table);
-    FieldMeta * getFieldMeta(const std::string & table, const std::string & field);
+    FieldMeta * getFieldMeta(const std::string & table,
+                             const std::string & field);
     bool destroyTableMeta(std::string table);
 } SchemaInfo;
 

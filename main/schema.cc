@@ -34,37 +34,6 @@ std::string OnionMeta::getAnonOnionName() const
     return onionname;
 }
 
-std::string FieldMeta::saltName() const
-{
-    assert(has_salt);
-
-    return BASE_SALT_NAME + "_f_" + StringFromVal(uniq) + "_" +
-           tm->getAnonTableName();
-}
-
-std::string FieldMeta::fullName(onion o) const
-{
-    auto it = onions.find(o);
-    OnionMeta *om = it->second;
-    assert(om);
-    return tm->getAnonTableName() + "." + om->getAnonOnionName();
-}
-
-string FieldMeta::stringify() {
-    string res = " [FieldMeta " + fname + "]";
-    return res;
-}
-
-FieldMeta::FieldMeta(TableMeta *tm, std::string name, unsigned int uniq,
-                     bool has_salt, onionlayout onion_layout)
-{
-    this->tm = tm;
-    this->fname = name;
-    this->uniq = uniq;
-    this->has_salt = has_salt;
-    this->onion_layout = onion_layout;
-}
-
 FieldMeta::FieldMeta(TableMeta *tm, std::string name, unsigned int uniq,
                      Create_field *field, AES_KEY *mKey)
 {
@@ -86,33 +55,33 @@ FieldMeta::~FieldMeta()
     }
 }
 
-bool TableMeta::destroyFieldMeta(std::string field)
+std::string FieldMeta::saltName() const
 {
-    FieldMeta *fm = this->getFieldMeta(field);
-    if (NULL == fm) {
-        return false;
-    }
+    assert(has_salt);
 
-    auto erase_count = fieldMetaMap.erase(field);
-    fieldNames.remove(field);
-
-    delete fm;
-    return 1 == erase_count;
+    return BASE_SALT_NAME + "_f_" + StringFromVal(uniq) + "_" +
+           tm->getAnonTableName();
 }
 
-FieldMeta *TableMeta::getFieldMeta(std::string field)
+std::string FieldMeta::fullName(onion o) const
 {
-    auto it = fieldMetaMap.find(field);
-    if (fieldMetaMap.end() == it) {
-        return NULL;
-    } else {
-        return it->second;
-    }
+    auto it = onions.find(o);
+    OnionMeta *om = it->second;
+    assert(om);
+    return tm->getAnonTableName() + "." + om->getAnonOnionName();
 }
 
-unsigned int TableMeta::getIndexCounter() const
+string FieldMeta::stringify() const
 {
-    return index_counter;
+    string res = " [FieldMeta " + fname + "]";
+    return res;
+}
+
+TableMeta::~TableMeta()
+{
+    for (auto i = fieldMetaMap.begin(); i != fieldMetaMap.end(); i++)
+        delete i->second;
+
 }
 
 FieldMeta *
@@ -134,23 +103,39 @@ TableMeta::createFieldMeta(Create_field *field, const Analysis &a,
     return fm;
 }
 
-TableMeta::TableMeta() {
-    tableNo = 0;
-    index_counter = 0;
-    uniq_counter = 0;
+FieldMeta *TableMeta::getFieldMeta(std::string field)
+{
+    auto it = fieldMetaMap.find(field);
+    if (fieldMetaMap.end() == it) {
+        return NULL;
+    } else {
+        return it->second;
+    }
 }
 
-TableMeta::~TableMeta()
+unsigned int TableMeta::getIndexCounter() const
 {
-    for (auto i = fieldMetaMap.begin(); i != fieldMetaMap.end(); i++)
-        delete i->second;
-
+    return index_counter;
 }
 
 // FIXME: May run into problems where a plaintext table expects the regular
 // name, but it shouldn't get that name from 'getAnonTableName' anyways.
 std::string TableMeta::getAnonTableName() const {
     return std::string("table") + strFromVal((uint32_t)tableNo);
+}
+
+bool TableMeta::destroyFieldMeta(std::string field)
+{
+    FieldMeta *fm = this->getFieldMeta(field);
+    if (NULL == fm) {
+        return false;
+    }
+
+    auto erase_count = fieldMetaMap.erase(field);
+    fieldNames.remove(field);
+
+    delete fm;
+    return 1 == erase_count;
 }
 
 std::string TableMeta::addIndex(std::string index_name)

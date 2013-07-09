@@ -29,6 +29,7 @@ class AddColumnSubHandler : public AlterSubHandler {
             [tm, a, dbname, table] (Create_field *cf) {
                 FieldMeta *fm =
                     tm->createFieldMeta(cf, a, a.ps->encByDefault);
+                assert(fm);
 
                 // Add metadata to embedded database.
                 assert(do_add_field(fm, a, dbname, table));
