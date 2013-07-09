@@ -7,11 +7,6 @@
 #include <main/alter_sub_handler.hh>
 #include <main/dispatcher.hh>
 
-// Prototypes.
-static void
-create_table_meta(Analysis & a, const string & table, LEX *lex,
-                  bool encByDefault);
-
 // > TODO: mysql permits a single ALTER TABLE command to invoke _multiple_
 //   and _different_ subcommands.
 //   ie, ALTER TABLE t ADD COLUMN x integer, ADD INDEX i (z);
@@ -57,12 +52,21 @@ class CreateHandler : public DDLHandler {
 
         // TODO(burrows): This should be a seperate step.
         // Create *Meta objects.
-        create_table_meta(a, std::string(table), lex, a.ps->encByDefault);
-
+        auto empty_index_map = std::map<std::string, std::string>();
+        // TODO: Use appropriate values for has_sensitive and has_salt.
+        TableMeta *tm = 
+            a.ps->schema->createTableMeta(std::string(table), true, true,
+                                          std::string(""), empty_index_map,
+                                          0, NULL);
+        auto it =
+            List_iterator<Create_field>(lex->alter_info.create_list);
+        eachList<Create_field>(it,
+            [tm, a] (Create_field *cf) {
+                assert(tm->createFieldMeta(cf, a, a.ps->encByDefault));
+        });
+        
         // Add table to embedded database.
         assert(a.ps->e_conn->execute(q));
-
-        TableMeta *tm = a.getTableMeta(table);
 
         a.ps->e_conn->execute("START TRANSACTION");
 
@@ -201,31 +205,6 @@ class ChangeDBHandler : public DDLHandler {
 LEX** DDLHandler::transformLex(LEX *lex, Analysis &analysis,
                                       const string &q, unsigned *out_lex_count) const {
     return this->rewriteAndUpdate(lex, analysis, q, out_lex_count);
-}
-
-static void
-create_table_meta(Analysis & a, const string & table, LEX *lex,
-                  bool encByDefault) {
-    assert(lex->sql_command == SQLCOM_CREATE_TABLE);
-
-    LOG(cdb_v) << "add_table encByDefault " << encByDefault;
-
-    assert(!a.tableMetaExists(table));
-
-    // FIXME: Use SchemaInfo::createTableMeta.
-    // What is the role of has_salt, has_sensitive and salt_name?
-    TableMeta *tm = new TableMeta();
-    a.ps->schema->tableMetaMap[table] = tm;
-
-    if (encByDefault) { //anonymize name
-	// such increment may cause problem with multiple proxies
-        tm->tableNo = a.ps->schema->totalTables++;
-    }
-
-    auto it = List_iterator<Create_field>(lex->alter_info.create_list);
-    eachList<Create_field>(it, [tm, a, encByDefault] (Create_field *cf) {
-        assert(tm->createFieldMeta(cf, a, encByDefault));
-    });
 }
 
 // FIXME: Add test to make sure handler added successfully.
