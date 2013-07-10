@@ -733,36 +733,8 @@ Connection::start() {
                 break;
             }
             //single -- new Rewriter
-            //multi -- new Rewriter
         case SINGLE:
-        case MULTI:
-#if 0
-            {
-                string dir_arg = "--datadir=" + tc.shadowdb_dir;
-
-                const char *mysql_av[] =
-                { "progname",
-                    "--skip-grant-tables",
-                    dir_arg.c_str(),
-                    "--character-set-server=utf8",
-                    "--language=" MYSQL_BUILD_DIR "/sql/share/"
-                };
-                assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
-                            (char**) mysql_av, 0));
-                assert(0 == mysql_thread_init());
-
-                cerr << "connect to " << tc.host << "." << tc.db << " as " << tc.user << " with password " << tc.pass << endl;
-                Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db);
-                conn_set.insert(c);
-                this->conn = conn_set.begin();
-                ConnectionInfo ci = ConnectionInfo(tc.host, tc.user, tc.pass, tc.port);
-                re = new Rewriter(ci, tc.shadowdb_dir, tc.db, (type == MULTI), false);
-                re->setMasterKey("2392834");
-                break;
-            }
-#endif
             break;
-            //proxy -- start proxy in separate process and initialize connection
         case PROXYPLAIN:
         case PROXYSINGLE:
             {
@@ -789,15 +761,6 @@ Connection::stop() {
         re_set.clear();
         break;
     case SINGLE:
-    case MULTI:
-        /*if (cl) {
-            delete cl;
-            cl = NULL;
-            }*/
-        if (re) {
-            delete re;
-            re = NULL;
-        }
         break;
     case UNENCRYPTED:
         for (auto c = conn_set.begin(); c != conn_set.end(); c++) {
@@ -819,8 +782,7 @@ Connection::execute(string query) {
     case PROXYPLAIN:
         return executeConn(query);
     case SINGLE:
-    case MULTI:
-        //return executeRewriter(query);
+        break;
     default:
         assert_s(false, "unrecognized type in Connection");
     }
@@ -879,8 +841,7 @@ my_ulonglong
 Connection::executeLast() {
     switch(type) {
     case SINGLE:
-    case MULTI:
-        //return executeLastEDB();
+        break;
     case UNENCRYPTED:
     case PROXYPLAIN:
     case PROXYSINGLE:
@@ -994,8 +955,6 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
             CheckQuery(tc, q->query);
             break;
 
-        case MULTI:
-
         default:
             assert_s(false, "test_type invalid");
         }
@@ -1017,33 +976,9 @@ RunTest(const TestConfig &tc) {
     CheckQueryList(tc, Delete);
     //CheckQueryList(tc, Search);
     CheckQueryList(tc, Basic);
-    if (test_type == MULTI) {
-        test->restart();
-    }
-    if (control_type == MULTI) {
-        control->restart();
-    }
     CheckQueryList(tc, PrivMessages);
-    if (test_type == MULTI) {
-        test->restart();
-    }
-    if (control_type == MULTI) {
-        control->restart();
-    }
     /*CheckQueryList(tc, UserGroupForum);
-    if (test_type == MULTI) {
-        test->restart();
-    }
-    if (control_type == MULTI) {
-        control->restart();
-    }
     CheckQueryList(tc, Auto);
-    if (test_type == MULTI) {
-        test->restart();
-    }
-    if (control_type == MULTI) {
-        control->restart();
-    }
     CheckQueryList(tc, Null);
     //everything has to restart so that last_insert_id() are lined up
     test->restart();
@@ -1067,8 +1002,6 @@ string_to_test_mode(const string &s)
         return UNENCRYPTED;
     else if (s == "single")
         return SINGLE;
-    else if (s == "multi")
-        return MULTI;
     else if (s == "proxy-plain")
         return PROXYPLAIN;
     else if (s == "proxy-single")
@@ -1094,10 +1027,9 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
              << "Possible control and test types:" << endl
              << "    plain" << endl
              << "    single" << endl
-             << "    multi" << endl
              << "    proxy-plain" << endl
              << "    proxy-single" << endl
-             << "single and multi make connections through EDBProxy" << endl
+             << "single make connections through EDBProxy" << endl
              << "proxy-* makes connections *'s encryption type through the proxy" << endl
              << "num_conn is the number of conns made to a single db (default 1)" << endl
              << "    for num_conn > 1, control and test should both be proxy-* for valid results" << endl;
@@ -1108,13 +1040,6 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
         switch(test_type) {
         case UNENCRYPTED:
         case SINGLE:
-        case MULTI:
-            if (control_type == PROXYPLAIN ||
-                control_type == PROXYSINGLE)
-            {
-                cerr << "cannot compare proxy-* vs non-proxy-* when there are multiple connections" << endl;
-                return;
-            }
             break;
         case PROXYPLAIN:
         case PROXYSINGLE:

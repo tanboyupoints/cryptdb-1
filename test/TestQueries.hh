@@ -13,8 +13,8 @@
 #include <test/test_utils.hh>
 
 typedef enum test_mode {
-    UNENCRYPTED, SINGLE, MULTI,
-    PROXYPLAIN, PROXYSINGLE, PROXYMULTI,
+    UNENCRYPTED, SINGLE,
+    PROXYPLAIN, PROXYSINGLE,
     TESTINVALID
 } test_mode;
 
@@ -38,8 +38,6 @@ struct QueryChoice {
         case SINGLE:
         case PROXYSINGLE:
             return single;
-
-        case MULTI:
 
         default:
             assert(0);
