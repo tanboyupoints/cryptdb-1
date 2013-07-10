@@ -235,7 +235,7 @@ operator<<(ostream &out, const RewritePlan * rp);
 typedef struct ProxyState {
 
     ProxyState(): conn(NULL), e_conn(NULL), encByDefault(true),
-		  masterKey(NULL), schema(NULL), totalTables(0) {}
+		  masterKey(NULL), schema(NULL) {}
     ConnectionInfo ci;
 
     // connection to remote and embedded server
@@ -246,7 +246,6 @@ typedef struct ProxyState {
     AES_KEY*       masterKey;
 
     SchemaInfo*    schema;
-    unsigned int   totalTables;
 
     ~ProxyState();
 } ProxyState;
