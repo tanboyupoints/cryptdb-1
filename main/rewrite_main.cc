@@ -900,7 +900,6 @@ Rewriter::Rewriter(ConnectionInfo ci,
     ps.conn = new Connect(ci.server, ci.user, ci.passwd, dbname, ci.port);
 
     ps.schema = new SchemaInfo();
-    ps.totalTables = 0;
 
     // Must be called before initSchema.
     buildTypeTextTranslator();
