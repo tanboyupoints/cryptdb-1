@@ -47,8 +47,11 @@ FieldMeta::FieldMeta(TableMeta *tm, std::string name, unsigned int uniq,
 
 FieldMeta::~FieldMeta()
 {
-    for (auto onion_it : onions) {
-        delete onion_it.second;
+    auto cp = onions;
+    onions.clear();
+
+    for (auto it : cp) {
+        delete it.second;
     }
 }
 
@@ -76,9 +79,12 @@ string FieldMeta::stringify() const
 
 TableMeta::~TableMeta()
 {
-    for (auto i = fieldMetaMap.begin(); i != fieldMetaMap.end(); i++)
-        delete i->second;
+    auto cp = fieldMetaMap;
+    fieldMetaMap.clear();
 
+    for (auto it : cp) {
+        delete it.second;
+    }
 }
 
 FieldMeta *
@@ -177,6 +183,16 @@ unsigned int TableMeta::leaseUniqCounter()
     return uniq_counter++;
 }
 
+SchemaInfo::~SchemaInfo()
+{
+    auto cp = tableMetaMap;
+    tableMetaMap.clear();
+
+    for (auto it : cp) {
+        delete it.second;
+    }
+}
+
 // table_no: defaults to NULL indicating we are to generate it ourselves.
 TableMeta *
 SchemaInfo::createTableMeta(std::string table_name,
@@ -206,7 +222,8 @@ SchemaInfo::createTableMeta(std::string table_name,
 }
 
 TableMeta *
-SchemaInfo::getTableMeta(const string & table) {
+SchemaInfo::getTableMeta(const string & table) const
+{
     auto it = tableMetaMap.find(table);
     if (tableMetaMap.end() == it) {
         return NULL;
@@ -216,7 +233,8 @@ SchemaInfo::getTableMeta(const string & table) {
 }
 
 FieldMeta *
-SchemaInfo::getFieldMeta(const string & table, const string & field) {
+SchemaInfo::getFieldMeta(const string & table, const string & field) const
+{
     TableMeta * tm = getTableMeta(table);
     if (NULL == tm) {
         return NULL;

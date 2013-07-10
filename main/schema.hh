@@ -179,10 +179,9 @@ private:
 // this level or below. Use Analysis::* if you need aliasing.
 typedef struct SchemaInfo {
     unsigned int totalTables;
-    embedmysql * embed_db;
 
-    SchemaInfo():totalTables(0) {};
-    ~SchemaInfo() { tableMetaMap.clear();}
+    SchemaInfo() : totalTables(0) {};
+    ~SchemaInfo();
 
     // Parameters should match TableMeta constructor, except for tableNo
     // which we derive from SchemaInfo and the addition of the plaintext
@@ -200,9 +199,9 @@ private:
 
     // These functions do not support Aliasing, use Analysis::getTableMeta
     // and Analysis::getFieldMeta.
-    TableMeta * getTableMeta(const std::string & table);
+    TableMeta * getTableMeta(const std::string & table) const;
     FieldMeta * getFieldMeta(const std::string & table,
-                             const std::string & field);
+                             const std::string & field) const;
     bool tableMetaExists(std::string table) const;
     bool destroyTableMeta(std::string table);
 } SchemaInfo;
