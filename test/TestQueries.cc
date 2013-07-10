@@ -717,35 +717,6 @@ Connection::restart() {
     start();
 }
 
-static bool
-try_connect_localhost(uint port)
-{
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
-    assert(fd >= 0);
-
-    struct sockaddr_in sin;
-    sin.sin_family = AF_INET;
-    sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    sin.sin_port = htons(port);
-    int r = connect(fd, (struct sockaddr *) &sin, sizeof(sin));
-    close(fd);
-
-    if (r == 0)
-        return true;
-    else
-        return false;
-}
-
-static uint
-alloc_port()
-{
-    static uint port = 5121;
-    for (;;) {
-        int myport = port++;
-        if (!try_connect_localhost(myport))
-            return myport;
-    }
-}
 
 void
 Connection::start() {
@@ -802,64 +773,6 @@ Connection::start() {
                 re_proxy->setMasterKey("2392834");
             }
             break;
-
-        case PROXYMULTI:
-            tc.port = alloc_port();
-
-            proxy_pid = fork();
-            if (proxy_pid == 0) {
-                LOG(test) << "starting proxy, pid " << getpid();
-                cerr << tc.edbdir << endl;
-                setenv("EDBDIR", tc.edbdir.c_str(), 1);
-                setenv("CRYPTDB_LOG", cryptdb_logger::getConf().c_str(), 1);
-                setenv("CRYPTDB_USER", tc.user.c_str(), 1);
-                setenv("CRYPTDB_PASS", tc.pass.c_str(), 1);
-                setenv("CRYPTDB_DB", tc.db.c_str(), 1);
-                if (type == PROXYSINGLE) {
-                    setenv("CRYPTDB_MODE", "single", 1);
-                } else if (type == PROXYMULTI) {
-                    setenv("CRYPTDB_MODE", "multi", 1);
-                } else {
-                    setenv("CRYPTDB_MODE", "plain", 1);
-                }
-                //setenv("CRYPTDB_PROXY_DEBUG","true",1);
-                stringstream script_path, address, backend;
-                script_path << "--proxy-lua-script=" << tc.edbdir << "/../mysqlproxy/wrapper.lua";
-                address << "--proxy-address=" << tc.host << ":" << tc.port;
-                backend << "--proxy-backend-addresses=" << tc.host << ":3306";
-                cerr << "starting on port " << tc.port << "\n";
-                execlp("mysql-proxy",
-                        "mysql-proxy", "--plugins=proxy",
-                        "--event-threads=4",
-                        "--max-open-files=1024",
-                        script_path.str().c_str(),
-                        address.str().c_str(),
-                        backend.str().c_str(),
-                        (char *) 0);
-                LOG(warn) << "could not execlp: " << strerror(errno);
-                exit(-1);
-            } else if (proxy_pid < 0) {
-                LOG(warn) << "failed to fork";
-                thrower() << "failed to fork: " << strerror(errno);
-            } else {
-                for (uint i = 0; i < 100; i++) {
-                    usleep(100000);
-                    LOG(test) << "checking if proxy is running yet..";
-                    if (try_connect_localhost(tc.port))
-                        break;
-                }
-
-                for (uint64_t i = 0; i < no_conn; i++) {
-                    Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
-                    conn_set.insert(c);
-                    if (type == PROXYMULTI) {
-                        assert_s(c->execute("DROP FUNCTION IF EXISTS test"),"dropping function test for proxy-multi");
-                        assert_s(c->execute("CREATE FUNCTION test (optionid integer) RETURNS bool RETURN optionid=20"),"creating function test for proxy-multi");
-                    }
-                }
-                this->conn = conn_set.begin();
-            }
-            break;
         default:
             assert_s(false, "invalid type passed to Connection");
     }
@@ -875,9 +788,6 @@ Connection::stop() {
         }
         re_set.clear();
         break;
-    case PROXYMULTI:
-        if (proxy_pid > 0)
-            kill(proxy_pid, SIGKILL);
     case SINGLE:
     case MULTI:
         /*if (cl) {
@@ -906,7 +816,6 @@ Connection::execute(string query) {
     case PROXYSINGLE:
         return executeRewriter(query);
     case UNENCRYPTED:
-    case PROXYMULTI:
     case PROXYPLAIN:
         return executeConn(query);
     case SINGLE:
@@ -975,10 +884,9 @@ Connection::executeLast() {
     case UNENCRYPTED:
     case PROXYPLAIN:
     case PROXYSINGLE:
-		//TODO: proxy 
+		//TODO(ccarvalho) check this 
+        break;
 
-    case PROXYMULTI:
-        return executeLastConn();
     default:
         assert_s(false, "type does not exist");
     }
@@ -1001,24 +909,6 @@ Connection::executeLastEDB() {
 }
 
 //----------------------------------------------------------------------
-
-static void
-CheckNULL(const TestConfig &tc, string test_query) {
-    ntest++;
-
-    //cerr << "CHECKING NULL" << endl;
-
-    ResType test_res = test->execute(test_query);
-    if (test_res.ok) {
-        LOG(test) << "On query: " << test_query << "\nshould have returned false, but did not";
-        if (tc.stop_if_fail) {
-            assert_s(false, test_query + " should have return ok = false, but did not");
-        }
-        return;
-    }
-
-    npass++;
-}
 
 static void
 CheckAnnotatedQuery(const TestConfig &tc, string control_query, string test_query)
@@ -1069,8 +959,6 @@ CheckAnnotatedQuery(const TestConfig &tc, string control_query, string test_quer
 static void
 CheckQuery(const TestConfig &tc, string query) {
     displayLoading(true);
-    my_ulonglong test_res;
-    my_ulonglong control_res;
     //TODO: should be case insensitive
     if (query == "SELECT LAST_INSERT_ID()") {
         ntest++;
@@ -1078,20 +966,7 @@ CheckQuery(const TestConfig &tc, string query) {
         case UNENCRYPTED:
         case PROXYPLAIN:
         case PROXYSINGLE:
-        case PROXYMULTI:
-            if (control_type != SINGLE && control_type != MULTI) {
-                test_res = test->executeLast();
-                control_res = control->executeLast();
-                if (test_res != control_res) {
-                    if (tc.stop_if_fail) {
-                        LOG(test) << "test last insert: " << test_res;
-                        LOG(test) << "control last insert: " << control_res;
-                        assert_s(false, "last insert id failed to match");
-                    }
-                    return;
-                }
-            }
-            break;
+            //TODO(ccarvalho): check proxy
         default:
             LOG(test) << "not a valid case of this test; skipped";
             break;
@@ -1120,13 +995,6 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
             break;
 
         case MULTI:
-        case PROXYMULTI:
-            if (q->test_res) {
-                CheckNULL(tc, q->query);
-            } else {
-                CheckQuery(tc, q->query);
-            }
-            break;
 
         default:
             assert_s(false, "test_type invalid");
@@ -1149,31 +1017,31 @@ RunTest(const TestConfig &tc) {
     CheckQueryList(tc, Delete);
     //CheckQueryList(tc, Search);
     CheckQueryList(tc, Basic);
-    if (test_type == MULTI || test_type == PROXYMULTI) {
+    if (test_type == MULTI) {
         test->restart();
     }
-    if (control_type == MULTI || control_type == PROXYMULTI) {
+    if (control_type == MULTI) {
         control->restart();
     }
     CheckQueryList(tc, PrivMessages);
-    if (test_type == MULTI || test_type == PROXYMULTI) {
+    if (test_type == MULTI) {
         test->restart();
     }
-    if (control_type == MULTI || control_type == PROXYMULTI) {
+    if (control_type == MULTI) {
         control->restart();
     }
     /*CheckQueryList(tc, UserGroupForum);
-    if (test_type == MULTI || test_type == PROXYMULTI) {
+    if (test_type == MULTI) {
         test->restart();
     }
-    if (control_type == MULTI || control_type == PROXYMULTI) {
+    if (control_type == MULTI) {
         control->restart();
     }
     CheckQueryList(tc, Auto);
-    if (test_type == MULTI || test_type == PROXYMULTI) {
+    if (test_type == MULTI) {
         test->restart();
     }
-    if (control_type == MULTI || control_type == PROXYMULTI) {
+    if (control_type == MULTI) {
         control->restart();
     }
     CheckQueryList(tc, Null);
@@ -1205,8 +1073,6 @@ string_to_test_mode(const string &s)
         return PROXYPLAIN;
     else if (s == "proxy-single")
         return PROXYSINGLE;
-    else if (s == "proxy-multi")
-        return PROXYMULTI;
     else
         thrower() << "unknown test mode " << s;
     return TESTINVALID;
@@ -1231,7 +1097,6 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
              << "    multi" << endl
              << "    proxy-plain" << endl
              << "    proxy-single" << endl
-             << "    proxy-multi" << endl
              << "single and multi make connections through EDBProxy" << endl
              << "proxy-* makes connections *'s encryption type through the proxy" << endl
              << "num_conn is the number of conns made to a single db (default 1)" << endl
@@ -1245,7 +1110,7 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
         case SINGLE:
         case MULTI:
             if (control_type == PROXYPLAIN ||
-                control_type == PROXYSINGLE || control_type == PROXYMULTI)
+                control_type == PROXYSINGLE)
             {
                 cerr << "cannot compare proxy-* vs non-proxy-* when there are multiple connections" << endl;
                 return;
@@ -1253,13 +1118,7 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
             break;
         case PROXYPLAIN:
         case PROXYSINGLE:
-        case PROXYMULTI:
-            if (control_type == UNENCRYPTED || control_type == SINGLE ||
-                control_type == MULTI)
-            {
-                cerr << "cannot compare proxy-* vs non-proxy-* when there are multiple connections" << endl;
-                return;
-            }
+            //TODO(ccarvalho) check this
             break;
         default:
             cerr << "test_type does not exist" << endl;
