@@ -70,13 +70,18 @@ TableMeta::~TableMeta()
     }
 }
 
+bool TableMeta::fieldMetaExists(std::string name)
+{
+    return this->fieldMetaMap.find(name) != this->fieldMetaMap.end();
+}
+
 bool TableMeta::addFieldMeta(FieldMeta *fm)
 {
     // FIXME: Use exists function.
-    if (this->fieldMetaMap.find(fm->fname) != this->fieldMetaMap.end()) {
+    if (fieldMetaExists(fm->fname)) {
         return NULL;
     }
-
+    
     this->fieldMetaMap[fm->fname] = fm;
     this->fieldNames.push_back(fm->fname);//TODO: do we need fieldNames?
 

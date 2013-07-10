@@ -282,13 +282,11 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
         onionlayout onion_layout = 
             TypeText<onionlayout>::toType(field_onion_layout);
 
-        // FIXME: Use TableMeta::createFieldMeta
         FieldMeta *fm =
             new FieldMeta(field_name, has_salt, field_salt_name,
                           onion_layout);
 
-        tm->fieldMetaMap[fm->fname] = fm;
-        tm->fieldNames.push_back(fm->fname);
+        assert(tm->addFieldMeta(fm));
 
         buildOnionMeta(ps, fm, atoi(field_id.c_str()));
     }

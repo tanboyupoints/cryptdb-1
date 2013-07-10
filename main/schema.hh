@@ -165,6 +165,7 @@ typedef struct TableMeta {
           index_map(index_map) {}
     ~TableMeta();
 
+    bool fieldMetaExists(std::string name);
     bool addFieldMeta(FieldMeta *fm);
     FieldMeta *getFieldMeta(std::string field);
     std::string getAnonTableName() const;
