@@ -2,7 +2,6 @@
  * Handlers for rewriting constants, integers, strings, decimals, date, etc. 
  */
 
-
 #include <map>
 #include <iostream>
 #include <fstream>

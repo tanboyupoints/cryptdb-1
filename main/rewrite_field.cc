@@ -2,7 +2,6 @@
  * Handlers for rewriting fields. 
  */
 
-
 #include <map>
 #include <iostream>
 #include <fstream>

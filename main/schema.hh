@@ -75,11 +75,10 @@ struct TableMeta;
 //TODO: FieldMeta and TableMeta are partly duplicates with the original
 // FieldMetadata an TableMetadata
 // which contains data we want to add to this structure soon
-// FIXME: Make uniq const.
 typedef struct FieldMeta {
-    TableMeta * tm; //point to table belonging in
-    std::string fname;
-    int uniq;
+    TableMeta * const tm; //point to table belonging in
+    const std::string fname;
+    const int uniq;
     bool has_salt; //whether this field has its own salt
     onionlayout onion_layout;
 
@@ -131,21 +130,17 @@ typedef struct FieldMeta {
     }
 } FieldMeta;
 
-
-// TODO: tableNo, hasSalt, salt_name should be const.
 typedef struct TableMeta {
     std::list<std::string> fieldNames;     //in order field names
-    unsigned int tableNo;
+    const unsigned int tableNo;
 
     std::map<std::string, FieldMeta *> fieldMetaMap;
 
-    bool hasSensitive;
+    const bool hasSensitive;
 
-    bool has_salt;
-    std::string salt_name;
+    const bool has_salt;
+    const std::string salt_name;
 
-    TableMeta()
-        : tableNo(0), uniq_counter(0) {}
     TableMeta(unsigned int table_no, bool has_sensitive,
               bool has_salt, std::string salt_name,
               std::map<std::string, std::string> index_map,
@@ -183,7 +178,6 @@ private:
 // AWARE: Table/Field aliases __WILL NOT__ be looked up when calling from
 // this level or below. Use Analysis::* if you need aliasing.
 typedef struct SchemaInfo {
-    std::map<std::string, TableMeta *> tableMetaMap;
     unsigned int totalTables;
     embedmysql * embed_db;
 
@@ -202,11 +196,14 @@ typedef struct SchemaInfo {
     friend class Analysis;
 
 private:
+    std::map<std::string, TableMeta *> tableMetaMap;
+
     // These functions do not support Aliasing, use Analysis::getTableMeta
     // and Analysis::getFieldMeta.
     TableMeta * getTableMeta(const std::string & table);
     FieldMeta * getFieldMeta(const std::string & table,
                              const std::string & field);
+    bool tableMetaExists(std::string table) const;
     bool destroyTableMeta(std::string table);
 } SchemaInfo;
 

@@ -5,9 +5,6 @@
 #include <parser/lex_util.hh>
 #include <main/dispatcher.hh>
 
-// Prototypes.
-static LEX **single_lex_output(LEX *out_me, unsigned *out_lex_count);
-
 class AddColumnSubHandler : public AlterSubHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
                                    unsigned *out_lex_count) const {
@@ -299,15 +296,6 @@ class DropIndexSubHandler : public AlterSubHandler {
 LEX **AlterSubHandler::transformLex(LEX *lex, Analysis &a, const string &q,
                                     unsigned *out_lex_count) const {
     return this->rewriteAndUpdate(lex, a, q, out_lex_count);
-}
-
-// TODO: Use this in other handlers.
-static LEX **single_lex_output(LEX *out_me, unsigned *out_lex_count)
-{
-    LEX **out_lex = new LEX*[1];
-    out_lex[0] = out_me;
-    *out_lex_count = 1;
-    return out_lex;
 }
 
 AlterDispatcher *buildAlterSubDispatcher() {

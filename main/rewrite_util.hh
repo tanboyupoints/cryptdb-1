@@ -48,6 +48,9 @@ do_add_field(FieldMeta *fm, const Analysis &a, std::string dbname,
 std::string
 bool_to_string(bool b);
 
+LEX **
+single_lex_output(LEX *out_me, unsigned *out_lex_count);
+
 // FIXME(burrows): Generalize to support any container with next AND end
 // semantics.
 template <typename T>

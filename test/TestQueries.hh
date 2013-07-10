@@ -88,14 +88,27 @@ class Connection {
  private:
     test_mode type;
     TestConfig tc;
-    //connection object for encryption test
-    //EDBProxy * cl;
-    //connection object for using rewriter
+
+    //TODO/FIXME: check this
     Rewriter * re;
-    //connection objects for plain and proxy test
+    
+    //Rewriter object for proxy
+    Rewriter * re_proxy;
+
+    //It allow multiple proxy connections however CryptDB 
+    //doesn't seem to support multiple proxy connections, anyways
+    //it serves as a temporary solution for Rewriter instance issue.
+    std::set<Rewriter *> re_set;
+
+    //Connect objects for plain 
     std::set<Connect *> conn_set;
+
     //current connection we are on, for multiple connections
     std::set<Connect *>::iterator conn;
+    
+    //current connection we are on
+    std::set<Rewriter *>::iterator re_it;
+    
     pid_t proxy_pid;
 
     ResType executeConn(std::string query);
