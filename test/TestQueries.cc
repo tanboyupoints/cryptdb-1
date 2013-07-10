@@ -29,10 +29,8 @@ static QueryList Insert = QueryList("SingleInsert",
     { "CREATE TABLE test_insert (id integer primary key auto_increment, age integer, salary integer, address text, name text)",
       "", "", "" },
     { "CREATE TABLE test_insert (id integer primary key auto_increment, age integer, salary integer, address text, name text)",
-      "CRYPTDB test_insert.age ENC",
-      "CRYPTDB test_insert.salary ENC",
-      "CRYPTDB test_insert.address ENC" },
-                                    // TODO parser currently has no KEY functionality
+      "", "", ""},
+                                    // TODO parser currently has no KEY functionality (broken?)
     { "CREATE TABLE test_insert (id integer auto_increment, age integer, salary integer, address text, name text, PRIMARY KEY (id))",
       "", "", "" },
       { Query("INSERT INTO test_insert VALUES (1, 21, 100, '24 Rosedale, Toronto, ONT', 'Pat Carlson')", false),
@@ -62,9 +60,8 @@ static QueryList Select = QueryList("SingleSelect",
     { "CREATE TABLE IF NOT EXISTS test_select (id integer, age integer, salary integer, address text, name text)",
       "", "", "" },
     { "CREATE TABLE IF NOT EXISTS test_select (id integer, age integer, salary integer, address text, name text)",
-      "CRYPTDB test_select.age ENC",
-      "CRYPTDB test_select.salary ENC",
-      "CRYPTDB test_select.address ENC" },
+      "", "", ""},
+
     { "CREATE TABLE test_select (id integer, age integer, salary integer, address text, name text)",
       "", "", "" },
     { Query("INSERT INTO test_select VALUES (1, 10, 0, 'first star to the right and straight on till morning', 'Peter Pan')", false),
@@ -203,6 +200,40 @@ static QueryList Update = QueryList("SingleUpdate",
     { "DROP TABLE test_update" },
     { "DROP TABLE test_update" } );
 
+
+static QueryList HOM = QueryList("HOMAdd",
+
+    { "CREATE TABLE test_HOM (id integer, age integer, salary integer, address text, name text)", "","","",""},
+    { "CREATE TABLE test_HOM (id integer, age integer, salary integer, address text, name text)", "","","","" },
+    { "CREATE TABLE test_HOM (id integer, age integer, salary integer, address text, name text)", "","","",""},
+
+    { Query("INSERT INTO test_HOM VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')", false),
+      Query("INSERT INTO test_HOM VALUES (2, 16, 1000, 'Green Gables', 'Anne Shirley')", false),
+      Query("INSERT INTO test_HOM VALUES (3, 8, 0, 'London', 'Lucy')", false),
+      Query("INSERT INTO test_HOM VALUES (4, 10, 0, 'London', 'Edmund')", false),
+      Query("INSERT INTO test_HOM VALUES (5, 30, 100000, '221B Baker Street', 'Sherlock Holmes')", false),
+      Query("INSERT INTO test_HOM VALUES (6, 21, 2000, 'Pemberly', 'Elizabeth')", false),
+      Query("INSERT INTO test_HOM VALUES (7, 10000, 1, 'Mordor', 'Sauron')", false),
+      Query("INSERT INTO test_HOM VALUES (8, 25, 100, 'The Heath', 'Eustacia Vye')", false),
+      
+      Query("SELECT * FROM test_HOM", false),
+      
+      Query("UPDATE test_HOM SET age = age + 1", false),
+      Query("SELECT * FROM test_HOM", false),
+
+      Query("UPDATE test_HOM SET age = age + 1 WHERE id=1", false),
+      Query("SELECT * FROM test_HOM", false),
+
+      Query("UPDATE test_HOM SET age = 100 WHERE id = 1", false),
+      Query("SELECT * FROM test_HOM WHERE age = 100", false),
+
+      Query("SELECT COUNT(*) FROM test_HOM WHERE age > 100", false),
+      Query("SELECT COUNT(*) FROM test_HOM WHERE age < 100", false),
+      Query("SELECT COUNT(*) FROM test_HOM WHERE age <= 100", false),
+      Query("SELECT COUNT(*) FROM test_HOM WHERE age >= 100", false) },
+    { "DROP TABLE test_HOM " },
+    { "DROP TABLE test_HOM" },
+    { "DROP TABLE test_HOM" } );
 
 //migrated from TestDelete
 static QueryList Delete = QueryList("SingleDelete",
@@ -736,6 +767,7 @@ Connection::start() {
         case SINGLE:
             break;
         case PROXYPLAIN:
+            //break;
         case PROXYSINGLE:
             {
                 ConnectionInfo ci(tc.host, tc.user, tc.pass);
@@ -754,6 +786,7 @@ void
 Connection::stop() {
     switch (type) {
     case PROXYPLAIN:
+        //break;
     case PROXYSINGLE:
         for (auto r = re_set.begin(); r != re_set.end(); r++) {
             delete *r;
@@ -781,6 +814,8 @@ Connection::execute(string query) {
     case UNENCRYPTED:
     case PROXYPLAIN:
         return executeConn(query);
+        //break;
+        //return executeConn(query);
     case SINGLE:
         break;
     default:
@@ -844,6 +879,7 @@ Connection::executeLast() {
         break;
     case UNENCRYPTED:
     case PROXYPLAIN:
+       // break;
     case PROXYSINGLE:
 		//TODO(ccarvalho) check this 
         break;
@@ -895,9 +931,9 @@ CheckAnnotatedQuery(const TestConfig &tc, string control_query, string test_quer
 
     if (control_res.ok != test_res.ok) {
         LOG(warn) << "control " << control_res.ok
-                  << ", test " << test_res.ok
-                  << ", and true is " << true
-                  << " for query: " << test_query;
+            << ", test " << test_res.ok
+            << ", and true is " << true
+            << " for query: " << test_query;
 
         if (tc.stop_if_fail)
             thrower() << "stop on failure";
@@ -919,18 +955,19 @@ CheckAnnotatedQuery(const TestConfig &tc, string control_query, string test_quer
 
 static void
 CheckQuery(const TestConfig &tc, string query) {
-    displayLoading(true);
+    cerr << "--------------------------------------------------------------------------------" << "\n";
     //TODO: should be case insensitive
     if (query == "SELECT LAST_INSERT_ID()") {
         ntest++;
         switch(test_type) {
-        case UNENCRYPTED:
-        case PROXYPLAIN:
-        case PROXYSINGLE:
-            //TODO(ccarvalho): check proxy
-        default:
-            LOG(test) << "not a valid case of this test; skipped";
-            break;
+            case UNENCRYPTED:
+            case PROXYPLAIN:
+                //break;
+            case PROXYSINGLE:
+                //TODO(ccarvalho): check proxy
+            default:
+                LOG(test) << "not a valid case of this test; skipped";
+                break;
         }
         npass++;
         return;
@@ -943,6 +980,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
     for (unsigned int i = 0; i < queries.create.size(); i++) {
         string control_query = queries.create.choose(control_type)[i];
         string test_query = queries.create.choose(test_type)[i];
+
         CheckAnnotatedQuery(tc, control_query, test_query);
     }
 
@@ -951,6 +989,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
         case PLAIN:
         case SINGLE:
         case PROXYPLAIN:
+           // break;
         case PROXYSINGLE:
             CheckQuery(tc, q->query);
             break;
@@ -969,14 +1008,22 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 
 static void
 RunTest(const TestConfig &tc) {
-    //CheckQueryList(tc, Insert);
+#if 1
     CheckQueryList(tc, Select);
+    CheckQueryList(tc, HOM);
+    CheckQueryList(tc, Insert);
+
     CheckQueryList(tc, Join);
-    CheckQueryList(tc, Update);
-    CheckQueryList(tc, Delete);
-    //CheckQueryList(tc, Search);
     CheckQueryList(tc, Basic);
-    CheckQueryList(tc, PrivMessages);
+#endif
+    //CheckQueryList(tc, Update);
+    //CheckQueryList(tc, Delete);
+
+    //CheckQueryList(tc, Search);
+    //
+
+    //CheckQueryList(tc, PrivMessages);
+
     /*CheckQueryList(tc, UserGroupForum);
     CheckQueryList(tc, Auto);
     CheckQueryList(tc, Null);
@@ -1042,6 +1089,7 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
         case SINGLE:
             break;
         case PROXYPLAIN:
+           // break;
         case PROXYSINGLE:
             //TODO(ccarvalho) check this
             break;
