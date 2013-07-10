@@ -52,9 +52,11 @@ class EncLayer {
         thrower() << "decryptUDF not supported";
     }
 
+protected:
     // can be deserialized by corresponding factory
     virtual std::string serialize() = 0;
 
+    friend class EncLayerFactory;
 };
 
 
@@ -122,8 +124,10 @@ public:
                                std::string key);
 
     // creates EncLayer from its serialization
-    static EncLayer * encLayerFromSerial(onion o, SECLEVEL sl,
+    static EncLayer * deserializeLayer(onion o, SECLEVEL sl,
 					 const std::string & serial);
+
+    static std::string serializeLayer(EncLayer * el);
 };
 
 

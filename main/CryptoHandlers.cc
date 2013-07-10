@@ -45,7 +45,7 @@ public:
     static EncLayer * create(Create_field * cf, std::string key) {
 	throw "needs to be inherited";
     };
-    static EncLayer * deserialize(const std::string & serial) {
+    static EncLayer * deserialize(const SerialLayer & serial) {
 	throw "needs to be inherited";
     };
 };
@@ -53,20 +53,20 @@ public:
 class RNDFactory : public LayerFactory {
 public:
     static EncLayer * create(Create_field * cf, std::string key);
-    static EncLayer * deserialize(const std::string & serial);
+    static EncLayer * deserialize(const SerialLayer & serial);
 };
 
 
 class DETFactory : public LayerFactory {
 public:
     static EncLayer * create(Create_field * cf, std::string key);
-    static EncLayer * deserialize(const std::string & serial);
+    static EncLayer * deserialize(const SerialLayer & serial);
 };
 
 class OPEFactory : public LayerFactory {
 public:
     static EncLayer * create(Create_field * cf, std::string key);
-    static EncLayer * deserialize(const std::string & serial);
+    static EncLayer * deserialize(const SerialLayer & serial);
 };
 
 
@@ -98,19 +98,23 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf,
 }
 
 EncLayer *
-EncLayerFactory::encLayerFromSerial(onion o, SECLEVEL sl,
+EncLayerFactory::deserializeLayer(onion o, SECLEVEL sl,
                                     const string & serial)
 {
+
+    LayerInfo li = serial_unpack(serial);
+    assert_s(li.l == sl, "inconsistency in sec levels");
+
     switch (sl) {
     case SECLEVEL::RND: 
-	return RNDFactory::deserialize(serial);
+	return RNDFactory::deserialize(li);
 	
     case SECLEVEL::DET: 
     case SECLEVEL::DETJOIN: 
-	return DETFactory::deserialize(serial);
+	return DETFactory::deserialize(li);
 	
     case SECLEVEL::OPE: 
-	return OPEFactory::deserialize(serial);
+	return OPEFactory::deserialize(li);
 	
     case SECLEVEL::HOM: 
 	return new HOM(serial);
@@ -123,40 +127,37 @@ EncLayerFactory::encLayerFromSerial(onion o, SECLEVEL sl,
     thrower() << "unknown or unimplemented security level \n";
 }
 
-
-
-/*===================== helpers =============================*/
-
-
-/*
- * EncLayer->serialize outputs a string of the form [LEN SECLEVEL LAYER_IMPL_TYPE
- * LAYER_INFO]
- * LEN indicates the length of LAYER_INFO
- * LAYER_IMPL_TYPE is a readable string
- * LAYER_INFO could be binary
- * LayerFactory->deserialize gets as input such a string
- */
-static string
-serial_pack(SECLEVEL l, const string & layer_impl_type, const string & layer_info) {
-    stringstream ss;
-    ss.clear();
-
-    ss << layer_info.length() << " " << levelnames[(uint)l] << " " << layer_impl_type << " " << layer_info;
-
-    return ss.str();
+string
+EncLayerFactory::serializeLayer(EncLayer * el) {
+    
 }
 
-static void
-serial_unpack(const string & serial, SECLEVEL & l, string & layer_impl_type, string & layer_info) {
-    stringstream ss(serial);
-    uint len;
-    ss >> len;
-    string levelname;
-    ss >> levelname;
-    l = string_to_sec_level(levelname);
-    ss >> layer_impl_type;
-    layer_info = serial.substr(serial.size()-len, len);
-}
+/*=====================  SERIALIZE Helpers =============================*/
+
+
+struct SerialLayer {
+    SECLEVEL l;
+    string name;
+    string layer_info;
+
+    string pack() {
+	stringstream ss;
+	ss.clear();
+	ss << layer_info.length() << " " << levelnames[(uint)l] << " " << layer_impl_type << " " << layer_info;
+	return ss.str();
+    }
+
+    void unpack(string serial) {
+	stringstream ss(serial);
+	uint len;
+	ss >> len;
+	string levelname;
+	ss >> levelname;
+	l = string_to_sec_level(levelname);
+	ss >> name;
+	layer_info = serial.substr(serial.size()-len, len);
+    }
+};
 
 
 static string
@@ -312,11 +313,13 @@ RNDFactory::create(Create_field * cf, std::string key) {
 }
 
 EncLayer *
-RNDFactory::deserialize(const std::string & serial) {
-    if (get_impl_type(serial) == "RND_int") {
-	return new RND_int(serial);
-    } else {
-	return new RND_str(serial);
+RNDFactory::deserialize(const SerialLayer & sl) {
+    switch (sl.name) {
+    case "RND_int" : return new RND_int(sl.layer_info);
+    case "RND_str" : return new RND_str(sl.layer_info);
+    default: {
+	assert_s(false, "incorrect layer name");
+    }
     }
 }
 
@@ -565,13 +568,17 @@ DETFactory::create(Create_field * cf, std::string key) {
 }
 
 EncLayer *
-DETFactory::deserialize(const std::string & serial) {
-    if (get_impl_type(serial) == "DET_int") {
-	return new DET_int(serial);
-    } else {
-	return new DET_str(serial);
+DETFactory::deserialize(const SerialLayer & sl) {
+    switch (sl.name) {
+    case "DET_int" : return new DET_int(sl.layer_info);
+    case "DET_str" : return new DET_str(sl.layer_info);
+    case "DET_dec": return new DET_dec(sl.layer_info);
+    default: {
+	assert_s(false, "incorrect layer name");
+    }
     }
 }
+
 
 
 DET_int::DET_int(Create_field * f, const string & seed_key)
@@ -878,17 +885,20 @@ OPEFactory::create(Create_field * cf, std::string key) {
      } else {
 	 return new OPE_str(cf, key);
      }
+
+    
 }
 
 EncLayer *
-OPEFactory::deserialize(const std::string & serial) {
-    if (get_impl_type(serial) == "OPE_int") {
-	return new OPE_int(serial);
-    } else {
-	return new OPE_str(serial);
+OPEFactory::deserialize(const SerialLayer & sl) {
+    switch (sl.name) {
+    case "OPE_int" : return new RND_int(sl.layer_info);
+    case "OPE_str" : return new RND_str(sl.layer_info);
+    default: {
+	assert_s(false, "incorrect layer name");
+    }
     }
 }
-
 
 OPE_int::OPE_int(Create_field * f, string seed_key)
     : key(prng_expand(seed_key, key_bytes)),
