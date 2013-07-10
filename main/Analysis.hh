@@ -214,6 +214,7 @@ public:
 				  childr_rp(childr_rp) {}
 };
 
+// TODO: Maybe we want a database name argument/member.
 typedef class ConnectionInfo {
 public:
     std::string server;
@@ -292,27 +293,6 @@ public:
     Rewriter *rewriter;
 
 private:
-    MYSQL * m;
     std::string unAliasTable(std::string table) const;
-
 };
-
-typedef struct ConnectionData {
-    std::string server;
-    std::string user;
-    std::string psswd;
-    std::string dbname;
-    uint port;
-
-    ConnectionData() {}
-
-    ConnectionData(std::string serverarg, std::string userarg, std::string psswdarg, std::string dbnamearg, uint portarg = 0) {
-        server = serverarg;
-        user = userarg;
-        psswd = psswdarg;
-        dbname = dbnamearg;
-        port = portarg;
-    }
-
-} ConnectionData;
 
