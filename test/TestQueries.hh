@@ -12,6 +12,9 @@
 
 #include <test/test_utils.hh>
 
+//HACK(ccarvalho) Will be removed after conn_set turn to be Rewriter objects. 
+static Rewriter __attribute__((unused)) *re_proxy;
+
 typedef enum test_mode {
     UNENCRYPTED, SINGLE, MULTI,
     PROXYPLAIN, PROXYSINGLE, PROXYMULTI,
@@ -92,8 +95,17 @@ class Connection {
     //EDBProxy * cl;
     //connection object for using rewriter
     Rewriter * re;
-    //connection objects for plain and proxy test
+    
+    //TODO/FIXME: Uncomment this after change 
+    //conn_set to std::set<Rewriter *>re_set
+    //Rewriter * re_proxy;
+
+
+    //TODO/FIXME: instead of Connect this 
+    //should be Rewrite, because of executeQuery!
+    //objects for plain and proxy test
     std::set<Connect *> conn_set;
+
     //current connection we are on, for multiple connections
     std::set<Connect *>::iterator conn;
     pid_t proxy_pid;

@@ -59,9 +59,9 @@ static QueryList Insert = QueryList("SingleInsert",
 
 //migrated from TestSinglePrinc TestSelect
 static QueryList Select = QueryList("SingleSelect",
-    { "CREATE TABLE test_select (id integer, age integer, salary integer, address text, name text)",
+    { "CREATE TABLE IF NOT EXISTS test_select (id integer, age integer, salary integer, address text, name text)",
       "", "", "" },
-    { "CREATE TABLE test_select (id integer, age integer, salary integer, address text, name text)",
+    { "CREATE TABLE IF NOT EXISTS test_select (id integer, age integer, salary integer, address text, name text)",
       "CRYPTDB test_select.age ENC",
       "CRYPTDB test_select.salary ENC",
       "CRYPTDB test_select.address ENC" },
@@ -754,102 +754,114 @@ Connection::start() {
     string masterKey = BytesFromInt(mkey, AES_KEY_BYTES);
     switch (type) {
         //plain -- new connection straight to the DB
-    case UNENCRYPTED:
-    {
-        Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
-        conn_set.insert(c);
-        this->conn = conn_set.begin();
-        break;
-    }
-        //single -- new Rewriter
-        //multi -- new Rewriter
-    case SINGLE:
-    case MULTI:
-    {
-        string dir_arg = "--datadir=" + tc.shadowdb_dir;
-
-        const char *mysql_av[] =
-            { "progname",
-              "--skip-grant-tables",
-              dir_arg.c_str(),
-              "--character-set-server=utf8",
-              "--language=" MYSQL_BUILD_DIR "/sql/share/"
-            };
-        assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
-                                       (char**) mysql_av, 0));
-        assert(0 == mysql_thread_init());
-
-        cerr << "connect to " << tc.host << "." << tc.db << " as " << tc.user << " with password " << tc.pass << endl;
-        Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db);
-        conn_set.insert(c);
-        this->conn = conn_set.begin();
-        ConnectionInfo ci = ConnectionInfo(tc.host, tc.user, tc.pass, tc.port);
-        re = new Rewriter(ci, tc.shadowdb_dir, tc.db, (type == MULTI), false);
-        re->setMasterKey("2392834");
-        break;
-    }
-        //proxy -- start proxy in separate process and initialize connection
-    case PROXYPLAIN:
-    case PROXYSINGLE:
-    case PROXYMULTI:
-        tc.port = alloc_port();
-
-        proxy_pid = fork();
-        if (proxy_pid == 0) {
-            LOG(test) << "starting proxy, pid " << getpid();
-            cerr << tc.edbdir << endl;
-            setenv("EDBDIR", tc.edbdir.c_str(), 1);
-            setenv("CRYPTDB_LOG", cryptdb_logger::getConf().c_str(), 1);
-            setenv("CRYPTDB_USER", tc.user.c_str(), 1);
-            setenv("CRYPTDB_PASS", tc.pass.c_str(), 1);
-            setenv("CRYPTDB_DB", tc.db.c_str(), 1);
-            if (type == PROXYSINGLE) {
-                setenv("CRYPTDB_MODE", "single", 1);
-            } else if (type == PROXYMULTI) {
-                setenv("CRYPTDB_MODE", "multi", 1);
-            } else {
-                setenv("CRYPTDB_MODE", "plain", 1);
-            }
-            //setenv("CRYPTDB_PROXY_DEBUG","true",1);
-            stringstream script_path, address, backend;
-            script_path << "--proxy-lua-script=" << tc.edbdir << "/../mysqlproxy/wrapper.lua";
-            address << "--proxy-address=" << tc.host << ":" << tc.port;
-            backend << "--proxy-backend-addresses=" << tc.host << ":3306";
-            cerr << "starting on port " << tc.port << "\n";
-            execlp("mysql-proxy",
-                   "mysql-proxy", "--plugins=proxy",
-                                  "--event-threads=4",
-                                  "--max-open-files=1024",
-                                  script_path.str().c_str(),
-                                  address.str().c_str(),
-                                  backend.str().c_str(),
-                                  (char *) 0);
-            LOG(warn) << "could not execlp: " << strerror(errno);
-            exit(-1);
-        } else if (proxy_pid < 0) {
-            LOG(warn) << "failed to fork";
-            thrower() << "failed to fork: " << strerror(errno);
-        } else {
-            for (uint i = 0; i < 100; i++) {
-                usleep(100000);
-                LOG(test) << "checking if proxy is running yet..";
-                if (try_connect_localhost(tc.port))
-                    break;
-            }
-
-            for (uint64_t i = 0; i < no_conn; i++) {
+        case UNENCRYPTED:
+            {
                 Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
                 conn_set.insert(c);
-                if (type == PROXYMULTI) {
-                    assert_s(c->execute("DROP FUNCTION IF EXISTS test"),"dropping function test for proxy-multi");
-                    assert_s(c->execute("CREATE FUNCTION test (optionid integer) RETURNS bool RETURN optionid=20"),"creating function test for proxy-multi");
-                }
+                this->conn = conn_set.begin();
+                break;
             }
-            this->conn = conn_set.begin();
-        }
-        break;
-    default:
-        assert_s(false, "invalid type passed to Connection");
+            //single -- new Rewriter
+            //multi -- new Rewriter
+        case SINGLE:
+        case MULTI:
+#if 0
+            {
+                string dir_arg = "--datadir=" + tc.shadowdb_dir;
+
+                const char *mysql_av[] =
+                { "progname",
+                    "--skip-grant-tables",
+                    dir_arg.c_str(),
+                    "--character-set-server=utf8",
+                    "--language=" MYSQL_BUILD_DIR "/sql/share/"
+                };
+                assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
+                            (char**) mysql_av, 0));
+                assert(0 == mysql_thread_init());
+
+                cerr << "connect to " << tc.host << "." << tc.db << " as " << tc.user << " with password " << tc.pass << endl;
+                Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db);
+                conn_set.insert(c);
+                this->conn = conn_set.begin();
+                ConnectionInfo ci = ConnectionInfo(tc.host, tc.user, tc.pass, tc.port);
+                re = new Rewriter(ci, tc.shadowdb_dir, tc.db, (type == MULTI), false);
+                re->setMasterKey("2392834");
+                break;
+            }
+#endif
+            break;
+            //proxy -- start proxy in separate process and initialize connection
+        case PROXYPLAIN:
+        case PROXYSINGLE:
+            {
+                ConnectionInfo ci(tc.host, tc.user, tc.pass);
+                re_proxy = new Rewriter(ci,tc.shadowdb_dir, tc.db, false, true);
+                conn_set.insert(re->getConnection());
+                this->conn = conn_set.begin();
+                re_proxy->setMasterKey("2392834");
+            }
+            break;
+
+        case PROXYMULTI:
+            tc.port = alloc_port();
+
+            proxy_pid = fork();
+            if (proxy_pid == 0) {
+                LOG(test) << "starting proxy, pid " << getpid();
+                cerr << tc.edbdir << endl;
+                setenv("EDBDIR", tc.edbdir.c_str(), 1);
+                setenv("CRYPTDB_LOG", cryptdb_logger::getConf().c_str(), 1);
+                setenv("CRYPTDB_USER", tc.user.c_str(), 1);
+                setenv("CRYPTDB_PASS", tc.pass.c_str(), 1);
+                setenv("CRYPTDB_DB", tc.db.c_str(), 1);
+                if (type == PROXYSINGLE) {
+                    setenv("CRYPTDB_MODE", "single", 1);
+                } else if (type == PROXYMULTI) {
+                    setenv("CRYPTDB_MODE", "multi", 1);
+                } else {
+                    setenv("CRYPTDB_MODE", "plain", 1);
+                }
+                //setenv("CRYPTDB_PROXY_DEBUG","true",1);
+                stringstream script_path, address, backend;
+                script_path << "--proxy-lua-script=" << tc.edbdir << "/../mysqlproxy/wrapper.lua";
+                address << "--proxy-address=" << tc.host << ":" << tc.port;
+                backend << "--proxy-backend-addresses=" << tc.host << ":3306";
+                cerr << "starting on port " << tc.port << "\n";
+                execlp("mysql-proxy",
+                        "mysql-proxy", "--plugins=proxy",
+                        "--event-threads=4",
+                        "--max-open-files=1024",
+                        script_path.str().c_str(),
+                        address.str().c_str(),
+                        backend.str().c_str(),
+                        (char *) 0);
+                LOG(warn) << "could not execlp: " << strerror(errno);
+                exit(-1);
+            } else if (proxy_pid < 0) {
+                LOG(warn) << "failed to fork";
+                thrower() << "failed to fork: " << strerror(errno);
+            } else {
+                for (uint i = 0; i < 100; i++) {
+                    usleep(100000);
+                    LOG(test) << "checking if proxy is running yet..";
+                    if (try_connect_localhost(tc.port))
+                        break;
+                }
+
+                for (uint64_t i = 0; i < no_conn; i++) {
+                    Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
+                    conn_set.insert(c);
+                    if (type == PROXYMULTI) {
+                        assert_s(c->execute("DROP FUNCTION IF EXISTS test"),"dropping function test for proxy-multi");
+                        assert_s(c->execute("CREATE FUNCTION test (optionid integer) RETURNS bool RETURN optionid=20"),"creating function test for proxy-multi");
+                    }
+                }
+                this->conn = conn_set.begin();
+            }
+            break;
+        default:
+            assert_s(false, "invalid type passed to Connection");
     }
 }
 
@@ -858,6 +870,11 @@ Connection::stop() {
     switch (type) {
     case PROXYPLAIN:
     case PROXYSINGLE:
+        if (re_proxy) {
+            delete re_proxy;
+            re_proxy = NULL;
+        }
+        break;
     case PROXYMULTI:
         if (proxy_pid > 0)
             kill(proxy_pid, SIGKILL);
@@ -871,6 +888,7 @@ Connection::stop() {
             delete re;
             re = NULL;
         }
+        break;
     case UNENCRYPTED:
         for (auto c = conn_set.begin(); c != conn_set.end(); c++) {
             delete *c;
@@ -885,14 +903,14 @@ Connection::stop() {
 ResType
 Connection::execute(string query) {
     switch (type) {
-    case UNENCRYPTED:
-    case PROXYPLAIN:
     case PROXYSINGLE:
+        return ResType((bool)executeQuery(*re_proxy, query, true)); 
+    case UNENCRYPTED:
     case PROXYMULTI:
+    case PROXYPLAIN:
         return executeConn(query);
     case SINGLE:
     case MULTI:
-        //return executeEDBProxy(query);
         return executeRewriter(query);
     default:
         assert_s(false, "unrecognized type in Connection");
@@ -925,6 +943,8 @@ Connection::executeConn(string query) {
     if (conn == conn_set.end()) {
         conn = conn_set.begin();
     }
+
+
     if (!(*conn)->execute(query, dbres)) {
         executeFail(query);
         return ResType(false);
@@ -963,6 +983,8 @@ Connection::executeLast() {
     case UNENCRYPTED:
     case PROXYPLAIN:
     case PROXYSINGLE:
+		//TODO: proxy 
+
     case PROXYMULTI:
         return executeLastConn();
     default:
