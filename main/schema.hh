@@ -6,6 +6,7 @@
 #include <parser/stringify.hh>
 #include <main/CryptoHandlers.hh>
 #include <main/Translator.hh>
+#include <main/enum_text.hh>
 #include <string>
 #include <map>
 #include <list>
@@ -55,6 +56,10 @@ std::ostream&
 operator<<(std::ostream &out, const OnionLevelFieldPair &p);
 
 
+/*
+ * The name must be unique as it is used as a unique identifier when
+ * generating the encryption layers.
+ */
 typedef struct OnionMeta {
     std::vector<EncLayer *> layers; //first in list is lowest layer
 
@@ -63,8 +68,12 @@ typedef struct OnionMeta {
         return layers.back()->level();
     }
 
-    OnionMeta(onion o, unsigned int field_index, std::string field_name) 
-        : onionname(anonymizeFieldName(field_index, o, field_name))  {};
+    // New.
+    OnionMeta(onion o) 
+        : onionname(getpRandomName() + TypeText<onion>::toText(o)) {};
+    // Restore.
+    OnionMeta(std::string name)
+        : onionname(name) {}
     std::string getAnonOnionName() const;
 
 private:
@@ -76,27 +85,28 @@ struct TableMeta;
 // FieldMetadata an TableMetadata
 // which contains data we want to add to this structure soon
 typedef struct FieldMeta {
-    TableMeta * const tm; //point to table belonging in
     const std::string fname;
-    const int uniq;
     bool has_salt; //whether this field has its own salt
+    const std::string salt_name;
     onionlayout onion_layout;
 
     std::map<onion, OnionMeta *> onions;
 
     // New field.
-    FieldMeta(TableMeta *tm, std::string name, unsigned int uniq,
-              Create_field *field, AES_KEY *mKey);
+    FieldMeta(std::string name, Create_field *field, AES_KEY *mKey);
     // Recovering field from proxy db.
-    FieldMeta(TableMeta *tm, std::string name, unsigned int uniq,
-              bool has_salt, onionlayout onion_layout)
-        : tm(tm), fname(name), uniq(uniq), has_salt(has_salt),
+    FieldMeta(std::string name, bool has_salt, 
+              std::string salt_name, onionlayout onion_layout)
+        : fname(name), has_salt(has_salt), salt_name(salt_name),
           onion_layout(onion_layout) {}
     ~FieldMeta();
 
-    std::string saltName() const;
-    std::string fullName(onion o) const;
     std::string stringify() const;
+
+    std::string getSaltName() const {
+        assert(has_salt);
+        return salt_name;
+    }
 
     bool hasOnion(onion o) const {
         return onions.find(o) !=
@@ -132,30 +142,31 @@ typedef struct FieldMeta {
 
 typedef struct TableMeta {
     std::list<std::string> fieldNames;     //in order field names
-    const unsigned int tableNo;
-
     std::map<std::string, FieldMeta *> fieldMetaMap;
-
     const bool hasSensitive;
-
     const bool has_salt;
     const std::string salt_name;
+    const std::string anon_table_name;
 
-    TableMeta(unsigned int table_no, bool has_sensitive,
-              bool has_salt, std::string salt_name,
-              std::map<std::string, std::string> index_map,
-              unsigned int uniq_counter=0)
-        : tableNo(table_no), hasSensitive(has_sensitive),
-          has_salt(has_salt), salt_name(salt_name),
-          index_map(index_map), uniq_counter(uniq_counter) {}
+    // Restore old TableMeta.
+    TableMeta(bool has_sensitive, bool has_salt, std::string salt_name,
+              std::string anon_table_name,
+              std::map<std::string, std::string> index_map)
+        : hasSensitive(has_sensitive), has_salt(has_salt),
+          salt_name(salt_name), anon_table_name(anon_table_name),
+          index_map(index_map) {}
+
+    // New TableMeta.
+    TableMeta(bool has_sensitive, bool has_salt,
+              std::map<std::string, std::string> index_map)
+        : hasSensitive(has_sensitive), has_salt(has_salt),
+          salt_name("tableSalt_" + getpRandomName()),
+          anon_table_name("table_" + getpRandomName()),
+          index_map(index_map) {}
     ~TableMeta();
 
-    // TODO: Make FieldMeta a friend and deal with the other uses of this
-    // function.
-    FieldMeta *createFieldMeta(Create_field *field, const Analysis &a,
-                               bool encByDefault);
+    bool addFieldMeta(FieldMeta *fm);
     FieldMeta *getFieldMeta(std::string field);
-    unsigned int getUniqCounter() const;
     std::string getAnonTableName() const;
 
     friend class Analysis;
@@ -169,29 +180,16 @@ protected:
    
 private:
     std::map<std::string, std::string> index_map;
-    unsigned int uniq_counter;
-
-    unsigned int leaseUniqCounter();
 } TableMeta;
 
 
 // AWARE: Table/Field aliases __WILL NOT__ be looked up when calling from
 // this level or below. Use Analysis::* if you need aliasing.
 typedef struct SchemaInfo {
-    unsigned int totalTables;
-
-    SchemaInfo() : totalTables(0) {};
+    SchemaInfo() {;}
     ~SchemaInfo();
+    bool addTableMeta(std::string name, TableMeta *tm);
 
-    // Parameters should match TableMeta constructor, except for tableNo
-    // which we derive from SchemaInfo and the addition of the plaintext
-    // table name.
-    TableMeta *createTableMeta(std::string table_name,
-                               bool has_sensitive, bool has_salt,
-                               std::string salt_name,
-                               std::map<std::string, std::string> index_map,
-                               unsigned int uniq_counter,
-                               const unsigned int *table_no=NULL);
     friend class Analysis;
 
 private:

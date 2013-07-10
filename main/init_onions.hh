@@ -4,9 +4,9 @@
 
 // If mkey == NULL, the field is not encrypted
 static void
-init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index,
-                   Create_field * cf, onionlayout ol) {
-
+init_onions_layout(AES_KEY * mKey, FieldMeta * fm, Create_field * cf,
+                   onionlayout ol)
+{
     fm->onions.clear();
 
     // This additional reflection is needed as we must rebuild the
@@ -15,13 +15,13 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index,
 
     for (auto it: ol) {
         onion o = it.first;
-        OnionMeta * om = new OnionMeta(o, index, fm->fname);
+        OnionMeta * om = new OnionMeta(o);
         fm->onions[o] = om;
 
         if (mKey) {
 	    Create_field * newcf = cf;
             //generate enclayers for encrypted field
-            string uniqueFieldName = fm->fullName(o);
+            string uniqueFieldName = om->getAnonOnionName();
             for (auto l: it.second) {
                 string key;
                 key = getLayerKey(mKey, uniqueFieldName, l);
@@ -42,20 +42,20 @@ init_onions_layout(AES_KEY * mKey, FieldMeta * fm, uint index,
 	    }
         }
 
-        LOG(cdb_v) << "adding onion layer " << om->getAnonOnionName() << " for " << fm->fname;
+        LOG(cdb_v) << "adding onion layer " << om->getAnonOnionName()
+                   << " for " << fm->fname;
 
         //set outer layer
         // fm->setCurrentOnionLevel(o, it.second.back());
     }
 }
 
-// @index: default value 0
 static void
-init_onions(AES_KEY * mKey, FieldMeta * fm, Create_field * cf,
-            uint index=0) {
+init_onions(AES_KEY * mKey, FieldMeta * fm, Create_field * cf)
+{
     if (!mKey) {
         // unencrypted field
-        init_onions_layout(NULL, fm, 0, cf, PLAIN_ONION_LAYOUT);
+        init_onions_layout(NULL, fm, cf, PLAIN_ONION_LAYOUT);
         fm->has_salt = false;
         return;
     }
@@ -65,9 +65,9 @@ init_onions(AES_KEY * mKey, FieldMeta * fm, Create_field * cf,
     fm->has_salt = true;
 
     if (IsMySQLTypeNumeric(cf->sql_type)) {
-        init_onions_layout(mKey, fm, index, cf, NUM_ONION_LAYOUT);
+        init_onions_layout(mKey, fm, cf, NUM_ONION_LAYOUT);
     } else {
-        init_onions_layout(mKey, fm, index, cf, STR_ONION_LAYOUT);
+        init_onions_layout(mKey, fm, cf, STR_ONION_LAYOUT);
     }
 }
 

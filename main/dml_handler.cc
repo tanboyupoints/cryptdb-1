@@ -236,7 +236,8 @@ class UpdateHandler : public DMLHandler {
             if (add_salt) {
                 salt_type salt = a.salts[fm];
                 assert(rew_fd);
-                res_items.push_back(make_item((Item_field *)rew_fd, fm->saltName()));
+                res_items.push_back(make_item((Item_field *)rew_fd,
+                                              fm->getSaltName()));
                 res_vals.push_back(new Item_int((ulonglong) salt));
             }
 
@@ -606,7 +607,8 @@ rewrite_proj(Item * i, const RewritePlan * rp, Analysis & a, List<Item> & newLis
     addToReturn(a.rmeta, a.pos++, olk, use_salt, i->name);
 
     if (use_salt) {
-        newList.push_back(make_item((Item_field*) ir, olk.key->saltName()));
+        newList.push_back(make_item((Item_field*) ir,
+                                    olk.key->getSaltName()));
         addSaltToReturn(a.rmeta, a.pos++);
     }
 }

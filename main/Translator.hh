@@ -51,11 +51,12 @@ std::string getTableOfSalt(std::string salt_name);
 // table, field are unanonymized names
 //should allow *
 //does not consider field aliases
-std::string fieldNameForResponse(std::string table, std::string field, std::string origName,
-                            QueryMeta & qm, bool isAgg = false);
-
+std::string fieldNameForResponse(std::string table, std::string field,
+                                 std::string origName, QueryMeta & qm,
+                                 bool isAgg = false);
 
 // fetches the next auto increment value for fullname and updates autoInc
-std::string nextAutoInc(std::map<std::string, unsigned int> & autoInc, std::string fullname);
+std::string nextAutoInc(std::map<std::string, unsigned int> & autoInc,
+                        std::string fullname);
 
-std::string anonymizeFieldName(unsigned int index, onion o, std::string origname);
+std::string getpRandomName();
