@@ -170,6 +170,26 @@ commit_transaction_lex(Analysis a) {
     return commit_parse->lex();
 }
 
+//TODO(raluca) : figure out how to create Create_field from scratch
+// and avoid this chaining and passing f as an argument
+static Create_field *
+get_create_field(Create_field * f, vector<EncLayer*> & v, const string & name) {
+
+    Create_field * new_cf = f;
+    
+    for (auto l : v) {
+	Create_field * old_cf = new_cf;
+	new_cf = l->newCreateField(old_cf, name);
+
+	if (old_cf != f) {
+	    delete old_cf;
+	}
+    }
+
+    return new_cf;
+    
+}
+
 //TODO: no need to pass create_field to this
 static vector<Create_field *>
 rewrite_create_field(const string &table_name, Create_field *f,
@@ -199,11 +219,14 @@ rewrite_create_field(const string &table_name, Create_field *f,
     for (auto oit = fm->onions.begin();
          oit != fm->onions.end();
          ++oit) {
+
+	Create_field * new_cf = get_create_field(f, oit->second->layers, oit->second->getAnonOnionName());
+	/*
 	EncLayer * last_layer = oit->second->layers.back();
 	//create field with anonymous name
 	Create_field * new_cf =
             last_layer->newCreateField(f, oit->second->getAnonOnionName().c_str());
-
+	*/
         output_cfields.push_back(new_cf);
     }
 
