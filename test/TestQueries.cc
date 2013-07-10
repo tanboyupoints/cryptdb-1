@@ -797,8 +797,8 @@ Connection::start() {
             {
                 ConnectionInfo ci(tc.host, tc.user, tc.pass);
                 re_proxy = new Rewriter(ci,tc.shadowdb_dir, tc.db, false, true);
-                conn_set.insert(re->getConnection());
-                this->conn = conn_set.begin();
+                re_set.insert(re_proxy);
+                this->re_it = re_set.begin();
                 re_proxy->setMasterKey("2392834");
             }
             break;
@@ -870,10 +870,10 @@ Connection::stop() {
     switch (type) {
     case PROXYPLAIN:
     case PROXYSINGLE:
-        if (re_proxy) {
-            delete re_proxy;
-            re_proxy = NULL;
+        for (auto r = re_set.begin(); r != re_set.end(); r++) {
+            delete *r;
         }
+        re_set.clear();
         break;
     case PROXYMULTI:
         if (proxy_pid > 0)
@@ -904,14 +904,14 @@ ResType
 Connection::execute(string query) {
     switch (type) {
     case PROXYSINGLE:
-        return ResType((bool)executeQuery(*re_proxy, query, true)); 
+        return executeRewriter(query);
     case UNENCRYPTED:
     case PROXYMULTI:
     case PROXYPLAIN:
         return executeConn(query);
     case SINGLE:
     case MULTI:
-        return executeRewriter(query);
+        //return executeRewriter(query);
     default:
         assert_s(false, "unrecognized type in Connection");
     }
@@ -955,23 +955,15 @@ Connection::executeConn(string query) {
 ResType
 Connection::executeRewriter(string query) {
     //translate the query
-    conn++;
-    if (conn == conn_set.end()) {
-        conn = conn_set.begin();
-    }
-    Analysis analysis;
-    // TODO: May need to set database on our ProxyState object.
-    QueryRewrite qr = re->rewrite(query);
-
-    //execute
-    // only the last query should actually have a useful result
-    ResType enc_res;
-    for (auto q = qr.queries.begin(); q != qr.queries.end(); q++) {
-        enc_res = executeConn(*q);
+    //
+    //
+    re_it++;
+    if (re_it == re_set.end()) {
+        re_it = re_set.begin();
     }
 
-    //decrypt results
-    return re->decryptResults(enc_res, qr.rmeta);
+    Rewriter *r = *re_it;
+    return ResType((bool)executeQuery(*r, query, true)); 
 }
 
 my_ulonglong

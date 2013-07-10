@@ -12,9 +12,6 @@
 
 #include <test/test_utils.hh>
 
-//HACK(ccarvalho) Will be removed after the creation of set<Rewriter*> objects. 
-static Rewriter __attribute__((unused)) *re_proxy;
-
 typedef enum test_mode {
     UNENCRYPTED, SINGLE, MULTI,
     PROXYPLAIN, PROXYSINGLE, PROXYMULTI,
@@ -91,22 +88,27 @@ class Connection {
  private:
     test_mode type;
     TestConfig tc;
-    //connection object for encryption test
-    //EDBProxy * cl;
-    //connection object for using rewriter
+
+    //TODO/FIXME: check this
     Rewriter * re;
     
-    //TODO/FIXME: Uncomment this after include
-    //std::set<Rewriter *>re_set
-    //Rewriter * re_proxy;
+    //Rewriter object for proxy
+    Rewriter * re_proxy;
 
+    //It allow multiple proxy connections however CryptDB 
+    //doesn't seem to support multiple proxy connections, anyways
+    //it serves as a temporary solution for Rewriter instance issue.
+    std::set<Rewriter *> re_set;
 
-    //TODO/FIXME: Connect should exist along with Rewriter because of proxy. 
-    //objects for plain and proxy test
+    //Connect objects for plain 
     std::set<Connect *> conn_set;
 
     //current connection we are on, for multiple connections
     std::set<Connect *>::iterator conn;
+    
+    //current connection we are on
+    std::set<Rewriter *>::iterator re_it;
+    
     pid_t proxy_pid;
 
     ResType executeConn(std::string query);
