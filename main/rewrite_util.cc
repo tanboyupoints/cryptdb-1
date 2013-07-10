@@ -235,7 +235,7 @@ rewrite_create_field(const string &table_name, Create_field *f,
         //cerr << fm->salt_name << endl;
         THD *thd         = current_thd;
         Create_field *f0 = f->clone(thd->mem_root);
-        f0->field_name   = thd->strdup(fm->saltName().c_str());
+        f0->field_name   = thd->strdup(fm->getSaltName().c_str());
 	f0->flags = f0->flags | UNSIGNED_FLAG;//salt is unsigned
         f0->sql_type     = MYSQL_TYPE_LONGLONG;
 	f0->length       = 8;
@@ -336,12 +336,13 @@ do_add_field(FieldMeta *fm, const Analysis &a, std::string dbname,
     }
 
     // Add the field data to the proxy db.
+    // TODO: hasSensitive
     ostringstream s;
     s << " INSERT INTO pdb.field_info VALUES ("
       << " " << table_id << ", "
       << " '" << fm->fname << "', "
-      << " " << fm->uniq << ", "
       << " " << bool_to_string(fm->has_salt) << ", "
+      << " '" << fm->getSaltName() << "', "
       << " '" << TypeText<onionlayout>::toText(fm->onion_layout)<< "',"
       << " 0"
       << " );";
@@ -353,6 +354,7 @@ do_add_field(FieldMeta *fm, const Analysis &a, std::string dbname,
     // Add the onion data to the proxy db.
     for (std::pair<onion, OnionMeta *> onion_pair: fm->onions) {
         onion o = onion_pair.first;
+        OnionMeta *om = onion_pair.second;
         ostringstream s;
 
         SECLEVEL current_sec_level = fm->getOnionLevel(o);
@@ -362,6 +364,7 @@ do_add_field(FieldMeta *fm, const Analysis &a, std::string dbname,
         std::string str_onion  = TypeText<onion>::toText(o);
         s << " INSERT INTO pdb.onion_info VALUES ("
           << " " << std::to_string(fieldID) << ", "
+          << " '" << om->getAnonOnionName() << "', "
           << " '" << str_onion << "', "
           << " '" << str_seclevel << "', "
           << " 0);";

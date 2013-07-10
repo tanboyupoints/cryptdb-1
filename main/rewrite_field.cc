@@ -126,9 +126,9 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
             l.push_back(new_field);
         }
         if (fm->has_salt) {
-	    assert(new_field); //need an anonymized field as template to create
-			       //salt item
-            l.push_back(make_item(new_field, fm->saltName()));
+	    assert(new_field); // need an anonymized field as template to
+                               // create salt item
+            l.push_back(make_item(new_field, fm->getSaltName()));
         }
     }
 

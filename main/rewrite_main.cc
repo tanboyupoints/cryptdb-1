@@ -45,7 +45,7 @@ static void
 buildTableMeta(ProxyState &ps);
 
 static std::map<std::string, std::string>
-fetchIndexMap(ProxyState &ps, unsigned int table_no);
+fetchIndexMap(ProxyState &ps);
 
 static void
 buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name);
@@ -104,21 +104,20 @@ createMetaTablesIfNotExists(ProxyState & ps)
 
     assert(ps.e_conn->execute(
                 " CREATE TABLE IF NOT EXISTS pdb.table_info"
-                " (number bigint NOT NULL UNIQUE,"
-                "  name varchar(64) NOT NULL UNIQUE,"
+                " (name varchar(64) NOT NULL UNIQUE,"
+                "  anon_name varchar(64) NOT NULL UNIQUE,"
                 "  has_sensitive boolean,"
                 "  has_salt boolean,"
                 "  salt_name varchar(64) NOT NULL,"
                 "  database_name varchar(64) NOT NULL,"
-                "  uniq_counter bigint NOT NULL,"
                 "  id SERIAL PRIMARY KEY)"
                 " ENGINE=InnoDB;"));
 
     s << " CREATE TABLE IF NOT EXISTS pdb.field_info"
       << " (table_info_id bigint NOT NULL," // Foreign key.
       << "  name varchar(64) NOT NULL,"
-      << "  uniq bigint NOT NULL,"
       << "  has_salt boolean,"
+      << "  salt_name varchar(64) NOT NULL,"
       << "  onion_layout enum"
       << " " << TypeText<onionlayout>::parenList().c_str() << " NOT NULL,"
       << "  id SERIAL PRIMARY KEY)"
@@ -130,6 +129,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
 
     s << " CREATE TABLE IF NOT EXISTS pdb.onion_info"
       << " (field_info_id bigint NOT NULL," // Foreign key.
+      << "  name varchar(64) NOT NULL UNIQUE,"
       << "  type enum"
       << " " << TypeText<onion>::parenList() << " NOT NULL,"
       << "  current_level enum"
@@ -192,8 +192,8 @@ buildTableMeta(ProxyState &ps)
 
     DBResult *dbres;
     assert(ps.e_conn->execute(
-                " SELECT number, name, has_sensitive, has_salt, salt_name, "
-                "        database_name, uniq_counter "
+                " SELECT name, anon_name, has_sensitive, has_salt," 
+                "        salt_name, database_name"
                 " FROM pdb.table_info", dbres));
     ScopedMySQLRes r(dbres->n);
     MYSQL_ROW row;
@@ -201,27 +201,21 @@ buildTableMeta(ProxyState &ps)
         unsigned long *l = mysql_fetch_lengths(r.res());
         assert(l != NULL);
 
-        string table_number(row[0], l[0]);
-        string table_name(row[1], l[1]);
+        string table_name(row[0], l[0]);
+        string table_anon_name(row[1], l[1]);
         string table_has_sensitive(row[2], l[2]);
         string table_has_salt(row[3], l[3]);
         string table_salt_name(row[4], l[4]);
         string table_database_name(row[5], l[5]);
-        string table_uniq_counter(row[6], l[6]);
 
-        // FIXME: Signed to unsigned conversion.
-        unsigned int int_table_number = atoi(table_number.c_str());
-        std::map<std::string, std::string> index_map =
-            fetchIndexMap(ps, int_table_number);
+        std::map<std::string, std::string> index_map = fetchIndexMap(ps);
 
-        TableMeta *tm =
-            ps.schema->createTableMeta(table_name,
-                                       string_to_bool(table_has_sensitive),
-                                       string_to_bool(table_has_salt),
-                                       table_salt_name,
-                                       index_map,
-                                       atoi(table_uniq_counter.c_str()),
-                                       &int_table_number);
+        TableMeta *tm = new TableMeta(string_to_bool(table_has_sensitive),
+                                      string_to_bool(table_has_salt),
+                                      table_salt_name,
+                                      table_anon_name,
+                                      index_map);
+        assert(ps.schema->addTableMeta(table_name, tm));
 
         buildFieldMeta(ps, tm, table_database_name);
     }
@@ -230,7 +224,7 @@ buildTableMeta(ProxyState &ps)
 }
 
 static std::map<std::string, std::string>
-fetchIndexMap(ProxyState &ps, unsigned int table_no)
+fetchIndexMap(ProxyState &ps)
 {
     const std::string dbname = ps.e_conn->getCurDBName();
     std::map<std::string, std::string> index_map;
@@ -238,7 +232,6 @@ fetchIndexMap(ProxyState &ps, unsigned int table_no)
     string q = " SELECT i.name, i.anon_name "
                " FROM   pdb.index_info i, pdb.table_info t"
                " WHERE  i.table_info_id = t.id "
-               "   AND  t.number = " + std::to_string(table_no) +
                "   AND  t.database_name = '" + dbname + "';";
 
     DBResult *dbRes;
@@ -264,10 +257,10 @@ static void
 buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
 {
 
-    string q = " SELECT f.name, f.uniq, f.has_salt, f.onion_layout, f.id"
+    string q = " SELECT f.name, f.has_salt, f.salt_name, f.onion_layout,"
+               "        f.id"
                " FROM pdb.table_info t, pdb.field_info f"
                " WHERE t.database_name = '" + database_name + "' "
-               "   AND t.number = " + std::to_string(tm->tableNo) +
                "   AND t.id = f.table_info_id;";
 
     DBResult *dbRes;
@@ -280,18 +273,19 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
         assert(l != NULL);
 
         string field_name(row[0], l[0]);
-        string field_uniq(row[1], l[1]);
-        string field_has_salt(row[2], l[2]);
+        string field_has_salt(row[1], l[1]);
+        string field_salt_name(row[2], l[2]);
         string field_onion_layout(row[3], l[3]);
         string field_id(row[4], l[4]);
 
-        unsigned int uniq = atoi(field_uniq.c_str());
         bool has_salt = string_to_bool(field_has_salt);
         onionlayout onion_layout = 
             TypeText<onionlayout>::toType(field_onion_layout);
 
+        // FIXME: Use TableMeta::createFieldMeta
         FieldMeta *fm =
-            new FieldMeta(tm, field_name, uniq, has_salt, onion_layout);
+            new FieldMeta(field_name, has_salt, field_salt_name,
+                          onion_layout);
 
         tm->fieldMetaMap[fm->fname] = fm;
         tm->fieldNames.push_back(fm->fname);
@@ -338,7 +332,7 @@ static void
 buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
 {
 
-    string q = " SELECT o.type, o.current_level, o.id"
+    string q = " SELECT o.name, o.type, o.current_level, o.id"
                " FROM pdb.onion_info o, pdb.field_info f"
                " WHERE o.field_info_id = " + std::to_string(field_id) +";";
 
@@ -351,12 +345,13 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
         unsigned long *l = mysql_fetch_lengths(r.res());
         assert(l != NULL);
 
-        string onion_type(row[0], l[0]);
-        string onion_current_level(row[1], l[1]);
-        string onion_id(row[2], l[2]);
+        string onion_name(row[0], l[0]);
+        string onion_type(row[1], l[1]);
+        string onion_current_level(row[2], l[2]);
+        string onion_id(row[3], l[3]);
 
         onion o = TypeText<onion>::toType(onion_type);
-        OnionMeta *om = new OnionMeta(o, fm->uniq, fm->fname);
+        OnionMeta *om = new OnionMeta(onion_name);
         fm->onions[o] = om;
 
         // Add elements to OnionMeta.layers starting with the bottom layer
@@ -530,14 +525,14 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
 
     OnionMeta * om    = getAssert(fm->onions, o);
     string fieldanon  = om->getAnonOnionName();
-    string tableanon  = fm->tm->getAnonTableName();
+    string tableanon  = a.getTableMeta(itf->table_name)->getAnonTableName();
 
     //removes onion layer at the DB
     stringstream query;
     query << "UPDATE " << tableanon << " SET " << fieldanon  << " = ";
 
     Item_field *field = stringToItemField(fieldanon, tableanon, itf);
-    Item_field *salt = stringToItemField(fm->saltName(), tableanon, itf);
+    Item_field *salt = stringToItemField(fm->getSaltName(), tableanon, itf);
     Item * decUDF = om->layers.back()->decryptUDF(field, salt);
 
     query << *decUDF << ";";

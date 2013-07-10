@@ -34,12 +34,11 @@ std::string OnionMeta::getAnonOnionName() const
     return onionname;
 }
 
-FieldMeta::FieldMeta(TableMeta *tm, std::string name, unsigned int uniq,
-                     Create_field *field, AES_KEY *mKey)
-    : tm(tm), fname(name), uniq(uniq)
+FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *mKey)
+    : fname(name), salt_name(BASE_SALT_NAME + getpRandomName())
 {
     if (mKey) {
-        init_onions(mKey, this, field, this->uniq);
+        init_onions(mKey, this, field);
     } else {
         init_onions(NULL, this, field);
     }
@@ -53,22 +52,6 @@ FieldMeta::~FieldMeta()
     for (auto it : cp) {
         delete it.second;
     }
-}
-
-std::string FieldMeta::saltName() const
-{
-    assert(has_salt);
-
-    return BASE_SALT_NAME + "_f_" + StringFromVal(uniq) + "_" +
-           tm->getAnonTableName();
-}
-
-std::string FieldMeta::fullName(onion o) const
-{
-    auto it = onions.find(o);
-    OnionMeta *om = it->second;
-    assert(om);
-    return tm->getAnonTableName() + "." + om->getAnonOnionName();
 }
 
 string FieldMeta::stringify() const
@@ -87,14 +70,8 @@ TableMeta::~TableMeta()
     }
 }
 
-FieldMeta *
-TableMeta::createFieldMeta(Create_field *field, const Analysis &a,
-                           bool encByDefault)
+bool TableMeta::addFieldMeta(FieldMeta *fm)
 {
-    FieldMeta * fm = new FieldMeta(this, string(field->field_name),
-                                   this->leaseUniqCounter(), field,
-                                   a.ps->masterKey); 
-
     // FIXME: Use exists function.
     if (this->fieldMetaMap.find(fm->fname) != this->fieldMetaMap.end()) {
         return NULL;
@@ -116,15 +93,10 @@ FieldMeta *TableMeta::getFieldMeta(std::string field)
     }
 }
 
-unsigned int TableMeta::getUniqCounter() const
-{
-    return uniq_counter;
-}
-
 // FIXME: May run into problems where a plaintext table expects the regular
 // name, but it shouldn't get that name from 'getAnonTableName' anyways.
 std::string TableMeta::getAnonTableName() const {
-    return std::string("table") + strFromVal((uint32_t)tableNo);
+    return anon_table_name;
 }
 
 bool TableMeta::destroyFieldMeta(std::string field)
@@ -144,7 +116,7 @@ bool TableMeta::destroyFieldMeta(std::string field)
 std::string TableMeta::addIndex(std::string index_name)
 {
     std::string anon_name =
-        std::string("index") + std::to_string(leaseUniqCounter()) +
+        std::string("index") + getpRandomName() +
         getAnonTableName();
     auto it = index_map.find(index_name);
     assert(index_map.end() == it);
@@ -178,11 +150,6 @@ bool TableMeta::destroyIndex(std::string index_name)
     return 1 == index_map.erase(index_name);
 }
 
-unsigned int TableMeta::leaseUniqCounter()
-{
-    return uniq_counter++;
-}
-
 SchemaInfo::~SchemaInfo()
 {
     auto cp = tableMetaMap;
@@ -193,32 +160,15 @@ SchemaInfo::~SchemaInfo()
     }
 }
 
-// table_no: defaults to NULL indicating we are to generate it ourselves.
-TableMeta *
-SchemaInfo::createTableMeta(std::string table_name,
-                            bool has_sensitive, bool has_salt,
-                            std::string salt_name,
-                            std::map<std::string, std::string> index_map,
-                            unsigned int uniq_counter,
-                            const unsigned int *table_no)
+bool
+SchemaInfo::addTableMeta(std::string name, TableMeta *tm)
 {
-    // Make sure a table with this name does not already exist.
-    if (this->tableMetaExists(table_name)) {
-        return NULL;
+    if (this->tableMetaExists(name)) {
+        return false;
     }
 
-    unsigned int table_number;
-    if (NULL == table_no) {
-        table_number = totalTables++;
-    } else {
-        // TODO: Make sure no other tables with this number exist.
-        ++totalTables;
-        table_number = *table_no;
-    }
-    TableMeta *tm = new TableMeta(table_number, has_sensitive, has_salt,
-                                  salt_name, index_map, uniq_counter);
-    tableMetaMap[table_name] = tm;
-    return tm;
+    tableMetaMap[name] = tm;
+    return true;
 }
 
 TableMeta *
@@ -257,13 +207,11 @@ SchemaInfo::destroyTableMeta(std::string table)
         return false;
     }
 
-    if (totalTables <= 0) {
-        throw CryptDBError("SchemaInfo::totalTables can't be less than zero");
+    if (1 == tableMetaMap.erase(table)) {
+        delete tm;
+        return true;
     }
 
-    --totalTables;
-    delete tm;
-
-    return 1 == tableMetaMap.erase(table);
+    return false;
 }
 
