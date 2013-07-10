@@ -77,15 +77,14 @@ bool TableMeta::fieldMetaExists(std::string name)
 
 bool TableMeta::addFieldMeta(FieldMeta *fm)
 {
-    // FIXME: Use exists function.
     if (fieldMetaExists(fm->fname)) {
-        return NULL;
+        return false;
     }
     
     this->fieldMetaMap[fm->fname] = fm;
     this->fieldNames.push_back(fm->fname);//TODO: do we need fieldNames?
 
-    return fm;
+    return true;
 }
 
 FieldMeta *TableMeta::getFieldMeta(std::string field)
