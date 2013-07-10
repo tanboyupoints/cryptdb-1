@@ -15,6 +15,9 @@
 using namespace std;
 using namespace NTL;
 
+
+
+
 void
 myassert(bool value, const string &mess)
 {
@@ -367,6 +370,44 @@ unmarshallBinary(const string &s)
     for (uint i = 0; i < (len-offset)/2; i++)
         r += getFromHex(&s[offset+i*2]);
     return r;
+}
+
+
+
+
+static uint hexval(char c) {
+    if (c >= '0' && c <= '9') {
+	return c - '0';
+    } else
+	return c - 'a'+10;
+}
+
+string
+fromHex(const string & h) {
+    string res(h.length()/2, '0');
+
+    for (uint i = 0; i < h.length(); i = i +2) {
+	res[i/2] = (unsigned char)(hexval(h[i])*16+hexval(h[i+1]));
+    }
+
+    return res;
+}
+
+const string hextable = "0123456789abcdef";
+
+string
+toHex(const string x) {
+
+    uint len = x.length();
+    string result(len*2, '0');
+    
+    for (uint i = 0; i < len; i++) {
+	uint v = (uint)x[i];
+	result[2*i] = hextable[v / 16];
+	result[2*i+1] = hextable[v % 16];
+    }
+
+    return result;
 }
 
 

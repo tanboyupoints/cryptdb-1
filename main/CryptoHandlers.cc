@@ -6,6 +6,8 @@
 #include <util/cryptdb_log.hh>
 #include <crypto/arc4.hh>
 
+#include <cmath>
+
 #define LEXSTRING(cstr) { (char*) cstr, sizeof(cstr) }
 
 
@@ -14,12 +16,15 @@ using namespace NTL;
 
 #include <utility>
 
+
 /* Implementation class hierarchy is as in .hh file plus:
 
-   - LayerFactory: creates EncLayer
+   - We have a set of implementation EncLayer-s: each implementation layer
+   is tied to some specific encryption scheme and key/block size:
+   RND_int, RND_str, DET_int, DET_str, OPE_int, OPE_str
 
-   To output an EncLayer specialized to work with certain cipher,
-   data length, data type, we have:
+   - LayerFactory: creates an implementation EncLayer for a certain security
+   level and field type:
 
    - RNDFactory: outputs a RND layer
          - RND layers: RND_int for blowfish, RND_str for AES
@@ -31,6 +36,7 @@ using namespace NTL;
          - OPE layers: OPE_int, OPE_str
   
  */
+
 
 //============= FACTORIES ==========================//
 
@@ -470,7 +476,8 @@ RND_str::decryptUDF(Item * col, Item * ivcol) {
 class DET_int : public EncLayer {
 public:
     DET_int(Create_field *,  const std::string & seed_key);
-
+    DET_int() : key("x"), bf(key) {}; // HACK(raluca)
+    
     std::string serialize() {return serial_pack(level(), name(), key); }
     // create object from serialized contents
     DET_int(const std::string & serial);
@@ -491,6 +498,31 @@ protected:
     static const int bf_key_size = 16;
     static const int ciph_size = 8;
 
+};
+
+
+
+class DET_dec : public DET_int {
+public:
+    DET_dec(Create_field *,  const std::string & seed_key);
+
+    std::string serialize();
+    // create object from serialized contents
+    DET_dec(const std::string & serial);
+
+
+    string name() {return "DET_dec";}
+    Create_field * newCreateField(Create_field * cf, std::string anonname = "");
+
+    Item * encrypt(Item * ptext, uint64_t IV = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0);
+    Item * decryptUDF(Item * col, Item * ivcol = NULL);
+
+
+protected:
+    uint decimals; // number of decimals
+    ulonglong shift;
+    
 };
 
 class DET_str : public EncLayer {
@@ -521,8 +553,12 @@ protected:
 
 EncLayer *
 DETFactory::create(Create_field * cf, std::string key) {
-    if (IsMySQLTypeNumeric(cf->sql_type)) { // the ope case as well 
-	 return new DET_int(cf, key);
+    if (IsMySQLTypeNumeric(cf->sql_type)) { 
+	if (cf->sql_type == MYSQL_TYPE_DECIMAL) {
+	    return new DET_dec(cf, key);
+	} else {
+	    return new DET_int(cf, key);
+	}
      } else {
 	 return new DET_str(cf, key);
      }
@@ -554,7 +590,6 @@ DET_int::newCreateField(Create_field * cf, string anonname) {
 }
 
 
-//TODO: may want to do more specialized crypto for lengths
 Item *
 DET_int::encrypt(Item * ptext, uint64_t IV) {
     ulonglong val = static_cast<Item_int *>(ptext)->value;
@@ -607,7 +642,72 @@ DET_int::decryptUDF(Item * col, Item * ivcol) {
     return udf;
 }
 
+DET_dec::DET_dec(Create_field * cf, const string & seed_key) : DET_int(cf, seed_key) {
+    assert_s(cf->length <= 8, " this type of decimal not supported ");
 
+    decimals = cf->decimals;
+    shift = pow(10, decimals);
+}
+
+string
+DET_dec::serialize() {
+    stringstream layerinfo;
+    layerinfo.clear();
+    layerinfo << decimals << " " << key;
+    return serial_pack(level(), name(), layerinfo.str());
+}
+
+DET_dec::DET_dec(const string & serial) {
+    string layerinfo = get_layer_info(serial, level(), name());
+    stringstream ss(layerinfo);
+
+    ss >> decimals;
+    shift = pow(10, decimals);
+
+    uint len = layerinfo.length();
+    key = layerinfo.substr(len - bf_key_size, bf_key_size);
+    bf = blowfish(key);
+}
+
+static Item_int *
+decimal_to_int(Item_decimal * v, uint decimals, const ulonglong & shift) {
+    assert_s(v->decimal_precision() <= decimals, "value has more precision that specified decimals");
+    
+    ulonglong res = (v->val_int() + v->val_real()) * shift;
+    
+    return new Item_int(res);
+}
+Item *
+DET_dec::encrypt(Item *ptext, uint64_t IV) {
+    Item_decimal * ptext_dec = (Item_decimal *) ptext;
+    Item_int * ptext_int = decimal_to_int(ptext_dec, decimals, shift);
+    Item * result = DET_int::encrypt(ptext_int, IV);
+    delete ptext_int;
+    
+    return result;
+}
+
+Item *
+DET_dec::decrypt(Item *ctext, uint64_t IV) {
+    Item_int * res_int = static_cast<Item_int*>(DET_int::decrypt(ctext, IV));
+
+    Item_decimal * res = new Item_decimal(res_int->value*1.0/shift, decimals, decimals);
+
+    delete res_int;
+
+    return res;
+}
+
+Item *
+DET_dec::decryptUDF(Item * col, Item * ivcol) {
+    assert_s(false, "should not decrypt decimal");
+    return NULL;
+}
+
+Create_field *
+DET_dec::newCreateField(Create_field * cf, string anonname) {
+    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname);
+}
 
 DET_str::DET_str(Create_field * f, string seed_key)
 {
@@ -686,7 +786,7 @@ public:
     DETJOIN_int(Create_field * cf, std::string seed_key) : DET_int(cf, seed_key) {}
 
     // serialize from parent;  unserialize:
-    DETJOIN_int(const std::string & serial);
+    DETJOIN_int(const std::string & serial) : DET_int(serial) {}
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
 };
@@ -697,18 +797,24 @@ public:
     DETJOIN_str(Create_field * cf, std::string seed_key) : DET_str(cf, seed_key) {}
 
     // serialize from parent; unserialize:
-    DETJOIN_str(const std::string & serial);
+    DETJOIN_str(const std::string & serial) : DET_str(serial) {};
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
 };
 
 
-DETJOIN_int::DETJOIN_int(const string & serial) : DET_int(serial)
-{}
 
 
-DETJOIN_str::DETJOIN_str(const std::string & serial) : DET_str(serial)
-{}
+class DETJOIN_dec: public DET_dec {
+    //TODO
+public:
+    DETJOIN_dec(Create_field * cf, std::string seed_key) : DET_dec(cf, seed_key) {}
+
+    // serialize from parent;  unserialize:
+    DETJOIN_dec(const std::string & serial) : DET_dec(serial) {}
+
+    SECLEVEL level() {return SECLEVEL::DETJOIN;}
+};
 
 
 /**************** OPE **************************/

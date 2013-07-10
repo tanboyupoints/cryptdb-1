@@ -250,6 +250,14 @@ toString(const C &l, T op)
     return ss.str();
 }
 
+// given binary string h, returns a hex readable string
+std::string
+fromHex(const std::string & h);
+
+// returns a binary string from a hex readable string
+std::string
+toHex(const std::string & b);
+
 // tries to represent value in minimum no of bytes, avoiding the \0 character
 std::string StringFromVal(uint64_t value, unsigned int padLen = 0);
 
