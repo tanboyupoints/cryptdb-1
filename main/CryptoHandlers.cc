@@ -70,6 +70,13 @@ public:
 };
 
 
+class HOMFactory : public LayerFactory {
+public:
+    static EncLayer * create(Create_field * cf, std::string key);
+    static EncLayer * deserialize(const SerialLayer & serial);
+};
+
+
 EncLayer *
 EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf,
                                 string key)
@@ -87,7 +94,7 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf,
 	return OPEFactory::create(cf, key);
     }
     case SECLEVEL::HOM: {
-	return new HOM(cf, key);
+	return HOMFactory::create(cf, key);
     }
     case SECLEVEL::SEARCH: {
 	return new Search(cf, key);
