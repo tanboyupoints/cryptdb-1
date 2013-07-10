@@ -12,7 +12,7 @@
 
 #include <test/test_utils.hh>
 
-//HACK(ccarvalho) Will be removed after conn_set turn to be Rewriter objects. 
+//HACK(ccarvalho) Will be removed after the creation of set<Rewriter*> objects. 
 static Rewriter __attribute__((unused)) *re_proxy;
 
 typedef enum test_mode {
@@ -96,13 +96,12 @@ class Connection {
     //connection object for using rewriter
     Rewriter * re;
     
-    //TODO/FIXME: Uncomment this after change 
-    //conn_set to std::set<Rewriter *>re_set
+    //TODO/FIXME: Uncomment this after include
+    //std::set<Rewriter *>re_set
     //Rewriter * re_proxy;
 
 
-    //TODO/FIXME: instead of Connect this 
-    //should be Rewrite, because of executeQuery!
+    //TODO/FIXME: Connect should exist along with Rewriter because of proxy. 
     //objects for plain and proxy test
     std::set<Connect *> conn_set;
 
