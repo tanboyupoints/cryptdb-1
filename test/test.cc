@@ -2991,7 +2991,7 @@ testBench(const TestConfig & tc, int argc, char ** argv)
 static void
 test_PKCS(const TestConfig &tc, int ac, char **av)
 {
-
+    
     PKCS * pk,* sk;
     generateKeys(pk, sk);
     assert_s(pk != NULL, "pk is null");
@@ -3027,24 +3027,24 @@ static struct {
     const char * description;
     void (*f)(const TestConfig &, int ac, char **av);
 } tests[] = {
-        //{ "aes",            "",                             &evaluate_AES },
-        { "autoinc",        "",                             &autoIncTest },
-        //{ "consider",       "consider queries (or not)",    &TestNotConsider::run },
-        //{ "crypto",         "crypto functions",             &TestCrypto::run },
-        //{ "paillier",       "",                             &testPaillier },
-        { "parseaccess",    "",                             &testParseAccess },
-        { "pkcs",           "",                             &test_PKCS },
-        //{ "proxy",          "proxy",                        &TestProxy::run },
-        { "queries",        "queries",                      &TestQueries::run },
-        //{ "single",         "integration - single principal",&TestSinglePrinc::run },
-        { "gen_enc_tables", "",                             &generateEncTables },
-        { "test_enc_tables","",                             &testEncTables },
-        { "trace",          "trace eval",                   &testTrace },
-        { "bench",          "TPC-C benchmark eval",         &testBench },
-        //{ "utils",          "",                             &testUtils },
+    //{ "aes",            "",                             &evaluate_AES },
+    { "autoinc",        "",                             &autoIncTest },
+    //{ "consider",       "consider queries (or not)",    &TestNotConsider::run },
+    //{ "crypto",         "crypto functions",             &TestCrypto::run },
+    //{ "paillier",       "",                             &testPaillier },
+    { "parseaccess",    "",                             &testParseAccess },
+    { "pkcs",           "",                             &test_PKCS },
+    //{ "proxy",          "proxy",                        &TestProxy::run },
+    { "queries",        "queries",                      &TestQueries::run },
+    //{ "single",         "integration - single principal",&TestSinglePrinc::run },
+    { "gen_enc_tables", "",                             &generateEncTables },
+    { "test_enc_tables","",                             &testEncTables },
+    { "trace",          "trace eval",                   &testTrace },
+    { "bench",          "TPC-C benchmark eval",         &testBench },
+    //{ "utils",          "",                             &testUtils },
         { "train",          "",                             &testTrain },
-
-        { "help",             "",                           &help },
+    
+    { "help",             "",                           &help },
 };
 
 static void
@@ -3052,81 +3052,81 @@ help(const TestConfig &tc, int ac, char **av)
 {
     cerr << "Usage: " << av[0] << " [options] testname" << endl;
     cerr << "Options:" << endl
-            << "    -s           stop on failure [" << tc.stop_if_fail << "]" << endl
-            << "    -h host      database server [" << tc.host << "]" << endl
-            << "    -t port      database port [" << tc.port << "]" << endl
-            << "    -u user      database username [" << tc.user << "]" << endl
-            << "    -p pass      database password [" << tc.pass << "]" << endl
-            << "    -d db        database to use [" << tc.db << "]" << endl
-	    << "    -e db        embedded database to use [" << tc.shadowdb_dir << "]" << endl
-            << "    -v group     enable verbose messages in group" << endl;
+	 << "    -s           stop on failure [" << tc.stop_if_fail << "]" << endl
+	 << "    -h host      database server [" << tc.host << "]" << endl
+	 << "    -t port      database port [" << tc.port << "]" << endl
+	 << "    -u user      database username [" << tc.user << "]" << endl
+	 << "    -p pass      database password [" << tc.pass << "]" << endl
+	 << "    -d db        database to use [" << tc.db << "]" << endl
+	 << "    -e db        embedded database to use [" << tc.shadowdb_dir << "]" << endl
+	 << "    -v group     enable verbose messages in group" << endl;
     cerr << "Verbose groups:" << endl;
     for (auto i = log_name_to_group.begin(); i != log_name_to_group.end(); i++)
         cerr << "    " << i->first << endl;
     cerr << "Supported tests:" << endl;
     for (uint i = 0; i < NELEM(tests); i++)
         cerr << "    " << left << setw(20) << tests[i].name
-        << tests[i].description << endl;
+	     << tests[i].description << endl;
 }
 
 int
 main(int argc, char ** argv)
 {
-
+    
     TestConfig tc;
     int c;
-
+    
     while ((c = getopt(argc, argv, "v:sh:u:p:d:t:e:")) != -1) {
         switch (c) {
-            case 'v':
-                if (log_name_to_group.find(optarg) == log_name_to_group.end()) {
-                    help(tc, argc, argv);
+	case 'v':
+	    if (log_name_to_group.find(optarg) == log_name_to_group.end()) {
+		help(tc, argc, argv);
                     exit(0);
-                }
+	    }
+	    
+	    cryptdb_logger::enable(log_name_to_group[optarg]);
+	    break;
 
-                cryptdb_logger::enable(log_name_to_group[optarg]);
-                break;
-
-            case 's':
-                tc.stop_if_fail = true;
-                break;
-
-            case 'u':
-                tc.user = optarg;
-                break;
-
+	case 's':
+	    tc.stop_if_fail = true;
+	    break;
+	    
+	case 'u':
+	    tc.user = optarg;
+	    break;
+	    
             case 'p':
                 tc.pass = optarg;
                 break;
-
-            case 'd':
-                tc.db = optarg;
-                break;
-
-            case 'h':
+		
+	case 'd':
+	    tc.db = optarg;
+	    break;
+	    
+	case 'h':
                 tc.host = optarg;
                 break;
-
-            case 't':
-                tc.port = atoi(optarg);
-                break;
-
-            case 'e':
-                tc.shadowdb_dir = optarg;
-                break;
-
-            default:
-                help(tc, argc, argv);
-                exit(0);
+		
+	case 't':
+	    tc.port = atoi(optarg);
+	    break;
+	    
+	case 'e':
+	    tc.shadowdb_dir = optarg;
+	    break;
+	    
+	default:
+	    help(tc, argc, argv);
+	    exit(0);
         }
     }
-
-
+    
+    
     if (argc == optind) {
         cerr << "interactiveTest is deprecated; please use obj/parser/cdb_test" << endl;
         return 0;
     }
-
+    
     for (uint i = 0; i < NELEM(tests); i++) {
         if (!strcasecmp(argv[optind], tests[i].name)) {
             tests[i].f(tc, argc - optind, argv + optind);
@@ -3134,10 +3134,10 @@ main(int argc, char ** argv)
             return 0;
         }
     }
-
+    
     help(tc, argc, argv);
 }
-
+ 
 /*    if (strcmp(argv[1], "train") == 0) {
                 test_train();
                 return 0;

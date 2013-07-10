@@ -22,15 +22,13 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
-#include "main/rewrite_main.hh"
-#include "parser/embedmysql.hh"
-#include "parser/stringify.hh"
-#include "crypto/ecjoin.hh"
-#include "util/errstream.hh"
-#include "util/cryptdb_log.hh"
+#include <main/rewrite_main.hh>
+#include <parser/embedmysql.hh>
+#include <parser/stringify.hh>
+#include <crypto/ecjoin.hh>
+#include <util/errstream.hh>
+#include <util/cryptdb_log.hh>
 
-// if true, uses MultiPrinc mode
-static bool Multi = false;
 
 static bool encByDefault = true;
 
@@ -114,7 +112,7 @@ main(int ac, char **av)
 
     ConnectionInfo ci("localhost", "root", "letmein");
 
-    Rewriter r(ci, av[1], "cryptdbtest", Multi, encByDefault);
+    Rewriter r(ci, av[1], "cryptdbtest", false, encByDefault);
 
     r.setMasterKey("2392834");
 

@@ -21,7 +21,6 @@
 #include <parser/lex_util.hh>
 #include <main/enum_text.hh>
 
-#include <main/MultiPrinc.hh>
 
 // gives names to classes and objects we don't care to know the name of 
 #define ANON                ANON_NAME(__anon_id_func_)

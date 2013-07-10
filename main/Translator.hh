@@ -18,7 +18,7 @@
 #include <stdlib.h>
 
 #include <main/Connect.hh>
-#include <main/AccessManager.hh>
+#include <util/onions.hh>
 
 bool isCommand(std::string str);
 

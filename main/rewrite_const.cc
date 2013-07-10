@@ -22,8 +22,6 @@
 #include <parser/lex_util.hh>
 #include <main/enum_text.hh>
 
-#include <main/MultiPrinc.hh>
-
 using namespace std;
 
 

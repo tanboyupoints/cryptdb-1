@@ -202,7 +202,7 @@ rewrite_create_field(const string &table_name, Create_field *f,
 	EncLayer * last_layer = oit->second->layers.back();
 	//create field with anonymous name
 	Create_field * new_cf =
-            last_layer->newCreateField(oit->second->getAnonOnionName().c_str());
+            last_layer->newCreateField(f, oit->second->getAnonOnionName().c_str());
 
         output_cfields.push_back(new_cf);
     }

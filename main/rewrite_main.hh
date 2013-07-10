@@ -11,7 +11,6 @@
 
 #include <main/Translator.hh>
 #include <main/Connect.hh>
-#include <main/MultiPrinc.hh>
 #include <main/dispatcher.hh>
 
 #include <sql_select.h>
@@ -190,22 +189,22 @@ class CItemTypeDir : public CItemType {
 		     Analysis &a) const {
         return lookup(i)->do_rewrite(i, constr, rp, a);
     }
-
+    
     void do_rewrite_insert(Item *i, Analysis &a, vector<Item *> &l, FieldMeta *fm) const {
         lookup(i)->do_rewrite_insert(i, a, l, fm);
     }
-
-
- protected:
+    
+    
+protected:
     virtual CItemType *lookup(Item *i) const = 0;
-
+    
     CItemType *do_lookup(Item *i, T t, const char *errname) const {
         auto x = types.find(t);
         if (x == types.end())
             thrower() << "missing " << errname << " " << t << " in " << *i;
         return x->second;
     }
-
+    
  private:
     std::map<T, CItemType*> types;
 };
@@ -222,7 +221,7 @@ class CItemFuncDir : public CItemTypeDir<Item_func::Functype> {
     CItemType *lookup(Item *i) const {
         return do_lookup(i, ((Item_func *) i)->functype(), "func type");
     }
- public:
+public:
     CItemFuncDir() {
         itemTypes.reg(Item::Type::FUNC_ITEM, this);
         itemTypes.reg(Item::Type::COND_ITEM, this);
@@ -235,7 +234,7 @@ class CItemSumFuncDir : public CItemTypeDir<Item_sum::Sumfunctype> {
     CItemType *lookup(Item *i) const {
         return do_lookup(i, ((Item_sum *) i)->sum_func(), "sumfunc type");
     }
- public:
+public:
     CItemSumFuncDir() {
         itemTypes.reg(Item::Type::SUM_FUNC_ITEM, this);
     }
@@ -248,7 +247,7 @@ class CItemFuncNameDir : public CItemTypeDir<std::string> {
     CItemType *lookup(Item *i) const {
         return do_lookup(i, ((Item_func *) i)->func_name(), "func name");
     }
- public:
+public:
     CItemFuncNameDir() {
         funcTypes.reg(Item_func::Functype::UNKNOWN_FUNC, this);
         funcTypes.reg(Item_func::Functype::NOW_FUNC, this);
@@ -260,25 +259,25 @@ extern CItemFuncNameDir funcNames;
 
 template<class T, Item::Type TYPE>
 class CItemSubtypeIT : public CItemSubtype<T> {
- public:
+public:
     CItemSubtypeIT() { itemTypes.reg(TYPE, this); }
 };
 
 template<class T, Item_func::Functype TYPE>
 class CItemSubtypeFT : public CItemSubtype<T> {
- public:
+public:
     CItemSubtypeFT() { funcTypes.reg(TYPE, this); }
 };
 
 template<class T, Item_sum::Sumfunctype TYPE>
 class CItemSubtypeST : public CItemSubtype<T> {
- public:
+public:
     CItemSubtypeST() { sumFuncTypes.reg(TYPE, this); }
 };
 
 template<class T, const char *TYPE>
 class CItemSubtypeFN : public CItemSubtype<T> {
- public:
+public:
     CItemSubtypeFN() { funcNames.reg(std::string(TYPE), this); }
 };
 

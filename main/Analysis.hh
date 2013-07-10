@@ -3,8 +3,9 @@
 #include <util/onions.hh>
 #include <parser/embedmysql.hh>
 #include <parser/stringify.hh>
-#include <main/MultiPrinc.hh>
 #include <util/cryptdb_log.hh>
+#include <util/onions.hh>
+#include <main/schema.hh>
 
 using namespace std;
 

@@ -16,15 +16,15 @@ public:
         if (handlers.end() != it) {
             return false;
         }
-
+	
         handlers[cmd] = h;
         return true;
     }
-
+    
     bool canDo(Input lex) const {
         return handlers.end() != handlers.find(extract(lex));
     }
-
+    
     const FetchMe dispatch(Input lex) const {
         auto it = handlers.find(extract(lex));
         if (handlers.end() == it) {
@@ -33,18 +33,18 @@ public:
             return it->second;
         }
     }
-
+    
     std::map<long long, FetchMe> handlers; 
-
+    
     virtual ~Dispatcher() {
         auto cp = handlers;
         handlers.clear();
-
+	
         for (auto it : cp) {
             delete it.second;
         }
     }
-
+    
 private:
     virtual long long extract(Input lex) const = 0;
 };
