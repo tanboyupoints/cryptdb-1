@@ -153,7 +153,6 @@ uint64FromZZ(ZZ val)
 
 
 
-
 string
 StringFromZZ(const ZZ &x)
 {

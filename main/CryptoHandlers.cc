@@ -5,6 +5,7 @@
 #include <util/util.hh>
 #include <util/cryptdb_log.hh>
 #include <crypto/arc4.hh>
+#include <util/zz.hh>
 
 #include <cmath>
 
@@ -68,6 +69,13 @@ public:
     static EncLayer * deserialize(const SerialLayer & serial);
 };
 
+
+class DETJOINFactory : public LayerFactory {
+public:
+    static EncLayer * create(Create_field * cf, std::string key);
+    static EncLayer * deserialize(const SerialLayer & serial);
+};
+
 class OPEFactory : public LayerFactory {
 public:
     static EncLayer * create(Create_field * cf, std::string key);
@@ -125,9 +133,11 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf,
     case SECLEVEL::RND: {
 	return RNDFactory::create(cf, key);
     }
-    case SECLEVEL::DET:
-    case SECLEVEL::DETJOIN: {
+    case SECLEVEL::DET: {
 	return DETFactory::create(cf, key);
+    }
+    case SECLEVEL::DETJOIN: {
+	return DETJOINFactory::create(cf, key);
     }
 	
     case SECLEVEL::OPE: {
@@ -158,9 +168,11 @@ EncLayerFactory::deserializeLayer(onion o, SECLEVEL sl,
 	return RNDFactory::deserialize(li);
 	
     case SECLEVEL::DET: 
-    case SECLEVEL::DETJOIN: 
 	return DETFactory::deserialize(li);
 	
+    case SECLEVEL::DETJOIN: 
+	return DETJOINFactory::deserialize(li);
+
     case SECLEVEL::OPE: 
 	return OPEFactory::deserialize(li);
 	
@@ -484,7 +496,7 @@ public:
     DET_int(const std::string & serial);
 
 
-    SECLEVEL level() {return SECLEVEL::DET;}
+    virtual SECLEVEL level() {return SECLEVEL::DET;}
     string name() {return "DET_int";}
     Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
@@ -531,7 +543,7 @@ public:
     DET_str(const std::string & serial);
 
 
-    SECLEVEL level() {return SECLEVEL::DET;}
+    virtual SECLEVEL level() {return SECLEVEL::DET;}
     string name() {return "DET_str";}
     Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
@@ -574,6 +586,7 @@ DETFactory::deserialize(const SerialLayer & sl) {
 	return new DET_dec(sl.layer_info);
     }
 }
+
 
 
 
@@ -646,7 +659,9 @@ DET_int::decryptUDF(Item * col, Item * ivcol) {
 }
 
 DET_dec::DET_dec(Create_field * cf, const string & seed_key) : DET_int(cf, seed_key) {
-    assert_s(cf->length <= 8, " this type of decimal not supported ");
+    // make sure we have at most 8 precision
+    // a number of the form DECIMAL(a, b) has decimals = b and length = a + b
+    assert_s(cf->length - cf->decimals <= 8, " this type of decimal not supported ");
 
     decimals = cf->decimals;
     shift = pow(10, decimals);
@@ -656,7 +671,7 @@ string
 DET_dec::serialize() {
     stringstream layerinfo;
 
-    layerinfo << DET_int::serialize() << " " << decimals;
+    layerinfo << decimals << "  " << DET_int::serialize();
 
     return layerinfo.str();
 }
@@ -794,7 +809,13 @@ public:
     DETJOIN_int(const std::string & serial) : DET_int(serial) {}
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
+    string name() {return "DETJOIN_int";}
+    
+private:
+   
 };
+
+
 
 
 class DETJOIN_str : public DET_str {
@@ -805,6 +826,9 @@ public:
     DETJOIN_str(const std::string & serial) : DET_str(serial) {};
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
+     string name() {return "DETJOIN_str";}
+private:
+ 
 };
 
 
@@ -819,7 +843,39 @@ public:
     DETJOIN_dec(const std::string & serial) : DET_dec(serial) {}
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
+    string name() {return "DETJOIN_dec";}
+
+private:
 };
+
+
+EncLayer *
+DETJOINFactory::create(Create_field * cf, std::string key) {
+    if (IsMySQLTypeNumeric(cf->sql_type)) {
+	cerr << "sql type " << cf->sql_type << "\n";
+	if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
+	    cerr << "decimal!\n";
+	    return new DETJOIN_dec(cf, key);
+	} else {
+	    cerr << "int!\n";
+	    return new DETJOIN_int(cf, key);
+	}
+     } else {
+	 return new DETJOIN_str(cf, key);
+     }
+}
+
+EncLayer *
+DETJOINFactory::deserialize(const SerialLayer & sl) {
+    if  (sl.name == "DETJOIN_int") {
+	return new DETJOIN_int(sl.layer_info);
+    } else if (sl.name == "DETJOIN_str") {
+	return new DETJOIN_str(sl.layer_info);
+    } else {
+	return new DETJOIN_dec(sl.layer_info);
+    }
+}
+
 
 
 /**************** OPE **************************/
@@ -917,13 +973,12 @@ OPEFactory::deserialize(const SerialLayer & sl) {
     } else if (sl.name == "OPE_str") {
 	return new OPE_str(sl.layer_info);
     } else  {
-	assert_s(false, "incorrect layer name");
-	return NULL;
+	return new OPE_dec(sl.layer_info);
     }
 }
 
 OPE_dec::OPE_dec(Create_field * cf, string seed_key) : OPE_int(cf, seed_key) {
-    assert_s(cf->length <= 8, "this type of decimal not supported ");
+    assert_s(cf->length - cf->decimals <= 8, "this type of decimal not supported ");
 
     decimals = cf->decimals;
     shift = pow(10, decimals);
@@ -933,7 +988,7 @@ string
 OPE_dec::serialize() {
     stringstream layerinfo;
 
-    layerinfo << OPE_int::serialize() << " " << decimals;
+    layerinfo << decimals << " " << OPE_int::serialize();
 
     return layerinfo.str();
 }
@@ -1078,7 +1133,7 @@ private:
 
 EncLayer *
 HOMFactory::create(Create_field *cf, string key) {
-    if (cf->sql_type == MYSQL_TYPE_DECIMAL) {
+    if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
 	return new HOM_dec(cf, key);
     }
 
@@ -1132,7 +1187,7 @@ string
 HOM_dec::serialize() {
     stringstream layerinfo;
 
-    layerinfo << HOM::serialize() << " " << decimals;
+    layerinfo << decimals << " " << HOM::serialize();
 
     return layerinfo.str();
 }
@@ -1149,6 +1204,8 @@ ItemDecToZZ(Item * ptext, const ZZ & shift, uint decimals) {
     static_cast<Item_decimal*>(ptext)->val_str(&s);
 
     string ss(s.ptr(), s.length()); // ss is a number : - xxxx.yyyy
+
+    cerr << "item to enc is " <<ss ;
    
     string ss_int = ss.substr(0, ss.find('.')); // integer part
     if (ss_int == "") ss_int = "0";
@@ -1157,17 +1214,27 @@ ItemDecToZZ(Item * ptext, const ZZ & shift, uint decimals) {
 	ss_dec = ss.substr(ss.find('.') + 1); // decimal part
     }
 
+    cerr << "int part " << ss_int << " dec part " << ss_dec << "\n";
+
     uint actual_decs = ss_dec.length();
     cerr << "decimals are " << decimals << "\n";
     assert_s(actual_decs <= decimals, "value has more decimals than declared");
 
-    ZZ val_int = ZZFromString(ss_int);
-    ZZ val_dec = ZZFromString(ss_dec);
+    cerr << "Before transform ss_int <" << ss_int << ">\n";
+    ZZ val_int = ZZFromDecString(ss_int);
+    cerr << "after val_int " << val_int << "\n";
+    ZZ val_dec = ZZFromDecString(ss_dec);
+
+    cerr << "zz int " << val_int << " zz dec " << val_dec << "\n";
 
     // make an integer out of it   
     val_dec = val_dec * power(to_ZZ(10), decimals - actual_decs);
-    return val_int * shift + val_dec;
     
+    ZZ val_fin = val_int * shift + val_dec;
+
+    cerr << "val fin is " << val_fin << "\n";
+
+    return val_fin;
 }
 
 static Item_decimal *
@@ -1176,7 +1243,7 @@ ZZToItemDec(const ZZ & val, const ZZ & shift) {
     ZZ val_int = val / shift;
     ZZ val_dec = val % shift;
 
-    string num = StringFromZZ(val_int) + "." + StringFromZZ(val_dec);
+    string num = DecStringFromZZ(val_int) + "." + DecStringFromZZ(val_dec);
     
     return new Item_decimal(num.data(), num.length(), &my_charset_numeric);
 }
