@@ -97,10 +97,9 @@ class CreateHandler : public DDLHandler {
         }
 
         // Add field.
-        unsigned long long tableID = a.ps->e_conn->last_insert_id();
         for (std::pair<std::string, FieldMeta *> fm_pair: tm->fieldMetaMap){
             FieldMeta *fm = fm_pair.second;
-            assert(do_add_field(fm, a, dbname, table, &tableID));
+            assert(do_add_field(fm, a, dbname, table));
         }
 
         a.ps->e_conn->execute("COMMIT");

@@ -304,44 +304,17 @@ do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
 // @tid: defaults to NULL.
 bool
 do_add_field(FieldMeta *fm, const Analysis &a, std::string dbname,
-             std::string table, unsigned long long *tid)
+             std::string table)
 {
-    // Get the table ID if we do not already have it.
-    unsigned long long table_id;
-    if (NULL == tid) {
-        DBResult *dbres;
-        ostringstream s;
-        s << " SELECT id FROM pdb.table_info "
-          << " WHERE pdb.table_info.database_name = '" << dbname << "'"
-          << "   AND pdb.table_info.name = '" << table << "';";
-
-        assert(a.ps->e_conn->execute(s.str(), dbres));
-
-        ScopedMySQLRes r(dbres->n);
-        MYSQL_ROW row;
-
-        if (1 != mysql_num_rows(r.res())) {
-            return false;
-        }
-
-        while ((row = mysql_fetch_row(r.res()))) {
-            unsigned long *l = mysql_fetch_lengths(r.res());
-            assert(l != NULL);
-
-            string str_table_id(row[0], l[0]);
-            table_id = (unsigned long long)atoi(str_table_id.c_str());
-        }
-    } else {
-        table_id = *tid;
-    }
-
     // Add the field data to the proxy db.
     // TODO: hasSensitive
     ostringstream s;
     s << " INSERT INTO pdb.field_info VALUES ("
-      << " " << table_id << ", "
+      << "       (SELECT id FROM pdb.table_info "
+      << "         WHERE pdb.table_info.database_name = '" << dbname << "'"
+      << "           AND pdb.table_info.name = '" << table << "'),"
       << " '" << fm->fname << "', "
-      << " " << bool_to_string(fm->has_salt) << ", "
+      << " "  << bool_to_string(fm->has_salt) << ", "
       << " '" << fm->getSaltName() << "', "
       << " '" << TypeText<onionlayout>::toText(fm->onion_layout)<< "',"
       << " 0"
