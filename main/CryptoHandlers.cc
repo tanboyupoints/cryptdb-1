@@ -554,10 +554,13 @@ protected:
 
 EncLayer *
 DETFactory::create(Create_field * cf, std::string key) {
-    if (IsMySQLTypeNumeric(cf->sql_type)) { 
-	if (cf->sql_type == MYSQL_TYPE_DECIMAL) {
+    if (IsMySQLTypeNumeric(cf->sql_type)) {
+	cerr << "sql type " << cf->sql_type << "\n";
+	if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
+	    cerr << "decimal!\n";
 	    return new DET_dec(cf, key);
 	} else {
+	    cerr << "int!\n";
 	    return new DET_int(cf, key);
 	}
      } else {
@@ -682,16 +685,19 @@ DET_dec::DET_dec(const string & serial) :
 
 static Item_int *
 decimal_to_int(Item_decimal * v, uint decimals, const ulonglong & shift) {
-    assert_s(v->decimal_precision() <= decimals, "value has more precision that specified decimals");
-    
-    ulonglong res = (v->val_int() + v->val_real()) * shift;
+    ulonglong res =  v->val_real() * shift;
     
     return new Item_int(res);
 }
 Item *
 DET_dec::encrypt(Item *ptext, uint64_t IV) {
     Item_decimal * ptext_dec = (Item_decimal *) ptext;
+    String s;
+    ptext->val_str(&s);
+    cerr << "given decimal " << string(s.ptr(), s.length()) << "\n";
+    cerr << "decimals " << decimals << "\n";
     Item_int * ptext_int = decimal_to_int(ptext_dec, decimals, shift);
+    cerr << "encrypting int " << ptext_int->value << "\n";
     Item * result = DET_int::encrypt(ptext_int, IV);
     delete ptext_int;
     
@@ -890,7 +896,6 @@ OPEFactory::create(Create_field * cf, std::string key) {
 	 return new OPE_str(cf, key);
      }
 
-    
 }
 
 EncLayer *
@@ -1079,9 +1084,10 @@ HOM_dec::HOM_dec(const string & serial) :
 
 static ZZ
 ItemDecToZZ(Item * ptext, const ZZ & shift, uint decimals) {
-    String * s = static_cast<Item_decimal*>(ptext)->val_str(NULL);
+    String s;
+    static_cast<Item_decimal*>(ptext)->val_str(&s);
 
-    string ss(s->ptr(), s->length()); // ss is a number : - xxxx.yyyy
+    string ss(s.ptr(), s.length()); // ss is a number : - xxxx.yyyy
    
     string ss_int = ss.substr(0, ss.find('.')); // integer part
     if (ss_int == "") ss_int = "0";
@@ -1091,6 +1097,7 @@ ItemDecToZZ(Item * ptext, const ZZ & shift, uint decimals) {
     }
 
     uint actual_decs = ss_dec.length();
+    cerr << "decimals are " << decimals << "\n";
     assert_s(actual_decs <= decimals, "value has more decimals than declared");
 
     ZZ val_int = ZZFromString(ss_int);

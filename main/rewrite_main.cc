@@ -1202,10 +1202,10 @@ executeQuery(Rewriter &r, const string &q, bool show)
     } catch (runtime_error &e) {
         cout << "Unexpected Error: " << e.what() << " in query " << q << endl;
         return NULL;
-    } catch (CryptDBError &e) {
+	 } /* catch (CryptDBError &e) {
         cout << "Internal Error: " << e.msg << " in query " << q << endl;
-        return NULL;
-    }
+	return NULL;
+	}*/
 }
 
 void
