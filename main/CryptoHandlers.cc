@@ -34,6 +34,9 @@ using namespace NTL;
 
     -OPEFactory: outputs a OPE layer
          - OPE layers: OPE_int, OPE_str
+
+    -HOMFactory: outputs a HOM layer
+         - HOM layers: HOM (for integers), HOM_dec (for decimals)
   
  */
 
@@ -1007,21 +1010,21 @@ private:
 };
 
 
-
-class HOMFactory : public LayerFactory {
-public:
-    static EncLayer * create(Create_field * cf, std::string key);
-    static EncLayer * deserialize(const SerialLayer & serial);
-};
-
-
 EncLayer *
 HOMFactory::create(Create_field *cf, string key) {
     if (cf->sql_type == MYSQL_TYPE_DECIMAL) {
 	return new HOM_dec(cf, key);
     }
 
-    return HOM(cf, key);
+    return new HOM(cf, key);
+}
+
+EncLayer *
+HOMFactory::deserialize(const SerialLayer & serial) {
+    if (serial.name == "HOM_dec") {
+	return new HOM_dec(serial.layer_info);
+    }
+    return new HOM(serial.layer_info);
 }
 
 static ZZ

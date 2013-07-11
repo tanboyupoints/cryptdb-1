@@ -175,42 +175,29 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
 
 static class ANON : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITEM> {
     virtual RewritePlan * do_gather_type(Item_decimal *i, reason &tr, Analysis & a) const {
-        LOG(cdb_v) << "CItemSubtypeIT (L1024) decimal do_gather " << *i;
-	UNIMPLEMENTED;
-        /* constant decimals are always ok */
-        return NULL;
+        LOG(cdb_v) << "CItemSubtypeIT decimal do_gather " << *i;
+
+	tr = reason(FULL_EncSet, "is a constant", i);
+        return new RewritePlan(FULL_EncSet_Int, tr);
     }
-        virtual Item * do_optimize_type(Item_decimal *i, Analysis & a) const {
+    virtual Item * do_optimize_type(Item_decimal *i, Analysis & a) const {
         return i;
     }
     virtual Item * do_rewrite_type(Item_decimal *i,
 				   const OLK & constr, const RewritePlan * rp,
 				   Analysis & a) const {
-        LOG(cdb_v) << "do_rewrite_type L1028";
-        double n = i->val_real();
+        LOG(cdb_v) << "do_rewrite_type " << *i << "endl";
+
+	return encrypt_item(i, constr, a);
+/*        double n = i->val_real();
         char buf[sizeof(double) * 2];
         sprintf(buf, "%x", (unsigned int)n);
         // TODO(stephentu): Do some actual encryption of the double here
-        return new Item_hex_string(buf, sizeof(buf));
+        return new Item_hex_string(buf, sizeof(buf));*/
     }
     virtual void
     do_rewrite_insert_type(Item_decimal *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
-        assert(fm != NULL);
-        double n = i->val_real();
-        char buf[sizeof(double) * 2];
-        sprintf(buf, "%x", (unsigned int)n);
-        for (auto it = fm->onions.begin();
-             it != fm->onions.end();
-             ++it) {
-            l.push_back(new Item_hex_string(buf, sizeof(buf)));
-        }
-        if (fm->has_salt) {
-            l.push_back(new Item_hex_string(buf, sizeof(buf)));
-        }
-        //if no onions, add field as is
-        if (l.empty()) {
-            l.push_back(new Item_hex_string(buf, sizeof(buf)));
-        }
+	typical_rewrite_insert_type(i, a, l, fm);
     }
 } ANON;

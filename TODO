@@ -50,7 +50,11 @@ Import tool notes:
       -- update + increment
       -- test persistency
       (by Wed)
-      -- soon: decimal, varchar, char[lengths], (should be ready by Wed)
+      Data types
+        -- varchar: test various lengths
+        -- tinytext, mediumtext, text, longtext
+      	-- decimal: test various length of decimals, including zero decimal
+	-- for each data type above, exercise each onion to see if it still works
       
 
 Raluca:
