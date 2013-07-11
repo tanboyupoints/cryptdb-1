@@ -33,7 +33,7 @@ using namespace NTL;
          - DET layers: DET_int, DET_str
 
     -OPEFactory: outputs a OPE layer
-         - OPE layers: OPE_int, OPE_str
+         - OPE layers: OPE_int, OPE_str, OPE_dec
 
     -HOMFactory: outputs a HOM layer
          - HOM layers: HOM (for integers), HOM_dec (for decimals)
@@ -511,15 +511,11 @@ public:
     // create object from serialized contents
     DET_dec(const std::string & serial);
 
-
     string name() {return "DET_dec";}
-    Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV = 0);
     Item * decrypt(Item * ctext, uint64_t IV = 0);
-    Item * decryptUDF(Item * col, Item * ivcol = NULL);
-
-
+ 
 protected:
     uint decimals; // number of decimals
     ulonglong shift;
@@ -715,16 +711,8 @@ DET_dec::decrypt(Item *ctext, uint64_t IV) {
     return res;
 }
 
-Item *
-DET_dec::decryptUDF(Item * col, Item * ivcol) {
-    assert_s(false, "should not decrypt decimal");
-    return NULL;
-}
 
-Create_field *
-DET_dec::newCreateField(Create_field * cf, string anonname) {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname);
-}
+
 
 DET_str::DET_str(Create_field * f, string seed_key)
 {
@@ -888,14 +876,37 @@ private:
 };
 
 
+class OPE_dec : public OPE_int {
+public:
+    OPE_dec(Create_field *, std::string seed_key);
+
+    // serialize and deserialize
+    std::string serialize();
+    OPE_dec(const std::string & serial);
+
+    string name() {return "OPE_dec";}
+
+    Item * encrypt(Item * p, uint64_t IV);
+    Item * decrypt(Item * c, uint64_t IV);
+
+private:
+    uint decimals;
+    ulonglong shift;
+};
+
+
+
 EncLayer *
 OPEFactory::create(Create_field * cf, std::string key) {
-    if (IsMySQLTypeNumeric(cf->sql_type)) { // the ope case as well 
-	 return new OPE_int(cf, key);
-     } else {
-	 return new OPE_str(cf, key);
-     }
-
+    if (IsMySQLTypeNumeric(cf->sql_type)) { 
+	if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type ==  MYSQL_TYPE_NEWDECIMAL) {
+	    return new OPE_dec(cf, key);
+	} 
+	return new OPE_int(cf, key);
+    }
+    
+    return new OPE_str(cf, key);
+    
 }
 
 EncLayer *
@@ -911,10 +922,60 @@ OPEFactory::deserialize(const SerialLayer & sl) {
     }
 }
 
+OPE_dec::OPE_dec(Create_field * cf, string seed_key) : OPE_int(cf, seed_key) {
+    assert_s(cf->length <= 8, "this type of decimal not supported ");
+
+    decimals = cf->decimals;
+    shift = pow(10, decimals);
+}
+
+string
+OPE_dec::serialize() {
+    stringstream layerinfo;
+
+    layerinfo << OPE_int::serialize() << " " << decimals;
+
+    return layerinfo.str();
+}
+
+OPE_dec::OPE_dec(const string & serial) :
+    OPE_int(parent_serial(decimals, serial))
+{
+    shift = pow(10, decimals);
+}
+
+Item *
+OPE_dec::encrypt(Item * ptext, uint64_t IV) {
+    Item_decimal * ptext_dec = (Item_decimal *) ptext;
+    Item_int * ptext_int = decimal_to_int(ptext_dec, decimals, shift);
+    cerr << "encrypting int " << ptext_int->value << "\n";
+    Item * result = OPE_int::encrypt(ptext_int, IV);
+    delete ptext_int;
+    
+    return result;
+}
+
+
+Item *
+OPE_dec::decrypt(Item *ctext, uint64_t IV) {
+    Item_int * res_int = static_cast<Item_int*>(OPE_int::decrypt(ctext, IV));
+
+    Item_decimal * res = new Item_decimal(res_int->value*1.0/shift, decimals, decimals);
+
+    delete res_int;
+
+    return res;
+}
+
+
+
+
 OPE_int::OPE_int(Create_field * f, string seed_key)
     : key(prng_expand(seed_key, key_bytes)),
       ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
+
+
 
 OPE_int::OPE_int(const std::string & serial) :
     key(serial), ope(OPE(key, plain_size * 8, ciph_size * 8))
