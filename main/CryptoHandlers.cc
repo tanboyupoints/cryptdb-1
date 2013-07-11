@@ -1006,98 +1006,22 @@ private:
     ~HOM_dec();
 };
 
-HOM_dec::HOM_dec(Create_field * cf, std::string seed_key) :  HOM(cf, seed_key){
-    assert_s(cf->length() <= 120, "too large decimal for HOM layer");
 
-    decimals =  cf->decimals;
-    shift = power(to_ZZ(10), decimals);
-    
-}
 
-string
-HOM_dec::serialize() {
-    stringstream layerinfo;
+class HOMFactory : public LayerFactory {
+public:
+    static EncLayer * create(Create_field * cf, std::string key);
+    static EncLayer * deserialize(const SerialLayer & serial);
+};
 
-    layerinfo << HOM::serialize() << " " << decimals;
 
-    return layerinfo.str();
-}
-
-HOM_dec::HOM_dec(const string & serial) :
-    HOM(parent_serial(decimals, serial))
-{
-    shift = power(to_ZZ(10), decimals);
-}
-
-static ZZ
-ItemDecToZZ(Item * ptext, const ZZ & shift) {
-    String * s = static_cast<Item_decimal*>(ptext)->val_str();
-
-    string ss(s->ptr, s->str_length());
-    // ss is a number : - xxxx.yyyy
-
-    string ss_int = ss.substr(0, ss.pos('.'));
-    string ss_dec = "";
-    if (ss.find('.') != npos) {
-	ss_dec = ss.substr(ss.pos('.' + 1), string::npos);
+EncLayer *
+HOMFactory::create(Create_field *cf, string key) {
+    if (cf->sql_type == MYSQL_TYPE_DECIMAL) {
+	return new HOM_dec(cf, key);
     }
 
-    // pad ss_dec to number of decimals
-    uint actual_decs = ss_dec.length();
-    assert_s(actual_decs <= decimals, "value has more decimals than declared");
-    
-    for (uint i = actual_decs; i < decimals - actual_decs; i++) {
-	ss_dec = ss_dec + '0';
-    }
-
-    // now values is xxxxyyy000
-    string ss_final = ss_int + ss_dec; 
-	
-    return ZZFromString(ss_final);
-}
-
-static Item_decimal *
-ZZToItemDec(const ZZ & val, uint decimals) {
-    new Item_decimal(const char * str, length, charset);
-}
-
-TODO: need shift?
-
-Item *
-DET_dec::encrypt(Item *ptext, uint64_t IV) {
-    ZZ enc = sk->encrypt(ItemDecToZZ(ptext, shift));
-
-    return ZZToItemStr(enc);
-}
-
-Item *
-DET_dec::decrypt(Item *ctext, uint64_t IV) {
-    ZZ enc = ItemStrToZZ(ctext);
-    ZZ dec = sk->decrypt(enc);
-
-    return ZZToItemDec(dec, shift);
-}
-
-
-
-HOM::HOM(Create_field * f, string seed_key) :
-    seed_key(seed_key)
-{
-    streamrng<arc4> * prng = new streamrng<arc4>(seed_key);
-    sk =  new Paillier_priv(Paillier_priv::keygen(prng, nbits));
-    delete prng;
-}
-
-HOM::HOM(const std::string & serial): seed_key(serial)
-{
-    streamrng<arc4> * prng = new streamrng<arc4>(seed_key);
-    sk = new Paillier_priv(Paillier_priv::keygen(prng, nbits));
-    delete prng;
-}
-
-Create_field *
-HOM::newCreateField(Create_field * cf, string anonname) {
-    return createFieldHelper(cf, 2*nbits/8, MYSQL_TYPE_BLOB, anonname, &my_charset_bin);
+    return HOM(cf, key);
 }
 
 static ZZ
@@ -1126,6 +1050,104 @@ ItemStrToZZ(Item* i) {
     string res = ItemToString(i);
     return ZZFromString(res);
 }
+
+HOM_dec::HOM_dec(Create_field * cf, std::string seed_key) :  HOM(cf, seed_key){
+    assert_s(cf->length <= 120, "too large decimal for HOM layer");
+
+    decimals =  cf->decimals;
+    shift = power(to_ZZ(10), decimals);
+    
+}
+
+string
+HOM_dec::serialize() {
+    stringstream layerinfo;
+
+    layerinfo << HOM::serialize() << " " << decimals;
+
+    return layerinfo.str();
+}
+
+HOM_dec::HOM_dec(const string & serial) :
+    HOM(parent_serial(decimals, serial))
+{
+    shift = power(to_ZZ(10), decimals);
+}
+
+static ZZ
+ItemDecToZZ(Item * ptext, const ZZ & shift, uint decimals) {
+    String * s = static_cast<Item_decimal*>(ptext)->val_str(NULL);
+
+    string ss(s->ptr(), s->length()); // ss is a number : - xxxx.yyyy
+   
+    string ss_int = ss.substr(0, ss.find('.')); // integer part
+    if (ss_int == "") ss_int = "0";
+    string ss_dec = "";
+    if (ss.find('.') != string::npos) {
+	ss_dec = ss.substr(ss.find('.') + 1); // decimal part
+    }
+
+    uint actual_decs = ss_dec.length();
+    assert_s(actual_decs <= decimals, "value has more decimals than declared");
+
+    ZZ val_int = ZZFromString(ss_int);
+    ZZ val_dec = ZZFromString(ss_dec);
+
+    // make an integer out of it   
+    val_dec = val_dec * power(to_ZZ(10), decimals - actual_decs);
+    return val_int * shift + val_dec;
+    
+}
+
+static Item_decimal *
+ZZToItemDec(const ZZ & val, const ZZ & shift) {
+
+    ZZ val_int = val / shift;
+    ZZ val_dec = val % shift;
+
+    string num = StringFromZZ(val_int) + "." + StringFromZZ(val_dec);
+    
+    return new Item_decimal(num.data(), num.length(), &my_charset_numeric);
+}
+
+
+Item *
+HOM_dec::encrypt(Item *ptext, uint64_t IV) {
+    ZZ enc = sk->encrypt(ItemDecToZZ(ptext, shift, decimals));
+
+    return ZZToItemStr(enc);
+}
+
+Item *
+HOM_dec::decrypt(Item *ctext, uint64_t IV) {
+    ZZ enc = ItemStrToZZ(ctext);
+    ZZ dec = sk->decrypt(enc);
+
+    return ZZToItemDec(dec, shift);
+}
+
+
+
+HOM::HOM(Create_field * f, string seed_key) :
+    seed_key(seed_key)
+{
+    streamrng<arc4> * prng = new streamrng<arc4>(seed_key);
+    sk =  new Paillier_priv(Paillier_priv::keygen(prng, nbits));
+    delete prng;
+}
+
+HOM::HOM(const std::string & serial): seed_key(serial)
+{
+    streamrng<arc4> * prng = new streamrng<arc4>(seed_key);
+    sk = new Paillier_priv(Paillier_priv::keygen(prng, nbits));
+    delete prng;
+}
+
+Create_field *
+HOM::newCreateField(Create_field * cf, string anonname) {
+    return createFieldHelper(cf, 2*nbits/8, MYSQL_TYPE_BLOB, anonname, &my_charset_bin);
+}
+
 
 Item *
 HOM::encrypt(Item * ptext, uint64_t IV) {

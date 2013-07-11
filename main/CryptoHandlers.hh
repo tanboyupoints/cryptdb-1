@@ -83,7 +83,7 @@ public:
     Item * sumUDA(Item * expr);
     Item * sumUDF(Item * i1, Item * i2);
 
-private:
+protected:
     std::string seed_key;
     static const uint nbits = 1024;
     Paillier_priv * sk;
