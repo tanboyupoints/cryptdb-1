@@ -563,12 +563,9 @@ protected:
 EncLayer *
 DETFactory::create(Create_field * cf, std::string key) {
     if (IsMySQLTypeNumeric(cf->sql_type)) {
-	cerr << "sql type " << cf->sql_type << "\n";
 	if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
-	    cerr << "decimal!\n";
 	    return new DET_dec(cf, key);
 	} else {
-	    cerr << "int!\n";
 	    return new DET_int(cf, key);
 	}
      } else {
@@ -593,12 +590,14 @@ DETFactory::deserialize(const SerialLayer & sl) {
 DET_int::DET_int(Create_field * f, const string & seed_key)
     : key(prng_expand(seed_key, bf_key_size)),
       bf(key)
-{}
+{
+}
 
 DET_int::DET_int(const string & serial) : 
     key(serial),
     bf(key)
-{}
+{
+}
 
 Create_field *
 DET_int::newCreateField(Create_field * cf, string anonname) {
@@ -671,7 +670,7 @@ string
 DET_dec::serialize() {
     stringstream layerinfo;
 
-    layerinfo << decimals << "  " << DET_int::serialize();
+    layerinfo << decimals << " " << DET_int::serialize();
 
     return layerinfo.str();
 }
@@ -685,12 +684,13 @@ parent_serial(uint & decimals, const string & serial) {
 
     uint pos = layerinfo.tellg();
 
-    return serial.substr(pos, serial.length()-pos);
+    return serial.substr(pos+1, serial.length()-pos);
 }
 
 DET_dec::DET_dec(const string & serial) :
     DET_int(parent_serial(decimals, serial))
 {
+
     shift = pow(10, decimals);   
 }
 
@@ -703,12 +703,7 @@ decimal_to_int(Item_decimal * v, uint decimals, const ulonglong & shift) {
 Item *
 DET_dec::encrypt(Item *ptext, uint64_t IV) {
     Item_decimal * ptext_dec = (Item_decimal *) ptext;
-    String s;
-    ptext->val_str(&s);
-    cerr << "given decimal " << string(s.ptr(), s.length()) << "\n";
-    cerr << "decimals " << decimals << "\n";
     Item_int * ptext_int = decimal_to_int(ptext_dec, decimals, shift);
-    cerr << "encrypting int " << ptext_int->value << "\n";
     Item * result = DET_int::encrypt(ptext_int, IV);
     delete ptext_int;
     
@@ -721,6 +716,8 @@ DET_dec::decrypt(Item *ctext, uint64_t IV) {
 
     Item_decimal * res = new Item_decimal(res_int->value*1.0/shift, decimals, decimals);
 
+    LOG(encl) << "DET_dec dec " << res_int->value << "--->" << res->val_real();
+    
     delete res_int;
 
     return res;
@@ -852,12 +849,9 @@ private:
 EncLayer *
 DETJOINFactory::create(Create_field * cf, std::string key) {
     if (IsMySQLTypeNumeric(cf->sql_type)) {
-	cerr << "sql type " << cf->sql_type << "\n";
 	if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
-	    cerr << "decimal!\n";
 	    return new DETJOIN_dec(cf, key);
 	} else {
-	    cerr << "int!\n";
 	    return new DETJOIN_int(cf, key);
 	}
      } else {
@@ -1003,7 +997,6 @@ Item *
 OPE_dec::encrypt(Item * ptext, uint64_t IV) {
     Item_decimal * ptext_dec = (Item_decimal *) ptext;
     Item_int * ptext_int = decimal_to_int(ptext_dec, decimals, shift);
-    cerr << "encrypting int " << ptext_int->value << "\n";
     Item * result = OPE_int::encrypt(ptext_int, IV);
     delete ptext_int;
     
@@ -1205,8 +1198,6 @@ ItemDecToZZ(Item * ptext, const ZZ & shift, uint decimals) {
 
     string ss(s.ptr(), s.length()); // ss is a number : - xxxx.yyyy
 
-    cerr << "item to enc is " <<ss ;
-   
     string ss_int = ss.substr(0, ss.find('.')); // integer part
     if (ss_int == "") ss_int = "0";
     string ss_dec = "";
@@ -1214,27 +1205,16 @@ ItemDecToZZ(Item * ptext, const ZZ & shift, uint decimals) {
 	ss_dec = ss.substr(ss.find('.') + 1); // decimal part
     }
 
-    cerr << "int part " << ss_int << " dec part " << ss_dec << "\n";
-
     uint actual_decs = ss_dec.length();
-    cerr << "decimals are " << decimals << "\n";
     assert_s(actual_decs <= decimals, "value has more decimals than declared");
 
-    cerr << "Before transform ss_int <" << ss_int << ">\n";
     ZZ val_int = ZZFromDecString(ss_int);
-    cerr << "after val_int " << val_int << "\n";
     ZZ val_dec = ZZFromDecString(ss_dec);
-
-    cerr << "zz int " << val_int << " zz dec " << val_dec << "\n";
 
     // make an integer out of it   
     val_dec = val_dec * power(to_ZZ(10), decimals - actual_decs);
     
-    ZZ val_fin = val_int * shift + val_dec;
-
-    cerr << "val fin is " << val_fin << "\n";
-
-    return val_fin;
+    return val_int * shift + val_dec;
 }
 
 static Item_decimal *
@@ -1468,8 +1448,6 @@ static udf_func u_search = {
 
 static string
 searchstrip(string s) {
-    cerr << "searchstrip input " << s << "\n";
-
     if (s[0] == '%') {
 	s = s.substr(1, s.length() - 1);
     }
@@ -1477,7 +1455,7 @@ searchstrip(string s) {
     if (s[len-1] == '%') {
 	s = s.substr(0, len-1);
     }
-    cerr << "searchstrip output " << s << "\n";
+
     return s;
 }
 
