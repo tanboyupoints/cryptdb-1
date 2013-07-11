@@ -8,34 +8,35 @@
 #include <main/Translator.hh>
 #include <util/cryptdb_log.hh>
 
+#include <functional>
+#include <ctime>
+
 using namespace std;
 
-string
-anonymizeFieldName(unsigned int index, onion o, string origname)
+// TODO: Make length longer.
+// TODO: Ensure some level of collision resistance.
+std::string
+getpRandomName()
 {
+    static const char valids[] =
+        "0123456789"
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    static int out_length = 8;
+    char output[out_length + 1];
 
-    switch (o) {
-    case oPLAIN:
-	return origname;
-    case oDET: {
-        return string("field") + strFromVal(index) + "DET";
-    }
-    case oOPE: {
-        return string("field") + strFromVal(index) + "OPE";
-    }
-    case oAGG: {
-        return string("field") + strFromVal(index) + "AGG";
-    }
-    case oSWP: {
-        return string("field") + strFromVal(index) + "SWP";
-    }
-    default: {assert_s(false, "invalid onion in anonymizeFieldName"); }
-    }
+    std::function<bool()> wrap_srand =[](){srand(time(NULL)); return true;};
+    std::function<void(bool)> do_nothing = [] (bool b) {return;};
+    static bool danger_will_robinson = wrap_srand();
+    do_nothing(danger_will_robinson);
 
-    assert_s(false, "invalid control path in anonymizeFieldName");
-    return "";
+    for (int i = 0; i < out_length; ++i) {
+        output[i] = valids[rand() % strlen(valids)];
+    }
+    output[out_length] = 0;
+
+    return std::string(output);
 }
-
 
 string
 nextAutoInc(map<string, unsigned int > & autoInc, string fullname)

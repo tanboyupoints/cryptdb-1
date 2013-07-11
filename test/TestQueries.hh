@@ -13,23 +13,20 @@
 #include <test/test_utils.hh>
 
 typedef enum test_mode {
-    UNENCRYPTED, SINGLE, MULTI,
-    PROXYPLAIN, PROXYSINGLE, PROXYMULTI,
+    UNENCRYPTED, SINGLE,
+    PROXYPLAIN, PROXYSINGLE,
     TESTINVALID
 } test_mode;
 
 struct QueryChoice {
     const std::vector<std::string> plain;
     const std::vector<std::string> single;
-    const std::vector<std::string> multi;
 
     QueryChoice(const std::vector<std::string> &plain_arg,
-                const std::vector<std::string> &single_arg,
-                const std::vector<std::string> &multi_arg)
-        : plain(plain_arg), single(single_arg), multi(multi_arg)
+                const std::vector<std::string> &single_arg)
+        : plain(plain_arg), single(single_arg)
     {
         assert(plain_arg.size() == single_arg.size());
-        assert(plain_arg.size() == multi_arg.size());
     }
 
     const std::vector<std::string> &choose(test_mode t) const {
@@ -41,10 +38,6 @@ struct QueryChoice {
         case SINGLE:
         case PROXYSINGLE:
             return single;
-
-        case MULTI:
-        case PROXYMULTI:
-            return multi;
 
         default:
             assert(0);
@@ -67,9 +60,9 @@ struct QueryList {
               std::vector<Query> c,
               std::vector<std::string> pd, std::vector<std::string> sd, std::vector<std::string> md)
         : name(namearg),
-          create(pc, sc, mc),
+          create(pc, sc),
           common(c),
-          drop(pd, sd, md)
+          drop(pd, sd)
     {}
 };
 

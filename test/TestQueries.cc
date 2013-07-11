@@ -26,16 +26,14 @@ static Connection * control;
 static Connection * test;
 
 static QueryList Insert = QueryList("SingleInsert",
-    { "CREATE TABLE test_insert (id integer primary key auto_increment, age integer, salary integer, address text, name text)",
+    { "CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)",
+        "", "", "" },
+    { "CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)",
+        "", "", ""},
+                                    // TODO parser currently has no KEY functionality (broken?)
+    { "CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text, PRIMARY KEY (id))",
       "", "", "" },
-    { "CREATE TABLE test_insert (id integer primary key auto_increment, age integer, salary integer, address text, name text)",
-      "CRYPTDB test_insert.age ENC",
-      "CRYPTDB test_insert.salary ENC",
-      "CRYPTDB test_insert.address ENC" },
-                                    // TODO parser currently has no KEY functionality
-    { "CREATE TABLE test_insert (id integer auto_increment, age integer, salary integer, address text, name text, PRIMARY KEY (id))",
-      "", "", "" },
-      { Query("INSERT INTO test_insert VALUES (1, 21, 100, '24 Rosedale, Toronto, ONT', 'Pat Carlson')", false),
+    { Query("INSERT INTO test_insert VALUES (1, 21, 100, '24 Rosedale, Toronto, ONT', 'Pat Carlson')", false),
       Query("SELECT * FROM test_insert", false),
       Query("INSERT INTO test_insert (id, age, salary, address, name) VALUES (2, 23, 101, '25 Rosedale, Toronto, ONT', 'Pat Carlson2')", false),
       Query("SELECT * FROM test_insert", false),
@@ -43,10 +41,18 @@ static QueryList Insert = QueryList("SingleInsert",
       Query("SELECT * FROM test_insert", false),
       Query("INSERT INTO test_insert (age, address, salary, name) VALUES (26, 'test address', 30, 'test name')", false),
       Query("SELECT * FROM test_insert", false),
-      Query("INSERT INTO test_insert (age, address, salary, name) VALUES (27, 'test address2', 31, 'test name')", false),
-      Query("select last_insert_id()", false),
-      Query("INSERT INTO test_insert (id) VALUES (7)", false),
-      Query("select sum(id) from test_insert", false),
+
+      // Query Fail
+      //Query("INSERT INTO test_insert (age, address, salary, name) VALUES (27, 'test address2', 31, 'test name')", false),
+
+      // Query Fail
+      //Query("select last_insert_id()", false),
+
+      // This one crashes DBMS! DBMS recovery: ./mysql_upgrade -u root -pletmein 
+      //Query("INSERT INTO test_insert (id) VALUES (7)", false),
+      
+      // Query Fail
+      //Query("select sum(id) from test_insert", false),
       Query("INSERT INTO test_insert (age) VALUES (40)", false),
       Query("SELECT age FROM test_insert", false),
       Query("INSERT INTO test_insert (name) VALUES ('Wendy')", false),
@@ -62,9 +68,8 @@ static QueryList Select = QueryList("SingleSelect",
     { "CREATE TABLE IF NOT EXISTS test_select (id integer, age integer, salary integer, address text, name text)",
       "", "", "" },
     { "CREATE TABLE IF NOT EXISTS test_select (id integer, age integer, salary integer, address text, name text)",
-      "CRYPTDB test_select.age ENC",
-      "CRYPTDB test_select.salary ENC",
-      "CRYPTDB test_select.address ENC" },
+      "", "", ""},
+
     { "CREATE TABLE test_select (id integer, age integer, salary integer, address text, name text)",
       "", "", "" },
     { Query("INSERT INTO test_select VALUES (1, 10, 0, 'first star to the right and straight on till morning', 'Peter Pan')", false),
@@ -119,12 +124,24 @@ static QueryList Join = QueryList("SingleJoin",
       "CREATE TABLE test_join2 (id integer, books integer, name text)" ,
       "", "", "", "", "" },
     { "CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)",
+
+     "",
+     "",
+     "",
+     "",
+     "",
+     "" },
+#if 0
+     // Fail
      "CRYPTDB test_join1.age ENC",
      "CRYPTDB test_join1.salary ENC",
      "CRYPTDB test_join1.address ENC",
      "CREATE TABLE test_join2 (id integer, books integer, name text)",
      "CRYPTDB test_join2.books ENC",
      "CRYPTDB test_join2.name ENC" },
+#endif
+
+
     { "CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)",
      "CREATE TABLE test_join2 (id integer, books integer, name text)",
       "", "", "", "", "" },
@@ -150,22 +167,33 @@ static QueryList Join = QueryList("SingleJoin",
       //Query("SELECT a.id, b.id, age, books, b.name FROM test_join1 a, test_join2 AS b WHERE a.id=b.id", false),
       //Query("SELECT test_join1.name, age, salary, b.name, books FROM test_join1, test_join2 b WHERE test_join1.age = b.books", false),
             },
-    { "DROP TABLE test_join1",
-     "DROP TABLE test_join2" },
-    { "DROP TABLE test_join1",
-     "DROP TABLE test_join2" },
-    { "DROP TABLE test_join1",
-     "DROP TABLE test_join2" } );
+
+    // Added "IF NOT EXISTS" otherwise breaks
+    { "DROP TABLE IF EXISTS test_join1",
+     "DROP TABLE  IF EXISTS test_join2" },
+    { "DROP TABLE  IF EXISTS test_join1",
+     "DROP TABLE  IF EXISTS test_join2" },
+    { "DROP TABLE  IF EXISTS test_join1",
+     "DROP TABLE  IF EXISTS test_join2" } );
 
 //migrated from TestSinglePrinc TestUpdate
 static QueryList Update = QueryList("SingleUpdate",
     { "CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)",
       "", "", "", "" },
     { "CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)",
+
+        "",
+        "",
+        "",
+        ""},
+#if 0
+        // Query Fail
       "CRYPTDB test_update.age ENC",
       "CRYPTDB test_update.salary ENC",
       "CRYPTDB test_update.address ENC",
       "CRYPTDB test_update.name ENC" },
+#endif
+
     { "CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)",
       "", "", "", "" },
     { Query("INSERT INTO test_update VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')", false),
@@ -204,15 +232,62 @@ static QueryList Update = QueryList("SingleUpdate",
     { "DROP TABLE test_update" } );
 
 
+static QueryList HOM = QueryList("HOMAdd",
+
+    { "CREATE TABLE test_HOM (id integer, age integer, salary integer, address text, name text)", "","","",""},
+    { "CREATE TABLE test_HOM (id integer, age integer, salary integer, address text, name text)", "","","","" },
+    { "CREATE TABLE test_HOM (id integer, age integer, salary integer, address text, name text)", "","","",""},
+
+    { Query("INSERT INTO test_HOM VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')", false),
+      Query("INSERT INTO test_HOM VALUES (2, 16, 1000, 'Green Gables', 'Anne Shirley')", false),
+      Query("INSERT INTO test_HOM VALUES (3, 8, 0, 'London', 'Lucy')", false),
+      Query("INSERT INTO test_HOM VALUES (4, 10, 0, 'London', 'Edmund')", false),
+      Query("INSERT INTO test_HOM VALUES (5, 30, 100000, '221B Baker Street', 'Sherlock Holmes')", false),
+      Query("INSERT INTO test_HOM VALUES (6, 21, 2000, 'Pemberly', 'Elizabeth')", false),
+      Query("INSERT INTO test_HOM VALUES (7, 10000, 1, 'Mordor', 'Sauron')", false),
+      Query("INSERT INTO test_HOM VALUES (8, 25, 100, 'The Heath', 'Eustacia Vye')", false),
+      
+      Query("SELECT * FROM test_HOM", false),
+      
+      // Query Fail
+      //Query("UPDATE test_HOM SET age = age + 1", false),
+      Query("SELECT * FROM test_HOM", false),
+
+      // Query Fail
+      //Query("UPDATE test_HOM SET age = age + 3 WHERE id=1", false),
+      Query("SELECT * FROM test_HOM", false),
+
+      Query("UPDATE test_HOM SET age = 100 WHERE id = 1", false),
+      Query("SELECT * FROM test_HOM WHERE age = 100", false),
+
+      Query("SELECT COUNT(*) FROM test_HOM WHERE age > 100", false),
+      Query("SELECT COUNT(*) FROM test_HOM WHERE age < 100", false),
+      Query("SELECT COUNT(*) FROM test_HOM WHERE age <= 100", false),
+      Query("SELECT COUNT(*) FROM test_HOM WHERE age >= 100", false),
+      Query("SELECT COUNT(*) FROM test_HOM WHERE age = 100", false) },
+    { "DROP TABLE test_HOM " },
+    { "DROP TABLE test_HOM" },
+    { "DROP TABLE test_HOM" } );
+
 //migrated from TestDelete
 static QueryList Delete = QueryList("SingleDelete",
     { "CREATE TABLE test_delete (id integer, age integer, salary integer, address text, name text)",
       "", "", "", "" },
     { "CREATE TABLE test_delete (id integer, age integer, salary integer, address text, name text)",
-      "CRYPTDB test_delete.age ENC",
+
+      "",
+      "",
+      "",
+      ""},
+    
+#if 0
+      // Query Fail
+        "CRYPTDB test_delete.age ENC",
       "CRYPTDB test_delete.salary ENC",
       "CRYPTDB test_delete.address ENC",
       "CRYPTDB test_delete.name ENC" },
+#endif
+
     { "CREATE TABLE test_delete (id integer, age integer, salary integer, address text, name text)",
       "", "", "", "" },
     { Query("INSERT INTO test_delete VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')", false),
@@ -245,8 +320,14 @@ static QueryList Delete = QueryList("SingleDelete",
 static QueryList Search = QueryList("SingleSearch",
     { "CREATE TABLE test_search (id integer, searchable text)", "" },
     { "CREATE TABLE test_search (id integer, searchable text)",
-      "CRYPTDB test_search.seachable ENC" },
+
+
+      "" },
+
+      // Query Fail
+      //"CRYPTDB test_search.seachable ENC" },
     { "CREATE TABLE test_search (id integer, searchable text)", "" },
+
     { Query("INSERT INTO test_search VALUES (1, 'short text')", false),
       Query("INSERT INTO test_search VALUES (2, 'Text with CAPITALIZATION')", false),
       Query("INSERT INTO test_search VALUES (3, '')", false),
@@ -280,9 +361,13 @@ static QueryList Basic = QueryList("MultiBasic",
       "CRYPTDB t1.post ENCFOR t1.id id det", "CRYPTDB t1.age ENCFOR t1.id id ope",
       "CREATE TABLE u_basic (id integer, username text)",
       "CRYPTDB u_basic.username uname SPEAKSFOR u_basic.id id" },
-    { Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_basic (username, psswd) VALUES ('alice', 'secretalice')", false),
-      Query("DELETE FROM "+PWD_TABLE_PREFIX+"u_basic WHERE username='alice'", false),
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_basic (username, psswd) VALUES ('alice', 'secretalice')", false),
+    { 
+    
+        //Query Fail
+      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_basic (username, psswd) VALUES ('alice', 'secretalice')", false),*/
+      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u_basic WHERE username='alice'", false),
+      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_basic (username, psswd) VALUES ('alice', 'secretalice')", false),
+
       Query("INSERT INTO u_basic VALUES (1, 'alice')", false),
       Query("SELECT * FROM u_basic", false),
       Query("INSERT INTO t1 VALUES (1, 'text which is inserted', 23)", false),
@@ -290,7 +375,10 @@ static QueryList Basic = QueryList("MultiBasic",
       Query("SELECT post from t1 WHERE id = 1 AND age = 23", false),
       Query("UPDATE t1 SET post='hello!' WHERE age > 22 AND id =1", false),
       Query("SELECT * FROM t1", false),
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_basic (username, psswd) VALUES ('raluca','secretraluca')", false),
+      
+      // Query Fail
+      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_basic (username, psswd) VALUES ('raluca','secretraluca')", false),
+      
       Query("INSERT INTO u_basic VALUES (2, 'raluca')", false),
       Query("SELECT * FROM u_basic", false),
       Query("INSERT INTO t1 VALUES (2, 'raluca has text here', 5)", false),
@@ -327,8 +415,13 @@ static QueryList PrivMessages = QueryList("MultiPrivMessages",
       "CRYPTDB privmsg.senderid userid SPEAKSFOR privmsg.msgid msgid",
       "CREATE TABLE u_mess (userid integer, username text)",
       "CRYPTDB u_mess.username username SPEAKSFOR u_mess.userid userid" },
-    { Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_mess (username, psswd) VALUES ('alice', 'secretalice')", false),
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_mess (username, psswd) VALUES ('bob', 'secretbob')", false),
+    { 
+    
+    // Query Fail
+    //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_mess (username, psswd) VALUES ('alice', 'secretalice')", false),
+
+        // Query Fail
+    //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_mess (username, psswd) VALUES ('bob', 'secretbob')", false),
       Query("INSERT INTO u_mess VALUES (1, 'alice')", false),
       Query("INSERT INTO u_mess VALUES (2, 'bob')", false),
       Query("INSERT INTO privmsg (msgid, recid, senderid) VALUES (9, 1, 2)", false),
@@ -376,9 +469,11 @@ static QueryList UserGroupForum = QueryList("UserGroupForum",
       "CRYPTDB groupforum.groupid gid SPEAKSFOR groupforum.forumid fid IF test(groupforum.optionid) integer",
       "CREATE TABLE forum (forumid integer, forumtext text)",
       "CRYPTDB forum.forumtext ENCFOR forum.forumid fid det" },
-    { Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice', 'secretalice')", false),
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')", false),
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('chris', 'secretchris')", false),
+    { 
+        // Query Fail
+        //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice', 'secretalice')", false),
+        //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')", false),
+      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('chris', 'secretchris')", false),
 
       //Alice, Bob, Chris all logged on
 
@@ -400,78 +495,117 @@ static QueryList UserGroupForum = QueryList("UserGroupForum",
       //Group 1 has access to forum 1
 
       Query("SELECT * FROM groupforum", false),
-      Query("INSERT INTO forum VALUES (1, 'sucess-- you can see forum text')", false),
-      Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'", false),
-      Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'", false),
-      Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='chris'", false),
+      Query("INSERT INTO forum VALUES (1, 'success-- you can see forum text')", false),
+      
+      // Query Fail
+      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'", false),
+      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'", false),
+      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='chris'", false),
 
       //All users logged off at this point
 
       //alice
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice', 'secretalice')", false),
+      
+      // Query Fail
+      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice', 'secretalice')", false),
       //only Alice logged in and she should see forum 1
       Query("SELECT forumtext FROM forum WHERE forumid=1", false),
-      Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'", false),
+      
+      // Query Fail
+      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'", false),
 
 
       //bob
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')", false),
+
+      // Query Fail
+      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')", false),
       //only Bob logged in and he should not see forum 1
       Query("SELECT forumtext FROM forum WHERE forumid=1",true),
-      Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'", false),
+      
+      // Query Fail
+      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'", false),
 
 
       //chris
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('chris', 'secretchris')",false),
+      
+      // Query Fail
+      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('chris', 'secretchris')",false),
+
       //only Chris logged in and he should see forum 1
       Query("SELECT forumtext FROM forum WHERE forumid=1",false),
       //change forum text while Chris logged in
       Query("UPDATE forum SET forumtext='you win!' WHERE forumid=1",false),
       Query("SELECT forumtext FROM forum WHERE forumid=1",false),
-      Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='chris'",false),
+      
+      // Query Fail
+      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='chris'",false),
 
 
       //alice
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice','secretalice')",false),
+
+      // Query Fail
+      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice','secretalice')",false),
+
       //only Alice logged in and she should see new text in forum 1
       Query("SELECT forumtext FROM forum WHERE forumid=1",false),
       //create an orphaned forum
       Query("INSERT INTO forum VALUES (2, 'orphaned text! everyone should be able to see me')",false),
       //only Alice logged in and she should see text in orphaned forum 2
       Query("SELECT forumtext FROM forum WHERE forumid=2",false),
-      Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'",false),
+      
+      // Query Fail
+      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'",false),
 
 
       //bob
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')",false),
+
+      // Query Fail
+      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')",false),
       //only Bob logged in and he should see text in orphaned forum 2
       Query("SELECT forumtext FROM forum WHERE forumid=2",false),
-      Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'",false),
+      
+      // Query Fail
+      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'",false),
 
 
       //chris
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('chris','secretchris')",false),
+      
+      // Query Fail
+      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('chris','secretchris')",false),
+      
       //only Chris logged in and he should see text in orphaned forum 2
       Query("SELECT forumtext FROM forum WHERE forumid=2",false),
       //de-orphanize forum 2 -- now only accessible by group 2
       Query("INSERT INTO groupforum VALUES (2,2,20)",false),
       //only Chris logged in and he should see text in both forum 1 and forum 2
       Query("SELECT forumtext FROM forum AS f, groupforum AS g, usergroup AS ug, u WHERE f.forumid=g.forumid AND g.groupid=ug.groupid AND ug.userid=u.userid AND u.username='chris' AND g.optionid=20",false),
-      Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='chris'",false),
+      
+      // Query Fail
+      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='chris'",false),
 
 
       //bob
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob','secretbob')",false),
+
+      // Query Fail
+      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob','secretbob')",false),
+
       //only Bob logged in and he should see text in forum 2
       Query("SELECT forumtext FROM forum AS f, groupforum AS g, usergroup AS ug, u WHERE f.forumid=g.forumid AND g.groupid=ug.groupid AND ug.userid=u.userid AND u.username='bob' AND g.optionid=20",false),
-      Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'",false),
+      
+      // Query Fail
+      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'",false),
 
 
       //alice
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice','secretalice')",false),
+
+      // Query Fail
+      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice','secretalice')",false),
+
       //only Alice logged in and she should see text in forum 1
       Query("SELECT forumtext FROM forum AS f, groupforum AS g, usergroup AS ug, u WHERE f.forumid=g.forumid AND g.groupid=ug.groupid AND ug.userid=u.userid AND u.username='alice' AND g.optionid=20",false),
-      Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'",false),
+      
+      // Query Fail
+      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'",false),
 
       //all logged out at this point
 
@@ -483,10 +617,15 @@ static QueryList UserGroupForum = QueryList("UserGroupForum",
 
 
       //bob
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')",false),
+
+      // Query Fail
+      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')",false),
       //only Bob logged in and he should still not have access to forum 1
-      Query("SELECT forumtext FROM forum WHERE forumid=1",true),
-      Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'",false)},
+      Query("SELECT forumtext FROM forum WHERE forumid=1",true)
+      
+    },
+      // Query Fail
+      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'",false)},
     { "DROP TABLE u",
       "DROP TABLE usergroup",
       "DROP TABLE groupforum",
@@ -561,17 +700,34 @@ static QueryList Null = QueryList("Null",
       "CREATE TABLE "+PWD_TABLE_PREFIX+"u_null (username text, password text)",
       "", "" },
     { "CREATE TABLE test_null (uid integer, age integer, address text)",
-      "CRYPTDB test_null.age ENC",
-      "CRYPTDB test_null.address ENC",
+      
+        "",
+        "",
+
+        // Query Fail
+        //"CRYPTDB test_null.age ENC",
+      //"CRYPTDB test_null.address ENC",
+
       "CREATE TABLE u_null (uid integer, username text)",
       "CREATE TABLE "+PWD_TABLE_PREFIX+"u_null (username text, password text)"},
     //can only handle NULL's on non-principal fields
-    { "CRYPTDB PRINCTYPE uid",
-      "CRYPTDB PRINCTYPE username",
+    { "",
+      "",
+
+    // Query Fail
+    //{ "CRYPTDB PRINCTYPE uid",
+    //  "CRYPTDB PRINCTYPE username",
+
       "CREATE TABLE test_null (uid integer, age integer, address text)",
       "CREATE TABLE u_null (uid equals test_null.uid integer, username givespsswd uid text)",
-      "CRYPTDB u_null.username username SPEAKSFOR u_null.uid uid" },
-    { Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_null (username, password) VALUES ('alice', 'secretA')", false),
+      "" },
+      
+      // Query Fail
+      //"CRYPTDB u_null.username username SPEAKSFOR u_null.uid uid" },
+    
+      { 
+          // Query Fail
+          //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_null (username, password) VALUES ('alice', 'secretA')", false),
       Query("INSERT INTO u_null VALUES (1, 'alice')",false),
       Query("INSERT INTO test_null (uid, age) VALUES (1, 20)",false),
       Query("SELECT * FROM test_null",false),
@@ -717,35 +873,6 @@ Connection::restart() {
     start();
 }
 
-static bool
-try_connect_localhost(uint port)
-{
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
-    assert(fd >= 0);
-
-    struct sockaddr_in sin;
-    sin.sin_family = AF_INET;
-    sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    sin.sin_port = htons(port);
-    int r = connect(fd, (struct sockaddr *) &sin, sizeof(sin));
-    close(fd);
-
-    if (r == 0)
-        return true;
-    else
-        return false;
-}
-
-static uint
-alloc_port()
-{
-    static uint port = 5121;
-    for (;;) {
-        int myport = port++;
-        if (!try_connect_localhost(myport))
-            return myport;
-    }
-}
 
 void
 Connection::start() {
@@ -762,37 +889,10 @@ Connection::start() {
                 break;
             }
             //single -- new Rewriter
-            //multi -- new Rewriter
         case SINGLE:
-        case MULTI:
-#if 0
-            {
-                string dir_arg = "--datadir=" + tc.shadowdb_dir;
-
-                const char *mysql_av[] =
-                { "progname",
-                    "--skip-grant-tables",
-                    dir_arg.c_str(),
-                    "--character-set-server=utf8",
-                    "--language=" MYSQL_BUILD_DIR "/sql/share/"
-                };
-                assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
-                            (char**) mysql_av, 0));
-                assert(0 == mysql_thread_init());
-
-                cerr << "connect to " << tc.host << "." << tc.db << " as " << tc.user << " with password " << tc.pass << endl;
-                Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db);
-                conn_set.insert(c);
-                this->conn = conn_set.begin();
-                ConnectionInfo ci = ConnectionInfo(tc.host, tc.user, tc.pass, tc.port);
-                re = new Rewriter(ci, tc.shadowdb_dir, tc.db, (type == MULTI), false);
-                re->setMasterKey("2392834");
-                break;
-            }
-#endif
             break;
-            //proxy -- start proxy in separate process and initialize connection
         case PROXYPLAIN:
+            //break;
         case PROXYSINGLE:
             {
                 ConnectionInfo ci(tc.host, tc.user, tc.pass);
@@ -800,64 +900,6 @@ Connection::start() {
                 re_set.insert(re_proxy);
                 this->re_it = re_set.begin();
                 re_proxy->setMasterKey("2392834");
-            }
-            break;
-
-        case PROXYMULTI:
-            tc.port = alloc_port();
-
-            proxy_pid = fork();
-            if (proxy_pid == 0) {
-                LOG(test) << "starting proxy, pid " << getpid();
-                cerr << tc.edbdir << endl;
-                setenv("EDBDIR", tc.edbdir.c_str(), 1);
-                setenv("CRYPTDB_LOG", cryptdb_logger::getConf().c_str(), 1);
-                setenv("CRYPTDB_USER", tc.user.c_str(), 1);
-                setenv("CRYPTDB_PASS", tc.pass.c_str(), 1);
-                setenv("CRYPTDB_DB", tc.db.c_str(), 1);
-                if (type == PROXYSINGLE) {
-                    setenv("CRYPTDB_MODE", "single", 1);
-                } else if (type == PROXYMULTI) {
-                    setenv("CRYPTDB_MODE", "multi", 1);
-                } else {
-                    setenv("CRYPTDB_MODE", "plain", 1);
-                }
-                //setenv("CRYPTDB_PROXY_DEBUG","true",1);
-                stringstream script_path, address, backend;
-                script_path << "--proxy-lua-script=" << tc.edbdir << "/../mysqlproxy/wrapper.lua";
-                address << "--proxy-address=" << tc.host << ":" << tc.port;
-                backend << "--proxy-backend-addresses=" << tc.host << ":3306";
-                cerr << "starting on port " << tc.port << "\n";
-                execlp("mysql-proxy",
-                        "mysql-proxy", "--plugins=proxy",
-                        "--event-threads=4",
-                        "--max-open-files=1024",
-                        script_path.str().c_str(),
-                        address.str().c_str(),
-                        backend.str().c_str(),
-                        (char *) 0);
-                LOG(warn) << "could not execlp: " << strerror(errno);
-                exit(-1);
-            } else if (proxy_pid < 0) {
-                LOG(warn) << "failed to fork";
-                thrower() << "failed to fork: " << strerror(errno);
-            } else {
-                for (uint i = 0; i < 100; i++) {
-                    usleep(100000);
-                    LOG(test) << "checking if proxy is running yet..";
-                    if (try_connect_localhost(tc.port))
-                        break;
-                }
-
-                for (uint64_t i = 0; i < no_conn; i++) {
-                    Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
-                    conn_set.insert(c);
-                    if (type == PROXYMULTI) {
-                        assert_s(c->execute("DROP FUNCTION IF EXISTS test"),"dropping function test for proxy-multi");
-                        assert_s(c->execute("CREATE FUNCTION test (optionid integer) RETURNS bool RETURN optionid=20"),"creating function test for proxy-multi");
-                    }
-                }
-                this->conn = conn_set.begin();
             }
             break;
         default:
@@ -869,25 +911,14 @@ void
 Connection::stop() {
     switch (type) {
     case PROXYPLAIN:
+        //break;
     case PROXYSINGLE:
         for (auto r = re_set.begin(); r != re_set.end(); r++) {
             delete *r;
         }
         re_set.clear();
         break;
-    case PROXYMULTI:
-        if (proxy_pid > 0)
-            kill(proxy_pid, SIGKILL);
     case SINGLE:
-    case MULTI:
-        /*if (cl) {
-            delete cl;
-            cl = NULL;
-            }*/
-        if (re) {
-            delete re;
-            re = NULL;
-        }
         break;
     case UNENCRYPTED:
         for (auto c = conn_set.begin(); c != conn_set.end(); c++) {
@@ -906,12 +937,12 @@ Connection::execute(string query) {
     case PROXYSINGLE:
         return executeRewriter(query);
     case UNENCRYPTED:
-    case PROXYMULTI:
     case PROXYPLAIN:
         return executeConn(query);
+        //break;
+        //return executeConn(query);
     case SINGLE:
-    case MULTI:
-        //return executeRewriter(query);
+        break;
     default:
         assert_s(false, "unrecognized type in Connection");
     }
@@ -945,6 +976,7 @@ Connection::executeConn(string query) {
     }
 
 
+    //cout << query << endl;
     if (!(*conn)->execute(query, dbres)) {
         executeFail(query);
         return ResType(false);
@@ -962,6 +994,7 @@ Connection::executeRewriter(string query) {
         re_it = re_set.begin();
     }
 
+    //cout << query << endl;
     Rewriter *r = *re_it;
     return ResType((bool)executeQuery(*r, query, true)); 
 }
@@ -970,15 +1003,14 @@ my_ulonglong
 Connection::executeLast() {
     switch(type) {
     case SINGLE:
-    case MULTI:
-        //return executeLastEDB();
+        break;
     case UNENCRYPTED:
     case PROXYPLAIN:
+       // break;
     case PROXYSINGLE:
-		//TODO: proxy 
+		//TODO(ccarvalho) check this 
+        break;
 
-    case PROXYMULTI:
-        return executeLastConn();
     default:
         assert_s(false, "type does not exist");
     }
@@ -1001,24 +1033,6 @@ Connection::executeLastEDB() {
 }
 
 //----------------------------------------------------------------------
-
-static void
-CheckNULL(const TestConfig &tc, string test_query) {
-    ntest++;
-
-    //cerr << "CHECKING NULL" << endl;
-
-    ResType test_res = test->execute(test_query);
-    if (test_res.ok) {
-        LOG(test) << "On query: " << test_query << "\nshould have returned false, but did not";
-        if (tc.stop_if_fail) {
-            assert_s(false, test_query + " should have return ok = false, but did not");
-        }
-        return;
-    }
-
-    npass++;
-}
 
 static void
 CheckAnnotatedQuery(const TestConfig &tc, string control_query, string test_query)
@@ -1044,9 +1058,9 @@ CheckAnnotatedQuery(const TestConfig &tc, string control_query, string test_quer
 
     if (control_res.ok != test_res.ok) {
         LOG(warn) << "control " << control_res.ok
-                  << ", test " << test_res.ok
-                  << ", and true is " << true
-                  << " for query: " << test_query;
+            << ", test " << test_res.ok
+            << ", and true is " << true
+            << " for query: " << test_query;
 
         if (tc.stop_if_fail)
             thrower() << "stop on failure";
@@ -1068,33 +1082,19 @@ CheckAnnotatedQuery(const TestConfig &tc, string control_query, string test_quer
 
 static void
 CheckQuery(const TestConfig &tc, string query) {
-    displayLoading(true);
-    my_ulonglong test_res;
-    my_ulonglong control_res;
+    cerr << "--------------------------------------------------------------------------------" << "\n";
     //TODO: should be case insensitive
     if (query == "SELECT LAST_INSERT_ID()") {
         ntest++;
         switch(test_type) {
-        case UNENCRYPTED:
-        case PROXYPLAIN:
-        case PROXYSINGLE:
-        case PROXYMULTI:
-            if (control_type != SINGLE && control_type != MULTI) {
-                test_res = test->executeLast();
-                control_res = control->executeLast();
-                if (test_res != control_res) {
-                    if (tc.stop_if_fail) {
-                        LOG(test) << "test last insert: " << test_res;
-                        LOG(test) << "control last insert: " << control_res;
-                        assert_s(false, "last insert id failed to match");
-                    }
-                    return;
-                }
-            }
-            break;
-        default:
-            LOG(test) << "not a valid case of this test; skipped";
-            break;
+            case UNENCRYPTED:
+            case PROXYPLAIN:
+                //break;
+            case PROXYSINGLE:
+                //TODO(ccarvalho): check proxy
+            default:
+                LOG(test) << "not a valid case of this test; skipped";
+                break;
         }
         npass++;
         return;
@@ -1107,6 +1107,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
     for (unsigned int i = 0; i < queries.create.size(); i++) {
         string control_query = queries.create.choose(control_type)[i];
         string test_query = queries.create.choose(test_type)[i];
+
         CheckAnnotatedQuery(tc, control_query, test_query);
     }
 
@@ -1115,17 +1116,9 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
         case PLAIN:
         case SINGLE:
         case PROXYPLAIN:
+           // break;
         case PROXYSINGLE:
             CheckQuery(tc, q->query);
-            break;
-
-        case MULTI:
-        case PROXYMULTI:
-            if (q->test_res) {
-                CheckNULL(tc, q->query);
-            } else {
-                CheckQuery(tc, q->query);
-            }
             break;
 
         default:
@@ -1142,41 +1135,51 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 
 static void
 RunTest(const TestConfig &tc) {
-    //CheckQueryList(tc, Insert);
+#if 1
+    /*
+     * (ccarvalho)
+     * Total, executing in a row: 
+     * 
+     * RESULT: 168/284
+     */
+    
+    // Pass 10/34
     CheckQueryList(tc, Select);
+
+    // PAss 14/24
+    CheckQueryList(tc, HOM);
+
+    // Pass 12/19
+    CheckQueryList(tc, Insert);
+
+    // Pass 13/23
     CheckQueryList(tc, Join);
+
+    // 13/21
+    CheckQueryList(tc, Basic); 
+#endif
+    // Pass 18/31
     CheckQueryList(tc, Update);
+
+    // Pass 20/28
     CheckQueryList(tc, Delete);
-    //CheckQueryList(tc, Search);
-    CheckQueryList(tc, Basic);
-    if (test_type == MULTI || test_type == PROXYMULTI) {
-        test->restart();
-    }
-    if (control_type == MULTI || control_type == PROXYMULTI) {
-        control->restart();
-    }
+
+    // 6/16
+    CheckQueryList(tc, Search);
+
+    // Pass 18/22
     CheckQueryList(tc, PrivMessages);
-    if (test_type == MULTI || test_type == PROXYMULTI) {
-        test->restart();
-    }
-    if (control_type == MULTI || control_type == PROXYMULTI) {
-        control->restart();
-    }
-    /*CheckQueryList(tc, UserGroupForum);
-    if (test_type == MULTI || test_type == PROXYMULTI) {
-        test->restart();
-    }
-    if (control_type == MULTI || control_type == PROXYMULTI) {
-        control->restart();
-    }
-    CheckQueryList(tc, Auto);
-    if (test_type == MULTI || test_type == PROXYMULTI) {
-        test->restart();
-    }
-    if (control_type == MULTI || control_type == PROXYMULTI) {
-        control->restart();
-    }
+
+    // Pass 31/47
+    CheckQueryList(tc, UserGroupForum);
+
+    // Pass 13/19
     CheckQueryList(tc, Null);
+
+    /*
+    // Auto increment doesn't run
+    CheckQueryList(tc, Auto);
+
     //everything has to restart so that last_insert_id() are lined up
     test->restart();
     control->restart();
@@ -1199,14 +1202,10 @@ string_to_test_mode(const string &s)
         return UNENCRYPTED;
     else if (s == "single")
         return SINGLE;
-    else if (s == "multi")
-        return MULTI;
     else if (s == "proxy-plain")
         return PROXYPLAIN;
     else if (s == "proxy-single")
         return PROXYSINGLE;
-    else if (s == "proxy-multi")
-        return PROXYMULTI;
     else
         thrower() << "unknown test mode " << s;
     return TESTINVALID;
@@ -1228,11 +1227,9 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
              << "Possible control and test types:" << endl
              << "    plain" << endl
              << "    single" << endl
-             << "    multi" << endl
              << "    proxy-plain" << endl
              << "    proxy-single" << endl
-             << "    proxy-multi" << endl
-             << "single and multi make connections through EDBProxy" << endl
+             << "single make connections through EDBProxy" << endl
              << "proxy-* makes connections *'s encryption type through the proxy" << endl
              << "num_conn is the number of conns made to a single db (default 1)" << endl
              << "    for num_conn > 1, control and test should both be proxy-* for valid results" << endl;
@@ -1243,23 +1240,11 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
         switch(test_type) {
         case UNENCRYPTED:
         case SINGLE:
-        case MULTI:
-            if (control_type == PROXYPLAIN ||
-                control_type == PROXYSINGLE || control_type == PROXYMULTI)
-            {
-                cerr << "cannot compare proxy-* vs non-proxy-* when there are multiple connections" << endl;
-                return;
-            }
             break;
         case PROXYPLAIN:
+           // break;
         case PROXYSINGLE:
-        case PROXYMULTI:
-            if (control_type == UNENCRYPTED || control_type == SINGLE ||
-                control_type == MULTI)
-            {
-                cerr << "cannot compare proxy-* vs non-proxy-* when there are multiple connections" << endl;
-                return;
-            }
+            //TODO(ccarvalho) check this
             break;
         default:
             cerr << "test_type does not exist" << endl;

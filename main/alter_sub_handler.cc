@@ -25,8 +25,9 @@ class AddColumnSubHandler : public AlterSubHandler {
         eachList<Create_field>(add_it,
             [tm, a, dbname, table] (Create_field *cf) {
                 FieldMeta *fm =
-                    tm->createFieldMeta(cf, a, a.ps->encByDefault);
-                assert(fm);
+                    new FieldMeta(std::string(cf->field_name), cf,
+                                  a.ps->masterKey); 
+                assert(tm->addFieldMeta(fm));
 
                 // Add metadata to embedded database.
                 assert(do_add_field(fm, a, dbname, table));
@@ -109,7 +110,7 @@ class DropColumnSubHandler : public AlterSubHandler {
         if (fm->has_salt) {
             Alter_drop *new_adrop = adrop->clone(thd->mem_root);
             new_adrop->name =
-                thd->strdup(fm->saltName().c_str());
+                thd->strdup(fm->getSaltName().c_str());
             out_list.push_back(new_adrop);
         }
 
@@ -162,22 +163,12 @@ class AddIndexSubHandler : public AlterSubHandler {
         return out_lex;
     }
 
-    // NOTE: This must be executed after 'this->rewrite' because it needs
-    // the TableMeta to update it's uniq_counter.
     // TODO: Add index to embedded shallow mirror.
     void update(const string &q, LEX *lex, Analysis &a) const {
         const string &table =
             lex->select_lex.table_list.first->table_name;
         TableMeta *tm = a.getTableMeta(table);
         
-        // Update the counter.
-        ostringstream s;
-        s << " UPDATE pdb.table_info"
-          << "    SET uniq_counter = " << tm->getUniqCounter()
-          << "  WHERE number = " << tm->tableNo
-          <<"    AND database_name = '"<<a.ps->e_conn->getCurDBName()<<"';";
-        assert(a.ps->e_conn->execute(s.str()));
-
         // Add each new index.
         auto key_it =
             List_iterator<Key>(lex->alter_info.key_list);
@@ -189,7 +180,7 @@ class AddIndexSubHandler : public AlterSubHandler {
             s << " INSERT INTO pdb.index_info VALUES ("
               << " (SELECT table_info.id "
               << "    FROM pdb.table_info"
-              << "  WHERE number = " << tm->tableNo
+              << "  WHERE anon_name = " << tm->getAnonTableName()
               << "    AND database_name = '"
               <<          a.ps->e_conn->getCurDBName() << "'), "
               << " '" << index_name << "', "

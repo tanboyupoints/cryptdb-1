@@ -63,15 +63,17 @@ class CreateHandler : public DDLHandler {
         // Create *Meta objects.
         auto empty_index_map = std::map<std::string, std::string>();
         // TODO: Use appropriate values for has_sensitive and has_salt.
-        TableMeta *tm = 
-            a.ps->schema->createTableMeta(std::string(table), true, true,
-                                          std::string(""), empty_index_map,
-                                          0, NULL);
+        TableMeta *tm = new TableMeta(true, true, empty_index_map);
+        a.ps->schema->addTableMeta(std::string(table), tm);
+
         auto it =
             List_iterator<Create_field>(lex->alter_info.create_list);
         eachList<Create_field>(it,
             [tm, a] (Create_field *cf) {
-                assert(tm->createFieldMeta(cf, a, a.ps->encByDefault));
+                FieldMeta *fm =
+                    new FieldMeta(string(cf->field_name), cf,
+                                  a.ps->masterKey);
+                assert(tm->addFieldMeta(fm));
         });
         
         // Add table to embedded database.
@@ -82,13 +84,12 @@ class CreateHandler : public DDLHandler {
         {
             ostringstream s;
             s << " INSERT INTO pdb.table_info VALUES ("
-              << " " << tm->tableNo << ", "
               << " '" << table << "', "
+              << " '" << tm->getAnonTableName() << "', "
               << " " << bool_to_string(tm->hasSensitive) << ", "
               << " " << bool_to_string(tm->has_salt) << ", "
               << " '" << tm->salt_name << "', "
               << " '" << dbname << "',"
-              << " " << tm->getUniqCounter() << ", "
               << " 0"
               << " );";
 
@@ -96,10 +97,9 @@ class CreateHandler : public DDLHandler {
         }
 
         // Add field.
-        unsigned long long tableID = a.ps->e_conn->last_insert_id();
         for (std::pair<std::string, FieldMeta *> fm_pair: tm->fieldMetaMap){
             FieldMeta *fm = fm_pair.second;
-            assert(do_add_field(fm, a, dbname, table, &tableID));
+            assert(do_add_field(fm, a, dbname, table));
         }
 
         a.ps->e_conn->execute("COMMIT");
