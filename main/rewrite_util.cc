@@ -375,7 +375,7 @@ do_add_field(FieldMeta *fm, const Analysis &a, std::string dbname,
             std::string str_level =
                 TypeText<SECLEVEL>::toText(level);
 
-            std::string crypto_key = onion_pair.second->layers[i]->serialize();
+            std::string crypto_key = EncLayerFactory::serializeLayer(onion_pair.second->layers[i]);
 
             unsigned int escaped_length = crypto_key.size() * 2 + 1;
             char escaped_key[escaped_length];

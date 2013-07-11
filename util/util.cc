@@ -396,7 +396,7 @@ fromHex(const string & h) {
 const string hextable = "0123456789abcdef";
 
 string
-toHex(const string x) {
+toHex(const string  & x) {
 
     uint len = x.length();
     string result(len*2, '0');

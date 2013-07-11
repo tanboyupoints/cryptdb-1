@@ -40,6 +40,7 @@ class EncLayer {
  public:
     
     virtual SECLEVEL level() = 0;
+    virtual std::string name() = 0;
 
     // returns a rewritten create field to include in rewritten query
     virtual Create_field * newCreateField(Create_field * cf, std::string anonname = "") = 0;
@@ -71,6 +72,7 @@ public:
 
 
     SECLEVEL level() {return SECLEVEL::HOM;}
+    std::string name() {return "HOM";}
     Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     //TODO needs multi encrypt and decrypt
@@ -99,6 +101,7 @@ public:
 
 
     SECLEVEL level() {return SECLEVEL::SEARCH;}
+    std::string name() {return "SEARCH";}
     Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV = 0);
