@@ -55,6 +55,26 @@ const OLK PLAIN_OLK = OLK(oPLAIN, SECLEVEL::PLAINVAL, NULL);
 std::ostream&
 operator<<(std::ostream &out, const OnionLevelFieldPair &p);
 
+// TODO: A bit HACKy. Could be cleaned up with RTTI.
+class MetaKey {
+    std::string s;
+    onion o;
+
+public:
+    MetaKey(std::string s) : s(s), o((onion)0) {}
+    MetaKey(onion o) : s(""), o(o) {}
+
+    bool operator <(const MetaKey &rhs) const
+    {
+        return rhs.o < o && rhs.s < s;
+    }
+
+    bool operator ==(const MetaKey &rhs) const
+    {
+        return rhs.o == o && rhs.s == s;
+    }
+};
+
 class MetaSerial {
     std::string serial;
     unsigned int meta_database_id;
@@ -80,24 +100,32 @@ struct AbstractMeta {
     }
     // TODO: Remove default constructor.
     AbstractMeta() {}
-    virtual ~AbstractMeta() {}
+    virtual ~AbstractMeta()
+    {
+        auto cp = children;
+        children.clear();
+
+        for (auto it : cp) {
+            delete it.second;
+        }
+    }
     // Virtual constructor to deserialize from embedded database.
     template <typename ConcreteMeta>
         static ConcreteMeta *deserialize(std::string serial);
-    /*
-    bool childExists(std::string key);
-    bool addChild(std::string key, AbstractMeta *meta);
-    */
+    bool childExists(const MetaKey &key) const;
+    AbstractMeta *getChild(const MetaKey &key) const;
+    virtual bool addChild(const MetaKey &key, AbstractMeta *meta);
+    bool replaceChild(const MetaKey &key, AbstractMeta *meta);
+    virtual bool destroyChild(const MetaKey &key);
     AbstractMeta **doFetchChildren(unsigned int *count);
     // [id, parent_id, type, <member-data>]
     virtual MetaSerial serialize(AbstractMeta *parent) const = 0;
     unsigned int getDatabaseID() const {return database_id;}
 
+    std::map<MetaKey, AbstractMeta *> children;
+
 private:
     int database_id;                        // id in Database.
-    /*
-    std::map<std::string, AbstractMeta *> children;
-    */
 };
 
 /*
@@ -160,11 +188,6 @@ typedef struct FieldMeta : public AbstractMeta {
         return salt_name;
     }
 
-    bool hasOnion(onion o) const {
-        return onions.find(o) !=
-            onions.end();
-    }
-
     SECLEVEL getOnionLevel(onion o) const {
         auto it = onions.find(o);
         if (it == onions.end()) return SECLEVEL::INVALID;
@@ -183,10 +206,6 @@ typedef struct FieldMeta : public AbstractMeta {
         return false;
     }
 
-    void removeOnion(onion o) {
-        onions.erase(o);
-    }
-
     bool isEncrypted() {
         return ((onions.size() != 1) ||  (onions.find(oPLAIN) == onions.end()));
     }
@@ -194,8 +213,7 @@ typedef struct FieldMeta : public AbstractMeta {
 
 // TODO: Put const back.
 typedef struct TableMeta : public AbstractMeta {
-    std::list<std::string> fieldNames;     //in order field names
-    std::map<std::string, FieldMeta *> fieldMetaMap;
+    std::list<MetaKey> fieldNames;     //in order field names
     bool hasSensitive;
     bool has_salt;
     std::string salt_name;
@@ -217,18 +235,15 @@ typedef struct TableMeta : public AbstractMeta {
           anon_table_name("table_" + getpRandomName()),
           index_map(index_map) {}
     TableMeta(std::string serial);
-    ~TableMeta();
 
     MetaSerial serialize(AbstractMeta *parent) const;
-    bool fieldMetaExists(std::string name);
-    bool addFieldMeta(FieldMeta *fm);
-    FieldMeta *getFieldMeta(std::string field);
+    bool addChild(const MetaKey &key, AbstractMeta *meta);
     std::string getAnonTableName() const;
+    bool destroyChild(const MetaKey &key);
 
     friend class Analysis;
 
 protected:
-    bool destroyFieldMeta(std::string field);
     std::string addIndex(std::string index_name); 
     std::string getAnonIndexName(std::string index_name) const;
     std::string getIndexName(std::string anon_index_name) const;

@@ -315,6 +315,9 @@ public:
     // HACK(burrows): This is a temporary solution until I redesign.
     Rewriter *rewriter;
 
+    // TODO: Make private.
+    std::vector<Delta> deltas;
+
 private:
     std::string unAliasTable(std::string table) const;
 };

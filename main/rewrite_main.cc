@@ -286,7 +286,7 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
             new FieldMeta(field_name, has_salt, field_salt_name,
                           onion_layout);
 
-        assert(tm->addFieldMeta(fm));
+        assert(tm->addChild(field_name, fm));
 
         buildOnionMeta(ps, fm, atoi(field_id.c_str()));
     }

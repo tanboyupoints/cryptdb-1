@@ -212,7 +212,7 @@ bool Analysis::destroyFieldMeta(std::string table, std::string field)
         return false;
     }
 
-    return tm->destroyFieldMeta(field);
+    return tm->destroyChild(field);
 }
 
 bool Analysis::destroyTableMeta(std::string table)

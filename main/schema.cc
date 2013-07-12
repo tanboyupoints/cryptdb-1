@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "schema.hh"
 #include <parser/lex_util.hh>
 #include <parser/stringify.hh>
@@ -42,13 +44,22 @@ AbstractMeta::deserialize(std::string serial)
     return new ConcreteMeta(serial);
 }
 
-/*
-bool AbstractMeta::childExists(std::string key)
+bool AbstractMeta::childExists(const MetaKey &key) const
 {
     return children.find(key) != children.end();
 }
 
-bool AbstractMeta::addChild(std::string key, AbstractMeta *meta)
+AbstractMeta *AbstractMeta::getChild(const MetaKey &key) const
+{
+    auto it = children.find(key);
+    if (children.end() == it) {
+        return NULL;
+    }
+
+    return it->second;
+}
+
+bool AbstractMeta::addChild(const MetaKey &key, AbstractMeta *meta)
 {
     if (childExists(key)) {
         return false;
@@ -57,7 +68,34 @@ bool AbstractMeta::addChild(std::string key, AbstractMeta *meta)
     children[key] = meta;
     return true;
 }
-*/
+
+bool AbstractMeta::replaceChild(const MetaKey &key, AbstractMeta *meta)
+{
+    if (!childExists(key)) {
+        return false;
+    }
+
+    children[key] = meta;
+    return true;
+}
+
+bool AbstractMeta::destroyChild(const MetaKey &key)
+{
+    if (!childExists(key)) {
+        return false;
+    }
+
+    auto child = children[key];
+    auto erase_count = children.erase(key);
+    if (1 == erase_count) {
+        delete child;
+        return true;
+    } else if (0 == erase_count) {
+        return false;
+    } else {
+        throw CryptDBError("Bad erase amount in destroyChild!");
+    }
+}
 
 // TODO: Implement.
 AbstractMeta ** AbstractMeta::doFetchChildren(unsigned int *count)
@@ -161,41 +199,17 @@ MetaSerial TableMeta::serialize(AbstractMeta *parent) const
     return MetaSerial(serial, this->getDatabaseID());
 }
 
-TableMeta::~TableMeta()
+// TODO: @fieldNames is a blight. Use a counter.
+bool TableMeta::addChild(const MetaKey &key, AbstractMeta *meta)
 {
-    auto cp = fieldMetaMap;
-    fieldMetaMap.clear();
-
-    for (auto it : cp) {
-        delete it.second;
-    }
-}
-
-bool TableMeta::fieldMetaExists(std::string name)
-{
-    return this->fieldMetaMap.find(name) != this->fieldMetaMap.end();
-}
-
-bool TableMeta::addFieldMeta(FieldMeta *fm)
-{
-    if (fieldMetaExists(fm->fname)) {
+    bool status = AbstractMeta::addChild(key, meta);
+    if (false == status) {
         return false;
     }
     
-    this->fieldMetaMap[fm->fname] = fm;
-    this->fieldNames.push_back(fm->fname);//TODO: do we need fieldNames?
+    this->fieldNames.push_back(key);//TODO: do we need fieldNames?
 
     return true;
-}
-
-FieldMeta *TableMeta::getFieldMeta(std::string field)
-{
-    auto it = fieldMetaMap.find(field);
-    if (fieldMetaMap.end() == it) {
-        return NULL;
-    } else {
-        return it->second;
-    }
 }
 
 // FIXME: May run into problems where a plaintext table expects the regular
@@ -204,18 +218,15 @@ std::string TableMeta::getAnonTableName() const {
     return anon_table_name;
 }
 
-bool TableMeta::destroyFieldMeta(std::string field)
+bool TableMeta::destroyChild(const MetaKey &key)
 {
-    FieldMeta *fm = this->getFieldMeta(field);
-    if (NULL == fm) {
-        return false;
+    fieldNames.remove(key);
+    bool status = AbstractMeta::destroyChild(key);
+    if (false == status) {
+        throw CryptDBError("Failed to destroy FieldMeta!");
     }
 
-    auto erase_count = fieldMetaMap.erase(field);
-    fieldNames.remove(field);
-
-    delete fm;
-    return 1 == erase_count;
+    return true;
 }
 
 std::string TableMeta::addIndex(std::string index_name)
@@ -295,7 +306,7 @@ SchemaInfo::getFieldMeta(const string & table, const string & field) const
         return NULL;
     }
 
-    return tm->getFieldMeta(field);
+    return static_cast<FieldMeta*>(tm->getChild(field));
 }
 
 bool

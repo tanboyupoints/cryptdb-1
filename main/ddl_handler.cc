@@ -73,7 +73,7 @@ class CreateHandler : public DDLHandler {
                 FieldMeta *fm =
                     new FieldMeta(string(cf->field_name), cf,
                                   a.ps->masterKey);
-                assert(tm->addFieldMeta(fm));
+                assert(tm->addChild(fm->fname, fm));
         });
         
         // Add table to embedded database.
@@ -97,8 +97,9 @@ class CreateHandler : public DDLHandler {
         }
 
         // Add field.
-        for (std::pair<std::string, FieldMeta *> fm_pair: tm->fieldMetaMap){
-            FieldMeta *fm = fm_pair.second;
+        // FIXME: Prevents us from making AbstractMeta::children private.
+        for (std::pair<MetaKey, AbstractMeta *> fm_pair: tm->children){
+            FieldMeta *fm = static_cast<FieldMeta *>(fm_pair.second);
             assert(do_add_field(fm, a, dbname, table));
         }
 

@@ -27,7 +27,7 @@ class AddColumnSubHandler : public AlterSubHandler {
                 FieldMeta *fm =
                     new FieldMeta(std::string(cf->field_name), cf,
                                   a.ps->masterKey); 
-                assert(tm->addFieldMeta(fm));
+                assert(tm->addChild(fm->fname, fm));
 
                 // Add metadata to embedded database.
                 assert(do_add_field(fm, a, dbname, table));
