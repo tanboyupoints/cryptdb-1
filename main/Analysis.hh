@@ -252,6 +252,29 @@ typedef struct ProxyState {
 } ProxyState;
 
 
+struct Delta {
+    enum Action {CREATE, REPLACE, DELETE};
+    Action action;
+    AbstractMeta *meta;
+    AbstractMeta *parent_meta;
+
+    std::string serialize() const 
+    {
+        MetaSerial meta_serial = meta->serialize(parent_meta);
+        std::string serial =  
+            action + " " + std::to_string(parent_meta->getDatabaseID()) +
+            " " + std::to_string(meta_serial.getDatabaseID()) + " " +
+            meta_serial.getSerial();
+        return serial;
+    }
+    
+    // TODO: Implement.
+    static Delta unserialize() 
+    {
+        return Delta();
+    }
+};
+
 class Rewriter;
 
 class Analysis {

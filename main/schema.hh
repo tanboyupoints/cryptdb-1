@@ -55,8 +55,20 @@ const OLK PLAIN_OLK = OLK(oPLAIN, SECLEVEL::PLAINVAL, NULL);
 std::ostream&
 operator<<(std::ostream &out, const OnionLevelFieldPair &p);
 
+class MetaSerial {
+    std::string serial;
+    unsigned int meta_database_id;
+public:
+    MetaSerial(std::string serial, unsigned int meta_database_id)
+        : serial(serial), meta_database_id(meta_database_id) {}
+    std::string getSerial() {return serial;}
+    unsigned int getDatabaseID() const {return meta_database_id;}
+};
+
 // > TODO: template child and parent type (possibly key type as well).
 //   This would allow us to remove boilerplate for children of *Meta class.
+// > TODO: Mage getDatabaseID() protected by templating on the Concrete type
+//   and making it a friend.
 struct AbstractMeta {
     // Constructor to build _new_ *Meta
     AbstractMeta(int database_id) : database_id(database_id) {}
@@ -78,7 +90,8 @@ struct AbstractMeta {
     */
     AbstractMeta **doFetchChildren(unsigned int *count);
     // [id, parent_id, type, <member-data>]
-    virtual std::string serialize(AbstractMeta *parent) const = 0;
+    virtual MetaSerial serialize(AbstractMeta *parent) const = 0;
+    unsigned int getDatabaseID() const {return database_id;}
 
 private:
     int database_id;                        // id in Database.
@@ -105,7 +118,7 @@ typedef struct OnionMeta : AbstractMeta {
         : onionname(name) {}
     */
     OnionMeta(std::string serial);
-    std::string serialize(AbstractMeta *parent) const;
+    MetaSerial serialize(AbstractMeta *parent) const;
     std::string getAnonOnionName() const;
 
     SECLEVEL getSecLevel() {
@@ -139,7 +152,7 @@ typedef struct FieldMeta : public AbstractMeta {
     FieldMeta(std::string serial);
     ~FieldMeta();
 
-    std::string serialize(AbstractMeta *parent) const;
+    MetaSerial serialize(AbstractMeta *parent) const;
     std::string stringify() const;
 
     std::string getSaltName() const {
@@ -206,7 +219,7 @@ typedef struct TableMeta : public AbstractMeta {
     TableMeta(std::string serial);
     ~TableMeta();
 
-    std::string serialize(AbstractMeta *parent) const;
+    MetaSerial serialize(AbstractMeta *parent) const;
     bool fieldMetaExists(std::string name);
     bool addFieldMeta(FieldMeta *fm);
     FieldMeta *getFieldMeta(std::string field);

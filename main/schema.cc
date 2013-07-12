@@ -3,6 +3,7 @@
 #include <parser/stringify.hh>
 #include <main/rewrite_main.hh>
 #include <main/init_onions.hh>
+#include <main/rewrite_util.hh>
 
 using namespace std;
 
@@ -27,6 +28,12 @@ operator<<(std::ostream &out, const OLK &olk)
     }
     out << ")";
     return out;
+}
+
+static std::string
+serialize_string(std::string str)
+{
+    return std::string(std::to_string(str.length()) + "_" + str);
 }
 
 template <typename ConcreteMeta> ConcreteMeta *
@@ -65,9 +72,20 @@ OnionMeta::OnionMeta(std::string serial)
 }
 
 // TODO: Implement serialization.
-std::string OnionMeta::serialize(AbstractMeta *parent) const
+MetaSerial OnionMeta::serialize(AbstractMeta *parent) const
 {
-    return ("");
+    // FIXME: Get onion from parent.
+    onion o = oDET;
+    SECLEVEL seclevel = ((FieldMeta*)parent)->getOnionLevel(o);
+    assert(seclevel != SECLEVEL::INVALID);
+
+    std::string serial =
+        serialize_string(std::to_string(parent->getDatabaseID())) +
+        serialize_string(getAnonOnionName()) +
+        serialize_string(TypeText<onion>::toText(o)) +
+        serialize_string(TypeText<SECLEVEL>::toText(seclevel));
+
+    return MetaSerial(serial, this->getDatabaseID());
 }
 
 std::string OnionMeta::getAnonOnionName() const
@@ -82,9 +100,16 @@ FieldMeta::FieldMeta(std::string serial)
 }
 
 // TODO: Implement serialization.
-std::string FieldMeta::serialize(AbstractMeta *parent) const
+MetaSerial FieldMeta::serialize(AbstractMeta *parent) const
 {
-    return ("");
+    std::string serial =
+        serialize_string(std::to_string(parent->getDatabaseID())) +
+        serialize_string(fname) +
+        serialize_string(bool_to_string(has_salt)) +
+        serialize_string(getSaltName()) +
+        serialize_string(TypeText<onionlayout>::toText(onion_layout));
+
+   return MetaSerial(serial, this->getDatabaseID());
 }
 
 FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *mKey)
@@ -119,10 +144,21 @@ TableMeta::TableMeta(std::string serial)
 
 }
 
-// TODO: Implement serialization.
-std::string TableMeta::serialize(AbstractMeta *parent) const
+MetaSerial TableMeta::serialize(AbstractMeta *parent) const
 {
-    return std::string("");
+    // HACK: Need to get this information from parent.
+    std::string dbname = "cryptdbtest";
+
+    std::string serial = 
+        // FIXME: Do anon_table_name => table_name translation at parent.
+        // serialize_string(table) +
+        serialize_string(getAnonTableName()) +
+        serialize_string(bool_to_string(hasSensitive)) +
+        serialize_string(bool_to_string(has_salt)) +
+        serialize_string(salt_name) +
+        serialize_string(dbname);
+    
+    return MetaSerial(serial, this->getDatabaseID());
 }
 
 TableMeta::~TableMeta()
