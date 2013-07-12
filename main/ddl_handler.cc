@@ -70,10 +70,9 @@ class CreateHandler : public DDLHandler {
             List_iterator<Create_field>(lex->alter_info.create_list);
         eachList<Create_field>(it,
             [tm, a] (Create_field *cf) {
-                FieldMeta *fm =
-                    new FieldMeta(string(cf->field_name), cf,
-                                  a.ps->masterKey);
-                assert(tm->addChild(fm->fname, fm));
+                std::string name = std::string(cf->field_name);
+                FieldMeta *fm = new FieldMeta(name, cf, a.ps->masterKey);
+                assert(tm->addChild(name, fm));
         });
         
         // Add table to embedded database.

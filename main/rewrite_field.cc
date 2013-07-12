@@ -109,10 +109,14 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 	assert(fm==NULL);
         fm = a.getFieldMeta(i->table_name, i->field_name);
 
+        assert(fm->isEncrypted());
+        /*
+         * TODO: Give the FieldMeta a plaintext onion
 	if (!fm->isEncrypted()) {
 	    l.push_back(make_item(i, fm->fname));
 	    return;
 	}
+        */
 
 	// Encrypted field
 

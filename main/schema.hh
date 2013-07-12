@@ -45,33 +45,35 @@ public:
     }
 };
 
-std::ostream&
-operator<<(std::ostream &out, const OLK &olk);
-
-
 const OLK PLAIN_OLK = OLK(oPLAIN, SECLEVEL::PLAINVAL, NULL);
-
-
-std::ostream&
-operator<<(std::ostream &out, const OnionLevelFieldPair &p);
 
 // TODO: A bit HACKy. Could be cleaned up with RTTI.
 class MetaKey {
-    std::string s;
-    onion o;
+    const std::string *s;
+    const onion *o;
 
 public:
-    MetaKey(std::string s) : s(s), o((onion)0) {}
-    MetaKey(onion o) : s(""), o(o) {}
+    MetaKey(std::string s) : s(new std::string(s)), o(NULL) {}
+    MetaKey(onion o) : s(NULL), o(new onion(o)) {}
+    ~MetaKey() {
+        if (s) delete s;
+        if (o) delete o;
+    }
 
     bool operator <(const MetaKey &rhs) const
     {
-        return rhs.o < o && rhs.s < s;
+        return *rhs.o < *o && *rhs.s < *s;
     }
 
     bool operator ==(const MetaKey &rhs) const
     {
-        return rhs.o == o && rhs.s == s;
+        return *rhs.o == *o && *rhs.s == *s;
+    }
+
+    std::string getString() const
+    {
+        assert(s);
+        return *s;
     }
 };
 

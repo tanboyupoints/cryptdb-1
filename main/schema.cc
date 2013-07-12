@@ -9,33 +9,31 @@
 
 using namespace std;
 
-ostream&
-operator<<(ostream &out, const OnionLevelFieldPair &p)
-{
-    out << "(onion " << p.first
-        << ", level " << levelnames[(int)p.second.first]
-        << ", field `" << (p.second.second == NULL ? "*" : p.second.second->fname) << "`"
-        << ")";
-    return out;
-}
-
-std::ostream&
-operator<<(std::ostream &out, const OLK &olk)
-{
-    out << "( onion " << olk.o << " level " << levelnames[(uint)olk.l] << " fieldmeta ";
-    if (olk.key == NULL) {
-	out << " NULL ";
-    } else {
-	out << olk.key->fname;
-    }
-    out << ")";
-    return out;
-}
-
 static std::string
 serialize_string(std::string str)
 {
     return std::string(std::to_string(str.length()) + "_" + str);
+}
+
+// TESTME.
+// Must perserve order.
+static std::vector<std::string>
+unserialize_string(std::string serial)
+{
+    std::vector<std::string> output;
+    std::size_t start = 0;
+    std::size_t under_pos = serial.find_first_of("_");
+    while (under_pos != std::string::npos) {
+        std::size_t length =
+            atoi(serial.substr(start, under_pos-start).c_str());
+        output.push_back(serial.substr(under_pos+1, length)); 
+        start = under_pos + 1 + length;
+        under_pos = serial.find_first_of("_", start);
+    }
+
+    // TODO: Sanity check no leftover characters.
+
+    return output;
 }
 
 template <typename ConcreteMeta> ConcreteMeta *
@@ -106,10 +104,9 @@ AbstractMeta ** AbstractMeta::doFetchChildren(unsigned int *count)
 // TODO: Implement deserialization.
 OnionMeta::OnionMeta(std::string serial)
 {
-    
+   unserialize_string(serial); 
 }
 
-// TODO: Implement serialization.
 MetaSerial OnionMeta::serialize(AbstractMeta *parent) const
 {
     // FIXME: Get onion from parent.
