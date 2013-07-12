@@ -29,9 +29,62 @@ operator<<(std::ostream &out, const OLK &olk)
     return out;
 }
 
+template <typename ConcreteMeta> ConcreteMeta *
+AbstractMeta::deserialize(std::string serial)
+{
+    return new ConcreteMeta(serial);
+}
+
+/*
+bool AbstractMeta::childExists(std::string key)
+{
+    return children.find(key) != children.end();
+}
+
+bool AbstractMeta::addChild(std::string key, AbstractMeta *meta)
+{
+    if (childExists(key)) {
+        return false;
+    }
+
+    children[key] = meta;
+    return true;
+}
+*/
+
+// TODO: Implement.
+AbstractMeta ** AbstractMeta::doFetchChildren(unsigned int *count)
+{
+    return NULL;
+}
+
+// TODO: Implement deserialization.
+OnionMeta::OnionMeta(std::string serial)
+{
+    
+}
+
+// TODO: Implement serialization.
+std::string OnionMeta::serialize(AbstractMeta *parent) const
+{
+    return ("");
+}
+
 std::string OnionMeta::getAnonOnionName() const
 {
     return onionname;
+}
+
+// TODO: Implement deserialization.
+FieldMeta::FieldMeta(std::string serial)
+{
+    
+}
+
+// TODO: Implement serialization.
+std::string FieldMeta::serialize(AbstractMeta *parent) const
+{
+    return ("");
 }
 
 FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *mKey)
@@ -58,6 +111,18 @@ string FieldMeta::stringify() const
 {
     string res = " [FieldMeta " + fname + "]";
     return res;
+}
+
+// TODO: Implement deserialization.
+TableMeta::TableMeta(std::string serial)
+{
+
+}
+
+// TODO: Implement serialization.
+std::string TableMeta::serialize(AbstractMeta *parent) const
+{
+    return std::string("");
 }
 
 TableMeta::~TableMeta()

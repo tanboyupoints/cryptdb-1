@@ -55,26 +55,63 @@ const OLK PLAIN_OLK = OLK(oPLAIN, SECLEVEL::PLAINVAL, NULL);
 std::ostream&
 operator<<(std::ostream &out, const OnionLevelFieldPair &p);
 
+// > TODO: template child and parent type (possibly key type as well).
+//   This would allow us to remove boilerplate for children of *Meta class.
+struct AbstractMeta {
+    // Constructor to build _new_ *Meta
+    AbstractMeta(int database_id) : database_id(database_id) {}
+    // Specific constructor for deserialization.
+    AbstractMeta(std::string serial)
+    {
+        throw CryptDBError("Classes derived from AbstractMeta must"
+                           " implement deserialization constructor!");
+    }
+    // TODO: Remove default constructor.
+    AbstractMeta() {}
+    virtual ~AbstractMeta() {}
+    // Virtual constructor to deserialize from embedded database.
+    template <typename ConcreteMeta>
+        static ConcreteMeta *deserialize(std::string serial);
+    /*
+    bool childExists(std::string key);
+    bool addChild(std::string key, AbstractMeta *meta);
+    */
+    AbstractMeta **doFetchChildren(unsigned int *count);
+    // [id, parent_id, type, <member-data>]
+    virtual std::string serialize(AbstractMeta *parent) const = 0;
+
+private:
+    int database_id;                        // id in Database.
+    /*
+    std::map<std::string, AbstractMeta *> children;
+    */
+};
 
 /*
  * The name must be unique as it is used as a unique identifier when
  * generating the encryption layers.
  */
-typedef struct OnionMeta {
+// TODO: Semantically enforce that OnionMeta can not have children.
+typedef struct OnionMeta : AbstractMeta {
+    // TODO: Private.
     std::vector<EncLayer *> layers; //first in list is lowest layer
-
-    SECLEVEL getSecLevel() {
-        assert(layers.size() > 0);
-        return layers.back()->level();
-    }
 
     // New.
     OnionMeta(onion o) 
         : onionname(getpRandomName() + TypeText<onion>::toText(o)) {};
     // Restore.
+    /*
     OnionMeta(std::string name)
         : onionname(name) {}
+    */
+    OnionMeta(std::string serial);
+    std::string serialize(AbstractMeta *parent) const;
     std::string getAnonOnionName() const;
+
+    SECLEVEL getSecLevel() {
+        assert(layers.size() > 0);
+        return layers.back()->level();
+    }
 
 private:
     const std::string onionname;
@@ -84,7 +121,7 @@ struct TableMeta;
 //TODO: FieldMeta and TableMeta are partly duplicates with the original
 // FieldMetadata an TableMetadata
 // which contains data we want to add to this structure soon
-typedef struct FieldMeta {
+typedef struct FieldMeta : public AbstractMeta {
     const std::string fname;
     bool has_salt; //whether this field has its own salt
     const std::string salt_name;
@@ -99,8 +136,10 @@ typedef struct FieldMeta {
               std::string salt_name, onionlayout onion_layout)
         : fname(name), has_salt(has_salt), salt_name(salt_name),
           onion_layout(onion_layout) {}
+    FieldMeta(std::string serial);
     ~FieldMeta();
 
+    std::string serialize(AbstractMeta *parent) const;
     std::string stringify() const;
 
     std::string getSaltName() const {
@@ -140,13 +179,14 @@ typedef struct FieldMeta {
     }
 } FieldMeta;
 
-typedef struct TableMeta {
+// TODO: Put const back.
+typedef struct TableMeta : public AbstractMeta {
     std::list<std::string> fieldNames;     //in order field names
     std::map<std::string, FieldMeta *> fieldMetaMap;
-    const bool hasSensitive;
-    const bool has_salt;
-    const std::string salt_name;
-    const std::string anon_table_name;
+    bool hasSensitive;
+    bool has_salt;
+    std::string salt_name;
+    std::string anon_table_name;
 
     // Restore old TableMeta.
     TableMeta(bool has_sensitive, bool has_salt, std::string salt_name,
@@ -163,8 +203,10 @@ typedef struct TableMeta {
           salt_name("tableSalt_" + getpRandomName()),
           anon_table_name("table_" + getpRandomName()),
           index_map(index_map) {}
+    TableMeta(std::string serial);
     ~TableMeta();
 
+    std::string serialize(AbstractMeta *parent) const;
     bool fieldMetaExists(std::string name);
     bool addFieldMeta(FieldMeta *fm);
     FieldMeta *getFieldMeta(std::string field);
