@@ -190,15 +190,12 @@ get_create_field(Create_field * f, vector<EncLayer*> & v, const string & name) {
     
 }
 
-//TODO: no need to pass create_field to this
-static vector<Create_field *>
-rewrite_create_field(const string &table_name, Create_field *f,
-                     const Analysis &a)
+vector<Create_field *>
+rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
 {
     LOG(cdb_v) << "in rewrite create field for " << *f;
 
     vector<Create_field *> output_cfields;
-    FieldMeta *fm = a.getFieldMeta(table_name, f->field_name);
 
     if (!fm->isEncrypted()) {
         // Unencrypted field
@@ -243,6 +240,15 @@ rewrite_create_field(const string &table_name, Create_field *f,
     }
 
     return output_cfields;
+}
+
+//TODO: no need to pass create_field to this
+static vector<Create_field *>
+rewrite_create_field(const string &table_name, Create_field *f,
+                     const Analysis &a)
+{
+    FieldMeta *fm = a.getFieldMeta(table_name, f->field_name);
+    return rewrite_create_field(fm, f, a);
 }
 
 void

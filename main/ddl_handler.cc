@@ -33,103 +33,101 @@ public:
 
 class CreateHandler : public DDLHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
-                                   unsigned *out_lex_count) const {
-        bool new_table;
-
-        update(q, lex, a, &new_table);
-        return rewrite(lex, a, out_lex_count, new_table);
-    }
-
-    void update(const string &q, LEX *lex, Analysis &a,
-                bool *new_table) const
+                                   unsigned *out_lex_count) const
     {
         char* dbname = lex->select_lex.table_list.first->db;
         char* table  = lex->select_lex.table_list.first->table_name;
+        LEX *new_lex = copy(lex);
 
-        // If we are only creating the table if it doesn't exist,
-        // we must forgo the duplication of meta objects and such.
-        if (a.tableMetaExists(table)) {
-            if (lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS) {
-                *new_table = false;
-                return;
-            } else {
-                // User is trying to create a table that already exists.
-                // How to gracefully handle this?
-                assert(false);
-            }
-        }
-
-        // TODO(burrows): This should be a seperate step.
-        // Create *Meta objects.
-        auto empty_index_map = std::map<std::string, std::string>();
-        // TODO: Use appropriate values for has_sensitive and has_salt.
-        TableMeta *tm = new TableMeta(true, true, empty_index_map);
-        a.ps->schema->addTableMeta(std::string(table), tm);
-
-        auto it =
-            List_iterator<Create_field>(lex->alter_info.create_list);
-        eachList<Create_field>(it,
-            [tm, a] (Create_field *cf) {
-                FieldMeta *fm =
-                    new FieldMeta(string(cf->field_name), cf,
-                                  a.ps->masterKey);
-                assert(tm->addFieldMeta(fm));
-        });
-        
-        // Add table to embedded database.
-        assert(a.ps->e_conn->execute(q));
-
-        a.ps->e_conn->execute("START TRANSACTION");
-
-        {
-            ostringstream s;
-            s << " INSERT INTO pdb.table_info VALUES ("
-              << " '" << table << "', "
-              << " '" << tm->getAnonTableName() << "', "
-              << " " << bool_to_string(tm->hasSensitive) << ", "
-              << " " << bool_to_string(tm->has_salt) << ", "
-              << " '" << tm->salt_name << "', "
-              << " '" << dbname << "',"
-              << " 0"
-              << " );";
-
-            assert(a.ps->e_conn->execute(s.str()));
-        }
-
-        // Add field.
-        for (std::pair<std::string, FieldMeta *> fm_pair: tm->fieldMetaMap){
-            FieldMeta *fm = fm_pair.second;
-            assert(do_add_field(fm, a, dbname, table));
-        }
-
-        a.ps->e_conn->execute("COMMIT");
-        *new_table = true;
-    }
-
-    LEX **rewrite(LEX *lex, Analysis &a, unsigned *out_lex_count,
-                  bool new_table) const
-    {
-        LEX * new_lex = copy(lex);
-        // This table already exists, thus it's *Meta data already exists.
-        if (false == new_table) {
-            assert((lex->create_info.options &HA_LEX_CREATE_IF_NOT_EXISTS));
-            return single_lex_output(new_lex, out_lex_count);
-        }
-
-        // table name
-        const string &table =
-            lex->select_lex.table_list.first->table_name;
-
-        new_lex->select_lex.table_list =
-            rewrite_table_list(lex->select_lex.table_list, a);
-        
+       
         //TODO: support for "create table like"
         if (lex->create_info.options & HA_LEX_CREATE_TABLE_LIKE) {
             cryptdb_err() << "No support for create table like yet. " <<
                        "If you see this, please implement me";
         }
 
-        do_field_rewriting(lex, new_lex, table, a);
+        // Create the table regardless of 'IF NOT EXISTS' if the table
+        // doens't exist.
+        if (false == a.tableMetaExists(table)) {
+            // -----------------------------
+            //         Update TABLE       
+            // -----------------------------
+            auto empty_index_map = std::map<std::string, std::string>();
+            // TODO: Use appropriate values for has_sensitive and has_salt.
+            TableMeta *tm = new TableMeta(true, true, empty_index_map);
+            a.ps->schema->addTableMeta(std::string(table), tm);
+
+           
+            // Add table to embedded database.
+            assert(a.ps->e_conn->execute(q));
+
+            a.ps->e_conn->execute("START TRANSACTION");
+
+            {
+                ostringstream s;
+                s << " INSERT INTO pdb.table_info VALUES ("
+                  << " '" << table << "', "
+                  << " '" << tm->getAnonTableName() << "', "
+                  << " " << bool_to_string(tm->hasSensitive) << ", "
+                  << " " << bool_to_string(tm->has_salt) << ", "
+                  << " '" << tm->salt_name << "', "
+                  << " '" << dbname << "',"
+                  << " 0"
+                  << " );";
+
+                assert(a.ps->e_conn->execute(s.str()));
+            }
+            
+            // -----------------------------
+            //         Rewrite TABLE       
+            // -----------------------------
+            new_lex->select_lex.table_list =
+                rewrite_table_list(lex->select_lex.table_list, a);
+
+            auto it =
+                List_iterator<Create_field>(lex->alter_info.create_list);
+            new_lex->alter_info.create_list = 
+                reduceList<Create_field>(it, List<Create_field>(),
+                    [tm, a, dbname, table] (List<Create_field> out_list,
+                                            Create_field *cf) {
+                        // -----------------------------
+                        //         Update FIELD       
+                        // -----------------------------
+                        FieldMeta *fm =
+                            new FieldMeta(string(cf->field_name), cf,
+                                          a.ps->masterKey);
+                        assert(tm->addFieldMeta(fm));
+                        assert(do_add_field(fm, a, dbname, table));
+                        // -----------------------------
+                        //         Rewrite FIELD       
+                        // -----------------------------
+                        auto new_fields = rewrite_create_field(fm, cf, a);
+                        out_list.concat(vectorToList(new_fields));
+
+                        return out_list;
+                });
+            
+            a.ps->e_conn->execute("COMMIT");
+        } else {
+            // Make sure we aren't trying to create a table that
+            // already exists.
+            assert(lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS);
+            // -----------------------------
+            //         Rewrite TABLE       
+            // -----------------------------
+            new_lex->select_lex.table_list =
+                rewrite_table_list(lex->select_lex.table_list, a);
+            // > We do not rewrite the fields because presumably the caller
+            // can do a CREATE TABLE IF NOT EXISTS for a table that already
+            // exists, but with fields that do not actually exist.
+            // > This would cause problems when trying to look up FieldMeta
+            // for these non-existant fields.
+            // > We may want to do some additional non-deterministic
+            // anonymization of the fieldnames to prevent information leaks.
+            // (ie, server gets compromised, server logged all sql queries,
+            // attacker can see that the admin creates the account table
+            // with the credit card field every time the server boots)
+        }
 
         return single_lex_output(new_lex, out_lex_count);
     }
