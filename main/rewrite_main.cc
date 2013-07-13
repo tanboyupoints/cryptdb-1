@@ -974,6 +974,10 @@ rewrite_helper(const string & q, Analysis & analysis,
                                                      &out_lex_count);
     assert(new_lexes && out_lex_count != 0);
 
+    for (auto it : analysis.deltas) {
+        it.doAction();
+    }
+
     list<string> queries;
     for (unsigned i = 0; i < out_lex_count; ++i) {
         LOG(cdb_v) << "FINAL QUERY [" << i+1 << "/" << out_lex_count

@@ -69,10 +69,11 @@ class CreateHandler : public DDLHandler {
         auto it =
             List_iterator<Create_field>(lex->alter_info.create_list);
         eachList<Create_field>(it,
-            [tm, a] (Create_field *cf) {
+            [tm, &a] (Create_field *cf) {
                 std::string name = std::string(cf->field_name);
                 FieldMeta *fm = new FieldMeta(name, cf, a.ps->masterKey);
-                assert(tm->addChild(name, fm));
+                a.deltas.push_back(Delta(Delta::CREATE, fm, tm, name));
+                // assert(tm->addChild(name, fm));
         });
         
         // Add table to embedded database.
@@ -95,12 +96,15 @@ class CreateHandler : public DDLHandler {
             assert(a.ps->e_conn->execute(s.str()));
         }
 
+        /*
+         * FIXME.
         // Add field.
         // FIXME: Prevents us from making AbstractMeta::children private.
         for (std::pair<MetaKey, AbstractMeta *> fm_pair: tm->children){
             FieldMeta *fm = static_cast<FieldMeta *>(fm_pair.second);
             assert(do_add_field(fm, a, dbname, table));
         }
+        */
 
         a.ps->e_conn->execute("COMMIT");
         *new_table = true;

@@ -42,7 +42,7 @@ void
 do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a);
 
 bool
-do_add_field(FieldMeta *fm, const Analysis &a, std::string dbname,
+do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
              std::string table);
 
 std::string

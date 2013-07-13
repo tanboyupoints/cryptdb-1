@@ -303,7 +303,7 @@ do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
 
 // @tid: defaults to NULL.
 bool
-do_add_field(FieldMeta *fm, const Analysis &a, std::string dbname,
+do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
              std::string table)
 {
     // Add the field data to the proxy db.
@@ -321,7 +321,7 @@ do_add_field(FieldMeta *fm, const Analysis &a, std::string dbname,
       << " );";
 
     assert(a.ps->e_conn->execute(s.str()));
-
+    
     unsigned long long fieldID = a.ps->e_conn->last_insert_id();
 
     // Add the onion data to the proxy db.

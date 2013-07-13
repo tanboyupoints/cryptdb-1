@@ -49,6 +49,7 @@ public:
 const OLK PLAIN_OLK = OLK(oPLAIN, SECLEVEL::PLAINVAL, NULL);
 
 // TODO: A bit HACKy. Could be cleaned up with RTTI.
+// FIXME: Sharing semantics are broke.
 class MetaKey {
     const std::string *s;
     const onion *o;
@@ -57,8 +58,10 @@ public:
     MetaKey(std::string s) : s(new std::string(s)), o(NULL) {}
     MetaKey(onion o) : s(NULL), o(new onion(o)) {}
     ~MetaKey() {
+        /*
         if (s) delete s;
         if (o) delete o;
+        */
     }
 
     bool operator <(const MetaKey &rhs) const
@@ -242,6 +245,7 @@ private:
 } TableMeta;
 
 
+// FIXME: Inherit from AbstractMeta.
 // AWARE: Table/Field aliases __WILL NOT__ be looked up when calling from
 // this level or below. Use Analysis::* if you need aliasing.
 typedef struct SchemaInfo {
