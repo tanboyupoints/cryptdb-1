@@ -252,26 +252,45 @@ typedef struct ProxyState {
 } ProxyState;
 
 
-struct Delta {
+// FIXME: Use RTTI as we are going to need a way to determine what the
+// parent is.
+class Delta : public DBObject {
+public:
     enum Action {CREATE, REPLACE, DELETE};
-    Action action;
-    AbstractMeta *meta;
-    AbstractMeta *parent_meta;
 
+    // New Delta.
+    Delta(Action action, const AbstractMeta *meta,
+          const AbstractMeta *parent_meta)
+        : action(action), meta(meta), parent_meta(parent_meta) {}
+    // FIXME: Unserialize old Delta.
+    Delta(std::string serial)
+    {
+        // return Delta(CREATE, NULL, NULL);
+        std::vector<std::string> split_serials = unserialize_string(serial);
+        throw CryptDBError("implement!");
+    }
+
+    // HACK: The parent parameter is nonsensical.
     std::string serialize() const 
     {
-        MetaSerial meta_serial = meta->serialize(parent_meta);
         std::string serial =  
-            action + " " + std::to_string(parent_meta->getDatabaseID()) +
-            " " + std::to_string(meta_serial.getDatabaseID()) + " " +
-            meta_serial.getSerial();
+            serialize_string(std::to_string(action)) +
+            serialize_string(std::to_string(parent_meta->getDatabaseID())) +
+            serialize_string(std::to_string(meta->getDatabaseID())) +
+            serialize_string(meta->serialize(*parent_meta));
         return serial;
     }
-    
-    // TODO: Implement.
-    static Delta unserialize() 
+
+private:
+    Action action;
+    // Can't use references because of deserialization.
+    const AbstractMeta * meta;
+    const AbstractMeta * parent_meta;
+
+    std::string serialize(const DBObject &parent) const 
     {
-        return Delta();
+        throw CryptDBError("Calling Delta::serialize with a parent argument"
+                           " is nonsensical!");
     }
 };
 

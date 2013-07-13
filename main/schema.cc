@@ -6,35 +6,9 @@
 #include <main/rewrite_main.hh>
 #include <main/init_onions.hh>
 #include <main/rewrite_util.hh>
+#include <main/dbobject.hh>
 
 using namespace std;
-
-static std::string
-serialize_string(std::string str)
-{
-    return std::string(std::to_string(str.length()) + "_" + str);
-}
-
-// TESTME.
-// Must perserve order.
-static std::vector<std::string>
-unserialize_string(std::string serial)
-{
-    std::vector<std::string> output;
-    std::size_t start = 0;
-    std::size_t under_pos = serial.find_first_of("_");
-    while (under_pos != std::string::npos) {
-        std::size_t length =
-            atoi(serial.substr(start, under_pos-start).c_str());
-        output.push_back(serial.substr(under_pos+1, length)); 
-        start = under_pos + 1 + length;
-        under_pos = serial.find_first_of("_", start);
-    }
-
-    // TODO: Sanity check no leftover characters.
-
-    return output;
-}
 
 template <typename ConcreteMeta> ConcreteMeta *
 AbstractMeta::deserialize(std::string serial)
@@ -107,20 +81,21 @@ OnionMeta::OnionMeta(std::string serial)
    unserialize_string(serial); 
 }
 
-MetaSerial OnionMeta::serialize(AbstractMeta *parent) const
+std::string OnionMeta::serialize(const DBObject &parent) const
 {
     // FIXME: Get onion from parent.
     onion o = oDET;
-    SECLEVEL seclevel = ((FieldMeta*)parent)->getOnionLevel(o);
+    SECLEVEL seclevel =
+        static_cast<const FieldMeta&>(parent).getOnionLevel(o);
     assert(seclevel != SECLEVEL::INVALID);
 
     std::string serial =
-        serialize_string(std::to_string(parent->getDatabaseID())) +
+        serialize_string(std::to_string(parent.getDatabaseID())) +
         serialize_string(getAnonOnionName()) +
         serialize_string(TypeText<onion>::toText(o)) +
         serialize_string(TypeText<SECLEVEL>::toText(seclevel));
 
-    return MetaSerial(serial, this->getDatabaseID());
+    return serial;
 }
 
 std::string OnionMeta::getAnonOnionName() const
@@ -135,16 +110,16 @@ FieldMeta::FieldMeta(std::string serial)
 }
 
 // TODO: Implement serialization.
-MetaSerial FieldMeta::serialize(AbstractMeta *parent) const
+std::string FieldMeta::serialize(const DBObject &parent) const
 {
     std::string serial =
-        serialize_string(std::to_string(parent->getDatabaseID())) +
+        serialize_string(std::to_string(parent.getDatabaseID())) +
         serialize_string(fname) +
         serialize_string(bool_to_string(has_salt)) +
         serialize_string(getSaltName()) +
         serialize_string(TypeText<onionlayout>::toText(onion_layout));
 
-   return MetaSerial(serial, this->getDatabaseID());
+   return serial;
 }
 
 FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *mKey)
@@ -179,7 +154,7 @@ TableMeta::TableMeta(std::string serial)
 
 }
 
-MetaSerial TableMeta::serialize(AbstractMeta *parent) const
+std::string TableMeta::serialize(const DBObject &parent) const
 {
     // HACK: Need to get this information from parent.
     std::string dbname = "cryptdbtest";
@@ -193,7 +168,7 @@ MetaSerial TableMeta::serialize(AbstractMeta *parent) const
         serialize_string(salt_name) +
         serialize_string(dbname);
     
-    return MetaSerial(serial, this->getDatabaseID());
+    return serial;
 }
 
 // TODO: @fieldNames is a blight. Use a counter.

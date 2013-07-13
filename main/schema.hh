@@ -7,6 +7,7 @@
 #include <main/CryptoHandlers.hh>
 #include <main/Translator.hh>
 #include <main/enum_text.hh>
+#include <main/dbobject.hh>
 #include <string>
 #include <map>
 #include <list>
@@ -77,29 +78,11 @@ public:
     }
 };
 
-class MetaSerial {
-    std::string serial;
-    unsigned int meta_database_id;
-public:
-    MetaSerial(std::string serial, unsigned int meta_database_id)
-        : serial(serial), meta_database_id(meta_database_id) {}
-    std::string getSerial() {return serial;}
-    unsigned int getDatabaseID() const {return meta_database_id;}
-};
-
 // > TODO: template child and parent type (possibly key type as well).
 //   This would allow us to remove boilerplate for children of *Meta class.
 // > TODO: Mage getDatabaseID() protected by templating on the Concrete type
 //   and making it a friend.
-struct AbstractMeta {
-    // Constructor to build _new_ *Meta
-    AbstractMeta(int database_id) : database_id(database_id) {}
-    // Specific constructor for deserialization.
-    AbstractMeta(std::string serial)
-    {
-        throw CryptDBError("Classes derived from AbstractMeta must"
-                           " implement deserialization constructor!");
-    }
+struct AbstractMeta : public DBObject {
     // TODO: Remove default constructor.
     AbstractMeta() {}
     virtual ~AbstractMeta()
@@ -120,14 +103,10 @@ struct AbstractMeta {
     bool replaceChild(const MetaKey &key, AbstractMeta *meta);
     virtual bool destroyChild(const MetaKey &key);
     AbstractMeta **doFetchChildren(unsigned int *count);
-    // [id, parent_id, type, <member-data>]
-    virtual MetaSerial serialize(AbstractMeta *parent) const = 0;
-    unsigned int getDatabaseID() const {return database_id;}
+    // FIXME: Use rtti.
+    virtual std::string typeName() const = 0;
 
     std::map<MetaKey, AbstractMeta *> children;
-
-private:
-    int database_id;                        // id in Database.
 };
 
 /*
@@ -148,8 +127,10 @@ typedef struct OnionMeta : AbstractMeta {
         : onionname(name) {}
     */
     OnionMeta(std::string serial);
-    MetaSerial serialize(AbstractMeta *parent) const;
+    std::string serialize(const DBObject &parent) const;
     std::string getAnonOnionName() const;
+    // FIXME: Use rtti.
+    std::string typeName() const {return "onionMeta";}
 
     SECLEVEL getSecLevel() {
         assert(layers.size() > 0);
@@ -182,7 +163,7 @@ typedef struct FieldMeta : public AbstractMeta {
     FieldMeta(std::string serial);
     ~FieldMeta();
 
-    MetaSerial serialize(AbstractMeta *parent) const;
+    std::string serialize(const DBObject &parent) const;
     std::string stringify() const;
 
     std::string getSaltName() const {
@@ -211,6 +192,9 @@ typedef struct FieldMeta : public AbstractMeta {
     bool isEncrypted() {
         return ((onions.size() != 1) ||  (onions.find(oPLAIN) == onions.end()));
     }
+
+    // FIXME: Use rtti.
+    std::string typeName() const {return "fieldMeta";}
 } FieldMeta;
 
 // TODO: Put const back.
@@ -238,10 +222,12 @@ typedef struct TableMeta : public AbstractMeta {
           index_map(index_map) {}
     TableMeta(std::string serial);
 
-    MetaSerial serialize(AbstractMeta *parent) const;
+    std::string serialize(const DBObject &parent) const;
     bool addChild(const MetaKey &key, AbstractMeta *meta);
     std::string getAnonTableName() const;
     bool destroyChild(const MetaKey &key);
+    // FIXME: Use rtti.
+    std::string typeName() const {return "tableMeta";}
 
     friend class Analysis;
 
