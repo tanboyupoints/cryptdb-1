@@ -23,7 +23,7 @@ class AddColumnSubHandler : public AlterSubHandler {
         auto add_it =
             List_iterator<Create_field>(lex->alter_info.create_list);
         eachList<Create_field>(add_it,
-            [tm, a, dbname, table] (Create_field *cf) {
+            [tm, &a, dbname, table] (Create_field *cf) {
                 std::string name = std::string(cf->field_name);
                 FieldMeta *fm = new FieldMeta(name, cf, a.ps->masterKey); 
                 assert(tm->addChild(name, fm));

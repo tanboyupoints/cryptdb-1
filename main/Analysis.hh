@@ -254,16 +254,18 @@ typedef struct ProxyState {
 
 // FIXME: Use RTTI as we are going to need a way to determine what the
 // parent is.
+// For REPLACE and DELETE we are duplicating the MetaKey information.
 class Delta : public DBObject {
 public:
     enum Action {CREATE, REPLACE, DELETE};
 
     // New Delta.
-    Delta(Action action, const AbstractMeta *meta,
-          const AbstractMeta *parent_meta)
-        : action(action), meta(meta), parent_meta(parent_meta) {}
+    Delta(Action action, AbstractMeta *meta, AbstractMeta *parent_meta,
+          MetaKey key)
+        : action(action), meta(meta), parent_meta(parent_meta), key(key),
+          used(false) {}
     // FIXME: Unserialize old Delta.
-    Delta(std::string serial)
+    Delta(std::string serial) : key(MetaKey("implement me!"))
     {
         // return Delta(CREATE, NULL, NULL);
         std::vector<std::string> split_serials = unserialize_string(serial);
@@ -281,11 +283,35 @@ public:
         return serial;
     }
 
+    bool doAction() 
+    {
+        if (true == used) {
+            throw CryptDBError("Attempted to use a Delta more than once!");
+        }
+        used = false;
+
+        switch (action) {
+            case CREATE:
+                return parent_meta->addChild(key, meta);
+                break;
+            case REPLACE:
+                return parent_meta->replaceChild(key, meta);
+                break;
+            case DELETE:
+                return parent_meta->destroyChild(key);
+                break;
+            default:
+                throw CryptDBError("Unknown Delta::Action!");
+        }
+    }
+
 private:
     Action action;
     // Can't use references because of deserialization.
-    const AbstractMeta * meta;
-    const AbstractMeta * parent_meta;
+    AbstractMeta * meta;
+    AbstractMeta * parent_meta;
+    MetaKey key;
+    bool used;
 
     std::string serialize(const DBObject &parent) const 
     {
