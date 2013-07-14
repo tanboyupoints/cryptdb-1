@@ -82,11 +82,17 @@ AbstractMeta<ChildType>::deserialize(std::string serial)
 }
 
 // TODO: Implement.
-template <typename ChildType>
-std::vector<DBMeta *> AbstractMeta<ChildType>::fetchChildren(Connect *e_conn)
+template <typename ChildType> std::vector<std::pair<MetaKey, DBMeta *>>
+AbstractMeta<ChildType>::fetchChildren(Connect *e_conn)
 {
-    /*
+    std::vector<std::pair<MetaKey, DBMeta *>> out_vec;
     DBResult *db_res;
+    /*
+    std::string table_name = 
+    std::string join_table_name;
+    */
+    std::string query = 
+        " SELECT serial FROM <something>;";
     assert(e_conn->execute(query, db_res));
     ScopedMySQLRes r(db_res->n);
     MYSQL_ROW row;
@@ -94,11 +100,14 @@ std::vector<DBMeta *> AbstractMeta<ChildType>::fetchChildren(Connect *e_conn)
         unsigned long *l = mysql_fetch_lengths(r.res());
         assert(l != NULL);
 
+        std::string child_serial(row[0], l[0]);
+        auto key = MetaKey("implementplz");
+        auto new_old_meta =
+            AbstractMeta<ChildType>::deserialize<ChildType>("Aaron");
+        out_vec.push_back(std::pair<MetaKey, DBMeta *>(key, new_old_meta));
     }
-    */
-    AbstractMeta<ChildType>::deserialize<ChildType>("Aaron");
 
-    return std::vector<DBMeta *>(4);
+    return out_vec;
 }
 
 // TODO: Implement deserialization.

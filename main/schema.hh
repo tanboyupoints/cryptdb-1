@@ -114,13 +114,12 @@ struct DBMeta : public DBObject {
 
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;
-    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn) = 0;
+    virtual std::vector<std::pair<MetaKey, DBMeta *>>
+        fetchChildren(Connect *e_conn) = 0;
 
     std::map<MetaKey, DBMeta *> children;
 };
 
-// > TODO: template child and parent type (possibly key type as well).
-//   This would allow us to remove boilerplate for children of *Meta class.
 // > TODO: Mage getDatabaseID() protected by templating on the Concrete type
 //   and making it a friend.
 template <typename ChildType>
@@ -139,14 +138,15 @@ struct AbstractMeta : public DBMeta {
     // Virtual constructor to deserialize from embedded database.
     template <typename ConcreteMeta>
         static ConcreteMeta *deserialize(std::string serial);
-    std::vector<DBMeta *> fetchChildren(Connect *e_conn);
+    std::vector<std::pair<MetaKey, DBMeta *>>
+        fetchChildren(Connect *e_conn);
 };
 
 /*
  * The name must be unique as it is used as a unique identifier when
  * generating the encryption layers.
  */
-// TODO: Semantically enforce that OnionMeta can not have children.
+// TODO: Fix the children.
 typedef struct OnionMeta : AbstractMeta<OnionMeta> {
     // TODO: Private.
     std::vector<EncLayer *> layers; //first in list is lowest layer
