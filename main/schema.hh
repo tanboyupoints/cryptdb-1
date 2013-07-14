@@ -64,14 +64,15 @@ public:
         */
     }
 
+    // FIXME: Broken semantic.
     bool operator <(const MetaKey &rhs) const
     {
-        return *rhs.o < *o && *rhs.s < *s;
+        return (rhs.o && o && *rhs.o < *o) && (rhs.s && s && *rhs.s < *s);
     }
 
     bool operator ==(const MetaKey &rhs) const
     {
-        return *rhs.o == *o && *rhs.s == *s;
+        return (rhs.o && o && *rhs.o == *o) && (rhs.s && s && *rhs.s == *s);
     }
 
     std::string getString() const
