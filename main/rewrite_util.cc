@@ -302,7 +302,7 @@ do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
         assert(current_sec_level != SECLEVEL::INVALID);
         std::string str_seclevel =
             TypeText<SECLEVEL>::toText(current_sec_level);
-        std::string str_onion  = TypeText<onion>::toText(o);
+        std::string str_onion = TypeText<onion>::toText(o);
         s << " INSERT INTO pdb.onion_info VALUES ("
           << " " << std::to_string(fieldID) << ", "
           << " '" << om->getAnonOnionName() << "', "
@@ -312,6 +312,7 @@ do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
 
         assert(a.ps->e_conn->execute(s.str()));
 
+        // TODO: Get EncLayer to inherit from DBObject.
         // Add the encryption layer data to the proxy db.
         unsigned long long onionID = a.ps->e_conn->last_insert_id();
         for (unsigned int i = 0; i < onion_pair.second->layers.size(); ++i) {

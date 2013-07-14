@@ -262,8 +262,7 @@ public:
     // New Delta.
     Delta(Action action, AbstractMeta *meta, AbstractMeta *parent_meta,
           MetaKey key)
-        : action(action), meta(meta), parent_meta(parent_meta), key(key),
-          used(false) {}
+        : action(action), meta(meta), parent_meta(parent_meta), key(key) {}
     // FIXME: Unserialize old Delta.
     Delta(std::string serial) : key(MetaKey("implement me!"))
     {
@@ -272,36 +271,82 @@ public:
         throw CryptDBError("implement!");
     }
 
-    // HACK: The parent parameter is nonsensical.
-    std::string serialize() const 
+    /*
+     * This function is responsible for writing our Delta to the database.
+     */
+    bool save(Connect *e_conn)
     {
-        std::string serial =  
-            serialize_string(std::to_string(action)) +
-            serialize_string(std::to_string(parent_meta->getDatabaseID())) +
-            serialize_string(std::to_string(meta->getDatabaseID())) +
-            serialize_string(meta->serialize(*parent_meta));
-        return serial;
+        std::string serial_object = meta->serialize(*parent_meta);
+        std::string parent_id =
+            std::to_string(parent_meta->getDatabaseID());
+        std::string table_name = "Delta";
+
+        // TODO: Maybe we want to join on object_id as well.
+        std::string query =
+            " INSERT INTO pdb." + table_name +
+            "    (action, serial_object, parent_id) VALUES (" +
+            " "  + std::to_string(action) + ", " +
+            " '" + serial_object + "', " +
+            " '" + parent_id + "');";
+
+        return e_conn->execute(query);
     }
 
-    bool doAction() 
+    /*
+     * Take the update action against the database. Contains high level
+     * serialization semantics.
+     */
+    bool apply(Connect *e_conn) 
     {
-        if (true == used) {
-            throw CryptDBError("Attempted to use a Delta more than once!");
-        }
-        used = false;
-
         switch (action) {
-            case CREATE:
-                return parent_meta->addChild(key, meta);
+            case CREATE: {
+                // FIXME: Remove this once we are doing a Load after DDL
+                // queries.
+                assert(parent_meta->addChild(key, meta));
+                
+                // TODO: Encapsulate this behavior somewhere.
+                std::string child_serial = meta->serialize(*parent_meta);
+                std::string child_id =
+                    std::to_string(meta->getDatabaseID());
+                assert("0" == child_id);
+                std::string parent_id =
+                    std::to_string(parent_meta->getDatabaseID());
+                // FIXME: rtti.
+                std::string table_name = meta->typeName();
+                std::string join_table_name = parent_meta->typeName() + "_" +
+                    meta->typeName();
+                // FIXME: Slow.
+                std::string key = parent_meta->getKey(meta).getString();
+
+                // Build the queries.
+                std::string query =
+                    " INSERT INTO pdb." + table_name + 
+                    "    (serial) VALUES ("
+                    " "  + child_id + ", " +
+                    " '" + child_serial + "'); ";
+                std::string join_query =
+                    " INSERT INTO pdb." + join_table_name +
+                    "   (object_id, parent_id, key) VALUES ("
+                    " "  + child_id + ", " +
+                    " "  + parent_id + ", " +
+                    " '" + key + "'); ";
+
+                // TODO: Remove these asserts and use the return once
+                // we've debugged.
+                assert(e_conn->execute(query));
+                assert(e_conn->execute(join_query));
+
+                return true;
                 break;
-            case REPLACE:
+            } case REPLACE: {
                 return parent_meta->replaceChild(key, meta);
                 break;
-            case DELETE:
+            } case DELETE: {
                 return parent_meta->destroyChild(key);
                 break;
-            default:
+            } default: {
                 throw CryptDBError("Unknown Delta::Action!");
+            }
         }
     }
 

@@ -51,6 +51,10 @@ const OLK PLAIN_OLK = OLK(oPLAIN, SECLEVEL::PLAINVAL, NULL);
 // TODO: A bit HACKy. Could be cleaned up with RTTI.
 // TODO: This really should be templated, those exceptions are _why_
 // templates.
+//       > Can't template because it requires templating AbstractMeta
+//         and we want all AbstractMetaz to be the same type. Otherwise
+//         AbstractMeta::children will need to know what type the 'children'
+//         use for keys.
 class MetaKey {
     const std::string *s;
     const onion *o;
@@ -115,6 +119,7 @@ struct AbstractMeta : public DBObject {
         static ConcreteMeta *deserialize(std::string serial);
     bool childExists(const MetaKey &key) const;
     AbstractMeta *getChild(const MetaKey &key) const;
+    MetaKey getKey(const AbstractMeta *const child) const;
     virtual bool addChild(const MetaKey &key, AbstractMeta *meta);
     bool replaceChild(const MetaKey &key, AbstractMeta *meta);
     virtual bool destroyChild(const MetaKey &key);

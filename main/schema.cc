@@ -31,6 +31,17 @@ AbstractMeta *AbstractMeta::getChild(const MetaKey &key) const
     return it->second;
 }
 
+MetaKey AbstractMeta::getKey(const AbstractMeta * const child) const
+{
+    for (auto it : children) {
+        if (it.second == child) {
+            return it.first;
+        }
+    }
+
+    throw CryptDBError("reverse lookup failed to find the child's key!");
+}
+
 bool AbstractMeta::addChild(const MetaKey &key, AbstractMeta *meta)
 {
     if (childExists(key)) {
