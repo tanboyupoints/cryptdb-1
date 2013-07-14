@@ -270,7 +270,6 @@ rewrite_key(const string &table, Key *key, Analysis &a)
     return output_keys;
 }
 
-// @tid: defaults to NULL.
 bool
 do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
              std::string table)
@@ -380,7 +379,10 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
     // -----------------------------
     std::string name = std::string(cf->field_name);
     FieldMeta *fm = new FieldMeta(name, cf, a.ps->masterKey);
-    assert(tm->addChild(name, fm));
+    // Here we store the key name for the first time. It will be applied
+    // after the Delta is read out of the database.
+    a.deltas.push_back(Delta(Delta::CREATE, fm, tm, MetaKey(name)));
+    // assert(tm->addChild(name, fm));
     assert(do_add_field(fm, a, dbname, table));
     // -----------------------------
     //         Rewrite FIELD       

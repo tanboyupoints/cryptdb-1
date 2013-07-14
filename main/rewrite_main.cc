@@ -975,7 +975,7 @@ rewrite_helper(const string & q, Analysis & analysis,
     assert(new_lexes && out_lex_count != 0);
 
     for (auto it : analysis.deltas) {
-        it.doAction();
+        assert(it.doAction());
     }
 
     list<string> queries;

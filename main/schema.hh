@@ -49,7 +49,8 @@ public:
 const OLK PLAIN_OLK = OLK(oPLAIN, SECLEVEL::PLAINVAL, NULL);
 
 // TODO: A bit HACKy. Could be cleaned up with RTTI.
-// FIXME: Sharing semantics are broke.
+// TODO: This really should be templated, those exceptions are _why_
+// templates.
 class MetaKey {
     const std::string *s;
     const onion *o;
@@ -64,15 +65,26 @@ public:
         */
     }
 
-    // FIXME: Broken semantic.
     bool operator <(const MetaKey &rhs) const
     {
-        return (rhs.o && o && *rhs.o < *o) && (rhs.s && s && *rhs.s < *s);
+        if (o && rhs.o) {
+            return *o < *rhs.o;
+        } else if (s && rhs.s) {
+            return *s < *rhs.s;
+        } else {
+            throw CryptDBError("MetaKey cannot support this operation!");
+        }
     }
 
     bool operator ==(const MetaKey &rhs) const
     {
-        return (rhs.o && o && *rhs.o == *o) && (rhs.s && s && *rhs.s == *s);
+        if (o && rhs.o) {
+            return *o == *rhs.o;
+        } else if (s && rhs.s) {
+            return *s == *rhs.s;
+        } else {
+            throw CryptDBError("MetaKey cannot support this operation!");
+        }
     }
 
     std::string getString() const
