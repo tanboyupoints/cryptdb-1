@@ -27,17 +27,18 @@ typedef std::map<SECLEVEL, FieldMeta *> LevelFieldMap;
 typedef std::pair<onion, LevelFieldPair> OnionLevelFieldPair;
 typedef std::map<onion, LevelFieldPair> OnionLevelFieldMap;
 
-// onion-level-key: all the information needed to know how to encrypt a constant
+// onion-level-key: all the information needed to know how to encrypt a
+// constant
 class OLK {
 public:
     OLK(onion o, SECLEVEL l, FieldMeta * key) : o(o), l(l), key(key) {}
     OLK() : o(oINVALID), l(SECLEVEL::INVALID), key(NULL) {}
     onion o;
     SECLEVEL l;
-    FieldMeta * key; //a field meta is a key because each encryption key ever
-		     //used in CryptDB belongs to a field; a field contains the
-		     //encryption and decryption handlers for its keys (see
-		     //layers)
+    FieldMeta * key; // a field meta is a key because each encryption key
+                     // ever used in CryptDB belongs to a field; a field
+                     // contains the encryption and decryption handlers
+                     // for its keys (see layers)
     bool operator<(const OLK & olk ) const {
         return (o < olk.o) || ((o == olk.o) && (l < olk.l));
     }
@@ -123,7 +124,7 @@ struct AbstractMeta : public DBObject {
     virtual bool addChild(const MetaKey &key, AbstractMeta *meta);
     bool replaceChild(const MetaKey &key, AbstractMeta *meta);
     virtual bool destroyChild(const MetaKey &key);
-    AbstractMeta **doFetchChildren(unsigned int *count);
+    std::vector<AbstractMeta *> fetchChildren(Connect *e_conn);
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;
 
@@ -266,10 +267,11 @@ private:
 // FIXME: Inherit from AbstractMeta.
 // AWARE: Table/Field aliases __WILL NOT__ be looked up when calling from
 // this level or below. Use Analysis::* if you need aliasing.
-typedef struct SchemaInfo {
+typedef struct SchemaInfo : public AbstractMeta {
     SchemaInfo() {;}
     ~SchemaInfo();
-    bool addTableMeta(std::string name, TableMeta *tm);
+
+    std::string typeName() const {return "SchemaInfo";}
 
     friend class Analysis;
 
@@ -278,10 +280,10 @@ private:
 
     // These functions do not support Aliasing, use Analysis::getTableMeta
     // and Analysis::getFieldMeta.
-    TableMeta * getTableMeta(const std::string & table) const;
     FieldMeta * getFieldMeta(const std::string & table,
                              const std::string & field) const;
-    bool tableMetaExists(std::string table) const;
-    bool destroyTableMeta(std::string table);
+    std::string serialize(const DBObject &parent) const {
+        throw CryptDBError("SchemaInfo can not be serialized!");
+    }
 } SchemaInfo;
 

@@ -81,9 +81,22 @@ bool AbstractMeta::destroyChild(const MetaKey &key)
 }
 
 // TODO: Implement.
-AbstractMeta ** AbstractMeta::doFetchChildren(unsigned int *count)
+std::vector<AbstractMeta *> AbstractMeta::fetchChildren(Connect *e_conn)
 {
-    return NULL;
+    /*
+     * FIXME: We need the child type.
+    DBResult *db_res;
+    assert(e_conn->execute(query, db_res));
+    ScopedMySQLRes r(db_res->n);
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(r.res()))) {
+        unsigned long *l = mysql_fetch_lengths(r.res());
+        assert(l != NULL);
+
+    }
+    */
+
+    return std::vector<AbstractMeta *>(4);
 }
 
 // TODO: Implement deserialization.
@@ -260,58 +273,14 @@ SchemaInfo::~SchemaInfo()
     }
 }
 
-bool
-SchemaInfo::addTableMeta(std::string name, TableMeta *tm)
-{
-    if (this->tableMetaExists(name)) {
-        return false;
-    }
-
-    tableMetaMap[name] = tm;
-    return true;
-}
-
-TableMeta *
-SchemaInfo::getTableMeta(const string & table) const
-{
-    auto it = tableMetaMap.find(table);
-    if (tableMetaMap.end() == it) {
-        return NULL;
-    } else {
-        return it->second;
-    }
-}
-
 FieldMeta *
 SchemaInfo::getFieldMeta(const string & table, const string & field) const
 {
-    TableMeta * tm = getTableMeta(table);
+    TableMeta * tm = static_cast<TableMeta *>(getChild(table));
     if (NULL == tm) {
         return NULL;
     }
 
-    return static_cast<FieldMeta*>(tm->getChild(field));
-}
-
-bool
-SchemaInfo::tableMetaExists(std::string table) const
-{
-    return tableMetaMap.find(table) != tableMetaMap.end();
-}
-
-bool
-SchemaInfo::destroyTableMeta(std::string table)
-{
-    TableMeta *tm = this->getTableMeta(table);
-    if (NULL == tm) {
-        return false;
-    }
-
-    if (1 == tableMetaMap.erase(table)) {
-        delete tm;
-        return true;
-    }
-
-    return false;
+    return static_cast<FieldMeta *>(tm->getChild(field));
 }
 

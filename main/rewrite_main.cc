@@ -167,6 +167,23 @@ createMetaTablesIfNotExists(ProxyState & ps)
     return;
 }
 
+static SchemaInfo *
+loadSchemaInfo(Connect *e_conn)
+{
+    SchemaInfo *schema = new SchemaInfo(); 
+    std::function<AbstractMeta*(AbstractMeta *)> loadChildren =
+        [loadChildren, &e_conn](AbstractMeta *parent) {
+            auto kids = parent->fetchChildren(e_conn);
+            if (0 != kids.size()) {
+                for_each(kids.begin(), kids.end(), loadChildren); 
+            }
+
+            return parent;
+        };
+
+    return static_cast<SchemaInfo *>(loadChildren(schema));
+}
+
 static void
 createInMemoryTables(ProxyState & ps)
 {
@@ -215,7 +232,7 @@ buildTableMeta(ProxyState &ps)
                                       table_salt_name,
                                       table_anon_name,
                                       index_map);
-        assert(ps.schema->addTableMeta(table_name, tm));
+        assert(ps.schema->addChild(table_name, tm));
 
         buildFieldMeta(ps, tm, table_database_name);
     }
@@ -893,6 +910,8 @@ Rewriter::Rewriter(ConnectionInfo ci,
     ps.conn = new Connect(ci.server, ci.user, ci.passwd, dbname, ci.port);
 
     ps.schema = new SchemaInfo();
+    // Should be using this.
+    loadSchemaInfo(ps.e_conn);
 
     // Must be called before initSchema.
     buildTypeTextTranslator();

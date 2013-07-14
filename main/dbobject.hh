@@ -7,34 +7,34 @@
  *   > EncLayerz.
  *   > Index mappings.
  * 
- *      TableMeta
- * id | serial | delta_id
- * ----------------------
- *    |        |     
- * ----------------------
+ *                 Delta
+ * id | action | serial_object | parent_id
+ * ---------------------------------------
+ *    |        |               |
+ * ---------------------------------------
+
+ *   TableMeta
+ * id | serial |
+ * -------------
+ *    |        |
+ * -------------
  *
- *      FieldMeta
- * id | serial | delta_id
- * ----------------------
- *    |        |     
- * ----------------------
+ *   FieldMeta
+ * id | serial | 
+ * -------------
+ *    |        |
+ * -------------
  *
- *      OnionMeta
- * id | serial | delta_id
- * ----------------------
- *    |        |     
- * ----------------------
+ *   OnionMeta
+ * id | serial |
+ * -------------
+ *    |        |
+ * -------------
  *  
- *    Delta
- * id | serial
- * -----------
- *    |
- * -----------
- *
- *      TableMeta_SchemaInfo?
+ *      TableMeta_SchemaInfo
  * id | object_id | parent_id | key
  * --------------------------------
- *    |           |           |
+ *    |           |   NULL    |
  * --------------------------------
  *
  *       FieldMeta_TableMeta
@@ -63,8 +63,10 @@ public:
     {
         throw "Cannot unserialize into DBObject";
     }
-    // FIXME: Remove default constructor.
-    DBObject() {;}
+    // 0 indicates that the object does not have a database id.
+    // This is the state of the object before it is written to the database
+    // for the first time.
+    DBObject() : id(0) {}
     unsigned int getDatabaseID() const {return id;}
     virtual std::string serialize(const DBObject &parent) const = 0;
 };

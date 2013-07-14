@@ -41,8 +41,8 @@ class CreateHandler : public DDLHandler {
         
         //TODO: support for "create table like"
         if (lex->create_info.options & HA_LEX_CREATE_TABLE_LIKE) {
-            cryptdb_err() << "No support for create table like yet. " <<
-                       "If you see this, please implement me";
+            cryptdb_err() << "No support for create table like yet. "
+                          << "If you see this, please implement me";
         }
 
         // Create the table regardless of 'IF NOT EXISTS' if the table
@@ -54,7 +54,7 @@ class CreateHandler : public DDLHandler {
             auto empty_index_map = std::map<std::string, std::string>();
             // TODO: Use appropriate values for has_sensitive and has_salt.
             TableMeta *tm = new TableMeta(true, true, empty_index_map);
-            a.ps->schema->addTableMeta(std::string(table), tm);
+            a.ps->schema->addChild(std::string(table), tm);
 
            
             // Add table to embedded database.

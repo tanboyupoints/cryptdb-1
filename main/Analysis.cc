@@ -198,7 +198,8 @@ FieldMeta *Analysis::getFieldMeta(std::string table, std::string field) const
 TableMeta *Analysis::getTableMeta(std::string table) const
 {
     string real_table_name = unAliasTable(table);
-    TableMeta *tm = ps->schema->getTableMeta(real_table_name);
+    TableMeta *tm =
+        static_cast<TableMeta *>(ps->schema->getChild(real_table_name));
     assert(tm);
     return tm;
 }
@@ -207,7 +208,8 @@ TableMeta *Analysis::getTableMeta(std::string table) const
 bool Analysis::destroyFieldMeta(std::string table, std::string field)
 {
     string real_table_name = unAliasTable(table);
-    TableMeta *tm = ps->schema->getTableMeta(real_table_name);
+    TableMeta *tm = 
+        static_cast<TableMeta *>(ps->schema->getChild(real_table_name));
     if (!tm) {
         return false;
     }
@@ -218,13 +220,13 @@ bool Analysis::destroyFieldMeta(std::string table, std::string field)
 bool Analysis::destroyTableMeta(std::string table)
 {
     string real_table_name = unAliasTable(table);
-    return ps->schema->destroyTableMeta(table);
+    return ps->schema->destroyChild(table);
 }
 
 bool Analysis::tableMetaExists(std::string table) const
 {
     string real_table_name = unAliasTable(table);
-    return ps->schema->tableMetaExists(real_table_name);
+    return ps->schema->childExists(real_table_name);
 }
 
 std::string Analysis::getAnonTableName(const string &table) const
