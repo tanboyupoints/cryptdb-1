@@ -219,6 +219,7 @@ std::string TableMeta::getAnonIndexName(std::string index_name) const
     return it->second;
 }
 
+// Reverse lookup.
 std::string TableMeta::getIndexName(std::string anon_name) const
 {
     for (auto it : index_map) {

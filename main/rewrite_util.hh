@@ -35,11 +35,11 @@ begin_transaction_lex(Analysis a);
 LEX *
 commit_transaction_lex(Analysis a);
 
-void
-do_field_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a);
+vector<Create_field*>
+rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a);
 
-void
-do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a);
+vector<Key*>
+rewrite_key(const string &table, Key *key, Analysis &a);
 
 bool
 do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
@@ -50,6 +50,12 @@ bool_to_string(bool b);
 
 LEX **
 single_lex_output(LEX *out_me, unsigned *out_lex_count);
+
+List<Create_field>
+createAndRewriteField(Create_field *cf, TableMeta *tm,
+                      const std::string &table, const std::string &dbname,
+                      Analysis &a,
+                      List<Create_field> &rewritten_cfield_list);
 
 // FIXME(burrows): Generalize to support any container with next AND end
 // semantics.

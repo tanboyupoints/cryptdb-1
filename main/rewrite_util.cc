@@ -190,15 +190,12 @@ get_create_field(Create_field * f, vector<EncLayer*> & v, const string & name) {
     
 }
 
-//TODO: no need to pass create_field to this
-static vector<Create_field *>
-rewrite_create_field(const string &table_name, Create_field *f,
-                     const Analysis &a)
+vector<Create_field *>
+rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
 {
     LOG(cdb_v) << "in rewrite create field for " << *f;
 
     vector<Create_field *> output_cfields;
-    FieldMeta *fm = a.getFieldMeta(table_name, f->field_name);
 
     if (!fm->isEncrypted()) {
         // Unencrypted field
@@ -245,23 +242,8 @@ rewrite_create_field(const string &table_name, Create_field *f,
     return output_cfields;
 }
 
-void
-do_field_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
-{
-    // TODO(stephentu): template this pattern away
-    // (borrowed from rewrite_select_lex())
-    auto cl_it = List_iterator<Create_field>(lex->alter_info.create_list);
-    new_lex->alter_info.create_list =
-        reduceList<Create_field>(cl_it, List<Create_field>(),
-            [table, &a] (List<Create_field> out_list, Create_field *cf) {
-                out_list.concat(vectorToList(rewrite_create_field(table, cf,
-                                                                  a)));
-            return out_list; /* lambda */
-         });
-}
-
 // TODO: Add Key for oDET onion as well.
-static vector<Key*>
+vector<Key*>
 rewrite_key(const string &table, Key *key, Analysis &a)
 {
     vector<Key*> output_keys;
@@ -269,7 +251,7 @@ rewrite_key(const string &table, Key *key, Analysis &a)
     auto col_it =
         List_iterator<Key_part_spec>(key->columns);
     new_key->name =
-        string_to_lex_str(a.addIndex(table, convert_lex_str(key->name)));
+        string_to_lex_str(a.getAnonIndexName(table, convert_lex_str(key->name)));
     new_key->columns = 
         reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
             [table, a] (List<Key_part_spec> out_field_list,
@@ -286,19 +268,6 @@ rewrite_key(const string &table, Key *key, Analysis &a)
     output_keys.push_back(new_key);
 
     return output_keys;
-}
-
-void
-do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
-{
-    // Rewrite the index names and choose the onion to apply it too.
-    auto key_it = List_iterator<Key>(lex->alter_info.key_list);
-    new_lex->alter_info.key_list =
-        reduceList<Key>(key_it, List<Key>(),
-            [table, &a] (List<Key> out_list, Key *key) {
-                out_list.concat(vectorToList(rewrite_key(table, key, a)));
-                return out_list;    /* lambda */
-            });
 }
 
 // @tid: defaults to NULL.
@@ -399,3 +368,26 @@ single_lex_output(LEX *out_me, unsigned *out_lex_count)
     *out_lex_count = 1;
     return out_lex;
 }
+
+List<Create_field>
+createAndRewriteField(Create_field *cf, TableMeta *tm,
+                      const std::string &table, const std::string &dbname,
+                      Analysis &a,
+                      List<Create_field> &rewritten_cfield_list)
+{
+    // -----------------------------
+    //         Update FIELD       
+    // -----------------------------
+    std::string name = std::string(cf->field_name);
+    FieldMeta *fm = new FieldMeta(name, cf, a.ps->masterKey);
+    assert(tm->addChild(name, fm));
+    assert(do_add_field(fm, a, dbname, table));
+    // -----------------------------
+    //         Rewrite FIELD       
+    // -----------------------------
+    auto new_fields = rewrite_create_field(fm, cf, a);
+    rewritten_cfield_list.concat(vectorToList(new_fields));
+
+    return rewritten_cfield_list;
+}
+

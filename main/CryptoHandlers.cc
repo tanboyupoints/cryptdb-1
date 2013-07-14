@@ -151,7 +151,7 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf,
     }
     default:{}
     }
-    throw CryptDBError("unknown or unimplemented security level");
+    throw CryptDBError("unknown or unimplemented security level \n");
 }
 
 EncLayer *
@@ -184,7 +184,7 @@ EncLayerFactory::deserializeLayer(onion o, SECLEVEL sl,
 	
     default:{}
     }
-    throw CryptDBError("unknown or unimplemented security level");
+    throw CryptDBError("unknown or unimplemented security level \n");
 }
 
 string
