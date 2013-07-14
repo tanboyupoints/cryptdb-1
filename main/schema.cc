@@ -74,17 +74,18 @@ MetaKey DBMeta::getKey(const DBMeta * const child) const
     throw CryptDBError("reverse lookup failed to find the child's key!");
 }
 
+template <typename ChildType>
 template <typename ConcreteMeta> ConcreteMeta *
-AbstractMeta::deserialize(std::string serial)
+AbstractMeta<ChildType>::deserialize(std::string serial)
 {
     return new ConcreteMeta(serial);
 }
 
 // TODO: Implement.
-std::vector<AbstractMeta *> AbstractMeta::fetchChildren(Connect *e_conn)
+template <typename ChildType>
+std::vector<DBMeta *> AbstractMeta<ChildType>::fetchChildren(Connect *e_conn)
 {
     /*
-     * FIXME: We need the child type.
     DBResult *db_res;
     assert(e_conn->execute(query, db_res));
     ScopedMySQLRes r(db_res->n);
@@ -95,8 +96,9 @@ std::vector<AbstractMeta *> AbstractMeta::fetchChildren(Connect *e_conn)
 
     }
     */
+    AbstractMeta<ChildType>::deserialize<ChildType>("Aaron");
 
-    return std::vector<AbstractMeta *>(4);
+    return std::vector<DBMeta *>(4);
 }
 
 // TODO: Implement deserialization.

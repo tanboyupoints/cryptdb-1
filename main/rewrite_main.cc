@@ -171,8 +171,8 @@ static SchemaInfo *
 loadSchemaInfo(Connect *e_conn)
 {
     SchemaInfo *schema = new SchemaInfo(); 
-    std::function<AbstractMeta*(AbstractMeta *)> loadChildren =
-        [loadChildren, &e_conn](AbstractMeta *parent) {
+    std::function<DBMeta*(DBMeta *)> loadChildren =
+        [loadChildren, &e_conn](DBMeta *parent) {
             auto kids = parent->fetchChildren(e_conn);
             if (0 != kids.size()) {
                 for_each(kids.begin(), kids.end(), loadChildren); 

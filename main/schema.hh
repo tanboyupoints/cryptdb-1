@@ -114,16 +114,16 @@ struct DBMeta : public DBObject {
 
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;
+    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn) = 0;
 
     std::map<MetaKey, DBMeta *> children;
-
 };
 
 // > TODO: template child and parent type (possibly key type as well).
 //   This would allow us to remove boilerplate for children of *Meta class.
 // > TODO: Mage getDatabaseID() protected by templating on the Concrete type
 //   and making it a friend.
-// template <typename ChildType>
+template <typename ChildType>
 struct AbstractMeta : public DBMeta {
     // TODO: Remove default constructor.
     AbstractMeta() {}
@@ -139,7 +139,7 @@ struct AbstractMeta : public DBMeta {
     // Virtual constructor to deserialize from embedded database.
     template <typename ConcreteMeta>
         static ConcreteMeta *deserialize(std::string serial);
-    std::vector<AbstractMeta *> fetchChildren(Connect *e_conn);
+    std::vector<DBMeta *> fetchChildren(Connect *e_conn);
 };
 
 /*
@@ -147,7 +147,7 @@ struct AbstractMeta : public DBMeta {
  * generating the encryption layers.
  */
 // TODO: Semantically enforce that OnionMeta can not have children.
-typedef struct OnionMeta : AbstractMeta {
+typedef struct OnionMeta : AbstractMeta<OnionMeta> {
     // TODO: Private.
     std::vector<EncLayer *> layers; //first in list is lowest layer
 
@@ -178,7 +178,7 @@ struct TableMeta;
 //TODO: FieldMeta and TableMeta are partly duplicates with the original
 // FieldMetadata an TableMetadata
 // which contains data we want to add to this structure soon
-typedef struct FieldMeta : public AbstractMeta {
+typedef struct FieldMeta : public AbstractMeta<OnionMeta> {
     const std::string fname;
     bool has_salt; //whether this field has its own salt
     const std::string salt_name;
@@ -231,7 +231,7 @@ typedef struct FieldMeta : public AbstractMeta {
 } FieldMeta;
 
 // TODO: Put const back.
-typedef struct TableMeta : public AbstractMeta {
+typedef struct TableMeta : public AbstractMeta<FieldMeta> {
     std::list<MetaKey> fieldNames;     //in order field names
     bool hasSensitive;
     bool has_salt;
@@ -278,7 +278,7 @@ private:
 // FIXME: Inherit from AbstractMeta.
 // AWARE: Table/Field aliases __WILL NOT__ be looked up when calling from
 // this level or below. Use Analysis::* if you need aliasing.
-typedef struct SchemaInfo : public AbstractMeta {
+typedef struct SchemaInfo : public AbstractMeta<TableMeta> {
     SchemaInfo() {;}
     ~SchemaInfo();
 
