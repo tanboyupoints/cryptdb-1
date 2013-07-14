@@ -141,55 +141,56 @@ class ForeignKeySubHandler : public AlterSubHandler {
 };
 
 class AddIndexSubHandler : public AlterSubHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
-                                   unsigned *out_lex_count) const {
-        LEX **out_lex = this->rewrite(lex, a, q, out_lex_count);
-        this->update(q, lex, a);
-
-        return out_lex;
-    }
-
     // TODO: Add index to embedded shallow mirror.
-    void update(const string &q, LEX *lex, Analysis &a) const {
+    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
+                                   unsigned *out_lex_count) const
+    {
         const string &table =
             lex->select_lex.table_list.first->table_name;
-        TableMeta *tm = a.getTableMeta(table);
-        
-        // Add each new index.
-        auto key_it =
-            List_iterator<Key>(lex->alter_info.key_list);
-        eachList<Key>(key_it, [table, tm, a] (Key *key) {
-            std::string index_name = convert_lex_str(key->name);
-            std::string anon_name = a.getAnonIndexName(table, index_name);
-
-            ostringstream s;
-            s << " INSERT INTO pdb.index_info VALUES ("
-              << " (SELECT table_info.id "
-              << "    FROM pdb.table_info"
-              << "  WHERE anon_name = " << tm->getAnonTableName()
-              << "    AND database_name = '"
-              <<          a.ps->e_conn->getCurDBName() << "'), "
-              << " '" << index_name << "', "
-              << " '" << anon_name << "', "
-              << " 0"
-              << " );";
-
-            assert(a.ps->e_conn->execute(s.str()));
-        });
- 
-        return;
-    }
-
-    LEX **rewrite(LEX *lex, Analysis &a, const string &q,
-                  unsigned *out_lex_count) const {
         LEX *new_lex = copy(lex);
-        const string &table =
-            lex->select_lex.table_list.first->table_name;
+
+        TableMeta *tm = a.getTableMeta(table);
+
+        // -----------------------------
+        //         Rewrite TABLE
+        // -----------------------------
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a);
 
-        do_key_rewriting(lex, new_lex, table, a);
+        // Add each new index.
+        auto key_it =
+            List_iterator<Key>(lex->alter_info.key_list);
+        new_lex->alter_info.key_list = 
+            reduceList<Key>(key_it, List<Key>(),
+                [&table, &tm, &a] (List<Key> out_list, Key *key) {
+                    // -----------------------------
+                    //         Update INDEX
+                    // -----------------------------
+                    std::string index_name = convert_lex_str(key->name);
+                    std::string anon_name = a.addIndex(table, index_name);
+                    ostringstream s;
+                    s << " INSERT INTO pdb.index_info VALUES ("
+                      << " (SELECT table_info.id "
+                      << "    FROM pdb.table_info"
+                      << "  WHERE anon_name = '" << tm->getAnonTableName()
+                      << "'"
+                      << "    AND database_name = '"
+                      <<          a.ps->e_conn->getCurDBName() << "'), "
+                      << " '" << index_name << "', "
+                      << " '" << anon_name << "', "
+                      << " 0"
+                      << " );";
 
+                    assert(a.ps->e_conn->execute(s.str()));
+                    // -----------------------------
+                    //         Rewrite INDEX
+                    // -----------------------------
+                    auto new_keys = rewrite_key(table, key, a);
+                    out_list.concat(vectorToList(new_keys));
+
+                    return out_list;
+            });
+ 
         return single_lex_output(new_lex, out_lex_count);
     }
 };

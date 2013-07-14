@@ -38,8 +38,8 @@ commit_transaction_lex(Analysis a);
 vector<Create_field*>
 rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a);
 
-void
-do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a);
+vector<Key*>
+rewrite_key(const string &table, Key *key, Analysis &a);
 
 bool
 do_add_field(FieldMeta *fm, const Analysis &a, std::string dbname,

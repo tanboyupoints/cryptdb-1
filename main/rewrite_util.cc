@@ -243,7 +243,7 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
 }
 
 // TODO: Add Key for oDET onion as well.
-static vector<Key*>
+vector<Key*>
 rewrite_key(const string &table, Key *key, Analysis &a)
 {
     vector<Key*> output_keys;
@@ -251,7 +251,7 @@ rewrite_key(const string &table, Key *key, Analysis &a)
     auto col_it =
         List_iterator<Key_part_spec>(key->columns);
     new_key->name =
-        string_to_lex_str(a.addIndex(table, convert_lex_str(key->name)));
+        string_to_lex_str(a.getAnonIndexName(table, convert_lex_str(key->name)));
     new_key->columns = 
         reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
             [table, a] (List<Key_part_spec> out_field_list,
@@ -268,19 +268,6 @@ rewrite_key(const string &table, Key *key, Analysis &a)
     output_keys.push_back(new_key);
 
     return output_keys;
-}
-
-void
-do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
-{
-    // Rewrite the index names and choose the onion to apply it too.
-    auto key_it = List_iterator<Key>(lex->alter_info.key_list);
-    new_lex->alter_info.key_list =
-        reduceList<Key>(key_it, List<Key>(),
-            [table, &a] (List<Key> out_list, Key *key) {
-                out_list.concat(vectorToList(rewrite_key(table, key, a)));
-                return out_list;    /* lambda */
-            });
 }
 
 // @tid: defaults to NULL.
