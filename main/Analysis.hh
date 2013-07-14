@@ -260,7 +260,7 @@ public:
     enum Action {CREATE, REPLACE, DELETE};
 
     // New Delta.
-    Delta(Action action, AbstractMeta *meta, AbstractMeta *parent_meta,
+    Delta(Action action, DBMeta *meta, DBMeta *parent_meta,
           MetaKey key)
         : action(action), meta(meta), parent_meta(parent_meta), key(key) {}
     // FIXME: Unserialize old Delta.
@@ -353,8 +353,8 @@ public:
 private:
     Action action;
     // Can't use references because of deserialization.
-    AbstractMeta * meta;
-    AbstractMeta * parent_meta;
+    DBMeta * meta;
+    DBMeta * parent_meta;
     MetaKey key;
     bool used;
 

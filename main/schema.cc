@@ -10,39 +10,7 @@
 
 using namespace std;
 
-template <typename ConcreteMeta> ConcreteMeta *
-AbstractMeta::deserialize(std::string serial)
-{
-    return new ConcreteMeta(serial);
-}
-
-bool AbstractMeta::childExists(const MetaKey &key) const
-{
-    return children.find(key) != children.end();
-}
-
-DBMeta *AbstractMeta::getChild(const MetaKey &key) const
-{
-    auto it = children.find(key);
-    if (children.end() == it) {
-        return NULL;
-    }
-
-    return it->second;
-}
-
-MetaKey AbstractMeta::getKey(const AbstractMeta * const child) const
-{
-    for (auto it : children) {
-        if (it.second == child) {
-            return it.first;
-        }
-    }
-
-    throw CryptDBError("reverse lookup failed to find the child's key!");
-}
-
-bool AbstractMeta::addChild(const MetaKey &key, DBMeta *meta)
+bool DBMeta::addChild(const MetaKey &key, DBMeta *meta)
 {
     if (childExists(key)) {
         return false;
@@ -52,7 +20,7 @@ bool AbstractMeta::addChild(const MetaKey &key, DBMeta *meta)
     return true;
 }
 
-bool AbstractMeta::replaceChild(const MetaKey &key, DBMeta *meta)
+bool DBMeta::replaceChild(const MetaKey &key, DBMeta *meta)
 {
     if (!childExists(key)) {
         return false;
@@ -62,7 +30,7 @@ bool AbstractMeta::replaceChild(const MetaKey &key, DBMeta *meta)
     return true;
 }
 
-bool AbstractMeta::destroyChild(const MetaKey &key)
+bool DBMeta::destroyChild(const MetaKey &key)
 {
     if (!childExists(key)) {
         return false;
@@ -78,6 +46,38 @@ bool AbstractMeta::destroyChild(const MetaKey &key)
     } else {
         throw CryptDBError("Bad erase amount in destroyChild!");
     }
+}
+
+bool DBMeta::childExists(const MetaKey &key) const
+{
+    return children.find(key) != children.end();
+}
+
+DBMeta *DBMeta::getChild(const MetaKey &key) const
+{
+    auto it = children.find(key);
+    if (children.end() == it) {
+        return NULL;
+    }
+
+    return it->second;
+}
+
+MetaKey DBMeta::getKey(const DBMeta * const child) const
+{
+    for (auto it : children) {
+        if (it.second == child) {
+            return it.first;
+        }
+    }
+
+    throw CryptDBError("reverse lookup failed to find the child's key!");
+}
+
+template <typename ConcreteMeta> ConcreteMeta *
+AbstractMeta::deserialize(std::string serial)
+{
+    return new ConcreteMeta(serial);
 }
 
 // TODO: Implement.

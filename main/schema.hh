@@ -103,15 +103,27 @@ struct DBMeta : public DBObject {
     DBMeta() {}
     virtual ~DBMeta() {}
 
-    virtual bool addChild(const MetaKey &key, DBMeta *meta) = 0;
-    virtual bool replaceChild(const MetaKey &key, DBMeta *meta) = 0;
-    virtual bool destroyChild(const MetaKey &key) = 0;
+    virtual bool addChild(const MetaKey &key, DBMeta *meta);
+    virtual bool replaceChild(const MetaKey &key, DBMeta *meta);
+    virtual bool destroyChild(const MetaKey &key);
+
+    // Helpers.
+    bool childExists(const MetaKey &key) const;
+    DBMeta *getChild(const MetaKey &key) const;
+    MetaKey getKey(const DBMeta *const child) const;
+
+    // FIXME: Use rtti.
+    virtual std::string typeName() const = 0;
+
+    std::map<MetaKey, DBMeta *> children;
+
 };
 
 // > TODO: template child and parent type (possibly key type as well).
 //   This would allow us to remove boilerplate for children of *Meta class.
 // > TODO: Mage getDatabaseID() protected by templating on the Concrete type
 //   and making it a friend.
+// template <typename ChildType>
 struct AbstractMeta : public DBMeta {
     // TODO: Remove default constructor.
     AbstractMeta() {}
@@ -127,17 +139,7 @@ struct AbstractMeta : public DBMeta {
     // Virtual constructor to deserialize from embedded database.
     template <typename ConcreteMeta>
         static ConcreteMeta *deserialize(std::string serial);
-    bool childExists(const MetaKey &key) const;
-    DBMeta *getChild(const MetaKey &key) const;
-    MetaKey getKey(const AbstractMeta *const child) const;
-    virtual bool addChild(const MetaKey &key, DBMeta *meta);
-    bool replaceChild(const MetaKey &key, DBMeta *meta);
-    virtual bool destroyChild(const MetaKey &key);
     std::vector<AbstractMeta *> fetchChildren(Connect *e_conn);
-    // FIXME: Use rtti.
-    virtual std::string typeName() const = 0;
-
-    std::map<MetaKey, DBMeta *> children;
 };
 
 /*
