@@ -242,30 +242,6 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
     return output_cfields;
 }
 
-//TODO: no need to pass create_field to this
-static vector<Create_field *>
-rewrite_create_field(const string &table_name, Create_field *f,
-                     const Analysis &a)
-{
-    FieldMeta *fm = a.getFieldMeta(table_name, f->field_name);
-    return rewrite_create_field(fm, f, a);
-}
-
-void
-do_field_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a)
-{
-    // TODO(stephentu): template this pattern away
-    // (borrowed from rewrite_select_lex())
-    auto cl_it = List_iterator<Create_field>(lex->alter_info.create_list);
-    new_lex->alter_info.create_list =
-        reduceList<Create_field>(cl_it, List<Create_field>(),
-            [table, &a] (List<Create_field> out_list, Create_field *cf) {
-                out_list.concat(vectorToList(rewrite_create_field(table, cf,
-                                                                  a)));
-            return out_list; /* lambda */
-         });
-}
-
 // TODO: Add Key for oDET onion as well.
 static vector<Key*>
 rewrite_key(const string &table, Key *key, Analysis &a)

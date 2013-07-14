@@ -39,9 +39,6 @@ vector<Create_field*>
 rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a);
 
 void
-do_field_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a);
-
-void
 do_key_rewriting(LEX *lex, LEX *new_lex, const string &table, Analysis &a);
 
 bool
