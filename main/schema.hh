@@ -99,11 +99,20 @@ public:
     }
 };
 
+struct DBMeta : public DBObject {
+    DBMeta() {}
+    virtual ~DBMeta() {}
+
+    virtual bool addChild(const MetaKey &key, DBMeta *meta) = 0;
+    virtual bool replaceChild(const MetaKey &key, DBMeta *meta) = 0;
+    virtual bool destroyChild(const MetaKey &key) = 0;
+};
+
 // > TODO: template child and parent type (possibly key type as well).
 //   This would allow us to remove boilerplate for children of *Meta class.
 // > TODO: Mage getDatabaseID() protected by templating on the Concrete type
 //   and making it a friend.
-struct AbstractMeta : public DBObject {
+struct AbstractMeta : public DBMeta {
     // TODO: Remove default constructor.
     AbstractMeta() {}
     virtual ~AbstractMeta()
@@ -119,16 +128,16 @@ struct AbstractMeta : public DBObject {
     template <typename ConcreteMeta>
         static ConcreteMeta *deserialize(std::string serial);
     bool childExists(const MetaKey &key) const;
-    AbstractMeta *getChild(const MetaKey &key) const;
+    DBMeta *getChild(const MetaKey &key) const;
     MetaKey getKey(const AbstractMeta *const child) const;
-    virtual bool addChild(const MetaKey &key, AbstractMeta *meta);
-    bool replaceChild(const MetaKey &key, AbstractMeta *meta);
+    virtual bool addChild(const MetaKey &key, DBMeta *meta);
+    bool replaceChild(const MetaKey &key, DBMeta *meta);
     virtual bool destroyChild(const MetaKey &key);
     std::vector<AbstractMeta *> fetchChildren(Connect *e_conn);
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;
 
-    std::map<MetaKey, AbstractMeta *> children;
+    std::map<MetaKey, DBMeta *> children;
 };
 
 /*
@@ -245,7 +254,7 @@ typedef struct TableMeta : public AbstractMeta {
     TableMeta(std::string serial);
 
     std::string serialize(const DBObject &parent) const;
-    bool addChild(const MetaKey &key, AbstractMeta *meta);
+    bool addChild(const MetaKey &key, DBMeta *meta);
     std::string getAnonTableName() const;
     bool destroyChild(const MetaKey &key);
     // FIXME: Use rtti.

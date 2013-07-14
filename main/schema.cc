@@ -21,7 +21,7 @@ bool AbstractMeta::childExists(const MetaKey &key) const
     return children.find(key) != children.end();
 }
 
-AbstractMeta *AbstractMeta::getChild(const MetaKey &key) const
+DBMeta *AbstractMeta::getChild(const MetaKey &key) const
 {
     auto it = children.find(key);
     if (children.end() == it) {
@@ -42,7 +42,7 @@ MetaKey AbstractMeta::getKey(const AbstractMeta * const child) const
     throw CryptDBError("reverse lookup failed to find the child's key!");
 }
 
-bool AbstractMeta::addChild(const MetaKey &key, AbstractMeta *meta)
+bool AbstractMeta::addChild(const MetaKey &key, DBMeta *meta)
 {
     if (childExists(key)) {
         return false;
@@ -52,7 +52,7 @@ bool AbstractMeta::addChild(const MetaKey &key, AbstractMeta *meta)
     return true;
 }
 
-bool AbstractMeta::replaceChild(const MetaKey &key, AbstractMeta *meta)
+bool AbstractMeta::replaceChild(const MetaKey &key, DBMeta *meta)
 {
     if (!childExists(key)) {
         return false;
@@ -196,7 +196,7 @@ std::string TableMeta::serialize(const DBObject &parent) const
 }
 
 // TODO: @fieldNames is a blight. Use a counter.
-bool TableMeta::addChild(const MetaKey &key, AbstractMeta *meta)
+bool TableMeta::addChild(const MetaKey &key, DBMeta *meta)
 {
     bool status = AbstractMeta::addChild(key, meta);
     if (false == status) {
