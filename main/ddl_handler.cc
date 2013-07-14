@@ -47,7 +47,7 @@ class CreateHandler : public DDLHandler {
         }
 
         // Create the table regardless of 'IF NOT EXISTS' if the table
-        // doens't exist.
+        // doesn't exist.
         if (false == a.tableMetaExists(table)) {
             // -----------------------------
             //         Update TABLE       
@@ -88,27 +88,15 @@ class CreateHandler : public DDLHandler {
                 List_iterator<Create_field>(lex->alter_info.create_list);
             new_lex->alter_info.create_list = 
                 reduceList<Create_field>(it, List<Create_field>(),
-                    [tm, a, dbname, table] (List<Create_field> out_list,
-                                            Create_field *cf) {
-                        // -----------------------------
-                        //         Update FIELD       
-                        // -----------------------------
-                        FieldMeta *fm =
-                            new FieldMeta(string(cf->field_name), cf,
-                                          a.ps->masterKey);
-                        assert(tm->addFieldMeta(fm));
-                        assert(do_add_field(fm, a, dbname, table));
-                        // -----------------------------
-                        //         Rewrite FIELD       
-                        // -----------------------------
-                        auto new_fields = rewrite_create_field(fm, cf, a);
-                        out_list.concat(vectorToList(new_fields));
-
-                        return out_list;
+                    [&tm, &a, dbname, table] (List<Create_field> out_list,
+                                              Create_field *cf) {
+                        return updateAndRewriteField(cf, tm, table, dbname,
+                                                     a, out_list);
                 });
             
             a.ps->e_conn->execute("COMMIT");
-        } else {
+        } else { // Table already exists.
+
             // Make sure we aren't trying to create a table that
             // already exists.
             assert(lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS);

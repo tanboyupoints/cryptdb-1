@@ -7,47 +7,33 @@
 
 class AddColumnSubHandler : public AlterSubHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
-                                   unsigned *out_lex_count) const {
-        update(q, lex, a);
-        return this->rewrite(lex, a, q, out_lex_count);
-    }
-
-    void update(const string &q, LEX *lex, Analysis &a) const {
+                                   unsigned *out_lex_count) const
+    {
         const string &table =
             lex->select_lex.table_list.first->table_name;
         const string &dbname = lex->select_lex.table_list.first->db;
+        LEX *new_lex = copy(lex);
 
         TableMeta *tm = a.getTableMeta(table);
+        // -----------------------------
+        //         Rewrite TABLE
+        // -----------------------------
+        new_lex->select_lex.table_list =
+            rewrite_table_list(lex->select_lex.table_list, a);
 
         // Create *Meta objects.
         auto add_it =
             List_iterator<Create_field>(lex->alter_info.create_list);
-        eachList<Create_field>(add_it,
-            [tm, a, dbname, table] (Create_field *cf) {
-                FieldMeta *fm =
-                    new FieldMeta(std::string(cf->field_name), cf,
-                                  a.ps->masterKey); 
-                assert(tm->addFieldMeta(fm));
-
-                // Add metadata to embedded database.
-                assert(do_add_field(fm, a, dbname, table));
-        });
+        new_lex->alter_info.create_list = 
+            reduceList<Create_field>(add_it, List<Create_field>(),
+                [&tm, &a, dbname, table] (List<Create_field> out_list,
+                                        Create_field *cf) {
+                    return updateAndRewriteField(cf, tm, table, dbname, a,
+                                                 out_list);
+            });
 
         // Add field to embedded database.
         assert(a.ps->e_conn->execute(q));
-    }
-
-    LEX **rewrite(LEX *lex, Analysis &a, const string &q,
-                  unsigned *out_lex_count) const {
-        LEX *new_lex = copy(lex);
-        const string &table =
-            lex->select_lex.table_list.first->table_name;
-        new_lex->select_lex.table_list =
-            rewrite_table_list(lex->select_lex.table_list, a);
-
-        do_field_rewriting(lex, new_lex, table, a);
-        // TODO: Should this be here?
-        do_key_rewriting(lex, new_lex, table, a);
         return single_lex_output(new_lex, out_lex_count);
     }
 };

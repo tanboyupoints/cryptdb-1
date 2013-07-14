@@ -405,3 +405,27 @@ single_lex_output(LEX *out_me, unsigned *out_lex_count)
     *out_lex_count = 1;
     return out_lex;
 }
+
+List<Create_field>
+updateAndRewriteField(Create_field *cf, TableMeta *tm,
+                      const std::string &table, const std::string &dbname,
+                      Analysis &a,
+                      List<Create_field> &rewritten_cfield_list)
+{
+    // -----------------------------
+    //         Update FIELD       
+    // -----------------------------
+    FieldMeta *fm =
+        new FieldMeta(string(cf->field_name), cf,
+                      a.ps->masterKey);
+    assert(tm->addFieldMeta(fm));
+    assert(do_add_field(fm, a, dbname, table));
+    // -----------------------------
+    //         Rewrite FIELD       
+    // -----------------------------
+    auto new_fields = rewrite_create_field(fm, cf, a);
+    rewritten_cfield_list.concat(vectorToList(new_fields));
+
+    return rewritten_cfield_list;
+}
+

@@ -21,6 +21,8 @@ Misc Bugs
       # Crash doesn't happen if we build another table first.
     * ALTER TABLE ... occasionally locks in
       mysql_execute_query => pthread_cond_timedwait
+    * ALTER TABLE <table> ADD COLUMN.. will occasionally segfault if we are
+      adding 3 columns. Discover why.
 Finish removing MultiPrincipal code.
  - Test stuff.
  - Rewriter constructor.

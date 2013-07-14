@@ -54,6 +54,12 @@ bool_to_string(bool b);
 LEX **
 single_lex_output(LEX *out_me, unsigned *out_lex_count);
 
+List<Create_field>
+updateAndRewriteField(Create_field *cf, TableMeta *tm,
+                      const std::string &table, const std::string &dbname,
+                      Analysis &a,
+                      List<Create_field> &rewritten_cfield_list);
+
 // FIXME(burrows): Generalize to support any container with next AND end
 // semantics.
 template <typename T>
