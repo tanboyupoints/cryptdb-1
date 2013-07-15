@@ -94,31 +94,40 @@ AbstractMeta<ChildType, KeyType>::deserialize(std::string serial)
     return new ConcreteMeta(serial);
 }
 
-// TODO: Implement.
+// TODO: Debug.
 template <typename ChildType, typename KeyType>
 std::vector<std::pair<AbstractMetaKey *, DBMeta *>>
 AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
 {
+    // FIXME: Elsewhere.
+    const std::string create_db =
+        " CREATE DATABASE IF NOT EXISTS pdb;";
+    
+    assert(e_conn->execute(create_db));
+
     // First, build the table in case this is the first time accessing
     // the embedded database.
-    // FIXME: Get name.
-    const std::string table_name = "<something>"; // ChildType::typeName();
-    std::string create_query =
-        " CREATE TABLE IF NOT EXIST pdb." + table_name +
-        "   (serial VARCHAR(100) NOT NULL,"
+
+    // HACK.
+    auto getChildTypeName = ChildType::instanceTypeName;
+
+    const std::string table_name = getChildTypeName(); 
+    const std::string create_query =
+        " CREATE TABLE IF NOT EXISTS pdb." + table_name +
+        "   (serial_object VARCHAR(100) NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
 
     assert(e_conn->execute(create_query));
 
     // Do the same for the JOIN table.
-    // FIXME: Get name.
-    const std::string join_table_name = "<somethingelse>";
-    std::string join_create_query = 
+    const std::string join_table_name =
+        getChildTypeName() + "_" + this->typeName();
+    const std::string join_create_query = 
         " CREATE TABLE IF NOT EXISTS pdb." + join_table_name +
         "   (object_id bigint NOT NULL,"
         "    parent_id bigint NOT NULL,"
-        "    key varchar(100) NOT NULL,"
+        "    serial_key varchar(100) NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
 
@@ -128,9 +137,9 @@ AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
     std::vector<std::pair<AbstractMetaKey *, DBMeta *>> out_vec;
     DBResult *db_res;
     const std::string parent_id = std::to_string(this->getDatabaseID());
-    std::string serials_query = 
-        " SELECT pdb." + table_name + ".serial,"
-        "        pdb." + join_table_name + ".key"
+    const std::string serials_query = 
+        " SELECT pdb." + table_name + ".serial_object,"
+        "        pdb." + join_table_name + ".serial_key"
         " FROM pdb." + table_name + 
         "   INNER JOIN pdb." + join_table_name +
         "       ON (pdb." + table_name + ".id"

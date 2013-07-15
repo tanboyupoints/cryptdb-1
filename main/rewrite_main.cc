@@ -167,15 +167,19 @@ createMetaTablesIfNotExists(ProxyState & ps)
     return;
 }
 
+// FIXME: This function will not build all of our tables when it is run
+// on an empty database.  If you don't have a parent, your table won't be
+// built.  We probably want to seperate our database logic into 3 parts.
+//  1> Schema buildling (CREATE TABLE IF NOT EXISTS...)
+//  2> INSERTing
+//  3> SELECTing
 static SchemaInfo *
 loadSchemaInfo(Connect *e_conn)
 {
     SchemaInfo *schema = new SchemaInfo(); 
-    // FIXME: Remove.
-    return schema;
     // Recursively rebuild the AbstractMeta<Whatever> and it's children.
     std::function<DBMeta*(DBMeta *)> loadChildren =
-        [loadChildren, &e_conn](DBMeta *parent) {
+        [&loadChildren, &e_conn](DBMeta *parent) {
             std::vector<std::pair<AbstractMetaKey *, DBMeta *>> kids =
                 parent->fetchChildren(e_conn);
             for (auto it : kids) {

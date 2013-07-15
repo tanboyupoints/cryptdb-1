@@ -162,7 +162,8 @@ typedef struct OnionMeta : AbstractMeta<OnionMeta, std::string> {
     std::string serialize(const DBObject &parent) const;
     std::string getAnonOnionName() const;
     // FIXME: Use rtti.
-    std::string typeName() const {return "onionMeta";}
+    std::string typeName() const {return type_name;}
+    static std::string instanceTypeName() {return type_name;}
 
     SECLEVEL getSecLevel() {
         assert(layers.size() > 0);
@@ -170,6 +171,7 @@ typedef struct OnionMeta : AbstractMeta<OnionMeta, std::string> {
     }
 
 private:
+    constexpr static const char *type_name = "onionMeta";
     const std::string onionname;
 } OnionMeta;
 
@@ -226,7 +228,11 @@ typedef struct FieldMeta : public AbstractMeta<OnionMeta, onion> {
     }
 
     // FIXME: Use rtti.
-    std::string typeName() const {return "fieldMeta";}
+    std::string typeName() const {return type_name;}
+    static std::string instanceTypeName() {return type_name;}
+
+private:
+    constexpr static const char *type_name = "fieldMeta";
 } FieldMeta;
 
 // TODO: Put const back.
@@ -259,7 +265,8 @@ typedef struct TableMeta : public AbstractMeta<FieldMeta, std::string> {
     std::string getAnonTableName() const;
     bool destroyChild(AbstractMetaKey *key);
     // FIXME: Use rtti.
-    std::string typeName() const {return "tableMeta";}
+    std::string typeName() const {return type_name;}
+    static std::string instanceTypeName() {return type_name;}
 
     friend class Analysis;
 
@@ -270,6 +277,7 @@ protected:
     bool destroyIndex(std::string index_name);
    
 private:
+    constexpr static const char *type_name = "tableMeta";
     std::map<std::string, std::string> index_map;
 } TableMeta;
 
@@ -281,11 +289,14 @@ typedef struct SchemaInfo : public AbstractMeta<TableMeta, std::string> {
     SchemaInfo() {;}
     ~SchemaInfo();
 
-    std::string typeName() const {return "SchemaInfo";}
+    std::string typeName() const {return type_name;}
+    static std::string instanceTypeName() {return type_name;}
 
     friend class Analysis;
 
 private:
+    constexpr static const char *type_name = "schemaInfo";
+    // FIXME: Remove.
     std::map<std::string, TableMeta *> tableMetaMap;
 
     // These functions do not support Aliasing, use Analysis::getTableMeta

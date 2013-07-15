@@ -305,34 +305,37 @@ public:
                 assert(parent_meta->addChild(key, meta));
                 
                 // TODO: Encapsulate this behavior somewhere.
-                std::string child_serial = meta->serialize(*parent_meta);
-                std::string child_id =
-                    std::to_string(meta->getDatabaseID());
-                assert("0" == child_id);
-                std::string parent_id =
+                const std::string child_serial =
+                    meta->serialize(*parent_meta);
+                assert(0 == meta->getDatabaseID());
+                const std::string parent_id =
                     std::to_string(parent_meta->getDatabaseID());
                 // FIXME: rtti.
-                std::string table_name = meta->typeName();
-                std::string join_table_name = parent_meta->typeName() + "_" +
-                    meta->typeName();
+                const std::string table_name = meta->typeName();
+                const std::string join_table_name =
+                    parent_meta->typeName() + "_" + meta->typeName();
 
                 // Build the queries.
+
+                // On CREATE, the database generates a unique ID for us.
                 std::string query =
                     " INSERT INTO pdb." + table_name + 
-                    "    (serial) VALUES ("
-                    " "  + child_id + ", " +
+                    "    (serial_object) VALUES ("
                     " '" + child_serial + "'); ";
+                // TODO: Remove assert.
+                assert(e_conn->execute(query));
+
+                const std::string object_id =
+                    std::to_string(e_conn->last_insert_id());
                 std::string join_query =
                     " INSERT INTO pdb." + join_table_name +
-                    "   (object_id, parent_id, key) VALUES ("
-                    " "  + child_id + ", " +
+                    "   (object_id, parent_id, serial_key) VALUES ("
+                    " "  + object_id + ", " +
                     " "  + parent_id + ", " +
                     // FIXME: Serialize.
                     " '" + key->toString() + "'); ";
 
-                // TODO: Remove these asserts and use the return once
-                // we've debugged.
-                assert(e_conn->execute(query));
+                // TODO: Remove assert.
                 assert(e_conn->execute(join_query));
 
                 return true;
