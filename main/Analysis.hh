@@ -261,10 +261,10 @@ public:
 
     // New Delta.
     Delta(Action action, DBMeta *meta, DBMeta *parent_meta,
-          MetaKey key)
+          AbstractMetaKey *key)
         : action(action), meta(meta), parent_meta(parent_meta), key(key) {}
     // FIXME: Unserialize old Delta.
-    Delta(std::string serial) : key(MetaKey("implement me!"))
+    Delta(std::string serial) : key(new MetaKey<std::string>("implement me!"))
     {
         // return Delta(CREATE, NULL, NULL);
         std::vector<std::string> split_serials = unserialize_string(serial);
@@ -315,8 +315,6 @@ public:
                 std::string table_name = meta->typeName();
                 std::string join_table_name = parent_meta->typeName() + "_" +
                     meta->typeName();
-                // FIXME: Slow.
-                std::string key = parent_meta->getKey(meta).getString();
 
                 // Build the queries.
                 std::string query =
@@ -329,7 +327,8 @@ public:
                     "   (object_id, parent_id, key) VALUES ("
                     " "  + child_id + ", " +
                     " "  + parent_id + ", " +
-                    " '" + key + "'); ";
+                    // FIXME: Serialize.
+                    " '" + key->toString() + "'); ";
 
                 // TODO: Remove these asserts and use the return once
                 // we've debugged.
@@ -355,7 +354,7 @@ private:
     // Can't use references because of deserialization.
     DBMeta * meta;
     DBMeta * parent_meta;
-    MetaKey key;
+    AbstractMetaKey *key;
     bool used;
 
     std::string serialize(const DBObject &parent) const 

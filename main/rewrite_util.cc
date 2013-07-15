@@ -382,7 +382,8 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
     FieldMeta *fm = new FieldMeta(name, cf, a.ps->masterKey);
     // Here we store the key name for the first time. It will be applied
     // after the Delta is read out of the database.
-    a.deltas.push_back(Delta(Delta::CREATE, fm, tm, MetaKey(name)));
+    Delta d(Delta::CREATE, fm, tm, new MetaKey<std::string>(name));
+    a.deltas.push_back(d);
     // assert(tm->addChild(name, fm));
     assert(do_add_field(fm, a, dbname, table));
     // -----------------------------

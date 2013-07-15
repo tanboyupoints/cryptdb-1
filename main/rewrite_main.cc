@@ -171,10 +171,12 @@ static SchemaInfo *
 loadSchemaInfo(Connect *e_conn)
 {
     SchemaInfo *schema = new SchemaInfo(); 
+    // FIXME: Remove.
+    return schema;
     // Recursively rebuild the AbstractMeta<Whatever> and it's children.
     std::function<DBMeta*(DBMeta *)> loadChildren =
         [loadChildren, &e_conn](DBMeta *parent) {
-            std::vector<std::pair<MetaKey, DBMeta *>> kids =
+            std::vector<std::pair<AbstractMetaKey *, DBMeta *>> kids =
                 parent->fetchChildren(e_conn);
             for (auto it : kids) {
                 parent->addChild(it.first, it.second);
@@ -235,7 +237,8 @@ buildTableMeta(ProxyState &ps)
                                       table_salt_name,
                                       table_anon_name,
                                       index_map);
-        assert(ps.schema->addChild(table_name, tm));
+        MetaKey<std::string> *key = new MetaKey<std::string>(table_name);
+        assert(ps.schema->addChild(key, tm));
 
         buildFieldMeta(ps, tm, table_database_name);
     }
@@ -306,7 +309,8 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
             new FieldMeta(field_name, has_salt, field_salt_name,
                           onion_layout);
 
-        assert(tm->addChild(field_name, fm));
+        MetaKey<std::string> *key = new MetaKey<std::string>(field_name);
+        assert(tm->addChild(key, fm));
 
         buildOnionMeta(ps, fm, atoi(field_id.c_str()));
     }
@@ -895,7 +899,6 @@ Rewriter::Rewriter(ConnectionInfo ci,
                    bool multi,
 		   bool encByDefault)
 {
-
     init_mysql(embed_dir);
 
     ps.ci = ci;

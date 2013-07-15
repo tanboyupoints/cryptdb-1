@@ -12,6 +12,8 @@
 #include <map>
 #include <list>
 #include <iostream>
+#include <sstream>
+#include <functional>
 
 class Analysis;
 struct FieldMeta;
@@ -49,53 +51,40 @@ public:
 
 const OLK PLAIN_OLK = OLK(oPLAIN, SECLEVEL::PLAINVAL, NULL);
 
-// TODO: A bit HACKy. Could be cleaned up with RTTI.
-// TODO: This really should be templated, those exceptions are _why_
-// templates.
-//       > Can't template because it requires templating AbstractMeta
-//         and we want all AbstractMetaz to be the same type. Otherwise
-//         AbstractMeta::children will need to know what type the 'children'
-//         use for keys.
-class MetaKey {
-    const std::string *s;
-    const onion *o;
-
+class AbstractMetaKey {
 public:
-    MetaKey(std::string s) : s(new std::string(s)), o(NULL) {}
-    MetaKey(onion o) : s(NULL), o(new onion(o)) {}
-    ~MetaKey() {
-        /*
-        if (s) delete s;
-        if (o) delete o;
-        */
+    AbstractMetaKey() {;}
+    virtual ~AbstractMetaKey() {;}
+    virtual bool operator <(const AbstractMetaKey &rhs) const = 0;
+    virtual bool operator ==(const AbstractMetaKey &rhs) const = 0;
+    virtual std::string toString() const = 0;
+};
+
+template <typename KeyType>
+class MetaKey : public AbstractMetaKey {
+public:
+    const KeyType key_data;
+
+    MetaKey(KeyType key_data) : key_data(key_data) {}
+
+    bool operator <(const AbstractMetaKey &rhs) const
+    {
+        MetaKey rhs_key = static_cast<const MetaKey &>(rhs);
+        return key_data < rhs_key.key_data;
     }
 
-    bool operator <(const MetaKey &rhs) const
+    bool operator ==(const AbstractMetaKey &rhs) const
     {
-        if (o && rhs.o) {
-            return *o < *rhs.o;
-        } else if (s && rhs.s) {
-            return *s < *rhs.s;
-        } else {
-            throw CryptDBError("MetaKey cannot support this operation!");
-        }
+        MetaKey rhs_key = static_cast<const MetaKey &>(rhs);
+        return key_data == rhs_key.key_data;
     }
 
-    bool operator ==(const MetaKey &rhs) const
+    // FIXME.
+    std::string toString() const
     {
-        if (o && rhs.o) {
-            return *o == *rhs.o;
-        } else if (s && rhs.s) {
-            return *s == *rhs.s;
-        } else {
-            throw CryptDBError("MetaKey cannot support this operation!");
-        }
-    }
-
-    std::string getString() const
-    {
-        assert(s);
-        return *s;
+        std::ostringstream s;
+        s << key_data;
+        return s.str();
     }
 };
 
@@ -103,21 +92,23 @@ struct DBMeta : public DBObject {
     DBMeta() {}
     virtual ~DBMeta() {}
 
-    virtual bool addChild(const MetaKey &key, DBMeta *meta);
-    virtual bool replaceChild(const MetaKey &key, DBMeta *meta);
-    virtual bool destroyChild(const MetaKey &key);
+    virtual bool addChild(AbstractMetaKey *key, DBMeta *meta);
+    virtual bool replaceChild(AbstractMetaKey *key, DBMeta *meta);
+    virtual bool destroyChild(AbstractMetaKey *key);
 
     // Helpers.
-    bool childExists(const MetaKey &key) const;
-    DBMeta *getChild(const MetaKey &key) const;
-    MetaKey getKey(const DBMeta *const child) const;
+    std::map<AbstractMetaKey *, DBMeta *>::const_iterator
+        findChild(AbstractMetaKey *key) const;
+    bool childExists(AbstractMetaKey * key) const;
+    DBMeta *getChild(AbstractMetaKey * key) const;
+    AbstractMetaKey *getKey(const DBMeta *const child) const;
 
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;
-    virtual std::vector<std::pair<MetaKey, DBMeta *>>
+    virtual std::vector<std::pair<AbstractMetaKey *, DBMeta *>>
         fetchChildren(Connect *e_conn) = 0;
 
-    std::map<MetaKey, DBMeta *> children;
+    std::map<AbstractMetaKey *, DBMeta *> children;
 };
 
 // > TODO: Mage getDatabaseID() protected by templating on the Concrete type
@@ -138,7 +129,7 @@ struct AbstractMeta : public DBMeta {
     // Virtual constructor to deserialize from embedded database.
     template <typename ConcreteMeta>
         static ConcreteMeta *deserialize(std::string serial);
-    std::vector<std::pair<MetaKey, DBMeta *>>
+    std::vector<std::pair<AbstractMetaKey *, DBMeta *>>
         fetchChildren(Connect *e_conn);
 };
 
@@ -232,7 +223,7 @@ typedef struct FieldMeta : public AbstractMeta<OnionMeta> {
 
 // TODO: Put const back.
 typedef struct TableMeta : public AbstractMeta<FieldMeta> {
-    std::list<MetaKey> fieldNames;     //in order field names
+    std::list<AbstractMetaKey *> fieldNames;  //in order field names
     bool hasSensitive;
     bool has_salt;
     std::string salt_name;
@@ -256,9 +247,9 @@ typedef struct TableMeta : public AbstractMeta<FieldMeta> {
     TableMeta(std::string serial);
 
     std::string serialize(const DBObject &parent) const;
-    bool addChild(const MetaKey &key, DBMeta *meta);
+    bool addChild(AbstractMetaKey *key, DBMeta *meta);
     std::string getAnonTableName() const;
-    bool destroyChild(const MetaKey &key);
+    bool destroyChild(AbstractMetaKey *key);
     // FIXME: Use rtti.
     std::string typeName() const {return "tableMeta";}
 
@@ -291,8 +282,8 @@ private:
 
     // These functions do not support Aliasing, use Analysis::getTableMeta
     // and Analysis::getFieldMeta.
-    FieldMeta * getFieldMeta(const std::string & table,
-                             const std::string & field) const;
+    FieldMeta * getFieldMeta(std::string & table,
+                             std::string & field) const;
     std::string serialize(const DBObject &parent) const {
         throw CryptDBError("SchemaInfo can not be serialized!");
     }

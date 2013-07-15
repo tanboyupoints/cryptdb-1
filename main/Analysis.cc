@@ -2,6 +2,7 @@
 
 using namespace std;
 
+// FIXME: Memory leaks when we allocate MetaKey<...>, use smart pointer.
 
 EncSet::EncSet() : osl(FULL_EncSet.osl) {}
 
@@ -197,9 +198,10 @@ FieldMeta *Analysis::getFieldMeta(std::string table, std::string field) const
 
 TableMeta *Analysis::getTableMeta(std::string table) const
 {
-    string real_table_name = unAliasTable(table);
+    MetaKey<std::string> *key =
+        new MetaKey<std::string>(unAliasTable(table));
     TableMeta *tm =
-        static_cast<TableMeta *>(ps->schema->getChild(real_table_name));
+        static_cast<TableMeta *>(ps->schema->getChild(key));
     assert(tm);
     return tm;
 }
@@ -207,26 +209,30 @@ TableMeta *Analysis::getTableMeta(std::string table) const
 // FIXME: Field aliasing.
 bool Analysis::destroyFieldMeta(std::string table, std::string field)
 {
-    string real_table_name = unAliasTable(table);
+    MetaKey<std::string> *table_key =
+        new MetaKey<std::string>(unAliasTable(table));
     TableMeta *tm = 
-        static_cast<TableMeta *>(ps->schema->getChild(real_table_name));
+        static_cast<TableMeta *>(ps->schema->getChild(table_key));
     if (!tm) {
         return false;
     }
 
-    return tm->destroyChild(field);
+    MetaKey<std::string> *field_key = new MetaKey<std::string>(field);
+    return tm->destroyChild(field_key);
 }
 
 bool Analysis::destroyTableMeta(std::string table)
 {
-    string real_table_name = unAliasTable(table);
-    return ps->schema->destroyChild(table);
+    MetaKey<std::string> *key =
+        new MetaKey<std::string>(unAliasTable(table));
+    return ps->schema->destroyChild(key);
 }
 
 bool Analysis::tableMetaExists(std::string table) const
 {
-    string real_table_name = unAliasTable(table);
-    return ps->schema->childExists(real_table_name);
+    MetaKey<std::string> *key =
+        new MetaKey<std::string>(unAliasTable(table));
+    return ps->schema->childExists(key);
 }
 
 std::string Analysis::getAnonTableName(const string &table) const

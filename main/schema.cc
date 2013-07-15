@@ -10,7 +10,7 @@
 
 using namespace std;
 
-bool DBMeta::addChild(const MetaKey &key, DBMeta *meta)
+bool DBMeta::addChild(AbstractMetaKey *key, DBMeta *meta)
 {
     if (childExists(key)) {
         return false;
@@ -20,7 +20,7 @@ bool DBMeta::addChild(const MetaKey &key, DBMeta *meta)
     return true;
 }
 
-bool DBMeta::replaceChild(const MetaKey &key, DBMeta *meta)
+bool DBMeta::replaceChild(AbstractMetaKey *key, DBMeta *meta)
 {
     if (!childExists(key)) {
         return false;
@@ -30,7 +30,7 @@ bool DBMeta::replaceChild(const MetaKey &key, DBMeta *meta)
     return true;
 }
 
-bool DBMeta::destroyChild(const MetaKey &key)
+bool DBMeta::destroyChild(AbstractMetaKey *key)
 {
     if (!childExists(key)) {
         return false;
@@ -48,14 +48,27 @@ bool DBMeta::destroyChild(const MetaKey &key)
     }
 }
 
-bool DBMeta::childExists(const MetaKey &key) const
+std::map<AbstractMetaKey *, DBMeta *>::const_iterator
+DBMeta::findChild(AbstractMetaKey *key) const
 {
-    return children.find(key) != children.end();
+    auto it = 
+        std::find_if(children.begin(), children.end(),
+            [&key](const std::pair<AbstractMetaKey *, DBMeta *> child) {
+                return *child.first == *key;
+            });
+
+    return it;
 }
 
-DBMeta *DBMeta::getChild(const MetaKey &key) const
+bool DBMeta::childExists(AbstractMetaKey *key) const
 {
-    auto it = children.find(key);
+    auto it = this->findChild(key);
+    return children.end() != it;
+}
+
+DBMeta *DBMeta::getChild(AbstractMetaKey *key) const
+{
+    auto it = this->findChild(key);
     if (children.end() == it) {
         return NULL;
     }
@@ -63,7 +76,7 @@ DBMeta *DBMeta::getChild(const MetaKey &key) const
     return it->second;
 }
 
-MetaKey DBMeta::getKey(const DBMeta * const child) const
+AbstractMetaKey *DBMeta::getKey(const DBMeta * const child) const
 {
     for (auto it : children) {
         if (it.second == child) {
@@ -82,10 +95,10 @@ AbstractMeta<ChildType>::deserialize(std::string serial)
 }
 
 // TODO: Implement.
-template <typename ChildType> std::vector<std::pair<MetaKey, DBMeta *>>
+template <typename ChildType> std::vector<std::pair<AbstractMetaKey *, DBMeta *>>
 AbstractMeta<ChildType>::fetchChildren(Connect *e_conn)
 {
-    std::vector<std::pair<MetaKey, DBMeta *>> out_vec;
+    std::vector<std::pair<AbstractMetaKey *, DBMeta *>> out_vec;
     DBResult *db_res;
     /*
     std::string table_name = 
@@ -101,10 +114,10 @@ AbstractMeta<ChildType>::fetchChildren(Connect *e_conn)
         assert(l != NULL);
 
         std::string child_serial(row[0], l[0]);
-        auto key = MetaKey("implementplz");
+        auto key = new MetaKey<std::string>("implementplz");
         auto new_old_meta =
             AbstractMeta<ChildType>::deserialize<ChildType>("Aaron");
-        out_vec.push_back(std::pair<MetaKey, DBMeta *>(key, new_old_meta));
+        out_vec.push_back(std::pair<AbstractMetaKey *, DBMeta *>(key, new_old_meta));
     }
 
     return out_vec;
@@ -207,7 +220,7 @@ std::string TableMeta::serialize(const DBObject &parent) const
 }
 
 // TODO: @fieldNames is a blight. Use a counter.
-bool TableMeta::addChild(const MetaKey &key, DBMeta *meta)
+bool TableMeta::addChild(AbstractMetaKey *key, DBMeta *meta)
 {
     bool status = AbstractMeta::addChild(key, meta);
     if (false == status) {
@@ -225,7 +238,7 @@ std::string TableMeta::getAnonTableName() const {
     return anon_table_name;
 }
 
-bool TableMeta::destroyChild(const MetaKey &key)
+bool TableMeta::destroyChild(AbstractMetaKey *key)
 {
     fieldNames.remove(key);
     bool status = AbstractMeta::destroyChild(key);
@@ -285,13 +298,15 @@ SchemaInfo::~SchemaInfo()
 }
 
 FieldMeta *
-SchemaInfo::getFieldMeta(const string & table, const string & field) const
+SchemaInfo::getFieldMeta(std::string & table, std::string & field) const
 {
-    TableMeta * tm = static_cast<TableMeta *>(getChild(table));
+    AbstractMetaKey *table_key = new MetaKey<std::string>(table);
+    TableMeta * tm = static_cast<TableMeta *>(getChild(table_key));
     if (NULL == tm) {
         return NULL;
     }
 
-    return static_cast<FieldMeta *>(tm->getChild(field));
+    AbstractMetaKey *field_key = new MetaKey<std::string>(field);
+    return static_cast<FieldMeta *>(tm->getChild(field_key));
 }
 
