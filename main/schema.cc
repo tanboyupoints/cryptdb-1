@@ -87,26 +87,57 @@ AbstractMetaKey *DBMeta::getKey(const DBMeta * const child) const
     throw CryptDBError("reverse lookup failed to find the child's key!");
 }
 
-template <typename ChildType>
+template <typename ChildType, typename KeyType>
 template <typename ConcreteMeta> ConcreteMeta *
-AbstractMeta<ChildType>::deserialize(std::string serial)
+AbstractMeta<ChildType, KeyType>::deserialize(std::string serial)
 {
     return new ConcreteMeta(serial);
 }
 
 // TODO: Implement.
-template <typename ChildType> std::vector<std::pair<AbstractMetaKey *, DBMeta *>>
-AbstractMeta<ChildType>::fetchChildren(Connect *e_conn)
+template <typename ChildType, typename KeyType>
+std::vector<std::pair<AbstractMetaKey *, DBMeta *>>
+AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
 {
+    // First, build the table in case this is the first time accessing
+    // the embedded database.
+    // FIXME: Get name.
+    const std::string table_name = "<something>"; // ChildType::typeName();
+    std::string create_query =
+        " CREATE TABLE IF NOT EXIST pdb." + table_name +
+        "   (serial VARCHAR(100) NOT NULL,"
+        "    id SERIAL PRIMARY KEY)"
+        " ENGINE=InnoDB;";
+
+    assert(e_conn->execute(create_query));
+
+    // Do the same for the JOIN table.
+    // FIXME: Get name.
+    const std::string join_table_name = "<somethingelse>";
+    std::string join_create_query = 
+        " CREATE TABLE IF NOT EXISTS pdb." + join_table_name +
+        "   (object_id bigint NOT NULL,"
+        "    parent_id bigint NOT NULL,"
+        "    key varchar(100) NOT NULL,"
+        "    id SERIAL PRIMARY KEY)"
+        " ENGINE=InnoDB;";
+
+    assert(e_conn->execute(join_create_query));
+
+    // Now that we know the table exists, SELECT the data we want.
     std::vector<std::pair<AbstractMetaKey *, DBMeta *>> out_vec;
     DBResult *db_res;
-    /*
-    std::string table_name = 
-    std::string join_table_name;
-    */
-    std::string query = 
-        " SELECT serial FROM <something>;";
-    assert(e_conn->execute(query, db_res));
+    const std::string parent_id = std::to_string(this->getDatabaseID());
+    std::string serials_query = 
+        " SELECT pdb." + table_name + ".serial,"
+        "        pdb." + join_table_name + ".key"
+        " FROM pdb." + table_name + 
+        "   INNER JOIN pdb." + join_table_name +
+        "       ON (pdb." + table_name + ".id"
+        "       =   pdb." + join_table_name + ".object_id)"
+        " WHERE pdb." + join_table_name + ".parent_id"
+        "   = " + parent_id + ";";
+    assert(e_conn->execute(serials_query, db_res));
     ScopedMySQLRes r(db_res->n);
     MYSQL_ROW row;
     while ((row = mysql_fetch_row(r.res()))) {
@@ -114,9 +145,11 @@ AbstractMeta<ChildType>::fetchChildren(Connect *e_conn)
         assert(l != NULL);
 
         std::string child_serial(row[0], l[0]);
-        auto key = new MetaKey<std::string>("implementplz");
-        auto new_old_meta =
-            AbstractMeta<ChildType>::deserialize<ChildType>("Aaron");
+        std::string child_key(row[1], l[1]);
+
+        AbstractMetaKey *key = MetaKey<KeyType>::deserialize(child_key);
+        DBMeta *new_old_meta =
+            AbstractMeta::deserialize<ChildType>(child_serial);
         out_vec.push_back(std::pair<AbstractMetaKey *, DBMeta *>(key, new_old_meta));
     }
 
