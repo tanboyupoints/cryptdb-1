@@ -126,7 +126,10 @@ AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
         std::string child_serial(row[0], l[0]);
         std::string child_key(row[1], l[1]);
 
-        AbstractMetaKey *key = MetaKey<KeyType>::deserialize(child_key);
+        // FIXME: Get deserialization function from parent in Caller.
+        AbstractMetaKey *key =
+            MetaKey<KeyType>::deserialize(child_key,
+                                          MetaKey<KeyType>::failD);
         DBMeta *new_old_meta =
             AbstractMeta::deserialize<ChildType>(child_serial);
         out_vec.push_back(std::pair<AbstractMetaKey *, DBMeta *>(key, new_old_meta));
@@ -312,13 +315,13 @@ SchemaInfo::~SchemaInfo()
 FieldMeta *
 SchemaInfo::getFieldMeta(std::string & table, std::string & field) const
 {
-    AbstractMetaKey *table_key = new MetaKey<std::string>(table);
+    AbstractMetaKey *table_key = new IdentityMetaKey(table);
     TableMeta * tm = static_cast<TableMeta *>(getChild(table_key));
     if (NULL == tm) {
         return NULL;
     }
 
-    AbstractMetaKey *field_key = new MetaKey<std::string>(field);
+    AbstractMetaKey *field_key = new IdentityMetaKey(field);
     return static_cast<FieldMeta *>(tm->getChild(field_key));
 }
 

@@ -54,7 +54,7 @@ class CreateHandler : public DDLHandler {
             auto empty_index_map = std::map<std::string, std::string>();
             // TODO: Use appropriate values for has_sensitive and has_salt.
             TableMeta *tm = new TableMeta(true, true, empty_index_map);
-            MetaKey<std::string> *key = new MetaKey<std::string>(table);
+            IdentityMetaKey *key = new IdentityMetaKey(table);
             a.ps->schema->addChild(key, tm);
 
            

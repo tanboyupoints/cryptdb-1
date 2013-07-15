@@ -198,8 +198,8 @@ FieldMeta *Analysis::getFieldMeta(std::string table, std::string field) const
 
 TableMeta *Analysis::getTableMeta(std::string table) const
 {
-    MetaKey<std::string> *key =
-        new MetaKey<std::string>(unAliasTable(table));
+    IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
+                                 
     TableMeta *tm =
         static_cast<TableMeta *>(ps->schema->getChild(key));
     assert(tm);
@@ -209,29 +209,26 @@ TableMeta *Analysis::getTableMeta(std::string table) const
 // FIXME: Field aliasing.
 bool Analysis::destroyFieldMeta(std::string table, std::string field)
 {
-    MetaKey<std::string> *table_key =
-        new MetaKey<std::string>(unAliasTable(table));
+    IdentityMetaKey *table_key = new IdentityMetaKey(unAliasTable(table));
     TableMeta *tm = 
         static_cast<TableMeta *>(ps->schema->getChild(table_key));
     if (!tm) {
         return false;
     }
 
-    MetaKey<std::string> *field_key = new MetaKey<std::string>(field);
+    IdentityMetaKey *field_key = new IdentityMetaKey(field);
     return tm->destroyChild(field_key);
 }
 
 bool Analysis::destroyTableMeta(std::string table)
 {
-    MetaKey<std::string> *key =
-        new MetaKey<std::string>(unAliasTable(table));
+    IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
     return ps->schema->destroyChild(key);
 }
 
 bool Analysis::tableMetaExists(std::string table) const
 {
-    MetaKey<std::string> *key =
-        new MetaKey<std::string>(unAliasTable(table));
+    IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
     return ps->schema->childExists(key);
 }
 

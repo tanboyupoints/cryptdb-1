@@ -241,7 +241,7 @@ buildTableMeta(ProxyState &ps)
                                       table_salt_name,
                                       table_anon_name,
                                       index_map);
-        MetaKey<std::string> *key = new MetaKey<std::string>(table_name);
+        IdentityMetaKey *key = new IdentityMetaKey(table_name);
         assert(ps.schema->addChild(key, tm));
 
         buildFieldMeta(ps, tm, table_database_name);
@@ -313,7 +313,7 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
             new FieldMeta(field_name, has_salt, field_salt_name,
                           onion_layout);
 
-        MetaKey<std::string> *key = new MetaKey<std::string>(field_name);
+        IdentityMetaKey *key = new IdentityMetaKey(field_name);
         assert(tm->addChild(key, fm));
 
         buildOnionMeta(ps, fm, atoi(field_id.c_str()));

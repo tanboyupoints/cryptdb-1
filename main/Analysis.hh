@@ -264,8 +264,9 @@ public:
           AbstractMetaKey *key)
         : action(action), meta(meta), parent_meta(parent_meta), key(key) {}
     // FIXME: Unserialize old Delta.
-    Delta(std::string serial) : key(new MetaKey<std::string>("implement me!"))
+    Delta(std::string serial)
     {
+        // FIXME: Determine key.
         // return Delta(CREATE, NULL, NULL);
         std::vector<std::string> split_serials = unserialize_string(serial);
         throw CryptDBError("implement!");
@@ -279,15 +280,17 @@ public:
         std::string serial_object = meta->serialize(*parent_meta);
         std::string parent_id =
             std::to_string(parent_meta->getDatabaseID());
+        std::string serial_key = key->serialize();
         std::string table_name = "Delta";
 
         // TODO: Maybe we want to join on object_id as well.
         std::string query =
             " INSERT INTO pdb." + table_name +
-            "    (action, serial_object, parent_id) VALUES (" +
+            "    (action, serial_object, parent_id, serial_key) VALUES (" +
             " "  + std::to_string(action) + ", " +
             " '" + serial_object + "', " +
-            " '" + parent_id + "');";
+            " "  + parent_id + ", " +
+            " '" + serial_key + "');";
 
         return e_conn->execute(query);
     }

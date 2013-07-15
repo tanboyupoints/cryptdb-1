@@ -51,24 +51,33 @@ public:
 
 const OLK PLAIN_OLK = OLK(oPLAIN, SECLEVEL::PLAINVAL, NULL);
 
+// FIXME: Maybe should inherit from DBObject.
 class AbstractMetaKey {
 public:
     AbstractMetaKey() {;}
     virtual ~AbstractMetaKey() {;}
     virtual bool operator <(const AbstractMetaKey &rhs) const = 0;
     virtual bool operator ==(const AbstractMetaKey &rhs) const = 0;
+    virtual std::string serialize() const = 0;
     virtual std::string toString() const = 0;
 };
 
 template <typename KeyType>
 class MetaKey : public AbstractMetaKey {
+    typedef std::function<std::string(KeyType)> serializer;
+    typedef std::function<KeyType(std::string)> deserializer;
+    
+    // Build MetaKey from serialized MetaKey.
+    MetaKey(int dummy, std::string serial, deserializer toKeyType)
+        : key_data(toKeyType(serial)), serial(serial) {}
+
 public:
-    KeyType key_data;
+    const KeyType key_data;
+    const std::string serial;
 
-    MetaKey(KeyType key_data) : key_data(key_data) {}
-    // FIXME: Implement.
-    MetaKey(int dummy, std::string serial) {;}
-
+    // Build MetaKey from 'actual' key value.
+    MetaKey(KeyType key_data, serializer toStr)
+        : key_data(key_data), serial(toStr(key_data)) {}
     bool operator <(const AbstractMetaKey &rhs) const
     {
         MetaKey rhs_key = static_cast<const MetaKey &>(rhs);
@@ -81,10 +90,16 @@ public:
         return key_data == rhs_key.key_data;
     }
 
-    static MetaKey<KeyType> *deserialize(std::string serial)
+    static MetaKey<KeyType> *deserialize(std::string serial,
+                                         deserializer toKeyType)
     {
-        int dummy = 1;
-        return new MetaKey<KeyType>(dummy, serial);
+        static const int dummy = 1;
+        return new MetaKey<KeyType>(dummy, serial, toKeyType);
+    }
+
+    std::string serialize() const
+    {
+        return serial;
     }
 
     // FIXME.
@@ -94,6 +109,26 @@ public:
         s << key_data;
         return s.str();
     }
+    
+    static std::string identity(std::string s) {
+        return s;
+    }
+
+    static std::string failS(KeyType key) {
+        throw CryptDBError("You need to implement some serialization!");
+    }
+
+    static KeyType failD(std::string serial) {
+        throw CryptDBError("You need to implement some deserialization!");
+    }
+};
+
+// A string key is most common and this class will allow us to clean up
+// the instantiaion syntax significantly.
+class IdentityMetaKey : public MetaKey<std::string> {
+public:
+    IdentityMetaKey(std::string key_data)
+        : MetaKey<std::string>(key_data, MetaKey<std::string>::identity) {}
 };
 
 struct DBMeta : public DBObject {
