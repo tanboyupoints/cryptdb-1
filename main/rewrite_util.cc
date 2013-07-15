@@ -46,17 +46,25 @@ rewrite(Item *i, const OLK & constr, Analysis &a, string context)
 TABLE_LIST *
 rewrite_table_list(TABLE_LIST *t, Analysis &a)
 {
-    TABLE_LIST * new_t = copy(t);
-
     // Table name can only be empty when grouping a nested join.
     assert(t->table_name || t->nested_join);
     if (t->table_name) {
         string anon_name = a.getAnonTableName(string(t->table_name,
                                                      t->table_name_length));
-        new_t->table_name = make_thd_string(anon_name, &new_t->table_name_length);
-        new_t->alias = make_thd_string(anon_name);
-        new_t->next_local = NULL;
+        return rewrite_table_list(t, anon_name);
+    } else {
+        return copy(t);
     }
+}
+
+TABLE_LIST *
+rewrite_table_list(TABLE_LIST *t, std::string anon_name)
+{
+    TABLE_LIST *new_t = copy(t);
+    new_t->table_name =
+        make_thd_string(anon_name, &new_t->table_name_length);
+    new_t->alias = make_thd_string(anon_name);
+    new_t->next_local = NULL;
 
     return new_t;
 }
@@ -384,6 +392,7 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
     // after the Delta is read out of the database.
     Delta d(Delta::CREATE, fm, tm, new IdentityMetaKey(name));
     a.deltas.push_back(d);
+    // FIXME: Remove.
     // assert(tm->addChild(name, fm));
     assert(do_add_field(fm, a, dbname, table));
     // -----------------------------

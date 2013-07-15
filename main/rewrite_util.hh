@@ -13,6 +13,9 @@ rewrite(Item *i, const OLK & constr, Analysis &a, string context = "");
 TABLE_LIST *
 rewrite_table_list(TABLE_LIST *t, Analysis &a);
 
+TABLE_LIST *
+rewrite_table_list(TABLE_LIST *t, std::string anon_name);
+
 SQL_I_List<TABLE_LIST>
 rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
                    bool if_exists=false);

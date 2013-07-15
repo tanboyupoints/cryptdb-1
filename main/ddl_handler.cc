@@ -55,7 +55,10 @@ class CreateHandler : public DDLHandler {
             // TODO: Use appropriate values for has_sensitive and has_salt.
             TableMeta *tm = new TableMeta(true, true, empty_index_map);
             IdentityMetaKey *key = new IdentityMetaKey(table);
-            a.ps->schema->addChild(key, tm);
+            // FIXME: Remove.
+            // assert(a.ps->schema->addChild(key, tm));
+            Delta delta(Delta::CREATE, tm, a.ps->schema, key);
+            a.deltas.push_back(delta);
 
            
             // Add table to embedded database.
@@ -81,8 +84,20 @@ class CreateHandler : public DDLHandler {
             // -----------------------------
             //         Rewrite TABLE       
             // -----------------------------
-            new_lex->select_lex.table_list =
-                rewrite_table_list(lex->select_lex.table_list, a);
+            // HACK.
+            // > We know that there is only one table.
+            // > We also know that rewrite_table_list is going to fail to
+            // find this table in 'a'.
+            // > And we know that the table we want is tm with name table.
+            // > This will _NOT_ gracefully handle a malformed CREATE TABLE
+            // query.
+            assert(1 == new_lex->select_lex.table_list.elements);
+            TABLE_LIST *tbl =
+                rewrite_table_list(new_lex->select_lex.table_list.first,
+                                   tm->getAnonTableName());
+            new_lex->select_lex.table_list = *oneElemList<TABLE_LIST>(tbl);
+
+            // rewrite_table_list(lex->select_lex.table_list, a);
 
             auto it =
                 List_iterator<Create_field>(lex->alter_info.create_list);
