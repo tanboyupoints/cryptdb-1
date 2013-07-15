@@ -113,14 +113,6 @@ public:
     static std::string identity(std::string s) {
         return s;
     }
-
-    static std::string failS(KeyType key) {
-        throw CryptDBError("You need to implement some serialization!");
-    }
-
-    static KeyType failD(std::string serial) {
-        throw CryptDBError("You need to implement some deserialization!");
-    }
 };
 
 // A string key is most common and this class will allow us to clean up
@@ -154,7 +146,7 @@ struct DBMeta : public DBObject {
     std::map<AbstractMetaKey *, DBMeta *> children;
 };
 
-// > TODO: Mage getDatabaseID() protected by templating on the Concrete type
+// > TODO: Make getDatabaseID() protected by templating on the Concrete type
 //   and making it a friend.
 template <typename ChildType, typename KeyType>
 struct AbstractMeta : public DBMeta {
@@ -174,6 +166,9 @@ struct AbstractMeta : public DBMeta {
         static ConcreteMeta *deserialize(std::string serial);
     std::vector<std::pair<AbstractMetaKey *, DBMeta *>>
         fetchChildren(Connect *e_conn);
+    // FIXME: If this is too tightly coupled with MetaKey, implement it
+    // as a function pointer passed to the constructor.
+    virtual KeyType deserializeKey(std::string serialized_key) const = 0;
 };
 
 /*
@@ -199,6 +194,11 @@ typedef struct OnionMeta : AbstractMeta<OnionMeta, std::string> {
     // FIXME: Use rtti.
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
+
+    std::string deserializeKey(std::string serialized_key) const
+    {
+        throw CryptDBError("It's unclear what an OnionMeta child is!");
+    }
 
     SECLEVEL getSecLevel() {
         assert(layers.size() > 0);
@@ -234,6 +234,11 @@ typedef struct FieldMeta : public AbstractMeta<OnionMeta, onion> {
 
     std::string serialize(const DBObject &parent) const;
     std::string stringify() const;
+
+    onion deserializeKey(std::string serialized_key) const
+    {
+       return TypeText<onion>::toType(serialized_key);
+    }
 
     std::string getSaltName() const {
         assert(has_salt);
@@ -302,6 +307,10 @@ typedef struct TableMeta : public AbstractMeta<FieldMeta, std::string> {
     // FIXME: Use rtti.
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
+    std::string deserializeKey(std::string serialized_key) const
+    {
+        return serialized_key;
+    }
 
     friend class Analysis;
 
@@ -340,6 +349,10 @@ private:
                              std::string & field) const;
     std::string serialize(const DBObject &parent) const {
         throw CryptDBError("SchemaInfo can not be serialized!");
+    }
+
+    std::string deserializeKey(std::string serialized_key) const {
+        return serialized_key;
     }
 } SchemaInfo;
 

@@ -1,8 +1,8 @@
 #include <algorithm>
 
-#include "schema.hh"
 #include <parser/lex_util.hh>
 #include <parser/stringify.hh>
+#include <main/schema.hh>
 #include <main/rewrite_main.hh>
 #include <main/init_onions.hh>
 #include <main/rewrite_util.hh>
@@ -126,10 +126,12 @@ AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
         std::string child_serial(row[0], l[0]);
         std::string child_key(row[1], l[1]);
 
-        // FIXME: Get deserialization function from parent in Caller.
+        auto local_deserialization = 
+            std::bind(&AbstractMeta::deserializeKey, this,
+                      std::placeholders::_1);
         AbstractMetaKey *key =
             MetaKey<KeyType>::deserialize(child_key,
-                                          MetaKey<KeyType>::failD);
+                                          local_deserialization);
         DBMeta *new_old_meta =
             AbstractMeta::deserialize<ChildType>(child_serial);
         out_vec.push_back(std::pair<AbstractMetaKey *, DBMeta *>(key, new_old_meta));
