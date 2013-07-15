@@ -304,22 +304,23 @@ public:
                 // queries.
                 assert(parent_meta->addChild(key, meta));
                 
-                // TODO: Encapsulate this behavior somewhere.
+                // Ensure the tables exist.
+                DBWriter dbw(meta, parent_meta);
+                assert(create_tables(e_conn, dbw));
+                
                 const std::string child_serial =
                     meta->serialize(*parent_meta);
                 assert(0 == meta->getDatabaseID());
                 const std::string parent_id =
                     std::to_string(parent_meta->getDatabaseID());
-                // FIXME: rtti.
-                const std::string table_name = meta->typeName();
-                const std::string join_table_name =
-                    parent_meta->typeName() + "_" + meta->typeName();
 
-                // Build the queries.
+                // ------------------------
+                //    Build the queries.
+                // ------------------------
 
                 // On CREATE, the database generates a unique ID for us.
                 std::string query =
-                    " INSERT INTO pdb." + table_name + 
+                    " INSERT INTO pdb." + dbw.table_name() + 
                     "    (serial_object) VALUES ("
                     " '" + child_serial + "'); ";
                 // TODO: Remove assert.
@@ -328,7 +329,7 @@ public:
                 const std::string object_id =
                     std::to_string(e_conn->last_insert_id());
                 std::string join_query =
-                    " INSERT INTO pdb." + join_table_name +
+                    " INSERT INTO pdb." + dbw.join_table_name() +
                     "   (object_id, parent_id, serial_key) VALUES ("
                     " "  + object_id + ", " +
                     " "  + parent_id + ", " +

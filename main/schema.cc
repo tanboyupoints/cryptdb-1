@@ -99,52 +99,22 @@ template <typename ChildType, typename KeyType>
 std::vector<std::pair<AbstractMetaKey *, DBMeta *>>
 AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
 {
-    // FIXME: Elsewhere.
-    const std::string create_db =
-        " CREATE DATABASE IF NOT EXISTS pdb;";
-    
-    assert(e_conn->execute(create_db));
-
-    // First, build the table in case this is the first time accessing
-    // the embedded database.
-
-    // HACK.
-    auto getChildTypeName = ChildType::instanceTypeName;
-
-    const std::string table_name = getChildTypeName(); 
-    const std::string create_query =
-        " CREATE TABLE IF NOT EXISTS pdb." + table_name +
-        "   (serial_object VARCHAR(100) NOT NULL,"
-        "    id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-
-    assert(e_conn->execute(create_query));
-
-    // Do the same for the JOIN table.
-    const std::string join_table_name =
-        getChildTypeName() + "_" + this->typeName();
-    const std::string join_create_query = 
-        " CREATE TABLE IF NOT EXISTS pdb." + join_table_name +
-        "   (object_id bigint NOT NULL,"
-        "    parent_id bigint NOT NULL,"
-        "    serial_key varchar(100) NOT NULL,"
-        "    id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-
-    assert(e_conn->execute(join_create_query));
+    DBWriter dbw = DBWriter::factory<ChildType>(this);
+    // Ensure the tables exist.
+    assert(create_tables(e_conn, dbw));
 
     // Now that we know the table exists, SELECT the data we want.
     std::vector<std::pair<AbstractMetaKey *, DBMeta *>> out_vec;
     DBResult *db_res;
     const std::string parent_id = std::to_string(this->getDatabaseID());
     const std::string serials_query = 
-        " SELECT pdb." + table_name + ".serial_object,"
-        "        pdb." + join_table_name + ".serial_key"
-        " FROM pdb." + table_name + 
-        "   INNER JOIN pdb." + join_table_name +
-        "       ON (pdb." + table_name + ".id"
-        "       =   pdb." + join_table_name + ".object_id)"
-        " WHERE pdb." + join_table_name + ".parent_id"
+        " SELECT pdb." + dbw.table_name() + ".serial_object,"
+        "        pdb." + dbw.join_table_name() + ".serial_key"
+        " FROM pdb." + dbw.table_name() + 
+        "   INNER JOIN pdb." + dbw.join_table_name() +
+        "       ON (pdb." + dbw.table_name() + ".id"
+        "       =   pdb." + dbw.join_table_name() + ".object_id)"
+        " WHERE pdb." + dbw.join_table_name() + ".parent_id"
         "   = " + parent_id + ";";
     assert(e_conn->execute(serials_query, db_res));
     ScopedMySQLRes r(db_res->n);
@@ -350,5 +320,35 @@ SchemaInfo::getFieldMeta(std::string & table, std::string & field) const
 
     AbstractMetaKey *field_key = new MetaKey<std::string>(field);
     return static_cast<FieldMeta *>(tm->getChild(field_key));
+}
+
+bool create_tables(Connect *e_conn, DBWriter dbw)
+{
+    // FIXME: Elsewhere.
+    const std::string create_db =
+        " CREATE DATABASE IF NOT EXISTS pdb;";
+    
+    assert(e_conn->execute(create_db));
+
+    const std::string create_query =
+        " CREATE TABLE IF NOT EXISTS pdb." + dbw.table_name() +
+        "   (serial_object VARCHAR(100) NOT NULL,"
+        "    id SERIAL PRIMARY KEY)"
+        " ENGINE=InnoDB;";
+
+    assert(e_conn->execute(create_query));
+
+    // Do the same for the JOIN table.
+    const std::string join_create_query = 
+        " CREATE TABLE IF NOT EXISTS pdb." + dbw.join_table_name() +
+        "   (object_id bigint NOT NULL,"
+        "    parent_id bigint NOT NULL,"
+        "    serial_key varchar(100) NOT NULL,"
+        "    id SERIAL PRIMARY KEY)"
+        " ENGINE=InnoDB;";
+
+    assert(e_conn->execute(join_create_query));
+
+    return true;
 }
 
