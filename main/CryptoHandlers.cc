@@ -10,7 +10,7 @@
 #include <cmath>
 
 #define LEXSTRING(cstr) { (char*) cstr, sizeof(cstr) }
-#define ISSIGNED(val) val<0
+#define ISNEG(val) val<0
 
 
 using namespace std;
@@ -358,6 +358,7 @@ RND_int::encrypt(Item * ptext, uint64_t IV) {
     uint64_t p = static_cast<Item_int *>(ptext)->value;
     uint64_t c = bf.encrypt(p ^ IV);
     LOG(encl) << "RND_int encrypt " << p << " IV " << IV << "-->" << c;
+    cout << "RND_int encrypt " << p << " IV " << IV << "-->" << c << endl;
 
     return new Item_int((ulonglong) c);
 }
@@ -611,14 +612,18 @@ DET_int::encrypt(Item * ptext, uint64_t IV) {
 
     static ulonglong res;
 
-    //val_int() make sure we have the real value 
-    //in both negative and positive numbers.
+    //val_int() make sure we have the real signed value
     longlong val = static_cast<Item_int *>(ptext)->val_int();
 
-    if(ISSIGNED(val))
+    if(ISNEG(val))
+    {
+        cout << "ENCRYPTING(NEG): " << val << endl;
+        res = (ulonglong) bf.encrypt((longlong)val);
+    }else{
+        ulonglong val = static_cast<Item_int *>(ptext)->value;
+        cout << "ENCRYPTING: " << val << endl;
         res = (ulonglong) bf.encrypt(val);
-    else
-        res = (ulonglong) bf.encrypt((ulonglong)val);
+    }
 
     return new Item_int(res);
 }
@@ -629,13 +634,15 @@ DET_int::decrypt(Item * ctext, uint64_t IV) {
     static ulonglong res;
     longlong val = static_cast<Item_int*>(ctext)->val_int();
     
-    if(ISSIGNED(val))
+    if(ISNEG(val))
+    {
+        res = (ulonglong) bf.decrypt((longlong)val);
+    }else{
+        ulonglong val = static_cast<Item_int*>(ctext)->value;
         res = (ulonglong) bf.decrypt(val);
-    else
-        res = (ulonglong) bf.decrypt((ulonglong)val);
+    }
     
     Item * ni = new Item_int(res);
-
     return ni;
 }
 
@@ -1053,7 +1060,8 @@ Item *
 OPE_int::encrypt(Item * ptext, uint64_t IV) {
     ulong pval =  (ulong)static_cast<Item_int *>(ptext)->value;
     ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ(pval)));
-    LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV << "--->" << enc;
+    //LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV << "--->" << enc;
+    cout << "OPE_int encrypt " << pval << " IV " << IV << "--->" << enc << endl;
 
     return new Item_int(enc);
 }
