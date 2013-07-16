@@ -71,10 +71,11 @@ class CreateHandler : public DDLHandler {
                 s << " INSERT INTO pdb.table_info VALUES ("
                   << " '" << table << "', "
                   << " '" << tm->getAnonTableName() << "', "
-                  << " " << bool_to_string(tm->hasSensitive) << ", "
-                  << " " << bool_to_string(tm->has_salt) << ", "
+                  << " "  << bool_to_string(tm->hasSensitive) << ", "
+                  << " "  << bool_to_string(tm->has_salt) << ", "
                   << " '" << tm->salt_name << "', "
                   << " '" << dbname << "',"
+                  << " "  << tm->getUniqCounter() << ", "
                   << " 0"
                   << " );";
 

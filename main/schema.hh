@@ -223,12 +223,14 @@ typedef struct FieldMeta : public AbstractMeta<OnionMeta, onion> {
     std::map<onion, OnionMeta *> onions;
 
     // New field.
-    FieldMeta(std::string name, Create_field *field, AES_KEY *mKey);
+    FieldMeta(std::string name, Create_field *field, AES_KEY *mKey,
+              unsigned long uniq_count);
     // Recovering field from proxy db.
     FieldMeta(std::string name, bool has_salt, 
-              std::string salt_name, onionlayout onion_layout)
+              std::string salt_name, onionlayout onion_layout,
+              unsigned long uniq_count)
         : fname(name), has_salt(has_salt), salt_name(salt_name),
-          onion_layout(onion_layout) {}
+          onion_layout(onion_layout), uniq_count(uniq_count) {}
     FieldMeta(std::string serial);
     ~FieldMeta();
 
@@ -243,6 +245,10 @@ typedef struct FieldMeta : public AbstractMeta<OnionMeta, onion> {
     std::string getSaltName() const {
         assert(has_salt);
         return salt_name;
+    }
+
+    unsigned long getUniqCount() const {
+        return uniq_count;
     }
 
     SECLEVEL getOnionLevel(onion o) const {
@@ -273,11 +279,11 @@ typedef struct FieldMeta : public AbstractMeta<OnionMeta, onion> {
 
 private:
     constexpr static const char *type_name = "fieldMeta";
+    unsigned long uniq_count;
 } FieldMeta;
 
 // TODO: Put const back.
 typedef struct TableMeta : public AbstractMeta<FieldMeta, std::string> {
-    std::list<AbstractMetaKey *> fieldNames;  //in order field names
     bool hasSensitive;
     bool has_salt;
     std::string salt_name;
@@ -286,10 +292,11 @@ typedef struct TableMeta : public AbstractMeta<FieldMeta, std::string> {
     // Restore old TableMeta.
     TableMeta(bool has_sensitive, bool has_salt, std::string salt_name,
               std::string anon_table_name,
-              std::map<std::string, std::string> index_map)
+              std::map<std::string, std::string> index_map,
+              unsigned long counter)
         : hasSensitive(has_sensitive), has_salt(has_salt),
           salt_name(salt_name), anon_table_name(anon_table_name),
-          index_map(index_map) {}
+          index_map(index_map), counter(counter) {}
 
     // New TableMeta.
     TableMeta(bool has_sensitive, bool has_salt,
@@ -297,19 +304,26 @@ typedef struct TableMeta : public AbstractMeta<FieldMeta, std::string> {
         : hasSensitive(has_sensitive), has_salt(has_salt),
           salt_name("tableSalt_" + getpRandomName()),
           anon_table_name("table_" + getpRandomName()),
-          index_map(index_map) {}
+          index_map(index_map), counter(0) {}
     TableMeta(std::string serial);
 
     std::string serialize(const DBObject &parent) const;
     bool addChild(AbstractMetaKey *key, DBMeta *meta);
     std::string getAnonTableName() const;
     bool destroyChild(AbstractMetaKey *key);
+    std::vector<FieldMeta *> orderedFieldMetas() const;
     // FIXME: Use rtti.
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
     std::string deserializeKey(std::string serialized_key) const
     {
         return serialized_key;
+    }
+    unsigned long leaseIncUniq() {
+        return counter++;
+    }
+    unsigned long getUniqCounter() {
+        return counter;
     }
 
     friend class Analysis;
@@ -323,6 +337,7 @@ protected:
 private:
     constexpr static const char *type_name = "tableMeta";
     std::map<std::string, std::string> index_map;
+    unsigned int counter;
 } TableMeta;
 
 

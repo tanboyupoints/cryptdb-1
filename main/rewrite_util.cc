@@ -293,6 +293,7 @@ do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
       << " "  << bool_to_string(fm->has_salt) << ", "
       << " '" << fm->getSaltName() << "', "
       << " '" << TypeText<onionlayout>::toText(fm->onion_layout)<< "',"
+      << " "  << fm->getUniqCount() << ", "
       << " 0"
       << " );";
 
@@ -387,7 +388,8 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
     //         Update FIELD       
     // -----------------------------
     std::string name = std::string(cf->field_name);
-    FieldMeta *fm = new FieldMeta(name, cf, a.ps->masterKey);
+    FieldMeta *fm =
+        new FieldMeta(name, cf, a.ps->masterKey, tm->leaseIncUniq());
     // Here we store the key name for the first time. It will be applied
     // after the Delta is read out of the database.
     Delta d(Delta::CREATE, fm, tm, new IdentityMetaKey(name));

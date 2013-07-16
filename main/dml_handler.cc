@@ -69,13 +69,9 @@ class InsertHandler : public DMLHandler {
 
         if (fmVec.empty()) {
             // Use the table order.
-
             TableMeta *tm = a.getTableMeta(table);
-            //keep fields in order
-            for (auto it0 = tm->fieldNames.begin(); it0 != tm->fieldNames.end(); it0++) {
-                // TODO: Use dynamic_cast.
-                fmVec.push_back(static_cast<FieldMeta*>(tm->getChild(*it0)));
-            }
+            std::vector<FieldMeta *> fmetas = tm->orderedFieldMetas();
+            fmVec.assign(fmetas.begin(), fmetas.end());
         }
 
         // values

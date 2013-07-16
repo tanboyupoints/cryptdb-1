@@ -174,21 +174,10 @@ FieldMeta::FieldMeta(std::string serial)
     
 }
 
-// TODO: Implement serialization.
-std::string FieldMeta::serialize(const DBObject &parent) const
-{
-    std::string serial =
-        serialize_string(std::to_string(parent.getDatabaseID())) +
-        serialize_string(fname) +
-        serialize_string(bool_to_string(has_salt)) +
-        serialize_string(getSaltName()) +
-        serialize_string(TypeText<onionlayout>::toText(onion_layout));
-
-   return serial;
-}
-
-FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *mKey)
-    : fname(name), salt_name(BASE_SALT_NAME + getpRandomName())
+FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *mKey,
+                     unsigned long uniq_count)
+    : fname(name), salt_name(BASE_SALT_NAME + getpRandomName()),
+      uniq_count(uniq_count)
 {
     if (mKey) {
         init_onions(mKey, this, field);
@@ -205,6 +194,19 @@ FieldMeta::~FieldMeta()
     for (auto it : cp) {
         delete it.second;
     }
+}
+
+std::string FieldMeta::serialize(const DBObject &parent) const
+{
+    std::string serial =
+        serialize_string(std::to_string(parent.getDatabaseID())) +
+        serialize_string(fname) +
+        serialize_string(bool_to_string(has_salt)) +
+        serialize_string(getSaltName()) +
+        serialize_string(TypeText<onionlayout>::toText(onion_layout)) +
+        serialize_string(std::to_string(uniq_count));
+
+   return serial;
 }
 
 string FieldMeta::stringify() const
@@ -231,12 +233,12 @@ std::string TableMeta::serialize(const DBObject &parent) const
         serialize_string(bool_to_string(hasSensitive)) +
         serialize_string(bool_to_string(has_salt)) +
         serialize_string(salt_name) +
-        serialize_string(dbname);
+        serialize_string(dbname) +
+        serialize_string(std::to_string(counter));
     
     return serial;
 }
 
-// TODO: @fieldNames is a blight. Use a counter.
 bool TableMeta::addChild(AbstractMetaKey *key, DBMeta *meta)
 {
     bool status = AbstractMeta::addChild(key, meta);
@@ -244,8 +246,6 @@ bool TableMeta::addChild(AbstractMetaKey *key, DBMeta *meta)
         return false;
     }
     
-    this->fieldNames.push_back(key);//TODO: do we need fieldNames?
-
     return true;
 }
 
@@ -257,13 +257,23 @@ std::string TableMeta::getAnonTableName() const {
 
 bool TableMeta::destroyChild(AbstractMetaKey *key)
 {
-    fieldNames.remove(key);
     bool status = AbstractMeta::destroyChild(key);
     if (false == status) {
         throw CryptDBError("Failed to destroy FieldMeta!");
     }
 
     return true;
+}
+
+std::vector<FieldMeta *> TableMeta::orderedFieldMetas() const
+{
+    std::vector<FieldMeta *> v;
+    for (auto it : children) {
+        // FIXME: Use dynamic_cast.
+        v.push_back(static_cast<FieldMeta *>(it.second));
+    }
+
+    return v;
 }
 
 std::string TableMeta::addIndex(std::string index_name)

@@ -110,6 +110,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
                 "  has_salt boolean,"
                 "  salt_name varchar(64) NOT NULL,"
                 "  database_name varchar(64) NOT NULL,"
+                "  uniq_counter bigint NOT NULL,"
                 "  id SERIAL PRIMARY KEY)"
                 " ENGINE=InnoDB;"));
 
@@ -120,6 +121,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
       << "  salt_name varchar(64) NOT NULL,"
       << "  onion_layout enum"
       << " " << TypeText<onionlayout>::parenList().c_str() << " NOT NULL,"
+      << "  uniq_count bigint NOT NULL,"
       << "  id SERIAL PRIMARY KEY)"
       << " ENGINE=InnoDB;";
 
@@ -219,7 +221,7 @@ buildTableMeta(ProxyState &ps)
     DBResult *dbres;
     assert(ps.e_conn->execute(
                 " SELECT name, anon_name, has_sensitive, has_salt," 
-                "        salt_name, database_name"
+                "        salt_name, database_name, uniq_counter"
                 " FROM pdb.table_info", dbres));
     ScopedMySQLRes r(dbres->n);
     MYSQL_ROW row;
@@ -233,14 +235,15 @@ buildTableMeta(ProxyState &ps)
         string table_has_salt(row[3], l[3]);
         string table_salt_name(row[4], l[4]);
         string table_database_name(row[5], l[5]);
+        string table_uniq_counter(row[6], l[6]);
 
         std::map<std::string, std::string> index_map = fetchIndexMap(ps);
+        unsigned long counter = atoi(table_uniq_counter.c_str());
 
         TableMeta *tm = new TableMeta(string_to_bool(table_has_sensitive),
                                       string_to_bool(table_has_salt),
-                                      table_salt_name,
-                                      table_anon_name,
-                                      index_map);
+                                      table_salt_name, table_anon_name,
+                                      index_map, counter);
         IdentityMetaKey *key = new IdentityMetaKey(table_name);
         assert(ps.schema->addChild(key, tm));
 
@@ -285,7 +288,7 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
 {
 
     string q = " SELECT f.name, f.has_salt, f.salt_name, f.onion_layout,"
-               "        f.id"
+               "        f.uniq_count, f.id"
                " FROM pdb.table_info t, pdb.field_info f"
                " WHERE t.database_name = '" + database_name + "' "
                "   AND t.id = f.table_info_id;";
@@ -303,15 +306,17 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
         string field_has_salt(row[1], l[1]);
         string field_salt_name(row[2], l[2]);
         string field_onion_layout(row[3], l[3]);
-        string field_id(row[4], l[4]);
+        string field_uniq_count(row[4], l[4]);
+        string field_id(row[5], l[5]);
 
         bool has_salt = string_to_bool(field_has_salt);
         onionlayout onion_layout = 
             TypeText<onionlayout>::toType(field_onion_layout);
+        long unsigned uniq_count = atoi(field_uniq_count.c_str());
 
         FieldMeta *fm =
             new FieldMeta(field_name, has_salt, field_salt_name,
-                          onion_layout);
+                          onion_layout, uniq_count);
 
         IdentityMetaKey *key = new IdentityMetaKey(field_name);
         assert(tm->addChild(key, fm));
