@@ -150,19 +150,15 @@ typedef struct TableMeta {
 
     // Restore old TableMeta.
     TableMeta(bool has_sensitive, bool has_salt, std::string salt_name,
-              std::string anon_table_name,
-              std::map<std::string, std::string> index_map)
+              std::string anon_table_name)
         : hasSensitive(has_sensitive), has_salt(has_salt),
-          salt_name(salt_name), anon_table_name(anon_table_name),
-          index_map(index_map) {}
+          salt_name(salt_name), anon_table_name(anon_table_name) {}
 
     // New TableMeta.
-    TableMeta(bool has_sensitive, bool has_salt,
-              std::map<std::string, std::string> index_map)
+    TableMeta(bool has_sensitive, bool has_salt)
         : hasSensitive(has_sensitive), has_salt(has_salt),
           salt_name("tableSalt_" + getpRandomName()),
-          anon_table_name("table_" + getpRandomName()),
-          index_map(index_map) {}
+          anon_table_name("table_" + getpRandomName()) {}
     ~TableMeta();
 
     bool fieldMetaExists(std::string name);
@@ -174,13 +170,7 @@ typedef struct TableMeta {
 
 protected:
     bool destroyFieldMeta(std::string field);
-    std::string addIndex(std::string index_name); 
     std::string getAnonIndexName(std::string index_name) const;
-    std::string getIndexName(std::string anon_index_name) const;
-    bool destroyIndex(std::string index_name);
-   
-private:
-    std::map<std::string, std::string> index_map;
 } TableMeta;
 
 

@@ -52,9 +52,8 @@ class CreateHandler : public DDLHandler {
             // -----------------------------
             //         Update TABLE       
             // -----------------------------
-            auto empty_index_map = std::map<std::string, std::string>();
             // TODO: Use appropriate values for has_sensitive and has_salt.
-            TableMeta *tm = new TableMeta(true, true, empty_index_map);
+            TableMeta *tm = new TableMeta(true, true);
             a.ps->schema->addTableMeta(std::string(table), tm);
 
            

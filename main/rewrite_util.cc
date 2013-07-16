@@ -250,6 +250,7 @@ rewrite_key(const string &table, Key *key, Analysis &a)
     Key *new_key = key->clone(current_thd->mem_root);    
     auto col_it =
         List_iterator<Key_part_spec>(key->columns);
+    // FIXME: Memleak.
     new_key->name =
         string_to_lex_str(a.getAnonIndexName(table, convert_lex_str(key->name)));
     new_key->columns = 

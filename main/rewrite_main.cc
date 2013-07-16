@@ -44,9 +44,6 @@ extern CItemFuncNameDir funcNames;
 static void
 buildTableMeta(ProxyState &ps);
 
-static std::map<std::string, std::string>
-fetchIndexMap(ProxyState &ps);
-
 static void
 buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name);
 
@@ -156,14 +153,6 @@ createMetaTablesIfNotExists(ProxyState & ps)
     s.str("");
     s.clear();
 
-    s << " CREATE TABLE IF NOT EXISTS pdb.index_info"
-      << " (table_info_id bigint NOT NULL," // Foreign Key.
-      << "  name varchar(64) NOT NULL,"
-      << "  anon_name varchar(64) NOT NULL,"
-      << "  id SERIAL PRIMARY KEY)"
-      << " ENGINE=InnoDB;";
-
-    assert(ps.e_conn->execute(s.str()));
     return;
 }
 
@@ -208,49 +197,16 @@ buildTableMeta(ProxyState &ps)
         string table_salt_name(row[4], l[4]);
         string table_database_name(row[5], l[5]);
 
-        std::map<std::string, std::string> index_map = fetchIndexMap(ps);
-
         TableMeta *tm = new TableMeta(string_to_bool(table_has_sensitive),
                                       string_to_bool(table_has_salt),
                                       table_salt_name,
-                                      table_anon_name,
-                                      index_map);
+                                      table_anon_name);
         assert(ps.schema->addTableMeta(table_name, tm));
 
         buildFieldMeta(ps, tm, table_database_name);
     }
 
     return;
-}
-
-static std::map<std::string, std::string>
-fetchIndexMap(ProxyState &ps)
-{
-    const std::string dbname = ps.e_conn->getCurDBName();
-    std::map<std::string, std::string> index_map;
-
-    string q = " SELECT i.name, i.anon_name "
-               " FROM   pdb.index_info i, pdb.table_info t"
-               " WHERE  i.table_info_id = t.id "
-               "   AND  t.database_name = '" + dbname + "';";
-
-    DBResult *dbRes;
-    assert(ps.e_conn->execute(q, dbRes));
-
-    ScopedMySQLRes r(dbRes->n);
-    MYSQL_ROW row;
-    while ((row = mysql_fetch_row(r.res()))) {
-        unsigned long *l = mysql_fetch_lengths(r.res());
-        assert(l != NULL);
-
-        string index_name(row[0], l[0]);
-        string index_anon_name(row[1], l[1]);
-
-        assert(index_map.find(index_name) == index_map.end());
-        index_map[index_name] = index_anon_name;
-    }
-
-    return index_map;
 }
 
 static void

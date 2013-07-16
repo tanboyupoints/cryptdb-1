@@ -1,6 +1,8 @@
-#include "schema.hh"
+#include <functional>
+
 #include <parser/lex_util.hh>
 #include <parser/stringify.hh>
+#include <main/schema.hh>
 #include <main/rewrite_main.hh>
 #include <main/init_onions.hh>
 
@@ -117,42 +119,13 @@ bool TableMeta::destroyFieldMeta(std::string field)
     return 1 == erase_count;
 }
 
-std::string TableMeta::addIndex(std::string index_name)
-{
-    std::string anon_name =
-        std::string("index") + getpRandomName() +
-        getAnonTableName();
-    auto it = index_map.find(index_name);
-    assert(index_map.end() == it);
-
-    return index_map[index_name] = anon_name;
-}
-
+// TODO: Add salt.
 std::string TableMeta::getAnonIndexName(std::string index_name) const
 {
-    auto it = index_map.find(index_name);
-    assert(index_map.end() != it);
-    return it->second;
-}
+    std::string hash_input = anon_table_name + index_name;
+    std::size_t hsh = std::hash<std::string>()(hash_input);
 
-// Reverse lookup.
-std::string TableMeta::getIndexName(std::string anon_name) const
-{
-    for (auto it : index_map) {
-        if (it.second == anon_name) {
-            return it.first;
-        }
-    }
-
-    assert(false);
-}
-
-bool TableMeta::destroyIndex(std::string index_name)
-{
-    auto it = index_map.find(index_name);
-    assert(index_map.end() != it);
-
-    return 1 == index_map.erase(index_name);
+    return std::string("index_") + std::to_string(hsh);
 }
 
 SchemaInfo::~SchemaInfo()
