@@ -51,135 +51,13 @@ public:
 
 const OLK PLAIN_OLK = OLK(oPLAIN, SECLEVEL::PLAINVAL, NULL);
 
-// FIXME: Maybe should inherit from DBObject.
-class AbstractMetaKey {
-public:
-    AbstractMetaKey() {;}
-    virtual ~AbstractMetaKey() {;}
-    virtual bool operator <(const AbstractMetaKey &rhs) const = 0;
-    virtual bool operator ==(const AbstractMetaKey &rhs) const = 0;
-    virtual std::string serialize() const = 0;
-    virtual std::string toString() const = 0;
-};
-
-template <typename KeyType>
-class MetaKey : public AbstractMetaKey {
-    typedef std::function<std::string(KeyType)> serializer;
-    typedef std::function<KeyType(std::string)> deserializer;
-    
-    // Build MetaKey from serialized MetaKey.
-    MetaKey(int dummy, std::string serial, deserializer toKeyType)
-        : key_data(toKeyType(serial)), serial(serial) {}
-
-public:
-    const KeyType key_data;
-    const std::string serial;
-
-    // Build MetaKey from 'actual' key value.
-    MetaKey(KeyType key_data, serializer toStr)
-        : key_data(key_data), serial(toStr(key_data)) {}
-    bool operator <(const AbstractMetaKey &rhs) const
-    {
-        MetaKey rhs_key = static_cast<const MetaKey &>(rhs);
-        return key_data < rhs_key.key_data;
-    }
-
-    bool operator ==(const AbstractMetaKey &rhs) const
-    {
-        MetaKey rhs_key = static_cast<const MetaKey &>(rhs);
-        return key_data == rhs_key.key_data;
-    }
-
-    static MetaKey<KeyType> *deserialize(std::string serial,
-                                         deserializer toKeyType)
-    {
-        static const int dummy = 1;
-        return new MetaKey<KeyType>(dummy, serial, toKeyType);
-    }
-
-    std::string serialize() const
-    {
-        return serial;
-    }
-
-    // FIXME.
-    std::string toString() const
-    {
-        std::ostringstream s;
-        s << key_data;
-        return s.str();
-    }
-    
-    static std::string identity(std::string s) {
-        return s;
-    }
-};
-
-// A string key is most common and this class will allow us to clean up
-// the instantiaion syntax significantly.
-class IdentityMetaKey : public MetaKey<std::string> {
-public:
-    IdentityMetaKey(std::string key_data)
-        : MetaKey<std::string>(key_data, MetaKey<std::string>::identity) {}
-};
-
-struct DBMeta : public DBObject {
-    DBMeta() {}
-    virtual ~DBMeta() {}
-
-    virtual bool addChild(AbstractMetaKey *key, DBMeta *meta);
-    virtual bool replaceChild(AbstractMetaKey *key, DBMeta *meta);
-    virtual bool destroyChild(AbstractMetaKey *key);
-
-    // Helpers.
-    std::map<AbstractMetaKey *, DBMeta *>::const_iterator
-        findChild(AbstractMetaKey *key) const;
-    bool childExists(AbstractMetaKey * key) const;
-    DBMeta *getChild(AbstractMetaKey * key) const;
-    AbstractMetaKey *getKey(const DBMeta *const child) const;
-
-    // FIXME: Use rtti.
-    virtual std::string typeName() const = 0;
-    virtual std::vector<std::pair<AbstractMetaKey *, DBMeta *>>
-        fetchChildren(Connect *e_conn) = 0;
-
-    std::map<AbstractMetaKey *, DBMeta *> children;
-};
-
-// > TODO: Make getDatabaseID() protected by templating on the Concrete type
-//   and making it a friend.
-// > TODO: Use static deserialization functions for the derived types so we
-//   can get rid of the <Constructor>(std::string serial) functions and put
-//   'const' back on the members.
-template <typename ChildType, typename KeyType>
-struct AbstractMeta : public DBMeta {
-    // TODO: Remove default constructor.
-    AbstractMeta() {}
-    virtual ~AbstractMeta()
-    {
-        auto cp = children;
-        children.clear();
-
-        for (auto it : cp) {
-            delete it.second;
-        }
-    }
-    // Virtual constructor to deserialize from embedded database.
-    template <typename ConcreteMeta>
-        static ConcreteMeta *deserialize(std::string serial);
-    std::vector<std::pair<AbstractMetaKey *, DBMeta *>>
-        fetchChildren(Connect *e_conn);
-    // FIXME: If this is too tightly coupled with MetaKey, implement it
-    // as a function pointer passed to the constructor.
-    virtual KeyType deserializeKey(std::string serialized_key) const = 0;
-};
-
 /*
  * The name must be unique as it is used as a unique identifier when
  * generating the encryption layers.
  */
 // TODO: Fix the children.
-typedef struct OnionMeta : AbstractMeta<OnionMeta, std::string> {
+typedef class OnionMeta : public AbstractMeta<OnionMeta, std::string> {
+public:
     // TODO: Private.
     std::vector<EncLayer *> layers; //first in list is lowest layer
 
@@ -217,7 +95,8 @@ struct TableMeta;
 //TODO: FieldMeta and TableMeta are partly duplicates with the original
 // FieldMetadata an TableMetadata
 // which contains data we want to add to this structure soon
-typedef struct FieldMeta : public AbstractMeta<OnionMeta, onion> {
+typedef class FieldMeta : public AbstractMeta<OnionMeta, onion> {
+public:
     std::string fname;
     bool has_salt; //whether this field has its own salt
     std::string salt_name;
@@ -286,7 +165,8 @@ private:
 } FieldMeta;
 
 // TODO: Put const back.
-typedef struct TableMeta : public AbstractMeta<FieldMeta, std::string> {
+typedef class TableMeta : public AbstractMeta<FieldMeta, std::string> {
+public:
     bool hasSensitive;
     bool has_salt;
     std::string salt_name;
@@ -335,7 +215,8 @@ private:
 // FIXME: Inherit from AbstractMeta.
 // AWARE: Table/Field aliases __WILL NOT__ be looked up when calling from
 // this level or below. Use Analysis::* if you need aliasing.
-typedef struct SchemaInfo : public AbstractMeta<TableMeta, std::string> {
+typedef class SchemaInfo : public AbstractMeta<TableMeta, std::string> {
+public:
     SchemaInfo() {;}
     ~SchemaInfo();
 

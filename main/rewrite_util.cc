@@ -305,7 +305,7 @@ do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
     // Add the onion data to the proxy db.
     for (std::pair<onion, OnionMeta *> onion_pair: fm->onions) {
         onion o = onion_pair.first;
-        OnionMeta *om = onion_pair.second;
+        OnionMeta * const om = onion_pair.second;
         ostringstream s;
 
         SECLEVEL current_sec_level = fm->getOnionLevel(o);
@@ -322,15 +322,15 @@ do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
 
         assert(a.ps->e_conn->execute(s.str()));
 
-        // TODO: Get EncLayer to inherit from DBObject.
         // Add the encryption layer data to the proxy db.
         unsigned long long onionID = a.ps->e_conn->last_insert_id();
-        for (unsigned int i = 0; i < onion_pair.second->layers.size(); ++i) {
+        for (unsigned int i = 0; i < om->layers.size(); ++i) {
             SECLEVEL level = fm->onion_layout[o][i];
             std::string str_level =
                 TypeText<SECLEVEL>::toText(level);
 
-            std::string crypto_key = EncLayerFactory::serializeLayer(onion_pair.second->layers[i]);
+            std::string crypto_key =
+                EncLayerFactory::serializeLayer(om->layers[i], om);
 
             unsigned int escaped_length = crypto_key.size() * 2 + 1;
             char escaped_key[escaped_length];

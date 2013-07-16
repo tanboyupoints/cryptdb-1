@@ -9,6 +9,8 @@
 #include <parser/sql_utils.hh>
 #include <crypto/SWPSearch.hh>
 
+#include <main/dbobject.hh>
+
 #include <sql_select.h>
 #include <sql_delete.h>
 #include <sql_insert.h>
@@ -36,38 +38,37 @@
  *  -- remove unnecessary padding
  */
 
-class EncLayer {
- public:
+class EncLayer : public LeafDBMeta {
+public:
+     virtual ~EncLayer() {;}
 
-    virtual SECLEVEL level() = 0;
-    virtual std::string name() = 0;
+     std::string typeName() const {return std::string("EncLayer");}
 
-    // returns a rewritten create field to include in rewritten query
-    virtual Create_field * newCreateField(Create_field * cf, std::string anonname = "") = 0;
+     virtual SECLEVEL level() = 0;
+     virtual std::string name() = 0;
 
-    virtual Item * encrypt(Item * ptext, uint64_t IV = 0) = 0;
-    virtual Item * decrypt(Item * ctext, uint64_t IV = 0) = 0;
+     // returns a rewritten create field to include in rewritten query
+     virtual Create_field * newCreateField(Create_field * cf,
+                                           std::string anonname = "") = 0;
 
-    // returns the decryptUDF to remove the onion layer
-    virtual Item * decryptUDF(Item * col, Item * ivcol = NULL) {
-        thrower() << "decryptUDF not supported";
-    }
+     virtual Item * encrypt(Item * ptext, uint64_t IV = 0) = 0;
+     virtual Item * decrypt(Item * ctext, uint64_t IV = 0) = 0;
+
+     // returns the decryptUDF to remove the onion layer
+     virtual Item * decryptUDF(Item * col, Item * ivcol = NULL) {
+         thrower() << "decryptUDF not supported";
+     }
 
 protected:
-    // can be deserialized by corresponding factory
-    virtual std::string serialize() = 0;
-
-    friend class EncLayerFactory;
+     friend class EncLayerFactory;
 };
-
-
 
 class HOM : public EncLayer {
 public:
     HOM(Create_field * cf, std::string seed_key);
 
     // serialize and deserialize
-    std::string serialize() {return seed_key;}
+    std::string serialize(const DBObject &parent) const {return seed_key;}
     HOM(const std::string & serial);
 
 
@@ -96,7 +97,7 @@ public:
     Search(Create_field * cf, std::string seed_key);
 
     // serialize and deserialize
-    std::string serialize() {return key;}
+    std::string serialize(const DBObject &parent) const {return key;}
     Search(const std::string & serial);
 
 
@@ -117,9 +118,9 @@ private:
 
 };
 
-
-
 extern const std::vector<udf_func*> udf_list;
+
+class OnionMeta;
 
 class EncLayerFactory {
 public:
@@ -128,9 +129,9 @@ public:
 
     // creates EncLayer from its serialization
     static EncLayer * deserializeLayer(onion o, SECLEVEL sl,
-					 const std::string & serial);
+        			       const std::string & serial);
 
-    static std::string serializeLayer(EncLayer * el);
+    static std::string serializeLayer(EncLayer * el, DBMeta *parent);
 };
 
 

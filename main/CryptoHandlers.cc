@@ -128,7 +128,7 @@ serial_unpack(string serial) {
 
 EncLayer *
 EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf,
-                                string key)
+                          string key)
 {
     switch (sl) {
     case SECLEVEL::RND: {
@@ -189,8 +189,8 @@ EncLayerFactory::deserializeLayer(onion o, SECLEVEL sl,
 }
 
 string
-EncLayerFactory::serializeLayer(EncLayer * el) {
-    return serial_pack(el->level(), el->name(), el->serialize());
+EncLayerFactory::serializeLayer(EncLayer * el, DBMeta *parent) {
+    return serial_pack(el->level(), el->name(), el->serialize(*parent));
 }
 
 /* ========================= other helpers ==============================*/
@@ -272,7 +272,7 @@ public:
     RND_int(Create_field *cf, const std::string & seed_key);
 
     // serialize and deserialize
-    virtual std::string serialize() {return key;}
+    std::string serialize(const DBObject &parent) const {return key;}
     RND_int(const std::string & serial);
 
     SECLEVEL level() {return SECLEVEL::RND;}
@@ -297,7 +297,7 @@ public:
     RND_str(Create_field *, const std::string & seed_key);
 
     // serialize and deserialize
-    std::string serialize() {return rawkey; }
+    std::string serialize(const DBObject &parent) const {return rawkey; }
     RND_str(const std::string & serial);
 
 
@@ -492,7 +492,7 @@ class DET_int : public EncLayer {
 public:
     DET_int(Create_field *,  const std::string & seed_key);
     
-    std::string serialize() {return key; }
+    std::string serialize(const DBObject &parent) const {return key; }
     // create object from serialized contents
     DET_int(const std::string & serial);
 
@@ -520,7 +520,7 @@ class DET_dec : public DET_int {
 public:
     DET_dec(Create_field *,  const std::string & seed_key);
 
-    std::string serialize();
+    std::string serialize(const DBObject &parent) const;
     // create object from serialized contents
     DET_dec(const std::string & serial);
 
@@ -540,7 +540,7 @@ public:
     DET_str(Create_field *cf, std::string seed_key);
 
     // serialize and deserialize
-    std::string serialize() {return rawkey;}
+    std::string serialize(const DBObject &parent) const {return rawkey;}
     DET_str(const std::string & serial);
 
 
@@ -686,10 +686,10 @@ DET_dec::DET_dec(Create_field * cf, const string & seed_key) : DET_int(cf, seed_
 }
 
 string
-DET_dec::serialize() {
+DET_dec::serialize(const DBObject &parent) const {
     stringstream layerinfo;
 
-    layerinfo << decimals << " " << DET_int::serialize();
+    layerinfo << decimals << " " << DET_int::serialize(parent);
 
     return layerinfo.str();
 }
@@ -899,7 +899,7 @@ public:
     OPE_int(Create_field *, std::string seed_key);
 
     // serialize and deserialize
-    std::string serialize() {return key;}
+    std::string serialize(const DBObject &parent) const {return key;}
     OPE_int(const std::string & serial);
 
     SECLEVEL level() {return SECLEVEL::OPE;}
@@ -925,7 +925,7 @@ public:
     OPE_str(Create_field *, std::string seed_key);
 
     // serialize and deserialize
-    std::string serialize() {return key;}
+    std::string serialize(const DBObject &parent) const {return key;}
     OPE_str(const std::string & serial);
 
 
@@ -950,7 +950,7 @@ public:
     OPE_dec(Create_field *, std::string seed_key);
 
     // serialize and deserialize
-    std::string serialize();
+    std::string serialize(const DBObject &parent) const;
     OPE_dec(const std::string & serial);
 
     string name() {return "OPE_dec";}
@@ -998,10 +998,10 @@ OPE_dec::OPE_dec(Create_field * cf, string seed_key) : OPE_int(cf, seed_key) {
 }
 
 string
-OPE_dec::serialize() {
+OPE_dec::serialize(const DBObject &parent) const {
     stringstream layerinfo;
 
-    layerinfo << decimals << " " << OPE_int::serialize();
+    layerinfo << decimals << " " << OPE_int::serialize(parent);
 
     return layerinfo.str();
 }
@@ -1110,11 +1110,7 @@ OPE_str::decrypt(Item * ctext, uint64_t IV) {
 }
 
 
-
 /**************** HOM ***************************/
-
-
-
 
 class HOM_dec : public HOM {
 public:
@@ -1138,8 +1134,8 @@ private:
     uint decimals;
     ZZ shift;
 
-    std::string serialize();
-    ~HOM_dec();
+    std::string serialize(const DBObject &parent) const;
+    ~HOM_dec() {;}
 };
 
 
@@ -1196,10 +1192,10 @@ HOM_dec::HOM_dec(Create_field * cf, std::string seed_key) :  HOM(cf, seed_key){
 }
 
 string
-HOM_dec::serialize() {
+HOM_dec::serialize(const DBObject &parent) const {
     stringstream layerinfo;
 
-    layerinfo << decimals << " " << HOM::serialize();
+    layerinfo << decimals << " " << HOM::serialize(parent);
 
     return layerinfo.str();
 }

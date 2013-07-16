@@ -171,11 +171,15 @@ loadSchemaInfo(Connect *e_conn)
     // Recursively rebuild the AbstractMeta<Whatever> and it's children.
     std::function<DBMeta*(DBMeta *)> loadChildren =
         [&loadChildren, &e_conn](DBMeta *parent) {
-            std::vector<std::pair<AbstractMetaKey *, DBMeta *>> kids =
-                parent->fetchChildren(e_conn);
-            for (auto it : kids) {
-                parent->addChild(it.first, it.second);
-                loadChildren(it.second);
+            // FIXME: This is very ASK, should be TELL.
+            if (parent->supportsChildren()) {
+                auto kids = parent->fetchChildren(e_conn);
+                for (auto it : kids) {
+                    parent->addChild(it.first, it.second);
+                    // FIXME: dynamic_cast
+                    DBMeta *child = static_cast<DBMeta *>(it.second);
+                    loadChildren(child);
+                }
             }
 
             return parent;  /* lambda */
