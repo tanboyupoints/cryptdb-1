@@ -117,20 +117,29 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
     virtual Item * do_optimize_type(Item_func_neg *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
+
     virtual void do_rewrite_insert_type(Item_func_neg *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const {
 
         assert(!i->is_null());
 
         uint64_t salt = randomValue();
-        for (auto it : fm->onions) {
 
-            //TODO/FIXME: check for oPLAIN onions
+        for (auto it : fm->onions) {
 
             std::vector<EncLayer *>  layers = it.second->layers;
             assert(layers.size() > 0);
 
             Item * enc = i;
             Item * prev_enc = NULL;
+            
+            if (it.first == oPLAIN) {//Unencrypted item
+                l.push_back(enc);
+
+                //shouldn't we break instead?
+                //break;
+                
+                continue;
+            }
 
             for (auto layer : layers) {
                 LOG(cdb_v)  << "encrypting layer " << levelnames[(int)layer->level()];
