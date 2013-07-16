@@ -310,9 +310,7 @@ typedef struct TableMeta : public AbstractMeta<FieldMeta, std::string> {
     ~TableMeta() {;}
 
     std::string serialize(const DBObject &parent) const;
-    bool addChild(AbstractMetaKey *key, DBMeta *meta);
     std::string getAnonTableName() const;
-    bool destroyChild(AbstractMetaKey *key);
     std::vector<FieldMeta *> orderedFieldMetas() const;
     // FIXME: Use rtti.
     std::string typeName() const {return type_name;}
@@ -321,12 +319,8 @@ typedef struct TableMeta : public AbstractMeta<FieldMeta, std::string> {
     {
         return serialized_key;
     }
-    unsigned long leaseIncUniq() {
-        return counter++;
-    }
-    unsigned long getUniqCounter() {
-        return counter;
-    }
+    unsigned long leaseIncUniq() {return counter++;}
+    unsigned long getUniqCounter() {return counter;}
 
     friend class Analysis;
 

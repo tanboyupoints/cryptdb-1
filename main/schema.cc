@@ -262,30 +262,10 @@ std::string TableMeta::serialize(const DBObject &parent) const
     return serial;
 }
 
-bool TableMeta::addChild(AbstractMetaKey *key, DBMeta *meta)
-{
-    bool status = AbstractMeta::addChild(key, meta);
-    if (false == status) {
-        return false;
-    }
-    
-    return true;
-}
-
 // FIXME: May run into problems where a plaintext table expects the regular
 // name, but it shouldn't get that name from 'getAnonTableName' anyways.
 std::string TableMeta::getAnonTableName() const {
     return anon_table_name;
-}
-
-bool TableMeta::destroyChild(AbstractMetaKey *key)
-{
-    bool status = AbstractMeta::destroyChild(key);
-    if (false == status) {
-        throw CryptDBError("Failed to destroy FieldMeta!");
-    }
-
-    return true;
 }
 
 std::vector<FieldMeta *> TableMeta::orderedFieldMetas() const
