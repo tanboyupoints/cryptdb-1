@@ -69,7 +69,7 @@ typedef struct OnionMeta {
     }
 
     // New.
-    OnionMeta(onion o) 
+    OnionMeta(onion o)
         : onionname(getpRandomName() + TypeText<onion>::toText(o)) {};
     // Restore.
     OnionMeta(std::string name)
@@ -95,7 +95,7 @@ typedef struct FieldMeta {
     // New field.
     FieldMeta(std::string name, Create_field *field, AES_KEY *mKey);
     // Recovering field from proxy db.
-    FieldMeta(std::string name, bool has_salt, 
+    FieldMeta(std::string name, bool has_salt,
               std::string salt_name, onionlayout onion_layout)
         : fname(name), has_salt(has_salt), salt_name(salt_name),
           onion_layout(onion_layout) {}
@@ -174,11 +174,11 @@ typedef struct TableMeta {
 
 protected:
     bool destroyFieldMeta(std::string field);
-    std::string addIndex(std::string index_name); 
+    std::string addIndex(std::string index_name);
     std::string getAnonIndexName(std::string index_name) const;
     std::string getIndexName(std::string anon_index_name) const;
     bool destroyIndex(std::string index_name);
-   
+
 private:
     std::map<std::string, std::string> index_map;
 } TableMeta;

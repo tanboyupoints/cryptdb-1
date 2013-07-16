@@ -18,7 +18,7 @@ private:
     virtual void gather(LEX *lex, Analysis &a) const = 0;
     virtual LEX **rewrite(LEX *lex, Analysis &a,
                           unsigned *out_lex_count) const = 0;
-     
+
 protected:
     DMLHandler() {;}
     virtual ~DMLHandler() {;}

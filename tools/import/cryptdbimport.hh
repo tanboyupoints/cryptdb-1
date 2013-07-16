@@ -5,7 +5,7 @@ using namespace std;
 namespace {
 
 /**
- * Import database tool class. 
+ * Import database tool class.
  */
 class Import
 {
