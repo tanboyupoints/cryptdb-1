@@ -202,18 +202,6 @@ createInMemoryTables(ProxyState & ps)
     return;
 }
 
-static bool
-string_to_bool(std::string s)
-{
-    if (s == std::string("TRUE") || s == std::string("1")) {
-        return true;
-    } else if (s == std::string("FALSE") || s == std::string("0")) {
-        return false;
-    } else {
-        throw "unrecognized string in string_to_bool!";
-    }
-}
-
 static void
 buildTableMeta(ProxyState &ps)
 {

@@ -369,6 +369,18 @@ bool_to_string(bool b)
     }
 }
 
+bool
+string_to_bool(std::string s)
+{
+    if (s == std::string("TRUE") || s == std::string("1")) {
+        return true;
+    } else if (s == std::string("FALSE") || s == std::string("0")) {
+        return false;
+    } else {
+        throw "unrecognized string in string_to_bool!";
+    }
+}
+
 LEX **
 single_lex_output(LEX *out_me, unsigned *out_lex_count)
 {

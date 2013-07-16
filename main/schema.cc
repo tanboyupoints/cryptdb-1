@@ -140,10 +140,17 @@ AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
     return out_vec;
 }
 
-// TODO: Implement deserialization.
 OnionMeta::OnionMeta(std::string serial)
 {
-   unserialize_string(serial); 
+    auto vec = unserialize_string(serial); 
+    std::string parent_id;
+    std::string o;
+    std::string seclevel;
+
+    parent_id = vec[0];              // ?
+    this->onionname = vec[1];
+    o = vec[2];                      // ?
+    seclevel = vec[3];               // ?
 }
 
 std::string OnionMeta::serialize(const DBObject &parent) const
@@ -155,10 +162,10 @@ std::string OnionMeta::serialize(const DBObject &parent) const
     assert(seclevel != SECLEVEL::INVALID);
 
     std::string serial =
-        serialize_string(std::to_string(parent.getDatabaseID())) +
+        serialize_string(std::to_string(parent.getDatabaseID())) +  // ?
         serialize_string(getAnonOnionName()) +
-        serialize_string(TypeText<onion>::toText(o)) +
-        serialize_string(TypeText<SECLEVEL>::toText(seclevel));
+        serialize_string(TypeText<onion>::toText(o)) +              // ?
+        serialize_string(TypeText<SECLEVEL>::toText(seclevel));     // ?
 
     return serial;
 }
@@ -168,10 +175,17 @@ std::string OnionMeta::getAnonOnionName() const
     return onionname;
 }
 
-// TODO: Implement deserialization.
 FieldMeta::FieldMeta(std::string serial)
 {
-    
+    auto vec = unserialize_string(serial);
+    std::string parent_id;
+
+    parent_id = vec[0];                         // ?
+    this->fname = vec[1];
+    this->has_salt = string_to_bool(vec[2]);
+    this->salt_name = vec[3];
+    this->onion_layout = TypeText<onionlayout>::toType(vec[4]);
+    this->uniq_count = atoi(vec[5].c_str());
 }
 
 FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *mKey,
@@ -199,7 +213,7 @@ FieldMeta::~FieldMeta()
 std::string FieldMeta::serialize(const DBObject &parent) const
 {
     std::string serial =
-        serialize_string(std::to_string(parent.getDatabaseID())) +
+        serialize_string(std::to_string(parent.getDatabaseID())) +      // ?
         serialize_string(fname) +
         serialize_string(bool_to_string(has_salt)) +
         serialize_string(getSaltName()) +
@@ -215,10 +229,18 @@ string FieldMeta::stringify() const
     return res;
 }
 
-// TODO: Implement deserialization.
+// FIXME: Get ID from caller.
 TableMeta::TableMeta(std::string serial)
 {
-
+    auto vec = unserialize_string(serial);
+    std::string dbname;
+    
+    this->anon_table_name = vec[0];
+    this->hasSensitive = string_to_bool(vec[1]);
+    this->has_salt = string_to_bool(vec[3]);
+    this->salt_name = vec[4];
+    dbname = vec[5];                // ?
+    this->counter = atoi(vec[6].c_str());
 }
 
 std::string TableMeta::serialize(const DBObject &parent) const
@@ -233,7 +255,7 @@ std::string TableMeta::serialize(const DBObject &parent) const
         serialize_string(bool_to_string(hasSensitive)) +
         serialize_string(bool_to_string(has_salt)) +
         serialize_string(salt_name) +
-        serialize_string(dbname) +
+        serialize_string(dbname) +                      // ?
         serialize_string(std::to_string(counter));
     
     return serial;

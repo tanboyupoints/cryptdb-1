@@ -51,6 +51,8 @@ do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
 std::string
 bool_to_string(bool b);
 
+bool string_to_bool(std::string s);
+
 LEX **
 single_lex_output(LEX *out_me, unsigned *out_lex_count);
 

@@ -148,6 +148,9 @@ struct DBMeta : public DBObject {
 
 // > TODO: Make getDatabaseID() protected by templating on the Concrete type
 //   and making it a friend.
+// > TODO: Use static deserialization functions for the derived types so we
+//   can get rid of the <Constructor>(std::string serial) functions and put
+//   'const' back on the members.
 template <typename ChildType, typename KeyType>
 struct AbstractMeta : public DBMeta {
     // TODO: Remove default constructor.
@@ -207,7 +210,7 @@ typedef struct OnionMeta : AbstractMeta<OnionMeta, std::string> {
 
 private:
     constexpr static const char *type_name = "onionMeta";
-    const std::string onionname;
+    std::string onionname;
 } OnionMeta;
 
 struct TableMeta;
@@ -215,9 +218,9 @@ struct TableMeta;
 // FieldMetadata an TableMetadata
 // which contains data we want to add to this structure soon
 typedef struct FieldMeta : public AbstractMeta<OnionMeta, onion> {
-    const std::string fname;
+    std::string fname;
     bool has_salt; //whether this field has its own salt
-    const std::string salt_name;
+    std::string salt_name;
     onionlayout onion_layout;
 
     std::map<onion, OnionMeta *> onions;
