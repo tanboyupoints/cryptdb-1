@@ -51,15 +51,13 @@ class CreateHandler : public DDLHandler {
             // -----------------------------
             //         Update TABLE       
             // -----------------------------
-            auto empty_index_map = std::map<std::string, std::string>();
             // TODO: Use appropriate values for has_sensitive and has_salt.
-            TableMeta *tm = new TableMeta(true, true, empty_index_map);
+            TableMeta *tm = new TableMeta(true, true);
             IdentityMetaKey *key = new IdentityMetaKey(table);
             // FIXME: Remove.
             // assert(a.ps->schema->addChild(key, tm));
             Delta delta(Delta::CREATE, tm, a.ps->schema, key);
             a.deltas.push_back(delta);
-
            
             // Add table to embedded database.
             assert(a.ps->e_conn->execute(q));

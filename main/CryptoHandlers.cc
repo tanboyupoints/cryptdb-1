@@ -10,6 +10,7 @@
 #include <cmath>
 
 #define LEXSTRING(cstr) { (char*) cstr, sizeof(cstr) }
+#define ISNEG(val) val<0
 
 
 using namespace std;
@@ -607,20 +608,38 @@ DET_int::newCreateField(Create_field * cf, string anonname) {
 
 Item *
 DET_int::encrypt(Item * ptext, uint64_t IV) {
-    ulonglong val = static_cast<Item_int *>(ptext)->value;
-    ulonglong res = (ulonglong) bf.encrypt(val);
-    LOG(encl) << "DET_int encrypt " << val << "--->" << res;
+
+    static ulonglong res;
+
+    //val_int() make sure we have the real signed value
+    longlong val = static_cast<Item_int *>(ptext)->val_int();
+
+    if(ISNEG(val))
+    {
+        res = (ulonglong) bf.encrypt((longlong)val);
+    }else{
+        ulonglong val = static_cast<Item_int *>(ptext)->value;
+        res = (ulonglong) bf.encrypt(val);
+    }
 
     return new Item_int(res);
 }
 
 Item *
 DET_int::decrypt(Item * ctext, uint64_t IV) {
-    ulonglong val = static_cast<Item_int*>(ctext)->value;
-    ulonglong res = (ulonglong) bf.decrypt(val);
-    LOG(encl) << "DET_int decrypt " << val << "-->" << res;
-    Item * ni = new Item_int(res);
 
+    static ulonglong res;
+    longlong val = static_cast<Item_int*>(ctext)->val_int();
+    
+    if(ISNEG(val))
+    {
+        res = (ulonglong) bf.decrypt((longlong)val);
+    }else{
+        ulonglong val = static_cast<Item_int*>(ctext)->value;
+        res = (ulonglong) bf.decrypt(val);
+    }
+    
+    Item * ni = new Item_int(res);
     return ni;
 }
 

@@ -184,7 +184,7 @@ typedef struct OnionMeta : AbstractMeta<OnionMeta, std::string> {
     std::vector<EncLayer *> layers; //first in list is lowest layer
 
     // New.
-    OnionMeta(onion o) 
+    OnionMeta(onion o)
         : onionname(getpRandomName() + TypeText<onion>::toText(o)) {};
     // Restore.
     /*
@@ -295,20 +295,19 @@ typedef struct TableMeta : public AbstractMeta<FieldMeta, std::string> {
     // Restore old TableMeta.
     TableMeta(bool has_sensitive, bool has_salt, std::string salt_name,
               std::string anon_table_name,
-              std::map<std::string, std::string> index_map,
               unsigned long counter)
         : hasSensitive(has_sensitive), has_salt(has_salt),
           salt_name(salt_name), anon_table_name(anon_table_name),
-          index_map(index_map), counter(counter) {}
+          counter(counter) {}
 
     // New TableMeta.
-    TableMeta(bool has_sensitive, bool has_salt,
-              std::map<std::string, std::string> index_map)
+    TableMeta(bool has_sensitive, bool has_salt)
         : hasSensitive(has_sensitive), has_salt(has_salt),
           salt_name("tableSalt_" + getpRandomName()),
           anon_table_name("table_" + getpRandomName()),
-          index_map(index_map), counter(0) {}
+          counter(0) {}
     TableMeta(std::string serial);
+    ~TableMeta() {;}
 
     std::string serialize(const DBObject &parent) const;
     bool addChild(AbstractMetaKey *key, DBMeta *meta);
@@ -331,16 +330,11 @@ typedef struct TableMeta : public AbstractMeta<FieldMeta, std::string> {
 
     friend class Analysis;
 
-protected:
-    std::string addIndex(std::string index_name); 
-    std::string getAnonIndexName(std::string index_name) const;
-    std::string getIndexName(std::string anon_index_name) const;
-    bool destroyIndex(std::string index_name);
-   
 private:
     constexpr static const char *type_name = "tableMeta";
-    std::map<std::string, std::string> index_map;
     unsigned int counter;
+
+    std::string getAnonIndexName(std::string index_name) const;
 } TableMeta;
 
 

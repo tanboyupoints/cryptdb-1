@@ -164,25 +164,6 @@ class AddIndexSubHandler : public AlterSubHandler {
             reduceList<Key>(key_it, List<Key>(),
                 [&table, &tm, &a] (List<Key> out_list, Key *key) {
                     // -----------------------------
-                    //         Update INDEX
-                    // -----------------------------
-                    std::string index_name = convert_lex_str(key->name);
-                    std::string anon_name = a.addIndex(table, index_name);
-                    ostringstream s;
-                    s << " INSERT INTO pdb.index_info VALUES ("
-                      << " (SELECT table_info.id "
-                      << "    FROM pdb.table_info"
-                      << "  WHERE anon_name = '" << tm->getAnonTableName()
-                      << "'"
-                      << "    AND database_name = '"
-                      <<          a.ps->e_conn->getCurDBName() << "'), "
-                      << " '" << index_name << "', "
-                      << " '" << anon_name << "', "
-                      << " 0"
-                      << " );";
-
-                    assert(a.ps->e_conn->execute(s.str()));
-                    // -----------------------------
                     //         Rewrite INDEX
                     // -----------------------------
                     auto new_keys = rewrite_key(table, key, a);
@@ -224,33 +205,12 @@ class DropIndexSubHandler : public AlterSubHandler {
             reduceList<Alter_drop>(drop_it, List<Alter_drop>(),
                 [table, dbname, tm, &a, this] (List<Alter_drop> out_list,
                                                Alter_drop *adrop) {
-                    this->update(a, table, dbname, adrop);
                     List<Alter_drop> lst = this->rewrite(a, adrop, table);
                     out_list.concat(&lst); 
                     return out_list;
                 });
 
         return single_lex_output(new_lex, out_lex_count);
-    }
-
-    void update(Analysis &a, const std::string &table,
-                const std::string &dbname, Alter_drop *adrop) const
-    {
-        // Remove the index_info record from the proxy db.
-        std::string index_name = adrop->name;
-        std::string anon_name = a.getAnonIndexName(table, index_name);
-
-        ostringstream s;
-        s << " DELETE FROM pdb.index_info "
-          << " WHERE table_info_id = "
-          << "       (SELECT table_info.id "
-          << "          FROM pdb.table_info"
-          << "         WHERE name = '" << table << "'"
-          << "           AND database_name = '" << dbname << "')"
-          << "   AND name = '" << index_name << "'"
-          << "   AND anon_name = '" << anon_name << "';";
-
-        assert(a.ps->e_conn->execute(s.str()));
     }
 
     List<Alter_drop> rewrite(Analysis a, Alter_drop *adrop,
@@ -262,9 +222,6 @@ class DropIndexSubHandler : public AlterSubHandler {
         Alter_drop *new_adrop = adrop->clone(thd->mem_root);  
         new_adrop->name =
             make_thd_string(a.getAnonIndexName(table, adrop->name));
-
-        // Remove from *Meta.
-        a.destroyIndex(table, adrop->name);
 
         out_list.push_back(new_adrop);
         return out_list;

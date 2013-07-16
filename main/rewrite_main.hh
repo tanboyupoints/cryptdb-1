@@ -57,7 +57,7 @@ public:
 };
 
 // Main class processing rewriting
-// TODO: Remove the MultiPrinc parameter. Requires changes to testing 
+// TODO: Remove the MultiPrinc parameter. Requires changes to testing
 // idioms.
 class Rewriter {
 public:
@@ -189,22 +189,22 @@ class CItemTypeDir : public CItemType {
 		     Analysis &a) const {
         return lookup(i)->do_rewrite(i, constr, rp, a);
     }
-    
+
     void do_rewrite_insert(Item *i, Analysis &a, vector<Item *> &l, FieldMeta *fm) const {
         lookup(i)->do_rewrite_insert(i, a, l, fm);
     }
-    
-    
+
+
 protected:
     virtual CItemType *lookup(Item *i) const = 0;
-    
+
     CItemType *do_lookup(Item *i, T t, const char *errname) const {
         auto x = types.find(t);
         if (x == types.end())
             thrower() << "missing " << errname << " " << t << " in " << *i;
         return x->second;
     }
-    
+
  private:
     std::map<T, CItemType*> types;
 };

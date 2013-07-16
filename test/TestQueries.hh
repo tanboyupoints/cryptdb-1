@@ -84,24 +84,24 @@ class Connection {
 
     //TODO/FIXME: check this
     Rewriter * re;
-    
+
     //Rewriter object for proxy
     Rewriter * re_proxy;
 
-    //It allow multiple proxy connections however CryptDB 
+    //It allow multiple proxy connections however CryptDB
     //doesn't seem to support multiple proxy connections, anyways
     //it serves as a temporary solution for Rewriter instance issue.
     std::set<Rewriter *> re_set;
 
-    //Connect objects for plain 
+    //Connect objects for plain
     std::set<Connect *> conn_set;
 
     //current connection we are on, for multiple connections
     std::set<Connect *>::iterator conn;
-    
+
     //current connection we are on
     std::set<Rewriter *>::iterator re_it;
-    
+
     pid_t proxy_pid;
 
     ResType executeConn(std::string query);

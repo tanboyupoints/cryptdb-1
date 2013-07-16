@@ -377,7 +377,9 @@ convert_lex_str(const LEX_STRING &l)
 inline LEX_STRING
 string_to_lex_str(const std::string &s)
 {
-    return (LEX_STRING){const_cast<char*>(s.c_str()), s.length()};
+    char *cstr = new char[s.length() + 1];
+    strncpy(cstr, s.c_str(), s.length());
+    return (LEX_STRING){cstr, s.length()};
 }
 
 static std::ostream&
@@ -547,10 +549,10 @@ do_prefix_add_index(std::string index_name) {
 
 static std::string
 prefix_add_index(Key key) {
-    std::string column_name = convert_lex_str(key.name);
+    std::string index_name = convert_lex_str(key.name);
     std::ostringstream key_output;
     key_output << ListJoin<Key_part_spec>(key.columns, ",",
-                                          do_prefix_add_index(column_name));
+                                          do_prefix_add_index(index_name));
     return key_output.str();
 }
 static inline std::ostream&

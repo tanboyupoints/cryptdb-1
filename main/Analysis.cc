@@ -237,27 +237,10 @@ std::string Analysis::getAnonTableName(const string &table) const
     return this->getTableMeta(table)->getAnonTableName();
 }
 
-std::string Analysis::addIndex(std::string table, std::string index_name)
-{
-    return this->getTableMeta(table)->addIndex(index_name);
-}
-
 std::string Analysis::getAnonIndexName(std::string table,
                                        std::string index_name) const
 {
     return this->getTableMeta(table)->getAnonIndexName(index_name); 
-}
-
-std::string Analysis::getIndexName(std::string table,
-                                   std::string anon_index_name) const
-{
-    return this->getTableMeta(table)->getIndexName(anon_index_name);
-}
-
-bool Analysis::destroyIndex(std::string table,
-                            std::string index_name) 
-{
-    return this->getTableMeta(table)->destroyIndex(index_name);
 }
 
 std::string Analysis::unAliasTable(std::string table) const

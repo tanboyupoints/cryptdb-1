@@ -28,12 +28,12 @@ static learn_mode_t __attribute__((unused))modes[]=
     {MODE_INVALID, "FALSE"},
 };
 
-class Learn 
+class Learn
 {
     public:
 
-        Learn(mode_e mode, Rewriter& r, const string&dbname, const string& filename) 
-            : m_totalnum(0), m_errnum(0), 
+        Learn(mode_e mode, Rewriter& r, const string&dbname, const string& filename)
+            : m_totalnum(0), m_errnum(0),
             m_mode(mode), m_r(r), m_dbname(dbname), m_filename(filename)
         {
             //TODO: setenv is just a sugestion took from test, but need to be
@@ -47,7 +47,7 @@ class Learn
             unsetenv("TRAIN_QUERY");
             //cout << "Executed queries: " << m_totalnum << endl;
             //cout << "Errors: " << m_errnum << endl;
-            //TODO: Generate onions enc. layout 
+            //TODO: Generate onions enc. layout
         }
 
         void trainFromFile(void);

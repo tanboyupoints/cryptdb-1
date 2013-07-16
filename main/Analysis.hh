@@ -400,13 +400,8 @@ public:
     bool destroyTableMeta(std::string table);
     bool tableMetaExists(std::string table) const;
     std::string getAnonTableName(const string &table) const;
-    std::string addIndex(std::string table,
-                         std::string index_name);
     std::string getAnonIndexName(std::string table,
                                  std::string index_name) const;
-    std::string getIndexName(std::string table,
-                             std::string anon_index_name) const;
-    bool destroyIndex(std::string table, std::string index_name);
 
     // HACK(burrows): This is a temporary solution until I redesign.
     Rewriter *rewriter;
