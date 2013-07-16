@@ -41,6 +41,10 @@ clean:
 doc:
 	doxygen CryptDBdoxgen
 
+.PHONY: whitespace
+whitespace:
+	find . -name '*.cc' -o -name '*.hh' -type f -exec sed -i 's/ *$//' '{}' ';'
+
 # Eliminate default suffix rules
 .SUFFIXES:
 

@@ -16,14 +16,14 @@
 
 
 /* Class hierarchy:
- * EncLayer:  
+ * EncLayer:
  * -  encrypts and decrypts data for a certain onion layer. It also
  *    knows how to transform the data type of some plain data to the data type of
  *    encrypted data in the DBMS.
- * 
+ *
  * HOM, SEARCH : more specialized types of EncLayer
  *
- * EncLayerFactory: creates EncLayer-s for SECLEVEL-s of interest 
+ * EncLayerFactory: creates EncLayer-s for SECLEVEL-s of interest
  */
 
 
@@ -38,7 +38,7 @@
 
 class EncLayer {
  public:
-    
+
     virtual SECLEVEL level() = 0;
     virtual std::string name() = 0;
 

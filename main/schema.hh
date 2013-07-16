@@ -69,7 +69,7 @@ typedef struct OnionMeta {
     }
 
     // New.
-    OnionMeta(onion o) 
+    OnionMeta(onion o)
         : onionname(getpRandomName() + TypeText<onion>::toText(o)) {};
     // Restore.
     OnionMeta(std::string name)
@@ -95,7 +95,7 @@ typedef struct FieldMeta {
     // New field.
     FieldMeta(std::string name, Create_field *field, AES_KEY *mKey);
     // Recovering field from proxy db.
-    FieldMeta(std::string name, bool has_salt, 
+    FieldMeta(std::string name, bool has_salt,
               std::string salt_name, onionlayout onion_layout)
         : fname(name), has_salt(has_salt), salt_name(salt_name),
           onion_layout(onion_layout) {}
