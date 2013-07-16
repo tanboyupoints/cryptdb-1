@@ -358,7 +358,6 @@ RND_int::encrypt(Item * ptext, uint64_t IV) {
     uint64_t p = static_cast<Item_int *>(ptext)->value;
     uint64_t c = bf.encrypt(p ^ IV);
     LOG(encl) << "RND_int encrypt " << p << " IV " << IV << "-->" << c;
-    cout << "RND_int encrypt " << p << " IV " << IV << "-->" << c << endl;
 
     return new Item_int((ulonglong) c);
 }
@@ -617,11 +616,9 @@ DET_int::encrypt(Item * ptext, uint64_t IV) {
 
     if(ISNEG(val))
     {
-        cout << "ENCRYPTING(NEG): " << val << endl;
         res = (ulonglong) bf.encrypt((longlong)val);
     }else{
         ulonglong val = static_cast<Item_int *>(ptext)->value;
-        cout << "ENCRYPTING: " << val << endl;
         res = (ulonglong) bf.encrypt(val);
     }
 
@@ -1060,8 +1057,7 @@ Item *
 OPE_int::encrypt(Item * ptext, uint64_t IV) {
     ulong pval =  (ulong)static_cast<Item_int *>(ptext)->value;
     ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ(pval)));
-    //LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV << "--->" << enc;
-    cout << "OPE_int encrypt " << pval << " IV " << IV << "--->" << enc << endl;
+    LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV << "--->" << enc;
 
     return new Item_int(enc);
 }
