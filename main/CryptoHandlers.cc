@@ -10,6 +10,7 @@
 #include <cmath>
 
 #define LEXSTRING(cstr) { (char*) cstr, sizeof(cstr) }
+#define ISSIGNED(val) val<0
 
 
 using namespace std;
@@ -607,18 +608,32 @@ DET_int::newCreateField(Create_field * cf, string anonname) {
 
 Item *
 DET_int::encrypt(Item * ptext, uint64_t IV) {
-    ulonglong val = static_cast<Item_int *>(ptext)->value;
-    ulonglong res = (ulonglong) bf.encrypt(val);
-    LOG(encl) << "DET_int encrypt " << val << "--->" << res;
+
+    static ulonglong res;
+
+    //val_int() make sure we have the real value 
+    //in both negative and positive numbers.
+    longlong val = static_cast<Item_int *>(ptext)->val_int();
+
+    if(ISSIGNED(val))
+        res = (ulonglong) bf.encrypt(val);
+    else
+        res = (ulonglong) bf.encrypt((ulonglong)val);
 
     return new Item_int(res);
 }
 
 Item *
 DET_int::decrypt(Item * ctext, uint64_t IV) {
-    ulonglong val = static_cast<Item_int*>(ctext)->value;
-    ulonglong res = (ulonglong) bf.decrypt(val);
-    LOG(encl) << "DET_int decrypt " << val << "-->" << res;
+
+    static ulonglong res;
+    longlong val = static_cast<Item_int*>(ctext)->val_int();
+    
+    if(ISSIGNED(val))
+        res = (ulonglong) bf.decrypt(val);
+    else
+        res = (ulonglong) bf.decrypt((ulonglong)val);
+    
     Item * ni = new Item_int(res);
 
     return ni;
