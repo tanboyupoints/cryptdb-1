@@ -97,7 +97,7 @@ AbstractMeta<ChildType, KeyType>::deserialize(std::string serial)
 
 // TODO: Debug.
 template <typename ChildType, typename KeyType>
-std::vector<std::pair<AbstractMetaKey *, DBMeta *>>
+std::vector<DBMeta *>
 AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
 {
     DBWriter dbw = DBWriter::factory<ChildType>(this);
@@ -105,7 +105,7 @@ AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
     assert(create_tables(e_conn, dbw));
 
     // Now that we know the table exists, SELECT the data we want.
-    std::vector<std::pair<AbstractMetaKey *, DBMeta *>> out_vec;
+    std::vector<DBMeta *> out_vec;
     DBResult *db_res;
     const std::string parent_id = std::to_string(this->getDatabaseID());
     const std::string serials_query = 
@@ -135,7 +135,10 @@ AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
                                           local_deserialization);
         DBMeta *new_old_meta =
             AbstractMeta::deserialize<ChildType>(child_serial);
-        out_vec.push_back(std::pair<AbstractMetaKey *, DBMeta *>(key, new_old_meta));
+        out_vec.push_back(new_old_meta);
+
+        // Gobble the child.
+        this->addChild(key, new_old_meta);
     }
 
     return out_vec;

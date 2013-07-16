@@ -156,8 +156,6 @@ public:
     DBMeta() {}
     virtual ~DBMeta() {}
 
-    virtual bool supportsChildren() {return true;}
-
     virtual bool addChild(AbstractMetaKey *key, DBMeta *meta);
     virtual bool replaceChild(AbstractMetaKey *key, DBMeta *meta);
     virtual bool destroyChild(AbstractMetaKey *key);
@@ -171,8 +169,7 @@ public:
 
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;
-    virtual std::vector<std::pair<AbstractMetaKey *, DBMeta *>>
-        fetchChildren(Connect *e_conn) = 0;
+    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn) = 0;
 
     std::map<AbstractMetaKey *, DBMeta *> children;
 };
@@ -199,8 +196,7 @@ public:
     // Virtual constructor to deserialize from embedded database.
     template <typename ConcreteMeta>
         static ConcreteMeta *deserialize(std::string serial);
-    std::vector<std::pair<AbstractMetaKey *, DBMeta *>>
-        fetchChildren(Connect *e_conn);
+    std::vector<DBMeta *> fetchChildren(Connect *e_conn);
     // FIXME: If this is too tightly coupled with MetaKey, implement it
     // as a function pointer passed to the constructor.
     virtual KeyType deserializeKey(std::string serialized_key) const = 0;
@@ -208,7 +204,10 @@ public:
 
 class LeafDBMeta : public DBMeta {
 public:
-    bool supportsChildren() {return false;}
+    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn)
+    {
+        return std::vector<DBMeta *>();
+    }
 
 private:
     bool addChild(AbstractMetaKey *key, DBMeta *meta)
@@ -220,11 +219,6 @@ private:
         throw CryptDBError("LeafMeta!");
     }
     bool destroyChild(AbstractMetaKey *key)
-    {
-        throw CryptDBError("LeafMeta!");
-    }
-    virtual std::vector<std::pair<AbstractMetaKey *, DBMeta *>>
-        fetchChildren(Connect *e_conn)
     {
         throw CryptDBError("LeafMeta!");
     }
