@@ -109,6 +109,10 @@ typical_gather(Analysis & a, Item_func * i,
 
 }
 
+/*
+ * TODO:FIXME(ccarvalho): This function is duplicated from rewrite_const.cc. See if we can merge this into 
+ * one single function, common to both files.
+ */
 static Item *
 encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers, Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0) {
     assert(!i->is_null());
