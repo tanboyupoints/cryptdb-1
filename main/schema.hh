@@ -116,7 +116,7 @@ struct TableMeta;
 //TODO: FieldMeta and TableMeta are partly duplicates with the original
 // FieldMetadata an TableMetadata
 // which contains data we want to add to this structure soon
-typedef class FieldMeta : public AbstractMeta<OnionMeta, onion> {
+typedef class FieldMeta : public AbstractMeta<OnionMeta, OnionMetaKey> {
 public:
     std::string fname;
     bool has_salt; //whether this field has its own salt
@@ -139,11 +139,6 @@ public:
 
     std::string serialize(const DBObject &parent) const;
     std::string stringify() const;
-
-    onion deserializeKey(std::string serialized_key) const
-    {
-       return TypeText<onion>::toType(serialized_key);
-    }
 
     std::string getSaltName() const {
         assert(has_salt);
@@ -186,7 +181,7 @@ private:
 } FieldMeta;
 
 // TODO: Put const back.
-typedef class TableMeta : public AbstractMeta<FieldMeta, std::string> {
+typedef class TableMeta : public AbstractMeta<FieldMeta, IdentityMetaKey> {
 public:
     bool hasSensitive;
     bool has_salt;
@@ -216,10 +211,6 @@ public:
     // FIXME: Use rtti.
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
-    std::string deserializeKey(std::string serialized_key) const
-    {
-        return serialized_key;
-    }
     unsigned long leaseIncUniq() {return counter++;}
     unsigned long getUniqCounter() {return counter;}
 
@@ -236,7 +227,7 @@ private:
 // FIXME: Inherit from AbstractMeta.
 // AWARE: Table/Field aliases __WILL NOT__ be looked up when calling from
 // this level or below. Use Analysis::* if you need aliasing.
-typedef class SchemaInfo : public AbstractMeta<TableMeta, std::string> {
+typedef class SchemaInfo : public AbstractMeta<TableMeta, IdentityMetaKey> {
 public:
     SchemaInfo() {;}
     ~SchemaInfo();
@@ -257,10 +248,6 @@ private:
                              std::string & field) const;
     std::string serialize(const DBObject &parent) const {
         throw CryptDBError("SchemaInfo can not be serialized!");
-    }
-
-    std::string deserializeKey(std::string serialized_key) const {
-        return serialized_key;
     }
 } SchemaInfo;
 

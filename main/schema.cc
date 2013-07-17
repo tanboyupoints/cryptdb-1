@@ -145,11 +145,8 @@ AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
     // scope.
     std::function<DBMeta *(std::string, std::string)> deserialize =
         [this] (std::string key, std::string serial) {
-            auto local_deserialization = 
-                std::bind(&AbstractMeta::deserializeKey, this,
-                          std::placeholders::_1);
             AbstractMetaKey *meta_key =
-                MetaKey<KeyType>::deserialize(key, local_deserialization);
+                AbstractMetaKey::factory<KeyType>(key);
             DBMeta *new_old_meta =
                 AbstractMeta::deserialize<ChildType>(serial);
 
@@ -237,9 +234,9 @@ std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
             // > Probably going to want to use indexes in AbstractMetaKey
             // for now, otherwise you will need to abstract and rederive
             // a keyed and nonkeyed version of Delta.
-            MetaKey<unsigned int> *meta_key =
-                MetaKey<unsigned int>::deserialize(key, strToInt);
-            unsigned int index = meta_key->value();
+            OnionMetaKey *meta_key =
+                AbstractMetaKey::factory<OnionMetaKey>(key);
+            unsigned int index = meta_key->getValue();
             if (index >= this->layers.size()) {
                 this->layers.resize(index + 1);
             }

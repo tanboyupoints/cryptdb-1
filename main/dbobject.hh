@@ -3,6 +3,7 @@
 #include <functional>
 
 #include <main/Connect.hh>
+#include <main/enum_text.hh>
 
 /*
  * Table Layout
@@ -62,53 +63,55 @@ public:
     virtual ~AbstractMetaKey() {;}
     virtual bool operator <(const AbstractMetaKey &rhs) const = 0;
     virtual bool operator ==(const AbstractMetaKey &rhs) const = 0;
-    virtual std::string serialize() const = 0;
     virtual std::string toString() const = 0;
+    virtual std::string getSerial() const = 0;
+    template <typename ConcreteKey>
+        static ConcreteKey *factory(std::string serial)
+    {
+        return new ConcreteKey(serial);
+    }
+
+
+protected:
+    virtual void serialize() = 0;
+    virtual void unserialize() = 0;
 };
 
+// TODO: Could use pointer hack so key_data and serial are const.
 template <typename KeyType>
 class MetaKey : public AbstractMetaKey {
-    typedef std::function<std::string(KeyType)> serializer;
-    typedef std::function<KeyType(std::string)> deserializer;
-    
+protected:
     // Build MetaKey from serialized MetaKey.
-    MetaKey(int dummy, std::string serial, deserializer toKeyType)
-        : key_data(toKeyType(serial)), serial(serial) {}
+    MetaKey(int dummy, std::string serial)
+        : serial(serial)
+    {
+        unserialize();
+    }
+
+    KeyType key_data;
+    std::string serial;
 
 public:
-    const KeyType key_data;
-    const std::string serial;
-
     // Build MetaKey from 'actual' key value.
-    MetaKey(KeyType key_data, serializer toStr)
-        : key_data(key_data), serial(toStr(key_data)) {}
+    MetaKey(KeyType key_data)
+        : key_data(key_data)
+    {
+        serialize();
+    }
     bool operator <(const AbstractMetaKey &rhs) const
     {
-        MetaKey rhs_key = static_cast<const MetaKey &>(rhs);
+        const MetaKey &rhs_key = static_cast<const MetaKey &>(rhs);
         return key_data < rhs_key.key_data;
     }
 
     bool operator ==(const AbstractMetaKey &rhs) const
     {
-        MetaKey rhs_key = static_cast<const MetaKey &>(rhs);
+        const MetaKey &rhs_key = static_cast<const MetaKey &>(rhs);
         return key_data == rhs_key.key_data;
     }
 
-    static MetaKey<KeyType> *deserialize(std::string serial,
-                                         deserializer toKeyType)
-    {
-        static const int dummy = 1;
-        return new MetaKey<KeyType>(dummy, serial, toKeyType);
-    }
-
-    std::string serialize() const
-    {
-        return serial;
-    }
-
-    KeyType value() const {
-        return key_data;
-    }
+    KeyType getValue() const {return key_data;}
+    std::string getSerial() const {return serial;}
 
     // FIXME.
     std::string toString() const
@@ -118,9 +121,6 @@ public:
         return s.str();
     }
     
-    static std::string identity(std::string s) {
-        return s;
-    }
 };
 
 // A string key is most common and this class will allow us to clean up
@@ -128,7 +128,37 @@ public:
 class IdentityMetaKey : public MetaKey<std::string> {
 public:
     IdentityMetaKey(std::string key_data)
-        : MetaKey<std::string>(key_data, MetaKey<std::string>::identity) {}
+        : MetaKey<std::string>(key_data) {}
+
+private:
+    virtual void serialize()
+    {
+        serial = key_data;
+    }
+
+    virtual void unserialize()
+    {
+        key_data = serial;
+    }
+};
+
+class OnionMetaKey : public MetaKey<onion> {
+public:
+    OnionMetaKey(std::string serial)
+        : MetaKey<onion>(1, serial) {}
+    OnionMetaKey(onion key_data)
+        : MetaKey<onion>(key_data) {}
+
+private:
+    virtual void serialize()
+    {
+        serial = TypeText<onion>::toText(key_data);
+    }
+
+    virtual void unserialize()
+    {
+        key_data = TypeText<onion>::toType(serial);
+    }
 };
 
 class DBObject {
@@ -237,9 +267,6 @@ public:
     template <typename ConcreteMeta>
         static ConcreteMeta *deserialize(std::string serial);
     virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn);
-    // FIXME: If this is too tightly coupled with MetaKey, implement it
-    // as a function pointer passed to the constructor.
-    virtual KeyType deserializeKey(std::string serialized_key) const = 0;
 };
 
 class DBWriter {

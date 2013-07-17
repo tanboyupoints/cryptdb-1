@@ -14,9 +14,8 @@ init_onions_layout(Analysis a, AES_KEY * m_key, FieldMeta * fm,
         onion o = it.first;
         std::vector<SECLEVEL> levels = it.second;
         OnionMeta * om = new OnionMeta(o, levels, m_key, cf);
-        AbstractMetaKey *key =
-            new MetaKey<onion>(o, OnionMeta::serializeOnion);
-        a.deltas.push_back(Delta(Delta::CREATE, om, fm, key));
+        a.deltas.push_back(Delta(Delta::CREATE, om, fm,
+                                 new OnionMetaKey(o)));
 
         LOG(cdb_v) << "adding onion layer " << om->getAnonOnionName()
                    << " for " << fm->fname;

@@ -280,7 +280,7 @@ public:
         std::string serial_object = meta->serialize(*parent_meta);
         std::string parent_id =
             std::to_string(parent_meta->getDatabaseID());
-        std::string serial_key = key->serialize();
+        std::string serial_key = key->getSerial();
         std::string table_name = "Delta";
 
         // TODO: Maybe we want to join on object_id as well.
@@ -342,7 +342,7 @@ public:
                     " "  + object_id + ", " +
                     " "  + parent_id + ", " +
                     // FIXME: Serialize.
-                    " '" + key->serialize() + "'); ";
+                    " '" + key->getSerial() + "'); ";
 
                 // TODO: Remove assert.
                 assert(e_conn->execute(join_query));
