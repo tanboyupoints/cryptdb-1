@@ -109,6 +109,36 @@ typical_gather(Analysis & a, Item_func * i,
 
 }
 
+/*
+ * TODO:FIXME(ccarvalho): This function is duplicated from rewrite_const.cc. See if we can merge this into 
+ * one single function, common to both files.
+ */
+static Item *
+encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers, Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0) {
+    assert(!i->is_null());
+
+    if (o == oPLAIN) {//Unencrypted item
+	return i;
+    }
+
+    // Encrypted item
+
+    assert_s(layers.size() > 0, "field must have at least one layer");
+    Item * enc = i;
+    Item * prev_enc = NULL;
+    for (auto layer : layers) {
+        LOG(encl) << "encrypt layer " << levelnames[(int)layer->level()] << "\n";
+	enc = layer->encrypt(enc, IV);
+        //need to free space for all enc
+        //except the last one
+        if (prev_enc) {
+            delete prev_enc;
+        }
+        prev_enc = enc;
+    }
+
+    return enc;
+}
 
 static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NEG_FUNC> {
     virtual RewritePlan * do_gather_type(Item_func_neg *i, reason &tr, Analysis & a) const {
@@ -119,38 +149,27 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
     }
 
     virtual void do_rewrite_insert_type(Item_func_neg *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const {
-
-        assert(!i->is_null());
+    
+        //TODO: check this.
+        //if (!fm->isEncrypted()) {
+        //    l.push_back(make_item(i));
+        //    return;
+        //}
 
         uint64_t salt = randomValue();
-
+    
+        if (fm->has_salt) {
+            salt = randomValue();
+        } else {
+        //TODO: need to use table salt in this case
+        }
+        
         for (auto it : fm->onions) {
-
-            std::vector<EncLayer *>  layers = it.second->layers;
-            assert(layers.size() > 0);
-
-            Item * enc = i;
-            Item * prev_enc = NULL;
-            
-            if (it.first == oPLAIN) {//Unencrypted item
-                l.push_back(enc);
-
-                //shouldn't we break instead?
-                //break;
-                
-                continue;
-            }
-
-            for (auto layer : layers) {
-                LOG(cdb_v)  << "encrypting layer " << levelnames[(int)layer->level()];
-                enc = layer->encrypt(enc, salt);
-
-                if (prev_enc) 
-                    delete prev_enc;
-
-                l.push_back(enc);
-                prev_enc = enc;
-            }
+            l.push_back(encrypt_item_layers(i, it.first, it.second->layers, a, fm, salt));
+        }
+    
+        if (fm->has_salt) {
+            l.push_back(new Item_int((ulonglong) salt));
         }
     }
 }ANON;
