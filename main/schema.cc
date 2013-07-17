@@ -11,7 +11,7 @@
 
 using namespace std;
 
-bool DBMeta::addChild(AbstractMetaKey *key, DBMeta *meta)
+bool KeyedDBMeta::addChild(AbstractMetaKey *key, DBMeta *meta)
 {
     if (childExists(key)) {
         return false;
@@ -21,7 +21,7 @@ bool DBMeta::addChild(AbstractMetaKey *key, DBMeta *meta)
     return true;
 }
 
-bool DBMeta::replaceChild(AbstractMetaKey *key, DBMeta *meta)
+bool KeyedDBMeta::replaceChild(AbstractMetaKey *key, DBMeta *meta)
 {
     if (!childExists(key)) {
         return false;
@@ -31,7 +31,7 @@ bool DBMeta::replaceChild(AbstractMetaKey *key, DBMeta *meta)
     return true;
 }
 
-bool DBMeta::destroyChild(AbstractMetaKey *key)
+bool KeyedDBMeta::destroyChild(AbstractMetaKey *key)
 {
     if (!childExists(key)) {
         return false;
@@ -50,7 +50,7 @@ bool DBMeta::destroyChild(AbstractMetaKey *key)
 }
 
 std::map<AbstractMetaKey *, DBMeta *>::const_iterator
-DBMeta::findChild(AbstractMetaKey *key) const
+KeyedDBMeta::findChild(AbstractMetaKey *key) const
 {
     auto it = 
         std::find_if(children.begin(), children.end(),
@@ -61,13 +61,13 @@ DBMeta::findChild(AbstractMetaKey *key) const
     return it;
 }
 
-bool DBMeta::childExists(AbstractMetaKey *key) const
+bool KeyedDBMeta::childExists(AbstractMetaKey *key) const
 {
     auto it = this->findChild(key);
     return children.end() != it;
 }
 
-DBMeta *DBMeta::getChild(AbstractMetaKey *key) const
+DBMeta *KeyedDBMeta::getChild(AbstractMetaKey *key) const
 {
     auto it = this->findChild(key);
     if (children.end() == it) {
@@ -77,7 +77,7 @@ DBMeta *DBMeta::getChild(AbstractMetaKey *key) const
     return it->second;
 }
 
-AbstractMetaKey *DBMeta::getKey(const DBMeta * const child) const
+AbstractMetaKey *KeyedDBMeta::getKey(const DBMeta * const child) const
 {
     for (auto it : children) {
         if (it.second == child) {
@@ -177,6 +177,12 @@ std::string OnionMeta::serialize(const DBObject &parent) const
 std::string OnionMeta::getAnonOnionName() const
 {
     return onionname;
+}
+
+// FIXME: Implement.
+std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
+{
+    throw CryptDBError("implement OnionMeta::fetchChildren!");
 }
 
 FieldMeta::FieldMeta(std::string serial)

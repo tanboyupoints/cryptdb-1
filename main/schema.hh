@@ -54,9 +54,18 @@ const OLK PLAIN_OLK = OLK(oPLAIN, SECLEVEL::PLAINVAL, NULL);
 /*
  * The name must be unique as it is used as a unique identifier when
  * generating the encryption layers.
+ * 
+ * OnionMeta is a bit different than the other AbstractMeta derivations.
+ * > It's children aren't of the same class.  Each EncLayer does
+ *   inherit from EncLayer, but they are still distinct classes. This
+ *   is problematic because DBMeta::deserialize<ConcreteClass> relies
+ *   on us being able to provide a concrete class.  We can't pick a
+ *   specific class for our OnionMeta as it must support multiple classes.
+ * > Also note that like FieldMeta, OnionMeta's children have an explicit
+ *   order that must be encoded.
  */
 // TODO: Fix the children.
-typedef class OnionMeta : public AbstractMeta<OnionMeta, std::string> {
+typedef class OnionMeta : public DBMeta {
 public:
     // TODO: Private.
     std::vector<EncLayer *> layers; //first in list is lowest layer
@@ -70,16 +79,23 @@ public:
         : onionname(name) {}
     */
     OnionMeta(std::string serial);
+
     std::string serialize(const DBObject &parent) const;
     std::string getAnonOnionName() const;
     // FIXME: Use rtti.
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
+    std::vector<DBMeta *> fetchChildren(Connect *e_conn)
+        __attribute__((noreturn));
 
-    std::string deserializeKey(std::string serialized_key) const
-    {
-        throw CryptDBError("It's unclear what an OnionMeta child is!");
-    }
+    // FIXME: If we actually need to push_front, we may want to use
+    // std::list.
+    bool addLayerFront(EncLayer *layer);
+    bool addLayerBack(EncLayer *layer);
+    bool removeLayerFront();
+    bool removeLayerBack();
+    bool replaceLayerFront(EncLayer *layer);
+    bool replaceLayerBack(EncLayer *layer);
 
     SECLEVEL getSecLevel() {
         assert(layers.size() > 0);

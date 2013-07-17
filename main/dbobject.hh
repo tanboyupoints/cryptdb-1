@@ -151,27 +151,54 @@ public:
     virtual std::string serialize(const DBObject &parent) const = 0;
 };
 
+/*
+ * DBBasicMeta is also a design choice about how we use Deltas.
+ * i) Read SchemaInfo from database, read Deltaz from database then
+ *  apply Deltaz to in memory SchemaInfo.
+ *  > How/When do we get an ID the first time we put something into the
+ *    SchemaInfo?
+ *  > Would likely require a function DBMeta::applyDelta(Delta *)
+ *    because we don't have singluarly available interfaces to change
+ *    a DBMeta from the outside, ie addChild/replaceChild/destroyChild.
+ * ii) Apply Deltaz to SchemaInfo while all is still in database, then
+ *  read SchemaInfo from database.
+ *  > Logic is in SQL.
+ */
 class DBMeta : public DBObject {
 public:
     DBMeta() {}
-    virtual ~DBMeta() {}
+    virtual ~DBMeta() {;}
+    // FIXME: Use rtti.
+    virtual std::string typeName() const = 0;
+    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn) = 0;
+};
+
+class LeafDBMeta : public DBMeta {
+public:
+    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn)
+    {
+        return std::vector<DBMeta *>();
+    }
+};
+
+class KeyedDBMeta : public DBMeta {
+public:
+    KeyedDBMeta() {}
+    virtual ~KeyedDBMeta() {;}
 
     virtual bool addChild(AbstractMetaKey *key, DBMeta *meta);
     virtual bool replaceChild(AbstractMetaKey *key, DBMeta *meta);
     virtual bool destroyChild(AbstractMetaKey *key);
+    virtual bool childExists(AbstractMetaKey * key) const;
+    virtual DBMeta *getChild(AbstractMetaKey * key) const;
 
+    std::map<AbstractMetaKey *, DBMeta *> children;
+
+private:
     // Helpers.
     std::map<AbstractMetaKey *, DBMeta *>::const_iterator
         findChild(AbstractMetaKey *key) const;
-    bool childExists(AbstractMetaKey * key) const;
-    DBMeta *getChild(AbstractMetaKey * key) const;
     AbstractMetaKey *getKey(const DBMeta *const child) const;
-
-    // FIXME: Use rtti.
-    virtual std::string typeName() const = 0;
-    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn) = 0;
-
-    std::map<AbstractMetaKey *, DBMeta *> children;
 };
 
 // > TODO: Make getDatabaseID() protected by templating on the Concrete type
@@ -180,7 +207,7 @@ public:
 //   can get rid of the <Constructor>(std::string serial) functions and put
 //   'const' back on the members.
 template <typename ChildType, typename KeyType>
-class AbstractMeta : public DBMeta {
+class AbstractMeta : public KeyedDBMeta {
 public:
     // TODO: Remove default constructor.
     AbstractMeta() {}
@@ -196,32 +223,10 @@ public:
     // Virtual constructor to deserialize from embedded database.
     template <typename ConcreteMeta>
         static ConcreteMeta *deserialize(std::string serial);
-    std::vector<DBMeta *> fetchChildren(Connect *e_conn);
+    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn);
     // FIXME: If this is too tightly coupled with MetaKey, implement it
     // as a function pointer passed to the constructor.
     virtual KeyType deserializeKey(std::string serialized_key) const = 0;
-};
-
-class LeafDBMeta : public DBMeta {
-public:
-    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn)
-    {
-        return std::vector<DBMeta *>();
-    }
-
-private:
-    bool addChild(AbstractMetaKey *key, DBMeta *meta)
-    {
-        throw CryptDBError("LeafMeta!");
-    }
-    bool replaceChild(AbstractMetaKey *key, DBMeta *obj)
-    {
-        throw CryptDBError("LeafMeta!");
-    }
-    bool destroyChild(AbstractMetaKey *key)
-    {
-        throw CryptDBError("LeafMeta!");
-    }
 };
 
 inline std::string

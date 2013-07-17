@@ -301,11 +301,16 @@ public:
      */
     bool apply(Connect *e_conn) 
     {
+        // HACK: A danger to myself and others, can remove once we have
+        // load working.
+        KeyedDBMeta *keyed_parent_meta =
+            static_cast<KeyedDBMeta *>(parent_meta);
+
         switch (action) {
             case CREATE: {
                 // FIXME: Remove this once we are doing a Load after DDL
                 // queries.
-                assert(parent_meta->addChild(key, meta));
+                assert(keyed_parent_meta->addChild(key, meta));
                 
                 // Ensure the tables exist.
                 DBWriter dbw(meta, parent_meta);
@@ -345,10 +350,10 @@ public:
                 return true;
                 break;
             } case REPLACE: {
-                return parent_meta->replaceChild(key, meta);
+                return keyed_parent_meta->replaceChild(key, meta);
                 break;
             } case DELETE: {
-                return parent_meta->destroyChild(key);
+                return keyed_parent_meta->destroyChild(key);
                 break;
             } default: {
                 throw CryptDBError("Unknown Delta::Action!");
