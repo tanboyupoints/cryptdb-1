@@ -4,6 +4,7 @@
 
 #include <main/Connect.hh>
 #include <main/enum_text.hh>
+#include <main/serializers.hh>
 
 /*
  * Table Layout
@@ -70,34 +71,24 @@ public:
     {
         return new ConcreteKey(serial);
     }
-
-
-protected:
-    virtual void serialize() = 0;
-    virtual void unserialize() = 0;
 };
 
 // TODO: Could use pointer hack so key_data and serial are const.
 template <typename KeyType>
 class MetaKey : public AbstractMetaKey {
+    const KeyType key_data;
+    const std::string serial;
+
 protected:
     // Build MetaKey from serialized MetaKey.
-    MetaKey(int dummy, std::string serial)
-        : serial(serial)
-    {
-        unserialize();
-    }
-
-    KeyType key_data;
-    std::string serial;
+    MetaKey(KeyType key_data, std::string serial) :
+        key_data(key_data), serial(serial) {}
 
 public:
     // Build MetaKey from 'actual' key value.
-    MetaKey(KeyType key_data)
-        : key_data(key_data)
-    {
-        serialize();
-    }
+    MetaKey(KeyType key_data) {;}
+    virtual ~MetaKey() = 0;
+
     bool operator <(const AbstractMetaKey &rhs) const
     {
         const MetaKey &rhs_key = static_cast<const MetaKey &>(rhs);
@@ -123,41 +114,64 @@ public:
     
 };
 
-// A string key is most common and this class will allow us to clean up
-// the instantiaion syntax significantly.
+template <typename KeyType>
+MetaKey<KeyType>::~MetaKey() {;}
+
 class IdentityMetaKey : public MetaKey<std::string> {
 public:
     IdentityMetaKey(std::string key_data)
-        : MetaKey<std::string>(key_data) {}
+        : MetaKey(key_data, serialize(key_data)) {}
+    ~IdentityMetaKey() {;}
 
 private:
-    virtual void serialize()
+    std::string serialize(std::string s)
     {
-        serial = key_data;
+        return serialize_string(s);
     }
 
-    virtual void unserialize()
+    std::string unserialize(std::string s)
     {
-        key_data = serial;
+        return unserialize_one_string(s);
     }
 };
 
 class OnionMetaKey : public MetaKey<onion> {
 public:
-    OnionMetaKey(std::string serial)
-        : MetaKey<onion>(1, serial) {}
     OnionMetaKey(onion key_data)
-        : MetaKey<onion>(key_data) {}
+        : MetaKey(key_data, serialize(key_data)) {}
+    OnionMetaKey(std::string serial)
+        : MetaKey(unserialize(serial), serial) {}
+    ~OnionMetaKey() {;}
 
 private:
-    virtual void serialize()
+    std::string serialize(onion o)
     {
-        serial = TypeText<onion>::toText(key_data);
+        return serialize_string(TypeText<onion>::toText(o));
     }
 
-    virtual void unserialize()
+    onion unserialize(std::string s)
     {
-        key_data = TypeText<onion>::toType(serial);
+        return TypeText<onion>::toType(unserialize_one_string(s));
+    }
+};
+
+class UIntMetaKey : public MetaKey<unsigned int> {
+public:
+    UIntMetaKey(unsigned int key_data)
+        : MetaKey(key_data, serialize(key_data)) {}
+    UIntMetaKey(std::string serial)
+        : MetaKey(unserialize(serial), serial) {}
+    ~UIntMetaKey() {;}
+
+private:
+    virtual std::string serialize(unsigned int i)
+    {
+        return serialize_string(std::to_string(i));
+    }
+
+    virtual unsigned int unserialize(std::string s)
+    {
+        return serial_to_uint(s);
     }
 };
 
@@ -290,30 +304,6 @@ public:
     std::string join_table_name() {return child_table + "_" + parent_table;}
 };
 
-inline std::string
-serialize_string(std::string str)
-{
-    return std::string(std::to_string(str.length()) + "_" + str);
-}
 
-// TESTME.
-// Must perserve order.
-inline std::vector<std::string>
-unserialize_string(std::string serial)
-{
-    std::vector<std::string> output;
-    std::size_t start = 0;
-    std::size_t under_pos = serial.find_first_of("_");
-    while (under_pos != std::string::npos) {
-        std::size_t length =
-            atoi(serial.substr(start, under_pos-start).c_str());
-        output.push_back(serial.substr(under_pos+1, length)); 
-        start = under_pos + 1 + length;
-        under_pos = serial.find_first_of("_", start);
-    }
 
-    // TODO: Sanity check no leftover characters.
-
-    return output;
-}
 
