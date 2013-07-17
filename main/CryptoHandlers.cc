@@ -156,15 +156,12 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf,
 }
 
 EncLayer *
-EncLayerFactory::deserializeLayer(onion o, SECLEVEL sl,
-                                    const string & serial)
+EncLayerFactory::deserializeLayer(const string & serial)
 {
 
     SerialLayer li = serial_unpack(serial);
     
-    assert_s(li.l == sl, "inconsistency in sec levels");
-
-    switch (sl) {
+    switch (li.l) {
     case SECLEVEL::RND: 
 	return RNDFactory::deserialize(li);
 	

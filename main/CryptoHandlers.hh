@@ -42,7 +42,8 @@ class EncLayer : public LeafDBMeta {
 public:
      virtual ~EncLayer() {;}
 
-     std::string typeName() const {return std::string("EncLayer");}
+     std::string typeName() const {return type_name;}
+     static std::string instanceTypeName() {return type_name;}
 
      virtual SECLEVEL level() = 0;
      virtual std::string name() = 0;
@@ -61,6 +62,9 @@ public:
 
 protected:
      friend class EncLayerFactory;
+
+private:
+     constexpr static const char* type_name = "encLayer";
 };
 
 class HOM : public EncLayer {
@@ -128,8 +132,7 @@ public:
                                std::string key);
 
     // creates EncLayer from its serialization
-    static EncLayer * deserializeLayer(onion o, SECLEVEL sl,
-        			       const std::string & serial);
+    static EncLayer * deserializeLayer(const std::string & serial);
 
     static std::string serializeLayer(EncLayer * el, DBMeta *parent);
 };

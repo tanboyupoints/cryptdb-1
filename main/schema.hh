@@ -85,17 +85,32 @@ public:
     // FIXME: Use rtti.
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
-    std::vector<DBMeta *> fetchChildren(Connect *e_conn)
-        __attribute__((noreturn));
+    std::vector<DBMeta *> fetchChildren(Connect *e_conn);
 
     // FIXME: If we actually need to push_front, we may want to use
     // std::list.
-    bool addLayerFront(EncLayer *layer);
-    bool addLayerBack(EncLayer *layer);
-    bool removeLayerFront();
-    bool removeLayerBack();
-    bool replaceLayerFront(EncLayer *layer);
-    bool replaceLayerBack(EncLayer *layer);
+    bool addLayerFront(EncLayer *layer) {
+        throw CryptDBError("addLayerFront!");
+    }
+    bool addLayerBack(EncLayer *layer) {
+        layers.push_back(layer);
+        return true;
+    }
+    bool removeLayerFront() {
+        throw CryptDBError("removeLayerFront!");
+    }
+    bool removeLayerBack() {
+        layers.pop_back();
+        return true;
+    }
+    bool replaceLayerFront(EncLayer *layer) {
+        throw CryptDBError("replaceLayerFront!");
+    }
+    bool replaceLayerBack(EncLayer *layer) {
+        layers.pop_back();
+        layers.push_back(layer);
+        return true;
+    }
 
     SECLEVEL getSecLevel() {
         assert(layers.size() > 0);
@@ -258,27 +273,6 @@ private:
         return serialized_key;
     }
 } SchemaInfo;
-
-class DBWriter {
-    const std::string child_table;
-    const std::string parent_table;
-
-public:
-    DBWriter(std::string child_name, std::string parent_name) :
-        child_table(child_name), parent_table(parent_name) {}
-    DBWriter(DBMeta *child, DBMeta *parent)
-        : child_table(child->typeName()), parent_table(parent->typeName())
-        {}
-
-    template <typename ChildType>
-        static DBWriter factory(DBMeta *parent) {
-            auto getChildTypeName = ChildType::instanceTypeName;
-            return DBWriter(getChildTypeName(), parent->typeName());
-        }
-
-    std::string table_name() {return child_table;}
-    std::string join_table_name() {return child_table + "_" + parent_table;}
-};
 
 bool create_tables(Connect *e_conn, DBWriter dbw);
 

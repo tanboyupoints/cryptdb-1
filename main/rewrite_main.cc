@@ -338,8 +338,7 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
             TypeText<SECLEVEL>::toType(onion_current_level);
         for (auto it: layers) {
             EncLayer *enc_layer =
-		EncLayerFactory::deserializeLayer(o, it,
-						  layer_serial[it]);
+		EncLayerFactory::deserializeLayer(layer_serial[it]);
 
             om->layers.push_back(enc_layer);
             SECLEVEL onion_level = fm->getOnionLevel(o);

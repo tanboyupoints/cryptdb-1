@@ -11,6 +11,44 @@
 
 using namespace std;
 
+std::vector<DBMeta *>
+DBMeta::doFetchChildren(Connect *e_conn, DBWriter dbw,
+                        std::function<DBMeta *(std::string, std::string)>
+                            deserialHandler)
+{
+    // Ensure the tables exist.
+    assert(create_tables(e_conn, dbw));
+
+    // Now that we know the table exists, SELECT the data we want.
+    std::vector<DBMeta *> out_vec;
+    DBResult *db_res;
+    const std::string parent_id = std::to_string(this->getDatabaseID());
+    const std::string serials_query = 
+        " SELECT pdb." + dbw.table_name() + ".serial_object,"
+        "        pdb." + dbw.join_table_name() + ".serial_key"
+        " FROM pdb." + dbw.table_name() + 
+        "   INNER JOIN pdb." + dbw.join_table_name() +
+        "       ON (pdb." + dbw.table_name() + ".id"
+        "       =   pdb." + dbw.join_table_name() + ".object_id)"
+        " WHERE pdb." + dbw.join_table_name() + ".parent_id"
+        "   = " + parent_id + ";";
+    assert(e_conn->execute(serials_query, db_res));
+    ScopedMySQLRes r(db_res->n);
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(r.res()))) {
+        unsigned long *l = mysql_fetch_lengths(r.res());
+        assert(l != NULL);
+
+        std::string child_serial(row[0], l[0]);
+        std::string child_key(row[1], l[1]);
+
+        DBMeta *new_old_meta = deserialHandler(child_key, child_serial);
+        out_vec.push_back(new_old_meta);
+    }
+
+    return out_vec;
+}
+
 bool KeyedDBMeta::addChild(AbstractMetaKey *key, DBMeta *meta)
 {
     if (childExists(key)) {
@@ -101,47 +139,24 @@ std::vector<DBMeta *>
 AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
 {
     DBWriter dbw = DBWriter::factory<ChildType>(this);
-    // Ensure the tables exist.
-    assert(create_tables(e_conn, dbw));
 
-    // Now that we know the table exists, SELECT the data we want.
-    std::vector<DBMeta *> out_vec;
-    DBResult *db_res;
-    const std::string parent_id = std::to_string(this->getDatabaseID());
-    const std::string serials_query = 
-        " SELECT pdb." + dbw.table_name() + ".serial_object,"
-        "        pdb." + dbw.join_table_name() + ".serial_key"
-        " FROM pdb." + dbw.table_name() + 
-        "   INNER JOIN pdb." + dbw.join_table_name() +
-        "       ON (pdb." + dbw.table_name() + ".id"
-        "       =   pdb." + dbw.join_table_name() + ".object_id)"
-        " WHERE pdb." + dbw.join_table_name() + ".parent_id"
-        "   = " + parent_id + ";";
-    assert(e_conn->execute(serials_query, db_res));
-    ScopedMySQLRes r(db_res->n);
-    MYSQL_ROW row;
-    while ((row = mysql_fetch_row(r.res()))) {
-        unsigned long *l = mysql_fetch_lengths(r.res());
-        assert(l != NULL);
+    std::function<DBMeta *(std::string, std::string)> deserialize =
+        [this] (std::string key, std::string serial) {
+            auto local_deserialization = 
+                std::bind(&AbstractMeta::deserializeKey, this,
+                          std::placeholders::_1);
+            AbstractMetaKey *meta_key =
+                MetaKey<KeyType>::deserialize(key, local_deserialization);
+            DBMeta *new_old_meta =
+                AbstractMeta::deserialize<ChildType>(serial);
 
-        std::string child_serial(row[0], l[0]);
-        std::string child_key(row[1], l[1]);
+            // Gobble the child.
+            this->addChild(meta_key, new_old_meta);
 
-        auto local_deserialization = 
-            std::bind(&AbstractMeta::deserializeKey, this,
-                      std::placeholders::_1);
-        AbstractMetaKey *key =
-            MetaKey<KeyType>::deserialize(child_key,
-                                          local_deserialization);
-        DBMeta *new_old_meta =
-            AbstractMeta::deserialize<ChildType>(child_serial);
-        out_vec.push_back(new_old_meta);
+            return new_old_meta;
+        };
 
-        // Gobble the child.
-        this->addChild(key, new_old_meta);
-    }
-
-    return out_vec;
+    return DBMeta::doFetchChildren(e_conn, dbw, deserialize);
 }
 
 OnionMeta::OnionMeta(std::string serial)
@@ -182,7 +197,17 @@ std::string OnionMeta::getAnonOnionName() const
 // FIXME: Implement.
 std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
 {
-    throw CryptDBError("implement OnionMeta::fetchChildren!");
+    DBWriter dbw = DBWriter::factory<EncLayer>(this);
+    std::function<DBMeta *(std::string, std::string)> deserialize =
+        [] (std::string key, std::string serial) -> DBMeta* {
+            return EncLayerFactory::deserializeLayer(serial);
+        };
+
+    // FIXME: Need access to the key here so we can determine where
+    // to put value in the vector.
+    // FIXME: Add sanity check to make sure that onions match
+    // OnionMeta::onion_layout.
+    return DBMeta::doFetchChildren(e_conn, dbw, deserialize);
 }
 
 FieldMeta::FieldMeta(std::string serial)

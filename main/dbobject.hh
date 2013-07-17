@@ -164,6 +164,9 @@ public:
  *  read SchemaInfo from database.
  *  > Logic is in SQL.
  */
+
+class DBWriter;
+
 class DBMeta : public DBObject {
 public:
     DBMeta() {}
@@ -171,6 +174,12 @@ public:
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;
     virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn) = 0;
+
+protected:
+    std::vector<DBMeta *>
+        doFetchChildren(Connect *e_conn, DBWriter dbw,
+                        std::function<DBMeta *(std::string, std::string)>
+                          deserialHandler);
 };
 
 class LeafDBMeta : public DBMeta {
@@ -227,6 +236,27 @@ public:
     // FIXME: If this is too tightly coupled with MetaKey, implement it
     // as a function pointer passed to the constructor.
     virtual KeyType deserializeKey(std::string serialized_key) const = 0;
+};
+
+class DBWriter {
+    const std::string child_table;
+    const std::string parent_table;
+
+public:
+    DBWriter(std::string child_name, std::string parent_name) :
+        child_table(child_name), parent_table(parent_name) {}
+    DBWriter(DBMeta *child, DBMeta *parent)
+        : child_table(child->typeName()), parent_table(parent->typeName())
+        {}
+
+    template <typename ChildType>
+        static DBWriter factory(DBMeta *parent) {
+            auto getChildTypeName = ChildType::instanceTypeName;
+            return DBWriter(getChildTypeName(), parent->typeName());
+        }
+
+    std::string table_name() {return child_table;}
+    std::string join_table_name() {return child_table + "_" + parent_table;}
 };
 
 inline std::string
