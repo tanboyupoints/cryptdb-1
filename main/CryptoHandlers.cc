@@ -1047,7 +1047,7 @@ OPE_int::encrypt(Item * ptext, uint64_t IV) {
 Item *
 OPE_int::decrypt(Item * ctext, uint64_t IV) {
     ulonglong cval = (ulonglong) static_cast<Item_int*>(ctext)->value;
-    ulonglong dec = uint64FromZZ(ope.decrypt(ZZFromUint64(cval)));
+    longlong dec = (longlong)uint64FromZZ(ope.decrypt(ZZFromUint64(cval)));
     LOG(encl) << "OPE_int decrypt " << cval << " IV " << IV << "--->" << dec;
 
     return new Item_int(dec);
