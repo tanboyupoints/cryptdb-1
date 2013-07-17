@@ -140,6 +140,9 @@ AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
 {
     DBWriter dbw = DBWriter::factory<ChildType>(this);
 
+    // Perhaps it's conceptually cleaner to have this lambda return
+    // pairs of keys and children and then add the children from local
+    // scope.
     std::function<DBMeta *(std::string, std::string)> deserialize =
         [this] (std::string key, std::string serial) {
             auto local_deserialization = 
@@ -157,6 +160,35 @@ AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
         };
 
     return DBMeta::doFetchChildren(e_conn, dbw, deserialize);
+}
+
+OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
+                     Create_field *cf)
+    : onionname(getpRandomName() + TypeText<onion>::toText(o))
+{
+    if (m_key) {         // Don't encrypt if we don't have a key.
+        Create_field * newcf = cf;
+        //generate enclayers for encrypted field
+        string uniqueFieldName = this->getAnonOnionName();
+        for (auto l: levels) {
+            string key;
+            key = getLayerKey(m_key, uniqueFieldName, l);
+
+            EncLayer * el = EncLayerFactory::encLayer(o, l, newcf, key);
+
+            Create_field * oldcf = newcf;
+            newcf = el->newCreateField(oldcf);
+            
+            this->layers.push_back(el);
+
+            if (oldcf != cf) {
+                delete oldcf;
+            }
+        }
+        if (newcf != cf) {
+            delete newcf;
+        }
+    }
 }
 
 OnionMeta::OnionMeta(std::string serial)
@@ -194,20 +226,39 @@ std::string OnionMeta::getAnonOnionName() const
     return onionname;
 }
 
-// FIXME: Implement.
+// TODO: TESTME.
 std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
 {
     DBWriter dbw = DBWriter::factory<EncLayer>(this);
     std::function<DBMeta *(std::string, std::string)> deserialize =
-        [] (std::string key, std::string serial) -> DBMeta* {
-            return EncLayerFactory::deserializeLayer(serial);
+        [this] (std::string key, std::string serial) -> DBMeta* {
+            std::function<unsigned int(std::string)> strToInt =
+                [](std::string s) {return atoi(s.c_str());};
+            // > Probably going to want to use indexes in AbstractMetaKey
+            // for now, otherwise you will need to abstract and rederive
+            // a keyed and nonkeyed version of Delta.
+            MetaKey<unsigned int> *meta_key =
+                MetaKey<unsigned int>::deserialize(key, strToInt);
+            unsigned int index = meta_key->value();
+            if (index >= this->layers.size()) {
+                this->layers.resize(index + 1);
+            }
+            EncLayer *layer = EncLayerFactory::deserializeLayer(serial);
+            this->layers[index] = layer;
+
+            return layer;
         };
 
-    // FIXME: Need access to the key here so we can determine where
-    // to put value in the vector.
     // FIXME: Add sanity check to make sure that onions match
     // OnionMeta::onion_layout.
     return DBMeta::doFetchChildren(e_conn, dbw, deserialize);
+}
+
+// TODO: Perhaps this should be on FieldMeta, as it already knows how to
+// deserialize an onion.
+std::string OnionMeta::serializeOnion(onion o)
+{
+    return std::string("br0ken");
 }
 
 FieldMeta::FieldMeta(std::string serial)
@@ -223,15 +274,19 @@ FieldMeta::FieldMeta(std::string serial)
     this->uniq_count = atoi(vec[5].c_str());
 }
 
-FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *mKey,
+// FIXME: This is an incomplete type. It's onions do not match it's
+// onionlayout.
+FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *m_key,
                      unsigned long uniq_count)
-    : fname(name), salt_name(BASE_SALT_NAME + getpRandomName()),
-      uniq_count(uniq_count)
+    : fname(name), has_salt(static_cast<bool>(m_key)),
+      salt_name(BASE_SALT_NAME + getpRandomName()), uniq_count(uniq_count)
 {
-    if (mKey) {
-        init_onions(mKey, this, field);
+    if (NULL == m_key) {
+        this->onion_layout = PLAIN_ONION_LAYOUT;
+    } else if (true == IsMySQLTypeNumeric(field->sql_type)) {
+        this->onion_layout = NUM_ONION_LAYOUT;
     } else {
-        init_onions(NULL, this, field);
+        this->onion_layout = STR_ONION_LAYOUT;
     }
 }
 

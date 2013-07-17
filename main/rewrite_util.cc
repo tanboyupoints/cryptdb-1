@@ -1,6 +1,7 @@
 #include <main/rewrite_util.hh>
 #include <main/enum_text.hh>
 #include <main/rewrite_main.hh>
+#include <main/init_onions.hh>
 #include <parser/lex_util.hh>
 #include <parser/stringify.hh>
 #include <List_helpers.hh>
@@ -410,6 +411,7 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
     // FIXME: Remove.
     // assert(tm->addChild(name, fm));
     assert(do_add_field(fm, a, dbname, table));
+    init_onions_layout(a, a.ps->masterKey, fm, cf);
     // -----------------------------
     //         Rewrite FIELD       
     // -----------------------------

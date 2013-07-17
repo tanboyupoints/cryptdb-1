@@ -342,7 +342,7 @@ public:
                     " "  + object_id + ", " +
                     " "  + parent_id + ", " +
                     // FIXME: Serialize.
-                    " '" + key->toString() + "'); ";
+                    " '" + key->serialize() + "'); ";
 
                 // TODO: Remove assert.
                 assert(e_conn->execute(join_query));

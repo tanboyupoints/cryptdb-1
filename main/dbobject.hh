@@ -106,6 +106,10 @@ public:
         return serial;
     }
 
+    KeyType value() const {
+        return key_data;
+    }
+
     // FIXME.
     std::string toString() const
     {

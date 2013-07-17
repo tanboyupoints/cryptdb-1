@@ -71,8 +71,8 @@ public:
     std::vector<EncLayer *> layers; //first in list is lowest layer
 
     // New.
-    OnionMeta(onion o)
-        : onionname(getpRandomName() + TypeText<onion>::toText(o)) {};
+    OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
+              Create_field *cf);
     // Restore.
     /*
     OnionMeta(std::string name)
@@ -86,25 +86,15 @@ public:
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
     std::vector<DBMeta *> fetchChildren(Connect *e_conn);
+    static std::string serializeOnion(onion o);
 
-    // FIXME: If we actually need to push_front, we may want to use
-    // std::list.
-    bool addLayerFront(EncLayer *layer) {
-        throw CryptDBError("addLayerFront!");
-    }
     bool addLayerBack(EncLayer *layer) {
         layers.push_back(layer);
         return true;
     }
-    bool removeLayerFront() {
-        throw CryptDBError("removeLayerFront!");
-    }
     bool removeLayerBack() {
         layers.pop_back();
         return true;
-    }
-    bool replaceLayerFront(EncLayer *layer) {
-        throw CryptDBError("replaceLayerFront!");
     }
     bool replaceLayerBack(EncLayer *layer) {
         layers.pop_back();
