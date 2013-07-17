@@ -354,8 +354,9 @@ RND_int::newCreateField(Create_field * cf, string anonname) {
 Item *
 RND_int::encrypt(Item * ptext, uint64_t IV) {
     //TODO: should have encrypt_SEM work for any length
-    uint64_t p = static_cast<Item_int *>(ptext)->value;
-    uint64_t c = bf.encrypt(p ^ IV);
+    int64_t p = static_cast<Item_int *>(ptext)->val_int();
+    uint64_t c = bf.encrypt(((uint64_t)p) ^ IV);
+
     LOG(encl) << "RND_int encrypt " << p << " IV " << IV << "-->" << c;
 
     return new Item_int((ulonglong) c);
@@ -364,7 +365,7 @@ RND_int::encrypt(Item * ptext, uint64_t IV) {
 Item *
 RND_int::decrypt(Item * ctext, uint64_t IV) {
     uint64_t c = static_cast<Item_int*>(ctext)->value;
-    uint64_t p = bf.decrypt(c) ^ IV;
+    int64_t p = (int64_t)bf.decrypt(c) ^ IV;
     LOG(encl) << "RND_int decrypt " << c << " IV " << IV << " --> " << p;
 
     return new Item_int((ulonglong) p);
