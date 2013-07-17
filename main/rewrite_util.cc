@@ -206,6 +206,7 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
 
     vector<Create_field *> output_cfields;
 
+    // FIXME: This sequence checking for encryption is broken.
     if (!fm->isEncrypted()) {
         // Unencrypted field
         output_cfields.push_back(f);
@@ -395,7 +396,7 @@ single_lex_output(LEX *out_me, unsigned *out_lex_count)
 List<Create_field>
 createAndRewriteField(Create_field *cf, TableMeta *tm,
                       const std::string &table, const std::string &dbname,
-                      Analysis &a,
+                      Analysis &a, bool new_table,
                       List<Create_field> &rewritten_cfield_list)
 {
     // -----------------------------
@@ -406,12 +407,15 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
         new FieldMeta(name, cf, a.ps->masterKey, tm->leaseIncUniq());
     // Here we store the key name for the first time. It will be applied
     // after the Delta is read out of the database.
-    Delta d(Delta::CREATE, fm, tm, new IdentityMetaKey(name));
-    a.deltas.push_back(d);
+    if (true == new_table) {
+        tm->addChild(new IdentityMetaKey(name), fm);
+    } else {
+        Delta d(Delta::CREATE, fm, tm, new IdentityMetaKey(name));
+        a.deltas.push_back(d);
+    }
     // FIXME: Remove.
     // assert(tm->addChild(name, fm));
     assert(do_add_field(fm, a, dbname, table));
-    init_onions_layout(a, a.ps->masterKey, fm, cf);
     // -----------------------------
     //         Rewrite FIELD       
     // -----------------------------

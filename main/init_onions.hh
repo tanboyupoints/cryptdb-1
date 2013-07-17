@@ -4,8 +4,7 @@
 
 // If mkey == NULL, the field is not encrypted
 inline void
-init_onions_layout(Analysis a, AES_KEY * m_key, FieldMeta * fm,
-                   Create_field * cf)
+init_onions_layout(AES_KEY * m_key, FieldMeta * fm, Create_field * cf)
 {
     assert(fm->has_salt == static_cast<bool>(m_key));
     assert(0 == fm->onions.size());
@@ -13,9 +12,10 @@ init_onions_layout(Analysis a, AES_KEY * m_key, FieldMeta * fm,
     for (auto it: fm->onion_layout) {
         onion o = it.first;
         std::vector<SECLEVEL> levels = it.second;
+        // A new OnionMeta will only occur with a new FieldMeta so
+        // we never have to build Deltaz for our OnionMetaz.
         OnionMeta * om = new OnionMeta(o, levels, m_key, cf);
-        a.deltas.push_back(Delta(Delta::CREATE, om, fm,
-                                 new OnionMetaKey(o)));
+        fm->addChild(new OnionMetaKey(o), om);
 
         LOG(cdb_v) << "adding onion layer " << om->getAnonOnionName()
                    << " for " << fm->fname;

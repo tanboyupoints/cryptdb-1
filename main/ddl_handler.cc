@@ -105,7 +105,7 @@ class CreateHandler : public DDLHandler {
                     [&tm, &a, dbname, table] (List<Create_field> out_list,
                                               Create_field *cf) {
                         return createAndRewriteField(cf, tm, table, dbname,
-                                                     a, out_list);
+                                                     a, true, out_list);
                 });
             
             a.ps->e_conn->execute("COMMIT");

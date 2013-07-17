@@ -308,6 +308,12 @@ public:
 
         switch (action) {
             case CREATE: {
+                /*
+                 * We know that the Delta object is the top level in
+                 * a hierarchy of all new objects. Therefore we must
+                 * go through and recursively associate them all with their
+                 * parents.
+                 */
                 // FIXME: Remove this once we are doing a Load after DDL
                 // queries.
                 assert(keyed_parent_meta->addChild(key, meta));
@@ -353,6 +359,9 @@ public:
                 return keyed_parent_meta->replaceChild(key, meta);
                 break;
             } case DELETE: {
+                /*
+                 * Recursively delete everything from this top level
+                 */
                 return keyed_parent_meta->destroyChild(key);
                 break;
             } default: {

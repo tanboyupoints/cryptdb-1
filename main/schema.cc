@@ -285,6 +285,8 @@ FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *m_key,
     } else {
         this->onion_layout = STR_ONION_LAYOUT;
     }
+
+    init_onions_layout(m_key, this, field);
 }
 
 FieldMeta::~FieldMeta()

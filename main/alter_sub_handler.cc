@@ -29,7 +29,7 @@ class AddColumnSubHandler : public AlterSubHandler {
                 [&tm, &a, dbname, table] (List<Create_field> out_list,
                                         Create_field *cf) {
                     return createAndRewriteField(cf, tm, table, dbname, a,
-                                                 out_list);
+                                                 false, out_list);
             });
 
         // Add field to embedded database.
