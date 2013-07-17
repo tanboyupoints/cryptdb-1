@@ -1037,8 +1037,8 @@ OPE_int::newCreateField(Create_field * cf, string anonname) {
 
 Item *
 OPE_int::encrypt(Item * ptext, uint64_t IV) {
-    ulong pval =  (ulong)static_cast<Item_int *>(ptext)->value;
-    ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ(pval)));
+    long pval =  static_cast<Item_int *>(ptext)->val_int();
+    ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ((ulong)pval)));
     LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV << "--->" << enc;
 
     return new Item_int(enc);
