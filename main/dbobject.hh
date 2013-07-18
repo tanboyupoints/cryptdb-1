@@ -223,6 +223,7 @@ public:
     virtual std::string typeName() const = 0;
     virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn) = 0;
     virtual void applyToChildren(std::function<void(DBMeta *)>) = 0;
+    virtual AbstractMetaKey *getKey(const DBMeta *const child) const = 0;
 
 protected:
     std::vector<DBMeta *>
@@ -241,18 +242,23 @@ public:
     {
         return;
     }
+    AbstractMetaKey *getKey(const DBMeta *const child) const
+    {
+        return NULL;
+    }
 };
 
-class KeyedDBMeta : public DBMeta {
+class MappedDBMeta : public DBMeta {
 public:
-    KeyedDBMeta() {}
-    virtual ~KeyedDBMeta() {;}
+    MappedDBMeta() {}
+    virtual ~MappedDBMeta() {;}
 
     virtual bool addChild(AbstractMetaKey *key, DBMeta *meta);
     virtual bool replaceChild(AbstractMetaKey *key, DBMeta *meta);
     virtual bool destroyChild(AbstractMetaKey *key);
     virtual bool childExists(AbstractMetaKey * key) const;
     virtual DBMeta *getChild(AbstractMetaKey * key) const;
+    AbstractMetaKey *getKey(const DBMeta *const child) const;
 
     std::map<AbstractMetaKey *, DBMeta *> children;
 
@@ -260,7 +266,6 @@ private:
     // Helpers.
     std::map<AbstractMetaKey *, DBMeta *>::const_iterator
         findChild(AbstractMetaKey *key) const;
-    AbstractMetaKey *getKey(const DBMeta *const child) const;
 };
 
 // > TODO: Make getDatabaseID() protected by templating on the Concrete type
@@ -271,7 +276,7 @@ private:
 // > FIXME: The key in children is a pointer so this means our lookup is
 //   slow. Use std::reference_wrapper.
 template <typename ChildType, typename KeyType>
-class AbstractMeta : public KeyedDBMeta {
+class AbstractMeta : public MappedDBMeta {
 public:
     // TODO: Remove default constructor.
     AbstractMeta() {}

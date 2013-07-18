@@ -49,7 +49,7 @@ DBMeta::doFetchChildren(Connect *e_conn, DBWriter dbw,
     return out_vec;
 }
 
-bool KeyedDBMeta::addChild(AbstractMetaKey *key, DBMeta *meta)
+bool MappedDBMeta::addChild(AbstractMetaKey *key, DBMeta *meta)
 {
     if (childExists(key)) {
         return false;
@@ -59,7 +59,7 @@ bool KeyedDBMeta::addChild(AbstractMetaKey *key, DBMeta *meta)
     return true;
 }
 
-bool KeyedDBMeta::replaceChild(AbstractMetaKey *key, DBMeta *meta)
+bool MappedDBMeta::replaceChild(AbstractMetaKey *key, DBMeta *meta)
 {
     if (!childExists(key)) {
         return false;
@@ -69,7 +69,7 @@ bool KeyedDBMeta::replaceChild(AbstractMetaKey *key, DBMeta *meta)
     return true;
 }
 
-bool KeyedDBMeta::destroyChild(AbstractMetaKey *key)
+bool MappedDBMeta::destroyChild(AbstractMetaKey *key)
 {
     if (!childExists(key)) {
         return false;
@@ -88,7 +88,7 @@ bool KeyedDBMeta::destroyChild(AbstractMetaKey *key)
 }
 
 std::map<AbstractMetaKey *, DBMeta *>::const_iterator
-KeyedDBMeta::findChild(AbstractMetaKey *key) const
+MappedDBMeta::findChild(AbstractMetaKey *key) const
 {
     auto it = 
         std::find_if(children.begin(), children.end(),
@@ -99,14 +99,14 @@ KeyedDBMeta::findChild(AbstractMetaKey *key) const
     return it;
 }
 
-bool KeyedDBMeta::childExists(AbstractMetaKey *key) const
+bool MappedDBMeta::childExists(AbstractMetaKey *key) const
 {
     auto it = this->findChild(key);
     return children.end() != it;
 }
 
 // Slow.
-DBMeta *KeyedDBMeta::getChild(AbstractMetaKey *key) const
+DBMeta *MappedDBMeta::getChild(AbstractMetaKey *key) const
 {
     for (auto it : children) {
         if (*it.first == *key) {
@@ -117,7 +117,7 @@ DBMeta *KeyedDBMeta::getChild(AbstractMetaKey *key) const
     return NULL;
 }
 
-AbstractMetaKey *KeyedDBMeta::getKey(const DBMeta * const child) const
+AbstractMetaKey *MappedDBMeta::getKey(const DBMeta * const child) const
 {
     for (auto it : children) {
         if (it.second == child) {
@@ -269,13 +269,6 @@ void OnionMeta::applyToChildren(std::function<void(DBMeta *)> fn)
     }
 }
 
-// TODO: Perhaps this should be on FieldMeta, as it already knows how to
-// deserialize an onion.
-std::string OnionMeta::serializeOnion(onion o)
-{
-    return std::string("br0ken");
-}
-
 FieldMeta::FieldMeta(std::string serial)
 {
     auto vec = unserialize_string(serial);
@@ -417,7 +410,7 @@ bool create_tables(Connect *e_conn, DBWriter dbw)
 
     const std::string create_query =
         " CREATE TABLE IF NOT EXISTS pdb." + dbw.table_name() +
-        "   (serial_object VARCHAR(100) NOT NULL,"
+        "   (serial_object VARBINARY(100) NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
 
@@ -426,9 +419,9 @@ bool create_tables(Connect *e_conn, DBWriter dbw)
     // Do the same for the JOIN table.
     const std::string join_create_query = 
         " CREATE TABLE IF NOT EXISTS pdb." + dbw.join_table_name() +
-        "   (object_id bigint NOT NULL,"
-        "    parent_id bigint NOT NULL,"
-        "    serial_key varchar(100) NOT NULL,"
+        "   (object_id BIGINT NOT NULL,"
+        "    parent_id BIGINT NOT NULL,"
+        "    serial_key VARBINARY(100) NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
 

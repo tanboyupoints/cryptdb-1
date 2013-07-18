@@ -4,6 +4,20 @@ using namespace std;
 
 // FIXME: Memory leaks when we allocate MetaKey<...>, use smart pointer.
 
+inline std::string
+escapeString(Connect *e_conn, std::string escape_me)
+{
+    unsigned int escaped_length = escape_me.size() * 2 + 1;
+    char *escaped = new char[escaped_length];
+    e_conn->real_escape_string(escaped, escape_me.c_str(),
+                               escape_me.size());
+
+    std::string out = std::string(escaped);
+    delete[] escaped;
+
+    return out;
+}
+
 EncSet::EncSet() : osl(FULL_EncSet.osl) {}
 
 // FIXME: Wrong interfaces.
@@ -205,8 +219,8 @@ bool Delta::apply(Connect *e_conn)
 {
     // HACK: A danger to myself and others, can remove once we have
     // load working.
-    KeyedDBMeta *keyed_parent_meta =
-        static_cast<KeyedDBMeta *>(parent_meta);
+    MappedDBMeta *keyed_parent_meta =
+        static_cast<MappedDBMeta *>(parent_meta);
 
     switch (action) {
         case CREATE: {
@@ -238,6 +252,7 @@ bool Delta::apply(Connect *e_conn)
     }
 }
 
+// TODO: Remove asserts.
 // Recursive.
 void Delta::createHandler(Connect *e_conn, DBMeta *object,
                           DBMeta *parent, AbstractMetaKey *k)
@@ -259,17 +274,17 @@ void Delta::createHandler(Connect *e_conn, DBMeta *object,
     std::string query =
         " INSERT INTO pdb." + dbw.table_name() + 
         "    (serial_object) VALUES ("
-        " '" + child_serial + "'); ";
-    // TODO: Remove assert.
+        " '" + escapeString(e_conn, child_serial) + "'); ";
+
     assert(e_conn->execute(query));
-    cout << "QUERY: " << query << endl;
 
     const std::string object_id =
         std::to_string(e_conn->last_insert_id());
     std::string serial_key;
     if (NULL == k) {
-        // FIXME: Need to get keys from things that don't have keys.
-        // serial_key = parent->getKey(object)->getSerial();
+        AbstractMetaKey *ck = parent->getKey(object);
+        assert(ck);
+        serial_key = ck->getSerial();
     } else {
         serial_key = k->getSerial();
     }
@@ -278,14 +293,10 @@ void Delta::createHandler(Connect *e_conn, DBMeta *object,
         "   (object_id, parent_id, serial_key) VALUES ("
         " "  + object_id + ", " +
         " "  + parent_id + ", " +
-        // FIXME: Serialize.
-        " '" + serial_key + "'); ";
+        " '" + escapeString(e_conn, serial_key) + "'); ";
 
-    // TODO: Remove assert.
     assert(e_conn->execute(join_query));
-    cout << "JOINQUERY: " << join_query << endl;
 
-    // std::bind(&Delta::createHandler, this, std::placeholders::_1);
     std::function<void(DBMeta *)> localCreateHandler =
         [&e_conn, &object, this] (DBMeta *child) {
             this->createHandler(e_conn, child, object);

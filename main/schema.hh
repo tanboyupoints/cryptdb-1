@@ -87,7 +87,16 @@ public:
     static std::string instanceTypeName() {return type_name;}
     std::vector<DBMeta *> fetchChildren(Connect *e_conn);
     void applyToChildren(std::function<void(DBMeta *)>);
-    static std::string serializeOnion(onion o);
+    AbstractMetaKey *getKey(const DBMeta *const child) const
+    {
+        for (std::vector<EncLayer *>::size_type i = 0; i < layers.size(); ++i) {
+            if (child == layers[i]) {
+                return new UIntMetaKey(i);
+            }
+        }
+
+        return NULL;
+    }
 
     bool addLayerBack(EncLayer *layer) {
         layers.push_back(layer);
