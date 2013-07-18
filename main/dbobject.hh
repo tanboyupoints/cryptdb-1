@@ -181,16 +181,13 @@ class DBObject {
 
 public:
     // Building new objects.
-    explicit DBObject(unsigned int id) : id(id) {}
+    DBObject() : id(0) {}
     // Unserializing old objects.
-    explicit DBObject(const std::string &serial)
-    {
-        throw "Cannot unserialize into DBObject";
-    }
+    explicit DBObject(unsigned int id) : id(id) {}
     // 0 indicates that the object does not have a database id.
     // This is the state of the object before it is written to the database
     // for the first time.
-    DBObject() : id(0) {}
+    // DBObject() : id(0) {}
     virtual ~DBObject() {;}
     unsigned int getDatabaseID() const {return id;}
     // FIXME: This should possibly be a part of DBMeta.
@@ -218,6 +215,7 @@ class DBWriter;
 class DBMeta : public DBObject {
 public:
     DBMeta() {}
+    explicit DBMeta(unsigned int id) : DBObject(id) {}
     virtual ~DBMeta() {;}
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;
@@ -228,12 +226,16 @@ public:
 protected:
     std::vector<DBMeta *>
         doFetchChildren(Connect *e_conn, DBWriter dbw,
-                        std::function<DBMeta *(std::string, std::string)>
+                        std::function<DBMeta *(std::string, std::string,
+                                               std::string)>
                           deserialHandler);
 };
 
 class LeafDBMeta : public DBMeta {
 public:
+    LeafDBMeta() {}
+    LeafDBMeta(unsigned int id) : DBMeta(id) {}
+
     std::vector<DBMeta *> fetchChildren(Connect *e_conn)
     {
         return std::vector<DBMeta *>();
@@ -251,6 +253,7 @@ public:
 class MappedDBMeta : public DBMeta {
 public:
     MappedDBMeta() {}
+    MappedDBMeta(unsigned int id) : DBMeta(id) {}
     virtual ~MappedDBMeta() {;}
 
     virtual bool addChild(AbstractMetaKey *key, DBMeta *meta);
@@ -278,8 +281,8 @@ private:
 template <typename ChildType, typename KeyType>
 class AbstractMeta : public MappedDBMeta {
 public:
-    // TODO: Remove default constructor.
     AbstractMeta() {}
+    AbstractMeta(unsigned int id) : MappedDBMeta(id) {}
     virtual ~AbstractMeta()
     {
         auto cp = children;
@@ -291,7 +294,7 @@ public:
     }
     // Virtual constructor to deserialize from embedded database.
     template <typename ConcreteMeta>
-        static ConcreteMeta *deserialize(std::string serial);
+        static ConcreteMeta *deserialize(unsigned int, std::string serial);
     virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn);
     void applyToChildren(std::function<void(DBMeta *)>);
 };
@@ -316,7 +319,4 @@ public:
     std::string table_name() {return child_table;}
     std::string join_table_name() {return child_table + "_" + parent_table;}
 };
-
-
-
 

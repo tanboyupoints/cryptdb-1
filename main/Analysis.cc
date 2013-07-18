@@ -255,7 +255,8 @@ bool Delta::apply(Connect *e_conn)
 // TODO: Remove asserts.
 // Recursive.
 void Delta::createHandler(Connect *e_conn, DBMeta *object,
-                          DBMeta *parent, AbstractMetaKey *k)
+                          DBMeta *parent, AbstractMetaKey *k,
+                          const unsigned int * const ptr_parent_id)
 {
     // Ensure the tables exist.
     DBWriter dbw(object, parent);
@@ -263,8 +264,12 @@ void Delta::createHandler(Connect *e_conn, DBMeta *object,
     
     const std::string child_serial = object->serialize(*parent);
     assert(0 == object->getDatabaseID());
-    const std::string parent_id =
-        std::to_string(parent->getDatabaseID());
+    unsigned int parent_id;
+    if (ptr_parent_id) {
+        parent_id = *ptr_parent_id;
+    } else {
+        parent_id = parent->getDatabaseID();
+    }
 
     // ------------------------
     //    Build the queries.
@@ -278,8 +283,7 @@ void Delta::createHandler(Connect *e_conn, DBMeta *object,
 
     assert(e_conn->execute(query));
 
-    const std::string object_id =
-        std::to_string(e_conn->last_insert_id());
+    const unsigned int object_id = e_conn->last_insert_id();
     std::string serial_key;
     if (NULL == k) {
         AbstractMetaKey *ck = parent->getKey(object);
@@ -291,15 +295,15 @@ void Delta::createHandler(Connect *e_conn, DBMeta *object,
     std::string join_query =
         " INSERT INTO pdb." + dbw.join_table_name() +
         "   (object_id, parent_id, serial_key) VALUES ("
-        " "  + object_id + ", " +
-        " "  + parent_id + ", " +
+        " "  + std::to_string(object_id) + ", " +
+        " "  + std::to_string(parent_id) + ", " +
         " '" + escapeString(e_conn, serial_key) + "'); ";
 
     assert(e_conn->execute(join_query));
 
     std::function<void(DBMeta *)> localCreateHandler =
-        [&e_conn, &object, this] (DBMeta *child) {
-            this->createHandler(e_conn, child, object);
+        [&e_conn, &object, object_id, this] (DBMeta *child) {
+            this->createHandler(e_conn, child, object, NULL, &object_id);
         };
     object->applyToChildren(localCreateHandler);
 }

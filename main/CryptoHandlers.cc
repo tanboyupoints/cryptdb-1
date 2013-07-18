@@ -59,34 +59,39 @@ public:
 class RNDFactory : public LayerFactory {
 public:
     static EncLayer * create(Create_field * cf, std::string key);
-    static EncLayer * deserialize(const SerialLayer & serial);
+    static EncLayer * deserialize(unsigned int id,
+                                  const SerialLayer & serial);
 };
 
 
 class DETFactory : public LayerFactory {
 public:
     static EncLayer * create(Create_field * cf, std::string key);
-    static EncLayer * deserialize(const SerialLayer & serial);
+    static EncLayer * deserialize(unsigned int id,
+                                  const SerialLayer & serial);
 };
 
 
 class DETJOINFactory : public LayerFactory {
 public:
     static EncLayer * create(Create_field * cf, std::string key);
-    static EncLayer * deserialize(const SerialLayer & serial);
+    static EncLayer * deserialize(unsigned int id,
+                                  const SerialLayer & serial);
 };
 
 class OPEFactory : public LayerFactory {
 public:
     static EncLayer * create(Create_field * cf, std::string key);
-    static EncLayer * deserialize(const SerialLayer & serial);
+    static EncLayer * deserialize(unsigned int id,
+                                  const SerialLayer & serial);
 };
 
 
 class HOMFactory : public LayerFactory {
 public:
     static EncLayer * create(Create_field * cf, std::string key);
-    static EncLayer * deserialize(const SerialLayer & serial);
+    static EncLayer * deserialize(unsigned int id,
+                                  const SerialLayer & serial);
 };
 
 
@@ -155,29 +160,29 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf,
 }
 
 EncLayer *
-EncLayerFactory::deserializeLayer(const string & serial)
+EncLayerFactory::deserializeLayer(unsigned int id, const string & serial)
 {
 
     SerialLayer li = serial_unpack(serial);
     
     switch (li.l) {
     case SECLEVEL::RND: 
-	return RNDFactory::deserialize(li);
+	return RNDFactory::deserialize(id, li);
 	
     case SECLEVEL::DET: 
-	return DETFactory::deserialize(li);
+	return DETFactory::deserialize(id, li);
 	
     case SECLEVEL::DETJOIN: 
-	return DETJOINFactory::deserialize(li);
+	return DETJOINFactory::deserialize(id, li);
 
     case SECLEVEL::OPE: 
-	return OPEFactory::deserialize(li);
+	return OPEFactory::deserialize(id, li);
 	
     case SECLEVEL::HOM: 
-	return new HOM(serial);
+	return new HOM(id, serial);
 	
     case SECLEVEL::SEARCH: 
-	return new Search(serial);
+	return new Search(id, serial);
 	
     default:{}
     }
@@ -269,7 +274,7 @@ public:
 
     // serialize and deserialize
     std::string serialize(const DBObject &parent) const {return key;}
-    RND_int(const std::string & serial);
+    RND_int(unsigned int id, const std::string & serial);
 
     SECLEVEL level() {return SECLEVEL::RND;}
     string name() {return "RND_int";}
@@ -294,7 +299,7 @@ public:
 
     // serialize and deserialize
     std::string serialize(const DBObject &parent) const {return rawkey; }
-    RND_str(const std::string & serial);
+    RND_str(unsigned int id, const std::string & serial);
 
 
     SECLEVEL level() {return SECLEVEL::RND;}
@@ -323,11 +328,12 @@ RNDFactory::create(Create_field * cf, std::string key) {
 }
 
 EncLayer *
-RNDFactory::deserialize(const SerialLayer & sl) {
+RNDFactory::deserialize(unsigned int id, const SerialLayer & sl)
+{
     if (sl.name == "RND_int") {
-	return new RND_int(sl.layer_info);
+	return new RND_int(id, sl.layer_info);
     } else {
-	return new RND_str(sl.layer_info);
+	return new RND_str(id, sl.layer_info);
     }
 }
 
@@ -337,9 +343,8 @@ RND_int::RND_int(Create_field * f, const string & seed_key)
       bf(key)
 {}
 
-RND_int::RND_int(const std::string & serial)
-    : key(serial),
-      bf(key)
+RND_int::RND_int(unsigned int id, const std::string & serial)
+    : EncLayer(id), key(serial), bf(key)
 {}
 
 Create_field *
@@ -410,9 +415,8 @@ RND_str::RND_str(Create_field * f,  const string & seed_key)
     deckey = get_AES_dec_key(rawkey);
 }
 
-RND_str::RND_str(const std::string & serial)
-    : rawkey(serial),
-      enckey(get_AES_enc_key(rawkey)),
+RND_str::RND_str(unsigned int id, const std::string & serial)
+    : EncLayer(id), rawkey(serial), enckey(get_AES_enc_key(rawkey)),
       deckey(get_AES_dec_key(rawkey))
  {}
 
@@ -490,7 +494,7 @@ public:
     
     std::string serialize(const DBObject &parent) const {return key; }
     // create object from serialized contents
-    DET_int(const std::string & serial);
+    DET_int(unsigned int id, const std::string & serial);
 
 
     virtual SECLEVEL level() {return SECLEVEL::DET;}
@@ -518,7 +522,7 @@ public:
 
     std::string serialize(const DBObject &parent) const;
     // create object from serialized contents
-    DET_dec(const std::string & serial);
+    DET_dec(unsigned int id, const std::string & serial);
 
     string name() {return "DET_dec";}
 
@@ -537,7 +541,7 @@ public:
 
     // serialize and deserialize
     std::string serialize(const DBObject &parent) const {return rawkey;}
-    DET_str(const std::string & serial);
+    DET_str(unsigned int id, const std::string & serial);
 
 
     virtual SECLEVEL level() {return SECLEVEL::DET;}
@@ -571,13 +575,14 @@ DETFactory::create(Create_field * cf, std::string key) {
 }
 
 EncLayer *
-DETFactory::deserialize(const SerialLayer & sl) {
+DETFactory::deserialize(unsigned int id, const SerialLayer & sl)
+{
     if  (sl.name == "DET_int") {
-	return new DET_int(sl.layer_info);
+	return new DET_int(id, sl.layer_info);
     } else if (sl.name == "DET_str") {
-	return new DET_str(sl.layer_info);
+	return new DET_str(id, sl.layer_info);
     } else {
-	return new DET_dec(sl.layer_info);
+	return new DET_dec(id, sl.layer_info);
     }
 }
 
@@ -590,9 +595,8 @@ DET_int::DET_int(Create_field * f, const string & seed_key)
 {
 }
 
-DET_int::DET_int(const string & serial) : 
-    key(serial),
-    bf(key)
+DET_int::DET_int(unsigned int id, const string & serial)
+    : EncLayer(id), key(serial), bf(key)
 {
 }
 
@@ -654,7 +658,9 @@ DET_int::decryptUDF(Item * col, Item * ivcol) {
     return udf;
 }
 
-DET_dec::DET_dec(Create_field * cf, const string & seed_key) : DET_int(cf, seed_key) {
+DET_dec::DET_dec(Create_field * cf, const string & seed_key)
+    : DET_int(cf, seed_key) 
+{
     // make sure we have at most 8 precision
     // a number of the form DECIMAL(a, b) has decimals = b and length = a + b
     assert_s(cf->length - cf->decimals <= 8, " this type of decimal not supported ");
@@ -684,8 +690,8 @@ parent_serial(uint & decimals, const string & serial) {
     return serial.substr(pos+1, serial.length()-pos);
 }
 
-DET_dec::DET_dec(const string & serial) :
-    DET_int(parent_serial(decimals, serial))
+DET_dec::DET_dec(unsigned int id, const string & serial)
+    : DET_int(id, parent_serial(decimals, serial))
 {
 
     shift = pow(10, decimals);   
@@ -728,13 +734,10 @@ DET_str::DET_str(Create_field * f, string seed_key)
     rawkey = prng_expand(seed_key, key_bytes);
     enckey = get_AES_enc_key(rawkey);
     deckey = get_AES_dec_key(rawkey);
-
-    
 }
 
-DET_str::DET_str(const std::string & serial): 
-    rawkey(serial),
-    enckey(get_AES_enc_key(rawkey)),
+DET_str::DET_str(unsigned int id, const std::string & serial)
+    : EncLayer(id), rawkey(serial), enckey(get_AES_enc_key(rawkey)),
     deckey(get_AES_dec_key(rawkey))
 {}
 
@@ -800,7 +803,8 @@ public:
     DETJOIN_int(Create_field * cf, std::string seed_key) : DET_int(cf, seed_key) {}
 
     // serialize from parent;  unserialize:
-    DETJOIN_int(const std::string & serial) : DET_int(serial) {}
+    DETJOIN_int(unsigned int id, const std::string & serial)
+        : DET_int(id, serial) {}
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
     string name() {return "DETJOIN_int";}
@@ -817,7 +821,8 @@ public:
     DETJOIN_str(Create_field * cf, std::string seed_key) : DET_str(cf, seed_key) {}
 
     // serialize from parent; unserialize:
-    DETJOIN_str(const std::string & serial) : DET_str(serial) {};
+    DETJOIN_str(unsigned int id, const std::string & serial)
+        : DET_str(id, serial) {};
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
      string name() {return "DETJOIN_str";}
@@ -831,10 +836,12 @@ private:
 class DETJOIN_dec: public DET_dec {
     //TODO
 public:
-    DETJOIN_dec(Create_field * cf, std::string seed_key) : DET_dec(cf, seed_key) {}
+    DETJOIN_dec(Create_field * cf, std::string seed_key)
+        : DET_dec(cf, seed_key) {}
 
     // serialize from parent;  unserialize:
-    DETJOIN_dec(const std::string & serial) : DET_dec(serial) {}
+    DETJOIN_dec(unsigned int id, const std::string & serial)
+        : DET_dec(id, serial) {}
 
     SECLEVEL level() {return SECLEVEL::DETJOIN;}
     string name() {return "DETJOIN_dec";}
@@ -857,13 +864,14 @@ DETJOINFactory::create(Create_field * cf, std::string key) {
 }
 
 EncLayer *
-DETJOINFactory::deserialize(const SerialLayer & sl) {
-    if  (sl.name == "DETJOIN_int") {
-	return new DETJOIN_int(sl.layer_info);
+DETJOINFactory::deserialize(unsigned int id, const SerialLayer & sl)
+{
+    if (sl.name == "DETJOIN_int") {
+	return new DETJOIN_int(id, sl.layer_info);
     } else if (sl.name == "DETJOIN_str") {
-	return new DETJOIN_str(sl.layer_info);
+	return new DETJOIN_str(id, sl.layer_info);
     } else {
-	return new DETJOIN_dec(sl.layer_info);
+	return new DETJOIN_dec(id, sl.layer_info);
     }
 }
 
@@ -878,7 +886,7 @@ public:
 
     // serialize and deserialize
     std::string serialize(const DBObject &parent) const {return key;}
-    OPE_int(const std::string & serial);
+    OPE_int(unsigned int id, const std::string & serial);
 
     SECLEVEL level() {return SECLEVEL::OPE;}
     string name() {return "OPE_int";}
@@ -904,7 +912,7 @@ public:
 
     // serialize and deserialize
     std::string serialize(const DBObject &parent) const {return key;}
-    OPE_str(const std::string & serial);
+    OPE_str(unsigned int id, const std::string & serial);
 
 
     SECLEVEL level() {return SECLEVEL::OPE;}
@@ -929,7 +937,7 @@ public:
 
     // serialize and deserialize
     std::string serialize(const DBObject &parent) const;
-    OPE_dec(const std::string & serial);
+    OPE_dec(unsigned int id, const std::string & serial);
 
     string name() {return "OPE_dec";}
 
@@ -957,18 +965,20 @@ OPEFactory::create(Create_field * cf, std::string key) {
 }
 
 EncLayer *
-OPEFactory::deserialize(const SerialLayer & sl) {
-
+OPEFactory::deserialize(unsigned int id, const SerialLayer & sl)
+{
     if (sl.name == "OPE_int") {
-	return new OPE_int(sl.layer_info);
+	return new OPE_int(id, sl.layer_info);
     } else if (sl.name == "OPE_str") {
-	return new OPE_str(sl.layer_info);
+	return new OPE_str(id, sl.layer_info);
     } else  {
-	return new OPE_dec(sl.layer_info);
+	return new OPE_dec(id, sl.layer_info);
     }
 }
 
-OPE_dec::OPE_dec(Create_field * cf, string seed_key) : OPE_int(cf, seed_key) {
+OPE_dec::OPE_dec(Create_field * cf, string seed_key)
+    : OPE_int(cf, seed_key)
+{
     assert_s(cf->length - cf->decimals <= 8, "this type of decimal not supported ");
 
     decimals = cf->decimals;
@@ -984,8 +994,8 @@ OPE_dec::serialize(const DBObject &parent) const {
     return layerinfo.str();
 }
 
-OPE_dec::OPE_dec(const string & serial) :
-    OPE_int(parent_serial(decimals, serial))
+OPE_dec::OPE_dec(unsigned int id, const string & serial)
+    : OPE_int(id, parent_serial(decimals, serial))
 {
     shift = pow(10, decimals);
 }
@@ -1013,17 +1023,14 @@ OPE_dec::decrypt(Item *ctext, uint64_t IV) {
 }
 
 
-
-
 OPE_int::OPE_int(Create_field * f, string seed_key)
     : key(prng_expand(seed_key, key_bytes)),
       ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
 
-
-
-OPE_int::OPE_int(const std::string & serial) :
-    key(serial), ope(OPE(key, plain_size * 8, ciph_size * 8))
+OPE_int::OPE_int(unsigned int id, const std::string & serial)
+    : EncLayer(id), key(serial),
+      ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
 
 Create_field *
@@ -1055,8 +1062,8 @@ OPE_str::OPE_str(Create_field * f, string seed_key)
       ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
 
-OPE_str::OPE_str(const std::string & serial) : 
-    key(serial),
+OPE_str::OPE_str(unsigned int id, const std::string & serial)
+    : EncLayer(id), key(serial),
     ope(OPE(key, plain_size * 8, ciph_size * 8))
 {}
 
@@ -1095,7 +1102,7 @@ public:
     HOM_dec(Create_field * cf, std::string seed_key);
 
     //deserialize
-    HOM_dec(const std::string & serial);
+    HOM_dec(unsigned int id, const std::string & serial);
     
     std::string name() {return "HOM_dec";}
   
@@ -1127,11 +1134,12 @@ HOMFactory::create(Create_field *cf, string key) {
 }
 
 EncLayer *
-HOMFactory::deserialize(const SerialLayer & serial) {
+HOMFactory::deserialize(unsigned int id, const SerialLayer & serial)
+{
     if (serial.name == "HOM_dec") {
-	return new HOM_dec(serial.layer_info);
+	return new HOM_dec(id, serial.layer_info);
     }
-    return new HOM(serial.layer_info);
+    return new HOM(id, serial.layer_info);
 }
 
 static ZZ
@@ -1178,8 +1186,8 @@ HOM_dec::serialize(const DBObject &parent) const {
     return layerinfo.str();
 }
 
-HOM_dec::HOM_dec(const string & serial) :
-    HOM(parent_serial(decimals, serial))
+HOM_dec::HOM_dec(unsigned int id, const string & serial)
+    : HOM(id, parent_serial(decimals, serial))
 {
     shift = power(to_ZZ(10), decimals);
 }
@@ -1239,15 +1247,16 @@ HOM_dec::decrypt(Item *ctext, uint64_t IV) {
 
 
 
-HOM::HOM(Create_field * f, string seed_key) :
-    seed_key(seed_key)
+HOM::HOM(Create_field * f, string seed_key)
+    : seed_key(seed_key)
 {
     streamrng<arc4> * prng = new streamrng<arc4>(seed_key);
     sk =  new Paillier_priv(Paillier_priv::keygen(prng, nbits));
     delete prng;
 }
 
-HOM::HOM(const std::string & serial): seed_key(serial)
+HOM::HOM(unsigned int id, const std::string & serial)
+    : EncLayer(id), seed_key(serial)
 {
     streamrng<arc4> * prng = new streamrng<arc4>(seed_key);
     sk = new Paillier_priv(Paillier_priv::keygen(prng, nbits));
@@ -1331,7 +1340,9 @@ Search::Search(Create_field * f, string seed_key)
     key = prng_expand(seed_key, key_bytes);
 }
 
-Search::Search(const std::string & serial) {
+Search::Search(unsigned int id, const std::string & serial) 
+    : EncLayer(id)
+{
     key = prng_expand(serial, key_bytes);
 }
 

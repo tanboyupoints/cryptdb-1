@@ -264,7 +264,8 @@ public:
           AbstractMetaKey *key)
         : action(action), meta(meta), parent_meta(parent_meta), key(key) {}
     // FIXME: Unserialize old Delta.
-    Delta(std::string serial)
+    Delta(unsigned int id, std::string serial)
+        : DBObject(id)
     {
         // FIXME: Determine key.
         // return Delta(CREATE, NULL, NULL);
@@ -283,7 +284,8 @@ public:
      */
     bool apply(Connect *e_conn);
     void createHandler(Connect *e_conn, DBMeta *object, DBMeta *parent,
-                       AbstractMetaKey *k = NULL);
+                       AbstractMetaKey *k = NULL,
+                       const unsigned int * const ptr_parent_id = NULL);
 
 private:
     Action action;

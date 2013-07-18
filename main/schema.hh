@@ -78,7 +78,7 @@ public:
     OnionMeta(std::string name)
         : onionname(name) {}
     */
-    OnionMeta(std::string serial);
+    OnionMeta(unsigned int id, std::string serial);
 
     std::string serialize(const DBObject &parent) const;
     std::string getAnonOnionName() const;
@@ -142,7 +142,7 @@ public:
               unsigned long uniq_count)
         : fname(name), has_salt(has_salt), salt_name(salt_name),
           onion_layout(onion_layout), uniq_count(uniq_count) {}
-    FieldMeta(std::string serial);
+    FieldMeta(unsigned int id, std::string serial);
     ~FieldMeta() {;}
 
     std::string serialize(const DBObject &parent) const;
@@ -233,7 +233,7 @@ public:
           salt_name("tableSalt_" + getpRandomName()),
           anon_table_name("table_" + getpRandomName()),
           counter(0) {}
-    TableMeta(std::string serial);
+    TableMeta(unsigned int id, std::string serial);
     ~TableMeta() {;}
 
     std::string serialize(const DBObject &parent) const;
@@ -260,7 +260,7 @@ private:
 // this level or below. Use Analysis::* if you need aliasing.
 typedef class SchemaInfo : public AbstractMeta<TableMeta, IdentityMetaKey> {
 public:
-    SchemaInfo() {;}
+    SchemaInfo() : AbstractMeta(0) {}
     ~SchemaInfo();
 
     std::string typeName() const {return type_name;}

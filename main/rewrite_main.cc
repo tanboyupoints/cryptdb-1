@@ -41,6 +41,9 @@ extern CItemFuncNameDir funcNames;
 //TODO: replace table/field with FieldMeta * for speed and conciseness
 
 // FIXME: Placement.
+SchemaInfo *
+loadSchemaInfo(Connect *e_conn);
+
 /*
 static void
 buildTableMeta(ProxyState &ps);
@@ -168,7 +171,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
 //  1> Schema buildling (CREATE TABLE IF NOT EXISTS...)
 //  2> INSERTing
 //  3> SELECTing
-static SchemaInfo *
+SchemaInfo *
 loadSchemaInfo(Connect *e_conn)
 {
     SchemaInfo *schema = new SchemaInfo(); 
@@ -373,12 +376,14 @@ printEmbeddedState(ProxyState & ps) {
     printEC(ps.e_conn, "use pdb;");
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables;");
-    // printEC(ps.e_conn, "selecT * from pdb.tableMeta_schemaInfo;");
-    // printEC(ps.e_conn, "select * from pdb.tableMeta;");
-    // printEC(ps.e_conn, "selecT * from pdb.fieldMeta_tableMeta;");
-    // printEC(ps.e_conn, "select * from pdb.fieldMeta;");
-    // printEC(ps.e_conn, "selecT * from pdb.onionMeta_tableMeta;");
-    // printEC(ps.e_conn, "select * from pdb.onionMeta;");
+    printEC(ps.e_conn, "selecT * from pdb.tableMeta_schemaInfo;");
+    printEC(ps.e_conn, "select * from pdb.tableMeta;");
+    printEC(ps.e_conn, "selecT * from pdb.fieldMeta_tableMeta;");
+    printEC(ps.e_conn, "select * from pdb.fieldMeta;");
+    printEC(ps.e_conn, "selecT * from pdb.onionMeta_fieldMeta;");
+    printEC(ps.e_conn, "select * from pdb.onionMeta;");
+    printEC(ps.e_conn, "selecT * from pdb.encLayer_onionMeta;");
+    printEC(ps.e_conn, "select * from pdb.encLayer;");
     // printEC(ps.e_conn, "select * from pdb.table_info;");
     // printEC(ps.e_conn, "select * from pdb.field_info;");
     // printEC(ps.e_conn, "select * from pdb.onion_info;");
@@ -884,15 +889,11 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
     ps.conn = new Connect(ci.server, ci.user, ci.passwd, dbname, ci.port);
 
-    // FIXME: Remove.
-    std::string x;
-    cin >> x;
-
     // Must be called before initSchema.
     buildTypeTextTranslator();
     // initSchema(ps);
     ps.schema = loadSchemaInfo(ps.e_conn);
-    printEmbeddedState(ps);
+    // printEmbeddedState(ps);
 
     dml_dispatcher = buildDMLDispatcher();
     ddl_dispatcher = buildDDLDispatcher();
@@ -910,9 +911,9 @@ Rewriter::dispatchAndTransformOnLex(LEX *lex, Analysis &a, const string &q,
                                     unsigned *out_lex_count) {
     const SQLHandler *handler;
     if (dml_dispatcher->canDo(lex)) {
-        assert(handler = dml_dispatcher->dispatch(lex));
+        handler = dml_dispatcher->dispatch(lex);
     } else if (ddl_dispatcher->canDo(lex)) {
-        assert(handler = ddl_dispatcher->dispatch(lex));
+        handler = ddl_dispatcher->dispatch(lex);
     } else {
         throw CryptDBError("Rewriter can not dispatch bad lex");
     }
@@ -973,6 +974,9 @@ rewrite_helper(const string & q, Analysis & analysis,
     for (auto it : analysis.deltas) {
         assert(it.apply(analysis.ps->e_conn));
     }
+
+    printEmbeddedState(*analysis.ps);
+    analysis.ps->schema = loadSchemaInfo(analysis.ps->e_conn);
 
     list<string> queries;
     for (unsigned i = 0; i < out_lex_count; ++i) {

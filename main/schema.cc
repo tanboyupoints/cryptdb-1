@@ -13,7 +13,8 @@ using namespace std;
 
 std::vector<DBMeta *>
 DBMeta::doFetchChildren(Connect *e_conn, DBWriter dbw,
-                        std::function<DBMeta *(std::string, std::string)>
+                        std::function<DBMeta *(std::string, std::string,
+                                               std::string)>
                             deserialHandler)
 {
     // Ensure the tables exist.
@@ -25,6 +26,7 @@ DBMeta::doFetchChildren(Connect *e_conn, DBWriter dbw,
     const std::string parent_id = std::to_string(this->getDatabaseID());
     const std::string serials_query = 
         " SELECT pdb." + dbw.table_name() + ".serial_object,"
+        "        pdb." + dbw.table_name() + ".id,"
         "        pdb." + dbw.join_table_name() + ".serial_key"
         " FROM pdb." + dbw.table_name() + 
         "   INNER JOIN pdb." + dbw.join_table_name() +
@@ -40,9 +42,11 @@ DBMeta::doFetchChildren(Connect *e_conn, DBWriter dbw,
         assert(l != NULL);
 
         std::string child_serial(row[0], l[0]);
-        std::string child_key(row[1], l[1]);
+        std::string child_id(row[1], l[1]);
+        std::string child_key(row[2], l[2]);
 
-        DBMeta *new_old_meta = deserialHandler(child_key, child_serial);
+        DBMeta *new_old_meta =
+            deserialHandler(child_key, child_serial, child_id);
         out_vec.push_back(new_old_meta);
     }
 
@@ -130,9 +134,10 @@ AbstractMetaKey *MappedDBMeta::getKey(const DBMeta * const child) const
 
 template <typename ChildType, typename KeyType>
 template <typename ConcreteMeta> ConcreteMeta *
-AbstractMeta<ChildType, KeyType>::deserialize(std::string serial)
+AbstractMeta<ChildType, KeyType>::deserialize(unsigned int id,
+                                              std::string serial)
 {
-    return new ConcreteMeta(serial);
+    return new ConcreteMeta(id, serial);
 }
 
 // TODO: Debug.
@@ -145,12 +150,13 @@ AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
     // Perhaps it's conceptually cleaner to have this lambda return
     // pairs of keys and children and then add the children from local
     // scope.
-    std::function<DBMeta *(std::string, std::string)> deserialize =
-        [this] (std::string key, std::string serial) {
+    std::function<DBMeta *(std::string, std::string, std::string)> deserialize =
+        [this] (std::string key, std::string serial, std::string id) {
             AbstractMetaKey *meta_key =
                 AbstractMetaKey::factory<KeyType>(key);
             DBMeta *new_old_meta =
-                AbstractMeta::deserialize<ChildType>(serial);
+                AbstractMeta::deserialize<ChildType>(atoi(id.c_str()),
+                                                     serial);
 
             // Gobble the child.
             this->addChild(meta_key, new_old_meta);
@@ -199,7 +205,8 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
     }
 }
 
-OnionMeta::OnionMeta(std::string serial)
+OnionMeta::OnionMeta(unsigned int id, std::string serial)
+    : DBMeta(id)
 {
     auto vec = unserialize_string(serial); 
     std::string parent_id;
@@ -238,8 +245,9 @@ std::string OnionMeta::getAnonOnionName() const
 std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
 {
     DBWriter dbw = DBWriter::factory<EncLayer>(this);
-    std::function<DBMeta *(std::string, std::string)> deserialize =
-        [this] (std::string key, std::string serial) -> DBMeta* {
+    std::function<DBMeta *(std::string, std::string, std::string)> deserialize =
+        [this] (std::string key, std::string serial, std::string id)
+        -> DBMeta* {
             std::function<unsigned int(std::string)> strToInt =
                 [](std::string s) {return atoi(s.c_str());};
             // > Probably going to want to use indexes in AbstractMetaKey
@@ -247,11 +255,13 @@ std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
             // a keyed and nonkeyed version of Delta.
             OnionMetaKey *meta_key =
                 AbstractMetaKey::factory<OnionMetaKey>(key);
-            unsigned int index = meta_key->getValue();
+            const unsigned int index = meta_key->getValue();
             if (index >= this->layers.size()) {
                 this->layers.resize(index + 1);
             }
-            EncLayer *layer = EncLayerFactory::deserializeLayer(serial);
+            EncLayer *layer =
+                EncLayerFactory::deserializeLayer(atoi(id.c_str()),
+                                                  serial);
             this->layers[index] = layer;
 
             return layer;
@@ -269,7 +279,8 @@ void OnionMeta::applyToChildren(std::function<void(DBMeta *)> fn)
     }
 }
 
-FieldMeta::FieldMeta(std::string serial)
+FieldMeta::FieldMeta(unsigned int id, std::string serial)
+    : AbstractMeta(id)
 {
     auto vec = unserialize_string(serial);
     std::string parent_id;
@@ -282,8 +293,6 @@ FieldMeta::FieldMeta(std::string serial)
     this->uniq_count = atoi(vec[5].c_str());
 }
 
-// FIXME: This is an incomplete type. It's onions do not match it's
-// onionlayout.
 FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *m_key,
                      unsigned long uniq_count)
     : fname(name), has_salt(static_cast<bool>(m_key)),
@@ -319,8 +328,8 @@ string FieldMeta::stringify() const
     return res;
 }
 
-// FIXME: Get ID from caller.
-TableMeta::TableMeta(std::string serial)
+TableMeta::TableMeta(unsigned int id, std::string serial)
+    : AbstractMeta(id)
 {
     auto vec = unserialize_string(serial);
     std::string dbname;

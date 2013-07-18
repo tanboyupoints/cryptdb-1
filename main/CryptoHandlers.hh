@@ -40,7 +40,9 @@
 
 class EncLayer : public LeafDBMeta {
 public:
-     virtual ~EncLayer() {;}
+     virtual ~EncLayer() {}
+     EncLayer() : LeafDBMeta() {}
+     EncLayer(unsigned int id) : LeafDBMeta(id) {}
 
      std::string typeName() const {return type_name;}
      static std::string instanceTypeName() {return type_name;}
@@ -73,8 +75,7 @@ public:
 
     // serialize and deserialize
     std::string serialize(const DBObject &parent) const {return seed_key;}
-    HOM(const std::string & serial);
-
+    HOM(unsigned int id, const std::string & serial);
 
     SECLEVEL level() {return SECLEVEL::HOM;}
     std::string name() {return "HOM";}
@@ -102,8 +103,7 @@ public:
 
     // serialize and deserialize
     std::string serialize(const DBObject &parent) const {return key;}
-    Search(const std::string & serial);
-
+    Search(unsigned int id, const std::string & serial);
 
     SECLEVEL level() {return SECLEVEL::SEARCH;}
     std::string name() {return "SEARCH";}
@@ -114,7 +114,6 @@ public:
 
     //expr is the expression (e.g. a field) over which to sum
     Item * searchUDF(Item * field, Item * expr);
-
 
 private:
     static const uint key_bytes = 16;
@@ -132,7 +131,8 @@ public:
                                std::string key);
 
     // creates EncLayer from its serialization
-    static EncLayer * deserializeLayer(const std::string & serial);
+    static EncLayer * deserializeLayer(unsigned int id,
+                                       const std::string & serial);
 
     static std::string serializeLayer(EncLayer * el, DBMeta *parent);
 };
