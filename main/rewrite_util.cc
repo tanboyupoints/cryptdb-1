@@ -216,18 +216,20 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
     // Encrypted field
 
     //check if field is not encrypted
-    if (fm->onions.empty()) {
+    if (fm->children.empty()) {
         output_cfields.push_back(f);
         //cerr << "onions were empty" << endl;
         return output_cfields;
     }
 
     // create each onion column
-    for (auto oit = fm->onions.begin();
-         oit != fm->onions.end();
+    for (auto oit = fm->children.begin();
+         oit != fm->children.end();
          ++oit) {
 
-	Create_field * new_cf = get_create_field(f, oit->second->layers, oit->second->getAnonOnionName());
+        OnionMeta *om = static_cast<OnionMeta *>(oit->second);
+	Create_field * new_cf =
+            get_create_field(f, om->layers, om->getAnonOnionName());
 	/*
 	EncLayer * last_layer = oit->second->layers.back();
 	//create field with anonymous name
@@ -271,8 +273,12 @@ rewrite_key(const string &table, Key *key, Analysis &a)
                     convert_lex_str(key_part->field_name);
                 FieldMeta *fm =
                     a.getFieldMeta(table, field_name);
-                key_part->field_name = 
-                    string_to_lex_str(fm->onions[oOPE]->getAnonOnionName());
+                OnionMetaKey *key = new OnionMetaKey(oOPE);
+                // FIXME: dynamic_cast
+                OnionMeta *om = static_cast<OnionMeta *>(fm->children[key]);
+                key_part->field_name =
+                    string_to_lex_str(om->getAnonOnionName());
+                delete key;
                 out_field_list.push_back(key_part);
                 return out_field_list; /* lambda */
             });
@@ -305,9 +311,12 @@ do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
     unsigned long long fieldID = a.ps->e_conn->last_insert_id();
 
     // Add the onion data to the proxy db.
-    for (std::pair<onion, OnionMeta *> onion_pair: fm->onions) {
-        onion o = onion_pair.first;
-        OnionMeta * const om = onion_pair.second;
+    for (std::pair<AbstractMetaKey *, DBMeta *> onion_pair :
+            fm->children) {
+        // FIXME: dynamic_cast
+        const onion o =
+            static_cast<OnionMetaKey *>(onion_pair.first)->getValue();
+        OnionMeta * const om = static_cast<OnionMeta *>(onion_pair.second);
         ostringstream s;
 
         SECLEVEL current_sec_level = fm->getOnionLevel(o);
@@ -354,7 +363,7 @@ do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
             // The last iteration should get us to the current
             // security level.
             if (current_sec_level == level) {
-                assert(i == onion_pair.second->layers.size() - 1);
+                assert(i == om->layers.size() - 1);
             }
         }
     }

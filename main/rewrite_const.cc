@@ -69,22 +69,28 @@ encrypt_item(Item * i, const OLK & olk, Analysis & a)
     assert(fm);
 
     onion o        = olk.o;
-    LOG(cdb_v) << fm->fname << " " << fm->onions.size();
+    LOG(cdb_v) << fm->fname << " " << fm->children.size();
 
     auto it = a.salts.find(fm);
     salt_type IV = 0;
     if (it != a.salts.end()) {
 	IV = it->second;
     }
-    return encrypt_item_layers(i, o, fm->onions[o]->layers, a, fm, IV);
+    OnionMeta *om = fm->getOnionMeta(o);
+    Item *ret_i = encrypt_item_layers(i, o, om->layers, a, fm, IV);
+
+    return ret_i;
 }
 
 static void
 encrypt_item_all_onions(Item * i, FieldMeta * fm,
                         uint64_t IV, vector<Item*> & l, Analysis &a) {
 
-    for (auto it : fm->onions) {
-        l.push_back(encrypt_item_layers(i, it.first, it.second->layers, a, fm, IV));
+    for (auto it : fm->children) {
+        // FIXME: dynamic_cast
+        onion o = static_cast<OnionMetaKey *>(it.first)->getValue();
+        OnionMeta *om = static_cast<OnionMeta *>(it.second);
+        l.push_back(encrypt_item_layers(i, o, om->layers, a, fm, IV));
     }
 }
  

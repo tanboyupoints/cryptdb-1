@@ -84,11 +84,12 @@ class DropColumnSubHandler : public AlterSubHandler {
         THD *thd = current_thd;
 
         // Rewrite each onion column.
-        for (auto onion_pair : fm->onions) {
+        for (auto onion_pair : fm->children) {
             Alter_drop *new_adrop =
                 adrop->clone(thd->mem_root);
-            new_adrop->name =
-                thd->strdup(onion_pair.second->getAnonOnionName().c_str());
+            // FIXME: dynamic_cast
+            OnionMeta *om = static_cast<OnionMeta *>(onion_pair.second);
+            new_adrop->name = thd->strdup(om->getAnonOnionName().c_str());
             out_list.push_back(new_adrop);
         }
 

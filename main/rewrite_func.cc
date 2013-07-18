@@ -164,8 +164,11 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
         //TODO: need to use table salt in this case
         }
         
-        for (auto it : fm->onions) {
-            l.push_back(encrypt_item_layers(i, it.first, it.second->layers, a, fm, salt));
+        for (auto it : fm->children) {
+            // FIXME: dynamic_cast
+            onion o = static_cast<OnionMetaKey *>(it.first)->getValue();
+            OnionMeta *om = static_cast<OnionMeta *>(it.second);
+            l.push_back(encrypt_item_layers(i, o, om->layers, a, fm, salt));
         }
     
         if (fm->has_salt) {
@@ -359,7 +362,9 @@ class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
 	Item * arg1 = itemTypes.do_rewrite(args[1],
 					   rp->olk, rp->childr_rp[1], a);
 
-	EncLayer *el = getAssert(constr.key->onions, oAGG)->layers.back();
+        OnionMeta *om = constr.key->getOnionMeta(oAGG);
+        assert(om);
+	EncLayer *el = om->layers.back();
 	assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
 	return ((HOM*)el)->sumUDF(arg0, arg1);
 

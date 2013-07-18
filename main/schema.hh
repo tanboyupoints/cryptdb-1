@@ -123,8 +123,6 @@ public:
     std::string salt_name;
     onionlayout onion_layout;
 
-    std::map<onion, OnionMeta *> onions;
-
     // New field.
     FieldMeta(std::string name, Create_field *field, AES_KEY *mKey,
               unsigned long uniq_count);
@@ -135,7 +133,7 @@ public:
         : fname(name), has_salt(has_salt), salt_name(salt_name),
           onion_layout(onion_layout), uniq_count(uniq_count) {}
     FieldMeta(std::string serial);
-    ~FieldMeta();
+    ~FieldMeta() {;}
 
     std::string serialize(const DBObject &parent) const;
     std::string stringify() const;
@@ -150,25 +148,48 @@ public:
     }
 
     SECLEVEL getOnionLevel(onion o) const {
-        auto it = onions.find(o);
-        if (it == onions.end()) return SECLEVEL::INVALID;
+        AbstractMetaKey *key = new OnionMetaKey(o);
+        auto om = getChild(key);
+        delete key;
+        if (om == NULL) {
+            return SECLEVEL::INVALID;
+        }
 
-        return it->second->getSecLevel();
+        // FIXME: dynamic_cast
+        return static_cast<OnionMeta *>(om)->getSecLevel();
     }
 
     bool setOnionLevel(onion o, SECLEVEL maxl) {
-        SECLEVEL current_sec_level = onions[o]->getSecLevel();
+        OnionMeta *om = getOnionMeta(o);
+        if (NULL == om) {
+            return false;
+        }
+        SECLEVEL current_sec_level = om->getSecLevel();
         if (current_sec_level > maxl) {
-            while (onions[o]->layers.size() != 0 && onions[o]->layers.back()->level() != maxl) {
-                onions[o]->layers.pop_back();
+            while (om->layers.size() != 0 &&
+                   om->layers.back()->level() != maxl) {
+                om->layers.pop_back();
             }
             return true;
         }
         return false;
     }
 
+    // FIXME: This is a HACK.
     bool isEncrypted() {
-        return ((onions.size() != 1) ||  (onions.find(oPLAIN) == onions.end()));
+        AbstractMetaKey *key = new OnionMetaKey(oPLAIN);
+        bool status =  ((children.size() != 1) ||
+                        (children.find(key) == children.end()));
+        delete key;
+        return status;
+    }
+
+    OnionMeta *getOnionMeta(onion o) {
+        OnionMetaKey *key = new OnionMetaKey(o);
+        // FIXME: dynamic_cast
+        OnionMeta *om = static_cast<OnionMeta *>(children[key]);
+        delete key;
+        return om;
     }
 
     // FIXME: Use rtti.

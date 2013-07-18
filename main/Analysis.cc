@@ -6,10 +6,14 @@ using namespace std;
 
 EncSet::EncSet() : osl(FULL_EncSet.osl) {}
 
+// FIXME: Wrong interfaces.
 EncSet::EncSet(FieldMeta * fm) {
     osl.clear();
-    for (auto pair : fm->onions) {
-	osl[pair.first] = LevelFieldPair(pair.second->getSecLevel(), fm);
+    for (auto pair : fm->children) {
+        // FIXME: dynamic_cast
+        OnionMeta *om = static_cast<OnionMeta *>(pair.second);
+        OnionMetaKey *key = static_cast<OnionMetaKey *>(pair.first);
+	osl[key->getValue()] = LevelFieldPair(om->getSecLevel(), fm);
     }
 }
 

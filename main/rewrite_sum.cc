@@ -167,8 +167,9 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
 
 	list<Item *> args = rewrite_agg_args(i, constr, (RewritePlanOneOLK *)rp, a, 1);
 
-	FieldMeta * fm = constr.key;
-	EncLayer * el = getAssert(fm->onions, oAGG, "onion oAGG not in onions")->layers.back();
+	OnionMeta * om = constr.key->getOnionMeta(oAGG);
+        assert(om);
+        EncLayer *el = om->layers.back();
 	assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
 	return ((HOM *)el)->sumUDA(args.front());
 
@@ -240,7 +241,7 @@ static class ANON : public CItemSubtypeIT<Item_null, Item::Type::NULL_ITEM> {
     virtual void
     do_rewrite_insert_type(Item_null *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
     {
-        for (uint j = 0; j < fm->onions.size(); ++j) {
+        for (uint j = 0; j < fm->children.size(); ++j) {
             l.push_back(make_item(i));
         }
         if (fm->has_salt) {

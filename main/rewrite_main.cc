@@ -327,7 +327,8 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
 
         onion o = TypeText<onion>::toType(onion_type);
         OnionMeta *om = new OnionMeta(onion_name);
-        fm->onions[o] = om;
+        OnionMetaKey *key = new OnionMetaKey(o);
+        fm->addChild(key, om);
 
         // Add elements to OnionMeta.layers starting with the bottom layer
         // and stopping at the current level.
@@ -497,7 +498,8 @@ initSchema(ProxyState & ps)
 static void
 removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEVEL & new_level, const string & cur_db) {
 
-    OnionMeta * om    = getAssert(fm->onions, o);
+    OnionMeta *om = fm->getOnionMeta(o);
+    assert(om);
     string fieldanon  = om->getAnonOnionName();
     string tableanon  = a.getTableMeta(itf->table_name)->getAnonTableName();
 
@@ -688,7 +690,8 @@ decrypt_item_layers(Item * i, onion o, vector<EncLayer *> & layers, uint64_t IV,
 static Item *
 decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV, Analysis &a, vector<Item *> &res) {
     assert(!i->is_null());
-    return decrypt_item_layers(i, o, fm->onions[o]->layers, IV, a, fm, res);
+    return decrypt_item_layers(i, o, fm->getOnionMeta(o)->layers, IV, a,
+                               fm, res);
 }
 
 

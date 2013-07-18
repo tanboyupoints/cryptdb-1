@@ -289,16 +289,6 @@ FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *m_key,
     init_onions_layout(m_key, this, field);
 }
 
-FieldMeta::~FieldMeta()
-{
-    auto cp = onions;
-    onions.clear();
-
-    for (auto it : cp) {
-        delete it.second;
-    }
-}
-
 std::string FieldMeta::serialize(const DBObject &parent) const
 {
     std::string serial =

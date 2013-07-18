@@ -7,7 +7,7 @@ inline void
 init_onions_layout(AES_KEY * m_key, FieldMeta * fm, Create_field * cf)
 {
     assert(fm->has_salt == static_cast<bool>(m_key));
-    assert(0 == fm->onions.size());
+    assert(0 == fm->children.size());
 
     for (auto it: fm->onion_layout) {
         onion o = it.first;
