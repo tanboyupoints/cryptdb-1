@@ -161,6 +161,15 @@ AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
     return DBMeta::doFetchChildren(e_conn, dbw, deserialize);
 }
 
+template <typename ChildType, typename KeyType>
+void
+AbstractMeta<ChildType, KeyType>::applyToChildren(std::function<void(DBMeta *)> fn)
+{
+    for (auto it : children) {
+        fn(it.second);
+    }
+}
+
 OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
                      Create_field *cf)
     : onionname(getpRandomName() + TypeText<onion>::toText(o))
@@ -251,6 +260,13 @@ std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
     // FIXME: Add sanity check to make sure that onions match
     // OnionMeta::onion_layout.
     return DBMeta::doFetchChildren(e_conn, dbw, deserialize);
+}
+
+void OnionMeta::applyToChildren(std::function<void(DBMeta *)> fn)
+{
+    for (auto it : layers) {
+        fn(it);
+    }
 }
 
 // TODO: Perhaps this should be on FieldMeta, as it already knows how to

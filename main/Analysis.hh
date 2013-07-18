@@ -373,11 +373,12 @@ public:
         // TODO: Remove assert.
         assert(e_conn->execute(join_query));
 
-        /* FIXME: Pass as a function object to something on DBMeta
-        for (auto it : object->children) {
-            createHandler(it, object);
-        }
-        */
+        // std::bind(&Delta::createHandler, this, std::placeholders::_1);
+        std::function<void(DBMeta *)> localCreateHandler =
+            [&e_conn, &object, this] (DBMeta *child) {
+                this->createHandler(e_conn, child, object);
+            };
+        object->applyToChildren(localCreateHandler);
     }
 
 private:

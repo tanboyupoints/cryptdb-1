@@ -222,6 +222,7 @@ public:
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;
     virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn) = 0;
+    virtual void applyToChildren(std::function<void(DBMeta *)>) = 0;
 
 protected:
     std::vector<DBMeta *>
@@ -232,9 +233,13 @@ protected:
 
 class LeafDBMeta : public DBMeta {
 public:
-    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn)
+    std::vector<DBMeta *> fetchChildren(Connect *e_conn)
     {
         return std::vector<DBMeta *>();
+    }
+    void applyToChildren(std::function<void(DBMeta *)> func)
+    {
+        return;
     }
 };
 
@@ -283,6 +288,7 @@ public:
     template <typename ConcreteMeta>
         static ConcreteMeta *deserialize(std::string serial);
     virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn);
+    void applyToChildren(std::function<void(DBMeta *)>);
 };
 
 class DBWriter {

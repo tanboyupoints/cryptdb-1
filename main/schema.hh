@@ -86,6 +86,7 @@ public:
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
     std::vector<DBMeta *> fetchChildren(Connect *e_conn);
+    void applyToChildren(std::function<void(DBMeta *)>);
     static std::string serializeOnion(onion o);
 
     bool addLayerBack(EncLayer *layer) {
