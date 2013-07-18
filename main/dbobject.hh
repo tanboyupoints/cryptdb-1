@@ -69,7 +69,8 @@ public:
     template <typename ConcreteKey>
         static ConcreteKey *factory(std::string serial)
     {
-        return new ConcreteKey(serial);
+        int dummy = 1;
+        return new ConcreteKey(dummy, serial);
     }
 };
 
@@ -121,6 +122,8 @@ class IdentityMetaKey : public MetaKey<std::string> {
 public:
     IdentityMetaKey(std::string key_data)
         : MetaKey(key_data, serialize(key_data)) {}
+    IdentityMetaKey(int dummy, std::string serial)
+        : MetaKey(unserialize(serial), serial) {}
     ~IdentityMetaKey() {;}
 
 private:
@@ -139,7 +142,7 @@ class OnionMetaKey : public MetaKey<onion> {
 public:
     OnionMetaKey(onion key_data)
         : MetaKey(key_data, serialize(key_data)) {}
-    OnionMetaKey(std::string serial)
+    OnionMetaKey(int dummy, std::string serial)
         : MetaKey(unserialize(serial), serial) {}
     ~OnionMetaKey() {;}
 
@@ -159,7 +162,7 @@ class UIntMetaKey : public MetaKey<unsigned int> {
 public:
     UIntMetaKey(unsigned int key_data)
         : MetaKey(key_data, serialize(key_data)) {}
-    UIntMetaKey(std::string serial)
+    UIntMetaKey(int dummy, std::string serial)
         : MetaKey(unserialize(serial), serial) {}
     ~UIntMetaKey() {;}
 
