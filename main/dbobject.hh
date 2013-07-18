@@ -263,6 +263,8 @@ private:
 // > TODO: Use static deserialization functions for the derived types so we
 //   can get rid of the <Constructor>(std::string serial) functions and put
 //   'const' back on the members.
+// > FIXME: The key in children is a pointer so this means our lookup is
+//   slow. Use std::reference_wrapper.
 template <typename ChildType, typename KeyType>
 class AbstractMeta : public KeyedDBMeta {
 public:

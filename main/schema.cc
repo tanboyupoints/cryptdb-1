@@ -75,7 +75,7 @@ bool KeyedDBMeta::destroyChild(AbstractMetaKey *key)
         return false;
     }
 
-    auto child = children[key];
+    auto child = getChild(key);
     auto erase_count = children.erase(key);
     if (1 == erase_count) {
         delete child;
@@ -105,14 +105,16 @@ bool KeyedDBMeta::childExists(AbstractMetaKey *key) const
     return children.end() != it;
 }
 
+// Slow.
 DBMeta *KeyedDBMeta::getChild(AbstractMetaKey *key) const
 {
-    auto it = this->findChild(key);
-    if (children.end() == it) {
-        return NULL;
+    for (auto it : children) {
+        if (*it.first == *key) {
+            return it.second;
+        }
     }
 
-    return it->second;
+    return NULL;
 }
 
 AbstractMetaKey *KeyedDBMeta::getKey(const DBMeta * const child) const

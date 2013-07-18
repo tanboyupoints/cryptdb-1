@@ -186,10 +186,10 @@ public:
 
     OnionMeta *getOnionMeta(onion o) {
         OnionMetaKey *key = new OnionMetaKey(o);
-        // FIXME: dynamic_cast
-        OnionMeta *om = static_cast<OnionMeta *>(children[key]);
+        DBMeta *om = getChild(key);
         delete key;
-        return om;
+        // FIXME: dynamic_cast
+        return static_cast<OnionMeta *>(om);
     }
 
     // FIXME: Use rtti.
