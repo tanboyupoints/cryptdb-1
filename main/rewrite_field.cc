@@ -80,11 +80,8 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 	// Encrypted item
 
 	res->table_name = make_thd_string(a.getAnonTableName(i->table_name));
-        OnionMetaKey *key = new OnionMetaKey(constr.o);
-        // FIXME: dynamic_cast
-        OnionMeta *om = static_cast<OnionMeta *>(fm->children[key]);
+        OnionMeta *om = fm->getOnionMeta(constr.o);
 	res->field_name = make_thd_string(om->getAnonOnionName());
-        delete key;
 
         return res;
     }

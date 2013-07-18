@@ -308,51 +308,17 @@ public:
 
         switch (action) {
             case CREATE: {
+                // FIXME: Remove this once we are doing a Load after DDL
+                // queries.
+                assert(keyed_parent_meta->addChild(key, meta));
+
                 /*
                  * We know that the Delta object is the top level in
                  * a hierarchy of all new objects. Therefore we must
                  * go through and recursively associate them all with their
                  * parents.
                  */
-                // FIXME: Remove this once we are doing a Load after DDL
-                // queries.
-                assert(keyed_parent_meta->addChild(key, meta));
-                
-                // Ensure the tables exist.
-                DBWriter dbw(meta, parent_meta);
-                assert(create_tables(e_conn, dbw));
-                
-                const std::string child_serial =
-                    meta->serialize(*parent_meta);
-                assert(0 == meta->getDatabaseID());
-                const std::string parent_id =
-                    std::to_string(parent_meta->getDatabaseID());
-
-                // ------------------------
-                //    Build the queries.
-                // ------------------------
-
-                // On CREATE, the database generates a unique ID for us.
-                std::string query =
-                    " INSERT INTO pdb." + dbw.table_name() + 
-                    "    (serial_object) VALUES ("
-                    " '" + child_serial + "'); ";
-                // TODO: Remove assert.
-                assert(e_conn->execute(query));
-
-                const std::string object_id =
-                    std::to_string(e_conn->last_insert_id());
-                std::string join_query =
-                    " INSERT INTO pdb." + dbw.join_table_name() +
-                    "   (object_id, parent_id, serial_key) VALUES ("
-                    " "  + object_id + ", " +
-                    " "  + parent_id + ", " +
-                    // FIXME: Serialize.
-                    " '" + key->getSerial() + "'); ";
-
-                // TODO: Remove assert.
-                assert(e_conn->execute(join_query));
-
+                createHandler(e_conn, meta, parent_meta);
                 return true;
                 break;
             } case REPLACE: {
@@ -368,6 +334,50 @@ public:
                 throw CryptDBError("Unknown Delta::Action!");
             }
         }
+    }
+
+    // Recursive.
+    void createHandler(Connect *e_conn, DBMeta *object, DBMeta *parent)
+    {
+        // Ensure the tables exist.
+        DBWriter dbw(object, parent);
+        assert(create_tables(e_conn, dbw));
+        
+        const std::string child_serial = meta->serialize(*parent);
+        assert(0 == object->getDatabaseID());
+        const std::string parent_id =
+            std::to_string(parent->getDatabaseID());
+
+        // ------------------------
+        //    Build the queries.
+        // ------------------------
+
+        // On CREATE, the database generates a unique ID for us.
+        std::string query =
+            " INSERT INTO pdb." + dbw.table_name() + 
+            "    (serial_object) VALUES ("
+            " '" + child_serial + "'); ";
+        // TODO: Remove assert.
+        assert(e_conn->execute(query));
+
+        const std::string object_id =
+            std::to_string(e_conn->last_insert_id());
+        std::string join_query =
+            " INSERT INTO pdb." + dbw.join_table_name() +
+            "   (object_id, parent_id, serial_key) VALUES ("
+            " "  + object_id + ", " +
+            " "  + parent_id + ", " +
+            // FIXME: Serialize.
+            " '" + key->getSerial() + "'); ";
+
+        // TODO: Remove assert.
+        assert(e_conn->execute(join_query));
+
+        /* FIXME: Pass as a function object to something on DBMeta
+        for (auto it : object->children) {
+            createHandler(it, object);
+        }
+        */
     }
 
 private:

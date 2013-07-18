@@ -273,12 +273,9 @@ rewrite_key(const string &table, Key *key, Analysis &a)
                     convert_lex_str(key_part->field_name);
                 FieldMeta *fm =
                     a.getFieldMeta(table, field_name);
-                OnionMetaKey *key = new OnionMetaKey(oOPE);
-                // FIXME: dynamic_cast
-                OnionMeta *om = static_cast<OnionMeta *>(fm->children[key]);
+                OnionMeta *om = fm->getOnionMeta(oOPE);
                 key_part->field_name =
                     string_to_lex_str(om->getAnonOnionName());
-                delete key;
                 out_field_list.push_back(key_part);
                 return out_field_list; /* lambda */
             });
