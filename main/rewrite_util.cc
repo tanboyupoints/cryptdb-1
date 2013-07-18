@@ -337,8 +337,8 @@ do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
             std::string str_level =
                 TypeText<SECLEVEL>::toText(level);
 
-            std::string crypto_key =
-                EncLayerFactory::serializeLayer(om->layers[i], om);
+            std::string crypto_key = "whatever";
+                // EncLayerFactory::serializeLayer(om->layers[i], om);
 
             unsigned int escaped_length = crypto_key.size() * 2 + 1;
             char escaped_key[escaped_length];

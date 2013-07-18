@@ -103,14 +103,6 @@ struct SerialLayer {
     string layer_info;
 };
 
-static string
-serial_pack(SECLEVEL l, const string & name, const string & layer_info) {
-    stringstream ss;
-    ss.clear();
-    ss << layer_info.length() << " " << levelnames[(uint)l] << " " << name << " " << layer_info;
-    return ss.str();
-}
-
 static SerialLayer
 serial_unpack(string serial) {
     SerialLayer sl;
@@ -189,10 +181,12 @@ EncLayerFactory::deserializeLayer(unsigned int id, const string & serial)
     throw CryptDBError("unknown or unimplemented security level \n");
 }
 
+/*
 string
 EncLayerFactory::serializeLayer(EncLayer * el, DBMeta *parent) {
     return serial_pack(el->level(), el->name(), el->serialize(*parent));
 }
+*/
 
 /* ========================= other helpers ==============================*/
 
@@ -273,11 +267,11 @@ public:
     RND_int(Create_field *cf, const std::string & seed_key);
 
     // serialize and deserialize
-    std::string serialize(const DBObject &parent) const {return key;}
+    std::string doSerialize() const {return key;}
     RND_int(unsigned int id, const std::string & serial);
 
-    SECLEVEL level() {return SECLEVEL::RND;}
-    string name() {return "RND_int";}
+    SECLEVEL level() const {return SECLEVEL::RND;}
+    string name() const {return "RND_int";}
     
     Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
@@ -298,12 +292,12 @@ public:
     RND_str(Create_field *, const std::string & seed_key);
 
     // serialize and deserialize
-    std::string serialize(const DBObject &parent) const {return rawkey; }
+    std::string doSerialize() const {return rawkey; }
     RND_str(unsigned int id, const std::string & serial);
 
 
-    SECLEVEL level() {return SECLEVEL::RND;}
-    string name() {return "RND_str";}
+    SECLEVEL level() const {return SECLEVEL::RND;}
+    string name() const {return "RND_str";}
     Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV);
@@ -492,13 +486,13 @@ class DET_int : public EncLayer {
 public:
     DET_int(Create_field *,  const std::string & seed_key);
     
-    std::string serialize(const DBObject &parent) const {return key; }
+    std::string doSerialize() const {return key; }
     // create object from serialized contents
     DET_int(unsigned int id, const std::string & serial);
 
 
-    virtual SECLEVEL level() {return SECLEVEL::DET;}
-    string name() {return "DET_int";}
+    virtual SECLEVEL level() const {return SECLEVEL::DET;}
+    string name() const {return "DET_int";}
     Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV = 0);
@@ -520,11 +514,11 @@ class DET_dec : public DET_int {
 public:
     DET_dec(Create_field *,  const std::string & seed_key);
 
-    std::string serialize(const DBObject &parent) const;
+    std::string doSerialize() const;
     // create object from serialized contents
     DET_dec(unsigned int id, const std::string & serial);
 
-    string name() {return "DET_dec";}
+    string name() const {return "DET_dec";}
 
     Item * encrypt(Item * ptext, uint64_t IV = 0);
     Item * decrypt(Item * ctext, uint64_t IV = 0);
@@ -540,12 +534,12 @@ public:
     DET_str(Create_field *cf, std::string seed_key);
 
     // serialize and deserialize
-    std::string serialize(const DBObject &parent) const {return rawkey;}
+    std::string doSerialize() const {return rawkey;}
     DET_str(unsigned int id, const std::string & serial);
 
 
-    virtual SECLEVEL level() {return SECLEVEL::DET;}
-    string name() {return "DET_str";}
+    virtual SECLEVEL level() const {return SECLEVEL::DET;}
+    string name() const {return "DET_str";}
     Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV = 0);
@@ -670,10 +664,10 @@ DET_dec::DET_dec(Create_field * cf, const string & seed_key)
 }
 
 string
-DET_dec::serialize(const DBObject &parent) const {
+DET_dec::doSerialize() const {
     stringstream layerinfo;
 
-    layerinfo << decimals << " " << DET_int::serialize(parent);
+    layerinfo << decimals << " " << DET_int::doSerialize();
 
     return layerinfo.str();
 }
@@ -806,8 +800,8 @@ public:
     DETJOIN_int(unsigned int id, const std::string & serial)
         : DET_int(id, serial) {}
 
-    SECLEVEL level() {return SECLEVEL::DETJOIN;}
-    string name() {return "DETJOIN_int";}
+    SECLEVEL level() const {return SECLEVEL::DETJOIN;}
+    string name() const {return "DETJOIN_int";}
     
 private:
    
@@ -824,8 +818,8 @@ public:
     DETJOIN_str(unsigned int id, const std::string & serial)
         : DET_str(id, serial) {};
 
-    SECLEVEL level() {return SECLEVEL::DETJOIN;}
-     string name() {return "DETJOIN_str";}
+    SECLEVEL level() const {return SECLEVEL::DETJOIN;}
+     string name() const {return "DETJOIN_str";}
 private:
  
 };
@@ -843,8 +837,8 @@ public:
     DETJOIN_dec(unsigned int id, const std::string & serial)
         : DET_dec(id, serial) {}
 
-    SECLEVEL level() {return SECLEVEL::DETJOIN;}
-    string name() {return "DETJOIN_dec";}
+    SECLEVEL level() const {return SECLEVEL::DETJOIN;}
+    string name() const {return "DETJOIN_dec";}
 
 private:
 };
@@ -885,11 +879,11 @@ public:
     OPE_int(Create_field *, std::string seed_key);
 
     // serialize and deserialize
-    std::string serialize(const DBObject &parent) const {return key;}
+    std::string doSerialize() const {return key;}
     OPE_int(unsigned int id, const std::string & serial);
 
-    SECLEVEL level() {return SECLEVEL::OPE;}
-    string name() {return "OPE_int";}
+    SECLEVEL level() const {return SECLEVEL::OPE;}
+    string name() const {return "OPE_int";}
     Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     Item * encrypt(Item * p, uint64_t IV);
@@ -911,12 +905,12 @@ public:
     OPE_str(Create_field *, std::string seed_key);
 
     // serialize and deserialize
-    std::string serialize(const DBObject &parent) const {return key;}
+    std::string doSerialize() const {return key;}
     OPE_str(unsigned int id, const std::string & serial);
 
 
-    SECLEVEL level() {return SECLEVEL::OPE;}
-    string name() {return "OPE_str";}
+    SECLEVEL level() const {return SECLEVEL::OPE;}
+    string name() const {return "OPE_str";}
     Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     Item * encrypt(Item * p, uint64_t IV = 0);
@@ -936,10 +930,10 @@ public:
     OPE_dec(Create_field *, std::string seed_key);
 
     // serialize and deserialize
-    std::string serialize(const DBObject &parent) const;
+    std::string doSerialize() const;
     OPE_dec(unsigned int id, const std::string & serial);
 
-    string name() {return "OPE_dec";}
+    string name() const {return "OPE_dec";}
 
     Item * encrypt(Item * p, uint64_t IV);
     Item * decrypt(Item * c, uint64_t IV);
@@ -986,10 +980,10 @@ OPE_dec::OPE_dec(Create_field * cf, string seed_key)
 }
 
 string
-OPE_dec::serialize(const DBObject &parent) const {
+OPE_dec::doSerialize() const {
     stringstream layerinfo;
 
-    layerinfo << decimals << " " << OPE_int::serialize(parent);
+    layerinfo << decimals << " " << OPE_int::doSerialize();
 
     return layerinfo.str();
 }
@@ -1104,7 +1098,7 @@ public:
     //deserialize
     HOM_dec(unsigned int id, const std::string & serial);
     
-    std::string name() {return "HOM_dec";}
+    std::string name() const {return "HOM_dec";}
   
 
     //TODO needs multi encrypt and decrypt
@@ -1119,7 +1113,7 @@ private:
     uint decimals;
     ZZ shift;
 
-    std::string serialize(const DBObject &parent) const;
+    std::string doSerialize() const;
     ~HOM_dec() {;}
 };
 
@@ -1178,10 +1172,10 @@ HOM_dec::HOM_dec(Create_field * cf, std::string seed_key) :  HOM(cf, seed_key){
 }
 
 string
-HOM_dec::serialize(const DBObject &parent) const {
+HOM_dec::doSerialize() const {
     stringstream layerinfo;
 
-    layerinfo << decimals << " " << HOM::serialize(parent);
+    layerinfo << decimals << " " << HOM::doSerialize();
 
     return layerinfo.str();
 }

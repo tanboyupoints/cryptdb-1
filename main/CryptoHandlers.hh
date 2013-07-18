@@ -38,6 +38,15 @@
  *  -- remove unnecessary padding
  */
 
+static std::string
+serial_pack(SECLEVEL l, const std::string & name,
+            const std::string & layer_info) {
+    std::stringstream ss;
+    ss.clear();
+    ss << layer_info.length() << " " << levelnames[(uint)l] << " " << name << " " << layer_info;
+    return ss.str();
+}
+
 class EncLayer : public LeafDBMeta {
 public:
      virtual ~EncLayer() {}
@@ -47,8 +56,8 @@ public:
      std::string typeName() const {return type_name;}
      static std::string instanceTypeName() {return type_name;}
 
-     virtual SECLEVEL level() = 0;
-     virtual std::string name() = 0;
+     virtual SECLEVEL level() const = 0;
+     virtual std::string name() const = 0;
 
      // returns a rewritten create field to include in rewritten query
      virtual Create_field * newCreateField(Create_field * cf,
@@ -60,6 +69,12 @@ public:
      // returns the decryptUDF to remove the onion layer
      virtual Item * decryptUDF(Item * col, Item * ivcol = NULL) {
          thrower() << "decryptUDF not supported";
+     }
+
+     virtual std::string doSerialize() const = 0;
+     std::string serialize(const DBObject &parent) const {
+         return serial_pack(this->level(), this->name(),
+                            this->doSerialize());
      }
 
 protected:
@@ -74,11 +89,11 @@ public:
     HOM(Create_field * cf, std::string seed_key);
 
     // serialize and deserialize
-    std::string serialize(const DBObject &parent) const {return seed_key;}
+    std::string doSerialize() const {return seed_key;}
     HOM(unsigned int id, const std::string & serial);
 
-    SECLEVEL level() {return SECLEVEL::HOM;}
-    std::string name() {return "HOM";}
+    SECLEVEL level() const {return SECLEVEL::HOM;}
+    std::string name() const {return "HOM";}
     Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     //TODO needs multi encrypt and decrypt
@@ -102,11 +117,11 @@ public:
     Search(Create_field * cf, std::string seed_key);
 
     // serialize and deserialize
-    std::string serialize(const DBObject &parent) const {return key;}
+    std::string doSerialize() const {return key;}
     Search(unsigned int id, const std::string & serial);
 
-    SECLEVEL level() {return SECLEVEL::SEARCH;}
-    std::string name() {return "SEARCH";}
+    SECLEVEL level() const {return SECLEVEL::SEARCH;}
+    std::string name() const {return "SEARCH";}
     Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV = 0);
@@ -123,8 +138,6 @@ private:
 
 extern const std::vector<udf_func*> udf_list;
 
-class OnionMeta;
-
 class EncLayerFactory {
 public:
     static EncLayer * encLayer(onion o, SECLEVEL sl, Create_field *cf,
@@ -134,7 +147,7 @@ public:
     static EncLayer * deserializeLayer(unsigned int id,
                                        const std::string & serial);
 
-    static std::string serializeLayer(EncLayer * el, DBMeta *parent);
+    // static std::string serializeLayer(EncLayer * el, DBMeta *parent);
 };
 
 
