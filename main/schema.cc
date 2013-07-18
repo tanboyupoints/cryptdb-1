@@ -334,10 +334,10 @@ TableMeta::TableMeta(std::string serial)
     
     this->anon_table_name = vec[0];
     this->hasSensitive = string_to_bool(vec[1]);
-    this->has_salt = string_to_bool(vec[3]);
-    this->salt_name = vec[4];
-    dbname = vec[5];                // ?
-    this->counter = atoi(vec[6].c_str());
+    this->has_salt = string_to_bool(vec[2]);
+    this->salt_name = vec[3];
+    dbname = vec[4];                // ?
+    this->counter = atoi(vec[5].c_str());
 }
 
 std::string TableMeta::serialize(const DBObject &parent) const

@@ -421,7 +421,7 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
     }
     // FIXME: Remove.
     // assert(tm->addChild(name, fm));
-    assert(do_add_field(fm, a, dbname, table));
+    // assert(do_add_field(fm, a, dbname, table));
     // -----------------------------
     //         Rewrite FIELD       
     // -----------------------------

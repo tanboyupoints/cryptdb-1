@@ -64,6 +64,7 @@ class CreateHandler : public DDLHandler {
 
             a.ps->e_conn->execute("START TRANSACTION");
 
+            /*
             {
                 ostringstream s;
                 s << " INSERT INTO pdb.table_info VALUES ("
@@ -79,6 +80,7 @@ class CreateHandler : public DDLHandler {
 
                 assert(a.ps->e_conn->execute(s.str()));
             }
+            */
             
             // -----------------------------
             //         Rewrite TABLE       

@@ -275,111 +275,15 @@ public:
     /*
      * This function is responsible for writing our Delta to the database.
      */
-    bool save(Connect *e_conn)
-    {
-        std::string serial_object = meta->serialize(*parent_meta);
-        std::string parent_id =
-            std::to_string(parent_meta->getDatabaseID());
-        std::string serial_key = key->getSerial();
-        std::string table_name = "Delta";
-
-        // TODO: Maybe we want to join on object_id as well.
-        std::string query =
-            " INSERT INTO pdb." + table_name +
-            "    (action, serial_object, parent_id, serial_key) VALUES (" +
-            " "  + std::to_string(action) + ", " +
-            " '" + serial_object + "', " +
-            " "  + parent_id + ", " +
-            " '" + serial_key + "');";
-
-        return e_conn->execute(query);
-    }
+    bool save(Connect *e_conn);
 
     /*
      * Take the update action against the database. Contains high level
      * serialization semantics.
      */
-    bool apply(Connect *e_conn) 
-    {
-        // HACK: A danger to myself and others, can remove once we have
-        // load working.
-        KeyedDBMeta *keyed_parent_meta =
-            static_cast<KeyedDBMeta *>(parent_meta);
-
-        switch (action) {
-            case CREATE: {
-                // FIXME: Remove this once we are doing a Load after DDL
-                // queries.
-                assert(keyed_parent_meta->addChild(key, meta));
-
-                /*
-                 * We know that the Delta object is the top level in
-                 * a hierarchy of all new objects. Therefore we must
-                 * go through and recursively associate them all with their
-                 * parents.
-                 */
-                createHandler(e_conn, meta, parent_meta);
-                return true;
-                break;
-            } case REPLACE: {
-                return keyed_parent_meta->replaceChild(key, meta);
-                break;
-            } case DELETE: {
-                /*
-                 * Recursively delete everything from this top level
-                 */
-                return keyed_parent_meta->destroyChild(key);
-                break;
-            } default: {
-                throw CryptDBError("Unknown Delta::Action!");
-            }
-        }
-    }
-
-    // Recursive.
-    void createHandler(Connect *e_conn, DBMeta *object, DBMeta *parent)
-    {
-        // Ensure the tables exist.
-        DBWriter dbw(object, parent);
-        assert(create_tables(e_conn, dbw));
-        
-        const std::string child_serial = meta->serialize(*parent);
-        assert(0 == object->getDatabaseID());
-        const std::string parent_id =
-            std::to_string(parent->getDatabaseID());
-
-        // ------------------------
-        //    Build the queries.
-        // ------------------------
-
-        // On CREATE, the database generates a unique ID for us.
-        std::string query =
-            " INSERT INTO pdb." + dbw.table_name() + 
-            "    (serial_object) VALUES ("
-            " '" + child_serial + "'); ";
-        // TODO: Remove assert.
-        assert(e_conn->execute(query));
-
-        const std::string object_id =
-            std::to_string(e_conn->last_insert_id());
-        std::string join_query =
-            " INSERT INTO pdb." + dbw.join_table_name() +
-            "   (object_id, parent_id, serial_key) VALUES ("
-            " "  + object_id + ", " +
-            " "  + parent_id + ", " +
-            // FIXME: Serialize.
-            " '" + key->getSerial() + "'); ";
-
-        // TODO: Remove assert.
-        assert(e_conn->execute(join_query));
-
-        // std::bind(&Delta::createHandler, this, std::placeholders::_1);
-        std::function<void(DBMeta *)> localCreateHandler =
-            [&e_conn, &object, this] (DBMeta *child) {
-                this->createHandler(e_conn, child, object);
-            };
-        object->applyToChildren(localCreateHandler);
-    }
+    bool apply(Connect *e_conn);
+    void createHandler(Connect *e_conn, DBMeta *object, DBMeta *parent,
+                       AbstractMetaKey *k = NULL);
 
 private:
     Action action;

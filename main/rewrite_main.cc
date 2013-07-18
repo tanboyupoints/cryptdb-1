@@ -41,6 +41,7 @@ extern CItemFuncNameDir funcNames;
 //TODO: replace table/field with FieldMeta * for speed and conciseness
 
 // FIXME: Placement.
+/*
 static void
 buildTableMeta(ProxyState &ps);
 
@@ -49,6 +50,7 @@ buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name);
 
 static void
 buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id);
+*/
 
 //TODO: rewrite_proj may not need to be part of each class;
 // it just does gather, choos and then rewrite
@@ -92,6 +94,7 @@ mysql_query_wrapper(MYSQL *m, const string &q)
     if (!ret) assert(false);
 }
 
+/*
 static void
 createMetaTablesIfNotExists(ProxyState & ps)
 {
@@ -157,6 +160,7 @@ createMetaTablesIfNotExists(ProxyState & ps)
 
     return;
 }
+*/
 
 // FIXME: This function will not build all of our tables when it is run
 // on an empty database.  If you don't have a parent, your table won't be
@@ -182,6 +186,7 @@ loadSchemaInfo(Connect *e_conn)
     return static_cast<SchemaInfo *>(loadChildren(schema));
 }
 
+/*
 static void
 createInMemoryTables(ProxyState & ps)
 {
@@ -353,6 +358,7 @@ buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
 
      return;
 }
+*/
 
 static void
 printEC(Connect * e_conn, const string & command) {
@@ -367,6 +373,12 @@ printEmbeddedState(ProxyState & ps) {
     printEC(ps.e_conn, "use pdb;");
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables;");
+    // printEC(ps.e_conn, "selecT * from pdb.tableMeta_schemaInfo;");
+    // printEC(ps.e_conn, "select * from pdb.tableMeta;");
+    // printEC(ps.e_conn, "selecT * from pdb.fieldMeta_tableMeta;");
+    // printEC(ps.e_conn, "select * from pdb.fieldMeta;");
+    // printEC(ps.e_conn, "selecT * from pdb.onionMeta_tableMeta;");
+    // printEC(ps.e_conn, "select * from pdb.onionMeta;");
     // printEC(ps.e_conn, "select * from pdb.table_info;");
     // printEC(ps.e_conn, "select * from pdb.field_info;");
     // printEC(ps.e_conn, "select * from pdb.onion_info;");
@@ -482,6 +494,7 @@ buildTypeTextTranslator()
 }
 
 
+/*
 static void
 initSchema(ProxyState & ps)
 {
@@ -493,6 +506,7 @@ initSchema(ProxyState & ps)
 
     return;
 }
+*/
 
 //l gets updated to the new level
 static void
@@ -870,13 +884,15 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
     ps.conn = new Connect(ci.server, ci.user, ci.passwd, dbname, ci.port);
 
-    ps.schema = new SchemaInfo();
-    // Should be using this.
-    loadSchemaInfo(ps.e_conn);
+    // FIXME: Remove.
+    std::string x;
+    cin >> x;
 
     // Must be called before initSchema.
     buildTypeTextTranslator();
-    initSchema(ps);
+    // initSchema(ps);
+    ps.schema = loadSchemaInfo(ps.e_conn);
+    printEmbeddedState(ps);
 
     dml_dispatcher = buildDMLDispatcher();
     ddl_dispatcher = buildDDLDispatcher();
