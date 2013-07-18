@@ -350,8 +350,9 @@ RND_int::newCreateField(Create_field * cf, string anonname) {
 Item *
 RND_int::encrypt(Item * ptext, uint64_t IV) {
     //TODO: should have encrypt_SEM work for any length
-    uint64_t p = static_cast<Item_int *>(ptext)->value;
-    uint64_t c = bf.encrypt(p ^ IV);
+    int64_t p = static_cast<Item_int *>(ptext)->val_int();
+    uint64_t c = bf.encrypt(((uint64_t)p) ^ IV);
+
     LOG(encl) << "RND_int encrypt " << p << " IV " << IV << "-->" << c;
 
     return new Item_int((ulonglong) c);
@@ -360,7 +361,7 @@ RND_int::encrypt(Item * ptext, uint64_t IV) {
 Item *
 RND_int::decrypt(Item * ctext, uint64_t IV) {
     uint64_t c = static_cast<Item_int*>(ctext)->value;
-    uint64_t p = bf.decrypt(c) ^ IV;
+    int64_t p = (int64_t)bf.decrypt(c) ^ IV;
     LOG(encl) << "RND_int decrypt " << c << " IV " << IV << " --> " << p;
 
     return new Item_int((ulonglong) p);
@@ -392,12 +393,14 @@ RND_int::decryptUDF(Item * col, Item * ivcol) {
 
     Item * udfdec = new Item_func_udf_int(&u_decRNDInt, l);
     udfdec->name = NULL; //no alias
-
-    //add encompassing CAST for unsigned
+    
+    /*	
+   //add encompassing CAST for unsigned
     Item * udf = new Item_func_unsigned(udfdec);
     udf->name = NULL;
+    */	
 
-    return udf;
+    return udfdec;
 }
 
 ///////////////////////////////////////////////
@@ -645,11 +648,13 @@ DET_int::decryptUDF(Item * col, Item * ivcol) {
     Item * udfdec = new Item_func_udf_int(&u_decDETInt, l);
     udfdec->name = NULL;
 
+    /*
     //add encompassing CAST for unsigned
     Item * udf = new Item_func_unsigned(udfdec);
     udf->name = NULL;
+    */
 
-    return udf;
+    return udfdec;
 }
 
 DET_dec::DET_dec(Create_field * cf, const string & seed_key)
@@ -1034,8 +1039,8 @@ OPE_int::newCreateField(Create_field * cf, string anonname) {
 
 Item *
 OPE_int::encrypt(Item * ptext, uint64_t IV) {
-    ulong pval =  (ulong)static_cast<Item_int *>(ptext)->value;
-    ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ(pval)));
+    long pval =  static_cast<Item_int *>(ptext)->val_int();
+    ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ((ulong)pval)));
     LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV << "--->" << enc;
 
     return new Item_int(enc);
@@ -1044,7 +1049,7 @@ OPE_int::encrypt(Item * ptext, uint64_t IV) {
 Item *
 OPE_int::decrypt(Item * ctext, uint64_t IV) {
     ulonglong cval = (ulonglong) static_cast<Item_int*>(ctext)->value;
-    ulonglong dec = uint64FromZZ(ope.decrypt(ZZFromUint64(cval)));
+    longlong dec = (longlong)uint64FromZZ(ope.decrypt(ZZFromUint64(cval)));
     LOG(encl) << "OPE_int decrypt " << cval << " IV " << IV << "--->" << dec;
 
     return new Item_int(dec);
