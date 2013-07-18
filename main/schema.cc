@@ -26,8 +26,10 @@ DBMeta::doFetchChildren(Connect *e_conn, DBWriter dbw,
     const std::string parent_id = std::to_string(this->getDatabaseID());
     const std::string serials_query = 
         " SELECT pdb." + dbw.table_name() + ".serial_object,"
+        "        pdb." + dbw.table_name() + ".serial_object_len,"
         "        pdb." + dbw.table_name() + ".id,"
-        "        pdb." + dbw.join_table_name() + ".serial_key"
+        "        pdb." + dbw.join_table_name() + ".serial_key,"
+        "        pdb." + dbw.join_table_name() + ".serial_key_len"
         " FROM pdb." + dbw.table_name() + 
         "   INNER JOIN pdb." + dbw.join_table_name() +
         "       ON (pdb." + dbw.table_name() + ".id"
@@ -42,8 +44,22 @@ DBMeta::doFetchChildren(Connect *e_conn, DBWriter dbw,
         assert(l != NULL);
 
         std::string child_serial(row[0], l[0]);
-        std::string child_id(row[1], l[1]);
-        std::string child_key(row[2], l[2]);
+        std::string child_serial_length(row[1], l[1]);
+        std::string child_id(row[2], l[2]);
+        std::string child_key(row[3], l[3]);
+        std::string child_key_length(row[4], l[4]);
+
+        if (child_serial.size() >
+            (unsigned int)atoi(child_serial_length.c_str())) {
+            child_serial.erase(atoi(child_serial_length.c_str()),
+                               std::string::npos);
+        }
+
+        if (child_key.size() >
+            (unsigned int)atoi(child_key_length.c_str())) {
+            child_key.erase(atoi(child_key_length.c_str()),
+                            std::string::npos);
+        }
 
         DBMeta *new_old_meta =
             deserialHandler(child_key, child_serial, child_id);
@@ -253,8 +269,8 @@ std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
             // > Probably going to want to use indexes in AbstractMetaKey
             // for now, otherwise you will need to abstract and rederive
             // a keyed and nonkeyed version of Delta.
-            OnionMetaKey *meta_key =
-                AbstractMetaKey::factory<OnionMetaKey>(key);
+            UIntMetaKey *meta_key =
+                AbstractMetaKey::factory<UIntMetaKey>(key);
             const unsigned int index = meta_key->getValue();
             if (index >= this->layers.size()) {
                 this->layers.resize(index + 1);
@@ -420,6 +436,7 @@ bool create_tables(Connect *e_conn, DBWriter dbw)
     const std::string create_query =
         " CREATE TABLE IF NOT EXISTS pdb." + dbw.table_name() +
         "   (serial_object VARBINARY(100) NOT NULL,"
+        "    serial_object_len BIGINT NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
 
@@ -431,6 +448,7 @@ bool create_tables(Connect *e_conn, DBWriter dbw)
         "   (object_id BIGINT NOT NULL,"
         "    parent_id BIGINT NOT NULL,"
         "    serial_key VARBINARY(100) NOT NULL,"
+        "    serial_key_len BIGINT NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
 

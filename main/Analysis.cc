@@ -276,10 +276,14 @@ void Delta::createHandler(Connect *e_conn, DBMeta *object,
     // ------------------------
 
     // On CREATE, the database generates a unique ID for us.
-    std::string query =
+    const std::string esc_child_serial =
+        escapeString(e_conn, child_serial);
+    const unsigned int esc_child_serial_len = esc_child_serial.size();
+    const std::string query =
         " INSERT INTO pdb." + dbw.table_name() + 
-        "    (serial_object) VALUES ("
-        " '" + escapeString(e_conn, child_serial) + "'); ";
+        "    (serial_object, serial_object_len) VALUES (" 
+        " '" + esc_child_serial + "', "
+        " "  + std::to_string(esc_child_serial_len) + "); ";
 
     assert(e_conn->execute(query));
 
@@ -292,12 +296,16 @@ void Delta::createHandler(Connect *e_conn, DBMeta *object,
     } else {
         serial_key = k->getSerial();
     }
-    std::string join_query =
+    const std::string esc_serial_key = escapeString(e_conn, serial_key);
+    const unsigned int esc_serial_key_len = 
+        esc_serial_key.size();
+    const std::string join_query =
         " INSERT INTO pdb." + dbw.join_table_name() +
-        "   (object_id, parent_id, serial_key) VALUES ("
-        " "  + std::to_string(object_id) + ", " +
-        " "  + std::to_string(parent_id) + ", " +
-        " '" + escapeString(e_conn, serial_key) + "'); ";
+        "   (object_id, parent_id, serial_key, serial_key_len) VALUES ("
+        " "  + std::to_string(object_id) + ", " 
+        " "  + std::to_string(parent_id) + ", "
+        " '" + esc_serial_key + "', " +
+        " "  + std::to_string(esc_serial_key_len) + ");";
 
     assert(e_conn->execute(join_query));
 
