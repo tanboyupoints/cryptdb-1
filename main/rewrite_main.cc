@@ -971,12 +971,21 @@ rewrite_helper(const string & q, Analysis & analysis,
                                                      &out_lex_count);
     assert(new_lexes && out_lex_count != 0);
 
+    // FIXME: This subsection needs to be moved around to fit our new
+    // execution scheme.
+    // --------------------------------------
+    // HACK: To determine if we have a DDL.
+    if (analysis.deltas.size() > 0) {
+        assert(analysis.ps->e_conn->execute("use pdb;"));
+        assert(analysis.ps->e_conn->execute(q));
+    }
     for (auto it : analysis.deltas) {
         assert(it.apply(analysis.ps->e_conn));
     }
 
-    printEmbeddedState(*analysis.ps);
     analysis.ps->schema = loadSchemaInfo(analysis.ps->e_conn);
+    printEmbeddedState(*analysis.ps);
+    // --------------------------------------
 
     list<string> queries;
     for (unsigned i = 0; i < out_lex_count; ++i) {

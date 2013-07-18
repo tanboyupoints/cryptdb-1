@@ -224,10 +224,6 @@ bool Delta::apply(Connect *e_conn)
 
     switch (action) {
         case CREATE: {
-            // FIXME: Remove this once we are doing a Load after DDL
-            // queries.
-            assert(keyed_parent_meta->addChild(key, meta));
-
             /*
              * We know that the Delta object is the top level in
              * a hierarchy of all new objects. Therefore we must
@@ -244,8 +240,8 @@ bool Delta::apply(Connect *e_conn)
             /*
              * Recursively delete everything from this top level
              */
-            return keyed_parent_meta->destroyChild(key);
-            break;
+            deleteHandler(e_conn, meta, parent_meta);
+            return true;
         } default: {
             throw CryptDBError("Unknown Delta::Action!");
         }
@@ -258,8 +254,9 @@ void Delta::createHandler(Connect *e_conn, DBMeta *object,
                           DBMeta *parent, AbstractMetaKey *k,
                           const unsigned int * const ptr_parent_id)
 {
-    // Ensure the tables exist.
     DBWriter dbw(object, parent);
+    
+    // Ensure the tables exist.
     assert(create_tables(e_conn, dbw));
     
     const std::string child_serial = object->serialize(*parent);
@@ -314,6 +311,34 @@ void Delta::createHandler(Connect *e_conn, DBMeta *object,
             this->createHandler(e_conn, child, object, NULL, &object_id);
         };
     object->applyToChildren(localCreateHandler);
+}
+
+void Delta::deleteHandler(Connect *e_conn, DBMeta *object,
+                          DBMeta *parent)
+{
+    DBWriter dbw(object, parent);
+    const unsigned int object_id = object->getDatabaseID();
+    const unsigned int parent_id = parent->getDatabaseID();
+
+    const std::string query =
+        " DELETE pdb." + dbw.table_name() + ", "
+        "        pdb." + dbw.join_table_name() +
+        "   FROM pdb." + dbw.table_name() + 
+        " INNER JOIN pdb." + dbw.join_table_name() +
+        "  WHERE pdb." + dbw.table_name() + ".id" +
+        "      = pdb." + dbw.join_table_name() + ".object_id" +
+        "    AND pdb." + dbw.table_name() + ".id" +
+        "      = "     + std::to_string(object_id) + 
+        "    AND pdb." + dbw.join_table_name() + ".parent_id" +
+        "      = "     + std::to_string(parent_id) + ";";
+
+    assert(e_conn->execute(query));
+
+    std::function<void(DBMeta *)> localDestroyHandler =
+        [&e_conn, &object, this] (DBMeta *child) {
+            this->deleteHandler(e_conn, child, object);
+        };
+    object->applyToChildren(localDestroyHandler);
 }
 
 

@@ -286,6 +286,7 @@ public:
     void createHandler(Connect *e_conn, DBMeta *object, DBMeta *parent,
                        AbstractMetaKey *k = NULL,
                        const unsigned int * const ptr_parent_id = NULL);
+    void deleteHandler(Connect *e_conn, DBMeta *object, DBMeta *parent);
 
 private:
     Action action;

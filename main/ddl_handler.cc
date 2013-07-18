@@ -59,11 +59,6 @@ class CreateHandler : public DDLHandler {
             Delta delta(Delta::CREATE, tm, a.ps->schema, key);
             a.deltas.push_back(delta);
            
-            // Add table to embedded database.
-            assert(a.ps->e_conn->execute(q));
-
-            a.ps->e_conn->execute("START TRANSACTION");
-
             /*
             {
                 ostringstream s;
@@ -109,8 +104,6 @@ class CreateHandler : public DDLHandler {
                         return createAndRewriteField(cf, tm, table, dbname,
                                                      a, true, out_list);
                 });
-            
-            a.ps->e_conn->execute("COMMIT");
         } else { // Table already exists.
 
             // Make sure we aren't trying to create a table that
@@ -159,7 +152,8 @@ class DropHandler : public DDLHandler {
 
         TABLE_LIST *tbl = lex->select_lex.table_list.first;
         for (; tbl; tbl = tbl->next_local) {
-            char* dbname = tbl->db;
+            // FIXME: Remove.
+            // char* dbname = tbl->db;
             char* table  = tbl->table_name;
 
             if (lex->drop_if_exists) {
@@ -168,6 +162,8 @@ class DropHandler : public DDLHandler {
                 }
             }
 
+            /*
+             * FIXME: Remove.
             ostringstream s;
 
             s << " DELETE FROM pdb.table_info, pdb.field_info, "
@@ -181,14 +177,18 @@ class DropHandler : public DDLHandler {
               << " AND    pdb.onion_info.id = pdb.layer_key.onion_info_id;";
 
             assert(a.ps->e_conn->execute(s.str()));
+            */
 
             // Remove from *Meta structures.
-            assert(a.destroyTableMeta(table));
+            TableMeta *tm = a.getTableMeta(table);
+            // FIXME: Key only necessary for CREATE.
+            Delta delta(Delta::DELETE, tm, a.ps->schema,
+                        new IdentityMetaKey(table));
+            a.deltas.push_back(delta);
+            // FIXME: Remove.
+            // assert(a.destroyTableMeta(table));
         }
         
-        // Remove table(s) from embedded database.
-        assert(a.ps->e_conn->execute(q));
-
         assert(a.ps->e_conn->execute("COMMIT"));
     }
 };
