@@ -117,7 +117,7 @@ public:
         return layers.back()->level();
     }
 
-    unsigned long getUniqCount() const {return uniq_count;}
+    unsigned long getUniq() const {return uniq_count;}
 
 private:
     constexpr static const char *type_name = "onionMeta";
@@ -160,7 +160,7 @@ public:
         return salt_name;
     }
 
-    unsigned long getUniqCount() const {
+    unsigned long getUniq() const {
         return uniq_count;
     }
 
@@ -215,7 +215,7 @@ public:
 
     unsigned long leaseIncUniq() {return counter++;}
     // FIXME: Change name.
-    unsigned long getUniqCounter() {return counter;}
+    unsigned long getCurrentUniqCounter() {return counter;}
 
 private:
     constexpr static const char *type_name = "fieldMeta";
@@ -255,7 +255,7 @@ public:
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
     unsigned long leaseIncUniq() {return counter++;}
-    unsigned long getUniqCounter() {return counter;}
+    unsigned long getCurrentUniqCounter() {return counter;}
 
     friend class Analysis;
 

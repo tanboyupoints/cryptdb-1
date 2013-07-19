@@ -66,8 +66,12 @@ class DropColumnSubHandler : public AlterSubHandler {
                 [table, dbname, &a, this] (List<Alter_drop> out_list,
                                            Alter_drop *adrop) {
                     FieldMeta *fm = a.getFieldMeta(table, adrop->name);
+                    TableMeta *tm = a.getTableMeta(table);
                     List<Alter_drop> lst = this->rewrite(fm, adrop);
                     out_list.concat(&lst);
+                    // FIXME: Slow.
+                    Delta d(Delta::DELETE, fm, tm, tm->getKey(fm));
+                    a.deltas.push_back(d);
                     this->update(a, table, dbname, adrop); 
                     return out_list; /* lambda */
                 });
@@ -107,6 +111,7 @@ class DropColumnSubHandler : public AlterSubHandler {
     void update(Analysis &a, const std::string &table,
                 const std::string &dbname, Alter_drop *adrop) const
     {
+        /*
         // Remove metadata from embedded database.
         ostringstream s;
         s << " DELETE FROM pdb.field_info, pdb.onion_info, "
@@ -124,6 +129,7 @@ class DropColumnSubHandler : public AlterSubHandler {
 
         // Remove from *Meta structures.
         assert(a.destroyFieldMeta(table, adrop->name));
+        */
     }
 };
 
@@ -198,7 +204,7 @@ class DropIndexSubHandler : public AlterSubHandler {
                     return Alter_drop::KEY == adrop->type;
                 });
 
-        // Update and Rewrite.
+        // Rewrite.
         // FIXME: Handle oDET index as well.
         drop_it =
             List_iterator<Alter_drop>(key_drop_list);

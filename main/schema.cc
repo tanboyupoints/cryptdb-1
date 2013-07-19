@@ -310,6 +310,7 @@ FieldMeta::FieldMeta(unsigned int id, std::string serial)
     this->salt_name = vec[3];
     this->onion_layout = TypeText<onionlayout>::toType(vec[4]);
     this->uniq_count = atoi(vec[5].c_str());
+    this->counter = atoi(vec[6].c_str());
 }
 
 FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *m_key,
@@ -337,7 +338,8 @@ std::string FieldMeta::serialize(const DBObject &parent) const
         serialize_string(bool_to_string(has_salt)) +
         serialize_string(getSaltName()) +
         serialize_string(TypeText<onionlayout>::toText(onion_layout)) +
-        serialize_string(std::to_string(uniq_count));
+        serialize_string(std::to_string(uniq_count)) +
+        serialize_string(std::to_string(counter));
 
    return serial;
 }
@@ -363,8 +365,8 @@ FieldMeta::orderedOnionMetas() const
     std::sort(v.begin(), v.end(),
               [] (std::pair<OnionMetaKey *, OnionMeta *> a,
                   std::pair<OnionMetaKey *, OnionMeta *> b) {
-                return a.second->getUniqCount() <
-                       b.second->getUniqCount();
+                return a.second->getUniq() <
+                       b.second->getUniq();
               });
 
     return v;
@@ -419,7 +421,7 @@ std::vector<FieldMeta *> TableMeta::orderedFieldMetas() const
 
     std::sort(v.begin(), v.end(),
               [] (FieldMeta *a, FieldMeta *b) {
-                return a->getUniqCount() < b->getUniqCount();
+                return a->getUniq() < b->getUniq();
               }); 
 
 

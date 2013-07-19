@@ -296,7 +296,7 @@ do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
       << " "  << bool_to_string(fm->has_salt) << ", "
       << " '" << fm->getSaltName() << "', "
       << " '" << TypeText<onionlayout>::toText(fm->onion_layout)<< "',"
-      << " "  << fm->getUniqCount() << ", "
+      << " "  << fm->getUniq() << ", "
       << " 0"
       << " );";
 
@@ -415,6 +415,9 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
     } else {
         Delta d(Delta::CREATE, fm, tm, new IdentityMetaKey(name));
         a.deltas.push_back(d);
+        Delta d0(Delta::REPLACE, tm, a.ps->schema,
+                 a.ps->schema->getKey(tm));
+        a.deltas.push_back(d0);
     }
     // FIXME: Remove.
     // assert(tm->addChild(name, fm));

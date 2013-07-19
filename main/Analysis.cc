@@ -217,11 +217,6 @@ bool Delta::save(Connect *e_conn)
 
 bool Delta::apply(Connect *e_conn) 
 {
-    // HACK: A danger to myself and others, can remove once we have
-    // load working.
-    MappedDBMeta *keyed_parent_meta =
-        static_cast<MappedDBMeta *>(parent_meta);
-
     switch (action) {
         case CREATE: {
             /*
@@ -234,8 +229,11 @@ bool Delta::apply(Connect *e_conn)
             return true;
             break;
         } case REPLACE: {
-            return keyed_parent_meta->replaceChild(key, meta);
-            break;
+            /*
+             * Replace the particular meta.
+             */
+            replaceHandler(e_conn, meta, parent_meta, key);
+            return true;
         } case DELETE: {
             /*
              * Recursively delete everything from this top level
@@ -341,6 +339,40 @@ void Delta::deleteHandler(Connect *e_conn, DBMeta *object,
     object->applyToChildren(localDestroyHandler);
 }
 
+void Delta::replaceHandler(Connect *e_conn, DBMeta *object,
+                           DBMeta *parent, AbstractMetaKey *k)
+{
+    DBWriter dbw(object, parent);
+
+    const std::string child_serial = object->serialize(*parent);
+    const unsigned int child_id = object->getDatabaseID();
+    const unsigned int parent_id = parent->getDatabaseID();
+    
+    const std::string esc_child_serial =
+        escapeString(e_conn, child_serial);
+    const unsigned int esc_child_serial_len = esc_child_serial.size();
+    const std::string query = 
+        " UPDATE pdb." + dbw.table_name() +
+        "    SET serial_object='" + esc_child_serial + "', "
+        "        serial_object_len=" + std::to_string(esc_child_serial_len) +
+        "  WHERE id=" + std::to_string(child_id) + ";";
+
+    assert(e_conn->execute(query));
+
+    const std::string serial_key = k->getSerial();
+    const std::string esc_serial_key = escapeString(e_conn, serial_key);
+    const unsigned int esc_serial_key_len = esc_serial_key.size();
+    const std::string join_query =
+        " UPDATE pdb." + dbw.join_table_name() +
+        "    SET serial_key='" + esc_serial_key + "', "
+        "        serial_key_len=" + std::to_string(esc_serial_key_len) +
+        "  WHERE object_id=" + std::to_string(child_id) +
+        "    AND parent_id=" + std::to_string(parent_id) + "; ";
+    
+    assert(e_conn->execute(join_query)); 
+
+    return;
+}
 
 bool Analysis::addAlias(std::string alias, std::string table)
 {
