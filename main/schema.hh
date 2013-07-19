@@ -72,7 +72,7 @@ public:
 
     // New.
     OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
-              Create_field *cf);
+              Create_field *cf, unsigned long uniq_count);
     // Restore.
     /*
     OnionMeta(std::string name)
@@ -117,9 +117,12 @@ public:
         return layers.back()->level();
     }
 
+    unsigned long getUniqCount() const {return uniq_count;}
+
 private:
     constexpr static const char *type_name = "onionMeta";
     std::string onionname;
+    unsigned long uniq_count;
 } OnionMeta;
 
 struct TableMeta;
@@ -139,14 +142,18 @@ public:
     // Recovering field from proxy db.
     FieldMeta(std::string name, bool has_salt, 
               std::string salt_name, onionlayout onion_layout,
-              unsigned long uniq_count)
+              unsigned long uniq_count, unsigned long counter)
         : fname(name), has_salt(has_salt), salt_name(salt_name),
           onion_layout(onion_layout), uniq_count(uniq_count) {}
+          // FIXME: Set counter
+          // counter(counter) {}
     FieldMeta(unsigned int id, std::string serial);
     ~FieldMeta() {;}
 
     std::string serialize(const DBObject &parent) const;
     std::string stringify() const;
+    std::vector<std::pair<OnionMetaKey *, OnionMeta *>>
+        orderedOnionMetas() const;
 
     std::string getSaltName() const {
         assert(has_salt);
@@ -206,9 +213,14 @@ public:
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
 
+    unsigned long leaseIncUniq() {return counter++;}
+    // FIXME: Change name.
+    unsigned long getUniqCounter() {return counter;}
+
 private:
     constexpr static const char *type_name = "fieldMeta";
     unsigned long uniq_count;
+    unsigned long counter;
 } FieldMeta;
 
 // TODO: Put const back.

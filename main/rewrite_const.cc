@@ -86,10 +86,10 @@ static void
 encrypt_item_all_onions(Item * i, FieldMeta * fm,
                         uint64_t IV, vector<Item*> & l, Analysis &a) {
 
-    for (auto it : fm->children) {
+    for (auto it : fm->orderedOnionMetas()) {
         // FIXME: dynamic_cast
-        onion o = static_cast<OnionMetaKey *>(it.first)->getValue();
-        OnionMeta *om = static_cast<OnionMeta *>(it.second);
+        onion o = it.first->getValue();
+        OnionMeta *om = it.second;
         l.push_back(encrypt_item_layers(i, o, om->layers, a, fm, IV));
     }
 }

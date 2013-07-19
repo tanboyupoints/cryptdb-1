@@ -266,6 +266,7 @@ public:
     virtual DBMeta *getChild(AbstractMetaKey * key) const;
     AbstractMetaKey *getKey(const DBMeta *const child) const;
 
+    // FIXME: Make protected.
     std::map<AbstractMetaKey *, DBMeta *> children;
 
 private:

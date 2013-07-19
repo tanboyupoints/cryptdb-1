@@ -193,8 +193,9 @@ AbstractMeta<ChildType, KeyType>::applyToChildren(std::function<void(DBMeta *)> 
 }
 
 OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
-                     Create_field *cf)
-    : onionname(getpRandomName() + TypeText<onion>::toText(o))
+                     Create_field *cf, unsigned long uniq_count)
+    : onionname(getpRandomName() + TypeText<onion>::toText(o)),
+      uniq_count(uniq_count)
 {
     if (m_key) {         // Don't encrypt if we don't have a key.
         Create_field * newcf = cf;
@@ -233,6 +234,7 @@ OnionMeta::OnionMeta(unsigned int id, std::string serial)
     this->onionname = vec[1];
     o = vec[2];                      // ?
     seclevel = vec[3];               // ?
+    uniq_count = atoi(vec[4].c_str());
 }
 
 std::string OnionMeta::serialize(const DBObject &parent) const
@@ -245,9 +247,10 @@ std::string OnionMeta::serialize(const DBObject &parent) const
 
     std::string serial =
         serialize_string(std::to_string(parent.getDatabaseID())) +  // ?
-        serialize_string(getAnonOnionName()) +
+        serialize_string(this->onionname) +
         serialize_string(TypeText<onion>::toText(o)) +              // ?
-        serialize_string(TypeText<SECLEVEL>::toText(seclevel));     // ?
+        serialize_string(TypeText<SECLEVEL>::toText(seclevel)) +    // ?
+        serialize_string(std::to_string(this->uniq_count));
 
     return serial;
 }
@@ -312,7 +315,8 @@ FieldMeta::FieldMeta(unsigned int id, std::string serial)
 FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *m_key,
                      unsigned long uniq_count)
     : fname(name), has_salt(static_cast<bool>(m_key)),
-      salt_name(BASE_SALT_NAME + getpRandomName()), uniq_count(uniq_count)
+      salt_name(BASE_SALT_NAME + getpRandomName()), uniq_count(uniq_count),
+      counter(0)
 {
     if (NULL == m_key) {
         this->onion_layout = PLAIN_ONION_LAYOUT;
@@ -342,6 +346,28 @@ string FieldMeta::stringify() const
 {
     string res = " [FieldMeta " + fname + "]";
     return res;
+}
+
+std::vector<std::pair<OnionMetaKey *, OnionMeta *>>
+FieldMeta::orderedOnionMetas() const
+{
+    std::vector<std::pair<OnionMetaKey *, OnionMeta *>> v;
+    for (auto it : children) {
+        // FIXME: dynamic_cast
+        auto pair =
+            std::make_pair(static_cast<OnionMetaKey *>(it.first),
+                           static_cast<OnionMeta *>(it.second));
+        v.push_back(pair);
+    }
+
+    std::sort(v.begin(), v.end(),
+              [] (std::pair<OnionMetaKey *, OnionMeta *> a,
+                  std::pair<OnionMetaKey *, OnionMeta *> b) {
+                return a.second->getUniqCount() <
+                       b.second->getUniqCount();
+              });
+
+    return v;
 }
 
 TableMeta::TableMeta(unsigned int id, std::string serial)
@@ -382,6 +408,7 @@ std::string TableMeta::getAnonTableName() const {
     return anon_table_name;
 }
 
+// FIXME: Slow.
 std::vector<FieldMeta *> TableMeta::orderedFieldMetas() const
 {
     std::vector<FieldMeta *> v;
@@ -389,6 +416,12 @@ std::vector<FieldMeta *> TableMeta::orderedFieldMetas() const
         // FIXME: Use dynamic_cast.
         v.push_back(static_cast<FieldMeta *>(it.second));
     }
+
+    std::sort(v.begin(), v.end(),
+              [] (FieldMeta *a, FieldMeta *b) {
+                return a->getUniqCount() < b->getUniqCount();
+              }); 
+
 
     return v;
 }
