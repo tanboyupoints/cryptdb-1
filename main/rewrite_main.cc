@@ -975,10 +975,12 @@ rewrite_helper(const string & q, Analysis & analysis,
     // execution scheme.
     // --------------------------------------
     // HACK: To determine if we have a DDL.
+    /*
     if (analysis.deltas.size() > 0) {
         assert(analysis.ps->e_conn->execute("use pdb;"));
         assert(analysis.ps->e_conn->execute(q));
     }
+    */
     for (auto it : analysis.deltas) {
         assert(it.apply(analysis.ps->e_conn));
     }

@@ -92,11 +92,11 @@ class InsertHandler : public DMLHandler {
                         break;
                     vector<Item *> l;
                     // Prevent the dereferencing of a bad iterator if
-                    // the user supplies more values than fields and the parser
-                    // fails to throw an error.
-                    // TODO(burrows): It seems like the expected behavior is
-                    // for the parser to catch this bad state, so we will fail
-                    // until further notice.
+                    // the user supplies more values than fields and the
+                    // parser fails to throw an error.
+                    // TODO(burrows): It seems like the expected behavior
+                    // is for the parser to catch this bad state, so we
+                    // will fail until further notice.
                     assert(fmVecIt != fmVec.end());
                     itemTypes.do_rewrite_insert(i, a, l, *fmVecIt);
                     for (auto it1 = l.begin(); it1 != l.end(); ++it1) {

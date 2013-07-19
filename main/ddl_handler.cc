@@ -58,6 +58,8 @@ class CreateHandler : public DDLHandler {
             // assert(a.ps->schema->addChild(key, tm));
             Delta delta(Delta::CREATE, tm, a.ps->schema, key);
             a.deltas.push_back(delta);
+            // FIXME: Remove.
+            assert(a.ps->e_conn->execute(q));
            
             /*
             {
@@ -185,6 +187,8 @@ class DropHandler : public DDLHandler {
             Delta delta(Delta::DELETE, tm, a.ps->schema,
                         new IdentityMetaKey(table));
             a.deltas.push_back(delta);
+            // FIXME: Remove.
+            assert(a.ps->e_conn->execute(q));
             // FIXME: Remove.
             // assert(a.destroyTableMeta(table));
         }
