@@ -413,9 +413,8 @@ printEC(Connect * e_conn, const string & command) {
 
 static void
 printEmbeddedState(ProxyState & ps) {
-    printEC(ps.e_conn, "use pdb;");
     printEC(ps.e_conn, "show databases;");
-    printEC(ps.e_conn, "show tables;");
+    printEC(ps.e_conn, "show tables from pdb;");
     printEC(ps.e_conn, "selecT * from pdb.tableMeta_schemaInfo;");
     printEC(ps.e_conn, "select * from pdb.tableMeta;");
     printEC(ps.e_conn, "selecT * from pdb.fieldMeta_tableMeta;");
