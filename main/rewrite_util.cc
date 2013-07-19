@@ -223,11 +223,8 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
     }
 
     // create each onion column
-    for (auto oit = fm->children.begin();
-         oit != fm->children.end();
-         ++oit) {
-
-        OnionMeta *om = static_cast<OnionMeta *>(oit->second);
+    for (auto oit : fm->orderedOnionMetas()) {
+        OnionMeta *om = oit.second;
 	Create_field * new_cf =
             get_create_field(f, om->layers, om->getAnonOnionName());
 	/*
