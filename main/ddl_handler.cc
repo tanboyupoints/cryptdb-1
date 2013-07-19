@@ -54,31 +54,11 @@ class CreateHandler : public DDLHandler {
             // TODO: Use appropriate values for has_sensitive and has_salt.
             TableMeta *tm = new TableMeta(true, true);
             IdentityMetaKey *key = new IdentityMetaKey(table);
-            // FIXME: Remove.
-            // assert(a.ps->schema->addChild(key, tm));
             Delta delta(Delta::CREATE, tm, a.ps->schema, key);
             a.deltas.push_back(delta);
             // FIXME: Remove.
             assert(a.ps->e_conn->execute(q));
            
-            /*
-            {
-                ostringstream s;
-                s << " INSERT INTO pdb.table_info VALUES ("
-                  << " '" << table << "', "
-                  << " '" << tm->getAnonTableName() << "', "
-                  << " "  << bool_to_string(tm->hasSensitive) << ", "
-                  << " "  << bool_to_string(tm->has_salt) << ", "
-                  << " '" << tm->salt_name << "', "
-                  << " '" << dbname << "',"
-                  << " "  << tm->getUniqCounter() << ", "
-                  << " 0"
-                  << " );";
-
-                assert(a.ps->e_conn->execute(s.str()));
-            }
-            */
-            
             // -----------------------------
             //         Rewrite TABLE       
             // -----------------------------
@@ -150,12 +130,8 @@ class DropHandler : public DDLHandler {
     }
 
     void update(const string &q, LEX *lex, Analysis &a) const {
-        assert(a.ps->e_conn->execute("START TRANSACTION;"));
-
         TABLE_LIST *tbl = lex->select_lex.table_list.first;
         for (; tbl; tbl = tbl->next_local) {
-            // FIXME: Remove.
-            // char* dbname = tbl->db;
             char* table  = tbl->table_name;
 
             if (lex->drop_if_exists) {
@@ -163,23 +139,6 @@ class DropHandler : public DDLHandler {
                     continue;
                 }
             }
-
-            /*
-             * FIXME: Remove.
-            ostringstream s;
-
-            s << " DELETE FROM pdb.table_info, pdb.field_info, "
-              << "             pdb.onion_info, pdb.layer_key"
-              << " USING pdb.table_info INNER JOIN pdb.field_info"
-              << "       INNER JOIN pdb.onion_info INNER JOIN pdb.layer_key"
-              << " WHERE  pdb.table_info.name = '" << table << "' "
-              << " AND    pdb.table_info.database_name = '" << dbname << "' "
-              << " AND    pdb.table_info.id = pdb.field_info.table_info_id"
-              << " AND    pdb.field_info.id = pdb.onion_info.field_info_id"
-              << " AND    pdb.onion_info.id = pdb.layer_key.onion_info_id;";
-
-            assert(a.ps->e_conn->execute(s.str()));
-            */
 
             // Remove from *Meta structures.
             TableMeta *tm = a.getTableMeta(table);
@@ -189,11 +148,7 @@ class DropHandler : public DDLHandler {
             a.deltas.push_back(delta);
             // FIXME: Remove.
             assert(a.ps->e_conn->execute(q));
-            // FIXME: Remove.
-            // assert(a.destroyTableMeta(table));
         }
-        
-        assert(a.ps->e_conn->execute("COMMIT"));
     }
 };
 

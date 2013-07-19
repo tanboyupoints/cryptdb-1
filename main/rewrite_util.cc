@@ -196,7 +196,6 @@ get_create_field(Create_field * f, vector<EncLayer*> & v, const string & name) {
     }
 
     return new_cf;
-    
 }
 
 vector<Create_field *>
@@ -281,90 +280,6 @@ rewrite_key(const string &table, Key *key, Analysis &a)
     return output_keys;
 }
 
-bool
-do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
-             std::string table)
-{
-    // Add the field data to the proxy db.
-    // TODO: hasSensitive
-    ostringstream s;
-    s << " INSERT INTO pdb.field_info VALUES ("
-      << "       (SELECT id FROM pdb.table_info "
-      << "         WHERE pdb.table_info.database_name = '" << dbname << "'"
-      << "           AND pdb.table_info.name = '" << table << "'),"
-      << " '" << fm->fname << "', "
-      << " "  << bool_to_string(fm->has_salt) << ", "
-      << " '" << fm->getSaltName() << "', "
-      << " '" << TypeText<onionlayout>::toText(fm->onion_layout)<< "',"
-      << " "  << fm->getUniq() << ", "
-      << " 0"
-      << " );";
-
-    assert(a.ps->e_conn->execute(s.str()));
-    
-    unsigned long long fieldID = a.ps->e_conn->last_insert_id();
-
-    // Add the onion data to the proxy db.
-    for (std::pair<AbstractMetaKey *, DBMeta *> onion_pair :
-            fm->children) {
-        // FIXME: dynamic_cast
-        const onion o =
-            static_cast<OnionMetaKey *>(onion_pair.first)->getValue();
-        OnionMeta * const om = static_cast<OnionMeta *>(onion_pair.second);
-        ostringstream s;
-
-        SECLEVEL current_sec_level = fm->getOnionLevel(o);
-        assert(current_sec_level != SECLEVEL::INVALID);
-        std::string str_seclevel =
-            TypeText<SECLEVEL>::toText(current_sec_level);
-        std::string str_onion = TypeText<onion>::toText(o);
-        s << " INSERT INTO pdb.onion_info VALUES ("
-          << " " << std::to_string(fieldID) << ", "
-          << " '" << om->getAnonOnionName() << "', "
-          << " '" << str_onion << "', "
-          << " '" << str_seclevel << "', "
-          << " 0);";
-
-        assert(a.ps->e_conn->execute(s.str()));
-
-        // Add the encryption layer data to the proxy db.
-        unsigned long long onionID = a.ps->e_conn->last_insert_id();
-        for (unsigned int i = 0; i < om->layers.size(); ++i) {
-            SECLEVEL level = fm->onion_layout[o][i];
-            std::string str_level =
-                TypeText<SECLEVEL>::toText(level);
-
-            std::string crypto_key = "whatever";
-                // EncLayerFactory::serializeLayer(om->layers[i], om);
-
-            unsigned int escaped_length = crypto_key.size() * 2 + 1;
-            char escaped_key[escaped_length];
-            a.ps->e_conn->real_escape_string(escaped_key,
-                                             crypto_key.c_str(),
-                                             escaped_length);
-
-            ostringstream s;
-            s << " INSERT INTO pdb.layer_key VALUES ("
-              << " " << onionID << ", "
-              << " '" << escaped_key << "', "
-              << " '" << str_onion << "', "
-              << " '" << str_level << "', "
-              << " '" << crypto_key.size() << "', "
-              << " 0"
-              << " );";
-
-            assert(a.ps->e_conn->execute(s.str()));
-            // The last iteration should get us to the current
-            // security level.
-            if (current_sec_level == level) {
-                assert(i == om->layers.size() - 1);
-            }
-        }
-    }
-
-    return true;
-}
-
 std::string
 bool_to_string(bool b)
 {
@@ -419,9 +334,7 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
                  a.ps->schema->getKey(tm));
         a.deltas.push_back(d0);
     }
-    // FIXME: Remove.
-    // assert(tm->addChild(name, fm));
-    // assert(do_add_field(fm, a, dbname, table));
+
     // -----------------------------
     //         Rewrite FIELD       
     // -----------------------------

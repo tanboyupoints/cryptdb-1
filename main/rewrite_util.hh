@@ -44,10 +44,6 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a);
 vector<Key*>
 rewrite_key(const string &table, Key *key, Analysis &a);
 
-bool
-do_add_field(FieldMeta *fm, Analysis &a, std::string dbname,
-             std::string table);
-
 std::string
 bool_to_string(bool b);
 
@@ -85,5 +81,4 @@ std::string vector_join(std::vector<T> v, std::string delim,
 
     return output;
 }
-
 

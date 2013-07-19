@@ -40,21 +40,6 @@ extern CItemFuncNameDir funcNames;
 //TODO: use getAssert in more places
 //TODO: replace table/field with FieldMeta * for speed and conciseness
 
-// FIXME: Placement.
-SchemaInfo *
-loadSchemaInfo(Connect *e_conn);
-
-/*
-static void
-buildTableMeta(ProxyState &ps);
-
-static void
-buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name);
-
-static void
-buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id);
-*/
-
 //TODO: rewrite_proj may not need to be part of each class;
 // it just does gather, choos and then rewrite
 
@@ -96,74 +81,6 @@ mysql_query_wrapper(MYSQL *m, const string &q)
     void* ret = create_embedded_thd(0);
     if (!ret) assert(false);
 }
-
-/*
-static void
-createMetaTablesIfNotExists(ProxyState & ps)
-{
-    ostringstream s;
-
-    assert(ps.e_conn->execute("CREATE DATABASE IF NOT EXISTS pdb"));
-
-    assert(ps.e_conn->execute(
-                " CREATE TABLE IF NOT EXISTS pdb.table_info"
-                " (name varchar(64) NOT NULL UNIQUE,"
-                "  anon_name varchar(64) NOT NULL UNIQUE,"
-                "  has_sensitive boolean,"
-                "  has_salt boolean,"
-                "  salt_name varchar(64) NOT NULL,"
-                "  database_name varchar(64) NOT NULL,"
-                "  uniq_counter bigint NOT NULL,"
-                "  id SERIAL PRIMARY KEY)"
-                " ENGINE=InnoDB;"));
-
-    s << " CREATE TABLE IF NOT EXISTS pdb.field_info"
-      << " (table_info_id bigint NOT NULL," // Foreign key.
-      << "  name varchar(64) NOT NULL,"
-      << "  has_salt boolean,"
-      << "  salt_name varchar(64) NOT NULL,"
-      << "  onion_layout enum"
-      << " " << TypeText<onionlayout>::parenList().c_str() << " NOT NULL,"
-      << "  uniq_count bigint NOT NULL,"
-      << "  id SERIAL PRIMARY KEY)"
-      << " ENGINE=InnoDB;";
-
-    assert(ps.e_conn->execute(s.str()));
-    s.str("");
-    s.clear();
-
-    s << " CREATE TABLE IF NOT EXISTS pdb.onion_info"
-      << " (field_info_id bigint NOT NULL," // Foreign key.
-      << "  name varchar(64) NOT NULL UNIQUE,"
-      << "  type enum"
-      << " " << TypeText<onion>::parenList() << " NOT NULL,"
-      << "  current_level enum"
-      << " " << TypeText<SECLEVEL>::parenList() << " NOT NULL,"
-      << "  id SERIAL PRIMARY KEY)"
-      << " ENGINE=InnoDB;";
-
-    assert(ps.e_conn->execute(s.str()));
-    s.str("");
-    s.clear();
-
-    s << " CREATE TABLE IF NOT EXISTS pdb.layer_key"
-      << " (onion_info_id bigint NOT NULL," // Foreign key.
-      << "  lkey varbinary(64) NOT NULL,"
-      << "  type enum"
-      << " " << TypeText<onion>::parenList() << " NOT NULL,"
-      << "  level enum"
-      << " " << TypeText<SECLEVEL>::parenList() << " NOT NULL,"
-      << "  len bigint NOT NULL,"
-      << "  id SERIAL PRIMARY KEY)"
-      << " ENGINE=InnoDB;";
-
-    assert(ps.e_conn->execute(s.str()));
-    s.str("");
-    s.clear();
-
-    return;
-}
-*/
 
 static bool
 sanityCheck(FieldMeta *fm)
@@ -209,7 +126,7 @@ sanityCheck(SchemaInfo *schema)
 //  1> Schema buildling (CREATE TABLE IF NOT EXISTS...)
 //  2> INSERTing
 //  3> SELECTing
-SchemaInfo *
+static SchemaInfo *
 loadSchemaInfo(Connect *e_conn)
 {
     SchemaInfo *schema = new SchemaInfo(); 
@@ -228,180 +145,6 @@ loadSchemaInfo(Connect *e_conn)
      assert(sanityCheck(schema));
      return schema;
 }
-
-/*
-static void
-createInMemoryTables(ProxyState & ps)
-{
-    buildTableMeta(ps);
-    return;
-}
-
-static void
-buildTableMeta(ProxyState &ps)
-{
-
-    DBResult *dbres;
-    assert(ps.e_conn->execute(
-                " SELECT name, anon_name, has_sensitive, has_salt," 
-                "        salt_name, database_name, uniq_counter"
-                " FROM pdb.table_info", dbres));
-    ScopedMySQLRes r(dbres->n);
-    MYSQL_ROW row;
-    while ((row = mysql_fetch_row(r.res()))) {
-        unsigned long *l = mysql_fetch_lengths(r.res());
-        assert(l != NULL);
-
-        string table_name(row[0], l[0]);
-        string table_anon_name(row[1], l[1]);
-        string table_has_sensitive(row[2], l[2]);
-        string table_has_salt(row[3], l[3]);
-        string table_salt_name(row[4], l[4]);
-        string table_database_name(row[5], l[5]);
-        string table_uniq_counter(row[6], l[6]);
-
-        unsigned long counter = atoi(table_uniq_counter.c_str());
-
-        TableMeta *tm = new TableMeta(string_to_bool(table_has_sensitive),
-                                      string_to_bool(table_has_salt),
-                                      table_salt_name, table_anon_name,
-                                      counter);
-        IdentityMetaKey *key = new IdentityMetaKey(table_name);
-        assert(ps.schema->addChild(key, tm));
-
-        buildFieldMeta(ps, tm, table_database_name);
-    }
-
-    return;
-}
-
-static void
-buildFieldMeta(ProxyState &ps, TableMeta *tm, string database_name)
-{
-
-    string q = " SELECT f.name, f.has_salt, f.salt_name, f.onion_layout,"
-               "        f.uniq_count, f.id"
-               " FROM pdb.table_info t, pdb.field_info f"
-               " WHERE t.database_name = '" + database_name + "' "
-               "   AND t.id = f.table_info_id;";
-
-    DBResult *dbRes;
-    assert(ps.e_conn->execute(q, dbRes));
-
-    ScopedMySQLRes r(dbRes->n);
-    MYSQL_ROW row;
-    while ((row = mysql_fetch_row(r.res()))) {
-        unsigned long *l = mysql_fetch_lengths(r.res());
-        assert(l != NULL);
-
-        string field_name(row[0], l[0]);
-        string field_has_salt(row[1], l[1]);
-        string field_salt_name(row[2], l[2]);
-        string field_onion_layout(row[3], l[3]);
-        string field_uniq_count(row[4], l[4]);
-        string field_id(row[5], l[5]);
-
-        bool has_salt = string_to_bool(field_has_salt);
-        onionlayout onion_layout = 
-            TypeText<onionlayout>::toType(field_onion_layout);
-        long unsigned uniq_count = atoi(field_uniq_count.c_str());
-
-        FieldMeta *fm =
-            new FieldMeta(field_name, has_salt, field_salt_name,
-                          onion_layout, uniq_count);
-
-        IdentityMetaKey *key = new IdentityMetaKey(field_name);
-        assert(tm->addChild(key, fm));
-
-        buildOnionMeta(ps, fm, atoi(field_id.c_str()));
-    }
-    return;
-}
-
-static std::map<SECLEVEL, std::string>
-get_layer_keys(ProxyState &ps, onion o, int onion_id) {
-    string q = " SELECT l.lkey, l.type, l.level, l.len"
-               " FROM pdb.layer_key l, pdb.onion_info o"
-               " WHERE l.onion_info_id = " + std::to_string(onion_id) +
-               "    AND o.type = l.type;";
-
-    DBResult *dbRes;
-    assert(ps.e_conn->execute(q, dbRes));
-
-    ScopedMySQLRes r(dbRes->n);
-    MYSQL_ROW row;
-    std::map<SECLEVEL, std::string> layer_keys;
-    while ((row = mysql_fetch_row(r.res()))) {
-        unsigned long *l = mysql_fetch_lengths(r.res());
-        assert(l != NULL);
-
-        string layer_lkey(row[0], l[0]);
-        string layer_type(row[1], l[1]);
-        string layer_level(row[2], l[2]);
-        string layer_len(row[3], l[3]);
-
-        layer_lkey.erase(atoi(layer_len.c_str()), std::string::npos);
-
-        SECLEVEL level = TypeText<SECLEVEL>::toType(layer_level);
-        std::pair<SECLEVEL, std::string> key(level, layer_lkey);
-        layer_keys.insert(key);
-    }
-
-    return layer_keys;
-}
-
-// Should basically mirror init_onions_layout()
-static void
-buildOnionMeta(ProxyState &ps, FieldMeta *fm, int field_id)
-{
-
-    string q = " SELECT o.name, o.type, o.current_level, o.id"
-               " FROM pdb.onion_info o, pdb.field_info f"
-               " WHERE o.field_info_id = " + std::to_string(field_id) +";";
-
-    DBResult *dbRes;
-    assert(ps.e_conn->execute(q, dbRes));
-
-    ScopedMySQLRes r(dbRes->n);
-    MYSQL_ROW row;
-    while ((row = mysql_fetch_row(r.res()))) {
-        unsigned long *l = mysql_fetch_lengths(r.res());
-        assert(l != NULL);
-
-        string onion_name(row[0], l[0]);
-        string onion_type(row[1], l[1]);
-        string onion_current_level(row[2], l[2]);
-        string onion_id(row[3], l[3]);
-
-        onion o = TypeText<onion>::toType(onion_type);
-        OnionMeta *om = new OnionMeta(onion_name);
-        OnionMetaKey *key = new OnionMetaKey(o);
-        fm->addChild(key, om);
-
-        // Add elements to OnionMeta.layers starting with the bottom layer
-        // and stopping at the current level.
-        std::map<SECLEVEL, std::string> layer_serial =
-            get_layer_keys(ps, o, atoi(onion_id.c_str()));
-        std::vector<SECLEVEL> layers = fm->onion_layout[o];
-        SECLEVEL current_level =
-            TypeText<SECLEVEL>::toType(onion_current_level);
-        for (auto it: layers) {
-            EncLayer *enc_layer =
-		EncLayerFactory::deserializeLayer(layer_serial[it]);
-
-            om->layers.push_back(enc_layer);
-            SECLEVEL onion_level = fm->getOnionLevel(o);
-            assert(onion_level != SECLEVEL::INVALID);
-            if (it == current_level) {
-                assert(it == layers.back());
-                break;
-            }
-        }
-     }
-
-     return;
-}
-*/
 
 static void
 printEC(Connect * e_conn, const string & command) {
@@ -423,10 +166,6 @@ printEmbeddedState(ProxyState & ps) {
     printEC(ps.e_conn, "select * from pdb.onionMeta;");
     printEC(ps.e_conn, "selecT * from pdb.encLayer_onionMeta;");
     printEC(ps.e_conn, "select * from pdb.encLayer;");
-    // printEC(ps.e_conn, "select * from pdb.table_info;");
-    // printEC(ps.e_conn, "select * from pdb.field_info;");
-    // printEC(ps.e_conn, "select * from pdb.onion_info;");
-    // printEC(ps.e_conn, "select * from pdb.layer_key;");
 }
 
 template <typename type> static void
@@ -537,21 +276,6 @@ buildTypeTextTranslator()
     return;
 }
 
-
-/*
-static void
-initSchema(ProxyState & ps)
-{
-    createMetaTablesIfNotExists(ps);
-
-    printEmbeddedState(ps);
-
-    createInMemoryTables(ps);
-
-    return;
-}
-*/
-
 //l gets updated to the new level
 static void
 removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEVEL & new_level, const string & cur_db) {
@@ -615,10 +339,6 @@ FieldQualifies(const FieldMeta * restriction,
 {
     return !restriction || restriction == field;
 }
-
-
-
-
 
 template <class T>
 static Item *
@@ -712,9 +432,6 @@ do_optimize_const_item(T *i, Analysis &a) {
     */
 }
 
-
-
-
 static Item *
 decrypt_item_layers(Item * i, onion o, vector<EncLayer *> & layers, uint64_t IV, Analysis &a, FieldMeta *fm, const vector<Item *> &res) {
     assert(!i->is_null());
@@ -741,9 +458,6 @@ decrypt_item_layers(Item * i, onion o, vector<EncLayer *> & layers, uint64_t IV,
 
     return dec;
 }
-
-
-
 
 static Item *
 decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV, Analysis &a, vector<Item *> &res) {
@@ -776,9 +490,6 @@ intersect(const EncSet & es, FieldMeta * fm) {
  * Actual item handlers.
  */
 static void optimize_select_lex(st_select_lex *select_lex, Analysis & a);
-
-
-
 
 static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_ITEM> {
     virtual RewritePlan * do_gather_type(Item_subselect *i, reason &tr, Analysis & a) const {
@@ -904,7 +615,6 @@ loadUDFs(Connect * conn) {
     createAll(conn);
     LOG(cdb_v) << "Loaded CryptDB's UDFs.";
 }
-
 
 Rewriter::Rewriter(ConnectionInfo ci,
                    const std::string &embed_dir,
@@ -1284,5 +994,4 @@ printRes(const ResType & r) {
         //LOG(edb_v) << ss.str();
     }
 }
-
 

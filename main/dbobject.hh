@@ -179,8 +179,7 @@ private:
 };
 
 class DBObject {
-    // FIXME: Make const.
-    unsigned int id;
+    const unsigned int id;
 
 public:
     // Building new objects.
@@ -199,8 +198,10 @@ public:
     virtual std::string serialize(const DBObject &parent) const = 0;
 };
 
+class DBWriter;
+
 /*
- * DBBasicMeta is also a design choice about how we use Deltas.
+ * DBMeta is also a design choice about how we use Deltas.
  * i) Read SchemaInfo from database, read Deltaz from database then
  *  apply Deltaz to in memory SchemaInfo.
  *  > How/When do we get an ID the first time we put something into the
@@ -212,9 +213,6 @@ public:
  *  read SchemaInfo from database.
  *  > Logic is in SQL.
  */
-
-class DBWriter;
-
 class DBMeta : public DBObject {
 public:
     DBMeta() {}
@@ -232,6 +230,27 @@ protected:
                         std::function<DBMeta *(std::string, std::string,
                                                std::string)>
                           deserialHandler);
+};
+
+class DBWriter {
+    const std::string child_table;
+    const std::string parent_table;
+
+public:
+    DBWriter(std::string child_name, std::string parent_name) :
+        child_table(child_name), parent_table(parent_name) {}
+    DBWriter(DBMeta *child, DBMeta *parent)
+        : child_table(child->typeName()), parent_table(parent->typeName())
+        {}
+
+    template <typename ChildType>
+        static DBWriter factory(DBMeta *parent) {
+            auto getChildTypeName = ChildType::instanceTypeName;
+            return DBWriter(getChildTypeName(), parent->typeName());
+        }
+
+    std::string table_name() {return child_table;}
+    std::string join_table_name() {return child_table + "_" + parent_table;}
 };
 
 class LeafDBMeta : public DBMeta {
@@ -296,31 +315,46 @@ public:
             delete it.second;
         }
     }
+
     // Virtual constructor to deserialize from embedded database.
     template <typename ConcreteMeta>
-        static ConcreteMeta *deserialize(unsigned int, std::string serial);
-    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn);
-    void applyToChildren(std::function<void(DBMeta *)>);
-};
+        static ConcreteMeta *deserialize(unsigned int id,
+                                         std::string serial)
+    {
+        return new ConcreteMeta(id, serial);
+    }
 
-class DBWriter {
-    const std::string child_table;
-    const std::string parent_table;
+    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn)
+    {
+        DBWriter dbw = DBWriter::factory<ChildType>(this);
 
-public:
-    DBWriter(std::string child_name, std::string parent_name) :
-        child_table(child_name), parent_table(parent_name) {}
-    DBWriter(DBMeta *child, DBMeta *parent)
-        : child_table(child->typeName()), parent_table(parent->typeName())
-        {}
+        // Perhaps it's conceptually cleaner to have this lambda return
+        // pairs of keys and children and then add the children from local
+        // scope.
+        std::function<DBMeta *(std::string,
+                               std::string, std::string)> deserialize =
+            [this] (std::string key, std::string serial, std::string id) {
+                AbstractMetaKey *meta_key =
+                    AbstractMetaKey::factory<KeyType>(key);
+                DBMeta *new_old_meta =
+                    AbstractMeta::deserialize<ChildType>(atoi(id.c_str()),
+                                                         serial);
 
-    template <typename ChildType>
-        static DBWriter factory(DBMeta *parent) {
-            auto getChildTypeName = ChildType::instanceTypeName;
-            return DBWriter(getChildTypeName(), parent->typeName());
+                // Gobble the child.
+                this->addChild(meta_key, new_old_meta);
+
+                return new_old_meta;
+            };
+
+        return DBMeta::doFetchChildren(e_conn, dbw, deserialize);
+    }
+
+    void applyToChildren(std::function<void(DBMeta *)> fn)
+    {
+        for (auto it : children) {
+            fn(it.second);
         }
-
-    std::string table_name() {return child_table;}
-    std::string join_table_name() {return child_table + "_" + parent_table;}
+    }
 };
+
 

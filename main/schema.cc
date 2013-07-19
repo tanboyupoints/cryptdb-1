@@ -148,50 +148,6 @@ AbstractMetaKey *MappedDBMeta::getKey(const DBMeta * const child) const
     throw CryptDBError("reverse lookup failed to find the child's key!");
 }
 
-template <typename ChildType, typename KeyType>
-template <typename ConcreteMeta> ConcreteMeta *
-AbstractMeta<ChildType, KeyType>::deserialize(unsigned int id,
-                                              std::string serial)
-{
-    return new ConcreteMeta(id, serial);
-}
-
-// TODO: Debug.
-template <typename ChildType, typename KeyType>
-std::vector<DBMeta *>
-AbstractMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
-{
-    DBWriter dbw = DBWriter::factory<ChildType>(this);
-
-    // Perhaps it's conceptually cleaner to have this lambda return
-    // pairs of keys and children and then add the children from local
-    // scope.
-    std::function<DBMeta *(std::string, std::string, std::string)> deserialize =
-        [this] (std::string key, std::string serial, std::string id) {
-            AbstractMetaKey *meta_key =
-                AbstractMetaKey::factory<KeyType>(key);
-            DBMeta *new_old_meta =
-                AbstractMeta::deserialize<ChildType>(atoi(id.c_str()),
-                                                     serial);
-
-            // Gobble the child.
-            this->addChild(meta_key, new_old_meta);
-
-            return new_old_meta;
-        };
-
-    return DBMeta::doFetchChildren(e_conn, dbw, deserialize);
-}
-
-template <typename ChildType, typename KeyType>
-void
-AbstractMeta<ChildType, KeyType>::applyToChildren(std::function<void(DBMeta *)> fn)
-{
-    for (auto it : children) {
-        fn(it.second);
-    }
-}
-
 OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
                      Create_field *cf, unsigned long uniq_count)
     : onionname(getpRandomName() + TypeText<onion>::toText(o)),
@@ -435,16 +391,6 @@ std::string TableMeta::getAnonIndexName(std::string index_name) const
     std::size_t hsh = std::hash<std::string>()(hash_input);
 
     return std::string("index_") + std::to_string(hsh);
-}
-
-SchemaInfo::~SchemaInfo()
-{
-    auto cp = tableMetaMap;
-    tableMetaMap.clear();
-
-    for (auto it : cp) {
-        delete it.second;
-    }
 }
 
 FieldMeta *

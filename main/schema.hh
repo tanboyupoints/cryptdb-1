@@ -74,10 +74,6 @@ public:
     OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
               Create_field *cf, unsigned long uniq_count);
     // Restore.
-    /*
-    OnionMeta(std::string name)
-        : onionname(name) {}
-    */
     OnionMeta(unsigned int id, std::string serial);
 
     std::string serialize(const DBObject &parent) const;
@@ -136,17 +132,10 @@ public:
     std::string salt_name;
     onionlayout onion_layout;
 
-    // New field.
+    // New.
     FieldMeta(std::string name, Create_field *field, AES_KEY *mKey,
               unsigned long uniq_count);
-    // Recovering field from proxy db.
-    FieldMeta(std::string name, bool has_salt, 
-              std::string salt_name, onionlayout onion_layout,
-              unsigned long uniq_count, unsigned long counter)
-        : fname(name), has_salt(has_salt), salt_name(salt_name),
-          onion_layout(onion_layout), uniq_count(uniq_count) {}
-          // FIXME: Set counter
-          // counter(counter) {}
+    // Restore.
     FieldMeta(unsigned int id, std::string serial);
     ~FieldMeta() {;}
 
@@ -231,20 +220,13 @@ public:
     std::string salt_name;
     std::string anon_table_name;
 
-    // Restore old TableMeta.
-    TableMeta(bool has_sensitive, bool has_salt, std::string salt_name,
-              std::string anon_table_name,
-              unsigned long counter)
-        : hasSensitive(has_sensitive), has_salt(has_salt),
-          salt_name(salt_name), anon_table_name(anon_table_name),
-          counter(counter) {}
-
     // New TableMeta.
     TableMeta(bool has_sensitive, bool has_salt)
         : hasSensitive(has_sensitive), has_salt(has_salt),
           salt_name("tableSalt_" + getpRandomName()),
           anon_table_name("table_" + getpRandomName()),
           counter(0) {}
+    // Restore.
     TableMeta(unsigned int id, std::string serial);
     ~TableMeta() {;}
 
@@ -273,7 +255,7 @@ private:
 typedef class SchemaInfo : public AbstractMeta<TableMeta, IdentityMetaKey> {
 public:
     SchemaInfo() : AbstractMeta(0) {}
-    ~SchemaInfo();
+    ~SchemaInfo() {}
 
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
@@ -282,8 +264,6 @@ public:
 
 private:
     constexpr static const char *type_name = "schemaInfo";
-    // FIXME: Remove.
-    std::map<std::string, TableMeta *> tableMetaMap;
 
     // These functions do not support Aliasing, use Analysis::getTableMeta
     // and Analysis::getFieldMeta.

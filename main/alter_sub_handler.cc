@@ -32,7 +32,7 @@ class AddColumnSubHandler : public AlterSubHandler {
                                                  false, out_list);
             });
 
-        // Add field to embedded database.
+        // REMOVE: Add field to embedded database.
         assert(a.ps->e_conn->execute(q));
         return single_lex_output(new_lex, out_lex_count);
     }
@@ -72,11 +72,10 @@ class DropColumnSubHandler : public AlterSubHandler {
                     // FIXME: Slow.
                     Delta d(Delta::DELETE, fm, tm, tm->getKey(fm));
                     a.deltas.push_back(d);
-                    this->update(a, table, dbname, adrop); 
                     return out_list; /* lambda */
                 });
 
-        // Remove column from embedded database.
+        // REMOVE: Remove column from embedded database.
         assert(a.ps->e_conn->execute(q));
 
         return single_lex_output(new_lex, out_lex_count);
@@ -106,30 +105,6 @@ class DropColumnSubHandler : public AlterSubHandler {
         }
 
         return out_list;
-    }
-
-    void update(Analysis &a, const std::string &table,
-                const std::string &dbname, Alter_drop *adrop) const
-    {
-        /*
-        // Remove metadata from embedded database.
-        ostringstream s;
-        s << " DELETE FROM pdb.field_info, pdb.onion_info, "
-          << "             pdb.layer_key"
-          << " USING pdb.table_info INNER JOIN pdb.field_info "
-          << "       INNER JOIN pdb.onion_info INNER JOIN "
-          << "       pdb.layer_key"
-          << " ON  pdb.table_info.id = pdb.field_info.table_info_id"
-          << " AND pdb.field_info.id = pdb.onion_info.field_info_id"
-          << " AND pdb.onion_info.id = pdb.layer_key.onion_info_id "
-          << " WHERE pdb.table_info.name = '" << table << "' "
-          << " AND pdb.table_info.database_name = '" << dbname << "';";
-
-        assert(a.ps->e_conn->execute(s.str()));
-
-        // Remove from *Meta structures.
-        assert(a.destroyFieldMeta(table, adrop->name));
-        */
     }
 };
 
