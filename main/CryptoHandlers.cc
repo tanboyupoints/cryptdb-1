@@ -397,14 +397,12 @@ RND_int::decryptUDF(Item * col, Item * ivcol) {
 
     Item * udfdec = new Item_func_udf_int(&u_decRNDInt, l);
     udfdec->name = NULL; //no alias
-    
-    /*	
-   //add encompassing CAST for unsigned
+
+    //add encompassing CAST for unsigned
     Item * udf = new Item_func_unsigned(udfdec);
     udf->name = NULL;
-    */	
 
-    return udfdec;
+    return udf;
 }
 
 ///////////////////////////////////////////////
@@ -653,13 +651,11 @@ DET_int::decryptUDF(Item * col, Item * ivcol) {
     Item * udfdec = new Item_func_udf_int(&u_decDETInt, l);
     udfdec->name = NULL;
 
-    /*
     //add encompassing CAST for unsigned
     Item * udf = new Item_func_unsigned(udfdec);
     udf->name = NULL;
-    */
 
-    return udfdec;
+    return udf;
 }
 
 DET_dec::DET_dec(Create_field * cf, const string & seed_key) : DET_int(cf, seed_key) {
