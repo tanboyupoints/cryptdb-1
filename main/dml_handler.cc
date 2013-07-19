@@ -318,7 +318,13 @@ private:
             output_rows.append(" ( ");
             for (unsigned long field_index = 0; field_index < field_count;
                  ++field_index) {
-                string field_data(row[field_index], l[field_index]);
+                string field_data;
+                if (row[field_index]) {
+                    field_data = std::string(row[field_index],
+                                             l[field_index]);
+                } else {    // Handle NULL values.
+                    field_data = std::string("NULL");
+                }
                 output_rows.append(field_data);
                 if (field_index + 1 < field_count) {
                     output_rows.append(", ");
@@ -340,10 +346,10 @@ private:
         Analysis insert_analysis = Analysis(a.ps);
         insert_analysis.rewriter = a.rewriter;
         // FIXME(burrows): Memleak.
-        // Freeing the query_parse (or using an automatic variable and letting
-        // it cleanup itself) will call the query_parse destructor which calls
-        // THD::cleanup_after_query which results in all of our Items_* being
-        // freed.
+        // Freeing the query_parse (or using an automatic variable and
+        // letting it cleanup itself) will call the query_parse
+        // destructor which calls THD::cleanup_after_query which
+        // results in all of our Items_* being freed.
         // THD::cleanup_after_query
         //     Query_arena::free_items
         //         Item::delete_self).

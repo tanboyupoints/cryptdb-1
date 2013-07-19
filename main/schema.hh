@@ -74,7 +74,10 @@ public:
     OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
               Create_field *cf, unsigned long uniq_count);
     // Restore.
-    OnionMeta(unsigned int id, std::string serial);
+    static OnionMeta *deserialize(unsigned int id, std::string serial);
+    OnionMeta(unsigned int id, std::string onionname,
+              unsigned long uniq_count)
+        : DBMeta(id), onionname(onionname), uniq_count(uniq_count) {}
 
     std::string serialize(const DBObject &parent) const;
     std::string getAnonOnionName() const;
@@ -117,7 +120,7 @@ public:
 
 private:
     constexpr static const char *type_name = "onionMeta";
-    std::string onionname;
+    const std::string onionname;
     unsigned long uniq_count;
 } OnionMeta;
 
@@ -127,16 +130,23 @@ struct TableMeta;
 // which contains data we want to add to this structure soon
 typedef class FieldMeta : public AbstractMeta<OnionMeta, OnionMetaKey> {
 public:
-    std::string fname;
-    bool has_salt; //whether this field has its own salt
-    std::string salt_name;
-    onionlayout onion_layout;
+    const std::string fname;
+    const bool has_salt; //whether this field has its own salt
+    const std::string salt_name;
+    const onionlayout onion_layout;
 
     // New.
     FieldMeta(std::string name, Create_field *field, AES_KEY *mKey,
               unsigned long uniq_count);
-    // Restore.
-    FieldMeta(unsigned int id, std::string serial);
+    // Restore (WARN: Creates an incomplete type as it will not have it's
+    // OnionMetas until they are added by the caller).
+    static FieldMeta *deserialize(unsigned int id, std::string serial);
+    FieldMeta(unsigned int id, std::string fname, bool has_salt,
+              std::string salt_name, onionlayout onion_layout,
+              unsigned long uniq_count, unsigned long counter)
+        : AbstractMeta(id), fname(fname), has_salt(has_salt),
+          salt_name(salt_name), onion_layout(onion_layout),
+          uniq_count(uniq_count) {}
     ~FieldMeta() {;}
 
     std::string serialize(const DBObject &parent) const;
@@ -210,15 +220,16 @@ private:
     constexpr static const char *type_name = "fieldMeta";
     unsigned long uniq_count;
     unsigned long counter;
+
+    static onionlayout getOnionLayout(AES_KEY *m_key, Create_field *f);
 } FieldMeta;
 
-// TODO: Put const back.
 typedef class TableMeta : public AbstractMeta<FieldMeta, IdentityMetaKey> {
 public:
-    bool hasSensitive;
-    bool has_salt;
-    std::string salt_name;
-    std::string anon_table_name;
+    const bool hasSensitive;
+    const bool has_salt;
+    const std::string salt_name;
+    const std::string anon_table_name;
 
     // New TableMeta.
     TableMeta(bool has_sensitive, bool has_salt)
@@ -227,7 +238,13 @@ public:
           anon_table_name("table_" + getpRandomName()),
           counter(0) {}
     // Restore.
-    TableMeta(unsigned int id, std::string serial);
+    static TableMeta *deserialize(unsigned int id, std::string serial);
+    TableMeta(unsigned int id, std::string anon_table_name,
+              bool has_sensitive, bool has_salt, std::string salt_name,
+              unsigned int counter)
+        : AbstractMeta(id), hasSensitive(has_sensitive),
+          has_salt(has_salt), salt_name(salt_name),
+          anon_table_name(anon_table_name), counter(counter) {}
     ~TableMeta() {;}
 
     std::string serialize(const DBObject &parent) const;

@@ -336,9 +336,9 @@ public:
             [this] (std::string key, std::string serial, std::string id) {
                 AbstractMetaKey *meta_key =
                     AbstractMetaKey::factory<KeyType>(key);
+                auto deserializeChild = ChildType::deserialize;
                 DBMeta *new_old_meta =
-                    AbstractMeta::deserialize<ChildType>(atoi(id.c_str()),
-                                                         serial);
+                    deserializeChild(atoi(id.c_str()), serial);
 
                 // Gobble the child.
                 this->addChild(meta_key, new_old_meta);

@@ -72,7 +72,12 @@ ItemToString(Item * i) {
     assert(i);
     String s;
     String *s0 = i->val_str(&s);
-    assert(s0 != NULL);
-    string ret = string(s0->ptr(), s0->length());
+    std::string ret;
+    if (NULL == s0) {
+        assert(i->is_null());
+        ret = std::string("NULL");
+    } else {
+        ret = string(s0->ptr(), s0->length());
+    }
     return ret;
 }

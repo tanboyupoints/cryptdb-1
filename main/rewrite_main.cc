@@ -89,7 +89,7 @@ sanityCheck(FieldMeta *fm)
         // FIXME: dynamic_cast
         OnionMeta *om = static_cast<OnionMeta *>(it.second);
         onion o = static_cast<OnionMetaKey *>(it.first)->getValue();
-        std::vector<SECLEVEL> secs = fm->onion_layout[o];
+        const std::vector<SECLEVEL> &secs = fm->onion_layout.at(o);
         for (unsigned int i = 0; i < om->layers.size(); ++i) {
             EncLayer *layer = om->layers[i];
             assert(layer->level() == secs[i]);

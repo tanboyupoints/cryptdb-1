@@ -178,19 +178,17 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
     }
 }
 
-OnionMeta::OnionMeta(unsigned int id, std::string serial)
-    : DBMeta(id)
+OnionMeta *OnionMeta::deserialize(unsigned int id, std::string serial)
 {
     auto vec = unserialize_string(serial); 
-    std::string parent_id;
-    std::string o;
-    std::string seclevel;
 
-    parent_id = vec[0];              // ?
-    this->onionname = vec[1];
-    o = vec[2];                      // ?
-    seclevel = vec[3];               // ?
-    uniq_count = atoi(vec[4].c_str());
+    std::string parent_id = vec[0];              // ?
+    std::string onionname = vec[1];
+    std::string o = vec[2];                      // ?
+    std::string seclevel = vec[3];               // ?
+    unsigned int uniq_count = atoi(vec[4].c_str());
+
+    return new OnionMeta(id, onionname, uniq_count);
 }
 
 std::string OnionMeta::serialize(const DBObject &parent) const
@@ -254,35 +252,29 @@ void OnionMeta::applyToChildren(std::function<void(DBMeta *)> fn)
     }
 }
 
-FieldMeta::FieldMeta(unsigned int id, std::string serial)
-    : AbstractMeta(id)
+FieldMeta *FieldMeta::deserialize(unsigned int id, std::string serial)
 {
     auto vec = unserialize_string(serial);
-    std::string parent_id;
+    std::string parent_id = vec[0];                         // ?
 
-    parent_id = vec[0];                         // ?
-    this->fname = vec[1];
-    this->has_salt = string_to_bool(vec[2]);
-    this->salt_name = vec[3];
-    this->onion_layout = TypeText<onionlayout>::toType(vec[4]);
-    this->uniq_count = atoi(vec[5].c_str());
-    this->counter = atoi(vec[6].c_str());
+    std::string fname = vec[1];
+    bool has_salt = string_to_bool(vec[2]);
+    std::string salt_name = vec[3];
+    onionlayout onion_layout = TypeText<onionlayout>::toType(vec[4]);
+    unsigned int uniq_count = atoi(vec[5].c_str());
+    unsigned int counter = atoi(vec[6].c_str());
+
+    return new FieldMeta(id, fname, has_salt, salt_name, onion_layout,
+                         uniq_count, counter);
 }
 
 FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *m_key,
                      unsigned long uniq_count)
     : fname(name), has_salt(static_cast<bool>(m_key)),
-      salt_name(BASE_SALT_NAME + getpRandomName()), uniq_count(uniq_count),
+      salt_name(BASE_SALT_NAME + getpRandomName()), 
+      onion_layout(getOnionLayout(m_key, field)), uniq_count(uniq_count),
       counter(0)
 {
-    if (NULL == m_key) {
-        this->onion_layout = PLAIN_ONION_LAYOUT;
-    } else if (true == IsMySQLTypeNumeric(field->sql_type)) {
-        this->onion_layout = NUM_ONION_LAYOUT;
-    } else {
-        this->onion_layout = STR_ONION_LAYOUT;
-    }
-
     init_onions_layout(m_key, this, field);
 }
 
@@ -328,18 +320,30 @@ FieldMeta::orderedOnionMetas() const
     return v;
 }
 
-TableMeta::TableMeta(unsigned int id, std::string serial)
-    : AbstractMeta(id)
+onionlayout FieldMeta::getOnionLayout(AES_KEY *m_key, Create_field *f)
+{
+    if (NULL == m_key) {
+        return PLAIN_ONION_LAYOUT;
+    } else if (true == IsMySQLTypeNumeric(f->sql_type)) {
+        return NUM_ONION_LAYOUT;
+    } else {
+        return STR_ONION_LAYOUT;
+    }
+}
+
+TableMeta *TableMeta::deserialize(unsigned int id, std::string serial)
 {
     auto vec = unserialize_string(serial);
-    std::string dbname;
     
-    this->anon_table_name = vec[0];
-    this->hasSensitive = string_to_bool(vec[1]);
-    this->has_salt = string_to_bool(vec[2]);
-    this->salt_name = vec[3];
-    dbname = vec[4];                // ?
-    this->counter = atoi(vec[5].c_str());
+    std::string anon_table_name = vec[0];
+    bool hasSensitive = string_to_bool(vec[1]);
+    bool has_salt = string_to_bool(vec[2]);
+    std::string salt_name = vec[3];
+    std::string dbname = vec[4];                // ?
+    unsigned int counter = atoi(vec[5].c_str());
+
+    return new TableMeta(id, anon_table_name, hasSensitive, has_salt,
+                         salt_name, counter);
 }
 
 std::string TableMeta::serialize(const DBObject &parent) const
