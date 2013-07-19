@@ -165,6 +165,44 @@ createMetaTablesIfNotExists(ProxyState & ps)
 }
 */
 
+static bool
+sanityCheck(FieldMeta *fm)
+{
+    for (auto it : fm->children) {
+        // FIXME: dynamic_cast
+        OnionMeta *om = static_cast<OnionMeta *>(it.second);
+        onion o = static_cast<OnionMetaKey *>(it.first)->getValue();
+        std::vector<SECLEVEL> secs = fm->onion_layout[o];
+        for (unsigned int i = 0; i < om->layers.size(); ++i) {
+            EncLayer *layer = om->layers[i];
+            assert(layer->level() == secs[i]);
+        }
+    }
+    return true;
+}
+
+static bool
+sanityCheck(TableMeta *tm)
+{
+    for (auto it : tm->children) {
+        // FIXME: dynamic_cast
+        FieldMeta *fm = static_cast<FieldMeta *>(it.second);
+        assert(sanityCheck(fm));
+    }
+    return true;
+}
+
+static bool
+sanityCheck(SchemaInfo *schema)
+{
+    for (auto it : schema->children) {
+        // FIXME: dynamic_cast
+        TableMeta *tm = static_cast<TableMeta *>(it.second);
+        assert(sanityCheck(tm));
+    }
+    return true;
+}
+
 // FIXME: This function will not build all of our tables when it is run
 // on an empty database.  If you don't have a parent, your table won't be
 // built.  We probably want to seperate our database logic into 3 parts.
@@ -186,7 +224,9 @@ loadSchemaInfo(Connect *e_conn)
             return parent;  /* lambda */
         };
 
-    return static_cast<SchemaInfo *>(loadChildren(schema));
+     loadChildren(schema);
+     assert(sanityCheck(schema));
+     return schema;
 }
 
 /*
