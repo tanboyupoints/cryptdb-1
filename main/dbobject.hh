@@ -63,7 +63,6 @@ public:
     virtual ~AbstractMetaKey() {;}
     virtual bool operator <(const AbstractMetaKey &rhs) const = 0;
     virtual bool operator ==(const AbstractMetaKey &rhs) const = 0;
-    virtual std::string toString() const = 0;
     virtual std::string getSerial() const = 0;
     template <typename ConcreteKey>
         static ConcreteKey *factory(std::string serial)
@@ -73,7 +72,6 @@ public:
     }
 };
 
-// TODO: Could use pointer hack so key_data and serial are const.
 template <typename KeyType>
 class MetaKey : public AbstractMetaKey {
     const KeyType key_data;
@@ -88,30 +86,11 @@ public:
     // Build MetaKey from 'actual' key value.
     MetaKey(KeyType key_data) {;}
     virtual ~MetaKey() = 0;
-
-    bool operator <(const AbstractMetaKey &rhs) const
-    {
-        const MetaKey &rhs_key = static_cast<const MetaKey &>(rhs);
-        return key_data < rhs_key.key_data;
-    }
-
-    bool operator ==(const AbstractMetaKey &rhs) const
-    {
-        const MetaKey &rhs_key = static_cast<const MetaKey &>(rhs);
-        return key_data == rhs_key.key_data;
-    }
+    bool operator <(const AbstractMetaKey &rhs) const;
+    bool operator ==(const AbstractMetaKey &rhs) const;
 
     KeyType getValue() const {return key_data;}
     std::string getSerial() const {return serial;}
-
-    // FIXME.
-    std::string toString() const
-    {
-        std::ostringstream s;
-        s << key_data;
-        return s.str();
-    }
-    
 };
 
 template <typename KeyType>
