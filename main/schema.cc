@@ -182,28 +182,16 @@ OnionMeta *OnionMeta::deserialize(unsigned int id, std::string serial)
 {
     auto vec = unserialize_string(serial); 
 
-    std::string parent_id = vec[0];              // ?
-    std::string onionname = vec[1];
-    std::string o = vec[2];                      // ?
-    std::string seclevel = vec[3];               // ?
-    unsigned int uniq_count = atoi(vec[4].c_str());
+    std::string onionname = vec[0];
+    unsigned int uniq_count = atoi(vec[1].c_str());
 
     return new OnionMeta(id, onionname, uniq_count);
 }
 
 std::string OnionMeta::serialize(const DBObject &parent) const
 {
-    // FIXME: Get onion from parent.
-    onion o = oDET;
-    SECLEVEL seclevel =
-        static_cast<const FieldMeta&>(parent).getOnionLevel(o);
-    assert(seclevel != SECLEVEL::INVALID);
-
     std::string serial =
-        serialize_string(std::to_string(parent.getDatabaseID())) +  // ?
         serialize_string(this->onionname) +
-        serialize_string(TypeText<onion>::toText(o)) +              // ?
-        serialize_string(TypeText<SECLEVEL>::toText(seclevel)) +    // ?
         serialize_string(std::to_string(this->uniq_count));
 
     return serial;
@@ -255,14 +243,13 @@ void OnionMeta::applyToChildren(std::function<void(DBMeta *)> fn)
 FieldMeta *FieldMeta::deserialize(unsigned int id, std::string serial)
 {
     auto vec = unserialize_string(serial);
-    std::string parent_id = vec[0];                         // ?
 
-    std::string fname = vec[1];
-    bool has_salt = string_to_bool(vec[2]);
-    std::string salt_name = vec[3];
-    onionlayout onion_layout = TypeText<onionlayout>::toType(vec[4]);
-    unsigned int uniq_count = atoi(vec[5].c_str());
-    unsigned int counter = atoi(vec[6].c_str());
+    std::string fname = vec[0];
+    bool has_salt = string_to_bool(vec[1]);
+    std::string salt_name = vec[2];
+    onionlayout onion_layout = TypeText<onionlayout>::toType(vec[3]);
+    unsigned int uniq_count = atoi(vec[4].c_str());
+    unsigned int counter = atoi(vec[5].c_str());
 
     return new FieldMeta(id, fname, has_salt, salt_name, onion_layout,
                          uniq_count, counter);
@@ -281,7 +268,6 @@ FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *m_key,
 std::string FieldMeta::serialize(const DBObject &parent) const
 {
     std::string serial =
-        serialize_string(std::to_string(parent.getDatabaseID())) +      // ?
         serialize_string(fname) +
         serialize_string(bool_to_string(has_salt)) +
         serialize_string(getSaltName()) +
@@ -339,8 +325,7 @@ TableMeta *TableMeta::deserialize(unsigned int id, std::string serial)
     bool hasSensitive = string_to_bool(vec[1]);
     bool has_salt = string_to_bool(vec[2]);
     std::string salt_name = vec[3];
-    std::string dbname = vec[4];                // ?
-    unsigned int counter = atoi(vec[5].c_str());
+    unsigned int counter = atoi(vec[4].c_str());
 
     return new TableMeta(id, anon_table_name, hasSensitive, has_salt,
                          salt_name, counter);
@@ -348,17 +333,11 @@ TableMeta *TableMeta::deserialize(unsigned int id, std::string serial)
 
 std::string TableMeta::serialize(const DBObject &parent) const
 {
-    // HACK: Need to get this information from parent.
-    std::string dbname = "cryptdbtest";
-
     std::string serial = 
-        // FIXME: Do anon_table_name => table_name translation at parent.
-        // serialize_string(table) +
         serialize_string(getAnonTableName()) +
         serialize_string(bool_to_string(hasSensitive)) +
         serialize_string(bool_to_string(has_salt)) +
         serialize_string(salt_name) +
-        serialize_string(dbname) +                      // ?
         serialize_string(std::to_string(counter));
     
     return serial;
