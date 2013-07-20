@@ -3,19 +3,16 @@
 #include <algorithm>
 
 template <typename KeyType>
-bool MetaKey<KeyType>::operator <(const AbstractMetaKey &rhs) const
+bool MetaKey<KeyType>::operator <(const MetaKey<KeyType> &rhs) const
 {
-    const MetaKey &rhs_key = static_cast<const MetaKey &>(rhs);
-    return key_data < rhs_key.key_data;
+    return key_data < rhs.key_data;
 }
 
 template <typename KeyType>
-bool MetaKey<KeyType>::operator ==(const AbstractMetaKey &rhs) const
+bool MetaKey<KeyType>::operator ==(const MetaKey<KeyType> &rhs) const
 {
-    const MetaKey &rhs_key = static_cast<const MetaKey &>(rhs);
-    return key_data == rhs_key.key_data;
+    return key_data == rhs.key_data;
 }
-
 
 template <typename ChildType, typename KeyType>
 MappedDBMeta<ChildType, KeyType>::~MappedDBMeta()

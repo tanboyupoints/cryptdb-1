@@ -61,8 +61,6 @@ class AbstractMetaKey {
 public:
     AbstractMetaKey() {;}
     virtual ~AbstractMetaKey() {;}
-    virtual bool operator <(const AbstractMetaKey &rhs) const = 0;
-    virtual bool operator ==(const AbstractMetaKey &rhs) const = 0;
     virtual std::string getSerial() const = 0;
     template <typename ConcreteKey>
         static ConcreteKey *factory(std::string serial)
@@ -86,8 +84,8 @@ public:
     // Build MetaKey from 'actual' key value.
     MetaKey(KeyType key_data) {;}
     virtual ~MetaKey() = 0;
-    bool operator <(const AbstractMetaKey &rhs) const;
-    bool operator ==(const AbstractMetaKey &rhs) const;
+    bool operator <(const MetaKey<KeyType> &rhs) const;
+    bool operator ==(const MetaKey<KeyType> &rhs) const;
 
     KeyType getValue() const {return key_data;}
     std::string getSerial() const {return serial;}
