@@ -128,7 +128,7 @@ struct TableMeta;
 //TODO: FieldMeta and TableMeta are partly duplicates with the original
 // FieldMetadata an TableMetadata
 // which contains data we want to add to this structure soon
-typedef class FieldMeta : public AbstractMeta<OnionMeta, OnionMetaKey> {
+typedef class FieldMeta : public MappedDBMeta<OnionMeta, OnionMetaKey> {
 public:
     const std::string fname;
     const bool has_salt; //whether this field has its own salt
@@ -144,7 +144,7 @@ public:
     FieldMeta(unsigned int id, std::string fname, bool has_salt,
               std::string salt_name, onionlayout onion_layout,
               unsigned long uniq_count, unsigned long counter)
-        : AbstractMeta(id), fname(fname), has_salt(has_salt),
+        : MappedDBMeta(id), fname(fname), has_salt(has_salt),
           salt_name(salt_name), onion_layout(onion_layout),
           uniq_count(uniq_count) {}
     ~FieldMeta() {;}
@@ -164,15 +164,14 @@ public:
     }
 
     SECLEVEL getOnionLevel(onion o) const {
-        AbstractMetaKey *key = new OnionMetaKey(o);
+        OnionMetaKey *key = new OnionMetaKey(o);
         auto om = getChild(key);
         delete key;
         if (om == NULL) {
             return SECLEVEL::INVALID;
         }
 
-        // FIXME: dynamic_cast
-        return static_cast<OnionMeta *>(om)->getSecLevel();
+        return om->getSecLevel();
     }
 
     bool setOnionLevel(onion o, SECLEVEL maxl) {
@@ -193,7 +192,7 @@ public:
 
     // FIXME: This is a HACK.
     bool isEncrypted() {
-        AbstractMetaKey *key = new OnionMetaKey(oPLAIN);
+        OnionMetaKey *key = new OnionMetaKey(oPLAIN);
         bool status =  ((children.size() != 1) ||
                         (children.find(key) == children.end()));
         delete key;
@@ -224,7 +223,7 @@ private:
     static onionlayout getOnionLayout(AES_KEY *m_key, Create_field *f);
 } FieldMeta;
 
-typedef class TableMeta : public AbstractMeta<FieldMeta, IdentityMetaKey> {
+typedef class TableMeta : public MappedDBMeta<FieldMeta, IdentityMetaKey> {
 public:
     const bool hasSensitive;
     const bool has_salt;
@@ -242,7 +241,7 @@ public:
     TableMeta(unsigned int id, std::string anon_table_name,
               bool has_sensitive, bool has_salt, std::string salt_name,
               unsigned int counter)
-        : AbstractMeta(id), hasSensitive(has_sensitive),
+        : MappedDBMeta(id), hasSensitive(has_sensitive),
           has_salt(has_salt), salt_name(salt_name),
           anon_table_name(anon_table_name), counter(counter) {}
     ~TableMeta() {;}
@@ -266,12 +265,11 @@ private:
 } TableMeta;
 
 
-// FIXME: Inherit from AbstractMeta.
 // AWARE: Table/Field aliases __WILL NOT__ be looked up when calling from
 // this level or below. Use Analysis::* if you need aliasing.
-typedef class SchemaInfo : public AbstractMeta<TableMeta, IdentityMetaKey> {
+typedef class SchemaInfo : public MappedDBMeta<TableMeta, IdentityMetaKey> {
 public:
-    SchemaInfo() : AbstractMeta(0) {}
+    SchemaInfo() : MappedDBMeta(0) {}
     ~SchemaInfo() {}
 
     std::string typeName() const {return type_name;}

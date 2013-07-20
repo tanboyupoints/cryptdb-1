@@ -29,9 +29,9 @@
 static void
 check_if_empty(const EncSet & sol, Item * i, const EncSet & my_es, const reason & child_r) {
     if (sol.empty()) {
-	cerr << "current crypto schemes do not support this query \n" \
-	     << "BECAUSE " << i << " NEEDS " << my_es << "\n"	      \
-	     << "AND children have " << child_r << "\n";
+        std::cerr << "current crypto schemes do not support this query \n"
+	          << "BECAUSE " << i << " NEEDS " << my_es << "\n"
+	          << "AND children have " << child_r << "\n";
 	assert(false);
     }
 }
@@ -40,7 +40,7 @@ check_if_empty(const EncSet & sol, Item * i, const EncSet & my_es, const reason 
 // rewrites the arguments of aggregators
 // no_args specifies a certain number of arguments that I must have
 // if negative, i can have any no. of arguments
-static list<Item *>
+static std::list<Item *>
 rewrite_agg_args(Item_sum * oldi, const OLK & constr, const RewritePlanOneOLK * rp,
 		 Analysis & a, int no_args = -1) {
     if (no_args >= 0) {
@@ -50,7 +50,7 @@ rewrite_agg_args(Item_sum * oldi, const OLK & constr, const RewritePlanOneOLK * 
 	no_args = oldi->get_arg_count();
     }
 
-    list<Item *> res = list<Item *>();
+    std::list<Item *> res = std::list<Item *>();
     for (int j = 0; j < no_args; j++) {
 	Item * child_item = oldi->get_arg(j);
 	child_item = itemTypes.do_rewrite(child_item, rp->olk, rp->childr_rp[j], a);
@@ -119,7 +119,7 @@ class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
     virtual Item * do_rewrite_type(Item_sum_hybrid *i,
            const OLK & constr, const RewritePlan * rp,
            Analysis & a) const {
-      list<Item *> args =
+        std::list<Item *> args =
         rewrite_agg_args(i, constr, (RewritePlanOneOLK *)rp, a, 1);
       return new IT(args.front());
     }
@@ -165,7 +165,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
 
 	LOG(cdb_v) << "Item_sum_sum rewrite " << *i;
 
-	list<Item *> args = rewrite_agg_args(i, constr, (RewritePlanOneOLK *)rp, a, 1);
+        std::list<Item *> args = rewrite_agg_args(i, constr, (RewritePlanOneOLK *)rp, a, 1);
 
 	OnionMeta * om = constr.key->getOnionMeta(oAGG);
         assert(om);
@@ -239,7 +239,8 @@ static class ANON : public CItemSubtypeIT<Item_null, Item::Type::NULL_ITEM> {
         // return encrypt_item(i, constr, a);
     }
     virtual void
-    do_rewrite_insert_type(Item_null *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
+    do_rewrite_insert_type(Item_null *i, Analysis & a,
+                           std::vector<Item *> &l, FieldMeta *fm) const
     {
         for (uint j = 0; j < fm->children.size(); ++j) {
             l.push_back(make_item(i));

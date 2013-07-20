@@ -5,6 +5,7 @@
  *
  */
 
+#include <algorithm>
 #include <stdexcept>
 #include <netinet/in.h>
 
@@ -14,8 +15,6 @@
 
 #include <test/TestQueries.hh>
 
-
-using namespace std;
 
 static int ntest = 0;
 static int npass = 0;
@@ -876,9 +875,9 @@ Connection::restart() {
 
 void
 Connection::start() {
-    cerr << "start " << tc.db << endl;
+    std::cerr << "start " << tc.db << std::endl;
     uint64_t mkey = 1133421234;
-    string masterKey = BytesFromInt(mkey, AES_KEY_BYTES);
+    std::string masterKey = BytesFromInt(mkey, AES_KEY_BYTES);
     switch (type) {
         //plain -- new connection straight to the DB
         case UNENCRYPTED:
@@ -932,7 +931,7 @@ Connection::stop() {
 }
 
 ResType
-Connection::execute(string query) {
+Connection::execute(std::string query) {
     switch (type) {
     case PROXYSINGLE:
         return executeRewriter(query);
@@ -950,9 +949,9 @@ Connection::execute(string query) {
 }
 
 void
-Connection::executeFail(string query) {
+Connection::executeFail(std::string query) {
     //cerr << type << " " << query << endl;
-    LOG(test) << "Query: " << query << " could not execute" << endl;
+    LOG(test) << "Query: " << query << " could not execute" << std::endl;
 }
 
 /*ResType
@@ -965,7 +964,7 @@ Connection::executeEDBProxy(string query) {
     }*/
 
 ResType
-Connection::executeConn(string query) {
+Connection::executeConn(std::string query) {
     DBResult * dbres = 0;
     auto ANON = cleanup([&dbres]() { if (dbres) delete dbres; });
 
@@ -985,7 +984,7 @@ Connection::executeConn(string query) {
 }
 
 ResType
-Connection::executeRewriter(string query) {
+Connection::executeRewriter(std::string query) {
     //translate the query
     //
     //
@@ -1028,14 +1027,15 @@ Connection::executeLastConn() {
 
 my_ulonglong
 Connection::executeLastEDB() {
-    cerr << "No functionality for LAST_INSERT_ID() without proxy" << endl;
+    std::cerr << "No functionality for LAST_INSERT_ID() without proxy" << std::endl;
     return 0;
 }
 
 //----------------------------------------------------------------------
 
 static void
-CheckAnnotatedQuery(const TestConfig &tc, string control_query, string test_query)
+CheckAnnotatedQuery(const TestConfig &tc, std::string control_query,
+                    std::string test_query)
 {
     ntest++;
 
@@ -1081,8 +1081,8 @@ CheckAnnotatedQuery(const TestConfig &tc, string control_query, string test_quer
 }
 
 static void
-CheckQuery(const TestConfig &tc, string query) {
-    cerr << "--------------------------------------------------------------------------------" << "\n";
+CheckQuery(const TestConfig &tc, std::string query) {
+    std::cerr << "--------------------------------------------------------------------------------" << "\n";
     //TODO: should be case insensitive
     if (query == "SELECT LAST_INSERT_ID()") {
         ntest++;
@@ -1105,8 +1105,8 @@ CheckQuery(const TestConfig &tc, string query) {
 static void
 CheckQueryList(const TestConfig &tc, const QueryList &queries) {
     for (unsigned int i = 0; i < queries.create.size(); i++) {
-        string control_query = queries.create.choose(control_type)[i];
-        string test_query = queries.create.choose(test_type)[i];
+        std::string control_query = queries.create.choose(control_type)[i];
+        std::string test_query = queries.create.choose(test_type)[i];
 
         CheckAnnotatedQuery(tc, control_query, test_query);
     }
@@ -1127,8 +1127,8 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
     }
 
     for (unsigned int i = 0; i < queries.drop.size(); i++) {
-        string control_query = queries.drop.choose(control_type)[i];
-        string test_query = queries.drop.choose(test_type)[i];
+        std::string control_query = queries.drop.choose(control_type)[i];
+        std::string test_query = queries.drop.choose(test_type)[i];
         CheckAnnotatedQuery(tc, control_query, test_query);
     }
 }
@@ -1196,7 +1196,7 @@ TestQueries::~TestQueries() {
 }
 
 static test_mode
-string_to_test_mode(const string &s)
+string_to_test_mode(const std::string &s)
 {
     if (s == "plain")
         return UNENCRYPTED;
@@ -1222,17 +1222,17 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
         test_type = string_to_test_mode(argv[2]);
         break;
     default:
-        cerr << "Usage:" << endl
-             << "    .../tests/test queries control-type test-type [num_conn]" << endl
-             << "Possible control and test types:" << endl
-             << "    plain" << endl
-             << "    single" << endl
-             << "    proxy-plain" << endl
-             << "    proxy-single" << endl
-             << "single make connections through EDBProxy" << endl
-             << "proxy-* makes connections *'s encryption type through the proxy" << endl
-             << "num_conn is the number of conns made to a single db (default 1)" << endl
-             << "    for num_conn > 1, control and test should both be proxy-* for valid results" << endl;
+        std::cerr << "Usage:" << std::endl
+             << "    .../tests/test queries control-type test-type [num_conn]" << std::endl
+             << "Possible control and test types:" << std::endl
+             << "    plain" << std::endl
+             << "    single" << std::endl
+             << "    proxy-plain" << std::endl
+             << "    proxy-single" << std::endl
+             << "single make connections through EDBProxy" << std::endl
+             << "proxy-* makes connections *'s encryption type through the proxy" << std::endl
+             << "num_conn is the number of conns made to a single db (default 1)" << std::endl
+             << "    for num_conn > 1, control and test should both be proxy-* for valid results" << std::endl;
         return;
     }
 
@@ -1247,7 +1247,7 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
             //TODO(ccarvalho) check this
             break;
         default:
-            cerr << "test_type does not exist" << endl;
+            std::cerr << "test_type does not exist" << std::endl;
         }
     }
 
@@ -1265,6 +1265,6 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
     for (uint i = 0; i < nrounds; i++)
         RunTest(tc);
 
-    cerr << "RESULT: " << npass << "/" << ntest << endl;
+    std::cerr << "RESULT: " << npass << "/" << ntest << std::endl;
 }
 

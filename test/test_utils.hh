@@ -7,6 +7,7 @@
  *   Author: cat_red
  */
 
+#include <algorithm>
 #include <string>
 #include <assert.h>
 #include <util/util.hh>

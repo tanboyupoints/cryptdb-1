@@ -13,10 +13,9 @@
 #include <iostream>
 #include <sstream>
 
-using namespace std;
-
-Connect::Connect(const string &server, const string &user, const string &passwd,
-                 const string &dbname, uint port)
+Connect::Connect(const std::string &server, const std::string &user,
+                 const std::string &passwd, const std::string &dbname,
+                 uint port)
     : conn(nullptr), dbname(dbname), close_on_destroy(true)
 {
     do_connect(server, user, passwd, port);
@@ -31,8 +30,8 @@ Connect::Connect(const string &server, const string &user, const string &passwd,
 }
 
 void
-Connect::do_connect(const string &server, const string &user,
-                    const string &passwd, uint port)
+Connect::do_connect(const std::string &server, const std::string &user,
+                    const std::string &passwd, uint port)
 {
     const char *dummy_argv[] = {
         "progname",
@@ -63,7 +62,7 @@ Connect::do_connect(const string &server, const string &user,
                   << " pwd " << passwd
                   << " port " << port;
         LOG(warn) << "mysql_real_connect: " << mysql_error(conn);
-        throw runtime_error("cannot connect");
+        throw std::runtime_error("cannot connect");
     }
 
     // We create and set the database here because the database will
@@ -73,7 +72,7 @@ Connect::do_connect(const string &server, const string &user,
 }
 
 void
-Connect::setCurDBName(const string & db)
+Connect::setCurDBName(const std::string & db)
 {
     dbname = db;
     assert(execute("USE " + db + ";"));
@@ -91,8 +90,8 @@ Connect::select_db(const std::string &dbname)
     return mysql_select_db(conn, dbname.c_str()) ? false : true;
 }
 
-Connect * Connect::getEmbedded(const string & embed_db,
-                               const string & dbname) {
+Connect * Connect::getEmbedded(const std::string & embed_db,
+                               const std::string & dbname) {
 
     init_mysql(embed_db);
 
@@ -123,7 +122,7 @@ Connect * Connect::getEmbedded(const string & embed_db,
 // in the database context (Connect::getCurDBName) that the caller
 // would expect. A rogue USE will lead to an inconsistent state.
 bool
-Connect::execute(const string &query, DBResult * & res)
+Connect::execute(const std::string &query, DBResult * & res)
 {
     //silently ignore empty queries
     if (query.length() == 0) {
@@ -149,7 +148,7 @@ Connect::execute(const string &query, DBResult * & res)
 
 
 bool
-Connect::execute(const string &query)
+Connect::execute(const std::string &query)
 {
     DBResult *aux;
     bool r = execute(query, aux);
@@ -158,7 +157,7 @@ Connect::execute(const string &query)
     return r;
 }
 
-string
+std::string
 Connect::getError()
 {
     return mysql_error(conn);
@@ -208,7 +207,7 @@ getItem(char * content, enum_field_types type, uint len) {
         return new Item_null();
     }
     Item * i;
-    string content_str = string(content, len);
+    std::string content_str = std::string(content, len);
     if (IsMySQLTypeNumeric(type)) {
         ulonglong val = valFromStr(content_str);
         i = new Item_int(val);
@@ -252,7 +251,7 @@ DBResult::unpack()
             break;
         unsigned long *lengths = mysql_fetch_lengths(n);
 
-        vector<Item *> resrow;
+        std::vector<Item *> resrow;
 
         for (int j = 0; j < cols; j++) {
             Item * it = getItem(row[j], res.types[j], lengths[j]);

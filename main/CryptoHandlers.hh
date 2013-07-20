@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include <util/util.hh>
 #include <crypto/prng.hh>
 #include <crypto/BasicCrypto.hh>

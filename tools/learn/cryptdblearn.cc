@@ -1,6 +1,7 @@
 /*
  * prototype
  */
+#include <algorithm>
 #include <cryptdblearn.hh>
 #include <iostream>
 #include <sstream>
@@ -13,9 +14,9 @@
 #include <rewrite_main.hh>
 
 static bool 
-ignore_line(const string& line)
+ignore_line(const std::string& line)
 {
-    static const string begin_match("--");
+    static const std::string begin_match("--");
 
     return(line.compare(0,2,begin_match) == 0); 
 }
@@ -25,8 +26,8 @@ void
 Learn::trainFromFile(void)
 {
     std::string line;
-    string s("");
-    ifstream input(this->m_filename);
+    std::string s("");
+    std::ifstream input(this->m_filename);
 
     assert(input.is_open() == true); 
 
@@ -79,10 +80,10 @@ int main(int argc, char **argv)
         {NULL, 0, 0, 0},
     };
 
-    string username("");
-    string password("");
-    string dbname("");
-    string filename("");
+    std::string username("");
+    std::string password("");
+    std::string dbname("");
+    std::string filename("");
 
     while(1)
     {

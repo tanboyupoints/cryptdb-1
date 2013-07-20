@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <string>
 #include <stdio.h>
 #include <iostream>
@@ -12,23 +13,23 @@
 
 static void do_display_help(const char *arg)
 {
-    cout << "CryptDBImport" << endl;
-    cout << "Use: " << arg << " [OPTIONS]" << endl;
-    cout << "OPTIONS are:" << endl;
-    cout << "-u<username>: MySQL server username" << endl;
-    cout << "-p<password>: MySQL server password" << endl;
-    cout << "-n: Do not execute queries. Only show stdout." << endl;
-    cout << "-f <file>: MySQL's .sql dump file, originated from \"mysqldump\" tool." << endl;
-    cout << "To generate DB's dump file use mysqldump, e.g.:" << endl;
-    cout << "$ mysqldump -u user -ppassword --all-databases >dumpfile.sql" << endl;
+    std::cout << "CryptDBImport" << std::endl;
+    std::cout << "Use: " << arg << " [OPTIONS]" << std::endl;
+    std::cout << "OPTIONS are:" << std::endl;
+    std::cout << "-u<username>: MySQL server username" << std::endl;
+    std::cout << "-p<password>: MySQL server password" << std::endl;
+    std::cout << "-n: Do not execute queries. Only show stdout." << std::endl;
+    std::cout << "-f <file>: MySQL's .sql dump file, originated from \"mysqldump\" tool." << std::endl;
+    std::cout << "To generate DB's dump file use mysqldump, e.g.:" << std::endl;
+    std::cout << "$ mysqldump -u user -ppassword --all-databases >dumpfile.sql" << std::endl;
     exit(0);
 }
 
 
 static bool 
-ignore_line(const string& line)
+ignore_line(const std::string& line)
 {
-    static const string begin_match("--");
+    static const std::string begin_match("--");
 
     return(line.compare(0,2,begin_match) == 0); 
 }
@@ -37,8 +38,8 @@ void
 Import::printOutOnly(void)
 {
     std::string line;
-    string s("");
-    ifstream input(this->filename);
+    std::string s("");
+    std::ifstream input(this->filename);
 
     assert(input.is_open() == true); 
 
@@ -49,7 +50,7 @@ Import::printOutOnly(void)
         if (!line.empty()){
             char lastChar = *line.rbegin();
             if(lastChar == ';'){
-                cout << s + line << endl;
+                std::cout << s + line << std::endl;
                 s.clear();
                 continue;
             }
@@ -62,8 +63,8 @@ void
 Import::executeQueries(Rewriter& r)
 {
     std::string line;
-    string s("");
-    ifstream input(this->filename);
+    std::string s("");
+    std::ifstream input(this->filename);
 
     assert(input.is_open() == true); 
 
@@ -75,7 +76,7 @@ Import::executeQueries(Rewriter& r)
             char lastChar = *line.rbegin();
             if(lastChar == ';'){
                 s += line;
-                cout << s << endl;
+                std::cout << s << std::endl;
                 executeQuery(r, s, true);
                 s.clear();
                 continue;
@@ -100,8 +101,8 @@ int main(int argc, char **argv)
         {NULL, 0, 0, 0},
     };
 
-    string username("");
-    string password("");
+    std::string username("");
+    std::string password("");
     bool exec = true;
 
     while(1)

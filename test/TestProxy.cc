@@ -9,8 +9,6 @@
 #include <test/TestProxy.hh>
 
 
-using namespace std;
-
 static int ntest = 0;
 static int npass = 0;
 
@@ -25,8 +23,9 @@ TestProxy::~TestProxy()
 }
 
 static void
-checkQuery(const TestConfig &tc, Connect * conn, const string &query,
-           const vector<string> &names, const vector<vector<string>> &rows)
+checkQuery(const TestConfig &tc, Connect * conn, const std::string &query,
+           const std::vector<std::string> &names,
+           const std::vector<std::vector<std::string>> &rows)
 {
     ntest++;
     ResType expected;
@@ -37,7 +36,7 @@ checkQuery(const TestConfig &tc, Connect * conn, const string &query,
      * so that we don't have to supply expected answers anyway.
      */
     for (auto i = rows.begin(); i != rows.end(); i++) {
-        vector<Item *> row;
+        std::vector<Item *> row;
         for (auto j = i->begin(); j != i->end(); j++) {
             SqlItem item;
             item.null = false;
@@ -72,7 +71,7 @@ checkQuery(const TestConfig &tc, Connect * conn, const string &query,
 }
 
 static void
-record(const TestConfig &tc, bool result, string test) {
+record(const TestConfig &tc, bool result, std::string test) {
     ntest++;
     if (!result) {
         if (tc.stop_if_fail) {
@@ -104,7 +103,7 @@ CreateMulti(Connect * conn) {
 
 static void
 Basic(const TestConfig &tc, Connect *conn) {
-    string test = "(basic) ";
+    std::string test = "(basic) ";
 
     //populate tables
     record(tc, conn->execute("INSERT INTO t1 VALUES (1, 'Lymond', 29, 'secretLymond')"), test+"insert Lymond failed");
@@ -145,8 +144,8 @@ TestProxy::run(const TestConfig &tc, int argc, char ** argv)
     if (pid == 0) {
         cerr << "child happened" << endl;
         //run proxy in child
-        string edbdir = getenv("EDBDIR");
-        string script_path = "--proxy-lua-script=" + edbdir + "/../mysqlproxy/wrapper.lua";
+        std::string edbdir = getenv("EDBDIR");
+        std::string script_path = "--proxy-lua-script=" + edbdir + "/../mysqlproxy/wrapper.lua";
         execl("/usr/local/bin/mysql-proxy", "mysql-proxy", "--plugins=proxy", "--max-open-files=1024", script_path.c_str(), "--proxy-address=localhost:3307", "--proxy-backend-addresses=localhost:3306", (char *) 0);
     } else if (pid < 0) {
         cerr << "failed to fork" << endl;

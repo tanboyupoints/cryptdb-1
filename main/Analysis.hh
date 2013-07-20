@@ -1,12 +1,11 @@
 #pragma once
 
+#include <algorithm>
 #include <util/onions.hh>
-#include <parser/embedmysql.hh>
-#include <parser/stringify.hh>
 #include <util/cryptdb_log.hh>
 #include <main/schema.hh>
-
-using namespace std;
+#include <parser/embedmysql.hh>
+#include <parser/stringify.hh>
 
 /**
  * Used to keep track of encryption constraints during
@@ -33,7 +32,7 @@ public:
     bool singleton() const { return osl.size() == 1; }
 
     OLK extract_singleton() const {
-        assert_s(singleton(), string("encset has size ") + StringFromVal(osl.size()));
+        assert_s(singleton(), std::string("encset has size ") + StringFromVal(osl.size()));
 	auto it = osl.begin();
 	return OLK(it->first, it->second.first, it->second.second);
     }
@@ -44,8 +43,8 @@ public:
 };
 
 
-ostream&
-operator<<(ostream &out, const EncSet & es);
+std::ostream&
+operator<<(std::ostream &out, const EncSet & es);
 
 const EncSet EQ_EncSet = {
     {
@@ -138,12 +137,12 @@ typedef struct ReturnField {
     OLK olk; // if !olk.key, field is not encrypted
     int pos_salt; //position of salt of this field in the query results,
                   // or -1 if such salt was not requested
-    string stringify();
+    std::string stringify();
 } ReturnField;
 
 typedef struct ReturnMeta {
-    map<int, ReturnField> rfmeta;
-    string stringify();
+    std::map<int, ReturnField> rfmeta;
+    std::string stringify();
 } ReturnMeta;
 
 
@@ -178,8 +177,8 @@ public:
     std::list<reason> * childr;
 };
 
-ostream&
-operator<<(ostream &out, const reason &r);
+std::ostream&
+operator<<(std::ostream &out, const reason &r);
 
 // The rewrite plan of a lex node: the information a
 // node remembers after gather, to be used during rewrite
@@ -228,8 +227,8 @@ public:
 
 } ConnectionInfo;
 
-ostream&
-operator<<(ostream &out, const RewritePlan * rp);
+std::ostream&
+operator<<(std::ostream &out, const RewritePlan * rp);
 
 
 // state maintained at the proxy
@@ -333,7 +332,7 @@ public:
     bool destroyFieldMeta(std::string table, std::string field);
     bool destroyTableMeta(std::string table);
     bool tableMetaExists(std::string table) const;
-    std::string getAnonTableName(const string &table) const;
+    std::string getAnonTableName(const std::string &table) const;
     std::string getAnonIndexName(std::string table,
                                  std::string index_name) const;
 

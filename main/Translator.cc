@@ -11,8 +11,6 @@
 #include <functional>
 #include <ctime>
 
-using namespace std;
-
 // TODO: Make length longer.
 // TODO: Ensure some level of collision resistance.
 std::string
@@ -38,10 +36,11 @@ getpRandomName()
     return std::string(output);
 }
 
-string
-nextAutoInc(map<string, unsigned int > & autoInc, string fullname)
+std::string
+nextAutoInc(std::map<std::string, unsigned int > & autoInc,
+            std::string fullname)
 {
-    string val;
+    std::string val;
     if (autoInc.find(fullname) == autoInc.end()) {
         val = "1";
         autoInc[fullname] = 1;
@@ -53,13 +52,13 @@ nextAutoInc(map<string, unsigned int > & autoInc, string fullname)
     return val;
 }
 
-string
-getTableSalt(string anonTableName) {
+std::string
+getTableSalt(std::string anonTableName) {
     return BASE_SALT_NAME + "_t_" + anonTableName;
 }
 
 bool
-isSalt(string id, bool & isTableSalt)
+isSalt(std::string id, bool & isTableSalt)
 {
     if (id.find(BASE_SALT_NAME) == 0 || (isTableField(id) && (getField(id).find(BASE_SALT_NAME) == 0))) {
         if (id.find(BASE_SALT_NAME+"_t_") == 0) {
@@ -73,20 +72,21 @@ isSalt(string id, bool & isTableSalt)
     return false;
 }
 
-string
-getTableOfSalt(string salt_name) {
+std::string
+getTableOfSalt(std::string salt_name) {
 
     return salt_name.substr(BASE_SALT_NAME.length() + 3, salt_name.length() - 3 - BASE_SALT_NAME.length());
 }
 
 
 
-string
-getFieldsItSelect(list<string> & words, list<string>::iterator & it)
+std::string
+getFieldsItSelect(std::list<std::string> & words,
+                  std::list<std::string>::iterator & it)
 {
     it = words.begin();
     it++;
-    string res = "SELECT ";
+    std::string res = "SELECT ";
 
     if (equalsIgnoreCase(*it, "distinct")) {
         LOG(edb_v) << "has distinct!";
@@ -102,8 +102,8 @@ getFieldsItSelect(list<string> & words, list<string>::iterator & it)
  * Require the data to be in the format table.field or field.
  *
  */
-string
-getField(string tablefield)
+std::string
+getField(std::string tablefield)
 {
     if (isTableField(tablefield)) {
         size_t pos = tablefield.find(".");
@@ -113,8 +113,8 @@ getField(string tablefield)
     }
 }
 
-string
-getTable(string tablefield)
+std::string
+getTable(std::string tablefield)
 {
     if (isTableField(tablefield)) {
         size_t pos = tablefield.find(".");

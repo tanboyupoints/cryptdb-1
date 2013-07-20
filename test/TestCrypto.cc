@@ -10,8 +10,6 @@
 #include <crypto/ECJoin.hh>
 #include <test/TestCrypto.hh>
 
-
-using namespace std;
 using namespace NTL;
 
 TestCrypto::TestCrypto()

@@ -1,6 +1,4 @@
 #pragma once
-using namespace std;
-
 
 namespace {
 
@@ -17,7 +15,7 @@ class Import
         void printOutOnly(void);
 
     private:
-        string filename;
+        std::string filename;
 };
 };
 

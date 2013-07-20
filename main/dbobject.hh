@@ -2,7 +2,6 @@
 
 #include <functional>
 
-#include <main/Connect.hh>
 #include <main/enum_text.hh>
 #include <main/serializers.hh>
 
@@ -199,6 +198,7 @@ public:
 };
 
 class DBWriter;
+class Connect;
 
 /*
  * DBMeta is also a design choice about how we use Deltas.
@@ -272,28 +272,6 @@ public:
     }
 };
 
-class MappedDBMeta : public DBMeta {
-public:
-    MappedDBMeta() {}
-    MappedDBMeta(unsigned int id) : DBMeta(id) {}
-    virtual ~MappedDBMeta() {;}
-
-    virtual bool addChild(AbstractMetaKey *key, DBMeta *meta);
-    virtual bool replaceChild(AbstractMetaKey *key, DBMeta *meta);
-    virtual bool destroyChild(AbstractMetaKey *key);
-    virtual bool childExists(AbstractMetaKey * key) const;
-    virtual DBMeta *getChild(AbstractMetaKey * key) const;
-    AbstractMetaKey *getKey(const DBMeta *const child) const;
-
-    // FIXME: Make protected.
-    std::map<AbstractMetaKey *, DBMeta *> children;
-
-private:
-    // Helpers.
-    std::map<AbstractMetaKey *, DBMeta *>::const_iterator
-        findChild(AbstractMetaKey *key) const;
-};
-
 // > TODO: Make getDatabaseID() protected by templating on the Concrete type
 //   and making it a friend.
 // > TODO: Use static deserialization functions for the derived types so we
@@ -302,59 +280,31 @@ private:
 // > FIXME: The key in children is a pointer so this means our lookup is
 //   slow. Use std::reference_wrapper.
 template <typename ChildType, typename KeyType>
-class AbstractMeta : public MappedDBMeta {
+class MappedDBMeta : public DBMeta {
 public:
-    AbstractMeta() {}
-    AbstractMeta(unsigned int id) : MappedDBMeta(id) {}
-    virtual ~AbstractMeta()
-    {
-        auto cp = children;
-        children.clear();
-
-        for (auto it : cp) {
-            delete it.second;
-        }
-    }
-
+    MappedDBMeta() {}
+    MappedDBMeta(unsigned int id) : DBMeta(id) {}
+    virtual ~MappedDBMeta();
+    virtual bool addChild(KeyType *key, ChildType *meta);
+    virtual bool destroyChild(KeyType *key);
+    virtual bool childExists(KeyType * key) const;
+    virtual ChildType *getChild(KeyType * key) const;
+    AbstractMetaKey *getKey(const DBMeta *const child) const;
     // Virtual constructor to deserialize from embedded database.
     template <typename ConcreteMeta>
         static ConcreteMeta *deserialize(unsigned int id,
-                                         std::string serial)
-    {
-        return new ConcreteMeta(id, serial);
-    }
+                                         std::string serial);
+    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn);
+    void applyToChildren(std::function<void(DBMeta *)> fn);
 
-    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn)
-    {
-        DBWriter dbw = DBWriter::factory<ChildType>(this);
+    // FIXME: Make protected.
+    std::map<KeyType *, ChildType *> children;
 
-        // Perhaps it's conceptually cleaner to have this lambda return
-        // pairs of keys and children and then add the children from local
-        // scope.
-        std::function<DBMeta *(std::string,
-                               std::string, std::string)> deserialize =
-            [this] (std::string key, std::string serial, std::string id) {
-                AbstractMetaKey *meta_key =
-                    AbstractMetaKey::factory<KeyType>(key);
-                auto deserializeChild = ChildType::deserialize;
-                DBMeta *new_old_meta =
-                    deserializeChild(atoi(id.c_str()), serial);
-
-                // Gobble the child.
-                this->addChild(meta_key, new_old_meta);
-
-                return new_old_meta;
-            };
-
-        return DBMeta::doFetchChildren(e_conn, dbw, deserialize);
-    }
-
-    void applyToChildren(std::function<void(DBMeta *)> fn)
-    {
-        for (auto it : children) {
-            fn(it.second);
-        }
-    }
+private:
+    // Helpers.
+    typename std::map<KeyType *, ChildType *>::const_iterator
+        findChild(KeyType *key) const;
 };
 
+#include <dbobject.tt>
 

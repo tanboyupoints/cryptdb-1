@@ -6,12 +6,13 @@
 #include <main/dispatcher.hh>
 
 class AddColumnSubHandler : public AlterSubHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
+    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
+                                   const std::string &q,
                                    unsigned *out_lex_count) const
     {
-        const string &table =
+        const std::string &table =
             lex->select_lex.table_list.first->table_name;
-        const string &dbname = lex->select_lex.table_list.first->db;
+        const std::string &dbname = lex->select_lex.table_list.first->db;
         LEX *new_lex = copy(lex);
 
         TableMeta *tm = a.getTableMeta(table);
@@ -39,10 +40,11 @@ class AddColumnSubHandler : public AlterSubHandler {
 };
 
 class DropColumnSubHandler : public AlterSubHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
+    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
+                                   const std::string &q,
                                    unsigned *out_lex_count) const {
         LEX *new_lex = copy(lex);
-        const string &table =
+        const std::string &table =
             lex->select_lex.table_list.first->table_name;
         const std::string &dbname =
             lex->select_lex.table_list.first->db;
@@ -109,14 +111,16 @@ class DropColumnSubHandler : public AlterSubHandler {
 };
 
 class ChangeColumnSubHandler : public AlterSubHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
+    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
+                                   const std::string &q,
                                    unsigned *out_lex_count) const {
         assert(false);
     }
 };
 
 class ForeignKeySubHandler : public AlterSubHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
+    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
+                                   const std::string &q,
                                    unsigned *out_lex_count) const {
         assert(false);
     }
@@ -124,10 +128,11 @@ class ForeignKeySubHandler : public AlterSubHandler {
 
 class AddIndexSubHandler : public AlterSubHandler {
     // TODO: Add index to embedded shallow mirror.
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
+    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
+                                   const std::string &q,
                                    unsigned *out_lex_count) const
     {
-        const string &table =
+        const std::string &table =
             lex->select_lex.table_list.first->table_name;
         LEX *new_lex = copy(lex);
 
@@ -159,12 +164,13 @@ class AddIndexSubHandler : public AlterSubHandler {
 };
 
 class DropIndexSubHandler : public AlterSubHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
+    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
+                                   const std::string &q,
                                    unsigned *out_lex_count) const {
         LEX *new_lex = copy(lex);
-        const string &table =
+        const std::string &table =
             lex->select_lex.table_list.first->table_name;
-        const string &dbname =
+        const std::string &dbname =
             lex->select_lex.table_list.first->db;
         TableMeta *tm = a.getTableMeta(table);
         new_lex->select_lex.table_list =
@@ -210,7 +216,8 @@ class DropIndexSubHandler : public AlterSubHandler {
     }
 };
 
-LEX **AlterSubHandler::transformLex(LEX *lex, Analysis &a, const string &q,
+LEX **AlterSubHandler::transformLex(LEX *lex, Analysis &a,
+                                    const std::string &q,
                                     unsigned *out_lex_count) const {
     return this->rewriteAndUpdate(lex, a, q, out_lex_count);
 }

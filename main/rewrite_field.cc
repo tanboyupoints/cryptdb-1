@@ -25,8 +25,6 @@
 // gives names to classes and objects we don't care to know the name of 
 #define ANON                ANON_NAME(__anon_id_f_)
 
-using namespace std;
-
 
 CItemTypesDir itemTypes = CItemTypesDir();
 CItemFuncDir funcTypes = CItemFuncDir();
@@ -39,9 +37,9 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     virtual RewritePlan * do_gather_type(Item_field *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << "FIELD_ITEM do_gather " << *i;
 
-        string fieldname = i->field_name;
-        string table = i->table_name;
-	string fullname = fullName(fieldname, table);
+        std::string fieldname = i->field_name;
+        std::string table = i->table_name;
+        std::string fullname = fullName(fieldname, table);
 
         FieldMeta * fm = a.getFieldMeta(table, fieldname);
 
@@ -105,7 +103,8 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
     //do we need do_rewrite_insert?
     virtual void
-    do_rewrite_insert_type(Item_field *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
+    do_rewrite_insert_type(Item_field *i, Analysis & a,
+                           std::vector<Item *> &l, FieldMeta *fm) const
     {
 	assert(fm==NULL);
         fm = a.getFieldMeta(i->table_name, i->field_name);
@@ -123,7 +122,7 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
 	Item_field * new_field = NULL;
         for (auto it : fm->orderedOnionMetas()) {
-            string name = it.second->getAnonOnionName();
+            std::string name = it.second->getAnonOnionName();
 	    new_field = make_item(i, name);
             new_field->table_name =
                 make_thd_string(a.getAnonTableName(i->table_name));

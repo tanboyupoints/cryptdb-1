@@ -24,8 +24,6 @@
 
 #include "field.h"
 
-using namespace std;
-
 extern CItemTypesDir itemTypes;
 extern CItemFuncDir funcTypes;
 extern CItemSumFuncDir sumFuncTypes;
@@ -44,7 +42,7 @@ extern CItemFuncNameDir funcNames;
 // it just does gather, choos and then rewrite
 
 static Item_field *
-stringToItemField(string field, string table, Item_field * itf) {
+stringToItemField(std::string field, std::string table, Item_field * itf) {
 
     THD * thd = current_thd;
     assert(thd);
@@ -56,10 +54,10 @@ stringToItemField(string field, string table, Item_field * itf) {
     return res;
 }
 
-static inline string
+static inline std::string
 extract_fieldname(Item_field *i)
 {
-    stringstream fieldtemp;
+    std::stringstream fieldtemp;
     fieldtemp << *i;
     return fieldtemp.str();
 }
@@ -67,7 +65,7 @@ extract_fieldname(Item_field *i)
 
 //TODO: remove this at some point
 static inline void
-mysql_query_wrapper(MYSQL *m, const string &q)
+mysql_query_wrapper(MYSQL *m, const std::string &q)
 {
     if (mysql_query(m, q.c_str())) {
         cryptdb_err() << "query failed: " << q
@@ -147,7 +145,7 @@ loadSchemaInfo(Connect *e_conn)
 }
 
 static void
-printEC(Connect * e_conn, const string & command) {
+printEC(Connect * e_conn, const std::string & command) {
     DBResult * dbres;
     assert_s(e_conn->execute(command, dbres), "command failed");
     ResType res = dbres->unpack();
@@ -171,8 +169,8 @@ printEmbeddedState(ProxyState & ps) {
 template <typename type> static void
 translatorHelper(const char **texts, type *enums, int count)
 {
-    vector<type> vec_enums(count);
-    vector<std::string> vec_texts(count);
+    std::vector<type> vec_enums(count);
+    std::vector<std::string> vec_texts(count);
 
     for (int i = 0; i < count; ++i) {
         vec_texts[i] = texts[i];
@@ -278,15 +276,17 @@ buildTypeTextTranslator()
 
 //l gets updated to the new level
 static void
-removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEVEL & new_level, const string & cur_db) {
+removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o,
+                 SECLEVEL & new_level, const std::string & cur_db) {
 
     OnionMeta *om = fm->getOnionMeta(o);
     assert(om);
-    string fieldanon  = om->getAnonOnionName();
-    string tableanon  = a.getTableMeta(itf->table_name)->getAnonTableName();
+    std::string fieldanon  = om->getAnonOnionName();
+    std::string tableanon  =
+        a.getTableMeta(itf->table_name)->getAnonTableName();
 
     //removes onion layer at the DB
-    stringstream query;
+    std::stringstream query;
     query << "UPDATE " << tableanon << " SET " << fieldanon  << " = ";
 
     Item_field *field = stringToItemField(fieldanon, tableanon, itf);
@@ -295,9 +295,9 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
 
     query << *decUDF << ";";
 
-    cerr << "\nADJUST: \n" << query.str() << "\n";
+    std::cerr << "\nADJUST: \n" << query.str() << "\n";
 
-    string usedb = "USE " +  cur_db + ";";
+    std::string usedb = "USE " +  cur_db + ";";
     //HACk: make sure right cur_db in other ways
     assert_s(a.ps->conn->execute(usedb),  "failed to execute " + usedb);
     //execute decryption query
@@ -321,7 +321,8 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o, SECLEV
  *
  */
 static void
-adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf, Analysis & a, const string & cur_db) {
+adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf,
+            Analysis & a, const std::string & cur_db) {
 
     SECLEVEL newlevel = fm->getOnionLevel(o);
     assert(newlevel != SECLEVEL::INVALID);
@@ -433,7 +434,10 @@ do_optimize_const_item(T *i, Analysis &a) {
 }
 
 static Item *
-decrypt_item_layers(Item * i, onion o, vector<EncLayer *> & layers, uint64_t IV, Analysis &a, FieldMeta *fm, const vector<Item *> &res) {
+decrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers,
+                    uint64_t IV, Analysis &a, FieldMeta *fm,
+                    const std::vector<Item *> &res)
+{
     assert(!i->is_null());
 
     if (o == oPLAIN) {// Unencrypted item
@@ -460,7 +464,9 @@ decrypt_item_layers(Item * i, onion o, vector<EncLayer *> & layers, uint64_t IV,
 }
 
 static Item *
-decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV, Analysis &a, vector<Item *> &res) {
+decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV, Analysis &a,
+             std::vector<Item *> &res)
+{
     assert(!i->is_null());
     return decrypt_item_layers(i, o, fm->getOnionMeta(o)->layers, IV, a,
                                fm, res);
@@ -581,7 +587,7 @@ static void
 dropAll(Connect * conn)
 {
     for (udf_func* u: udf_list) {
-        stringstream ss;
+        std::stringstream ss;
         ss << "DROP FUNCTION IF EXISTS " << convert_lex_str(u->name) << ";";
         assert_s(conn->execute(ss.str()), ss.str());
     }
@@ -591,7 +597,7 @@ static void
 createAll(Connect * conn)
 {
     for (udf_func* u: udf_list) {
-        stringstream ss;
+        std::stringstream ss;
         ss << "CREATE ";
         if (u->type == UDFTYPE_AGGREGATE) ss << "AGGREGATE ";
         ss << "FUNCTION " << u->name.str << " RETURNS ";
@@ -656,7 +662,8 @@ Rewriter::Rewriter(ConnectionInfo ci,
 }
 
 LEX **
-Rewriter::dispatchAndTransformOnLex(LEX *lex, Analysis &a, const string &q,
+Rewriter::dispatchAndTransformOnLex(LEX *lex, Analysis &a,
+                                    const std::string &q,
                                     unsigned *out_lex_count) {
     const SQLHandler *handler;
     if (dml_dispatcher->canDo(lex)) {
@@ -688,12 +695,12 @@ Rewriter::~Rewriter()
 }
 
 void
-Rewriter::setMasterKey(const string &mkey)
+Rewriter::setMasterKey(const std::string &mkey)
 {
     ps.masterKey = getKey(mkey);
 }
 
-static list<string>
+static std::list<std::string>
 processAnnotation(Annotation annot, Analysis &a)
 {
     // TODO: Support ENC keyword in query.
@@ -701,8 +708,8 @@ processAnnotation(Annotation annot, Analysis &a)
 }
 
 
-static list<string>
-rewrite_helper(const string & q, Analysis & analysis,
+static std::list<std::string>
+rewrite_helper(const std::string & q, Analysis & analysis,
 	       query_parse & p) {
     LOG(cdb_v) << "q " << q;
 
@@ -738,11 +745,11 @@ rewrite_helper(const string & q, Analysis & analysis,
     printEmbeddedState(*analysis.ps);
     // --------------------------------------
 
-    list<string> queries;
+    std::list<std::string> queries;
     for (unsigned i = 0; i < out_lex_count; ++i) {
         LOG(cdb_v) << "FINAL QUERY [" << i+1 << "/" << out_lex_count
-                   << "]: " << new_lexes[i] << endl;
-        stringstream ss;
+                   << "]: " << new_lexes[i] << std::endl;
+        std::stringstream ss;
         ss << *new_lexes[i];
         queries.push_back(ss.str());
     }
@@ -771,7 +778,7 @@ noRewrite(LEX * lex) {
 
 // TODO: we don't need to pass analysis, enough to pass returnmeta
 QueryRewrite
-Rewriter::rewrite(const string & q)
+Rewriter::rewrite(const std::string & q)
 {
 
     assert(0 == mysql_thread_init());
@@ -813,7 +820,7 @@ Rewriter::rewrite(const string & q)
 	    res.queries = rewrite_helper(q, analysis, p);
 	} catch (OnionAdjustExcept e) {
 	    LOG(cdb_v) << "caught onion adjustment";
-            cout << "Adjusting onion!" << endl;
+            std::cout << "Adjusting onion!" << std::endl;
 	    adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis,
                         ps.conn->getCurDBName());
 	    continue;
@@ -825,8 +832,8 @@ Rewriter::rewrite(const string & q)
 }
 
 //TODO: replace stringify with <<
-string ReturnField::stringify() {
-    stringstream res;
+std::string ReturnField::stringify() {
+    std::stringstream res;
 
     res << " is_salt: " << is_salt << " filed_called " << field_called;
     res <<" fm  " << olk.key << " onion " << olk.o;
@@ -834,8 +841,8 @@ string ReturnField::stringify() {
 
     return res.str();
 }
-string ReturnMeta::stringify() {
-    stringstream res;
+std::string ReturnMeta::stringify() {
+    std::stringstream res;
     res << "rmeta contains " << rfmeta.size() << " elements: \n";
     for (auto i : rfmeta) {
 	res << i.first << " " << i.second.stringify() << "\n";
@@ -874,9 +881,9 @@ Rewriter::decryptResults(ResType & dbres,
     unsigned int real_cols = res.names.size();
 
     //allocate space in results for decrypted rows
-    res.rows = vector<vector<Item*> >(rows);
+    res.rows = std::vector<std::vector<Item*> >(rows);
     for (unsigned int i = 0; i < rows; i++) {
-        res.rows[i] = vector<Item*>(real_cols);
+        res.rows[i] = std::vector<Item*>(real_cols);
     }
 
     // decrypt rows
@@ -910,7 +917,7 @@ Rewriter::decryptResults(ResType & dbres,
 
 // @show defaults to false.
 ResType *
-executeQuery(Rewriter &r, const string &q, bool show)
+executeQuery(Rewriter &r, const std::string &q, bool show)
 {
     try {
         DBResult *dbres;
@@ -923,10 +930,10 @@ executeQuery(Rewriter &r, const string &q, bool show)
         unsigned i = 0;
         for (auto query : qr.queries) {
             if (show) {
-                cerr << endl
+                std::cerr << std::endl
                      << RED_BEGIN << "ENCRYPTED QUERY [" << i+1 << "/"
-                     << qr.queries.size() << "]:" << COLOR_END << endl
-                     << query << endl;
+                     << qr.queries.size() << "]:" << COLOR_END << std::endl
+                     << query << std::endl;
             }
             assert(r.getConnection()->execute(query, dbres));
             if (!dbres) {
@@ -942,27 +949,30 @@ executeQuery(Rewriter &r, const string &q, bool show)
         }
 
         if (show) {
-            cerr << endl << RED_BEGIN << "ENCRYPTED RESULTS FROM DB:"
-                 << COLOR_END << endl;
+            std::cerr << std::endl << RED_BEGIN
+                      << "ENCRYPTED RESULTS FROM DB:" << COLOR_END
+                      << std::endl;
             printRes(res);
-            cerr << endl;
+            std::cerr << std::endl;
         }
 
         ResType dec_res = r.decryptResults(res, qr.rmeta);
 
         if (show) {
-            cerr << endl << RED_BEGIN << "DECRYPTED RESULTS:" << COLOR_END << endl;
+            std::cerr << std::endl << RED_BEGIN << "DECRYPTED RESULTS:" << COLOR_END << std::endl;
             printRes(dec_res);
         }
 
         return new ResType(dec_res);
-    } catch (runtime_error &e) {
-        cout << "Unexpected Error: " << e.what() << " in query " << q << endl;
+    } catch (std::runtime_error &e) {
+        std::cout << "Unexpected Error: " << e.what() << " in query "
+                  << q << std::endl;
         return NULL;
-	 }  catch (CryptDBError &e) {
-        cout << "Internal Error: " << e.msg << " in query " << q << endl;
+    }  catch (CryptDBError &e) {
+        std::cout << "Internal Error: " << e.msg << " in query " << q
+                  << std::endl;
 	return NULL;
-	}
+    }
 }
 
 void
@@ -982,7 +992,7 @@ printRes(const ResType & r) {
 
     /* next, print out the rows */
     for (unsigned int i = 0; i < r.rows.size(); i++) {
-	stringstream ss;
+        std::stringstream ss;
         for (unsigned int j = 0; j < r.rows[i].size(); j++) {
             char buf[400];
             std::stringstream sstr;

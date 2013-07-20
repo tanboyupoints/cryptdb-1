@@ -12,10 +12,12 @@
 class DDLHandler : public SQLHandler {
 public:
     virtual LEX **transformLex(LEX *lex, Analysis &analysis,
-                               const string &q, unsigned *out_lex_count) const;
+                               const std::string &q,
+                               unsigned *out_lex_count) const;
 
 private:
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
+    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
+                                   const std::string &q,
                                    unsigned *out_lex_count) const = 0;
 
 protected:

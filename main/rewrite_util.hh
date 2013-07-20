@@ -8,7 +8,7 @@
 #include <sql_table.h>
 
 Item *
-rewrite(Item *i, const OLK & constr, Analysis &a, string context = "");
+rewrite(Item *i, const OLK & constr, Analysis &a, std::string context = "");
 
 TABLE_LIST *
 rewrite_table_list(TABLE_LIST *t, Analysis &a);
@@ -38,11 +38,11 @@ begin_transaction_lex(Analysis a);
 LEX *
 commit_transaction_lex(Analysis a);
 
-vector<Create_field*>
+std::vector<Create_field*>
 rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a);
 
-vector<Key*>
-rewrite_key(const string &table, Key *key, Analysis &a);
+std::vector<Key*>
+rewrite_key(const std::string &table, Key *key, Analysis &a);
 
 std::string
 bool_to_string(bool b);

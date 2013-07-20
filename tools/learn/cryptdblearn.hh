@@ -4,8 +4,6 @@
 #include <iostream>
 #include <rewrite_main.hh>
 
-using namespace std;
-
 // Anonymous namespace
 namespace {
 
@@ -32,7 +30,8 @@ class Learn
 {
     public:
 
-        Learn(mode_e mode, Rewriter& r, const string&dbname, const string& filename)
+        Learn(mode_e mode, Rewriter& r, const std::string &dbname,
+              const std::string &filename)
             : m_totalnum(0), m_errnum(0),
             m_mode(mode), m_r(r), m_dbname(dbname), m_filename(filename)
         {
@@ -59,9 +58,9 @@ class Learn
         int m_errnum;
         mode_e m_mode;
         Rewriter& m_r;
-        string m_dbname;
-        string m_filename;
-        vector<query_parse*>qvec;
+        std::string m_dbname;
+        std::string m_filename;
+        std::vector<query_parse*>qvec;
 
 };
 

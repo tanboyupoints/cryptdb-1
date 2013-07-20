@@ -7,21 +7,18 @@
 
 #include <test/test_utils.hh>
 
-
-using namespace std;
-
 void
 PrintRes(const ResType &res)
 {
     for (auto i = res.names.begin(); i != res.names.end(); i++)
-        cerr << *i << " | ";
-    cerr << endl;
+        std::cerr << *i << " | ";
+    std::cerr << std::endl;
     for (auto outer = res.rows.begin(); outer != res.rows.end(); outer++) {
         for (auto inner = outer->begin(); inner != outer->end(); inner++)
-            cerr << *inner << " | ";
-        cerr << endl;
+            std::cerr << *inner << " | ";
+        std::cerr << std::endl;
     }
-    cerr << endl;
+    std::cerr << std::endl;
 }
 
 /*ResType

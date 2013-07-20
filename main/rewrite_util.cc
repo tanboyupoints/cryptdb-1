@@ -6,8 +6,6 @@
 #include <parser/stringify.hh>
 #include <List_helpers.hh>
 
-using namespace std;
-
 extern CItemTypesDir itemTypes;
 
 void
@@ -29,7 +27,7 @@ optimize(Item **i, Analysis &a) {
 // that should be rewritten
 // @context defaults to empty string.
 Item *
-rewrite(Item *i, const OLK & constr, Analysis &a, string context)
+rewrite(Item *i, const OLK & constr, Analysis &a, std::string context)
 {
     if (context.size()) {
 	context = " for " + context;
@@ -37,8 +35,10 @@ rewrite(Item *i, const OLK & constr, Analysis &a, string context)
     RewritePlan * rp = getAssert(a.rewritePlans, i);
     assert(rp);
     if (!rp->es_out.contains(constr)) {
-	cerr << "query cannot be supported because " << i << " needs to return " << constr << context << "\n" \
-	     << "BUT it can only return " << rp->es_out << " BECAUSE " << rp->r << "\n";
+        std::cerr << "query cannot be supported because " << i
+                  << " needs to return " << constr << context << "\n"
+	          << "BUT it can only return " << rp->es_out
+                  << " BECAUSE " << rp->r << "\n";
 	assert(false);
     }
     return itemTypes.do_rewrite(i, constr, rp, a);
@@ -50,8 +50,9 @@ rewrite_table_list(TABLE_LIST *t, Analysis &a)
     // Table name can only be empty when grouping a nested join.
     assert(t->table_name || t->nested_join);
     if (t->table_name) {
-        string anon_name = a.getAnonTableName(string(t->table_name,
-                                                     t->table_name_length));
+        std::string anon_name =
+            a.getAnonTableName(std::string(t->table_name,
+                               t->table_name_length));
         return rewrite_table_list(t, anon_name);
     } else {
         return copy(t);
@@ -165,7 +166,7 @@ analyze(Item *i, Analysis & a)
 
 LEX *
 begin_transaction_lex(Analysis a) {
-    string query = "START TRANSACTION;";
+    std::string query = "START TRANSACTION;";
     query_parse *begin_parse = new query_parse(a.ps->conn->getCurDBName(),
                                                query);
     return begin_parse->lex();
@@ -173,7 +174,7 @@ begin_transaction_lex(Analysis a) {
 
 LEX *
 commit_transaction_lex(Analysis a) {
-    string query = "COMMIT;";
+    std::string query = "COMMIT;";
     query_parse *commit_parse = new query_parse(a.ps->conn->getCurDBName(),
                                                 query);
     return commit_parse->lex();
@@ -182,7 +183,8 @@ commit_transaction_lex(Analysis a) {
 //TODO(raluca) : figure out how to create Create_field from scratch
 // and avoid this chaining and passing f as an argument
 static Create_field *
-get_create_field(Create_field * f, vector<EncLayer*> & v, const string & name) {
+get_create_field(Create_field * f, std::vector<EncLayer*> & v,
+                 const std::string & name) {
 
     Create_field * new_cf = f;
     
@@ -198,12 +200,12 @@ get_create_field(Create_field * f, vector<EncLayer*> & v, const string & name) {
     return new_cf;
 }
 
-vector<Create_field *>
+std::vector<Create_field *>
 rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
 {
     LOG(cdb_v) << "in rewrite create field for " << *f;
 
-    vector<Create_field *> output_cfields;
+    std::vector<Create_field *> output_cfields;
 
     // FIXME: This sequence checking for encryption is broken.
     if (!fm->isEncrypted()) {
@@ -251,10 +253,10 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
 }
 
 // TODO: Add Key for oDET onion as well.
-vector<Key*>
-rewrite_key(const string &table, Key *key, Analysis &a)
+std::vector<Key*>
+rewrite_key(const std::string &table, Key *key, Analysis &a)
 {
-    vector<Key*> output_keys;
+    std::vector<Key*> output_keys;
     Key *new_key = key->clone(current_thd->mem_root);    
     auto col_it =
         List_iterator<Key_part_spec>(key->columns);
@@ -265,7 +267,7 @@ rewrite_key(const string &table, Key *key, Analysis &a)
         reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
             [table, a] (List<Key_part_spec> out_field_list,
                         Key_part_spec *key_part) {
-                string field_name =
+                std::string field_name =
                     convert_lex_str(key_part->field_name);
                 FieldMeta *fm =
                     a.getFieldMeta(table, field_name);

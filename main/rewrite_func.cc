@@ -69,7 +69,7 @@ rewrite_args_FN(T * i, const OLK & constr,
 // if encset_from_intersection is false, or else is the intersection with the children
 static RewritePlan *
 typical_gather(Analysis & a, Item_func * i,
-	     const EncSet & my_es, string why, reason & my_r,
+	     const EncSet & my_es, std::string why, reason & my_r,
 	     bool encset_from_intersection, const EncSet & other_encset = PLAIN_EncSet)
 {
 
@@ -85,9 +85,10 @@ typical_gather(Analysis & a, Item_func * i,
 	                    intersect(childr_rp[1]->es_out);
 
     if (solution.empty()) {
-	cerr << "crypto schemes does not support this query BECAUSE " << i << "NEEDS " << my_es << "\n" \
-	     << " BECAUSE " << why << "\n" \
-	     << " AND children have:  " << r1 << r2 << "\n";
+        std::cerr << "crypto schemes does not support this query BECAUSE "
+                  << i << "NEEDS " << my_es << "\n"
+	          << " BECAUSE " << why << "\n" \
+	          << " AND children have:  " << r1 << r2 << "\n";
 	assert(false);
     }
 
@@ -114,7 +115,9 @@ typical_gather(Analysis & a, Item_func * i,
  * one single function, common to both files.
  */
 static Item *
-encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers, Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0) {
+encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers,
+                    Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0)
+{
     assert(!i->is_null());
 
     if (o == oPLAIN) {//Unencrypted item
@@ -148,7 +151,10 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
         return do_optimize_type_self_and_args(i, a);
     }
 
-    virtual void do_rewrite_insert_type(Item_func_neg *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const {
+    virtual void do_rewrite_insert_type(Item_func_neg *i, Analysis & a,
+                                        std::vector<Item *> &l,
+                                        FieldMeta *fm) const
+    {
     
         //TODO: check this.
         //if (!fm->isEncrypted()) {
@@ -193,7 +199,7 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
 	LOG(cdb_v) << "CItemCompare (L1139) do_gather func " << *i;
 
         EncSet my_es;
-	string why = "";
+        std::string why = "";
 
         if (FT == Item_func::Functype::EQ_FUNC ||
             FT == Item_func::Functype::EQUAL_FUNC ||
@@ -209,7 +215,7 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
 	assert_s(i->argument_count() == 2, "expected two arguments for comparison");
         if (!args[0]->const_item() && !args[1]->const_item()) {
             why = why + "; join";
-	    cerr << "join";
+            std::cerr << "join";
 	    my_es = JOIN_EncSet;
 	}
 
@@ -355,7 +361,7 @@ class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
 
 	RewritePlanOneOLK * rp = (RewritePlanOneOLK *) _rp;
 
-        cerr << "Rewrite plan is " << rp << "\n";
+        std::cerr << "Rewrite plan is " << rp << "\n";
 
 	Item * arg0 = itemTypes.do_rewrite(args[0],
 					   rp->olk, rp->childr_rp[0], a);
@@ -665,7 +671,7 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
 	Item **args = i->arguments();
         uint argcount = i->argument_count();
 	if (argcount != 2) {
-	    cerr << "expected two arguments in " << *i << "\n";
+            std::cerr << "expected two arguments in " << *i << "\n";
 	    assert(false);
 	}
 	//at least one has to be a constant as we don't support join now
@@ -683,7 +689,7 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
 	EncSet supported_es = needed_es.intersect(es1).intersect(es2);
 
 	if (supported_es.empty()) {
-	    cerr << "cannot support " << i << " BECAUSE it needs any of " << needed_es << "\n" \
+            std::cerr << "cannot support " << i << " BECAUSE it needs any of " << needed_es << "\n" \
 		 << "BUT children only have (" << r1 << "\n" << r2 << ")\n";
 	    assert(false);
 	}

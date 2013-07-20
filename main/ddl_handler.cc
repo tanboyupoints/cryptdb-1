@@ -15,7 +15,8 @@
 //   > If we drop Keys and Columns in the same query the order is probably
 //     going to get changed.
 class AlterHandler : public DDLHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
+    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
+                                   const std::string &q,
                                    unsigned *out_lex_count) const {
         const AlterSubHandler *handler;
         assert(sub_dispatcher->canDo(lex));
@@ -32,7 +33,8 @@ public:
 };
 
 class CreateHandler : public DDLHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
+    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
+                                   const std::string &q,
                                    unsigned *out_lex_count) const
     {
         char* dbname = lex->select_lex.table_list.first->db;
@@ -113,7 +115,8 @@ class CreateHandler : public DDLHandler {
 };
 
 class DropHandler : public DDLHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
+    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
+                                   const std::string &q,
                                    unsigned *out_lex_count) const {
         LEX **out_lex = rewrite(lex, a, out_lex_count);
         update(q, lex, a);
@@ -129,7 +132,7 @@ class DropHandler : public DDLHandler {
         return single_lex_output(new_lex, out_lex_count);
     }
 
-    void update(const string &q, LEX *lex, Analysis &a) const {
+    void update(const std::string &q, LEX *lex, Analysis &a) const {
         TABLE_LIST *tbl = lex->select_lex.table_list.first;
         for (; tbl; tbl = tbl->next_local) {
             char* table  = tbl->table_name;
@@ -154,7 +157,8 @@ class DropHandler : public DDLHandler {
 
 // TODO: FIXME.
 class ChangeDBHandler : public DDLHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a, const string &q,
+    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
+                                   const std::string &q,
                                    unsigned *out_lex_count) const {
         assert(lex->select_lex.db);
         char* dbname = lex->select_lex.db;
@@ -168,7 +172,8 @@ class ChangeDBHandler : public DDLHandler {
 };
 
 LEX** DDLHandler::transformLex(LEX *lex, Analysis &analysis,
-                                      const string &q, unsigned *out_lex_count) const {
+                               const std::string &q,
+                               unsigned *out_lex_count) const {
     return this->rewriteAndUpdate(lex, analysis, q, out_lex_count);
 }
 

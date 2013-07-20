@@ -21,9 +21,6 @@
 #include <parser/lex_util.hh>
 #include <main/enum_text.hh>
 
-using namespace std;
-
-
 // class/object names we don't care to know the name of
 #define ANON                ANON_NAME(__anon_id_const)
 
@@ -84,7 +81,9 @@ encrypt_item(Item * i, const OLK & olk, Analysis & a)
 
 static void
 encrypt_item_all_onions(Item * i, FieldMeta * fm,
-                        uint64_t IV, vector<Item*> & l, Analysis &a) {
+                        uint64_t IV, std::vector<Item*> & l,
+                        Analysis &a)
+{
 
     for (auto it : fm->orderedOnionMetas()) {
         // FIXME: dynamic_cast
@@ -97,8 +96,8 @@ encrypt_item_all_onions(Item * i, FieldMeta * fm,
 
 template <typename ItemType>
 static void
-typical_rewrite_insert_type(ItemType *i, Analysis &a, vector<Item *> &l,
-                            FieldMeta *fm)
+typical_rewrite_insert_type(ItemType *i, Analysis &a,
+                            std::vector<Item *> &l, FieldMeta *fm)
 {
     if (!fm->isEncrypted()) {
         l.push_back(make_item(i));
@@ -145,7 +144,8 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     }
 
     virtual void
-    do_rewrite_insert_type(Item_string *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
+    do_rewrite_insert_type(Item_string *i, Analysis & a,
+                           std::vector<Item *> &l, FieldMeta *fm) const
     {
         typical_rewrite_insert_type(i, a, l, fm);
     }
@@ -167,13 +167,14 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     virtual Item * do_rewrite_type(Item_num *i,
 				   const OLK & constr, const RewritePlan * rp,
 				   Analysis & a) const {
-        LOG(cdb_v) << "do_rewrite_type " << *i << endl;
+        LOG(cdb_v) << "do_rewrite_type " << *i << std::endl;
 
         return encrypt_item(i, constr, a);
     }
 
     virtual void
-    do_rewrite_insert_type(Item_num *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
+    do_rewrite_insert_type(Item_num *i, Analysis & a,
+                           std::vector<Item *> &l, FieldMeta *fm) const
     {
         typical_rewrite_insert_type(i, a, l, fm);
     }
@@ -192,7 +193,7 @@ static class ANON : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITEM
     virtual Item * do_rewrite_type(Item_decimal *i,
 				   const OLK & constr, const RewritePlan * rp,
 				   Analysis & a) const {
-        LOG(cdb_v) << "do_rewrite_type " << *i << "endl";
+        LOG(cdb_v) << "do_rewrite_type " << *i << std::endl;
 
 	return encrypt_item(i, constr, a);
 /*        double n = i->val_real();
@@ -202,7 +203,8 @@ static class ANON : public CItemSubtypeIT<Item_decimal, Item::Type::DECIMAL_ITEM
         return new Item_hex_string(buf, sizeof(buf));*/
     }
     virtual void
-    do_rewrite_insert_type(Item_decimal *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const
+    do_rewrite_insert_type(Item_decimal *i, Analysis & a,
+                           std::vector<Item *> &l, FieldMeta *fm) const
     {
 	typical_rewrite_insert_type(i, a, l, fm);
     }

@@ -1,7 +1,5 @@
 #include <main/Analysis.hh>
 
-using namespace std;
-
 // FIXME: Memory leaks when we allocate MetaKey<...>, use smart pointer.
 
 inline std::string
@@ -68,8 +66,8 @@ EncSet::intersect(const EncSet & es2) const
     return EncSet(m);
 }
 
-ostream&
-operator<<(ostream &out, const EncSet & es)
+std::ostream&
+operator<<(std::ostream &out, const EncSet & es)
 {
     if (es.osl.size() == 0) {
         out << "empty encset";
@@ -149,8 +147,8 @@ needsSalt(EncSet es) {
 }
 
 
-ostream&
-operator<<(ostream &out, const reason &r)
+std::ostream&
+operator<<(std::ostream &out, const reason &r)
 {
     out << r.why_t_item << " PRODUCES encset " << r.encset << "\n" \
 	<< " BECAUSE " << r.why_t << "\n";
@@ -182,8 +180,8 @@ RewritePlan::restrict(const EncSet & es) {
 }
 */
 
-ostream&
-operator<<(ostream &out, const RewritePlan * rp)
+std::ostream&
+operator<<(std::ostream &out, const RewritePlan * rp)
 {
     if (!rp) {
         out << "NULL RewritePlan";
@@ -387,7 +385,7 @@ bool Analysis::addAlias(std::string alias, std::string table)
 
 FieldMeta *Analysis::getFieldMeta(std::string table, std::string field) const
 {
-    string real_table_name = unAliasTable(table);
+    std::string real_table_name = unAliasTable(table);
     FieldMeta *fm = ps->schema->getFieldMeta(real_table_name, field);
     assert(fm);
     return fm;
@@ -429,7 +427,7 @@ bool Analysis::tableMetaExists(std::string table) const
     return ps->schema->childExists(key);
 }
 
-std::string Analysis::getAnonTableName(const string &table) const
+std::string Analysis::getAnonTableName(const std::string &table) const
 {
     return this->getTableMeta(table)->getAnonTableName();
 }

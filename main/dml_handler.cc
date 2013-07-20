@@ -39,14 +39,14 @@ class InsertHandler : public DMLHandler {
     virtual LEX **rewrite(LEX *lex, Analysis &a, unsigned *out_lex_count) const {
         LEX * new_lex = copy(lex);
 
-        const string &table =
+        const std::string &table =
                 lex->select_lex.table_list.first->table_name;
 
         //rewrite table name
         new_lex->select_lex.table_list.first = rewrite_table_list(lex->select_lex.table_list.first, a);
 
         // fields
-        vector<FieldMeta *> fmVec;
+        std::vector<FieldMeta *> fmVec;
         if (lex->field_list.head()) {
             auto it = List_iterator<Item>(lex->field_list);
             List<Item> newList;
@@ -58,7 +58,7 @@ class InsertHandler : public DMLHandler {
                 Item_field *ifd = static_cast<Item_field*>(i);
                 //cerr << "field " << ifd->table_name << "." << ifd->field_name << endl;
                 fmVec.push_back(a.getFieldMeta(ifd->table_name, ifd->field_name));
-                vector<Item *> l;
+                std::vector<Item *> l;
                 itemTypes.do_rewrite_insert(i, a, l, NULL);
                 for (auto it0 = l.begin(); it0 != l.end(); ++it0) {
                     newList.push_back(*it0);
@@ -90,7 +90,7 @@ class InsertHandler : public DMLHandler {
                     Item *i = it0++;
                     if (!i)
                         break;
-                    vector<Item *> l;
+                    std::vector<Item *> l;
                     // Prevent the dereferencing of a bad iterator if
                     // the user supplies more values than fields and the
                     // parser fails to throw an error.
@@ -257,15 +257,15 @@ private:
                           unsigned *out_lex_count) const
     {
         // TODO(burrows): Should support multiple tables in a single UPDATE.
-        string plain_table =
+        std::string plain_table =
             lex->select_lex.top_join_list.head()->table_name;
         // HACK(burrows): Handling empty WHERE clause.
-        string where_clause =
+        std::string where_clause =
             new_lex->select_lex.where ?
                 ItemToString(new_lex->select_lex.where) : " TRUE ";
 
         // Retrieve rows from database.
-        ostringstream select_stream;
+        std::ostringstream select_stream;
         select_stream << " SELECT * FROM " << plain_table
                       << " WHERE " << where_clause << ";";
         ResType *select_res_type =
@@ -280,20 +280,20 @@ private:
                 return "(" + vector_join<Item*>(row, ",", ItemToString) + ")";
             }
         };
-        string values_string =
+        std::string values_string =
             vector_join<std::vector<Item*>>(select_res_type->rows, ",",
                                             _::itemJoin);
         delete select_res_type;
 
         // Push the plaintext rows to the embedded database.
-        ostringstream push_stream;
+        std::ostringstream push_stream;
         push_stream << " INSERT INTO " << plain_table
                     << " VALUES " << values_string << ";";
         assert(a.ps->e_conn->execute(push_stream.str()));
 
         // Run the original (unmodified) query on the data in the embedded
         // database.
-        ostringstream query_stream;
+        std::ostringstream query_stream;
         query_stream << *lex;
         assert(a.ps->e_conn->execute(query_stream.str()));
 
@@ -302,14 +302,14 @@ private:
         //   and on the fact that the database is cleaned up after every such
         //   operation.
         DBResult *dbres;
-        ostringstream select_results_stream;
+        std::ostringstream select_results_stream;
         select_results_stream << " SELECT * FROM " << plain_table << ";";
         assert(a.ps->e_conn->execute(select_results_stream.str(), dbres));
 
         // FIXME(burrows): Use general join.
         ScopedMySQLRes r(dbres->n);
         MYSQL_ROW row;
-        string output_rows = " ";
+        std::string output_rows = " ";
         unsigned long field_count = r.res()->field_count;
         while ((row = mysql_fetch_row(r.res()))) {
             unsigned long *l = mysql_fetch_lengths(r.res());
@@ -318,7 +318,7 @@ private:
             output_rows.append(" ( ");
             for (unsigned long field_index = 0; field_index < field_count;
                  ++field_index) {
-                string field_data;
+                std::string field_data;
                 if (row[field_index]) {
                     field_data = std::string(row[field_index],
                                              l[field_index]);
@@ -335,12 +335,12 @@ private:
         output_rows = output_rows.substr(0, output_rows.length() - 1);
 
         // Cleanup the embedded database.
-        ostringstream cleanup_stream;
+        std::ostringstream cleanup_stream;
         cleanup_stream << "DELETE FROM " << plain_table << ";";
         assert(a.ps->e_conn->execute(cleanup_stream.str()));
 
         // > Add each row from the embedded database to the data database.
-        ostringstream push_results_stream;
+        std::ostringstream push_results_stream;
         push_results_stream << " INSERT INTO " << plain_table
                             << " VALUES " << output_rows << ";";
         Analysis insert_analysis = Analysis(a.ps);
@@ -366,7 +366,7 @@ private:
         LEX *final_insert_lex = final_insert_lex_arr[0];
 
         // DELETE the rows matching the WHERE clause from the database.
-        ostringstream delete_stream;
+        std::ostringstream delete_stream;
         delete_stream << " DELETE FROM " << plain_table
                       << " WHERE " << where_clause << ";";
         Analysis delete_analysis = Analysis(a.ps);
@@ -438,7 +438,8 @@ class SelectHandler : public DMLHandler {
 };
 
 LEX **DMLHandler::transformLex(LEX *lex, Analysis &analysis,
-                               const string &q, unsigned *out_lex_count) const
+                               const std::string &q,
+                               unsigned *out_lex_count) const
 {
     this->gather(lex, analysis);
 
@@ -523,7 +524,7 @@ analyze_update(Item_field * field, Item * val, Analysis & a) {
 
 static void
 rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
-	      const EncSet & constr, const string & name) {
+	      const EncSet & constr, const std::string & name) {
     ORDER * prev = NULL;
     for (ORDER *o = lst.first; o; o = o->next) {
 	Item * i = *o->item;
@@ -531,8 +532,11 @@ rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
 	assert(rp);
 	EncSet es = constr.intersect(rp->es_out);
 	if (es.empty()) {
-	    cerr << " cannot support query because " << name << " item " << i << " needs to output any of " << constr << "\n" \
-		 << " BUT it can only output " << rp->es_out << " BECAUSE " << "(" << rp->r << ")\n";
+            std::cerr << " cannot support query because " << name
+                      << " item " << i << " needs to output any of "
+                      << constr << "\n"
+		      << " BUT it can only output " << rp->es_out
+                      << " BECAUSE " << "(" << rp->r << ")\n";
 	    assert(false);
 	}
 	OLK olk = es.chooseOne();
@@ -586,7 +590,8 @@ addToReturn(ReturnMeta * rm, int pos, const OLK & constr,  bool has_salt) {
 }
 
 static void
-addToReturn(ReturnMeta * rm, int pos, const OLK & constr, bool has_salt, string name) {
+addToReturn(ReturnMeta * rm, int pos, const OLK & constr, bool has_salt,
+            std::string name) {
     addToReturn(rm, pos, constr, has_salt);
     rm->rfmeta[pos].field_called = name;
 }

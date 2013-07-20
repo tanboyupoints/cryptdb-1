@@ -12,7 +12,8 @@
 class DMLHandler : public SQLHandler {
 public:
     virtual LEX** transformLex(LEX *lex, Analysis &analysis,
-                               const string &q, unsigned *out_lex_count) const;
+                               const std::string &q,
+                               unsigned *out_lex_count) const;
 
 private:
     virtual void gather(LEX *lex, Analysis &a) const = 0;

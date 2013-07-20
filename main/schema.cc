@@ -9,8 +9,6 @@
 #include <main/rewrite_util.hh>
 #include <main/dbobject.hh>
 
-using namespace std;
-
 std::vector<DBMeta *>
 DBMeta::doFetchChildren(Connect *e_conn, DBWriter dbw,
                         std::function<DBMeta *(std::string, std::string,
@@ -69,85 +67,6 @@ DBMeta::doFetchChildren(Connect *e_conn, DBWriter dbw,
     return out_vec;
 }
 
-bool MappedDBMeta::addChild(AbstractMetaKey *key, DBMeta *meta)
-{
-    if (childExists(key)) {
-        return false;
-    }
-
-    children[key] = meta;
-    return true;
-}
-
-bool MappedDBMeta::replaceChild(AbstractMetaKey *key, DBMeta *meta)
-{
-    if (!childExists(key)) {
-        return false;
-    }
-
-    children[key] = meta;
-    return true;
-}
-
-bool MappedDBMeta::destroyChild(AbstractMetaKey *key)
-{
-    if (!childExists(key)) {
-        return false;
-    }
-
-    auto child = getChild(key);
-    auto erase_count = children.erase(key);
-    if (1 == erase_count) {
-        delete child;
-        return true;
-    } else if (0 == erase_count) {
-        return false;
-    } else {
-        throw CryptDBError("Bad erase amount in destroyChild!");
-    }
-}
-
-std::map<AbstractMetaKey *, DBMeta *>::const_iterator
-MappedDBMeta::findChild(AbstractMetaKey *key) const
-{
-    auto it = 
-        std::find_if(children.begin(), children.end(),
-            [&key](const std::pair<AbstractMetaKey *, DBMeta *> child) {
-                return *child.first == *key;
-            });
-
-    return it;
-}
-
-bool MappedDBMeta::childExists(AbstractMetaKey *key) const
-{
-    auto it = this->findChild(key);
-    return children.end() != it;
-}
-
-// Slow.
-DBMeta *MappedDBMeta::getChild(AbstractMetaKey *key) const
-{
-    for (auto it : children) {
-        if (*it.first == *key) {
-            return it.second;
-        }
-    }
-
-    return NULL;
-}
-
-AbstractMetaKey *MappedDBMeta::getKey(const DBMeta * const child) const
-{
-    for (auto it : children) {
-        if (it.second == child) {
-            return it.first;
-        }
-    }
-
-    throw CryptDBError("reverse lookup failed to find the child's key!");
-}
-
 OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
                      Create_field *cf, unsigned long uniq_count)
     : onionname(getpRandomName() + TypeText<onion>::toText(o)),
@@ -156,9 +75,9 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
     if (m_key) {         // Don't encrypt if we don't have a key.
         Create_field * newcf = cf;
         //generate enclayers for encrypted field
-        string uniqueFieldName = this->getAnonOnionName();
+        std::string uniqueFieldName = this->getAnonOnionName();
         for (auto l: levels) {
-            string key;
+            std::string key;
             key = getLayerKey(m_key, uniqueFieldName, l);
 
             EncLayer * el = EncLayerFactory::encLayer(o, l, newcf, key);
@@ -278,9 +197,9 @@ std::string FieldMeta::serialize(const DBObject &parent) const
    return serial;
 }
 
-string FieldMeta::stringify() const
+std::string FieldMeta::stringify() const
 {
-    string res = " [FieldMeta " + fname + "]";
+    std::string res = " [FieldMeta " + fname + "]";
     return res;
 }
 
@@ -379,14 +298,18 @@ std::string TableMeta::getAnonIndexName(std::string index_name) const
 FieldMeta *
 SchemaInfo::getFieldMeta(std::string & table, std::string & field) const
 {
-    AbstractMetaKey *table_key = new IdentityMetaKey(table);
-    TableMeta * tm = static_cast<TableMeta *>(getChild(table_key));
+    IdentityMetaKey *table_key = new IdentityMetaKey(table);
+    TableMeta * tm = getChild(table_key);
     if (NULL == tm) {
         return NULL;
     }
+    delete table_key;
 
-    AbstractMetaKey *field_key = new IdentityMetaKey(field);
-    return static_cast<FieldMeta *>(tm->getChild(field_key));
+    IdentityMetaKey *field_key = new IdentityMetaKey(field);
+    FieldMeta *fm = tm->getChild(field_key);
+    delete field_key;
+
+    return fm;
 }
 
 bool create_tables(Connect *e_conn, DBWriter dbw)

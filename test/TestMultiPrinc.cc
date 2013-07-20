@@ -9,8 +9,6 @@
 #include <test/TestMultiPrinc.hh>
 
 
-using namespace std;
-
 static int ntest = 0;
 static int npass = 0;
 
@@ -25,8 +23,9 @@ TestMultiPrinc::~TestMultiPrinc()
 }
 
 static void
-checkQuery(const TestConfig &tc, EDBProxy * cl, const string &query,
-           const vector<string> &names, const vector<vector<string>> &rows)
+checkQuery(const TestConfig &tc, EDBProxy * cl, const std::string &query,
+           const std::vector<std::string> &names,
+           const std::vector<std::vector<std::string>> &rows)
 {
     ResType expect;
     expect.names = names;
@@ -35,7 +34,7 @@ checkQuery(const TestConfig &tc, EDBProxy * cl, const string &query,
      * so that we don't have to supply expected answers anyway.
      */
     for (auto i = rows.begin(); i != rows.end(); i++) {
-        vector<SqlItem> row;
+        std::vector<SqlItem> row;
         for (auto j = i->begin(); j != i->end(); j++) {
             SqlItem item;
             item.null = false;
@@ -72,7 +71,8 @@ checkQuery(const TestConfig &tc, EDBProxy * cl, const string &query,
 }
 
 static void
-testNULL(const TestConfig &tc, EDBProxy * cl, const string &annotated, const string &plain) {
+testNULL(const TestConfig &tc, EDBProxy * cl,
+         const std::string &annotated, const std::string &plain) {
   ntest++;
   if (myCreate(cl, annotated, plain).ok) {
     if (PLAIN) {
@@ -488,7 +488,7 @@ TestMultiPrinc::run(const TestConfig &tc, int argc, char ** argv)
 {
     EDBProxy * cl;
     uint64_t mkey = 113341234;
-    string masterKey = BytesFromInt(mkey, AES_KEY_BYTES);
+    std::string masterKey = BytesFromInt(mkey, AES_KEY_BYTES);
 
     cl = new EDBProxy(tc.host, tc.user, tc.pass, tc.db, tc.port, true);
     cl->setMasterKey(masterKey);

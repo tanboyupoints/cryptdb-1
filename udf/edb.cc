@@ -30,7 +30,6 @@
 #include <util/params.hh>
 #include <util/util.hh>
 
-using namespace std;
 using namespace NTL;
 
 extern "C" {
@@ -88,24 +87,24 @@ char *   func_add_set(UDF_INIT *initid, UDF_ARGS *args, char *result,
 }
 
 static void __attribute__((unused))
-log(string s)
+log(std::string s)
 {
     /* Writes to the server's error log */
     fprintf(stderr, "%s\n", s.c_str());
 }
 
 
-static string
+static std::string
 decrypt_SEM(unsigned char *eValueBytes, uint64_t eValueLen,
             AES_KEY * aesKey, uint64_t salt)
 {
-    string c((char *) eValueBytes, (unsigned int) eValueLen);
+    std::string c((char *) eValueBytes, (unsigned int) eValueLen);
     return decrypt_AES_CBC(c, aesKey, BytesFromInt(salt, SALT_LEN_BYTES), false);
 }
 
 
-static list<string> *
-split(const string & s, unsigned int plen)
+static std::list<std::string> *
+split(const std::string & s, unsigned int plen)
 {
     unsigned int len = s.length();
     if (len % plen != 0) {
@@ -113,7 +112,7 @@ split(const string & s, unsigned int plen)
     }
 
     unsigned int num = len / plen;
-    list<string> * res = new list<string>();
+    std::list<std::string> * res = new std::list<std::string>();
 
     for (unsigned int i = 0; i < num; i++) {
         res->push_back(s.substr(i*plen, plen));
@@ -124,7 +123,7 @@ split(const string & s, unsigned int plen)
 
 
 static bool
-searchExists(const Token & token, const string & overall_ciph)
+searchExists(const Token & token, const std::string & overall_ciph)
 {
     auto l = split(overall_ciph, SWPCiphSize);
     bool r = SWP::searchExists(token, *l);
@@ -134,7 +133,7 @@ searchExists(const Token & token, const string & overall_ciph)
 
 
 static bool
-search(const Token & token, const string & overall_ciph)
+search(const Token & token, const std::string & overall_ciph)
 {
    return searchExists(token, overall_ciph);
 }
@@ -211,7 +210,7 @@ decrypt_int_sem(PG_FUNCTION_ARGS)
 
         uint64_t keyLen;
         char * keyBytes = getba(args, 1, keyLen);
-        string key = string(keyBytes, keyLen);
+        std::string key = std::string(keyBytes, keyLen);
 
         uint64_t salt = getui(args, 2);
 
@@ -255,7 +254,7 @@ decrypt_int_det(PG_FUNCTION_ARGS)
 
         uint64_t keyLen;
         char * keyBytes = getba(args, 1, keyLen);
-        string key = string(keyBytes, keyLen);
+        std::string key = std::string(keyBytes, keyLen);
 
         blowfish bf(key);
         value = bf.decrypt(eValue);
@@ -294,7 +293,7 @@ char *
 decrypt_text_sem(UDF_INIT *initid, UDF_ARGS *args,
                  char *result, unsigned long *length,
                  char *is_null, char *error) {
-    string value;
+    std::string value;
     if (NULL == ARGS->args[0]) {
         value = "";
         *is_null = 1;
@@ -304,7 +303,7 @@ decrypt_text_sem(UDF_INIT *initid, UDF_ARGS *args,
 
         uint64_t keyLen;
         char * keyBytes = getba(args, 1, keyLen);
-        string key = string(keyBytes, keyLen);
+        std::string key = std::string(keyBytes, keyLen);
 
         uint64_t salt = getui(ARGS, 2);
 
@@ -343,7 +342,7 @@ decrypt_int_det(PG_FUNCTION_ARGS)
 
     uint64_t keyLen;
     char * keyBytes = getba(args, 1, keyLen);
-    string key = string(keyBytes, keyLen);
+    std::string key = std::string(keyBytes, keyLen);
 
     blowfish bf(key);
     uint64_t value = bf.encrypt(eValue);
@@ -389,10 +388,12 @@ decrypt_text_det(PG_FUNCTION_ARGS)
 
     uint64_t keyLen;
     char *keyBytes = getba(args, 1, keyLen);
-    string key = string(keyBytes, keyLen);
+    std::string key = std::string(keyBytes, keyLen);
 
     AES_KEY * aesKey = get_AES_dec_key(key);
-    string value = decrypt_AES_CMC(string(eValueBytes, (unsigned int)eValueLen), aesKey, false);
+    std::string value =
+        decrypt_AES_CMC(std::string(eValueBytes, (unsigned int)eValueLen),
+                        aesKey, false);
     delete aesKey;
 
 #if MYSQL_S
@@ -436,7 +437,7 @@ search(PG_FUNCTION_ARGS)
     uint64_t wordLen;
     char * word = (char *)getba(ARGS, 0, wordLen);
     if (wordLen != (unsigned int)word[0]) {
-        cerr << "ERR: wordLen is not equal to fist byte of word!!! ";
+        std::cerr << "ERR: wordLen is not equal to fist byte of word!!! ";
     }
     word = word + 1;     // +1 skips over the length field
     //cerr << "given expr to search for has " << wordLen << " length \n";
@@ -495,8 +496,8 @@ searchSWP_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
     uint64_t wordKeyLen;
     char *wordKey = getba(args, 2, wordKeyLen);
 
-    t->ciph = string(ciph, ciphLen);
-    t->wordKey = string(wordKey, wordKeyLen);
+    t->ciph = std::string(ciph, ciphLen);
+    t->wordKey = std::string(wordKey, wordKeyLen);
 
     initid->ptr = (char *) t;
 
@@ -515,7 +516,7 @@ searchSWP(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
 {
     uint64_t allciphLen;
     char * allciph = getba(ARGS, 0, allciphLen);
-    string overallciph = string(allciph, allciphLen);
+    std::string overallciph = std::string(allciph, allciphLen);
 
     Token * t = (Token *) initid->ptr;
 
@@ -537,12 +538,12 @@ struct agg_state {
 my_bool
 agg_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
 {
-    cerr << "in agg_init \n";
+    std::cerr << "in agg_init \n";
     agg_state *as = new agg_state();
     as->rbuf = malloc(Paillier_len_bytes);
     initid->ptr = (char *) as;
     initid->maybe_null = 1;
-    cerr << "returning from agg_init \n";
+    std::cerr << "returning from agg_init \n";
     return 0;
 }
 

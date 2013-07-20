@@ -1,0 +1,143 @@
+#pragma once
+
+#include <algorithm>
+
+template <typename ChildType, typename KeyType>
+MappedDBMeta<ChildType, KeyType>::~MappedDBMeta()
+{
+    auto cp = children;
+    children.clear();
+
+    for (auto it : cp) {
+        delete it.second;
+    }
+}
+
+template <typename ChildType, typename KeyType>
+bool
+MappedDBMeta<ChildType, KeyType>::addChild(KeyType *key, ChildType *meta)
+{
+    if (childExists(key)) {
+        return false;
+    }
+
+    children[key] = meta;
+    return true;
+}
+
+template <typename ChildType, typename KeyType>
+bool
+MappedDBMeta<ChildType, KeyType>::destroyChild(KeyType *key)
+{
+    if (!childExists(key)) {
+        return false;
+    }
+
+    auto child = getChild(key);
+    auto erase_count = children.erase(key);
+    if (1 == erase_count) {
+        delete child;
+        return true;
+    } else if (0 == erase_count) {
+        return false;
+    } else {
+        throw CryptDBError("Bad erase amount in destroyChild!");
+    }
+}
+
+// FIXME: Slow.
+// > std::reference_wrapper should fix.
+template <typename ChildType, typename KeyType>
+typename std::map<KeyType *, ChildType *>::const_iterator
+MappedDBMeta<ChildType, KeyType>::findChild(KeyType *key) const
+{
+    auto it = 
+        std::find_if(children.begin(), children.end(),
+            [&key](const std::pair<KeyType *, ChildType *> child) {
+                return *child.first == *key;
+            });
+
+    return it;
+}
+
+template <typename ChildType, typename KeyType>
+bool
+MappedDBMeta<ChildType, KeyType>::childExists(KeyType *key) const
+{
+    return children.end() != this->findChild(key);
+}
+
+// Slow.
+// FIXME: Use findChild.
+template <typename ChildType, typename KeyType>
+ChildType *
+MappedDBMeta<ChildType, KeyType>::getChild(KeyType *key) const
+{
+    for (auto it : children) {
+        if (*it.first == *key) {
+            return it.second;
+        }
+    }
+
+    return NULL;
+}
+
+template <typename ChildType, typename KeyType>
+AbstractMetaKey *
+MappedDBMeta<ChildType, KeyType>::getKey(const DBMeta * const child) const
+{
+    for (auto it : children) {
+        if (it.second == child) {
+            return it.first;
+        }
+    }
+
+    throw CryptDBError("reverse lookup failed to find the child's key!");
+}
+
+// Virtual constructor to deserialize from embedded database.
+template <typename ChildType, typename KeyType>
+template <typename ConcreteMeta>
+ConcreteMeta *
+MappedDBMeta<ChildType, KeyType>::deserialize(unsigned int id,
+                                              std::string serial)
+{
+    return new ConcreteMeta(id, serial);
+}
+
+template <typename ChildType, typename KeyType>
+std::vector<DBMeta *>
+MappedDBMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
+{
+    DBWriter dbw = DBWriter::factory<ChildType>(this);
+
+    // Perhaps it's conceptually cleaner to have this lambda return
+    // pairs of keys and children and then add the children from local
+    // scope.
+    std::function<DBMeta *(std::string,
+                           std::string, std::string)> deserialize =
+        [this] (std::string key, std::string serial, std::string id) {
+            KeyType *meta_key =
+                AbstractMetaKey::factory<KeyType>(key);
+            auto deserializeChild = ChildType::deserialize;
+            ChildType *new_old_meta =
+                deserializeChild(atoi(id.c_str()), serial);
+
+            // Gobble the child.
+            this->addChild(meta_key, new_old_meta);
+
+            return new_old_meta;
+        };
+
+    return DBMeta::doFetchChildren(e_conn, dbw, deserialize);
+}
+
+template <typename ChildType, typename KeyType>
+void
+MappedDBMeta<ChildType, KeyType>::applyToChildren(std::function<void(DBMeta *)> fn)
+{
+    for (auto it : children) {
+        fn(it.second);
+    }
+}
+

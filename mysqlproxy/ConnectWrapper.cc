@@ -10,18 +10,13 @@
 #include <main/rewrite_main.hh>
 #include <parser/sql_utils.hh>
 
-
-
-using namespace std;
-
-
 class WrapperState {
- public:
-    string last_query;
+public:
+    std::string last_query;
     bool considered;
-    ofstream * PLAIN_LOG;
+    std::ofstream * PLAIN_LOG;
     ReturnMeta * rmeta;
-    string cur_db;
+    std::string cur_db;
 };
 
 static Timer t;
@@ -34,18 +29,18 @@ static bool DO_CRYPT = true;
 
 static bool EXECUTE_QUERIES = true;
 
-static string TRAIN_QUERY ="";
+static std::string TRAIN_QUERY ="";
 
 static bool LOG_PLAIN_QUERIES = false;
-static string PLAIN_BASELOG = "";
+static std::string PLAIN_BASELOG = "";
 
 
 static int counter = 0;
 
-static map<string, WrapperState*> clients;
+static std::map<std::string, WrapperState*> clients;
 
 static Item *
-make_item(string value, enum_field_types type)
+make_item(std::string value, enum_field_types type)
 {
     Item * i;
 
@@ -68,16 +63,16 @@ make_item(string value, enum_field_types type)
     return i;
 }
 
-static string
+static std::string
 xlua_tolstring(lua_State *l, int index)
 {
     size_t len;
     const char *s = lua_tolstring(l, index, &len);
-    return string(s, len);
+    return std::string(s, len);
 }
 
 static void
-xlua_pushlstring(lua_State *l, const string &s)
+xlua_pushlstring(lua_State *l, const std::string &s)
 {
     lua_pushlstring(l, s.data(), s.length());
 }
@@ -90,12 +85,12 @@ connect(lua_State *L)
     scoped_lock l(&big_lock);
     assert(0 == mysql_thread_init());
 
-    string client = xlua_tolstring(L, 1);
-    string server = xlua_tolstring(L, 2);
+    std::string client = xlua_tolstring(L, 1);
+    std::string server = xlua_tolstring(L, 2);
     uint port = luaL_checkint(L, 3);
-    string user = xlua_tolstring(L, 4);
-    string psswd = xlua_tolstring(L, 5);
-    string embed_dir = xlua_tolstring(L, 6);
+    std::string user = xlua_tolstring(L, 4);
+    std::string psswd = xlua_tolstring(L, 5);
+    std::string embed_dir = xlua_tolstring(L, 6);
 
     ConnectionInfo ci = ConnectionInfo(server, user, psswd, port);
 
@@ -108,7 +103,7 @@ connect(lua_State *L)
     clients[client] = ws;
 
     if (!r) {
-        cerr << "starting proxy\n";
+        std::cerr << "starting proxy\n";
         //cryptdb_logger::setConf(string(getenv("CRYPTDB_LOG")?:""));
 
         LOG(wrapper) << "connect " << client << "; "
@@ -119,15 +114,15 @@ connect(lua_State *L)
         // HACK: This code may require the support of databaseless 'Connect'
         // objects.  If so, use a derived type to make it clear that the 
         // Connect object supports this property.
-        string dbname = "cryptdbtest";
-        string mode = getenv("CRYPTDB_MODE")?:"";
+        std::string dbname = "cryptdbtest";
+        std::string mode = getenv("CRYPTDB_MODE")?:"";
         if (mode == "single") {
-	    string encbydefault = getenv("ENC_BY_DEFAULT");
+            std::string encbydefault = getenv("ENC_BY_DEFAULT");
 	    if (encbydefault == "false") {
-		cerr << "\n\n enc by default false " << "\n\n";
+                std::cerr << "\n\n enc by default false " << "\n\n";
 		r = new Rewriter(ci, embed_dir, dbname, false, false);
 	    } else {
-		cerr << "\n\nenc by default true" << "\n\n";
+                std::cerr << "\n\nenc by default true" << "\n\n";
 		r = new Rewriter(ci, embed_dir, dbname, false, true);
 	    }
 
@@ -141,19 +136,19 @@ connect(lua_State *L)
         //may need to do training
         char * ev = getenv("TRAIN_QUERY");
         if (ev) {
-            string trainQuery = ev;
+            std::string trainQuery = ev;
             LOG(wrapper) << "proxy trains using " << trainQuery;
             if (trainQuery != "") {
                 // TODO: May need to set current database in ProxyState.
                 r->rewrite(trainQuery);
             } else {
-                cerr << "empty training!\n";
+                std::cerr << "empty training!\n";
             }
         }
 
         ev = getenv("DO_CRYPT");
         if (ev) {
-            string useCryptDB = string(ev);
+            std::string useCryptDB = std::string(ev);
             if (useCryptDB == "false") {
                 LOG(wrapper) << "do not crypt queries/results";
                 DO_CRYPT = false;
@@ -165,7 +160,7 @@ connect(lua_State *L)
 
         ev = getenv("EXECUTE_QUERIES");
         if (ev) {
-            string execQueries = string(ev);
+            std::string execQueries = std::string(ev);
             if (execQueries == "false") {
                 LOG(wrapper) << "do not execute queries";
                 EXECUTE_QUERIES = false;
@@ -176,14 +171,14 @@ connect(lua_State *L)
 
         ev = getenv("LOAD_ENC_TABLES");
         if (ev) {
-            cerr << "No current functionality for loading tables\n";
+            std::cerr << "No current functionality for loading tables\n";
             //cerr << "loading enc tables\n";
             //cl->loadEncTables(string(ev));
         }
 
         ev = getenv("LOG_PLAIN_QUERIES");
         if (ev) {
-            string logPlainQueries = string(ev);
+            std::string logPlainQueries = std::string(ev);
             if (logPlainQueries != "") {
                 LOG_PLAIN_QUERIES = true;
                 PLAIN_BASELOG = logPlainQueries;
@@ -191,7 +186,8 @@ connect(lua_State *L)
 
                 assert_s(system(("rm -f" + logPlainQueries + "; touch " + logPlainQueries).c_str()) >= 0, "failed to rm -f and touch " + logPlainQueries);
 
-                ofstream * PLAIN_LOG = new ofstream(logPlainQueries, ios_base::app);
+                std::ofstream * PLAIN_LOG =
+                    new std::ofstream(logPlainQueries, std::ios_base::app);
                 LOG(wrapper) << "proxy logs plain queries at " << logPlainQueries;
                 assert_s(PLAIN_LOG != NULL, "could not create file " + logPlainQueries);
                 clients[client]->PLAIN_LOG = PLAIN_LOG;
@@ -204,11 +200,13 @@ connect(lua_State *L)
 
     } else {
         if (LOG_PLAIN_QUERIES) {
-            string logPlainQueries = PLAIN_BASELOG+StringFromVal(++counter);
+            std::string logPlainQueries =
+                PLAIN_BASELOG+StringFromVal(++counter);
             assert_s(system((" touch " + logPlainQueries).c_str()) >= 0, "failed to remove or touch plain log");
             LOG(wrapper) << "proxy logs plain queries at " << logPlainQueries;
 
-            ofstream * PLAIN_LOG = new ofstream(logPlainQueries, ios_base::app);
+            std::ofstream * PLAIN_LOG =
+                new std::ofstream(logPlainQueries, std::ios_base::app);
             assert_s(PLAIN_LOG != NULL, "could not create file " + logPlainQueries);
             clients[client]->PLAIN_LOG = PLAIN_LOG;
         }
@@ -226,7 +224,7 @@ disconnect(lua_State *L)
     scoped_lock l(&big_lock);
     assert(0 == mysql_thread_init());
 
-    string client = xlua_tolstring(L, 1);
+    std::string client = xlua_tolstring(L, 1);
     if (clients.find(client) == clients.end())
         return 0;
 
@@ -244,15 +242,15 @@ rewrite(lua_State *L)
     scoped_lock l(&big_lock);
     assert(0 == mysql_thread_init());
 
-    string client = xlua_tolstring(L, 1);
+    std::string client = xlua_tolstring(L, 1);
     if (clients.find(client) == clients.end())
         return 0;
 
-    string query = xlua_tolstring(L, 2);
+    std::string query = xlua_tolstring(L, 2);
 
     //clients[client]->considered = true;
 
-    list<string> new_queries;
+    std::list<std::string> new_queries;
 
 
     t.lap_ms();
@@ -311,7 +309,7 @@ decrypt(lua_State *L)
             delete thd;
         });
 
-    string client = xlua_tolstring(L, 1);
+    std::string client = xlua_tolstring(L, 1);
     if (clients.find(client) == clients.end())
         return 0;
 
@@ -325,7 +323,7 @@ decrypt(lua_State *L)
 
         lua_pushnil(L);
         while (lua_next(L, -2)) {
-            string k = xlua_tolstring(L, -2);
+            std::string k = xlua_tolstring(L, -2);
             if (k == "name")
                 res.names.push_back(xlua_tolstring(L, -1));
             else if (k == "type")
@@ -347,13 +345,13 @@ decrypt(lua_State *L)
             LOG(warn) << "mismatch";
 
         /* initialize all items to NULL, since Lua skips nil array entries */
-        vector<Item *> row(res.types.size());
+        std::vector<Item *> row(res.types.size());
 
         lua_pushnil(L);
         while (lua_next(L, -2)) {
             int key = luaL_checkint(L, -2) - 1;
             assert(key >= 0 && (uint) key < res.types.size());
-            string data = xlua_tolstring(L, -1);
+            std::string data = xlua_tolstring(L, -1);
             Item * value = make_item(data, res.types[key]);
             row[key] = value;
             lua_pop(L, 1);
@@ -364,7 +362,7 @@ decrypt(lua_State *L)
     }
 
     ResType rd;
-    cerr << "do crypt is " << DO_CRYPT << " and considered is " << clients[client]->considered << "\n";
+    std::cerr << "do crypt is " << DO_CRYPT << " and considered is " << clients[client]->considered << "\n";
     if (!DO_CRYPT || !clients[client]->considered) {
         rd = res;
     } else {

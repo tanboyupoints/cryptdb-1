@@ -9,7 +9,7 @@
 class SQLHandler {
 public:
     SQLHandler() {;}
-    virtual LEX **transformLex(LEX *lex, Analysis &a,const string &q,
+    virtual LEX **transformLex(LEX *lex, Analysis &a, const std::string &q,
                                unsigned *out_lex_count) const = 0;
     virtual ~SQLHandler() {;}
 };

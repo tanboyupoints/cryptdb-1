@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <stdio.h>
 #include <unistd.h>
 #include <time.h>
@@ -22,7 +23,6 @@
 #include <test/test_utils.hh>
 #include <test/TestQueries.hh>
 
-using namespace std;
 using namespace NTL;
 
 /*static string __attribute__((unused))
@@ -840,22 +840,22 @@ static void __attribute__((unused))
 convertQueries()
 {
 
-    ifstream firstfile("eval/tpcc/client.sql");
-    ofstream secondfile("eval/tpcc/clientplain.sql");
+    std::ifstream firstfile("eval/tpcc/client.sql");
+    std::ofstream secondfile("eval/tpcc/clientplain.sql");
 
-    string line;
+    std::string line;
 
     int nr= 0;
 
-    string transac = "";
+    std::string transac = "";
 
     if (!firstfile.is_open()) {
-        cerr << "cannot open input file \n";
+        std::cerr << "cannot open input file \n";
         return;
     }
 
     if (!secondfile.is_open()) {
-        cerr << "cannot open a second file \n";
+        std::cerr << "cannot open a second file \n";
         return;
     }
 
@@ -869,8 +869,8 @@ convertQueries()
         line = line + ";";
 
         //extract transaction number
-        string no = line.substr(0, line.find('\t'));
-        cerr << "no transac is " << no << "\n";
+        std::string no = line.substr(0, line.find('\t'));
+        std::cerr << "no transac is " << no << "\n";
         line = line.substr(no.length()+1, line.length() - no.length()+1);
 
         if (no.compare(transac) != 0) {
@@ -884,7 +884,7 @@ convertQueries()
         }
 
         size_t index = 0;
-        while (line.find(".", index) != string::npos) {
+        while (line.find(".", index) != std::string::npos) {
             size_t pos = line.find(".", index);
             index = pos+1;
             if (line[pos+1] >= '0' && line[pos+1] <= '9') {
@@ -896,7 +896,7 @@ convertQueries()
             }
         }
 
-        while (line.find(">=") != string::npos) {
+        while (line.find(">=") != std::string::npos) {
             size_t pos = line.find(">=");
             line[pos+1] = ' ';
             //TRACE SPECIFIC
@@ -908,15 +908,15 @@ convertQueries()
                 pos++;
             }
             nr2 = nr2 - 20;
-            string replacement =  strFromVal((uint32_t)nr2) + "     ";
+            std::string replacement =  strFromVal((uint32_t)nr2) + "     ";
             line.replace(oldpos, 9, replacement);
 
         }
-        while (line.find("<=") != string::npos) {
+        while (line.find("<=") != std::string::npos) {
             size_t pos = line.find("<");
             line[pos+1] = ' ';
         }
-        while (line.find(" -") != string::npos) {
+        while (line.find(" -") != std::string::npos) {
             size_t pos = line.find(" -");
             line[pos+1] = ' ';
         }
@@ -924,7 +924,7 @@ convertQueries()
         nr++;
     }
 
-    cerr << "there are " << nr << " queries \n";
+    std::cerr << "there are " << nr << " queries \n";
     firstfile.close();
     secondfile.close();
 
@@ -1063,14 +1063,14 @@ test_train(const TestConfig &tc)
 
  */
 
-static string __attribute__((unused))
+static std::string __attribute__((unused))
 suffix(int no)
 {
     int fi = 97 + (no/26);
     int se = 97 + (no%26);
-    string first = string("") + (char)fi;
-    string second = string("") + (char)se;
-    string res = first + second;
+    std::string first = std::string("") + (char)fi;
+    std::string second = std::string("") + (char)se;
+    std::string res = first + second;
 
     return res;
 }
@@ -1967,7 +1967,8 @@ encryptionTablesTest(const TestConfig &tc, int ac, char **av)
 static void
 testParseAccess(const TestConfig &tc, int ac, char **av)
 {
-    cerr << "testParseAccess uses old EDBProxy -- not run" << endl;
+    std::cerr << "testParseAccess uses old EDBProxy -- not run"
+              << std::endl;
     /*
     EDBProxy * cl = new EDBProxy(tc.host, tc.user, tc.pass, tc.db);
     cl->setMasterKey(BytesFromInt(mkey, AES_KEY_BYTES));
@@ -2429,24 +2430,24 @@ static void runExp(EDBProxy * cl, int noWorkers, const TestConfig & tc, int logF
 */
 
 static void
-loadDB(const TestConfig & tc, string dbname, string dumpname) {
-    string comm = "mysql -u root -pletmein -e 'drop database if exists " + dbname + "; ' ";
-    cerr << comm << "\n";
+loadDB(const TestConfig & tc, std::string dbname, std::string dumpname) {
+    std::string comm = "mysql -u root -pletmein -e 'drop database if exists " + dbname + "; ' ";
+    std::cerr << comm << "\n";
     assert_s(system(comm.c_str()) >= 0, "cannot drop db with if exists");
 
     comm = "mysql -u root -pletmein -e 'create database " + dbname + ";' ";
-    cerr << comm << "\n";
+    std::cerr << comm << "\n";
     assert_s(system(comm.c_str()) >= 0, "cannot create db");
 
     if (dumpname != "") {
         comm = "mysql -u root -pletmein " + dbname + " < " + tc.edbdir  + "/../eval/dumps/" + dumpname + "; ";
-        cerr << comm << "\n";
+        std::cerr << comm << "\n";
         assert_s(system(comm.c_str()) >= 0, "cannotload dump");
     }
 }
 
 static void
-startProxy(const TestConfig & tc, string host, uint port) {
+startProxy(const TestConfig & tc, std::string host, uint port) {
 
     setenv("CRYPTDB_LOG", cryptdb_logger::getConf().c_str(), 1);
     setenv("CRYPTDB_MODE", "single", 1);
@@ -2456,19 +2457,19 @@ startProxy(const TestConfig & tc, string host, uint port) {
     if (proxy_pid == 0) {
         LOG(test) << "starting proxy, pid " << getpid();
 
-        stringstream script_path, address, backend;
+        std::stringstream script_path, address, backend;
         script_path << "--proxy-lua-script=" << tc.edbdir << "/../mysqlproxy/wrapper.lua";
         address << "--proxy-address=localhost:" << port;
         backend << "--proxy-backend-addresses=" << host << ":" << tc.port;
 
-        cerr << "starting proxy on port " << port << "\n";
-        cerr << "\n";
-    cerr << "mysql-proxy" << " --plugins=proxy" <<
+        std::cerr << "starting proxy on port " << port << "\n";
+        std::cerr << "\n";
+        std::cerr << "mysql-proxy" << " --plugins=proxy" <<
                 " --max-open-files=1024 " <<
                 script_path.str().c_str() << " " <<
                 address.str().c_str() <<
       backend.str().c_str() << "\n";
-    cerr << "\n";
+        std::cerr << "\n";
         execlp("mysql-proxy",
                 "mysql-proxy", "--plugins=proxy",
                 "--max-open-files=1024",
@@ -2483,7 +2484,7 @@ startProxy(const TestConfig & tc, string host, uint port) {
     }
 
     //back in parent, wait for proxy to start
-    cerr << "waiting for proxy to start\n";
+    std::cerr << "waiting for proxy to start\n";
     sleep(1);
 }
 
@@ -2493,7 +2494,7 @@ startProxy(const TestConfig & tc, string host, uint port) {
 static void
 testTrace(const TestConfig &tc, int argc, char ** argv)
 {
-    cerr << "testTrace uses old EDBProxy -- not run" << endl;
+    std::cerr << "testTrace uses old EDBProxy -- not run" << std::endl;
     /*
     string masterKey =  BytesFromInt(mkey, AES_KEY_BYTES);
 
@@ -2640,7 +2641,8 @@ testTrace(const TestConfig &tc, int argc, char ** argv)
 static void
 generateEncTables(const TestConfig & tc, int argc, char ** argv)
 {
-    cerr << "generateEncTables uses old EDBProxy -- not run" << endl;
+    std::cerr << "generateEncTables uses old EDBProxy -- not run"
+              << std::endl;
     /*
     if (argc!=2) {
         cerr << "usage: gen_enc_tables filename\n";
@@ -2676,7 +2678,8 @@ generateEncTables(const TestConfig & tc, int argc, char ** argv)
 
 static void
 testEncTables(const TestConfig & tc, int argc, char ** argv) {
-    cerr << "testEncTables uses old EDBProxy -- not run" << endl;
+    std::cerr << "testEncTables uses old EDBProxy -- not run"
+              << std::endl;
     /*if (argc!=3) {
         cerr << "usage: test_enc_tables filename queriesfile\n";
         return;
@@ -2733,58 +2736,58 @@ static void
 testBench(const TestConfig & tc, int argc, char ** argv)
 {
     if (argc < 2) {
-        cerr << "usage: bench logplain or [client,server,both]";
+        std::cerr << "usage: bench logplain or [client,server,both]";
         return;
     }
 
-    if (string(argv[1]) == "logplain") {
+    if (std::string(argv[1]) == "logplain") {
 
         if (argc != 3){
-            cerr << "usage: bench logplain nowarehouses;";
+            std::cerr << "usage: bench logplain nowarehouses;";
             return;
         }
 
-        string numWarehouses = argv[2];
+        std::string numWarehouses = argv[2];
 
         loadDB(tc, "cryptdbtest", "");
 
-        string comm = "mysql -u root -pletmein cryptdbtest < ../../tpcc/orig_table_creates ;";
-        cerr << comm << "\n";
+        std::string comm = "mysql -u root -pletmein cryptdbtest < ../../tpcc/orig_table_creates ;";
+        std::cerr << comm << "\n";
         assert_s(system(comm.c_str()) >= 0, "cannot create tables");
 
         setenv("CRYPTDB_MODE", "single", 1);
         setenv("DO_CRYPT", "false", 1);
         //setenv("EXECUTE_QUERIES", "false", 1);
-        setenv("LOG_PLAIN_QUERIES", (string("plain_insert_w")+numWarehouses).c_str(), 1);
+        setenv("LOG_PLAIN_QUERIES", (std::string("plain_insert_w")+numWarehouses).c_str(), 1);
         setenv("CRYPTDB_DB", "cryptdbtest", 1);
         setenv("EDBDIR", tc.edbdir.c_str(), 1);
         setenv("CRYPTDB_LOG", cryptdb_logger::getConf().c_str(), 1);
 
-        string tpccdir = tc.edbdir + "/../eval/tpcc/";
+        std::string tpccdir = tc.edbdir + "/../eval/tpcc/";
 
         int res = system("killall mysql-proxy;");
         sleep(2);
-        cerr << "killing proxies .. " <<res << "\n";
+        std::cerr << "killing proxies .. " <<res << "\n";
         //start proxy(ies)
         startProxy(tc, "127.0.0.1", 5133);
 
-        comm = string("java -cp  ../build/classes:../lib/edb-jdbc14-8_0_3_14.jar:../lib/ganymed-ssh2-build250.jar:") +
+        comm = std::string("java -cp  ../build/classes:../lib/edb-jdbc14-8_0_3_14.jar:../lib/ganymed-ssh2-build250.jar:") +
                    "../lib/hsqldb.jar:../lib/mysql-connector-java-5.1.10-bin.jar:../lib/ojdbc14-10.2.jar:../lib/postgresql-8.0.309.jdbc3.jar " +
                    "-Ddriver=com.mysql.jdbc.Driver " +
                    "-Dconn=jdbc:mysql://localhost:5133/cryptdbtest " +
                    "-Duser=root -Dpassword=letmein LoadData.LoadData numWarehouses " + numWarehouses;
-        cerr << "\n" << comm << "\n\n";
+        std::cerr << "\n" << comm << "\n\n";
         assert_s(system(comm.c_str())>=0, "problem running benchmark");
 
         return;
     }
 
     if((argc != 3) && (argc != 9)) {
-        cerr << "usage: bench role[client, server, both] encrypted?[1,0] [specify for client: proxyhost serverhost noWorkers oneProxyPerWorker[1/0] noWarehouses timeLimit(mins)]    \n";
+        std::cerr << "usage: bench role[client, server, both] encrypted?[1,0] [specify for client: proxyhost serverhost noWorkers oneProxyPerWorker[1/0] noWarehouses timeLimit(mins)]    \n";
         exit(-1);
     }
 
-    string role = argv[1];
+    std::string role = argv[1];
     bool encrypted = atoi(argv[2]);
 
     bool is_client = false;
@@ -2802,14 +2805,14 @@ testBench(const TestConfig & tc, int argc, char ** argv)
         } else
             {
             if (role != "client") {
-                cerr <<"invalid role\n";
+                std::cerr <<"invalid role\n";
             } else {
                 is_client = true;
             }
-            }
+        }
     }
 
-    string serverhost = "localhost", proxyhost = "localhost", timeLimit="", noWarehouses="";
+    std::string serverhost = "localhost", proxyhost = "localhost", timeLimit="", noWarehouses="";
     bool oneProxyPerWorker = 0;
     unsigned int noWorkers = 0;
 
@@ -2835,7 +2838,7 @@ testBench(const TestConfig & tc, int argc, char ** argv)
             setenv("CRYPTDB_LOG", cryptdb_logger::getConf().c_str(), 1);
             setenv("CRYPTDB_MODE", "single", 1);
             setenv("CRYPTDB_DB", "tpccenc", 1);
-        string tpccdir = tc.edbdir + "/../eval/tpcc/";
+            std::string tpccdir = tc.edbdir + "/../eval/tpcc/";
             setenv("LOAD_ENC_TABLES", (tpccdir+"enc_tables_w1").c_str(), 1);
 
             //configure proxy
@@ -2843,7 +2846,7 @@ testBench(const TestConfig & tc, int argc, char ** argv)
 
             int res = system("killall mysql-proxy;");
             sleep(2);
-            cerr << "killing proxies .. " <<res << "\n";
+            std::cerr << "killing proxies .. " <<res << "\n";
             //start proxy(ies)
             if (!oneProxyPerWorker) {
                 startProxy(tc, serverhost, baseport);
@@ -2853,14 +2856,14 @@ testBench(const TestConfig & tc, int argc, char ** argv)
                 }
             }
 
-           string comm = string("java") + " -cp  ../build/classes:../lib/edb-jdbc14-8_0_3_14.jar:../lib/ganymed-ssh2-build250.jar:" +
+            std::string comm = std::string("java") + " -cp  ../build/classes:../lib/edb-jdbc14-8_0_3_14.jar:../lib/ganymed-ssh2-build250.jar:" +
                    "../lib/hsqldb.jar:../lib/mysql-connector-java-5.1.10-bin.jar:../lib/ojdbc14-10.2.jar:../lib/postgresql-8.0.309.jdbc3.jar " +
                    "-Ddriver=com.mysql.jdbc.Driver " +
                    "-Dconn=jdbc:mysql://"+proxyhost+":"+StringFromVal(baseport)+"/tpccenc " +
                    "-Duser=root -Dpassword=letmein " +
                    "-Dnwarehouses="+noWarehouses+" -Dnterminals=" + StringFromVal(noWorkers)+
                    " -DtimeLimit="+timeLimit+" client.jTPCCHeadless";
-           cerr << "\n" << comm << "\n\n";
+            std::cerr << "\n" << comm << "\n\n";
            assert_s(system(comm.c_str())>=0, "problem running benchmark");
         }
     } else {
@@ -2870,7 +2873,7 @@ testBench(const TestConfig & tc, int argc, char ** argv)
         }
         //just start the benchmark
         if (is_client) {
-            assert_s(system((string("java") + " -cp  ../build/classes:../lib/edb-jdbc14-8_0_3_14.jar:../lib/ganymed-ssh2-build250.jar:"
+            assert_s(system((std::string("java") + " -cp  ../build/classes:../lib/edb-jdbc14-8_0_3_14.jar:../lib/ganymed-ssh2-build250.jar:"
                     "../lib/hsqldb.jar:../lib/mysql-connector-java-5.1.10-bin.jar:../lib/ojdbc14-10.2.jar:../lib/postgresql-8.0.309.jdbc3.jar "
                     "-Ddriver=com.mysql.jdbc.Driver "
                     "-Dconn=jdbc:mysql://"+serverhost+":3306/tpccplain "
@@ -2997,14 +3000,14 @@ test_PKCS(const TestConfig &tc, int ac, char **av)
     assert_s(pk != NULL, "pk is null");
     assert_s(sk != NULL, "pk is null");
 
-    string pkbytes = marshallKey(pk, true);
+    std::string pkbytes = marshallKey(pk, true);
 
     assert_s(pkbytes ==
             marshallKey(unmarshallKey(pkbytes,
                     1),
                     1), "marshall does not work");
 
-    string skbytes = marshallKey(sk, false);
+    std::string skbytes = marshallKey(sk, false);
 
     assert_s(skbytes ==
             marshallKey(unmarshallKey(skbytes,
@@ -3013,11 +3016,11 @@ test_PKCS(const TestConfig &tc, int ac, char **av)
 
     char msg[] = "Hello world";
 
-    string enc = encrypt(pk, msg);
-    string dec = decrypt(sk, enc);
+    std::string enc = encrypt(pk, msg);
+    std::string dec = decrypt(sk, enc);
     assert_s(msg == dec, "decryption is not original msg");
 
-    cerr << "msg" << dec << "\n";
+    std::cerr << "msg" << dec << "\n";
 }
 
 static void help(const TestConfig &tc, int ac, char **av);
@@ -3050,23 +3053,23 @@ static struct {
 static void
 help(const TestConfig &tc, int ac, char **av)
 {
-    cerr << "Usage: " << av[0] << " [options] testname" << endl;
-    cerr << "Options:" << endl
-	 << "    -s           stop on failure [" << tc.stop_if_fail << "]" << endl
-	 << "    -h host      database server [" << tc.host << "]" << endl
-	 << "    -t port      database port [" << tc.port << "]" << endl
-	 << "    -u user      database username [" << tc.user << "]" << endl
-	 << "    -p pass      database password [" << tc.pass << "]" << endl
-	 << "    -d db        database to use [" << tc.db << "]" << endl
-	 << "    -e db        embedded database to use [" << tc.shadowdb_dir << "]" << endl
-	 << "    -v group     enable verbose messages in group" << endl;
-    cerr << "Verbose groups:" << endl;
+    std::cerr << "Usage: " << av[0] << " [options] testname" << std::endl;
+    std::cerr << "Options:" << std::endl
+	 << "    -s           stop on failure [" << tc.stop_if_fail << "]" << std::endl
+	 << "    -h host      database server [" << tc.host << "]" << std::endl
+	 << "    -t port      database port [" << tc.port << "]" << std::endl
+	 << "    -u user      database username [" << tc.user << "]" << std::endl
+	 << "    -p pass      database password [" << tc.pass << "]" << std::endl
+	 << "    -d db        database to use [" << tc.db << "]" << std::endl
+	 << "    -e db        embedded database to use [" << tc.shadowdb_dir << "]" << std::endl
+	 << "    -v group     enable verbose messages in group" << std::endl;
+    std::cerr << "Verbose groups:" << std::endl;
     for (auto i = log_name_to_group.begin(); i != log_name_to_group.end(); i++)
-        cerr << "    " << i->first << endl;
-    cerr << "Supported tests:" << endl;
+        std::cerr << "    " << i->first << std::endl;
+    std::cerr << "Supported tests:" << std::endl;
     for (uint i = 0; i < NELEM(tests); i++)
-        cerr << "    " << left << setw(20) << tests[i].name
-	     << tests[i].description << endl;
+        std::cerr << "    " << std::left << std::setw(20)
+                  << tests[i].name << tests[i].description << std::endl;
 }
 
 int
@@ -3123,7 +3126,7 @@ main(int argc, char ** argv)
     
     
     if (argc == optind) {
-        cerr << "interactiveTest is deprecated; please use obj/parser/cdb_test" << endl;
+        std::cerr << "interactiveTest is deprecated; please use obj/parser/cdb_test" << std::endl;
         return 0;
     }
     

@@ -33,11 +33,11 @@
 static bool encByDefault = true;
 
 
-static inline string user_homedir() {
+static inline std::string user_homedir() {
     return getenv("HOME");
 }
 
-static inline string user_histfile() {
+static inline std::string user_histfile() {
     return user_homedir() + "/.cryptdb-history";
 }
 
@@ -45,25 +45,25 @@ static void __write_history() {
     write_history(user_histfile().c_str());
 }
 
-static inline string &ltrim(string &s) {
-  s.erase(s.begin(), find_if(s.begin(), s.end(), not1(ptr_fun<int, int>(isspace))));
+static inline std::string &ltrim(std::string &s) {
+  s.erase(s.begin(), find_if(s.begin(), s.end(), not1(std::ptr_fun<int, int>(isspace))));
   return s;
 }
 
-static inline string &rtrim(string &s) {
-  s.erase(find_if(s.rbegin(), s.rend(), not1(ptr_fun<int, int>(isspace))).base(), s.end());
+static inline std::string &rtrim(std::string &s) {
+  s.erase(find_if(s.rbegin(), s.rend(), not1(std::ptr_fun<int, int>(isspace))).base(), s.end());
   return s;
 }
 
-static inline string &trim(string &s) {
+static inline std::string &trim(std::string &s) {
   return ltrim(rtrim(s));
 }
 
 /** returns true if should stop, to keep looping */
-static bool handle_line(Rewriter& r, const string& q)
+static bool handle_line(Rewriter& r, const std::string& q)
 {
   if (q == "\\q") {
-    cerr << "Goodbye!\n";
+    std::cerr << "Goodbye!\n";
     return false;
   }
 
@@ -71,19 +71,19 @@ static bool handle_line(Rewriter& r, const string& q)
 
   // handle meta inputs
   if (q.find(":load") == 0) {
-    string filename = q.substr(6);
+    std::string filename = q.substr(6);
     trim(filename);
-    cerr << RED_BEGIN << "Loading commands from file: " << filename << COLOR_END << endl;
-    ifstream f(filename.c_str());
+    std::cerr << RED_BEGIN << "Loading commands from file: " << filename << COLOR_END << std::endl;
+    std::ifstream f(filename.c_str());
     if (!f.is_open()) {
-      cerr << "ERROR: cannot open file: " << filename << endl;
+      std::cerr << "ERROR: cannot open file: " << filename << std::endl;
     }
     while (f.good()) {
-      string line;
+      std::string line;
       getline(f, line);
       if (line.empty())
         continue;
-      cerr << GREEN_BEGIN << line << COLOR_END << endl;
+      std::cerr << GREEN_BEGIN << line << COLOR_END << std::endl;
       if (!handle_line(r, line)) {
         f.close();
         return false;
@@ -101,7 +101,7 @@ int
 main(int ac, char **av)
 {
     if (ac != 2) {
-        cerr << "Usage: " << av[0] << " embed-db " << endl;
+        std::cerr << "Usage: " << av[0] << " embed-db " << std::endl;
         exit(1);
     }
 
@@ -116,13 +116,13 @@ main(int ac, char **av)
 
     r.setMasterKey("2392834");
 
-    string prompt = BOLD_BEGIN + "CryptDB=#" + COLOR_END + " ";
+    std::string prompt = BOLD_BEGIN + "CryptDB=#" + COLOR_END + " ";
 
 
     for (;;) {
         char *input = readline(prompt.c_str());
         if (!input) break;
-        string q(input);
+        std::string q(input);
         if (q.empty()) continue;
         else{
             if (!handle_line(r, q))

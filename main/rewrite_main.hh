@@ -28,11 +28,6 @@
 #include <util/cleanup.hh>
 #include <util/rob.hh>
 
-
-using namespace std;
-
-
-
 class FieldReturned {
 public:
     bool encrypted;
@@ -76,7 +71,8 @@ public:
     // to carry around Connect objects.
     Connect *getConnection() {return ps.conn;}
 
-    LEX **dispatchAndTransformOnLex(LEX *lex, Analysis &a, const string &q,
+    LEX **dispatchAndTransformOnLex(LEX *lex, Analysis &a,
+                                    const std::string &q,
                                     unsigned *out_lex_count);
 
     SQLDispatcher *dml_dispatcher;
@@ -101,16 +97,16 @@ private:
 };
 
 ResType *
-executeQuery(Rewriter &r, const string &q, bool show=false);
+executeQuery(Rewriter &r, const std::string &q, bool show=false);
 
-const string BOLD_BEGIN = "\033[1m";
-const string RED_BEGIN = "\033[1;31m";
-const string GREEN_BEGIN = "\033[1;92m";
-const string COLOR_END = "\033[0m";
+const std::string BOLD_BEGIN = "\033[1m";
+const std::string RED_BEGIN = "\033[1;31m";
+const std::string GREEN_BEGIN = "\033[1;92m";
+const std::string COLOR_END = "\033[0m";
 
 #define UNIMPLEMENTED \
-        throw runtime_error(string("Unimplemented: ") + \
-                        string(__PRETTY_FUNCTION__))
+        throw std::runtime_error(std::string("Unimplemented: ") + \
+                        std::string(__PRETTY_FUNCTION__))
 
 
 class CItemType {
@@ -120,7 +116,9 @@ class CItemType {
     virtual Item * do_rewrite(Item *,
 			      const OLK & constr, const RewritePlan * rp,
 			      Analysis &) const = 0;
-    virtual void   do_rewrite_insert(Item *, Analysis &, vector<Item *> &, FieldMeta *fm) const = 0;
+    virtual void   do_rewrite_insert(Item *, Analysis &,
+                                     std::vector<Item *> &,
+                                     FieldMeta *fm) const = 0;
 };
 
 /*
@@ -139,7 +137,9 @@ class CItemSubtype : public CItemType {
 			     Analysis & a) const {
         return do_rewrite_type((T*) i, constr, rp, a);
     }
-    virtual void  do_rewrite_insert(Item *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const {
+    virtual void  do_rewrite_insert(Item *i, Analysis & a,
+                                    std::vector<Item *> &l,
+                                    FieldMeta *fm) const {
         do_rewrite_insert_type((T*) i, a, l, fm);
     }
  private:
@@ -155,7 +155,9 @@ class CItemSubtype : public CItemType {
 	assert_s(false, "why is this rewrite called?");
         return i;
     }
-    virtual void   do_rewrite_insert_type(T *i, Analysis & a, vector<Item *> &l, FieldMeta *fm) const {
+    virtual void   do_rewrite_insert_type(T *i, Analysis & a,
+                                          std::vector<Item *> &l,
+                                          FieldMeta *fm) const {
         // default is un-implemented. we'll implement these as they come
         UNIMPLEMENTED;
     }
@@ -190,7 +192,8 @@ class CItemTypeDir : public CItemType {
         return lookup(i)->do_rewrite(i, constr, rp, a);
     }
 
-    void do_rewrite_insert(Item *i, Analysis &a, vector<Item *> &l, FieldMeta *fm) const {
+    void do_rewrite_insert(Item *i, Analysis &a, std::vector<Item *> &l,
+                           FieldMeta *fm) const {
         lookup(i)->do_rewrite_insert(i, a, l, fm);
     }
 
