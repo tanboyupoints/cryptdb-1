@@ -273,8 +273,8 @@ buildTypeTextTranslator()
 
 //l gets updated to the new level
 static void
-removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o,
-                 SECLEVEL & new_level, const std::string & cur_db) {
+removeOnionLayer(FieldMeta * fm, Item_field *itf, Analysis &a, onion o,
+                 SECLEVEL *new_level, const std::string &cur_db) {
 
     OnionMeta *om = fm->getOnionMeta(o);
     assert(om);
@@ -284,7 +284,8 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o,
 
     //removes onion layer at the DB
     std::stringstream query;
-    query << "UPDATE " << tableanon << " SET " << fieldanon  << " = ";
+    query << " UPDATE " << cur_db << "." << tableanon
+		  << "    SET " << fieldanon  << " = ";
 
     Item_field *field = stringToItemField(fieldanon, tableanon, itf);
     Item_field *salt = stringToItemField(fm->getSaltName(), tableanon, itf);
@@ -294,9 +295,6 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o,
 
     std::cerr << "\nADJUST: \n" << query.str() << "\n";
 
-    std::string usedb = "USE " +  cur_db + ";";
-    //HACk: make sure right cur_db in other ways
-    assert_s(a.ps->conn->execute(usedb),  "failed to execute " + usedb);
     //execute decryption query
     assert_s(a.ps->conn->execute(query.str()), "failed to execute onion decryption query");
 
@@ -305,7 +303,7 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o,
     //remove onion layer in schema
     om->layers.pop_back();
 
-    new_level = om->layers.back()->level();
+    *new_level = om->layers.back()->level();
 }
 
 /*
@@ -325,7 +323,7 @@ adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf,
     assert(newlevel != SECLEVEL::INVALID);
 
     while (newlevel > tolevel) {
-	removeOnionLayer(fm, itf, a, o, newlevel, cur_db);
+		removeOnionLayer(fm, itf, a, o, &newlevel, cur_db);
     }
     assert(newlevel == tolevel);
 }
