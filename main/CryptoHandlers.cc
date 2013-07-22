@@ -507,45 +507,33 @@ protected:
 
 };
 
-class DET_tinyint : public EncLayer {
+class DET_tinyint : public DET_int {
     public:
     DET_tinyint(Create_field *,  const std::string & seed_key);
-    std::string doSerialize() const {return key; }
+
+    //std::string doSerialize() const;
     // create object from serialized contents
     DET_tinyint(unsigned int id, const std::string & serial);
-    
-    virtual SECLEVEL level() const {return SECLEVEL::DET;}
+
     std::string name() const {return "DET_tinyint";}
-    Create_field * newCreateField(Create_field * cf, std::string anonname = "");
+
     Item * encrypt(Item * ptext, uint64_t IV = 0);
     Item * decrypt(Item * ctext, uint64_t IV = 0);
-    Item * decryptUDF(Item * col, Item * ivcol = NULL);
     
     protected:
-    std::string key;
-    blowfish bf;
-    static const int bf_key_size = 16;
-    static const int ciph_size = 8;
-
 };
 
 
-DET_tinyint::DET_tinyint(Create_field * f, const std::string & seed_key)
-    : key(prng_expand(seed_key, bf_key_size)),
-      bf(key)
+DET_tinyint::DET_tinyint(Create_field * cf, const std::string & seed_key)
+    : DET_int(cf, seed_key)
 {
 }
 
-DET_tinyint::DET_tinyint(unsigned int id, const std::string & serial) : 
-    key(serial),
-    bf(key)
+DET_tinyint::DET_tinyint(unsigned int id, const std::string & serial)  
+    : DET_int(id, serial)
 {
 }
 
-Create_field *
-DET_tinyint::newCreateField(Create_field * cf, std::string anonname) {
-    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
-}
 
 Item *
 DET_tinyint::encrypt(Item * ptext, uint64_t IV) {
@@ -590,7 +578,7 @@ static udf_func u_decDETInt = {
 };
 
 
-
+/*
 Item *
 DET_tinyint::decryptUDF(Item * col, Item * ivcol) {
     List<Item> l;
@@ -607,7 +595,7 @@ DET_tinyint::decryptUDF(Item * col, Item * ivcol) {
 
     return udf;
 }
-
+*/
 class DET_dec : public DET_int {
 public:
     DET_dec(Create_field *,  const std::string & seed_key);
