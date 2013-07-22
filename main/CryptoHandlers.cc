@@ -507,7 +507,129 @@ protected:
 
 };
 
+class DET_mediumint : public DET_int {
+    public:
+    DET_mediumint(Create_field *,  const std::string & seed_key);
 
+    //std::string doSerialize() const;
+    // create object from serialized contents
+    DET_mediumint(unsigned int id, const std::string & serial);
+
+    std::string name() const {return "DET_mediumint";}
+
+    Item * encrypt(Item * ptext, uint64_t IV = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0);
+    
+    protected:
+};
+
+
+DET_mediumint::DET_mediumint(Create_field * cf, const std::string & seed_key)
+    : DET_int(cf, seed_key)
+{}
+
+DET_mediumint::DET_mediumint(unsigned int id, const std::string & serial)  
+    : DET_int(id, serial)
+{}
+
+
+Item *
+DET_mediumint::encrypt(Item * ptext, uint64_t IV) {
+    ulonglong val = static_cast<Item_int *>(ptext)->value;
+    ulonglong res;
+    
+    //HACK encyption schema goes through bigint
+    if(val > 16777215)
+        res = (ulonglong) bf.encrypt(16777215);
+    else
+        res = (ulonglong) bf.encrypt(val);
+
+    LOG(encl) << "DET_mediumint encrypt " << val << "--->" << res;
+
+    return new Item_int(res);
+    
+}
+
+Item *
+DET_mediumint::decrypt(Item * ctext, uint64_t IV) {
+
+    longlong val = static_cast<Item_int*>(ctext)->value;
+    ulonglong res = (ulonglong) bf.decrypt(val);
+    LOG(encl) << "DET_mediumint decrypt " << val << "-->" << res;
+    Item * ni = new Item_int(res);
+
+    return ni;
+    
+}
+
+class DET_tinyint : public DET_int {
+    public:
+    DET_tinyint(Create_field *,  const std::string & seed_key);
+
+    //std::string doSerialize() const;
+    // create object from serialized contents
+    DET_tinyint(unsigned int id, const std::string & serial);
+
+    std::string name() const {return "DET_tinyint";}
+
+    Item * encrypt(Item * ptext, uint64_t IV = 0);
+    Item * decrypt(Item * ctext, uint64_t IV = 0);
+    
+    protected:
+};
+
+
+DET_tinyint::DET_tinyint(Create_field * cf, const std::string & seed_key)
+    : DET_int(cf, seed_key)
+{}
+
+DET_tinyint::DET_tinyint(unsigned int id, const std::string & serial)  
+    : DET_int(id, serial)
+{}
+
+
+Item *
+DET_tinyint::encrypt(Item * ptext, uint64_t IV) {
+    ulonglong val = static_cast<Item_int *>(ptext)->value;
+    ulonglong res;
+    
+    //HACK encyption schema goes through bigint
+    if(val > 255)
+        res = (ulonglong) bf.encrypt(255);
+    else
+        res = (ulonglong) bf.encrypt(val);
+
+    LOG(encl) << "DET_tinyint encrypt " << val << "--->" << res;
+
+    return new Item_int(res);
+    
+}
+
+Item *
+DET_tinyint::decrypt(Item * ctext, uint64_t IV) {
+
+    longlong val = static_cast<Item_int*>(ctext)->value;
+    ulonglong res = (ulonglong) bf.decrypt(val);
+    LOG(encl) << "DET_tinyint decrypt " << val << "-->" << res;
+    Item * ni = new Item_int(res);
+
+    return ni;
+    
+}
+
+static udf_func u_decDETInt = {
+    LEXSTRING("decrypt_int_det"),
+    INT_RESULT,
+    UDFTYPE_FUNCTION,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0L,
+};
 
 class DET_dec : public DET_int {
 public:
@@ -557,12 +679,17 @@ protected:
 EncLayer *
 DETFactory::create(Create_field * cf, std::string key) {
     if (IsMySQLTypeNumeric(cf->sql_type)) {
-	if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
-	    return new DET_dec(cf, key);
-	} else {
-	    return new DET_int(cf, key);
-	}
-     } else {
+        std::cout << "TYPEEE: " << cf->sql_type << std::endl;
+        if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
+            return new DET_dec(cf, key);
+        } else if(cf->sql_type == MYSQL_TYPE_INT24) {
+            return new DET_mediumint(cf, key);
+        } else if(cf->sql_type == MYSQL_TYPE_TINY) {
+            return new DET_tinyint(cf, key);
+        } else {
+            return new DET_int(cf, key);
+        }
+    } else {
 	 return new DET_str(cf, key);
      }
 }
@@ -571,7 +698,11 @@ EncLayer *
 DETFactory::deserialize(unsigned int id, const SerialLayer & sl)
 {
     if  (sl.name == "DET_int") {
-	return new DET_int(id, sl.layer_info);
+        return new DET_int(id, sl.layer_info);
+    } else if(sl.name == "DET_mediumint") {
+        return new DET_mediumint(id, sl.layer_info);
+    } else if(sl.name == "DET_tinyint") {
+        return new DET_tinyint(id, sl.layer_info);
     } else if (sl.name == "DET_str") {
 	return new DET_str(id, sl.layer_info);
     } else {
@@ -618,20 +749,6 @@ DET_int::decrypt(Item * ctext, uint64_t IV) {
     return ni;
 }
 
-
-static udf_func u_decDETInt = {
-    LEXSTRING("decrypt_int_det"),
-    INT_RESULT,
-    UDFTYPE_FUNCTION,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    0L,
-};
 
 
 Item *
@@ -806,6 +923,39 @@ private:
    
 };
 
+class DETJOIN_tinyint : public DET_tinyint {
+    //TODO
+public:
+    DETJOIN_tinyint(Create_field * cf, std::string seed_key) : DET_tinyint(cf, seed_key) {}
+
+    // serialize from parent;  unserialize:
+    DETJOIN_tinyint(unsigned int id, const std::string & serial) 
+        : DET_tinyint(id, serial) {}
+
+    SECLEVEL level() const {return SECLEVEL::DETJOIN;}
+    std::string name() const {return "DETJOIN_tinyint";}
+    
+private:
+   
+};
+
+class DETJOIN_mediumint : public DET_mediumint {
+public:
+    DETJOIN_mediumint(Create_field * cf, std::string seed_key) : DET_mediumint(cf, seed_key) {}
+
+    // serialize from parent;  unserialize:
+    DETJOIN_mediumint(unsigned int id, const std::string & serial) 
+        : DET_mediumint(id, serial) {}
+
+    SECLEVEL level() const {return SECLEVEL::DETJOIN;}
+    std::string name() const {return "DETJOIN_mediumint";}
+    
+private:
+   
+};
+
+
+
 class DETJOIN_str : public DET_str {
 public:
     DETJOIN_str(Create_field * cf, std::string seed_key) : DET_str(cf, seed_key) {}
@@ -840,21 +990,29 @@ private:
 EncLayer *
 DETJOINFactory::create(Create_field * cf, std::string key) {
     if (IsMySQLTypeNumeric(cf->sql_type)) {
-	if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
-	    return new DETJOIN_dec(cf, key);
-	} else {
-	    return new DETJOIN_int(cf, key);
-	}
-     } else {
-	 return new DETJOIN_str(cf, key);
-     }
+        std::cout << "DETJOIN TYPE: " << cf->sql_type << std::endl;
+        if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
+            return new DETJOIN_dec(cf, key);
+        } else if (cf->sql_type == MYSQL_TYPE_INT24) {
+            return new DETJOIN_mediumint(cf, key);
+        } else if (cf->sql_type == MYSQL_TYPE_TINY) {
+            return new DETJOIN_tinyint(cf, key);
+        } else {
+            return new DETJOIN_int(cf, key);
+        }
+    } else {
+        return new DETJOIN_str(cf, key);
+    }
 }
 
 EncLayer *
-DETJOINFactory::deserialize(unsigned int id, const SerialLayer & sl)
-{
-    if (sl.name == "DETJOIN_int") {
-	return new DETJOIN_int(id, sl.layer_info);
+DETJOINFactory::deserialize(unsigned int id, const SerialLayer & sl) {
+    if  (sl.name == "DETJOIN_int") {
+        return new DETJOIN_int(id, sl.layer_info);
+    } else if (sl.name == "DETJOIN_mediumint") {
+        return new DETJOIN_mediumint(id, sl.layer_info);
+    } else if (sl.name == "DETJOIN_tinyint") {
+        return new DETJOIN_tinyint(id, sl.layer_info);
     } else if (sl.name == "DETJOIN_str") {
 	return new DETJOIN_str(id, sl.layer_info);
     } else {

@@ -12,8 +12,8 @@ $(OBJDIR)/tools/import/$(EXECFILE): $(IMPORT_OBJS) \
 		     $(OBJDIR)/libcryptdb.so $(OBJDIR)/libedbcrypto.so \
 		     $(OBJDIR)/libedbutil.so $(OBJDIR)/libedbparser.so
 	$(CXX) -o $@ $(IMPORT_OBJS) $(LDFLAGS) \
-	       -ledbcrypto -ledbutil -ledbparser -lcryptdb  -lxml2
+	       -ledbcrypto -ledbutil -ledbparser -lcryptdb  
 
-CXXFLAGS += -Itools/import -Imain/ -I/usr/include/libxml2 
+CXXFLAGS += -Itools/import -Imain/ 
 
 # vim: set noexpandtab:

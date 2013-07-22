@@ -363,7 +363,7 @@ encrypt_item_layers(Item * i, onion o, OnionMeta *om, Analysis &a,
     Item * prev_enc = NULL;
     for (auto layer : om->layers) {
         LOG(encl) << "encrypt layer " << levelnames[(int)layer->level()] << "\n";
-	enc = layer->encrypt(enc, IV);
+		enc = layer->encrypt(enc, IV);
         //need to free space for all enc
         //except the last one
         if (prev_enc) {
