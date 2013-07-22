@@ -263,6 +263,7 @@ public:
           AbstractMetaKey *key)
         : action(action), meta(meta), parent_meta(parent_meta), key(key) {}
     // FIXME: Unserialize old Delta.
+    /*
     Delta(unsigned int id, std::string serial)
         : DBObject(id)
     {
@@ -271,6 +272,7 @@ public:
         std::vector<std::string> split_serials = unserialize_string(serial);
         throw CryptDBError("implement!");
     }
+    */
 
     /*
      * This function is responsible for writing our Delta to the database.
@@ -282,20 +284,22 @@ public:
      * serialization semantics.
      */
     bool apply(Connect *e_conn);
-    void createHandler(Connect *e_conn, DBMeta *object, DBMeta *parent,
-                       AbstractMetaKey *k = NULL,
+    void createHandler(Connect *e_conn, const DBMeta * const object,
+                       const DBMeta * const parent,
+                       const AbstractMetaKey * const k = NULL,
                        const unsigned int * const ptr_parent_id = NULL);
-    void deleteHandler(Connect *e_conn, DBMeta *object, DBMeta *parent);
-    void replaceHandler(Connect *e_conn, DBMeta *object, DBMeta *parent,
-                        AbstractMetaKey *k);
+    void deleteHandler(Connect *e_conn, const DBMeta * const object,
+                       const DBMeta * const parent);
+    void replaceHandler(Connect *e_conn, const DBMeta * const object,
+                        const DBMeta * const parent,
+                        const AbstractMetaKey * const k);
 
 private:
     Action action;
     // Can't use references because of deserialization.
-    DBMeta * meta;
-    DBMeta * parent_meta;
-    AbstractMetaKey *key;
-    bool used;
+    const DBMeta * const meta;
+    const DBMeta * const parent_meta;
+    const AbstractMetaKey * const key;
 
     std::string serialize(const DBObject &parent) const 
     {

@@ -82,7 +82,7 @@ public:
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
     std::vector<DBMeta *> fetchChildren(Connect *e_conn);
-    void applyToChildren(std::function<void(DBMeta *)>);
+    void applyToChildren(std::function<void(const DBMeta * const)>) const;
     AbstractMetaKey *getKey(const DBMeta *const child) const;
     SECLEVEL getSecLevel();
     unsigned long getUniq() const {return uniq_count;}

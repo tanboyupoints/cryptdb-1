@@ -152,7 +152,7 @@ std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
     return DBMeta::doFetchChildren(e_conn, dbw, deserialize);
 }
 
-void OnionMeta::applyToChildren(std::function<void(DBMeta *)> fn)
+void OnionMeta::applyToChildren(std::function<void(const DBMeta * const)> fn) const
 {
     for (auto it : layers) {
         fn(it);

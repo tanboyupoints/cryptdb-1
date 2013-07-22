@@ -146,7 +146,7 @@ MappedDBMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
 
 template <typename ChildType, typename KeyType>
 void
-MappedDBMeta<ChildType, KeyType>::applyToChildren(std::function<void(DBMeta *)> fn)
+MappedDBMeta<ChildType, KeyType>::applyToChildren(std::function<void(const DBMeta * const)> fn) const
 {
     for (auto it : children) {
         fn(it.second);

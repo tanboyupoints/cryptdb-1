@@ -245,8 +245,9 @@ bool Delta::apply(Connect *e_conn)
 
 // TODO: Remove asserts.
 // Recursive.
-void Delta::createHandler(Connect *e_conn, DBMeta *object,
-                          DBMeta *parent, AbstractMetaKey *k,
+void Delta::createHandler(Connect *e_conn, const DBMeta * const object,
+                          const DBMeta * const parent,
+                          const AbstractMetaKey * const k,
                           const unsigned int * const ptr_parent_id)
 {
     DBWriter dbw(object, parent);
@@ -301,15 +302,15 @@ void Delta::createHandler(Connect *e_conn, DBMeta *object,
 
     assert(e_conn->execute(join_query));
 
-    std::function<void(DBMeta *)> localCreateHandler =
-        [&e_conn, &object, object_id, this] (DBMeta *child) {
+    std::function<void(const DBMeta * const)> localCreateHandler =
+        [&e_conn, &object, object_id, this] (const DBMeta * const child) {
             this->createHandler(e_conn, child, object, NULL, &object_id);
         };
     object->applyToChildren(localCreateHandler);
 }
 
-void Delta::deleteHandler(Connect *e_conn, DBMeta *object,
-                          DBMeta *parent)
+void Delta::deleteHandler(Connect *e_conn, const DBMeta * const object,
+                          const DBMeta * const parent)
 {
     DBWriter dbw(object, parent);
     const unsigned int object_id = object->getDatabaseID();
@@ -329,15 +330,16 @@ void Delta::deleteHandler(Connect *e_conn, DBMeta *object,
 
     assert(e_conn->execute(query));
 
-    std::function<void(DBMeta *)> localDestroyHandler =
-        [&e_conn, &object, this] (DBMeta *child) {
+    std::function<void(const DBMeta * const)> localDestroyHandler =
+        [&e_conn, &object, this] (const DBMeta * const child) {
             this->deleteHandler(e_conn, child, object);
         };
     object->applyToChildren(localDestroyHandler);
 }
 
-void Delta::replaceHandler(Connect *e_conn, DBMeta *object,
-                           DBMeta *parent, AbstractMetaKey *k)
+void Delta::replaceHandler(Connect *e_conn, const DBMeta * const object,
+                           const DBMeta * const parent,
+                           const AbstractMetaKey * const k)
 {
     DBWriter dbw(object, parent);
 
