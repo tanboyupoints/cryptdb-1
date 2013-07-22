@@ -327,6 +327,8 @@ public:
 
     // These functions are prefered to their lower level counterparts.
     bool addAlias(std::string alias, std::string table);
+	OnionMeta *getOnionMeta(std::string table, std::string field,
+							onion o) const;
     FieldMeta *getFieldMeta(std::string table, std::string field) const;
     TableMeta *getTableMeta(std::string table) const;
     bool destroyFieldMeta(std::string table, std::string field);
@@ -335,6 +337,10 @@ public:
     std::string getAnonTableName(const std::string &table) const;
     std::string getAnonIndexName(std::string table,
                                  std::string index_name) const;
+	EncLayer *popBackEncLayer(std::string table, std::string field,
+							  onion o);
+	SECLEVEL getOnionLevel(std::string table, std::string field,
+						   onion o) const;
 
     // HACK(burrows): This is a temporary solution until I redesign.
     Rewriter *rewriter;
@@ -342,7 +348,13 @@ public:
     // TODO: Make private.
     std::list<Delta> deltas;
 
+	// TODO: Make private.
+	// Can't use OnionMeta as key because this data needs to be used
+	// across multiple reads from the database.
+	std::map<std::pair<std::string, std::pair<std::string, onion>>,
+			 std::vector<EncLayer *>> to_adjust_enc_layers;
 private:
+
     std::string unAliasTable(std::string table) const;
 };
 

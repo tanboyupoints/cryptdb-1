@@ -382,6 +382,15 @@ bool Analysis::addAlias(std::string alias, std::string table)
     return true;
 }
 
+OnionMeta *Analysis::getOnionMeta(std::string table, std::string field,
+								  onion o) const
+{
+	OnionMeta *om = this->getFieldMeta(table, field)->getOnionMeta(o);
+	assert(om);
+
+	return om;
+}
+
 FieldMeta *Analysis::getFieldMeta(std::string table, std::string field) const
 {
     std::string real_table_name = unAliasTable(table);
@@ -445,5 +454,34 @@ std::string Analysis::unAliasTable(std::string table) const
     } else {
         return table;
     }
+}
+
+EncLayer *Analysis::popBackEncLayer(std::string table, std::string field,
+								onion o)
+{
+	OnionMeta *om = this->getOnionMeta(table, field, o);
+	auto key = std::make_pair(table, std::make_pair(field, o));
+	auto it = to_adjust_enc_layers.find(key);
+	if (to_adjust_enc_layers.end() == it) { // First onion adjustment
+		to_adjust_enc_layers[key] = om->layers;		
+		EncLayer *out_layer = to_adjust_enc_layers[key].back();	
+		to_adjust_enc_layers[key].pop_back();
+		return out_layer;
+	} else { // Second onion adjustment for this query.
+		// FIXME: Maybe we want to support this case.
+		throw CryptDBError("Trying to adjust onion twice in same round!");
+	}
+}
+
+SECLEVEL Analysis::getOnionLevel(std::string table, std::string field,
+								 onion o) const
+{
+	auto key = std::make_pair(table, std::make_pair(field, o));
+	auto it = to_adjust_enc_layers.find(key);
+	if (to_adjust_enc_layers.end() == it) {
+		return this->getFieldMeta(table, field)->getOnionLevel(o);
+	} else {
+		return it->second.back()->level();
+	}
 }
 

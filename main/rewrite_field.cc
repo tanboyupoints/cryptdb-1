@@ -62,7 +62,8 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 	//assert(constr.key == fm);
 
 	//check if we need onion adjustment
-        SECLEVEL onion_level = fm->getOnionLevel(constr.o);
+        SECLEVEL onion_level =
+			a.getOnionLevel(i->table_name, i->field_name, constr.o);
         assert(onion_level != SECLEVEL::INVALID);
 	if (constr.l < onion_level) {
 	    //need adjustment, throw exception

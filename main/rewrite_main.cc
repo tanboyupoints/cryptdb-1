@@ -301,9 +301,12 @@ removeOnionLayer(FieldMeta * fm, Item_field *itf, Analysis &a, onion o,
     LOG(cdb_v) << "adjust onions: \n" << query.str() << "\n";
 
     //remove onion layer in schema
-    om->layers.pop_back();
+	Delta d(Delta::DELETE,
+			a.popBackEncLayer(itf->table_name, itf->field_name, o),
+			om, NULL);	
+	a.deltas.push_back(d);
 
-    *new_level = om->layers.back()->level();
+	*new_level = a.getOnionLevel(itf->table_name, itf->field_name, o);
 }
 
 /*
@@ -319,7 +322,8 @@ static void
 adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf,
             Analysis & a, const std::string & cur_db) {
 
-    SECLEVEL newlevel = fm->getOnionLevel(o);
+    SECLEVEL newlevel =
+		a.getOnionLevel(itf->table_name, itf->field_name, o);
     assert(newlevel != SECLEVEL::INVALID);
 
     while (newlevel > tolevel) {
@@ -807,22 +811,32 @@ Rewriter::rewrite(const std::string & q)
     }
 
     //for as long as there are onion adjustments
+	// HACK: Because we need to carry EncLayer adjustment information
+	// to the next iteration.
+	Analysis *old_analysis = NULL;
     while (true) {
-	Analysis analysis = Analysis(&ps);
+		Analysis analysis = Analysis(&ps);
         // HACK(burrows): Until redesign.
         analysis.rewriter = this;
-	try {
-	    res.queries = rewrite_helper(q, analysis, p);
-	} catch (OnionAdjustExcept e) {
-	    LOG(cdb_v) << "caught onion adjustment";
-            std::cout << "Adjusting onion!" << std::endl;
-	    adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis,
-                        ps.conn->getCurDBName());
-	    continue;
-	}
-        res.wasRew = true;
-	res.rmeta = analysis.rmeta;
-	return res;
+		// HACK.
+		if (old_analysis) {
+			analysis.to_adjust_enc_layers =
+				old_analysis->to_adjust_enc_layers;
+			delete old_analysis;
+		}
+		try {
+			res.queries = rewrite_helper(q, analysis, p);
+		} catch (OnionAdjustExcept e) {
+			LOG(cdb_v) << "caught onion adjustment";
+				std::cout << "Adjusting onion!" << std::endl;
+			adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis,
+							ps.conn->getCurDBName());
+			old_analysis = new Analysis(analysis);
+			continue;
+		}
+		res.wasRew = true;
+		res.rmeta = analysis.rmeta;
+		return res;
     }
 }
 
