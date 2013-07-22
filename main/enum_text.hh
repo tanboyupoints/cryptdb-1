@@ -4,39 +4,33 @@
 #include <string>
 #include <iostream>
 
-// TODO: Use functor + find_if instead of for loops.
 template <typename _type>
 class TypeText {
 public:
     TypeText(std::vector<_type> enums, std::vector<std::string> texts) {
-        theEnums = new std::vector<_type>(enums);
-        theTexts = new std::vector<std::string>(texts);
+        theEnums = std::vector<_type>(enums);
+        theTexts = std::vector<std::string>(texts);
     }
 
-    ~TypeText() {
-        delete theEnums;
-        delete theTexts;
-    }
+    ~TypeText() {}
 
     // Instance.
     std::string getText(_type e) {
-        for (unsigned int i = 0; i < theEnums->size(); ++i) {
-            if ((*theEnums)[i] == e) {
-                return (*theTexts)[i];
-            }
-        }
+		auto it = std::find(theEnums.begin(), theEnums.end(), e);
+		if (theEnums.end() == it) {
+			throw "type does not exist!";
+		}
 
-        throw "enum does not exist!";
+		return theTexts[it - theEnums.begin()];
     }
 
     _type getEnum(std::string t) {
-        for (unsigned int i = 0; i < theTexts->size(); ++i) {
-            if ((*theTexts)[i] == t) {
-                return (*theEnums)[i];
-            }
-        }
+		auto it = std::find(theTexts.begin(), theTexts.end(), t);
+		if (theTexts.end() == it) {
+			throw "text does not exist!";
+		}
 
-        throw "text does not exist!";
+		return theEnums[it - theTexts.begin()];
     }
 
     // Static.
@@ -86,8 +80,8 @@ public:
 
 protected:
     // Instance.
-    std::vector<std::string> *theTexts;
-    std::vector<_type> *theEnums;
+    std::vector<std::string> theTexts;
+    std::vector<_type> theEnums;
     static TypeText *instance;
 };
 
