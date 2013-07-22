@@ -58,6 +58,11 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
                       Analysis &a, bool new_table,
                       List<Create_field> &rewritten_cfield_list);
 
+
+Item *
+encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers, 
+        Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0);
+
 // FIXME(burrows): Generalize to support any container with next AND end
 // semantics.
 template <typename T>
