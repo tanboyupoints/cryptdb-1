@@ -346,6 +346,8 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
     return rewritten_cfield_list;
 }
 
+// FIXME(burrows): Generalize to support any container with next AND end
+ // semantics.
 Item *
 encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers, 
         Analysis &a, FieldMeta *fm, uint64_t IV) {
