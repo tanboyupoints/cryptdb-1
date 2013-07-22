@@ -275,7 +275,6 @@ buildTypeTextTranslator()
 static void
 removeOnionLayer(FieldMeta * fm, Item_field *itf, Analysis &a, onion o,
                  SECLEVEL *new_level, const std::string &cur_db) {
-
     OnionMeta *om = fm->getOnionMeta(o);
     assert(om);
     std::string fieldanon  = om->getAnonOnionName();
@@ -301,10 +300,10 @@ removeOnionLayer(FieldMeta * fm, Item_field *itf, Analysis &a, onion o,
     LOG(cdb_v) << "adjust onions: \n" << query.str() << "\n";
 
     //remove onion layer in schema
-	Delta d(Delta::DELETE, a.popBackEncLayer(om), om, NULL);	
-	a.deltas.push_back(d);
+    Delta d(Delta::DELETE, a.popBackEncLayer(om), om, NULL);	
+    a.deltas.push_back(d);
 
-	*new_level = a.getOnionLevel(om);
+    *new_level = a.getOnionLevel(om);
 }
 
 /*
@@ -320,12 +319,12 @@ static void
 adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf,
             Analysis & a, const std::string & cur_db)
 {
-	OnionMeta *om = fm->getOnionMeta(o);	
+    OnionMeta *om = fm->getOnionMeta(o);
     SECLEVEL newlevel = a.getOnionLevel(om);
     assert(newlevel != SECLEVEL::INVALID);
 
     while (newlevel > tolevel) {
-		removeOnionLayer(fm, itf, a, o, &newlevel, cur_db);
+        removeOnionLayer(fm, itf, a, o, &newlevel, cur_db);
     }
     assert(newlevel == tolevel);
 }
@@ -622,8 +621,7 @@ loadUDFs(Connect * conn) {
 Rewriter::Rewriter(ConnectionInfo ci,
                    const std::string &embed_dir,
                    const std::string &dbname,
-                   bool multi,
-		   bool encByDefault)
+                   bool encByDefault)
 {
     init_mysql(embed_dir);
 
@@ -633,17 +631,12 @@ Rewriter::Rewriter(ConnectionInfo ci,
     urandom u;
     ps.masterKey = getKey(u.rand_string(AES_KEY_BYTES));
 
-    if (multi) {
-	ps.encByDefault = false;
-    }
-
     ps.e_conn = Connect::getEmbedded(embed_dir, dbname);
 
     ps.conn = new Connect(ci.server, ci.user, ci.passwd, dbname, ci.port);
 
-    // Must be called before initSchema.
+    // Must be called before loadSchemaInfo.
     buildTypeTextTranslator();
-    // initSchema(ps);
     ps.schema = loadSchemaInfo(ps.e_conn);
     // printEmbeddedState(ps);
 

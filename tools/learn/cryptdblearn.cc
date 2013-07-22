@@ -119,7 +119,7 @@ int main(int argc, char **argv)
     assert(dbname != "");
     
     ConnectionInfo ci("localhost", username, password);
-    Rewriter r(ci, "/var/lib/shadow-mysql", dbname, false, true);
+    Rewriter r(ci, "/var/lib/shadow-mysql", dbname, true);
 
     // Onion layer keys are derived from master key.
     // here using the same as cdb_test.

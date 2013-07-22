@@ -895,7 +895,7 @@ Connection::start() {
         case PROXYSINGLE:
             {
                 ConnectionInfo ci(tc.host, tc.user, tc.pass);
-                re_proxy = new Rewriter(ci,tc.shadowdb_dir, tc.db, false, true);
+                re_proxy = new Rewriter(ci, tc.shadowdb_dir, tc.db, true);
                 re_set.insert(re_proxy);
                 this->re_it = re_set.begin();
                 re_proxy->setMasterKey("2392834");
