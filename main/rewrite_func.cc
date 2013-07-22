@@ -171,9 +171,8 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
         }
         
         for (auto it : fm->children) {
-            // FIXME: dynamic_cast
-            onion o = static_cast<OnionMetaKey *>(it.first)->getValue();
-            OnionMeta *om = static_cast<OnionMeta *>(it.second);
+            onion o = it.first->getValue();
+            OnionMeta *om = it.second;
             l.push_back(encrypt_item_layers(i, o, om->layers, a, fm, salt));
         }
     

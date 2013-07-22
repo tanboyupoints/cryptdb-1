@@ -22,9 +22,8 @@ EncSet::EncSet() : osl(FULL_EncSet.osl) {}
 EncSet::EncSet(FieldMeta * fm) {
     osl.clear();
     for (auto pair : fm->children) {
-        // FIXME: dynamic_cast
-        OnionMeta *om = static_cast<OnionMeta *>(pair.second);
-        OnionMetaKey *key = static_cast<OnionMetaKey *>(pair.first);
+        OnionMeta *om = pair.second;
+        OnionMetaKey *key = pair.first;
 	osl[key->getValue()] = LevelFieldPair(om->getSecLevel(), fm);
     }
 }

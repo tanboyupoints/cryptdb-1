@@ -86,7 +86,6 @@ encrypt_item_all_onions(Item * i, FieldMeta * fm,
 {
 
     for (auto it : fm->orderedOnionMetas()) {
-        // FIXME: dynamic_cast
         onion o = it.first->getValue();
         OnionMeta *om = it.second;
         l.push_back(encrypt_item_layers(i, o, om->layers, a, fm, IV));

@@ -398,8 +398,7 @@ private:
 
     bool invalidates(FieldMeta * fm, const EncSet & es) const {
         for (auto o_l : fm->children) {
-            // FIXME: dynamic_cast
-            onion o = static_cast<OnionMetaKey *>(o_l.first)->getValue();
+            onion o = o_l.first->getValue();
             if (es.osl.find(o) == es.osl.end()) {
                 return true;
             }

@@ -40,6 +40,7 @@ reduceList(List_iterator<T> it, O init, F op) {
 }
 
 // FIXME: Concating this into a mysql List is likely introducting a memleak.
+// > We should be able to remove this 'new' as concat doesn't keep the address.
 template <typename T> List<T> *
 vectorToList(std::vector<T*> v) {
     List<T> *lst = new List<T>;

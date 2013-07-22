@@ -208,11 +208,7 @@ FieldMeta::orderedOnionMetas() const
 {
     std::vector<std::pair<OnionMetaKey *, OnionMeta *>> v;
     for (auto it : children) {
-        // FIXME: dynamic_cast
-        auto pair =
-            std::make_pair(static_cast<OnionMetaKey *>(it.first),
-                           static_cast<OnionMeta *>(it.second));
-        v.push_back(pair);
+        v.push_back(it);
     }
 
     std::sort(v.begin(), v.end(),
@@ -269,19 +265,18 @@ std::string TableMeta::getAnonTableName() const {
 }
 
 // FIXME: Slow.
+// > Code is also duplicated with FieldMeta::orderedOnionMetas.
 std::vector<FieldMeta *> TableMeta::orderedFieldMetas() const
 {
     std::vector<FieldMeta *> v;
     for (auto it : children) {
-        // FIXME: Use dynamic_cast.
-        v.push_back(static_cast<FieldMeta *>(it.second));
+        v.push_back(it.second);
     }
 
     std::sort(v.begin(), v.end(),
               [] (FieldMeta *a, FieldMeta *b) {
                 return a->getUniq() < b->getUniq();
               }); 
-
 
     return v;
 }

@@ -84,9 +84,8 @@ static bool
 sanityCheck(FieldMeta *fm)
 {
     for (auto it : fm->children) {
-        // FIXME: dynamic_cast
-        OnionMeta *om = static_cast<OnionMeta *>(it.second);
-        onion o = static_cast<OnionMetaKey *>(it.first)->getValue();
+        OnionMeta *om = it.second;
+        onion o = it.first->getValue();
         const std::vector<SECLEVEL> &secs = fm->onion_layout.at(o);
         for (unsigned int i = 0; i < om->layers.size(); ++i) {
             EncLayer *layer = om->layers[i];
@@ -100,8 +99,7 @@ static bool
 sanityCheck(TableMeta *tm)
 {
     for (auto it : tm->children) {
-        // FIXME: dynamic_cast
-        FieldMeta *fm = static_cast<FieldMeta *>(it.second);
+        FieldMeta *fm = it.second;
         assert(sanityCheck(fm));
     }
     return true;
@@ -111,8 +109,7 @@ static bool
 sanityCheck(SchemaInfo *schema)
 {
     for (auto it : schema->children) {
-        // FIXME: dynamic_cast
-        TableMeta *tm = static_cast<TableMeta *>(it.second);
+        TableMeta *tm = it.second;
         assert(sanityCheck(tm));
     }
     return true;
