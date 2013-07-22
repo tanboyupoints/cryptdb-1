@@ -111,9 +111,6 @@ typical_gather(Analysis & a, Item_func * i,
 }
 
 /*
- * TODO:FIXME(ccarvalho): This function is duplicated from rewrite_const.cc. See if we can merge this into 
- * one single function, common to both files.
- */
 static Item *
 encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers,
                     Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0)
@@ -142,6 +139,7 @@ encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers,
 
     return enc;
 }
+*/
 
 static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NEG_FUNC> {
     virtual RewritePlan * do_gather_type(Item_func_neg *i, reason &tr, Analysis & a) const {
@@ -173,7 +171,7 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
         for (auto it : fm->children) {
             onion o = it.first->getValue();
             OnionMeta *om = it.second;
-            l.push_back(encrypt_item_layers(i, o, om->layers, a, fm, salt));
+            l.push_back(encrypt_item_layers(i, o, om, a, fm, salt));
         }
     
         if (fm->has_salt) {
@@ -354,24 +352,24 @@ class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
 				   Analysis & a) const {
         LOG(cdb_v) << "do_rewrite_type Item_func_additive_op" << *i << " with constr " << constr;
 
-	//rewrite children
-	assert_s(i->argument_count() == 2, " expecting two arguments for additive operator ");
-	Item **args = i->arguments();
+		//rewrite children
+		assert_s(i->argument_count() == 2, " expecting two arguments for additive operator ");
+		Item **args = i->arguments();
 
-	RewritePlanOneOLK * rp = (RewritePlanOneOLK *) _rp;
+		RewritePlanOneOLK * rp = (RewritePlanOneOLK *) _rp;
 
-        std::cerr << "Rewrite plan is " << rp << "\n";
+		std::cerr << "Rewrite plan is " << rp << "\n";
 
-	Item * arg0 = itemTypes.do_rewrite(args[0],
-					   rp->olk, rp->childr_rp[0], a);
-	Item * arg1 = itemTypes.do_rewrite(args[1],
-					   rp->olk, rp->childr_rp[1], a);
+		Item * arg0 = itemTypes.do_rewrite(args[0],
+						   rp->olk, rp->childr_rp[0], a);
+		Item * arg1 = itemTypes.do_rewrite(args[1],
+						   rp->olk, rp->childr_rp[1], a);
 
-        OnionMeta *om = constr.key->getOnionMeta(oAGG);
-        assert(om);
-	EncLayer *el = om->layers.back();
-	assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
-	return ((HOM*)el)->sumUDF(arg0, arg1);
+		OnionMeta *om = constr.key->getOnionMeta(oAGG);
+		assert(om);
+		EncLayer *el = a.getBackEncLayer(om);
+		assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
+		return ((HOM*)el)->sumUDF(arg0, arg1);
 
 	}
 };

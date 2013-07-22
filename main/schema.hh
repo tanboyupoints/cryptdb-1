@@ -67,9 +67,6 @@ const OLK PLAIN_OLK = OLK(oPLAIN, SECLEVEL::PLAINVAL, NULL);
 // TODO: Fix the children.
 typedef class OnionMeta : public DBMeta {
 public:
-    // TODO: Private.
-    std::vector<EncLayer *> layers; //first in list is lowest layer
-
     // New.
     OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
               Create_field *cf, unsigned long uniq_count);
@@ -86,42 +83,33 @@ public:
     static std::string instanceTypeName() {return type_name;}
     std::vector<DBMeta *> fetchChildren(Connect *e_conn);
     void applyToChildren(std::function<void(DBMeta *)>);
-    AbstractMetaKey *getKey(const DBMeta *const child) const
-    {
-        for (std::vector<EncLayer *>::size_type i = 0; i < layers.size(); ++i) {
-            if (child == layers[i]) {
-                return new UIntMetaKey(i);
-            }
-        }
-
-        return NULL;
-    }
-
-    bool addLayerBack(EncLayer *layer) {
-        layers.push_back(layer);
-        return true;
-    }
-    bool removeLayerBack() {
-        layers.pop_back();
-        return true;
-    }
-    bool replaceLayerBack(EncLayer *layer) {
-        layers.pop_back();
-        layers.push_back(layer);
-        return true;
-    }
-
-    SECLEVEL getSecLevel() {
-        assert(layers.size() > 0);
-        return layers.back()->level();
-    }
-
+    AbstractMetaKey *getKey(const DBMeta *const child) const;
+    SECLEVEL getSecLevel();
     unsigned long getUniq() const {return uniq_count;}
 
+	// Need access to layers.
+	friend class Analysis;
+	friend class FieldMeta;
+	friend Create_field *get_create_field(Create_field *,
+										  OnionMeta *,
+										  const std::string &);
+	friend Item *encrypt_item_layers(Item *, onion, OnionMeta *,
+									 Analysis &, FieldMeta *, uint64_t);
+	friend Item *decrypt_item_layers(Item *, onion, OnionMeta *,
+									 uint64_t, Analysis &, FieldMeta *,
+									 const std::vector<Item *> &);
+	friend bool sanityCheck(FieldMeta *);
+
 private:
+    std::vector<EncLayer *> layers; //first in list is lowest layer
     constexpr static const char *type_name = "onionMeta";
     const std::string onionname;
     unsigned long uniq_count;
+
+    void addLayerBack(EncLayer *layer);
+	EncLayer *getLayerBack() const;
+    void removeLayerBack();
+    void replaceLayerBack(EncLayer *layer);
 } OnionMeta;
 
 struct TableMeta;
@@ -153,60 +141,13 @@ public:
     std::string stringify() const;
     std::vector<std::pair<OnionMetaKey *, OnionMeta *>>
         orderedOnionMetas() const;
+    std::string getSaltName() const;
+    unsigned long getUniq() const {return uniq_count;}
 
-    std::string getSaltName() const {
-        assert(has_salt);
-        return salt_name;
-    }
-
-    unsigned long getUniq() const {
-        return uniq_count;
-    }
-
-    SECLEVEL getOnionLevel(onion o) const {
-        OnionMetaKey *key = new OnionMetaKey(o);
-        auto om = getChild(key);
-        delete key;
-        if (om == NULL) {
-            return SECLEVEL::INVALID;
-        }
-
-        return om->getSecLevel();
-    }
-
-    bool setOnionLevel(onion o, SECLEVEL maxl) {
-        OnionMeta *om = getOnionMeta(o);
-        if (NULL == om) {
-            return false;
-        }
-        SECLEVEL current_sec_level = om->getSecLevel();
-        if (current_sec_level > maxl) {
-            while (om->layers.size() != 0 &&
-                   om->layers.back()->level() != maxl) {
-                om->layers.pop_back();
-            }
-            return true;
-        }
-        return false;
-    }
-
-    // FIXME: This is a HACK.
-    bool isEncrypted() {
-        OnionMetaKey *key = new OnionMetaKey(oPLAIN);
-        bool status =  ((children.size() != 1) ||
-                        (children.find(key) == children.end()));
-        delete key;
-        return status;
-    }
-
-    OnionMeta *getOnionMeta(onion o) {
-        OnionMetaKey *key = new OnionMetaKey(o);
-        DBMeta *om = getChild(key);
-        delete key;
-        // FIXME: dynamic_cast
-        return static_cast<OnionMeta *>(om);
-    }
-
+    SECLEVEL getOnionLevel(onion o) const;
+    bool setOnionLevel(onion o, SECLEVEL maxl);
+    bool isEncrypted();
+    OnionMeta *getOnionMeta(onion o);
     // FIXME: Use rtti.
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}

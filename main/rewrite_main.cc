@@ -80,7 +80,7 @@ mysql_query_wrapper(MYSQL *m, const std::string &q)
     if (!ret) assert(false);
 }
 
-static bool
+bool
 sanityCheck(FieldMeta *fm)
 {
     for (auto it : fm->children) {
@@ -289,7 +289,7 @@ removeOnionLayer(FieldMeta * fm, Item_field *itf, Analysis &a, onion o,
 
     Item_field *field = stringToItemField(fieldanon, tableanon, itf);
     Item_field *salt = stringToItemField(fm->getSaltName(), tableanon, itf);
-    Item * decUDF = om->layers.back()->decryptUDF(field, salt);
+    Item * decUDF = a.getBackEncLayer(om)->decryptUDF(field, salt);
 
     query << *decUDF << ";";
 
@@ -301,12 +301,10 @@ removeOnionLayer(FieldMeta * fm, Item_field *itf, Analysis &a, onion o,
     LOG(cdb_v) << "adjust onions: \n" << query.str() << "\n";
 
     //remove onion layer in schema
-	Delta d(Delta::DELETE,
-			a.popBackEncLayer(itf->table_name, itf->field_name, o),
-			om, NULL);	
+	Delta d(Delta::DELETE, a.popBackEncLayer(om), om, NULL);	
 	a.deltas.push_back(d);
 
-	*new_level = a.getOnionLevel(itf->table_name, itf->field_name, o);
+	*new_level = a.getOnionLevel(om);
 }
 
 /*
@@ -320,10 +318,10 @@ removeOnionLayer(FieldMeta * fm, Item_field *itf, Analysis &a, onion o,
  */
 static void
 adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf,
-            Analysis & a, const std::string & cur_db) {
-
-    SECLEVEL newlevel =
-		a.getOnionLevel(itf->table_name, itf->field_name, o);
+            Analysis & a, const std::string & cur_db)
+{
+	OnionMeta *om = fm->getOnionMeta(o);	
+    SECLEVEL newlevel = a.getOnionLevel(om);
     assert(newlevel != SECLEVEL::INVALID);
 
     while (newlevel > tolevel) {
@@ -432,8 +430,8 @@ do_optimize_const_item(T *i, Analysis &a) {
     */
 }
 
-static Item *
-decrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers,
+Item *
+decrypt_item_layers(Item * i, onion o, OnionMeta *om,
                     uint64_t IV, Analysis &a, FieldMeta *fm,
                     const std::vector<Item *> &res)
 {
@@ -448,7 +446,7 @@ decrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers,
     Item * dec = i;
     Item * prev_dec = NULL;
 
-    for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
+    for (auto it = om->layers.rbegin(); it != om->layers.rend(); ++it) {
 
         dec = (*it)->decrypt(dec, IV);
         LOG(cdb_v) << "dec okay";
@@ -467,7 +465,7 @@ decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV, Analysis &a,
              std::vector<Item *> &res)
 {
     assert(!i->is_null());
-    return decrypt_item_layers(i, o, fm->getOnionMeta(o)->layers, IV, a,
+    return decrypt_item_layers(i, o, fm->getOnionMeta(o), IV, a,
                                fm, res);
 }
 
@@ -740,8 +738,6 @@ rewrite_helper(const std::string & q, Analysis & analysis,
         assert(it.apply(analysis.ps->e_conn));
     }
 
-    analysis.ps->schema = loadSchemaInfo(analysis.ps->e_conn);
-    printEmbeddedState(*analysis.ps);
     // --------------------------------------
 
     std::list<std::string> queries;
@@ -830,12 +826,18 @@ Rewriter::rewrite(const std::string & q)
 			LOG(cdb_v) << "caught onion adjustment";
 				std::cout << "Adjusting onion!" << std::endl;
 			adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis,
-							ps.conn->getCurDBName());
+						ps.conn->getCurDBName());
 			old_analysis = new Analysis(analysis);
+			// HACK.
+			for (auto it : analysis.deltas) {
+				assert(it.apply(ps.e_conn));
+			}
 			continue;
 		}
 		res.wasRew = true;
 		res.rmeta = analysis.rmeta;
+		ps.schema = loadSchemaInfo(ps.e_conn);
+		printEmbeddedState(ps);
 		return res;
     }
 }

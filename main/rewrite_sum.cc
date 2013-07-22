@@ -162,17 +162,15 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
     virtual Item * do_rewrite_type(Item_sum_sum * i,
 				   const OLK & constr, const RewritePlan * rp,
 				   Analysis & a) const {
-
-	LOG(cdb_v) << "Item_sum_sum rewrite " << *i;
+		LOG(cdb_v) << "Item_sum_sum rewrite " << *i;
 
         std::list<Item *> args = rewrite_agg_args(i, constr, (RewritePlanOneOLK *)rp, a, 1);
 
-	OnionMeta * om = constr.key->getOnionMeta(oAGG);
+		OnionMeta * om = constr.key->getOnionMeta(oAGG);
         assert(om);
-        EncLayer *el = om->layers.back();
-	assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
-	return ((HOM *)el)->sumUDA(args.front());
-
+        EncLayer *el = a.getBackEncLayer(om);
+		assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
+		return ((HOM *)el)->sumUDA(args.front());
     }
 };
 

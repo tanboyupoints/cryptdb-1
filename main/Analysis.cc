@@ -24,7 +24,7 @@ EncSet::EncSet(FieldMeta * fm) {
     for (auto pair : fm->children) {
         OnionMeta *om = pair.second;
         OnionMetaKey *key = pair.first;
-	osl[key->getValue()] = LevelFieldPair(om->getSecLevel(), fm);
+		osl[key->getValue()] = LevelFieldPair(om->getSecLevel(), fm);
     }
 }
 
@@ -456,16 +456,23 @@ std::string Analysis::unAliasTable(std::string table) const
     }
 }
 
-EncLayer *Analysis::popBackEncLayer(std::string table, std::string field,
-								onion o)
+EncLayer *Analysis::getBackEncLayer(OnionMeta *om) const
 {
-	OnionMeta *om = this->getOnionMeta(table, field, o);
-	auto key = std::make_pair(table, std::make_pair(field, o));
-	auto it = to_adjust_enc_layers.find(key);
+	auto it = to_adjust_enc_layers.find(om);
+	if (to_adjust_enc_layers.end() == it) {
+		return om->layers.back();
+	} else { 
+		return it->second.back();
+	}
+}
+
+EncLayer *Analysis::popBackEncLayer(OnionMeta *om)
+{
+	auto it = to_adjust_enc_layers.find(om);
 	if (to_adjust_enc_layers.end() == it) { // First onion adjustment
-		to_adjust_enc_layers[key] = om->layers;		
-		EncLayer *out_layer = to_adjust_enc_layers[key].back();	
-		to_adjust_enc_layers[key].pop_back();
+		to_adjust_enc_layers[om] = om->layers;		
+		EncLayer *out_layer = to_adjust_enc_layers[om].back();	
+		to_adjust_enc_layers[om].pop_back();
 		return out_layer;
 	} else { // Second onion adjustment for this query.
 		// FIXME: Maybe we want to support this case.
@@ -473,13 +480,11 @@ EncLayer *Analysis::popBackEncLayer(std::string table, std::string field,
 	}
 }
 
-SECLEVEL Analysis::getOnionLevel(std::string table, std::string field,
-								 onion o) const
+SECLEVEL Analysis::getOnionLevel(OnionMeta *om) const
 {
-	auto key = std::make_pair(table, std::make_pair(field, o));
-	auto it = to_adjust_enc_layers.find(key);
+	auto it = to_adjust_enc_layers.find(om);
 	if (to_adjust_enc_layers.end() == it) {
-		return this->getFieldMeta(table, field)->getOnionLevel(o);
+		return om->getSecLevel();
 	} else {
 		return it->second.back()->level();
 	}

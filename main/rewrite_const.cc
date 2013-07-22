@@ -24,35 +24,6 @@
 // class/object names we don't care to know the name of
 #define ANON                ANON_NAME(__anon_id_const)
 
-
-//TODO: which encrypt/decrypt should handle null?
-static Item *
-encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers, Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0) {
-    assert(!i->is_null());
-
-    if (o == oPLAIN) {//Unencrypted item
-	return i;
-    }
-
-    // Encrypted item
-
-    assert_s(layers.size() > 0, "field must have at least one layer");
-    Item * enc = i;
-    Item * prev_enc = NULL;
-    for (auto layer : layers) {
-        LOG(encl) << "encrypt layer " << levelnames[(int)layer->level()] << "\n";
-	enc = layer->encrypt(enc, IV);
-        //need to free space for all enc
-        //except the last one
-        if (prev_enc) {
-            delete prev_enc;
-        }
-        prev_enc = enc;
-    }
-
-    return enc;
-}
-
 // encrypts a constant item based on the information in a
 static Item *
 encrypt_item(Item * i, const OLK & olk, Analysis & a)
@@ -74,7 +45,7 @@ encrypt_item(Item * i, const OLK & olk, Analysis & a)
 	IV = it->second;
     }
     OnionMeta *om = fm->getOnionMeta(o);
-    Item *ret_i = encrypt_item_layers(i, o, om->layers, a, fm, IV);
+    Item *ret_i = encrypt_item_layers(i, o, om, a, fm, IV);
 
     return ret_i;
 }
@@ -88,11 +59,10 @@ encrypt_item_all_onions(Item * i, FieldMeta * fm,
     for (auto it : fm->orderedOnionMetas()) {
         onion o = it.first->getValue();
         OnionMeta *om = it.second;
-        l.push_back(encrypt_item_layers(i, o, om->layers, a, fm, IV));
+        l.push_back(encrypt_item_layers(i, o, om, a, fm, IV));
     }
 }
  
-
 template <typename ItemType>
 static void
 typical_rewrite_insert_type(ItemType *i, Analysis &a,

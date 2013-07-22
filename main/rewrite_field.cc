@@ -58,29 +58,29 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     {
         LOG(cdb_v) << "do_rewrite_type FIELD_ITEM " << *i;
 
-	FieldMeta *fm = a.getFieldMeta(i->table_name, i->field_name);
-	//assert(constr.key == fm);
+		FieldMeta *fm = a.getFieldMeta(i->table_name, i->field_name);
+		//assert(constr.key == fm);
 
-	//check if we need onion adjustment
-        SECLEVEL onion_level =
-			a.getOnionLevel(i->table_name, i->field_name, constr.o);
-        assert(onion_level != SECLEVEL::INVALID);
-	if (constr.l < onion_level) {
-	    //need adjustment, throw exception
-	    throw OnionAdjustExcept(constr.o, fm, constr.l, i);
-	}
+		//check if we need onion adjustment
+		OnionMeta *om =
+			a.getOnionMeta(i->table_name, i->field_name, constr.o);
+		SECLEVEL onion_level = a.getOnionLevel(om);
+		assert(onion_level != SECLEVEL::INVALID);
+		if (constr.l < onion_level) {
+			//need adjustment, throw exception
+			throw OnionAdjustExcept(constr.o, fm, constr.l, i);
+		}
 
-	Item_field * res = make_item(i);
+		Item_field * res = make_item(i);
 
-	if (!fm->isEncrypted()) { // Not encrypted
-	    return res;
-	}
+		if (!fm->isEncrypted()) { // Not encrypted
+			return res;
+		}
 
-	// Encrypted item
+		// Encrypted item
 
-	res->table_name = make_thd_string(a.getAnonTableName(i->table_name));
-        OnionMeta *om = fm->getOnionMeta(constr.o);
-	res->field_name = make_thd_string(om->getAnonOnionName());
+		res->table_name = make_thd_string(a.getAnonTableName(i->table_name));
+		res->field_name = make_thd_string(om->getAnonOnionName());
 
         return res;
     }
