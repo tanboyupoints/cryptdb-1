@@ -49,6 +49,7 @@ make_item(std::string value, enum_field_types type)
     case MYSQL_TYPE_LONG:
     case MYSQL_TYPE_LONGLONG:
     case MYSQL_TYPE_INT24:
+    case MYSQL_TYPE_TINY:
         i = new Item_int((long long) valFromStr(value));
         break;
 
