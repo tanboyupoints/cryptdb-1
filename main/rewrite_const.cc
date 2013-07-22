@@ -25,33 +25,6 @@
 #define ANON                ANON_NAME(__anon_id_const)
 
 
-//TODO: which encrypt/decrypt should handle null?
-static Item *
-encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers, Analysis &a, FieldMeta *fm = 0, uint64_t IV = 0) {
-    assert(!i->is_null());
-
-    if (o == oPLAIN) {//Unencrypted item
-	return i;
-    }
-
-    // Encrypted item
-
-    assert_s(layers.size() > 0, "field must have at least one layer");
-    Item * enc = i;
-    Item * prev_enc = NULL;
-    for (auto layer : layers) {
-        LOG(encl) << "encrypt layer " << levelnames[(int)layer->level()] << "\n";
-	enc = layer->encrypt(enc, IV);
-        //need to free space for all enc
-        //except the last one
-        if (prev_enc) {
-            delete prev_enc;
-        }
-        prev_enc = enc;
-    }
-
-    return enc;
-}
 
 // encrypts a constant item based on the information in a
 static Item *
