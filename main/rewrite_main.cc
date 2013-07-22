@@ -622,8 +622,7 @@ loadUDFs(Connect * conn) {
 Rewriter::Rewriter(ConnectionInfo ci,
                    const std::string &embed_dir,
                    const std::string &dbname,
-                   bool multi,
-		   bool encByDefault)
+                   bool encByDefault)
 {
     init_mysql(embed_dir);
 
@@ -633,17 +632,12 @@ Rewriter::Rewriter(ConnectionInfo ci,
     urandom u;
     ps.masterKey = getKey(u.rand_string(AES_KEY_BYTES));
 
-    if (multi) {
-	ps.encByDefault = false;
-    }
-
     ps.e_conn = Connect::getEmbedded(embed_dir, dbname);
 
     ps.conn = new Connect(ci.server, ci.user, ci.passwd, dbname, ci.port);
 
-    // Must be called before initSchema.
+    // Must be called before loadSchemaInfo.
     buildTypeTextTranslator();
-    // initSchema(ps);
     ps.schema = loadSchemaInfo(ps.e_conn);
     // printEmbeddedState(ps);
 
