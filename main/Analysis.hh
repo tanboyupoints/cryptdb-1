@@ -340,7 +340,7 @@ public:
     Rewriter *rewriter;
 
     // TODO: Make private.
-    std::vector<Delta> deltas;
+    std::list<Delta> deltas;
 
 private:
     std::string unAliasTable(std::string table) const;
