@@ -33,8 +33,8 @@ public:
 
     OLK extract_singleton() const {
         assert_s(singleton(), std::string("encset has size ") + StringFromVal(osl.size()));
-	auto it = osl.begin();
-	return OLK(it->first, it->second.first, it->second.second);
+        auto it = osl.begin();
+        return OLK(it->first, it->second.first, it->second.second);
     }
 
     void setFieldForOnion(onion o, FieldMeta * fm);
@@ -63,14 +63,14 @@ const EncSet JOIN_EncSet = {
 
 const EncSet ORD_EncSet = {
     {
-	{oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-	{oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
+        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+        {oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
     }
 };
 
 const EncSet PLAIN_EncSet = {
     {
-	{oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
     }
 };
 
@@ -162,11 +162,13 @@ class reason {
 public:
     reason(const EncSet & es, const std::string &why_t_arg,
                 Item *why_t_item_arg)
-	:  encset(es), why_t(why_t_arg), why_t_item(why_t_item_arg)
-	{ childr = new std::list<reason>();}
-    reason(): encset(EMPTY_EncSet), why_t(""), why_t_item(NULL), childr(NULL) {}
+        :  encset(es), why_t(why_t_arg), why_t_item(why_t_item_arg)
+    { childr = new std::list<reason>();}
+    reason()
+        : encset(EMPTY_EncSet), why_t(""), why_t_item(NULL),
+          childr(NULL) {}
     void add_child(const reason & ch) {
-	childr->push_back(ch);
+        childr->push_back(ch);
     }
 
     EncSet encset;
@@ -205,12 +207,9 @@ public:
     // the following store how to rewrite children
     RewritePlan ** childr_rp;
 
-    RewritePlanOneOLK(const EncSet & es_out,
-		      const OLK & olk,
-		      RewritePlan ** childr_rp,
-		      reason r) : RewritePlan(es_out, r),
-				  olk(olk),
-				  childr_rp(childr_rp) {}
+    RewritePlanOneOLK(const EncSet & es_out, const OLK & olk,
+                      RewritePlan ** childr_rp, reason r)
+        : RewritePlan(es_out, r), olk(olk), childr_rp(childr_rp) {}
 };
 
 // TODO: Maybe we want a database name argument/member.
@@ -234,8 +233,9 @@ operator<<(std::ostream &out, const RewritePlan * rp);
 // state maintained at the proxy
 typedef struct ProxyState {
 
-    ProxyState(): conn(NULL), e_conn(NULL), encByDefault(true),
-		  masterKey(NULL), schema(NULL) {}
+    ProxyState()
+        : conn(NULL), e_conn(NULL), encByDefault(true), masterKey(NULL),
+          schema(NULL) {}
     ConnectionInfo ci;
 
     // connection to remote and embedded server
@@ -327,8 +327,8 @@ public:
 
     // These functions are prefered to their lower level counterparts.
     bool addAlias(std::string alias, std::string table);
-	OnionMeta *getOnionMeta(std::string table, std::string field,
-							onion o) const;
+    OnionMeta *getOnionMeta(std::string table, std::string field,
+                            onion o) const;
     FieldMeta *getFieldMeta(std::string table, std::string field) const;
     TableMeta *getTableMeta(std::string table) const;
     bool destroyFieldMeta(std::string table, std::string field);
@@ -337,10 +337,9 @@ public:
     std::string getAnonTableName(const std::string &table) const;
     std::string getAnonIndexName(std::string table,
                                  std::string index_name) const;
-	EncLayer *getBackEncLayer(OnionMeta *om) const;
-	EncLayer *popBackEncLayer(OnionMeta *om);
-	SECLEVEL getOnionLevel(OnionMeta *om) const;
-						   
+    EncLayer *getBackEncLayer(OnionMeta *om) const;
+    EncLayer *popBackEncLayer(OnionMeta *om);
+    SECLEVEL getOnionLevel(OnionMeta *om) const;
 
     // HACK(burrows): This is a temporary solution until I redesign.
     Rewriter *rewriter;
@@ -348,10 +347,8 @@ public:
     // TODO: Make private.
     std::list<Delta> deltas;
 
-	// TODO: Make private.
-	// Can't use OnionMeta as key because this data needs to be used
-	// across multiple reads from the database.
-	std::map<OnionMeta *, std::vector<EncLayer *>> to_adjust_enc_layers;
+    // TODO: Make private.
+    std::map<OnionMeta *, std::vector<EncLayer *>> to_adjust_enc_layers;
 
 private:
     std::string unAliasTable(std::string table) const;

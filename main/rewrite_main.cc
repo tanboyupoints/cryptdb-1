@@ -285,7 +285,7 @@ removeOnionLayer(FieldMeta * fm, Item_field *itf, Analysis &a, onion o,
     //removes onion layer at the DB
     std::stringstream query;
     query << " UPDATE " << cur_db << "." << tableanon
-		  << "    SET " << fieldanon  << " = ";
+          << "    SET " << fieldanon  << " = ";
 
     Item_field *field = stringToItemField(fieldanon, tableanon, itf);
     Item_field *salt = stringToItemField(fm->getSaltName(), tableanon, itf);
