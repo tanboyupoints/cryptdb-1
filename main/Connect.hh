@@ -50,17 +50,14 @@ class Connect {
     unsigned long real_escape_string(char *to, const char *from,
                                      unsigned long length);
 
-    void setCurDBName(const std::string &dbname);
-    std::string getCurDBName(void);
-
     ~Connect();
 
  private:
     MYSQL * conn;
-    std::string dbname;
 
     void do_connect(const std::string &server, const std::string &user,
-                    const std::string &passwd, uint port);
+                    const std::string &passwd, const std::string &dbname,
+                    uint port);
 
     bool close_on_destroy;
 };

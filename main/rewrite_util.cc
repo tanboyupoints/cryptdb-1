@@ -164,18 +164,16 @@ analyze(Item *i, Analysis & a)
 }
 
 LEX *
-begin_transaction_lex(Analysis a) {
+begin_transaction_lex(const std::string &dbname) {
     static const std::string query = "START TRANSACTION;";
-    query_parse *begin_parse = new query_parse(a.ps->conn->getCurDBName(),
-                                               query);
+    query_parse *begin_parse = new query_parse(dbname, query);
     return begin_parse->lex();
 }
 
 LEX *
-commit_transaction_lex(Analysis a) {
+commit_transaction_lex(const std::string &dbname) {
     static const std::string query = "COMMIT;";
-    query_parse *commit_parse = new query_parse(a.ps->conn->getCurDBName(),
-                                                query);
+    query_parse *commit_parse = new query_parse(dbname, query);
     return commit_parse->lex();
 }
 

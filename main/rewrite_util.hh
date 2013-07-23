@@ -33,10 +33,10 @@ void
 optimize(Item **i, Analysis &a);
 
 LEX *
-begin_transaction_lex(Analysis a);
+begin_transaction_lex(const std::string &dbname);
 
 LEX *
-commit_transaction_lex(Analysis a);
+commit_transaction_lex(const std::string &dbname);
 
 std::vector<Create_field*>
 rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a);

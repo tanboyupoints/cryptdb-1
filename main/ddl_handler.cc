@@ -149,19 +149,12 @@ class DropHandler : public DDLHandler {
     }
 };
 
-// TODO: FIXME.
+// TODO: Implement.
 class ChangeDBHandler : public DDLHandler {
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
                                    const std::string &q,
                                    unsigned *out_lex_count) const {
-        assert(lex->select_lex.db);
-        char* dbname = lex->select_lex.db;
-
-        // new dbname is saved for next queries
-        a.ps->conn->setCurDBName(dbname);
-        a.ps->e_conn->setCurDBName(dbname);
-
-        return single_lex_output(lex, out_lex_count);
+        throw CryptDBError("cryptdb does not support changing the db!");
     }
 };
 

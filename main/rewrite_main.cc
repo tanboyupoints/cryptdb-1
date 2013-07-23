@@ -646,10 +646,10 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
     loadUDFs(ps.conn);
 
-    // HACK: This is necessary because above functions use a USE statement.
+    // HACK: This is necessary as above functions use a USE statement.
     // ie, loadUDFs.
-    ps.conn->setCurDBName(dbname);
-    ps.e_conn->setCurDBName(dbname);
+    ps.conn->execute("USE cryptdbtest;");
+    ps.e_conn->execute("USE cryptdbtest;");
 }
 
 LEX **
@@ -772,9 +772,7 @@ Rewriter::rewrite(const std::string & q)
 
     // printEmbeddedState(ps);
 
-    // TODO: Possibly database name should be in Analysis.
-    assert(ps.conn->getCurDBName() == ps.e_conn->getCurDBName());
-    query_parse p(ps.conn->getCurDBName(), q);
+    query_parse p(ps.dbName(), q);
     QueryRewrite res;
 
     /*
@@ -817,7 +815,7 @@ Rewriter::rewrite(const std::string & q)
             LOG(cdb_v) << "caught onion adjustment";
             std::cout << "Adjusting onion!" << std::endl;
             adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis,
-                        ps.conn->getCurDBName());
+                        ps.dbName());
             old_analysis = new Analysis(analysis);
             // HACK.
             for (auto it : analysis.deltas) {

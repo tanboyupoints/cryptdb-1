@@ -16,9 +16,9 @@
 Connect::Connect(const std::string &server, const std::string &user,
                  const std::string &passwd, const std::string &dbname,
                  uint port)
-    : conn(nullptr), dbname(dbname), close_on_destroy(true)
+    : conn(nullptr), close_on_destroy(true)
 {
-    do_connect(server, user, passwd, port);
+    do_connect(server, user, passwd, dbname, port);
 
     if (dbname.size() == 0) {
         LOG(warn) << "database name not set";
@@ -31,7 +31,8 @@ Connect::Connect(const std::string &server, const std::string &user,
 
 void
 Connect::do_connect(const std::string &server, const std::string &user,
-                    const std::string &passwd, uint port)
+                    const std::string &passwd, const std::string &dbname,
+                    uint port)
 {
     const char *dummy_argv[] = {
         "progname",
@@ -57,7 +58,7 @@ Connect::do_connect(const std::string &server, const std::string &user,
     if (!mysql_real_connect(conn, server.c_str(), user.c_str(),
                             passwd.c_str(), 0, port, 0, 0)) {
         LOG(warn) << "connecting to server " << server
-                  << " db " << getCurDBName()
+                  << " db " << dbname
                   << " user " << user
                   << " pwd " << passwd
                   << " port " << port;
@@ -65,23 +66,9 @@ Connect::do_connect(const std::string &server, const std::string &user,
         throw std::runtime_error("cannot connect");
     }
 
-    // We create and set the database here because the database will
+    // We create the database here because the database will
     // not exist if it is our first time connecting to it.
-    assert(execute("CREATE DATABASE IF NOT EXISTS " + getCurDBName() + ";"));
-    setCurDBName(getCurDBName());
-}
-
-void
-Connect::setCurDBName(const std::string & db)
-{
-    dbname = db;
-    assert(execute("USE " + db + ";"));
-}
-
-std::string
-Connect::getCurDBName()
-{
-    return dbname;
+    assert(execute("CREATE DATABASE IF NOT EXISTS " + dbname + ";"));
 }
 
 bool
@@ -113,14 +100,10 @@ Connect * Connect::getEmbedded(const std::string & embed_db,
     // because it may be our first time accessing that database and 
     // it will not exist yet.
     assert(conn->execute("CREATE DATABASE IF NOT EXISTS " + dbname + ";"));
-    conn->setCurDBName(dbname);
 
     return conn;
 }
 
-// FIXME: There is no guarentee that the query will actually be executed
-// in the database context (Connect::getCurDBName) that the caller
-// would expect. A rogue USE will lead to an inconsistent state.
 bool
 Connect::execute(const std::string &query, DBResult * & res)
 {

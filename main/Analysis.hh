@@ -236,6 +236,9 @@ typedef struct ProxyState {
     ProxyState()
         : conn(NULL), e_conn(NULL), encByDefault(true), masterKey(NULL),
           schema(NULL) {}
+    ~ProxyState();
+    std::string dbName() {return dbname;}
+
     ConnectionInfo ci;
 
     // connection to remote and embedded server
@@ -247,7 +250,9 @@ typedef struct ProxyState {
 
     SchemaInfo*    schema;
 
-    ~ProxyState();
+private:
+    // FIXME: Remove once cryptdb supports multiple databases.
+    constexpr static const char *dbname = "cryptdbtest";
 } ProxyState;
 
 

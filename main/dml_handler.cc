@@ -356,8 +356,7 @@ private:
         //     Query_arena::free_items
         //         Item::delete_self).
         query_parse * const parse =
-			new query_parse(a.ps->conn->getCurDBName(),
-                            push_results_stream.str());
+            new query_parse(a.ps->dbName(), push_results_stream.str());
         const SQLHandler *handler =
             a.rewriter->dml_dispatcher->dispatch(parse->lex());
         unsigned final_insert_out_lex_count;
@@ -376,8 +375,7 @@ private:
         delete_analysis.rewriter = a.rewriter;
         // FIXME(burrows): Identical memleak.
         query_parse * const delete_parse =
-            new query_parse(a.ps->conn->getCurDBName(),
-                            delete_stream.str());
+            new query_parse(a.ps->dbName(), delete_stream.str());
         const SQLHandler * const delete_handler =
             a.rewriter->dml_dispatcher->dispatch(delete_parse->lex());
         unsigned delete_out_lex_count;
@@ -391,10 +389,10 @@ private:
 
         // FIXME(burrows): Order matters, how to enforce?
         LEX **out_lex = new LEX*[4];
-        out_lex[0] = begin_transaction_lex(a);
+        out_lex[0] = begin_transaction_lex(a.ps->dbName());
         out_lex[1] = delete_lex;
         out_lex[2] = final_insert_lex;
-        out_lex[3] = commit_transaction_lex(a);
+        out_lex[3] = commit_transaction_lex(a.ps->dbName());
         *out_lex_count = 4;
         return out_lex;
     }

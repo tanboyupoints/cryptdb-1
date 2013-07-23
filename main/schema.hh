@@ -205,7 +205,7 @@ private:
 // this level or below. Use Analysis::* if you need aliasing.
 typedef class SchemaInfo : public MappedDBMeta<TableMeta, IdentityMetaKey> {
 public:
-    SchemaInfo() : MappedDBMeta(0) {}
+    SchemaInfo() : MappedDBMeta(0), db_name("cryptdbtest") {}
     ~SchemaInfo() {}
 
     std::string typeName() const {return type_name;}
@@ -216,6 +216,7 @@ public:
 
 private:
     constexpr static const char *type_name = "schemaInfo";
+    const char *db_name;
 
     // These functions do not support Aliasing, use Analysis::getTableMeta
     // and Analysis::getFieldMeta.
