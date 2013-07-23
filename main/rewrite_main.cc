@@ -430,14 +430,13 @@ do_optimize_const_item(T *i, Analysis &a) {
 }
 
 Item *
-decrypt_item_layers(Item * i, onion o, OnionMeta *om,
-                    uint64_t IV, Analysis &a, FieldMeta *fm,
-                    const std::vector<Item *> &res)
+decrypt_item_layers(Item * i, onion o, OnionMeta *om, uint64_t IV,
+                    FieldMeta *fm, const std::vector<Item *> &res)
 {
     assert(!i->is_null());
 
     if (o == oPLAIN) {// Unencrypted item
-	return i;
+        return i;
     }
 
     // Encrypted item
@@ -445,7 +444,9 @@ decrypt_item_layers(Item * i, onion o, OnionMeta *om,
     Item * dec = i;
     Item * prev_dec = NULL;
 
-    for (auto it = om->layers.rbegin(); it != om->layers.rend(); ++it) {
+    auto enc_layers = om->layers;
+    std::cout << "SIZE: " << enc_layers.size() << std::endl;
+    for (auto it = enc_layers.rbegin(); it != enc_layers.rend(); ++it) {
 
         dec = (*it)->decrypt(dec, IV);
         LOG(cdb_v) << "dec okay";
@@ -460,12 +461,11 @@ decrypt_item_layers(Item * i, onion o, OnionMeta *om,
 }
 
 static Item *
-decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV, Analysis &a,
+decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV,
              std::vector<Item *> &res)
 {
     assert(!i->is_null());
-    return decrypt_item_layers(i, o, fm->getOnionMeta(o), IV, a,
-                               fm, res);
+    return decrypt_item_layers(i, o, fm->getOnionMeta(o), IV, fm, res);
 }
 
 
@@ -494,13 +494,14 @@ intersect(const EncSet & es, FieldMeta * fm) {
 static void optimize_select_lex(st_select_lex *select_lex, Analysis & a);
 
 static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_ITEM> {
-    virtual RewritePlan * do_gather_type(Item_subselect *i, reason &tr, Analysis & a) const {
-	/*
+    virtual RewritePlan * do_gather_type(Item_subselect *i, reason &tr, Analysis & a) const
+    {
+        /*
         st_select_lex *select_lex = i->get_select_lex();
         process_select_lex(select_lex, a);
         return tr.encset;*/
-	UNIMPLEMENTED;
-	return NULL;
+        UNIMPLEMENTED;
+        return NULL;
     }
     virtual Item * do_optimize_type(Item_subselect *i, Analysis & a) const {
         optimize_select_lex(i->get_select_lex(), a);
@@ -509,16 +510,18 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
 } ANON;
 
 static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
-    virtual RewritePlan * do_gather_type(Item_cache *i, reason &tr, Analysis & a) const {
-	/*
+    virtual RewritePlan * do_gather_type(Item_cache *i, reason &tr, Analysis & a) const
+    {
+        /*
         Item *example = i->*rob<Item_cache, Item*, &Item_cache::example>::ptr();
         if (example)
             return gather(example, tr, a);
-	    return tr.encset;*/
-	UNIMPLEMENTED;
-	return NULL;
+        return tr.encset;*/
+        UNIMPLEMENTED;
+        return NULL;
     }
-    virtual Item * do_optimize_type(Item_cache *i, Analysis & a) const {
+    virtual Item * do_optimize_type(Item_cache *i, Analysis & a) const
+    {
         // TODO(stephentu): figure out how to use rob here
         return i;
     }
@@ -788,47 +791,47 @@ Rewriter::rewrite(const std::string & q)
         // HACK(burrows): This 'Analysis' is dummy as we never call
         // addToReturn. But it works because this optimized cases don't
         // have anything to do in addToReturn anyways.
-	Analysis analysis = Analysis(&ps);
+        Analysis analysis = Analysis(&ps);
 
-	res.wasRew = false;
-	res.queries.push_back(q);
+        res.wasRew = false;
+        res.queries.push_back(q);
         res.rmeta = analysis.rmeta;
-	return res;
+        return res;
     }
 
     //for as long as there are onion adjustments
-	// HACK: Because we need to carry EncLayer adjustment information
-	// to the next iteration.
-	Analysis *old_analysis = NULL;
+    // HACK: Because we need to carry EncLayer adjustment information
+    // to the next iteration.
+    Analysis *old_analysis = NULL;
     while (true) {
-		Analysis analysis = Analysis(&ps);
+        Analysis analysis = Analysis(&ps);
         // HACK(burrows): Until redesign.
         analysis.rewriter = this;
-		// HACK.
-		if (old_analysis) {
-			analysis.to_adjust_enc_layers =
-				old_analysis->to_adjust_enc_layers;
-			delete old_analysis;
-		}
-		try {
-			res.queries = rewrite_helper(q, analysis, p);
-		} catch (OnionAdjustExcept e) {
-			LOG(cdb_v) << "caught onion adjustment";
-				std::cout << "Adjusting onion!" << std::endl;
-			adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis,
-						ps.conn->getCurDBName());
-			old_analysis = new Analysis(analysis);
-			// HACK.
-			for (auto it : analysis.deltas) {
-				assert(it.apply(ps.e_conn));
-			}
-			continue;
-		}
-		res.wasRew = true;
-		res.rmeta = analysis.rmeta;
-		ps.schema = loadSchemaInfo(ps.e_conn);
-		printEmbeddedState(ps);
-		return res;
+        // HACK.
+        if (old_analysis) {
+            analysis.to_adjust_enc_layers =
+                old_analysis->to_adjust_enc_layers;
+            delete old_analysis;
+        }
+        try {
+            res.queries = rewrite_helper(q, analysis, p);
+        } catch (OnionAdjustExcept e) {
+            LOG(cdb_v) << "caught onion adjustment";
+            std::cout << "Adjusting onion!" << std::endl;
+            adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis,
+                        ps.conn->getCurDBName());
+            old_analysis = new Analysis(analysis);
+            // HACK.
+            for (auto it : analysis.deltas) {
+                assert(it.apply(ps.e_conn));
+            }
+            continue;
+        }
+        res.wasRew = true;
+        res.rmeta = analysis.rmeta;
+        ps.schema = loadSchemaInfo(ps.e_conn);
+        printEmbeddedState(ps);
+        return res;
     }
 }
 
@@ -852,12 +855,8 @@ std::string ReturnMeta::stringify() {
 }
 
 ResType
-Rewriter::decryptResults(ResType & dbres,
-			 ReturnMeta * rmeta) {
-
-    Analysis a = Analysis(&ps);
-    a.rmeta = rmeta;
-
+Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
+{
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
     unsigned int cols = dbres.names.size();
@@ -868,12 +867,12 @@ Rewriter::decryptResults(ResType & dbres,
 
     // un-anonymize the names
     for (auto it = dbres.names.begin();
-	 it != dbres.names.end(); it++) {
+        it != dbres.names.end(); it++) {
         ReturnField rf = rmeta->rfmeta[index];
         if (!rf.is_salt) {
-	    //need to return this field
+            //need to return this field
             res.names.push_back(rf.field_called);
-	    // switch types to original ones : TODO
+            // switch types to original ones : TODO
 
         }
         index++;
@@ -905,13 +904,14 @@ Rewriter::decryptResults(ResType & dbres,
                         salt = ((Item_int *)dbres.rows[r][rf.pos_salt])->value;
                     }
 
-		    res.rows[r][col_index] = decrypt_item(fm, rf.olk.o, dbres.rows[r][c], salt, a, res.rows[r]);
+                    res.rows[r][col_index] =
+                        decrypt_item(fm, rf.olk.o, dbres.rows[r][c],
+                                     salt, res.rows[r]);
                 }
             }
             col_index++;
         }
     }
-
 
     return res;
 }

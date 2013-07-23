@@ -89,14 +89,10 @@ public:
     // Need access to layers.
     friend class Analysis;
     friend class FieldMeta;
-    friend Create_field *get_create_field(Create_field *, OnionMeta *,
-                                          const std::string &);
-    friend Item *encrypt_item_layers(Item *, onion, OnionMeta *,
-                                     Analysis &, FieldMeta *, uint64_t);
-    friend Item *decrypt_item_layers(Item *, onion, OnionMeta *,
-                                     uint64_t, Analysis &, FieldMeta *,
-                                     const std::vector<Item *> &);
     friend bool sanityCheck(FieldMeta *);
+    friend Item *decrypt_item_layers(Item *, onion, OnionMeta *, uint64_t,
+                                     FieldMeta *,
+                                     const std::vector<Item *> &);
 
 private:
     std::vector<EncLayer *> layers; //first in list is lowest layer
