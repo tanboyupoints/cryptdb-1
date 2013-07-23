@@ -152,11 +152,57 @@ std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
     return DBMeta::doFetchChildren(e_conn, dbw, deserialize);
 }
 
-void OnionMeta::applyToChildren(std::function<void(DBMeta *)> fn)
+void OnionMeta::applyToChildren(std::function<void(const DBMeta * const)> fn) const
 {
     for (auto it : layers) {
         fn(it);
     }
+}
+
+AbstractMetaKey *OnionMeta::getKey(const DBMeta *const child) const
+{
+    for (std::vector<EncLayer *>::size_type i = 0; i< layers.size(); ++i) {
+        if (child == layers[i]) {
+            return new UIntMetaKey(i);
+        }
+    }
+
+    return NULL;
+}
+
+void OnionMeta::addLayerBack(EncLayer *layer) {
+    layers.push_back(layer);
+}
+
+EncLayer *OnionMeta::getLayerBack() const
+{
+    if (layers.size() == 0) {
+        throw CryptDBError("Tried getting EncLayer when there are none!");
+    }
+    return layers.back();
+}
+
+void OnionMeta::removeLayerBack()
+{
+    if (layers.size() == 0) {
+        throw CryptDBError("Tried to remove EncLayer when there are none!");
+    }
+    layers.pop_back();
+}
+
+void OnionMeta::replaceLayerBack(EncLayer *layer)
+{
+    if (layers.size() == 0) {
+        throw CryptDBError("Tried to remove EncLayer when there are none!");
+    }
+    layers.pop_back();
+    layers.push_back(layer);
+}
+
+SECLEVEL OnionMeta::getSecLevel()
+{
+    assert(layers.size() > 0);
+    return layers.back()->level();
 }
 
 FieldMeta *FieldMeta::deserialize(unsigned int id, std::string serial)
@@ -219,6 +265,54 @@ FieldMeta::orderedOnionMetas() const
               });
 
     return v;
+}
+
+std::string FieldMeta::getSaltName() const {
+    assert(has_salt);
+    return salt_name;
+}
+
+SECLEVEL FieldMeta::getOnionLevel(onion o) const {
+    OnionMetaKey *key = new OnionMetaKey(o);
+    auto om = getChild(key);
+    delete key;
+    if (om == NULL) {
+        return SECLEVEL::INVALID;
+    }
+
+    return om->getSecLevel();
+}
+
+bool FieldMeta::setOnionLevel(onion o, SECLEVEL maxl) {
+    OnionMeta *om = getOnionMeta(o);
+    if (NULL == om) {
+        return false;
+    }
+    SECLEVEL current_sec_level = om->getSecLevel();
+    if (current_sec_level > maxl) {
+        while (om->getSecLevel() != maxl) {
+            om->removeLayerBack();
+        }
+        return true;
+    }
+    return false;
+}
+
+// FIXME: This is a HACK.
+bool FieldMeta::isEncrypted() {
+    OnionMetaKey *key = new OnionMetaKey(oPLAIN);
+    bool status =  ((children.size() != 1) ||
+                    (children.find(key) == children.end()));
+    delete key;
+    return status;
+}
+
+OnionMeta *FieldMeta::getOnionMeta(onion o) {
+    OnionMetaKey *key = new OnionMetaKey(o);
+    DBMeta *om = getChild(key);
+    delete key;
+    // FIXME: dynamic_cast
+    return static_cast<OnionMeta *>(om);
 }
 
 onionlayout FieldMeta::getOnionLayout(AES_KEY *m_key, Create_field *f)
@@ -305,6 +399,20 @@ SchemaInfo::getFieldMeta(std::string & table, std::string & field) const
     delete field_key;
 
     return fm;
+}
+
+// FIXME: Slow.
+std::string
+SchemaInfo::getTableNameFromFieldMeta(FieldMeta *fm) const
+{
+    for (auto it : children) {
+        AbstractMetaKey *key = it.second->getKey(fm);
+        if (key) {
+            return it.first->getValue();
+        }
+    }
+
+    throw CryptDBError("Failed to get table name from FieldMeta");
 }
 
 bool create_tables(Connect *e_conn, DBWriter dbw)

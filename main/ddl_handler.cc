@@ -58,8 +58,6 @@ class CreateHandler : public DDLHandler {
             IdentityMetaKey *key = new IdentityMetaKey(table);
             Delta delta(Delta::CREATE, tm, a.ps->schema, key);
             a.deltas.push_back(delta);
-            // FIXME: Remove.
-            assert(a.ps->e_conn->execute(q));
            
             // -----------------------------
             //         Rewrite TABLE       
@@ -76,8 +74,6 @@ class CreateHandler : public DDLHandler {
                 rewrite_table_list(new_lex->select_lex.table_list.first,
                                    tm->getAnonTableName());
             new_lex->select_lex.table_list = *oneElemList<TABLE_LIST>(tbl);
-
-            // rewrite_table_list(lex->select_lex.table_list, a);
 
             auto it =
                 List_iterator<Create_field>(lex->alter_info.create_list);
@@ -149,8 +145,6 @@ class DropHandler : public DDLHandler {
             Delta delta(Delta::DELETE, tm, a.ps->schema,
                         new IdentityMetaKey(table));
             a.deltas.push_back(delta);
-            // FIXME: Remove.
-            assert(a.ps->e_conn->execute(q));
         }
     }
 };

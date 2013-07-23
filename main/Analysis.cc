@@ -19,12 +19,12 @@ escapeString(Connect *e_conn, std::string escape_me)
 EncSet::EncSet() : osl(FULL_EncSet.osl) {}
 
 // FIXME: Wrong interfaces.
-EncSet::EncSet(FieldMeta * fm) {
+EncSet::EncSet(Analysis &a, FieldMeta * fm) {
     osl.clear();
     for (auto pair : fm->children) {
         OnionMeta *om = pair.second;
         OnionMetaKey *key = pair.first;
-	osl[key->getValue()] = LevelFieldPair(om->getSecLevel(), fm);
+        osl[key->getValue()] = LevelFieldPair(a.getOnionLevel(om), fm);
     }
 }
 
@@ -46,7 +46,7 @@ EncSet::intersect(const EncSet & es2) const
         if (it != osl.end()) {
             SECLEVEL sl = (SECLEVEL)min((int)it->second.first,
                     (int)it2->second.first);
-	    onion o = it->first;
+            onion o = it->first;
 
             if (fm == NULL) {
                 m[o] = LevelFieldPair(sl, fm2);
@@ -54,9 +54,9 @@ EncSet::intersect(const EncSet & es2) const
                 m[it->first] = LevelFieldPair(sl, fm);
             } else if (fm != NULL && fm2 != NULL) {
                 // TODO(burrows): Guarentee that the keys are the same.
-		if (sl == SECLEVEL::DETJOIN) {
-		    m[o] = LevelFieldPair(sl, fm);
-		} else if (sl == SECLEVEL::HOM) {
+                if (sl == SECLEVEL::DETJOIN) {
+                    m[o] = LevelFieldPair(sl, fm);
+                } else if (sl == SECLEVEL::HOM) {
                     m[o] = LevelFieldPair(sl, fm);
                 }
             }
@@ -98,16 +98,17 @@ EncSet::chooseOne() const
         oOPE,
         oAGG,
         oSWP,
-	oPLAIN,
+        oPLAIN,
     };
 
 
     static size_t onion_size = sizeof(onion_order) / sizeof(onion_order[0]);
     for (size_t i = 0; i < onion_size; i++) {
-	onion o = onion_order[i];
+        onion o = onion_order[i];
         auto it = osl.find(o);
         if (it != osl.end()) {
-            if (it->second.second == 0 && it->second.first != SECLEVEL::PLAINVAL) {
+            if (it->second.second == 0 &&
+                it->second.first != SECLEVEL::PLAINVAL) {
                 /*
                  * If no key, skip this OLK.
                  * What are the semantics of chooseOne() anyway?
@@ -115,7 +116,7 @@ EncSet::chooseOne() const
                 continue;
             }
 
-	    return OLK(o,  it->second.first, it->second.second);
+            return OLK(o,  it->second.first, it->second.second);
         }
     }
     return OLK();
@@ -137,9 +138,9 @@ EncSet::contains(const OLK & olk) const {
 bool
 needsSalt(EncSet es) {
     for (auto pair : es.osl) {
-	if (pair.second.first == SECLEVEL::RND) {
-	    return true;
-	}
+        if (pair.second.first == SECLEVEL::RND) {
+            return true;
+        }
     }
 
     return false;
@@ -150,14 +151,14 @@ std::ostream&
 operator<<(std::ostream &out, const reason &r)
 {
     out << r.why_t_item << " PRODUCES encset " << r.encset << "\n" \
-	<< " BECAUSE " << r.why_t << "\n";
+        << " BECAUSE " << r.why_t << "\n";
 
     if (r.childr->size()) {
-	out << " AND CHILDREN: {" << "\n";
-	for (reason ch : *r.childr) {
-	    out << ch;
-	}
-	out << "} \n";
+        out << " AND CHILDREN: {" << "\n";
+        for (reason ch : *r.childr) {
+            out << ch;
+        }
+        out << "} \n";
     }
     return out;
 }
@@ -184,7 +185,7 @@ operator<<(std::ostream &out, const RewritePlan * rp)
 {
     if (!rp) {
         out << "NULL RewritePlan";
-	return out;
+        return out;
     }
 
     out << " RewritePlan: \n---> out encset " << rp->es_out << "\n---> reason " << rp->r << "\n";
@@ -245,8 +246,9 @@ bool Delta::apply(Connect *e_conn)
 
 // TODO: Remove asserts.
 // Recursive.
-void Delta::createHandler(Connect *e_conn, DBMeta *object,
-                          DBMeta *parent, AbstractMetaKey *k,
+void Delta::createHandler(Connect *e_conn, const DBMeta * const object,
+                          const DBMeta * const parent,
+                          const AbstractMetaKey * const k,
                           const unsigned int * const ptr_parent_id)
 {
     DBWriter dbw(object, parent);
@@ -301,15 +303,15 @@ void Delta::createHandler(Connect *e_conn, DBMeta *object,
 
     assert(e_conn->execute(join_query));
 
-    std::function<void(DBMeta *)> localCreateHandler =
-        [&e_conn, &object, object_id, this] (DBMeta *child) {
+    std::function<void(const DBMeta * const)> localCreateHandler =
+        [&e_conn, &object, object_id, this] (const DBMeta * const child) {
             this->createHandler(e_conn, child, object, NULL, &object_id);
         };
     object->applyToChildren(localCreateHandler);
 }
 
-void Delta::deleteHandler(Connect *e_conn, DBMeta *object,
-                          DBMeta *parent)
+void Delta::deleteHandler(Connect *e_conn, const DBMeta * const object,
+                          const DBMeta * const parent)
 {
     DBWriter dbw(object, parent);
     const unsigned int object_id = object->getDatabaseID();
@@ -329,15 +331,16 @@ void Delta::deleteHandler(Connect *e_conn, DBMeta *object,
 
     assert(e_conn->execute(query));
 
-    std::function<void(DBMeta *)> localDestroyHandler =
-        [&e_conn, &object, this] (DBMeta *child) {
+    std::function<void(const DBMeta * const)> localDestroyHandler =
+        [&e_conn, &object, this] (const DBMeta * const child) {
             this->deleteHandler(e_conn, child, object);
         };
     object->applyToChildren(localDestroyHandler);
 }
 
-void Delta::replaceHandler(Connect *e_conn, DBMeta *object,
-                           DBMeta *parent, AbstractMetaKey *k)
+void Delta::replaceHandler(Connect *e_conn, const DBMeta * const object,
+                           const DBMeta * const parent,
+                           const AbstractMetaKey * const k)
 {
     DBWriter dbw(object, parent);
 
@@ -380,6 +383,15 @@ bool Analysis::addAlias(std::string alias, std::string table)
 
     table_aliases[alias] = table;
     return true;
+}
+
+OnionMeta *Analysis::getOnionMeta(std::string table, std::string field,
+                                  onion o) const
+{
+    OnionMeta *om = this->getFieldMeta(table, field)->getOnionMeta(o);
+    assert(om);
+
+    return om;
 }
 
 FieldMeta *Analysis::getFieldMeta(std::string table, std::string field) const
@@ -447,3 +459,46 @@ std::string Analysis::unAliasTable(std::string table) const
     }
 }
 
+EncLayer *Analysis::getBackEncLayer(OnionMeta *om) const
+{
+    auto it = to_adjust_enc_layers.find(om);
+    if (to_adjust_enc_layers.end() == it) {
+        return om->layers.back();
+    } else { 
+        return it->second.back();
+    }
+}
+
+EncLayer *Analysis::popBackEncLayer(OnionMeta *om)
+{
+    auto it = to_adjust_enc_layers.find(om);
+    if (to_adjust_enc_layers.end() == it) { // First onion adjustment
+        to_adjust_enc_layers[om] = om->layers;
+        EncLayer *out_layer = to_adjust_enc_layers[om].back();
+        to_adjust_enc_layers[om].pop_back();
+        return out_layer;
+    } else { // Second onion adjustment for this query.
+        // FIXME: Maybe we want to support this case.
+        throw CryptDBError("Trying to adjust onion twice in same round!");
+    }
+}
+
+SECLEVEL Analysis::getOnionLevel(OnionMeta *om) const
+{
+    auto it = to_adjust_enc_layers.find(om);
+    if (to_adjust_enc_layers.end() == it) {
+        return om->getSecLevel();
+    } else {
+        return it->second.back()->level();
+    }
+}
+
+std::vector<EncLayer *> Analysis::getEncLayers(OnionMeta *om) const
+{
+    auto it = to_adjust_enc_layers.find(om);
+    if (to_adjust_enc_layers.end() == it) {
+        return om->layers;
+    } else {
+        return it->second;
+    }
+}

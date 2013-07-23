@@ -109,15 +109,11 @@ main(int ac, char **av)
     read_history(user_histfile().c_str());
     atexit(__write_history);
 
-
     ConnectionInfo ci("localhost", "root", "letmein");
-
-    Rewriter r(ci, av[1], "cryptdbtest", false, encByDefault);
-
+    Rewriter r(ci, av[1], "cryptdbtest", encByDefault);
     r.setMasterKey("2392834");
 
     std::string prompt = BOLD_BEGIN + "CryptDB=#" + COLOR_END + " ";
-
 
     for (;;) {
         char *input = readline(prompt.c_str());

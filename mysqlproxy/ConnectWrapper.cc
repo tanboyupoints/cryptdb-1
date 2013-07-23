@@ -120,11 +120,11 @@ connect(lua_State *L)
         if (mode == "single") {
             std::string encbydefault = getenv("ENC_BY_DEFAULT");
 	    if (encbydefault == "false") {
-                std::cerr << "\n\n enc by default false " << "\n\n";
-		r = new Rewriter(ci, embed_dir, dbname, false, false);
+            std::cerr << "\n\n enc by default false " << "\n\n";
+		    r = new Rewriter(ci, embed_dir, dbname, false);
 	    } else {
-                std::cerr << "\n\nenc by default true" << "\n\n";
-		r = new Rewriter(ci, embed_dir, dbname, false, true);
+            std::cerr << "\n\nenc by default true" << "\n\n";
+		    r = new Rewriter(ci, embed_dir, dbname, true);
 	    }
 
 	} else {

@@ -43,61 +43,61 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
         FieldMeta * fm = a.getFieldMeta(table, fieldname);
 
-	EncSet es  = EncSet(fm);
+        EncSet es  = EncSet(a, fm);
 
-	tr = reason(es, "is a field", i);
+        tr = reason(es, "is a field", i);
 
-	return new RewritePlan(es, tr);
-
+        return new RewritePlan(es, tr);
     }
 
     virtual Item *
-    do_rewrite_type(Item_field *i,
-		    const OLK & constr, const RewritePlan * rp,
-		    Analysis & a) const
+    do_rewrite_type(Item_field *i, const OLK & constr,
+                    const RewritePlan * rp, Analysis & a) const
     {
         LOG(cdb_v) << "do_rewrite_type FIELD_ITEM " << *i;
 
-	FieldMeta *fm = a.getFieldMeta(i->table_name, i->field_name);
-	//assert(constr.key == fm);
+        FieldMeta *fm = a.getFieldMeta(i->table_name, i->field_name);
+        //assert(constr.key == fm);
 
-	//check if we need onion adjustment
-        SECLEVEL onion_level = fm->getOnionLevel(constr.o);
+        //check if we need onion adjustment
+        OnionMeta *om =
+            a.getOnionMeta(i->table_name, i->field_name, constr.o);
+        SECLEVEL onion_level = a.getOnionLevel(om);
         assert(onion_level != SECLEVEL::INVALID);
-	if (constr.l < onion_level) {
-	    //need adjustment, throw exception
-	    throw OnionAdjustExcept(constr.o, fm, constr.l, i);
-	}
+        if (constr.l < onion_level) {
+            //need adjustment, throw exception
+            throw OnionAdjustExcept(constr.o, fm, constr.l, i);
+        }
 
-	Item_field * res = make_item(i);
+        Item_field * res = make_item(i);
 
-	if (!fm->isEncrypted()) { // Not encrypted
-	    return res;
-	}
+        if (!fm->isEncrypted()) { // Not encrypted
+            return res;
+        }
 
-	// Encrypted item
+        // Encrypted item
 
-	res->table_name = make_thd_string(a.getAnonTableName(i->table_name));
-        OnionMeta *om = fm->getOnionMeta(constr.o);
-	res->field_name = make_thd_string(om->getAnonOnionName());
+        res->table_name = make_thd_string(a.getAnonTableName(i->table_name));
+        res->field_name = make_thd_string(om->getAnonOnionName());
 
         return res;
     }
 /*
     static OLK
-    chooseProj(FieldMeta * fm) {
-	SECLEVEL l;
-	if (contains_get(fm->encdesc.olm, oDET, l)) {
-	    return OLK(oDET, l, fm);
-	}
-	if (contains_get(fm->encdesc.olm, oOPE, l)) {
-	    return OLK(oOPE, l, fm);
-	}
-	if (contains_get(fm->encdesc.olm, oAGG, l)) {
-	    return OLK(oAGG, l, fm);
-	}
-	assert_s(false, "field " + fm->fname + " does not have any decryptable onions for projection");
-	return OLK();
+    chooseProj(FieldMeta * fm)
+    {
+        SECLEVEL l;
+        if (contains_get(fm->encdesc.olm, oDET, l)) {
+            return OLK(oDET, l, fm);
+        }
+        if (contains_get(fm->encdesc.olm, oOPE, l)) {
+            return OLK(oOPE, l, fm);
+        }
+        if (contains_get(fm->encdesc.olm, oAGG, l)) {
+            return OLK(oAGG, l, fm);
+        }
+        assert_s(false, "field " + fm->fname + " does not have any decryptable onions for projection");
+        return OLK();
     }
 */
 
@@ -106,30 +106,30 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     do_rewrite_insert_type(Item_field *i, Analysis & a,
                            std::vector<Item *> &l, FieldMeta *fm) const
     {
-	assert(fm==NULL);
+        assert(fm==NULL);
         fm = a.getFieldMeta(i->table_name, i->field_name);
 
         assert(fm->isEncrypted());
         /*
          * TODO: Give the FieldMeta a plaintext onion
-	if (!fm->isEncrypted()) {
-	    l.push_back(make_item(i, fm->fname));
-	    return;
-	}
+        if (!fm->isEncrypted()) {
+            l.push_back(make_item(i, fm->fname));
+            return;
+        }
         */
 
-	// Encrypted field
+        // Encrypted field
 
-	Item_field * new_field = NULL;
+        Item_field * new_field = NULL;
         for (auto it : fm->orderedOnionMetas()) {
             std::string name = it.second->getAnonOnionName();
-	    new_field = make_item(i, name);
+            new_field = make_item(i, name);
             new_field->table_name =
                 make_thd_string(a.getAnonTableName(i->table_name));
             l.push_back(new_field);
         }
         if (fm->has_salt) {
-	    assert(new_field); // need an anonymized field as template to
+            assert(new_field); // need an anonymized field as template to
                                // create salt item
             l.push_back(make_item(new_field, fm->getSaltName()));
         }

@@ -193,7 +193,7 @@ class UpdateHandler : public DMLHandler {
             // Encrypted field
 
             RewritePlan * rp = getAssert(a.rewritePlans, val);
-            EncSet r_es = rp->es_out.intersect(EncSet(fm));
+            EncSet r_es = rp->es_out.intersect(EncSet(a, fm));
             if (r_es.empty()) {
                 /*
                  * FIXME(burrows): Change error message.
@@ -257,32 +257,34 @@ private:
                           unsigned *out_lex_count) const
     {
         // TODO(burrows): Should support multiple tables in a single UPDATE.
-        std::string plain_table =
+        const std::string plain_table =
             lex->select_lex.top_join_list.head()->table_name;
-        // HACK(burrows): Handling empty WHERE clause.
-        std::string where_clause =
-            new_lex->select_lex.where ?
-                ItemToString(new_lex->select_lex.where) : " TRUE ";
+        std::string where_clause;
+		if (lex->select_lex.where) {
+			std::ostringstream where_stream;
+			where_stream << " " << *lex->select_lex.where << " ";
+			where_clause = where_stream.str();
+		} else {	// HACK: Handle empty WHERE clause.
+			where_clause = " TRUE ";
+		}
 
         // Retrieve rows from database.
         std::ostringstream select_stream;
         select_stream << " SELECT * FROM " << plain_table
                       << " WHERE " << where_clause << ";";
-        ResType *select_res_type =
+        const ResType * const select_res_type =
             executeQuery(*a.rewriter, select_stream.str());
         assert(select_res_type);
         if (select_res_type->rows.size() == 0) { // No work to be done.
             return single_lex_output(new_lex, out_lex_count);
         }
 
-        struct _ {
-            static std::string itemJoin(std::vector<Item*> row) {
-                return "(" + vector_join<Item*>(row, ",", ItemToString) + ")";
-            }
+		const auto itemJoin = [](std::vector<Item*> row) {
+			return "(" + vector_join<Item*>(row, ",", ItemToString) + ")";
         };
-        std::string values_string =
+        const std::string values_string =
             vector_join<std::vector<Item*>>(select_res_type->rows, ",",
-                                            _::itemJoin);
+                                            itemJoin);
         delete select_res_type;
 
         // Push the plaintext rows to the embedded database.
@@ -310,7 +312,7 @@ private:
         ScopedMySQLRes r(dbres->n);
         MYSQL_ROW row;
         std::string output_rows = " ";
-        unsigned long field_count = r.res()->field_count;
+        const unsigned long field_count = r.res()->field_count;
         while ((row = mysql_fetch_row(r.res()))) {
             unsigned long *l = mysql_fetch_lengths(r.res());
             assert(l != NULL);
@@ -353,17 +355,18 @@ private:
         // THD::cleanup_after_query
         //     Query_arena::free_items
         //         Item::delete_self).
-        query_parse *parse = new query_parse(a.ps->conn->getCurDBName(),
-                                             push_results_stream.str());
+        query_parse * const parse =
+			new query_parse(a.ps->conn->getCurDBName(),
+                            push_results_stream.str());
         const SQLHandler *handler =
             a.rewriter->dml_dispatcher->dispatch(parse->lex());
         unsigned final_insert_out_lex_count;
-        LEX **final_insert_lex_arr =
+        LEX ** const final_insert_lex_arr =
             handler->transformLex(parse->lex(), insert_analysis,
                                   push_results_stream.str(),
                                   &final_insert_out_lex_count);
         assert(final_insert_lex_arr && 1 == final_insert_out_lex_count);
-        LEX *final_insert_lex = final_insert_lex_arr[0];
+        LEX * const final_insert_lex = final_insert_lex_arr[0];
 
         // DELETE the rows matching the WHERE clause from the database.
         std::ostringstream delete_stream;
@@ -372,19 +375,19 @@ private:
         Analysis delete_analysis = Analysis(a.ps);
         delete_analysis.rewriter = a.rewriter;
         // FIXME(burrows): Identical memleak.
-        query_parse *delete_parse =
+        query_parse * const delete_parse =
             new query_parse(a.ps->conn->getCurDBName(),
                             delete_stream.str());
-        const SQLHandler *delete_handler =
+        const SQLHandler * const delete_handler =
             a.rewriter->dml_dispatcher->dispatch(delete_parse->lex());
         unsigned delete_out_lex_count;
-        LEX **delete_lex_arr =
+        LEX ** const delete_lex_arr =
             delete_handler->transformLex(delete_parse->lex(),
                                          delete_analysis,
                                          delete_stream.str(),
                                          &delete_out_lex_count);
         assert(delete_lex_arr && 1 == delete_out_lex_count);
-        LEX *delete_lex = delete_lex_arr[0];
+        LEX * const delete_lex = delete_lex_arr[0];
 
         // FIXME(burrows): Order matters, how to enforce?
         LEX **out_lex = new LEX*[4];
@@ -526,28 +529,28 @@ rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
 	      const EncSet & constr, const std::string & name) {
     ORDER * prev = NULL;
     for (ORDER *o = lst.first; o; o = o->next) {
-	Item * i = *o->item;
-	RewritePlan * rp = getAssert(a.rewritePlans, i);
-	assert(rp);
-	EncSet es = constr.intersect(rp->es_out);
-	if (es.empty()) {
-            std::cerr << " cannot support query because " << name
-                      << " item " << i << " needs to output any of "
-                      << constr << "\n"
-		      << " BUT it can only output " << rp->es_out
-                      << " BECAUSE " << "(" << rp->r << ")\n";
-	    assert(false);
-	}
-	OLK olk = es.chooseOne();
+        Item * i = *o->item;
+        RewritePlan * rp = getAssert(a.rewritePlans, i);
+        assert(rp);
+        EncSet es = constr.intersect(rp->es_out);
+        if (es.empty()) {
+                std::cerr << " cannot support query because " << name
+                          << " item " << i << " needs to output any of "
+                          << constr << "\n"
+                  << " BUT it can only output " << rp->es_out
+                          << " BECAUSE " << "(" << rp->r << ")\n";
+            assert(false);
+        }
+        OLK olk = es.chooseOne();
 
-	Item * new_item = itemTypes.do_rewrite(*o->item, olk, rp, a);
-	ORDER * neworder = make_order(o, new_item);
-	if (prev == NULL) {
-	    lst = *oneElemList(neworder);
-	} else {
-	    prev->next = neworder;
-	}
-	prev = neworder;
+        Item * new_item = itemTypes.do_rewrite(*o->item, olk, rp, a);
+        ORDER * neworder = make_order(o, new_item);
+        if (prev == NULL) {
+            lst = *oneElemList(neworder);
+        } else {
+            prev->next = neworder;
+        }
+        prev = neworder;
     }
 }
 
@@ -635,7 +638,7 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
         if (!item)
             break;
         LOG(cdb_v) << "rewrite_select_lex " << *item << " with name " << item->name;
-	rewrite_proj(item, getAssert(a.rewritePlans, item), a, newList);
+        rewrite_proj(item, getAssert(a.rewritePlans, item), a, newList);
     }
 
     // TODO(stephentu): investigate whether or not this is a memory leak

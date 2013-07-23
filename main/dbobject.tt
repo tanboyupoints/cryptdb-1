@@ -94,6 +94,7 @@ MappedDBMeta<ChildType, KeyType>::getChild(KeyType *key) const
     return NULL;
 }
 
+// FIXME: Slow.
 template <typename ChildType, typename KeyType>
 AbstractMetaKey *
 MappedDBMeta<ChildType, KeyType>::getKey(const DBMeta * const child) const
@@ -104,7 +105,7 @@ MappedDBMeta<ChildType, KeyType>::getKey(const DBMeta * const child) const
         }
     }
 
-    throw CryptDBError("reverse lookup failed to find the child's key!");
+    return NULL;
 }
 
 // Virtual constructor to deserialize from embedded database.
@@ -146,7 +147,7 @@ MappedDBMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
 
 template <typename ChildType, typename KeyType>
 void
-MappedDBMeta<ChildType, KeyType>::applyToChildren(std::function<void(DBMeta *)> fn)
+MappedDBMeta<ChildType, KeyType>::applyToChildren(std::function<void(const DBMeta * const)> fn) const
 {
     for (auto it : children) {
         fn(it.second);

@@ -198,7 +198,7 @@ public:
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;
     virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn) = 0;
-    virtual void applyToChildren(std::function<void(DBMeta *)>) = 0;
+    virtual void applyToChildren(std::function<void(const DBMeta * const)>) const = 0;
     virtual AbstractMetaKey *getKey(const DBMeta *const child) const = 0;
 
 protected:
@@ -216,18 +216,18 @@ class DBWriter {
 public:
     DBWriter(std::string child_name, std::string parent_name) :
         child_table(child_name), parent_table(parent_name) {}
-    DBWriter(DBMeta *child, DBMeta *parent)
+    DBWriter(const DBMeta * const child, const DBMeta * const parent)
         : child_table(child->typeName()), parent_table(parent->typeName())
         {}
 
     template <typename ChildType>
-        static DBWriter factory(DBMeta *parent) {
+        static DBWriter factory(const DBMeta * const parent) {
             auto getChildTypeName = ChildType::instanceTypeName;
             return DBWriter(getChildTypeName(), parent->typeName());
         }
 
-    std::string table_name() {return child_table;}
-    std::string join_table_name() {return child_table + "_" + parent_table;}
+    std::string table_name() const {return child_table;}
+    std::string join_table_name() const {return child_table + "_" + parent_table;}
 };
 
 class LeafDBMeta : public DBMeta {
@@ -239,7 +239,7 @@ public:
     {
         return std::vector<DBMeta *>();
     }
-    void applyToChildren(std::function<void(DBMeta *)> func)
+    void applyToChildren(std::function<void(const DBMeta * const)> func) const
     {
         return;
     }
@@ -272,7 +272,7 @@ public:
         static ConcreteMeta *deserialize(unsigned int id,
                                          std::string serial);
     virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn);
-    void applyToChildren(std::function<void(DBMeta *)> fn);
+    void applyToChildren(std::function<void(const DBMeta * const)> fn) const;
 
     // FIXME: Make protected.
     std::map<KeyType *, ChildType *> children;

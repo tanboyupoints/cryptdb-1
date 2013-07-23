@@ -33,8 +33,6 @@ class AddColumnSubHandler : public AlterSubHandler {
                                                  false, out_list);
             });
 
-        // REMOVE: Add field to embedded database.
-        assert(a.ps->e_conn->execute(q));
         return single_lex_output(new_lex, out_lex_count);
     }
 };
@@ -76,9 +74,6 @@ class DropColumnSubHandler : public AlterSubHandler {
                     a.deltas.push_back(d);
                     return out_list; /* lambda */
                 });
-
-        // REMOVE: Remove column from embedded database.
-        assert(a.ps->e_conn->execute(q));
 
         return single_lex_output(new_lex, out_lex_count);
     }
@@ -125,7 +120,6 @@ class ForeignKeySubHandler : public AlterSubHandler {
 };
 
 class AddIndexSubHandler : public AlterSubHandler {
-    // TODO: Add index to embedded shallow mirror.
     virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
                                    const std::string &q,
                                    unsigned *out_lex_count) const

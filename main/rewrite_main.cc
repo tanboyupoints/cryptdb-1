@@ -80,7 +80,7 @@ mysql_query_wrapper(MYSQL *m, const std::string &q)
     if (!ret) assert(false);
 }
 
-static bool
+bool
 sanityCheck(FieldMeta *fm)
 {
     for (auto it : fm->children) {
@@ -273,9 +273,8 @@ buildTypeTextTranslator()
 
 //l gets updated to the new level
 static void
-removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o,
-                 SECLEVEL & new_level, const std::string & cur_db) {
-
+removeOnionLayer(FieldMeta * fm, Item_field *itf, Analysis &a, onion o,
+                 SECLEVEL *new_level, const std::string &cur_db) {
     OnionMeta *om = fm->getOnionMeta(o);
     assert(om);
     std::string fieldanon  = om->getAnonOnionName();
@@ -284,28 +283,27 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o,
 
     //removes onion layer at the DB
     std::stringstream query;
-    query << "UPDATE " << tableanon << " SET " << fieldanon  << " = ";
+    query << " UPDATE " << cur_db << "." << tableanon
+          << "    SET " << fieldanon  << " = ";
 
     Item_field *field = stringToItemField(fieldanon, tableanon, itf);
     Item_field *salt = stringToItemField(fm->getSaltName(), tableanon, itf);
-    Item * decUDF = om->layers.back()->decryptUDF(field, salt);
+    Item * decUDF = a.getBackEncLayer(om)->decryptUDF(field, salt);
 
     query << *decUDF << ";";
 
     std::cerr << "\nADJUST: \n" << query.str() << "\n";
 
-    std::string usedb = "USE " +  cur_db + ";";
-    //HACk: make sure right cur_db in other ways
-    assert_s(a.ps->conn->execute(usedb),  "failed to execute " + usedb);
     //execute decryption query
     assert_s(a.ps->conn->execute(query.str()), "failed to execute onion decryption query");
 
     LOG(cdb_v) << "adjust onions: \n" << query.str() << "\n";
 
     //remove onion layer in schema
-    om->layers.pop_back();
+    Delta d(Delta::DELETE, a.popBackEncLayer(om), om, NULL);	
+    a.deltas.push_back(d);
 
-    new_level = om->layers.back()->level();
+    *new_level = a.getOnionLevel(om);
 }
 
 /*
@@ -319,13 +317,14 @@ removeOnionLayer(FieldMeta * fm, Item_field * itf, Analysis & a, onion o,
  */
 static void
 adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf,
-            Analysis & a, const std::string & cur_db) {
-
-    SECLEVEL newlevel = fm->getOnionLevel(o);
+            Analysis & a, const std::string & cur_db)
+{
+    OnionMeta *om = fm->getOnionMeta(o);
+    SECLEVEL newlevel = a.getOnionLevel(om);
     assert(newlevel != SECLEVEL::INVALID);
 
     while (newlevel > tolevel) {
-	removeOnionLayer(fm, itf, a, o, newlevel, cur_db);
+        removeOnionLayer(fm, itf, a, o, &newlevel, cur_db);
     }
     assert(newlevel == tolevel);
 }
@@ -430,15 +429,14 @@ do_optimize_const_item(T *i, Analysis &a) {
     */
 }
 
-static Item *
-decrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers,
-                    uint64_t IV, Analysis &a, FieldMeta *fm,
-                    const std::vector<Item *> &res)
+Item *
+decrypt_item_layers(Item * i, onion o, OnionMeta *om, uint64_t IV,
+                    FieldMeta *fm, const std::vector<Item *> &res)
 {
     assert(!i->is_null());
 
     if (o == oPLAIN) {// Unencrypted item
-	return i;
+        return i;
     }
 
     // Encrypted item
@@ -446,8 +444,8 @@ decrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers,
     Item * dec = i;
     Item * prev_dec = NULL;
 
-    for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
-
+    auto enc_layers = om->layers;
+    for (auto it = enc_layers.rbegin(); it != enc_layers.rend(); ++it) {
         dec = (*it)->decrypt(dec, IV);
         LOG(cdb_v) << "dec okay";
         //need to free space for all decs except last
@@ -461,12 +459,11 @@ decrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers,
 }
 
 static Item *
-decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV, Analysis &a,
+decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV,
              std::vector<Item *> &res)
 {
     assert(!i->is_null());
-    return decrypt_item_layers(i, o, fm->getOnionMeta(o)->layers, IV, a,
-                               fm, res);
+    return decrypt_item_layers(i, o, fm->getOnionMeta(o), IV, fm, res);
 }
 
 
@@ -495,13 +492,14 @@ intersect(const EncSet & es, FieldMeta * fm) {
 static void optimize_select_lex(st_select_lex *select_lex, Analysis & a);
 
 static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_ITEM> {
-    virtual RewritePlan * do_gather_type(Item_subselect *i, reason &tr, Analysis & a) const {
-	/*
+    virtual RewritePlan * do_gather_type(Item_subselect *i, reason &tr, Analysis & a) const
+    {
+        /*
         st_select_lex *select_lex = i->get_select_lex();
         process_select_lex(select_lex, a);
         return tr.encset;*/
-	UNIMPLEMENTED;
-	return NULL;
+        UNIMPLEMENTED;
+        return NULL;
     }
     virtual Item * do_optimize_type(Item_subselect *i, Analysis & a) const {
         optimize_select_lex(i->get_select_lex(), a);
@@ -510,16 +508,18 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
 } ANON;
 
 static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
-    virtual RewritePlan * do_gather_type(Item_cache *i, reason &tr, Analysis & a) const {
-	/*
+    virtual RewritePlan * do_gather_type(Item_cache *i, reason &tr, Analysis & a) const
+    {
+        /*
         Item *example = i->*rob<Item_cache, Item*, &Item_cache::example>::ptr();
         if (example)
             return gather(example, tr, a);
-	    return tr.encset;*/
-	UNIMPLEMENTED;
-	return NULL;
+        return tr.encset;*/
+        UNIMPLEMENTED;
+        return NULL;
     }
-    virtual Item * do_optimize_type(Item_cache *i, Analysis & a) const {
+    virtual Item * do_optimize_type(Item_cache *i, Analysis & a) const
+    {
         // TODO(stephentu): figure out how to use rob here
         return i;
     }
@@ -622,8 +622,7 @@ loadUDFs(Connect * conn) {
 Rewriter::Rewriter(ConnectionInfo ci,
                    const std::string &embed_dir,
                    const std::string &dbname,
-                   bool multi,
-		   bool encByDefault)
+                   bool encByDefault)
 {
     init_mysql(embed_dir);
 
@@ -633,17 +632,12 @@ Rewriter::Rewriter(ConnectionInfo ci,
     urandom u;
     ps.masterKey = getKey(u.rand_string(AES_KEY_BYTES));
 
-    if (multi) {
-	ps.encByDefault = false;
-    }
-
     ps.e_conn = Connect::getEmbedded(embed_dir, dbname);
 
     ps.conn = new Connect(ci.server, ci.user, ci.passwd, dbname, ci.port);
 
-    // Must be called before initSchema.
+    // Must be called before loadSchemaInfo.
     buildTypeTextTranslator();
-    // initSchema(ps);
     ps.schema = loadSchemaInfo(ps.e_conn);
     // printEmbeddedState(ps);
 
@@ -728,18 +722,13 @@ rewrite_helper(const std::string & q, Analysis & analysis,
     // execution scheme.
     // --------------------------------------
     // HACK: To determine if we have a DDL.
-    /*
     if (analysis.deltas.size() > 0) {
-        assert(analysis.ps->e_conn->execute("use pdb;"));
         assert(analysis.ps->e_conn->execute(q));
     }
-    */
     for (auto it : analysis.deltas) {
         assert(it.apply(analysis.ps->e_conn));
     }
 
-    analysis.ps->schema = loadSchemaInfo(analysis.ps->e_conn);
-    printEmbeddedState(*analysis.ps);
     // --------------------------------------
 
     std::list<std::string> queries;
@@ -800,31 +789,67 @@ Rewriter::rewrite(const std::string & q)
         // HACK(burrows): This 'Analysis' is dummy as we never call
         // addToReturn. But it works because this optimized cases don't
         // have anything to do in addToReturn anyways.
-	Analysis analysis = Analysis(&ps);
+        Analysis analysis = Analysis(&ps);
 
-	res.wasRew = false;
-	res.queries.push_back(q);
+        res.wasRew = false;
+        res.queries.push_back(q);
         res.rmeta = analysis.rmeta;
-	return res;
+        return res;
     }
 
     //for as long as there are onion adjustments
+    // HACK: Because we need to carry EncLayer adjustment information
+    // to the next iteration.
+    Analysis *old_analysis = NULL;
     while (true) {
-	Analysis analysis = Analysis(&ps);
+        Analysis analysis = Analysis(&ps);
         // HACK(burrows): Until redesign.
         analysis.rewriter = this;
-	try {
-	    res.queries = rewrite_helper(q, analysis, p);
-	} catch (OnionAdjustExcept e) {
-	    LOG(cdb_v) << "caught onion adjustment";
+        // HACK.
+        if (old_analysis) {
+            analysis.to_adjust_enc_layers =
+                old_analysis->to_adjust_enc_layers;
+            delete old_analysis;
+        }
+        try {
+            res.queries = rewrite_helper(q, analysis, p);
+        } catch (OnionAdjustExcept e) {
+            LOG(cdb_v) << "caught onion adjustment";
             std::cout << "Adjusting onion!" << std::endl;
-	    adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis,
+            adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis,
                         ps.conn->getCurDBName());
-	    continue;
-	}
+            old_analysis = new Analysis(analysis);
+            // HACK.
+            for (auto it : analysis.deltas) {
+                assert(it.apply(ps.e_conn));
+            }
+            continue;
+        }
         res.wasRew = true;
-	res.rmeta = analysis.rmeta;
-	return res;
+        res.rmeta = analysis.rmeta;
+        SchemaInfo *old_schema = ps.schema;
+        ps.schema = loadSchemaInfo(ps.e_conn);
+        // HACK: The rmetas all have olks that refer to an older version
+        // of the FieldMeta that will not have the correct number of
+        // EncLayerz for each OnionMeta if there was an adjustment.
+        for (unsigned int i = 0; i < res.rmeta->rfmeta.size(); ++i) {
+            ReturnField *rf = &res.rmeta->rfmeta[i];
+            if (false == rf->is_salt) {
+                std::string table_name =
+                    old_schema->getTableNameFromFieldMeta(rf->olk.key);
+                IdentityMetaKey *table_key =
+                    new IdentityMetaKey(table_name);
+                TableMeta *tm = ps.schema->getChild(table_key);
+                delete table_key;
+                IdentityMetaKey *field_key =
+                    new IdentityMetaKey(rf->olk.key->fname);
+                FieldMeta *new_fm = tm->getChild(field_key);
+                delete field_key;
+                rf->olk.key = new_fm;
+            }
+        }
+        printEmbeddedState(ps);
+        return res;
     }
 }
 
@@ -848,12 +873,8 @@ std::string ReturnMeta::stringify() {
 }
 
 ResType
-Rewriter::decryptResults(ResType & dbres,
-			 ReturnMeta * rmeta) {
-
-    Analysis a = Analysis(&ps);
-    a.rmeta = rmeta;
-
+Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
+{
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
     unsigned int cols = dbres.names.size();
@@ -864,12 +885,12 @@ Rewriter::decryptResults(ResType & dbres,
 
     // un-anonymize the names
     for (auto it = dbres.names.begin();
-	 it != dbres.names.end(); it++) {
+        it != dbres.names.end(); it++) {
         ReturnField rf = rmeta->rfmeta[index];
         if (!rf.is_salt) {
-	    //need to return this field
+            //need to return this field
             res.names.push_back(rf.field_called);
-	    // switch types to original ones : TODO
+            // switch types to original ones : TODO
 
         }
         index++;
@@ -901,13 +922,14 @@ Rewriter::decryptResults(ResType & dbres,
                         salt = ((Item_int *)dbres.rows[r][rf.pos_salt])->value;
                     }
 
-		    res.rows[r][col_index] = decrypt_item(fm, rf.olk.o, dbres.rows[r][c], salt, a, res.rows[r]);
+                    res.rows[r][col_index] =
+                        decrypt_item(fm, rf.olk.o, dbres.rows[r][c],
+                                     salt, res.rows[r]);
                 }
             }
             col_index++;
         }
     }
-
 
     return res;
 }

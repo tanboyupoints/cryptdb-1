@@ -120,7 +120,8 @@ int main(int argc, char **argv)
                     Import import(optarg);
                     if(exec == true){
                         ConnectionInfo ci("localhost", username, password);
-                        Rewriter r(ci, "/var/lib/shadow-mysql", "cryptdbtest", false, true);
+                        Rewriter r(ci, "/var/lib/shadow-mysql",
+                                   "cryptdbtest", true);
 
                         // Onion layer keys are derived from master key.
                         // here using the same as cdb_test.

@@ -52,14 +52,11 @@ public:
 };
 
 // Main class processing rewriting
-// TODO: Remove the MultiPrinc parameter. Requires changes to testing
-// idioms.
 class Rewriter {
 public:
     Rewriter(ConnectionInfo ci,
              const std::string &embed_dir,
              const std::string &dbname,
-             bool MultiPrinc = false,
              bool encByDefault = true);
     ~Rewriter();
 

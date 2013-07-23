@@ -183,18 +183,19 @@ commit_transaction_lex(Analysis a) {
 //TODO(raluca) : figure out how to create Create_field from scratch
 // and avoid this chaining and passing f as an argument
 static Create_field *
-get_create_field(Create_field * f, std::vector<EncLayer*> & v,
-                 const std::string & name) {
-
+get_create_field(const Analysis &a, Create_field * f, OnionMeta *om,
+                 const std::string & name)
+{
     Create_field * new_cf = f;
     
-    for (auto l : v) {
-	Create_field * old_cf = new_cf;
-	new_cf = l->newCreateField(old_cf, name);
+    auto enc_layers = a.getEncLayers(om);
+    for (auto l : enc_layers) {
+        Create_field * old_cf = new_cf;
+        new_cf = l->newCreateField(old_cf, name);
 
-	if (old_cf != f) {
-	    delete old_cf;
-	}
+        if (old_cf != f) {
+            delete old_cf;
+        }
     }
 
     return new_cf;
@@ -226,14 +227,14 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
     // create each onion column
     for (auto oit : fm->orderedOnionMetas()) {
         OnionMeta *om = oit.second;
-	Create_field * new_cf =
-            get_create_field(f, om->layers, om->getAnonOnionName());
-	/*
-	EncLayer * last_layer = oit->second->layers.back();
-	//create field with anonymous name
-	Create_field * new_cf =
-            last_layer->newCreateField(f, oit->second->getAnonOnionName().c_str());
-	*/
+        Create_field * new_cf =
+        get_create_field(a, f, om, om->getAnonOnionName());
+        /*
+        EncLayer * last_layer = oit->second->layers.back();
+        //create field with anonymous name
+        Create_field * new_cf =
+                last_layer->newCreateField(f, oit->second->getAnonOnionName().c_str());
+        */
         output_cfields.push_back(new_cf);
     }
 
@@ -243,9 +244,9 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
         THD *thd         = current_thd;
         Create_field *f0 = f->clone(thd->mem_root);
         f0->field_name   = thd->strdup(fm->getSaltName().c_str());
-	f0->flags = f0->flags | UNSIGNED_FLAG;//salt is unsigned
+        f0->flags = f0->flags | UNSIGNED_FLAG;//salt is unsigned
         f0->sql_type     = MYSQL_TYPE_LONGLONG;
-	f0->length       = 8;
+        f0->length       = 8;
         output_cfields.push_back(f0);
     }
 
@@ -348,22 +349,23 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
 
 //TODO: which encrypt/decrypt should handle null?
 Item *
-encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers, 
-        Analysis &a, FieldMeta *fm, uint64_t IV) {
+encrypt_item_layers(Item * i, onion o, OnionMeta *om, Analysis &a,
+                    FieldMeta *fm, uint64_t IV) {
     assert(!i->is_null());
 
     if (o == oPLAIN) {//Unencrypted item
-	return i;
+        return i;
     }
 
     // Encrypted item
 
-    assert_s(layers.size() > 0, "field must have at least one layer");
+    auto enc_layers = a.getEncLayers(om);
+    assert_s(enc_layers.size() > 0, "field must have at least one layer");
     Item * enc = i;
     Item * prev_enc = NULL;
-    for (auto layer : layers) {
+    for (auto layer : enc_layers) {
         LOG(encl) << "encrypt layer " << levelnames[(int)layer->level()] << "\n";
-	enc = layer->encrypt(enc, IV);
+        enc = layer->encrypt(enc, IV);
         //need to free space for all enc
         //except the last one
         if (prev_enc) {
@@ -374,6 +376,4 @@ encrypt_item_layers(Item * i, onion o, std::vector<EncLayer *> & layers,
 
     return enc;
 }
-
-
 
