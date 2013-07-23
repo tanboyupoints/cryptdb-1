@@ -445,9 +445,7 @@ decrypt_item_layers(Item * i, onion o, OnionMeta *om, uint64_t IV,
     Item * prev_dec = NULL;
 
     auto enc_layers = om->layers;
-    std::cout << "SIZE: " << enc_layers.size() << std::endl;
     for (auto it = enc_layers.rbegin(); it != enc_layers.rend(); ++it) {
-
         dec = (*it)->decrypt(dec, IV);
         LOG(cdb_v) << "dec okay";
         //need to free space for all decs except last
@@ -829,7 +827,27 @@ Rewriter::rewrite(const std::string & q)
         }
         res.wasRew = true;
         res.rmeta = analysis.rmeta;
+        SchemaInfo *old_schema = ps.schema;
         ps.schema = loadSchemaInfo(ps.e_conn);
+        // HACK: The rmetas all have olks that refer to an older version
+        // of the FieldMeta that will not have the correct number of
+        // EncLayerz for each OnionMeta if there was an adjustment.
+        for (unsigned int i = 0; i < res.rmeta->rfmeta.size(); ++i) {
+            ReturnField *rf = &res.rmeta->rfmeta[i];
+            if (false == rf->is_salt) {
+                std::string table_name =
+                    old_schema->getTableNameFromFieldMeta(rf->olk.key);
+                IdentityMetaKey *table_key =
+                    new IdentityMetaKey(table_name);
+                TableMeta *tm = ps.schema->getChild(table_key);
+                delete table_key;
+                IdentityMetaKey *field_key =
+                    new IdentityMetaKey(rf->olk.key->fname);
+                FieldMeta *new_fm = tm->getChild(field_key);
+                delete field_key;
+                rf->olk.key = new_fm;
+            }
+        }
         printEmbeddedState(ps);
         return res;
     }

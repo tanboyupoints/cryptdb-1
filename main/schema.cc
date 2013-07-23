@@ -401,6 +401,20 @@ SchemaInfo::getFieldMeta(std::string & table, std::string & field) const
     return fm;
 }
 
+// FIXME: Slow.
+std::string
+SchemaInfo::getTableNameFromFieldMeta(FieldMeta *fm) const
+{
+    for (auto it : children) {
+        AbstractMetaKey *key = it.second->getKey(fm);
+        if (key) {
+            return it.first->getValue();
+        }
+    }
+
+    throw CryptDBError("Failed to get table name from FieldMeta");
+}
+
 bool create_tables(Connect *e_conn, DBWriter dbw)
 {
     // FIXME: Elsewhere.

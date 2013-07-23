@@ -210,6 +210,7 @@ public:
 
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
+    std::string getTableNameFromFieldMeta(FieldMeta *fm) const;
 
     friend class Analysis;
 
