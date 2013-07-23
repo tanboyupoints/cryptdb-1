@@ -538,9 +538,14 @@ DET_mediumint::encrypt(Item * ptext, uint64_t IV) {
     ulonglong val = static_cast<Item_int *>(ptext)->value;
     ulonglong res;
     
-    //HACK encyption schema goes through bigint
-    if(val > 16777215)
-        res = (ulonglong) bf.encrypt(16777215);
+    //TODO/FIXME(carlos)
+    //MYSql rounds down values if greater than type size, but
+    //it uses 'CAST() as unsigned' and it is disabled because
+    //of negative values. Fix and check negative functionality 
+    //as a whole and then double check this.
+    static const unsigned int medium_max = 0xffffff;
+    if(val > medium_max)
+        res = (ulonglong) bf.encrypt(medium_max);
     else
         res = (ulonglong) bf.encrypt(val);
 
@@ -593,9 +598,15 @@ DET_tinyint::encrypt(Item * ptext, uint64_t IV) {
     ulonglong val = static_cast<Item_int *>(ptext)->value;
     ulonglong res;
     
-    //HACK encyption schema goes through bigint
-    if(val > 255)
-        res = (ulonglong) bf.encrypt(255);
+    //TODO/FIXME(carlos)
+    //MYSql rounds down values if greater than type size, but
+    //it uses 'CAST() as unsigned' and it is disabled because
+    //of negative values. Fix and check negative functionality 
+    //as a whole and then double check this.
+    static const unsigned int tiny_max = 0xff;
+
+    if(val > tiny_max)
+        res = (ulonglong) bf.encrypt(tiny_max);
     else
         res = (ulonglong) bf.encrypt(val);
 
