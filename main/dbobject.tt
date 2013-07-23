@@ -83,7 +83,7 @@ MappedDBMeta<ChildType, KeyType>::childExists(KeyType *key) const
 // FIXME: Use findChild.
 template <typename ChildType, typename KeyType>
 ChildType *
-MappedDBMeta<ChildType, KeyType>::getChild(KeyType *key) const
+MappedDBMeta<ChildType, KeyType>::getChild(const KeyType * const key) const
 {
     for (auto it : children) {
         if (*it.first == *key) {

@@ -33,19 +33,16 @@ encrypt_item(Item * i, const OLK & olk, Analysis & a)
     if (olk.l == SECLEVEL::PLAINVAL)
         return i;
 
-    FieldMeta * fm = olk.key;
+    FieldMeta * const fm = olk.key;
     assert(fm);
 
-    onion o        = olk.o;
+    const onion o = olk.o;
     LOG(cdb_v) << fm->fname << " " << fm->children.size();
 
-    auto it = a.salts.find(fm);
-    salt_type IV = 0;
-    if (it != a.salts.end()) {
-        IV = it->second;
-    }
-    OnionMeta *om = fm->getOnionMeta(o);
-    Item *ret_i = encrypt_item_layers(i, o, om, a, fm, IV);
+    const auto it = a.salts.find(fm);
+    const salt_type IV = (it == a.salts.end()) ? 0 : it->second;
+    OnionMeta * const om = fm->getOnionMeta(o);
+    Item * const ret_i = encrypt_item_layers(i, o, om, a, IV);
 
     return ret_i;
 }
@@ -57,9 +54,9 @@ encrypt_item_all_onions(Item * i, FieldMeta * fm,
 {
 
     for (auto it : fm->orderedOnionMetas()) {
-        onion o = it.first->getValue();
-        OnionMeta *om = it.second;
-        l.push_back(encrypt_item_layers(i, o, om, a, fm, IV));
+        const onion o = it.first->getValue();
+        OnionMeta * const om = it.second;
+        l.push_back(encrypt_item_layers(i, o, om, a, IV));
     }
 }
  

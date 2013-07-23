@@ -30,16 +30,16 @@ Item *
 rewrite(Item *i, const OLK & constr, Analysis &a, std::string context)
 {
     if (context.size()) {
-	context = " for " + context;
+        context = " for " + context;
     }
-    RewritePlan * rp = getAssert(a.rewritePlans, i);
+    RewritePlan * const rp = getAssert(a.rewritePlans, i);
     assert(rp);
     if (!rp->es_out.contains(constr)) {
         std::cerr << "query cannot be supported because " << i
                   << " needs to return " << constr << context << "\n"
-	          << "BUT it can only return " << rp->es_out
+                  << "BUT it can only return " << rp->es_out
                   << " BECAUSE " << rp->r << "\n";
-	assert(false);
+        assert(false);
     }
     return itemTypes.do_rewrite(i, constr, rp, a);
 }
@@ -62,7 +62,7 @@ rewrite_table_list(TABLE_LIST *t, Analysis &a)
 TABLE_LIST *
 rewrite_table_list(TABLE_LIST *t, std::string anon_name)
 {
-    TABLE_LIST *new_t = copy(t);
+    TABLE_LIST * const new_t = copy(t);
     new_t->table_name =
         make_thd_string(anon_name, &new_t->table_name_length);
     new_t->alias = make_thd_string(anon_name);
@@ -77,7 +77,7 @@ rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
                    bool if_exists)
 {
     if (!tlist.elements) {
-	return SQL_I_List<TABLE_LIST>();
+        return SQL_I_List<TABLE_LIST>();
     }
 
     TABLE_LIST * tl;
@@ -90,9 +90,8 @@ rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
     SQL_I_List<TABLE_LIST> * new_tlist = oneElemList<TABLE_LIST>(tl);
 
     TABLE_LIST * prev = tl;
-    for (TABLE_LIST *tbl = tlist.first->next_local;
-	 tbl; tbl = tbl->next_local) {
-
+    for (TABLE_LIST *tbl = tlist.first->next_local; tbl;
+         tbl = tbl->next_local) {
         TABLE_LIST * new_tbl;
         if (if_exists && (false == a.tableMetaExists(tbl->table_name))) {
             new_tbl = copy(tbl);
@@ -100,8 +99,8 @@ rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
             new_tbl = rewrite_table_list(tbl, a);
         }
 
-	prev->next_local = new_tbl;
-	prev = new_tbl;
+        prev->next_local = new_tbl;
+        prev = new_tbl;
     }
     prev->next_local = NULL;
 
@@ -111,18 +110,18 @@ rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
 List<TABLE_LIST>
 rewrite_table_list(List<TABLE_LIST> tll, Analysis & a)
 {
-    List<TABLE_LIST> * new_tll = new List<TABLE_LIST>();
+    List<TABLE_LIST> * const new_tll = new List<TABLE_LIST>();
 
     List_iterator<TABLE_LIST> join_it(tll);
 
     for (;;) {
         TABLE_LIST *t = join_it++;
         if (!t) {
-	    break;
-	}
+            break;
+        }
 
-        TABLE_LIST * new_t = rewrite_table_list(t, a);
-	new_tll->push_back(new_t);
+        TABLE_LIST * const new_t = rewrite_table_list(t, a);
+        new_tll->push_back(new_t);
 
         if (t->nested_join) {
             new_t->nested_join->join_list = rewrite_table_list(t->nested_join->join_list, a);
@@ -131,7 +130,7 @@ rewrite_table_list(List<TABLE_LIST> tll, Analysis & a)
 
         if (t->on_expr) {
             new_t->on_expr = rewrite(t->on_expr, PLAIN_OLK, a);
-	}
+        }
 
 	/* TODO: derived tables
         if (t->derived) {
@@ -166,7 +165,7 @@ analyze(Item *i, Analysis & a)
 
 LEX *
 begin_transaction_lex(Analysis a) {
-    std::string query = "START TRANSACTION;";
+    static const std::string query = "START TRANSACTION;";
     query_parse *begin_parse = new query_parse(a.ps->conn->getCurDBName(),
                                                query);
     return begin_parse->lex();
@@ -174,7 +173,7 @@ begin_transaction_lex(Analysis a) {
 
 LEX *
 commit_transaction_lex(Analysis a) {
-    std::string query = "COMMIT;";
+    static const std::string query = "COMMIT;";
     query_parse *commit_parse = new query_parse(a.ps->conn->getCurDBName(),
                                                 query);
     return commit_parse->lex();
@@ -258,7 +257,7 @@ std::vector<Key*>
 rewrite_key(const std::string &table, Key *key, Analysis &a)
 {
     std::vector<Key*> output_keys;
-    Key *new_key = key->clone(current_thd->mem_root);    
+    Key * const new_key = key->clone(current_thd->mem_root);    
     auto col_it =
         List_iterator<Key_part_spec>(key->columns);
     // FIXME: Memleak.
@@ -268,11 +267,11 @@ rewrite_key(const std::string &table, Key *key, Analysis &a)
         reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
             [table, a] (List<Key_part_spec> out_field_list,
                         Key_part_spec *key_part) {
-                std::string field_name =
+                const std::string field_name =
                     convert_lex_str(key_part->field_name);
-                FieldMeta *fm =
+                const FieldMeta * const fm =
                     a.getFieldMeta(table, field_name);
-                OnionMeta *om = fm->getOnionMeta(oOPE);
+                const OnionMeta * const om = fm->getOnionMeta(oOPE);
                 key_part->field_name =
                     string_to_lex_str(om->getAnonOnionName());
                 out_field_list.push_back(key_part);
@@ -323,8 +322,8 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
     // -----------------------------
     //         Update FIELD       
     // -----------------------------
-    std::string name = std::string(cf->field_name);
-    FieldMeta *fm =
+    const std::string name = std::string(cf->field_name);
+    FieldMeta * const fm =
         new FieldMeta(name, cf, a.ps->masterKey, tm->leaseIncUniq());
     // Here we store the key name for the first time. It will be applied
     // after the Delta is read out of the database.
@@ -333,8 +332,8 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
     } else {
         Delta d(Delta::CREATE, fm, tm, new IdentityMetaKey(name));
         a.deltas.push_back(d);
-        Delta d0(Delta::REPLACE, tm, a.ps->schema,
-                 a.ps->schema->getKey(tm));
+        const Delta d0(Delta::REPLACE, tm, a.ps->schema,
+                       a.ps->schema->getKey(tm));
         a.deltas.push_back(d0);
     }
 
@@ -349,8 +348,8 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
 
 //TODO: which encrypt/decrypt should handle null?
 Item *
-encrypt_item_layers(Item * i, onion o, OnionMeta *om, Analysis &a,
-                    FieldMeta *fm, uint64_t IV) {
+encrypt_item_layers(Item * i, onion o, OnionMeta * const om,
+                    Analysis &a, uint64_t IV) {
     assert(!i->is_null());
 
     if (o == oPLAIN) {//Unencrypted item
@@ -359,7 +358,7 @@ encrypt_item_layers(Item * i, onion o, OnionMeta *om, Analysis &a,
 
     // Encrypted item
 
-    auto enc_layers = a.getEncLayers(om);
+    const auto enc_layers = a.getEncLayers(om);
     assert_s(enc_layers.size() > 0, "field must have at least one layer");
     Item * enc = i;
     Item * prev_enc = NULL;

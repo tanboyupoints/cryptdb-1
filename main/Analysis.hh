@@ -344,7 +344,7 @@ public:
     EncLayer *getBackEncLayer(OnionMeta *om) const;
     EncLayer *popBackEncLayer(OnionMeta *om);
     SECLEVEL getOnionLevel(OnionMeta *om) const;
-    std::vector<EncLayer *> getEncLayers(OnionMeta *om) const;
+    std::vector<EncLayer *> getEncLayers(OnionMeta * const om) const;
 
     // HACK(burrows): This is a temporary solution until I redesign.
     Rewriter *rewriter;

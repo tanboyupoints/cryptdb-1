@@ -307,12 +307,12 @@ bool FieldMeta::isEncrypted() {
     return status;
 }
 
-OnionMeta *FieldMeta::getOnionMeta(onion o) {
-    OnionMetaKey *key = new OnionMetaKey(o);
-    DBMeta *om = getChild(key);
+OnionMeta *FieldMeta::getOnionMeta(onion o) const
+{
+    const OnionMetaKey * const key = new OnionMetaKey(o);
+    OnionMeta * const om = getChild(key);
     delete key;
-    // FIXME: dynamic_cast
-    return static_cast<OnionMeta *>(om);
+    return om;
 }
 
 onionlayout FieldMeta::getOnionLayout(AES_KEY *m_key, Create_field *f)

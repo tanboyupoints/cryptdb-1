@@ -265,7 +265,7 @@ public:
     virtual bool addChild(KeyType *key, ChildType *meta);
     virtual bool destroyChild(KeyType *key);
     virtual bool childExists(KeyType * key) const;
-    virtual ChildType *getChild(KeyType * key) const;
+    virtual ChildType *getChild(const KeyType * const key) const;
     AbstractMetaKey *getKey(const DBMeta *const child) const;
     // Virtual constructor to deserialize from embedded database.
     template <typename ConcreteMeta>

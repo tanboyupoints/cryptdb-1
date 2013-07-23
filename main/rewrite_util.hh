@@ -59,8 +59,8 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
                       List<Create_field> &rewritten_cfield_list);
 
 Item *
-encrypt_item_layers(Item * i, onion o, OnionMeta *om, Analysis &a,
-					FieldMeta *fm = NULL, uint64_t IV = 0);
+encrypt_item_layers(Item * i, onion o, OnionMeta * const om,
+                    Analysis &a, uint64_t IV = 0);
 
 // FIXME(burrows): Generalize to support any container with next AND end
 // semantics.

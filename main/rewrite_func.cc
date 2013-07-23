@@ -136,7 +136,7 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
         for (auto it : fm->children) {
             onion o = it.first->getValue();
             OnionMeta *om = it.second;
-            l.push_back(encrypt_item_layers(i, o, om, a, fm, salt));
+            l.push_back(encrypt_item_layers(i, o, om, a, salt));
         }
     
         if (fm->has_salt) {

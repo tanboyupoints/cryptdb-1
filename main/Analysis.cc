@@ -493,7 +493,7 @@ SECLEVEL Analysis::getOnionLevel(OnionMeta *om) const
     }
 }
 
-std::vector<EncLayer *> Analysis::getEncLayers(OnionMeta *om) const
+std::vector<EncLayer *> Analysis::getEncLayers(OnionMeta * const om) const
 {
     auto it = to_adjust_enc_layers.find(om);
     if (to_adjust_enc_layers.end() == it) {
