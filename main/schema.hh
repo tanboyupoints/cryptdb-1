@@ -87,18 +87,17 @@ public:
     SECLEVEL getSecLevel();
     unsigned long getUniq() const {return uniq_count;}
 
-	// Need access to layers.
-	friend class Analysis;
-	friend class FieldMeta;
-	friend Create_field *get_create_field(Create_field *,
-										  OnionMeta *,
-										  const std::string &);
-	friend Item *encrypt_item_layers(Item *, onion, OnionMeta *,
-									 Analysis &, FieldMeta *, uint64_t);
-	friend Item *decrypt_item_layers(Item *, onion, OnionMeta *,
-									 uint64_t, Analysis &, FieldMeta *,
-									 const std::vector<Item *> &);
-	friend bool sanityCheck(FieldMeta *);
+    // Need access to layers.
+    friend class Analysis;
+    friend class FieldMeta;
+    friend Create_field *get_create_field(Create_field *, OnionMeta *,
+                                          const std::string &);
+    friend Item *encrypt_item_layers(Item *, onion, OnionMeta *,
+                                     Analysis &, FieldMeta *, uint64_t);
+    friend Item *decrypt_item_layers(Item *, onion, OnionMeta *,
+                                     uint64_t, Analysis &, FieldMeta *,
+                                     const std::vector<Item *> &);
+    friend bool sanityCheck(FieldMeta *);
 
 private:
     std::vector<EncLayer *> layers; //first in list is lowest layer
@@ -107,7 +106,7 @@ private:
     unsigned long uniq_count;
 
     void addLayerBack(EncLayer *layer);
-	EncLayer *getLayerBack() const;
+    EncLayer *getLayerBack() const;
     void removeLayerBack();
     void replaceLayerBack(EncLayer *layer);
 } OnionMeta;
