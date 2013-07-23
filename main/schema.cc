@@ -161,7 +161,8 @@ void OnionMeta::applyToChildren(std::function<void(const DBMeta * const)> fn) co
 
 AbstractMetaKey *OnionMeta::getKey(const DBMeta *const child) const
 {
-    for (std::vector<EncLayer *>::size_type i = 0; i < layers.size(); ++i) {        if (child == layers[i]) {
+    for (std::vector<EncLayer *>::size_type i = 0; i< layers.size(); ++i) {
+        if (child == layers[i]) {
             return new UIntMetaKey(i);
         }
     }

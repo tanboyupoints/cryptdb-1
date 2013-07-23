@@ -43,7 +43,7 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
         FieldMeta * fm = a.getFieldMeta(table, fieldname);
 
-        EncSet es  = EncSet(fm);
+        EncSet es  = EncSet(a, fm);
 
         tr = reason(es, "is a field", i);
 

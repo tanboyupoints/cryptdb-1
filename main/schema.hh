@@ -84,7 +84,6 @@ public:
     std::vector<DBMeta *> fetchChildren(Connect *e_conn);
     void applyToChildren(std::function<void(const DBMeta * const)>) const;
     AbstractMetaKey *getKey(const DBMeta *const child) const;
-    SECLEVEL getSecLevel();
     unsigned long getUniq() const {return uniq_count;}
 
     // Need access to layers.
@@ -105,6 +104,7 @@ private:
     const std::string onionname;
     unsigned long uniq_count;
 
+    SECLEVEL getSecLevel();
     void addLayerBack(EncLayer *layer);
     EncLayer *getLayerBack() const;
     void removeLayerBack();
@@ -143,8 +143,6 @@ public:
     std::string getSaltName() const;
     unsigned long getUniq() const {return uniq_count;}
 
-    SECLEVEL getOnionLevel(onion o) const;
-    bool setOnionLevel(onion o, SECLEVEL maxl);
     bool isEncrypted();
     OnionMeta *getOnionMeta(onion o);
     // FIXME: Use rtti.
@@ -160,6 +158,8 @@ private:
     unsigned long uniq_count;
     unsigned long counter;
 
+    SECLEVEL getOnionLevel(onion o) const;
+    bool setOnionLevel(onion o, SECLEVEL maxl);
     static onionlayout getOnionLayout(AES_KEY *m_key, Create_field *f);
 } FieldMeta;
 

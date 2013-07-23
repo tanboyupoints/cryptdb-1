@@ -193,7 +193,7 @@ class UpdateHandler : public DMLHandler {
             // Encrypted field
 
             RewritePlan * rp = getAssert(a.rewritePlans, val);
-            EncSet r_es = rp->es_out.intersect(EncSet(fm));
+            EncSet r_es = rp->es_out.intersect(EncSet(a, fm));
             if (r_es.empty()) {
                 /*
                  * FIXME(burrows): Change error message.
@@ -529,28 +529,28 @@ rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
 	      const EncSet & constr, const std::string & name) {
     ORDER * prev = NULL;
     for (ORDER *o = lst.first; o; o = o->next) {
-	Item * i = *o->item;
-	RewritePlan * rp = getAssert(a.rewritePlans, i);
-	assert(rp);
-	EncSet es = constr.intersect(rp->es_out);
-	if (es.empty()) {
-            std::cerr << " cannot support query because " << name
-                      << " item " << i << " needs to output any of "
-                      << constr << "\n"
-		      << " BUT it can only output " << rp->es_out
-                      << " BECAUSE " << "(" << rp->r << ")\n";
-	    assert(false);
-	}
-	OLK olk = es.chooseOne();
+        Item * i = *o->item;
+        RewritePlan * rp = getAssert(a.rewritePlans, i);
+        assert(rp);
+        EncSet es = constr.intersect(rp->es_out);
+        if (es.empty()) {
+                std::cerr << " cannot support query because " << name
+                          << " item " << i << " needs to output any of "
+                          << constr << "\n"
+                  << " BUT it can only output " << rp->es_out
+                          << " BECAUSE " << "(" << rp->r << ")\n";
+            assert(false);
+        }
+        OLK olk = es.chooseOne();
 
-	Item * new_item = itemTypes.do_rewrite(*o->item, olk, rp, a);
-	ORDER * neworder = make_order(o, new_item);
-	if (prev == NULL) {
-	    lst = *oneElemList(neworder);
-	} else {
-	    prev->next = neworder;
-	}
-	prev = neworder;
+        Item * new_item = itemTypes.do_rewrite(*o->item, olk, rp, a);
+        ORDER * neworder = make_order(o, new_item);
+        if (prev == NULL) {
+            lst = *oneElemList(neworder);
+        } else {
+            prev->next = neworder;
+        }
+        prev = neworder;
     }
 }
 
@@ -638,7 +638,7 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
         if (!item)
             break;
         LOG(cdb_v) << "rewrite_select_lex " << *item << " with name " << item->name;
-	rewrite_proj(item, getAssert(a.rewritePlans, item), a, newList);
+        rewrite_proj(item, getAssert(a.rewritePlans, item), a, newList);
     }
 
     // TODO(stephentu): investigate whether or not this is a memory leak

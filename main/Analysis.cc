@@ -19,12 +19,12 @@ escapeString(Connect *e_conn, std::string escape_me)
 EncSet::EncSet() : osl(FULL_EncSet.osl) {}
 
 // FIXME: Wrong interfaces.
-EncSet::EncSet(FieldMeta * fm) {
+EncSet::EncSet(Analysis &a, FieldMeta * fm) {
     osl.clear();
     for (auto pair : fm->children) {
         OnionMeta *om = pair.second;
         OnionMetaKey *key = pair.first;
-        osl[key->getValue()] = LevelFieldPair(om->getSecLevel(), fm);
+        osl[key->getValue()] = LevelFieldPair(a.getOnionLevel(om), fm);
     }
 }
 

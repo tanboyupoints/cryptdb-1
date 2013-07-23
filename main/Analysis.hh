@@ -15,7 +15,7 @@ class EncSet {
 public:
     EncSet(OnionLevelFieldMap input) : osl(input) {}
     EncSet(); // TODO(stephentu): move ctor here
-    EncSet(FieldMeta * fm);
+    EncSet(Analysis &a, FieldMeta * fm);
     EncSet(const OLK & olk);
 
     /**
