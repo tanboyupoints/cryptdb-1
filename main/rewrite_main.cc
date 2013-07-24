@@ -658,21 +658,31 @@ Rewriter::Rewriter(ConnectionInfo ci,
     ps.e_conn->execute("USE cryptdbtest;");
 }
 
-LEX *
+void 
 Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps, LEX *lex)
 {
-    SQLHandler *handler;
     if (dml_dispatcher->canDo(lex)) {
         a.output = new DMLOutput;
-        handler = dml_dispatcher->dispatch(lex);
+        SQLHandler *handler = dml_dispatcher->dispatch(lex);
+        LEX *out_lex = NULL;
+        try {
+            out_lex = handler->transformLex(a, lex, ps);
+        } catch (OnionAdjustExcept e) {
+            LOG(cdb_v) << "caught onion adjustment";
+            std::cout << "Adjusting onion!" << std::endl;
+            delete a.output;
+            a.output = new AdjustOnionOutput;
+            adjustOnion(a, ps, e.o, e.fm, e.tolevel, e.itf, ps.dbName());
+        }
+        a.output->setNewLex(out_lex);
     } else if (ddl_dispatcher->canDo(lex)) {
         a.output = new DDLOutput;
-        handler = ddl_dispatcher->dispatch(lex);
+        SQLHandler *handler = ddl_dispatcher->dispatch(lex);
+        LEX *out_lex = handler->transformLex(a, lex, ps);
+        a.output->setNewLex(out_lex);
     } else {
         throw CryptDBError("Rewriter can not dispatch bad lex");
     }
-
-    return handler->transformLex(a, lex, ps);
 }
 
 ProxyState::~ProxyState()
@@ -753,27 +763,15 @@ Rewriter::rewrite(const std::string & q)
     //for as long as there are onion adjustments
     // HACK: Because we need to carry EncLayer adjustment information
     // to the next iteration.
-    LEX *new_lex = NULL;
     const SchemaInfo * const schema = loadSchemaInfo(ps.e_conn);
     Analysis analysis = Analysis(schema);
     // HACK(burrows): Until redesign.
     analysis.rewriter = this;
-    try {
-        LOG(cdb_v) << "pre-analyze " << *lex;
+    LOG(cdb_v) << "pre-analyze " << *lex;
 
-        new_lex = analysis.rewriter->dispatchOnLex(analysis, ps, lex);
-        assert(new_lex);
-    } catch (OnionAdjustExcept e) {
-        LOG(cdb_v) << "caught onion adjustment";
-        std::cout << "Adjusting onion!" << std::endl;
-        delete analysis.output;
-        analysis.output = new AdjustOnionOutput;
-        adjustOnion(analysis, ps, e.o, e.fm, e.tolevel, e.itf,
-                    ps.dbName());
-    }
+    this->dispatchOnLex(analysis, ps, lex);
 
     analysis.output->setOriginalQuery(q);
-    analysis.output->setNewLex(new_lex);
 
     res.output = analysis.output;
     res.wasRew = true;

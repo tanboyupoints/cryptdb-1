@@ -69,8 +69,7 @@ public:
     // to carry around Connect objects.
     Connect *getConnection() {return ps.conn;}
 
-    LEX *dispatchOnLex(Analysis &a, const ProxyState &ps, 
-                       LEX *lex);
+    void dispatchOnLex(Analysis &a, const ProxyState &ps, LEX *lex);
 
     SQLDispatcher *dml_dispatcher;
     SQLDispatcher *ddl_dispatcher;
