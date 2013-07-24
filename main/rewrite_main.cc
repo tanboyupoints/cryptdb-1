@@ -690,39 +690,6 @@ Rewriter::setMasterKey(const std::string &mkey)
     ps.masterKey = getKey(mkey);
 }
 
-static std::list<std::string>
-rewrite_helper(const std::string & q, Analysis &analysis,
-               const ProxyState &ps, query_parse & p) {
-    LOG(cdb_v) << "q " << q;
-
-    LEX *lex = p.lex();
-
-    LOG(cdb_v) << "pre-analyze " << *lex;
-
-    LEX *new_lex = analysis.rewriter->dispatchOnLex(analysis, lex, ps);
-    assert(new_lex);
-
-    // FIXME: This subsection needs to be moved around to fit our new
-    // execution scheme.
-    // --------------------------------------
-    // HACK: To determine if we have a DDL.
-    if (analysis.deltas.size() > 0) {
-        assert(ps.e_conn->execute(q));
-    }
-    for (auto it : analysis.deltas) {
-        assert(it.apply(ps.e_conn));
-    }
-
-    // --------------------------------------
-
-    std::list<std::string> queries;
-    std::ostringstream ss;
-    ss << *new_lex;
-    queries.push_back(ss.str());
-
-    return queries;
-}
-
 static bool
 noRewrite(LEX * lex) {
     switch (lex->sql_command) {
@@ -746,13 +713,14 @@ noRewrite(LEX * lex) {
 QueryRewrite
 Rewriter::rewrite(const std::string & q)
 {
-
+    LOG(cdb_v) << "q " << q;
     assert(0 == mysql_thread_init());
     //assert(0 == create_embedded_thd(0));
 
     // printEmbeddedState(ps);
 
     query_parse p(ps.dbName(), q);
+    LEX *lex = p.lex();
     QueryRewrite res;
 
     /*
@@ -790,8 +758,13 @@ Rewriter::rewrite(const std::string & q)
                 old_analysis->to_adjust_enc_layers;
             delete old_analysis;
         }
+
+        LEX *new_lex = NULL;
         try {
-            res.queries = rewrite_helper(q, analysis, ps, p);
+            LOG(cdb_v) << "pre-analyze " << *lex;
+
+            new_lex = analysis.rewriter->dispatchOnLex(analysis, lex, ps);
+            assert(new_lex);
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
             std::cout << "Adjusting onion!" << std::endl;
@@ -804,6 +777,20 @@ Rewriter::rewrite(const std::string & q)
             }
             continue;
         }
+
+        // HACK: To determine if we have a DDL.
+        if (analysis.deltas.size() > 0) {
+            assert(ps.e_conn->execute(q));
+        }
+        for (auto it : analysis.deltas) {
+            assert(it.apply(ps.e_conn));
+        }
+
+        std::list<std::string> queries;
+        std::ostringstream ss;
+        ss << *new_lex;
+        res.queries.push_back(ss.str());
+
         res.wasRew = true;
         res.rmeta = analysis.rmeta;
         SchemaInfo *old_schema = analysis.getSchema();
