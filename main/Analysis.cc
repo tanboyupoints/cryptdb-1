@@ -380,7 +380,7 @@ RewriteOutput::~RewriteOutput()
 
 void RewriteOutput::setNewLex(LEX *lex)
 {
-    assert(!new_lex && lex);
+    assert(!new_lex);
     new_lex = lex;
 }
 

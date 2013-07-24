@@ -141,6 +141,7 @@ loadSchemaInfo(Connect *e_conn)
      return schema;
 }
 
+/*
 static void
 printEC(Connect * e_conn, const std::string & command) {
     DBResult * dbres;
@@ -148,9 +149,11 @@ printEC(Connect * e_conn, const std::string & command) {
     ResType res = dbres->unpack();
     printRes(res);
 }
+*/
 
 static void
 printEmbeddedState(ProxyState & ps) {
+    /*
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables from pdb;");
     printEC(ps.e_conn, "selecT * from pdb.tableMeta_schemaInfo;");
@@ -161,6 +164,7 @@ printEmbeddedState(ProxyState & ps) {
     printEC(ps.e_conn, "select * from pdb.onionMeta;");
     printEC(ps.e_conn, "selecT * from pdb.encLayer_onionMeta;");
     printEC(ps.e_conn, "select * from pdb.encLayer;");
+    */
 }
 
 template <typename type> static void
@@ -774,29 +778,7 @@ Rewriter::rewrite(const std::string & q)
     res.output = analysis.output;
     res.wasRew = true;
     res.rmeta = analysis.rmeta;
-    /* FIXME: Move to decryptResults.
-    SchemaInfo *old_schema = analysis.getSchema();
-    SchemaInfo *new_schema = loadSchemaInfo(ps.e_conn);
-    // HACK: The rmetas all have olks that refer to an older version
-    // of the FieldMeta that will not have the correct number of
-    // EncLayerz for each OnionMeta if there was an adjustment.
-    for (unsigned int i = 0; i < res.rmeta->rfmeta.size(); ++i) {
-        ReturnField *rf = &res.rmeta->rfmeta[i];
-        if (false == rf->is_salt) {
-            std::string table_name =
-                old_schema->getTableNameFromFieldMeta(rf->olk.key);
-            IdentityMetaKey *table_key =
-                new IdentityMetaKey(table_name);
-            TableMeta *tm = new_schema->getChild(table_key);
-            delete table_key;
-            IdentityMetaKey *field_key =
-                new IdentityMetaKey(rf->olk.key->fname);
-            FieldMeta *new_fm = tm->getChild(field_key);
-            delete field_key;
-            rf->olk.key = new_fm;
-        }
-    }
-    */
+
     return res;
 }
 
@@ -805,7 +787,7 @@ std::string ReturnField::stringify() {
     std::stringstream res;
 
     res << " is_salt: " << is_salt << " filed_called " << field_called;
-    res <<" fm  " << olk.key << " onion " << olk.o;
+    res << " fm  " << olk.key << " onion " << olk.o;
     res << " pos_salt " << pos_salt;
 
     return res.str();
