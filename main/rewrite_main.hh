@@ -45,9 +45,8 @@ printRes(const ResType & r);
 // - data structure needed to decrypt results
 class QueryRewrite {
 public:
-    QueryRewrite() : wasRew(true) {}
-    bool wasRew; //if query was rewritten
-    std::list<std::string> queries;
+    QueryRewrite(bool wasRes, ReturnMeta *rmeta, RewriteOutput *output)
+        : rmeta(rmeta), output(output) {}
     ReturnMeta * rmeta;
     RewriteOutput *output;
 };
@@ -69,7 +68,9 @@ public:
     // to carry around Connect objects.
     Connect *getConnection() {return ps.conn;}
 
-    void dispatchOnLex(Analysis &a, const ProxyState &ps, LEX *lex);
+    RewriteOutput *
+        dispatchOnLex(Analysis &a, const ProxyState &ps,
+                      const std::string &query);
 
     SQLDispatcher *dml_dispatcher;
     SQLDispatcher *ddl_dispatcher;
@@ -95,9 +96,6 @@ private:
 
 bool
 executeQuery(Rewriter &r, ProxyState &ps, const std::string &q);
-
-ResType *
-executeQuery(Rewriter &r, const std::string &q, bool show=false);
 
 #define UNIMPLEMENTED \
         throw std::runtime_error(std::string("Unimplemented: ") + \

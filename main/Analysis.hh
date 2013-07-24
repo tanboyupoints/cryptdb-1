@@ -314,26 +314,30 @@ class Rewriter;
 
 class RewriteOutput { 
 public:
-    RewriteOutput() : new_lex(NULL) {;}
+    RewriteOutput(const std::string &original_query, LEX *new_lex)
+        : original_query(original_query), new_query(getQuery(new_lex)) {}
     virtual ~RewriteOutput() = 0;
 
-    void setNewLex(LEX *lex);
-    void setOriginalQuery(const std::string query);
     virtual DBResult *doQuery(Connect *conn, Connect *e_conn);
     virtual bool queryAgain();
 
 protected:
-    std::string original_query;
+    const std::string original_query;
+    const std::string new_query;
 
-    std::string getQuery();
+    std::string getQuery(LEX *lex);
+};
 
-private:
-    LEX *new_lex;
+class SimpleOutput : public RewriteOutput {
+public:
+    SimpleOutput(const std::string &original_query)
+        : RewriteOutput(original_query, NULL) {}
 };
 
 class DMLOutput : public RewriteOutput {
 public:
-    DMLOutput() {;}
+    DMLOutput(const std::string &original_query, LEX *new_lex)
+        : RewriteOutput(original_query, new_lex) {}
     ~DMLOutput() {;}
 
     DBResult *doQuery(Connect *conn, Connect *e_conn);
@@ -342,7 +346,8 @@ public:
 // Special case of DML query.
 class SpecialUpdate : public RewriteOutput {
 public:
-    SpecialUpdate() {;}
+    SpecialUpdate(const std::string &original_query, LEX *new_lex)
+        : RewriteOutput(original_query, new_lex) {}
     ~SpecialUpdate() {;}
 
     DBResult *doQuery(Connect *conn, Connect *e_conn);
@@ -350,19 +355,21 @@ public:
 
 class DeltaOutput : public RewriteOutput {
 public:
-    DeltaOutput() {;}
+    DeltaOutput(const std::string &original_query, LEX *new_lex,
+                std::list<Delta> deltas)
+        : RewriteOutput(original_query, new_lex), deltas(deltas) {}
     virtual ~DeltaOutput() = 0;
-
-    void addDelta(Delta delta);
     virtual DBResult *doQuery(Connect *conn, Connect *e_conn);
 
 private:
-    std::list<Delta> deltas;
+    const std::list<Delta> deltas;
 };
 
 class DDLOutput : public DeltaOutput {
 public:
-    DDLOutput() {;}
+    DDLOutput(const std::string &original_query, LEX *new_lex,
+              std::list<Delta> deltas)
+        : DeltaOutput(original_query, new_lex, deltas) {}
     ~DDLOutput() {;}
 
     DBResult *doQuery(Connect *conn, Connect *e_conn);
@@ -370,15 +377,18 @@ public:
 
 class AdjustOnionOutput : public DeltaOutput {
 public:
-    AdjustOnionOutput() {;}
+    AdjustOnionOutput(const std::string &original_query,
+                      std::list<Delta> deltas,
+                      std::list<std::string> adjust_queries)
+        : DeltaOutput(original_query, NULL, deltas),
+          adjust_queries(adjust_queries) {}
     ~AdjustOnionOutput() {;}
 
     bool queryAgain();
     DBResult *doQuery(Connect *conn, Connect *e_conn);
-    void addAdjustQuery(const std::string &query);
 
 private:
-    std::list<std::string> adjust_queries;
+    const std::list<std::string> adjust_queries;
 };
 
 class Analysis {
@@ -422,7 +432,7 @@ public:
     // TODO: Make private.
     std::map<OnionMeta *, std::vector<EncLayer *>> to_adjust_enc_layers;
     
-    RewriteOutput *output;
+    std::list<Delta> deltas;
 
 private:
     const SchemaInfo * const schema;

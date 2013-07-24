@@ -276,7 +276,7 @@ buildTypeTextTranslator()
 }
 
 //l gets updated to the new level
-static void
+static std::string
 removeOnionLayer(Analysis &a, const ProxyState &ps, FieldMeta * fm,
                  Item_field *itf, onion o, SECLEVEL *new_level,
                  const std::string &cur_db) {
@@ -303,14 +303,11 @@ removeOnionLayer(Analysis &a, const ProxyState &ps, FieldMeta * fm,
 
     LOG(cdb_v) << "adjust onions: \n" << query.str() << "\n";
 
-    // FIXME: Should be dynamic_cast.
-    AdjustOnionOutput *adjust_output =
-        static_cast<AdjustOnionOutput *>(a.output);
     Delta d(Delta::DELETE, a.popBackEncLayer(om), om, NULL);
-    adjust_output->addDelta(d);
-    adjust_output->addAdjustQuery(query.str());
+    a.deltas.push_back(d);
 
     *new_level = a.getOnionLevel(om);
+    return query.str();
 }
 
 /*
@@ -322,7 +319,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps, FieldMeta * fm,
  * changed schema to persistent storage.
  *
  */
-static void
+static std::list<std::string>
 adjustOnion(Analysis &a, const ProxyState &ps, onion o, FieldMeta * fm,
             SECLEVEL tolevel, Item_field *itf, const std::string &cur_db)
 {
@@ -330,10 +327,15 @@ adjustOnion(Analysis &a, const ProxyState &ps, onion o, FieldMeta * fm,
     SECLEVEL newlevel = a.getOnionLevel(om);
     assert(newlevel != SECLEVEL::INVALID);
 
+    std::list<std::string> adjust_queries;
     while (newlevel > tolevel) {
-        removeOnionLayer(a, ps, fm, itf, o, &newlevel, cur_db);
+        auto query =
+            removeOnionLayer(a, ps, fm, itf, o, &newlevel, cur_db);
+        adjust_queries.push_back(query);
     }
     assert(newlevel == tolevel);
+
+    return adjust_queries;
 }
 //TODO: propagate these adjustments in the embedded database?
 
@@ -626,6 +628,25 @@ loadUDFs(Connect * conn) {
     LOG(cdb_v) << "Loaded CryptDB's UDFs.";
 }
 
+static bool
+noRewrite(LEX * lex) {
+    switch (lex->sql_command) {
+    case SQLCOM_SHOW_DATABASES:
+    case SQLCOM_SET_OPTION:
+    case SQLCOM_BEGIN:
+    case SQLCOM_COMMIT:
+    case SQLCOM_SHOW_TABLES:
+        return true;
+    case SQLCOM_SELECT: {
+
+    }
+    default:
+        return false;
+    }
+
+    return false;
+}
+
 Rewriter::Rewriter(ConnectionInfo ci,
                    const std::string &embed_dir,
                    const std::string &dbname,
@@ -658,28 +679,34 @@ Rewriter::Rewriter(ConnectionInfo ci,
     ps.e_conn->execute("USE cryptdbtest;");
 }
 
-void 
-Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps, LEX *lex)
+RewriteOutput * 
+Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
+                        const std::string &query)
 {
-    if (dml_dispatcher->canDo(lex)) {
-        a.output = new DMLOutput;
+    query_parse parse(ps.dbName(), query);
+    LEX *lex = parse.lex();
+    LOG(cdb_v) << "pre-analyze " << *lex;
+
+    // optimization: do not process queries that we will not rewrite
+    if (noRewrite(lex)) {
+        return new SimpleOutput(query);
+    } else if (dml_dispatcher->canDo(lex)) {
         SQLHandler *handler = dml_dispatcher->dispatch(lex);
-        LEX *out_lex = NULL;
         try {
-            out_lex = handler->transformLex(a, lex, ps);
+            LEX *out_lex = handler->transformLex(a, lex, ps);
+            return new DMLOutput(query, out_lex);
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
             std::cout << "Adjusting onion!" << std::endl;
-            delete a.output;
-            a.output = new AdjustOnionOutput;
-            adjustOnion(a, ps, e.o, e.fm, e.tolevel, e.itf, ps.dbName());
+            auto adjust_queries = 
+                adjustOnion(a, ps, e.o, e.fm, e.tolevel, e.itf,
+                            ps.dbName());
+            return new AdjustOnionOutput(query, a.deltas, adjust_queries);
         }
-        a.output->setNewLex(out_lex);
     } else if (ddl_dispatcher->canDo(lex)) {
-        a.output = new DDLOutput;
         SQLHandler *handler = ddl_dispatcher->dispatch(lex);
         LEX *out_lex = handler->transformLex(a, lex, ps);
-        a.output->setNewLex(out_lex);
+        return new DDLOutput(query, out_lex, a.deltas);
     } else {
         throw CryptDBError("Rewriter can not dispatch bad lex");
     }
@@ -707,25 +734,6 @@ Rewriter::setMasterKey(const std::string &mkey)
     ps.masterKey = getKey(mkey);
 }
 
-static bool
-noRewrite(LEX * lex) {
-    switch (lex->sql_command) {
-    case SQLCOM_SHOW_DATABASES:
-    case SQLCOM_SET_OPTION:
-    case SQLCOM_BEGIN:
-    case SQLCOM_COMMIT:
-    case SQLCOM_SHOW_TABLES:
-        return true;
-    case SQLCOM_SELECT: {
-
-    }
-    default:
-        return false;
-    }
-
-    return false;
-}
-
 // TODO: we don't need to pass analysis, enough to pass returnmeta
 QueryRewrite
 Rewriter::rewrite(const std::string & q)
@@ -736,48 +744,14 @@ Rewriter::rewrite(const std::string & q)
 
     // printEmbeddedState(ps);
 
-    query_parse p(ps.dbName(), q);
-    LEX *lex = p.lex();
-    QueryRewrite res;
-
-    /*
-     * At minimum we must create a valid Analysis object here because we
-     * res requires a valid rmeta object.
-     *
-     * The optimization is dubious however as we may still want to
-     * updateMeta or something.
-     */
-    //optimization: do not process queries that we will not rewrite
-    if (noRewrite(lex)) {
-        // HACK(burrows): This 'Analysis' is dummy as we never call
-        // addToReturn. But it works because this optimized cases don't
-        // have anything to do in addToReturn anyways.
-        Analysis analysis = Analysis(NULL);
-
-        res.wasRew = false;
-        res.queries.push_back(q);
-        res.rmeta = analysis.rmeta;
-        return res;
-    }
-
     //for as long as there are onion adjustments
-    // HACK: Because we need to carry EncLayer adjustment information
-    // to the next iteration.
     const SchemaInfo * const schema = loadSchemaInfo(ps.e_conn);
     Analysis analysis = Analysis(schema);
     // HACK(burrows): Until redesign.
     analysis.rewriter = this;
-    LOG(cdb_v) << "pre-analyze " << *lex;
 
-    this->dispatchOnLex(analysis, ps, lex);
-
-    analysis.output->setOriginalQuery(q);
-
-    res.output = analysis.output;
-    res.wasRew = true;
-    res.rmeta = analysis.rmeta;
-
-    return res;
+    return QueryRewrite(true, analysis.rmeta,
+                        this->dispatchOnLex(analysis, ps, q));
 }
 
 //TODO: replace stringify with <<
@@ -902,66 +876,6 @@ executeQuery(Rewriter &r, ProxyState &ps, const std::string &q)
         return false;
     }
 
-}
-
-// @show defaults to false.
-ResType *
-executeQuery(Rewriter &r, const std::string &q, bool show)
-{
-    try {
-        DBResult *dbres;
-
-        QueryRewrite qr = r.rewrite(q);
-        if (qr.queries.size() == 0) {
-          return NULL;
-        }
-
-        unsigned i = 0;
-        for (auto query : qr.queries) {
-            if (show) {
-                std::cerr << std::endl
-                     << RED_BEGIN << "ENCRYPTED QUERY [" << i+1 << "/"
-                     << qr.queries.size() << "]:" << COLOR_END << std::endl
-                     << query << std::endl;
-            }
-            assert(r.getConnection()->execute(query, dbres));
-            if (!dbres) {
-                return NULL;
-            }
-            ++i;
-        }
-
-        ResType res = dbres->unpack();
-
-        if (!res.ok) {
-          return NULL;
-        }
-
-        if (show) {
-            std::cerr << std::endl << RED_BEGIN
-                      << "ENCRYPTED RESULTS FROM DB:" << COLOR_END
-                      << std::endl;
-            printRes(res);
-            std::cerr << std::endl;
-        }
-
-        ResType dec_res = r.decryptResults(res, qr.rmeta);
-
-        if (show) {
-            std::cerr << std::endl << RED_BEGIN << "DECRYPTED RESULTS:" << COLOR_END << std::endl;
-            printRes(dec_res);
-        }
-
-        return new ResType(dec_res);
-    } catch (std::runtime_error &e) {
-        std::cout << "Unexpected Error: " << e.what() << " in query "
-                  << q << std::endl;
-        return NULL;
-    }  catch (CryptDBError &e) {
-        std::cout << "Internal Error: " << e.msg << " in query " << q
-                  << std::endl;
-        return NULL;
-    }
 }
 
 void

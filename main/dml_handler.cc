@@ -262,8 +262,6 @@ private:
     LEX *refresh_onions(Analysis &a, LEX *lex, LEX *new_lex,
                         const ProxyState &ps) const
     {
-        delete a.output;
-        a.output = new SpecialUpdate;
         throw CryptDBError("UPDATEing with a column as rvalue is broken!");
 
         // TODO(burrows): Should support multiple tables in single UPDATE.
@@ -282,12 +280,15 @@ private:
         std::ostringstream select_stream;
         select_stream << " SELECT * FROM " << plain_table
                       << " WHERE " << where_clause << ";";
-        const ResType * const select_res_type =
-            executeQuery(*a.rewriter, select_stream.str());
+        // FIXME.
+        const ResType * const select_res_type = NULL;
+        /*
+        executeQuery(*a.rewriter, select_stream.str());
         assert(select_res_type);
         if (select_res_type->rows.size() == 0) { // No work to be done.
             return new_lex;
         }
+        */
 
         const auto itemJoin = [](std::vector<Item*> row) {
             return "(" + vector_join<Item*>(row, ",", ItemToString) + ")";

@@ -378,17 +378,6 @@ void Delta::replaceHandler(Connect *e_conn, const DBMeta * const object,
 RewriteOutput::~RewriteOutput()
 {;}
 
-void RewriteOutput::setNewLex(LEX *lex)
-{
-    assert(!new_lex);
-    new_lex = lex;
-}
-
-void RewriteOutput::setOriginalQuery(const std::string query)
-{
-    original_query = query;
-}
-
 static void
 prettyPrintQuery(std::string query)
 {
@@ -401,10 +390,9 @@ DBResult *RewriteOutput::doQuery(Connect *conn, Connect *e_conn)
 {
     if (false == queryAgain()) {
         DBResult *dbres;
-        const std::string query = this->getQuery();
-        prettyPrintQuery(query);
+        prettyPrintQuery(new_query);
 
-        assert(conn->execute(query, dbres));
+        assert(conn->execute(new_query, dbres));
 
         return dbres;
     }
@@ -416,11 +404,15 @@ bool RewriteOutput::queryAgain()
     return false;
 }
 
-std::string RewriteOutput::getQuery()
+std::string RewriteOutput::getQuery(LEX *lex)
 {
-    std::ostringstream ss;
-    ss << *new_lex;
-    return ss.str();
+    if (NULL == lex) {
+        return std::string("");
+    } else {
+        std::ostringstream ss;
+        ss << *lex;
+        return ss.str();
+    }
 }
 
 DBResult *DMLOutput::doQuery(Connect *conn, Connect *e_conn)
@@ -436,11 +428,6 @@ DBResult *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn)
 
 DeltaOutput::~DeltaOutput()
 {;}
-
-void DeltaOutput::addDelta(Delta delta)
-{
-    deltas.push_back(delta);
-}
 
 DBResult *DeltaOutput::doQuery(Connect *conn, Connect *e_conn)
 {
@@ -468,11 +455,6 @@ DBResult *AdjustOnionOutput::doQuery(Connect *conn, Connect *e_conn)
         assert(conn->execute(it));
     }
     return DeltaOutput::doQuery(conn, e_conn);
-}
-
-void AdjustOnionOutput::addAdjustQuery(const std::string &query)
-{
-    adjust_queries.push_back(query);
 }
 
 bool Analysis::addAlias(const std::string &alias,
