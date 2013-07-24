@@ -75,7 +75,7 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
     if (m_key) {         // Don't encrypt if we don't have a key.
         Create_field * newcf = cf;
         //generate enclayers for encrypted field
-        std::string uniqueFieldName = this->getAnonOnionName();
+        const std::string uniqueFieldName = this->getAnonOnionName();
         for (auto l: levels) {
             std::string key;
             key = getLayerKey(m_key, uniqueFieldName, l);
@@ -97,19 +97,20 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
     }
 }
 
-OnionMeta *OnionMeta::deserialize(unsigned int id, std::string serial)
+OnionMeta *OnionMeta::deserialize(unsigned int id,
+                                  const std::string &serial)
 {
-    auto vec = unserialize_string(serial); 
+    const auto vec = unserialize_string(serial); 
 
-    std::string onionname = vec[0];
-    unsigned int uniq_count = atoi(vec[1].c_str());
+    const std::string onionname = vec[0];
+    const unsigned int uniq_count = atoi(vec[1].c_str());
 
     return new OnionMeta(id, onionname, uniq_count);
 }
 
 std::string OnionMeta::serialize(const DBObject &parent) const
 {
-    std::string serial =
+    const std::string serial =
         serialize_string(this->onionname) +
         serialize_string(std::to_string(this->uniq_count));
 
@@ -205,16 +206,17 @@ SECLEVEL OnionMeta::getSecLevel()
     return layers.back()->level();
 }
 
-FieldMeta *FieldMeta::deserialize(unsigned int id, std::string serial)
+FieldMeta *FieldMeta::deserialize(unsigned int id,
+                                  const std::string &serial)
 {
-    auto vec = unserialize_string(serial);
+    const auto vec = unserialize_string(serial);
 
-    std::string fname = vec[0];
-    bool has_salt = string_to_bool(vec[1]);
-    std::string salt_name = vec[2];
-    onionlayout onion_layout = TypeText<onionlayout>::toType(vec[3]);
-    unsigned int uniq_count = atoi(vec[4].c_str());
-    unsigned int counter = atoi(vec[5].c_str());
+    const std::string fname = vec[0];
+    const bool has_salt = string_to_bool(vec[1]);
+    const std::string salt_name = vec[2];
+    const onionlayout onion_layout = TypeText<onionlayout>::toType(vec[3]);
+    const unsigned int uniq_count = atoi(vec[4].c_str());
+    const unsigned int counter = atoi(vec[5].c_str());
 
     return new FieldMeta(id, fname, has_salt, salt_name, onion_layout,
                          uniq_count, counter);
@@ -232,7 +234,7 @@ FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *m_key,
 
 std::string FieldMeta::serialize(const DBObject &parent) const
 {
-    std::string serial =
+    const std::string serial =
         serialize_string(fname) +
         serialize_string(bool_to_string(has_salt)) +
         serialize_string(getSaltName()) +
@@ -245,7 +247,7 @@ std::string FieldMeta::serialize(const DBObject &parent) const
 
 std::string FieldMeta::stringify() const
 {
-    std::string res = " [FieldMeta " + fname + "]";
+    const std::string res = " [FieldMeta " + fname + "]";
     return res;
 }
 
@@ -274,7 +276,7 @@ std::string FieldMeta::getSaltName() const {
 
 SECLEVEL FieldMeta::getOnionLevel(onion o) const {
     OnionMetaKey *key = new OnionMetaKey(o);
-    auto om = getChild(key);
+    const auto om = getChild(key);
     delete key;
     if (om == NULL) {
         return SECLEVEL::INVALID;
@@ -301,8 +303,8 @@ bool FieldMeta::setOnionLevel(onion o, SECLEVEL maxl) {
 // FIXME: This is a HACK.
 bool FieldMeta::isEncrypted() {
     OnionMetaKey *key = new OnionMetaKey(oPLAIN);
-    bool status =  ((children.size() != 1) ||
-                    (children.find(key) == children.end()));
+    const bool status =  ((children.size() != 1) ||
+                          (children.find(key) == children.end()));
     delete key;
     return status;
 }
@@ -326,15 +328,16 @@ onionlayout FieldMeta::getOnionLayout(AES_KEY *m_key, Create_field *f)
     }
 }
 
-TableMeta *TableMeta::deserialize(unsigned int id, std::string serial)
+TableMeta *TableMeta::deserialize(unsigned int id,
+                                  const std::string &serial)
 {
-    auto vec = unserialize_string(serial);
+    const auto vec = unserialize_string(serial);
     
-    std::string anon_table_name = vec[0];
-    bool hasSensitive = string_to_bool(vec[1]);
-    bool has_salt = string_to_bool(vec[2]);
-    std::string salt_name = vec[3];
-    unsigned int counter = atoi(vec[4].c_str());
+    const std::string anon_table_name = vec[0];
+    const bool hasSensitive = string_to_bool(vec[1]);
+    const bool has_salt = string_to_bool(vec[2]);
+    const std::string salt_name = vec[3];
+    const unsigned int counter = atoi(vec[4].c_str());
 
     return new TableMeta(id, anon_table_name, hasSensitive, has_salt,
                          salt_name, counter);
@@ -376,16 +379,17 @@ std::vector<FieldMeta *> TableMeta::orderedFieldMetas() const
 }
 
 // TODO: Add salt.
-std::string TableMeta::getAnonIndexName(std::string index_name) const
+std::string TableMeta::getAnonIndexName(const std::string &index_name) const
 {
-    std::string hash_input = anon_table_name + index_name;
-    std::size_t hsh = std::hash<std::string>()(hash_input);
+    const std::string hash_input = anon_table_name + index_name;
+    const std::size_t hsh = std::hash<std::string>()(hash_input);
 
     return std::string("index_") + std::to_string(hsh);
 }
 
 FieldMeta *
-SchemaInfo::getFieldMeta(std::string & table, std::string & field) const
+SchemaInfo::getFieldMeta(const std::string &table,
+                         const std::string & field) const
 {
     IdentityMetaKey *table_key = new IdentityMetaKey(table);
     TableMeta * tm = getChild(table_key);

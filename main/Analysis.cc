@@ -374,7 +374,8 @@ void Delta::replaceHandler(Connect *e_conn, const DBMeta * const object,
     return;
 }
 
-bool Analysis::addAlias(std::string alias, std::string table)
+bool Analysis::addAlias(const std::string &alias,
+                        const std::string &table)
 {
     auto alias_pair = table_aliases.find(alias);
     if (table_aliases.end() != alias_pair) {
@@ -385,7 +386,8 @@ bool Analysis::addAlias(std::string alias, std::string table)
     return true;
 }
 
-OnionMeta *Analysis::getOnionMeta(std::string table, std::string field,
+OnionMeta *Analysis::getOnionMeta(const std::string &table,
+                                  const std::string &field,
                                   onion o) const
 {
     OnionMeta *om = this->getFieldMeta(table, field)->getOnionMeta(o);
@@ -394,7 +396,8 @@ OnionMeta *Analysis::getOnionMeta(std::string table, std::string field,
     return om;
 }
 
-FieldMeta *Analysis::getFieldMeta(std::string table, std::string field) const
+FieldMeta *Analysis::getFieldMeta(const std::string &table,
+                                  const std::string &field) const
 {
     std::string real_table_name = unAliasTable(table);
     FieldMeta *fm = ps->schema->getFieldMeta(real_table_name, field);
@@ -402,22 +405,21 @@ FieldMeta *Analysis::getFieldMeta(std::string table, std::string field) const
     return fm;
 }
 
-TableMeta *Analysis::getTableMeta(std::string table) const
+TableMeta *Analysis::getTableMeta(const std::string &table) const
 {
     IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
                                  
-    TableMeta *tm =
-        static_cast<TableMeta *>(ps->schema->getChild(key));
+    TableMeta *tm = ps->schema->getChild(key);
     assert(tm);
     return tm;
 }
 
 // FIXME: Field aliasing.
-bool Analysis::destroyFieldMeta(std::string table, std::string field)
+bool Analysis::destroyFieldMeta(const std::string &table,
+                                const std::string &field)
 {
     IdentityMetaKey *table_key = new IdentityMetaKey(unAliasTable(table));
-    TableMeta *tm = 
-        static_cast<TableMeta *>(ps->schema->getChild(table_key));
+    TableMeta *tm = ps->schema->getChild(table_key);
     if (!tm) {
         return false;
     }
@@ -426,13 +428,13 @@ bool Analysis::destroyFieldMeta(std::string table, std::string field)
     return tm->destroyChild(field_key);
 }
 
-bool Analysis::destroyTableMeta(std::string table)
+bool Analysis::destroyTableMeta(const std::string &table)
 {
     IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
     return ps->schema->destroyChild(key);
 }
 
-bool Analysis::tableMetaExists(std::string table) const
+bool Analysis::tableMetaExists(const std::string &table) const
 {
     IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
     return ps->schema->childExists(key);
@@ -443,13 +445,13 @@ std::string Analysis::getAnonTableName(const std::string &table) const
     return this->getTableMeta(table)->getAnonTableName();
 }
 
-std::string Analysis::getAnonIndexName(std::string table,
-                                       std::string index_name) const
+std::string Analysis::getAnonIndexName(const std::string &table,
+                                       const std::string &index_name) const
 {
     return this->getTableMeta(table)->getAnonIndexName(index_name); 
 }
 
-std::string Analysis::unAliasTable(std::string table) const
+std::string Analysis::unAliasTable(const std::string &table) const
 {
     auto alias_pair = table_aliases.find(table);
     if (table_aliases.end() != alias_pair) {
@@ -459,7 +461,7 @@ std::string Analysis::unAliasTable(std::string table) const
     }
 }
 
-EncLayer *Analysis::getBackEncLayer(OnionMeta *om) const
+EncLayer *Analysis::getBackEncLayer(OnionMeta * const om) const
 {
     auto it = to_adjust_enc_layers.find(om);
     if (to_adjust_enc_layers.end() == it) {
@@ -469,7 +471,7 @@ EncLayer *Analysis::getBackEncLayer(OnionMeta *om) const
     }
 }
 
-EncLayer *Analysis::popBackEncLayer(OnionMeta *om)
+EncLayer *Analysis::popBackEncLayer(OnionMeta * const om)
 {
     auto it = to_adjust_enc_layers.find(om);
     if (to_adjust_enc_layers.end() == it) { // First onion adjustment
@@ -483,7 +485,7 @@ EncLayer *Analysis::popBackEncLayer(OnionMeta *om)
     }
 }
 
-SECLEVEL Analysis::getOnionLevel(OnionMeta *om) const
+SECLEVEL Analysis::getOnionLevel(OnionMeta * const om) const
 {
     auto it = to_adjust_enc_layers.find(om);
     if (to_adjust_enc_layers.end() == it) {

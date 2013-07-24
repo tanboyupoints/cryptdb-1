@@ -308,8 +308,8 @@ private:
 
     std::string serialize(const DBObject &parent) const 
     {
-        throw CryptDBError("Calling Delta::serialize with a parent argument"
-                           " is nonsensical!");
+        throw CryptDBError("Calling Delta::serialize with a parent"
+                           "argument is nonsensical!");
     }
 };
 
@@ -335,20 +335,22 @@ public:
     ReturnMeta * rmeta;
 
     // These functions are prefered to their lower level counterparts.
-    bool addAlias(std::string alias, std::string table);
-    OnionMeta *getOnionMeta(std::string table, std::string field,
-                            onion o) const;
-    FieldMeta *getFieldMeta(std::string table, std::string field) const;
-    TableMeta *getTableMeta(std::string table) const;
-    bool destroyFieldMeta(std::string table, std::string field);
-    bool destroyTableMeta(std::string table);
-    bool tableMetaExists(std::string table) const;
+    bool addAlias(const std::string &alias, const std::string &table);
+    OnionMeta *getOnionMeta(const std::string &table,
+                            const std::string &field, onion o) const;
+    FieldMeta *getFieldMeta(const std::string &table,
+                            const std::string &field) const;
+    TableMeta *getTableMeta(const std::string &table) const;
+    bool destroyFieldMeta(const std::string &table,
+                          const std::string &field);
+    bool destroyTableMeta(const std::string &table);
+    bool tableMetaExists(const std::string &table) const;
     std::string getAnonTableName(const std::string &table) const;
-    std::string getAnonIndexName(std::string table,
-                                 std::string index_name) const;
-    EncLayer *getBackEncLayer(OnionMeta *om) const;
-    EncLayer *popBackEncLayer(OnionMeta *om);
-    SECLEVEL getOnionLevel(OnionMeta *om) const;
+    std::string getAnonIndexName(const std::string &table,
+                                 const std::string &index_name) const;
+    EncLayer *getBackEncLayer(OnionMeta * const om) const;
+    EncLayer *popBackEncLayer(OnionMeta * const om);
+    SECLEVEL getOnionLevel(OnionMeta * const om) const;
     std::vector<EncLayer *> getEncLayers(OnionMeta * const om) const;
 
     // HACK(burrows): This is a temporary solution until I redesign.
@@ -361,6 +363,6 @@ public:
     std::map<OnionMeta *, std::vector<EncLayer *>> to_adjust_enc_layers;
 
 private:
-    std::string unAliasTable(std::string table) const;
+    std::string unAliasTable(const std::string &table) const;
 };
 
