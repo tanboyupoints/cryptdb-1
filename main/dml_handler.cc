@@ -262,6 +262,8 @@ private:
     LEX *refresh_onions(Analysis &a, LEX *lex, LEX *new_lex,
                         const ProxyState &ps) const
     {
+        delete a.output;
+        a.output = new SpecialUpdate;
         throw CryptDBError("UPDATEing with a column as rvalue is broken!");
 
         // TODO(burrows): Should support multiple tables in single UPDATE.

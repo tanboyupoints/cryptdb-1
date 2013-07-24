@@ -317,42 +317,15 @@ public:
     RewriteOutput() {;}
     virtual ~RewriteOutput() = 0;
 
-    void setNewLex(LEX *lex) {
-        assert(!new_lex && lex);
-        new_lex = lex;
-    }
-
-    void setOriginalQuery(const std::string query) {
-        original_query = query;
-    }
-
-    virtual void doQuery(Connect *conn, Connect *e_conn) {
-        /*
-        if (false == queryAgain()) {
-            DBResult *dbres;
-            const std::string query = this->getQuery();
-            prettyPrintQuery(query);
-
-            assert(conn->execute(query, dbres));
-            prettyPrintQueryResult(dbres);
-
-            ResType dec_res = decryptResults(dbres, ???);
-            prettyPrintQueryResult(dec_res);
-        }
-        */
-        throw CryptDBError("RewriteOutput::doQuery!");
-    }
-
-    virtual bool queryAgain() {return false;}
+    void setNewLex(LEX *lex);
+    void setOriginalQuery(const std::string query);
+    virtual DBResult *doQuery(Connect *conn, Connect *e_conn);
+    virtual bool queryAgain();
 
 protected:
     std::string original_query;
 
-    std::string getQuery() {
-        std::ostringstream ss;
-        ss << *new_lex;
-        return ss.str();
-    }
+    std::string getQuery();
 
 private:
     LEX *new_lex;
@@ -363,20 +336,16 @@ public:
     DMLOutput() {;}
     ~DMLOutput() {;}
 
-    void doQuery(Connect *conn, Connect *e_conn) {
-        RewriteOutput::doQuery(conn, e_conn);
-    }
+    DBResult *doQuery(Connect *conn, Connect *e_conn);
 };
 
 // Special case of DML query.
 class SpecialUpdate : public RewriteOutput {
 public:
-    SpecialUpdate();
-    ~SpecialUpdate();
+    SpecialUpdate() {;}
+    ~SpecialUpdate() {;}
 
-    void doQuery(Connect *conn, Connect *e_conn) {
-        throw CryptDBError("SpecialUpdate::doQuery!");
-    }
+    DBResult *doQuery(Connect *conn, Connect *e_conn);
 };
 
 class DeltaOutput : public RewriteOutput {
@@ -384,17 +353,8 @@ public:
     DeltaOutput() {;}
     virtual ~DeltaOutput() = 0;
 
-    void addDelta(Delta delta) {
-        deltas.push_back(delta);
-    }
-    
-    virtual void doQuery(Connect *conn, Connect *e_conn) {
-        for (auto it : deltas) {
-            assert(it.apply(e_conn));
-        }
-
-        RewriteOutput::doQuery(conn, e_conn);
-    }
+    void addDelta(Delta delta);
+    virtual DBResult *doQuery(Connect *conn, Connect *e_conn);
 
 private:
     std::list<Delta> deltas;
@@ -405,29 +365,17 @@ public:
     DDLOutput() {;}
     ~DDLOutput() {;}
 
-    void doQuery(Connect *conn, Connect *e_conn) {
-        assert(e_conn->execute(original_query));
-        DeltaOutput::doQuery(conn, e_conn);
-    }
+    DBResult *doQuery(Connect *conn, Connect *e_conn);
 };
 
 class AdjustOnionOutput : public DeltaOutput {
 public:
     AdjustOnionOutput() {;}
-    ~AdjustOnionOutput();
+    ~AdjustOnionOutput() {;}
 
-    bool queryAgain() {return true;}
-
-    void doQuery(Connect *conn, Connect *e_conn) {
-        for (auto it : adjust_queries) {
-            assert(conn->execute(it));
-        }
-        DeltaOutput::doQuery(conn, e_conn);
-    }
-
-    void addAdjustQuery(const std::string &query) {
-        adjust_queries.push_back(query);
-    }
+    bool queryAgain();
+    DBResult *doQuery(Connect *conn, Connect *e_conn);
+    void addAdjustQuery(const std::string &query);
 
 private:
     std::list<std::string> adjust_queries;

@@ -374,8 +374,100 @@ void Delta::replaceHandler(Connect *e_conn, const DBMeta * const object,
     return;
 }
 
-RewriteOutput::~RewriteOutput() {;}
-DeltaOutput::~DeltaOutput() {;}
+RewriteOutput::~RewriteOutput()
+{;}
+
+void RewriteOutput::setNewLex(LEX *lex)
+{
+    assert(!new_lex && lex);
+    new_lex = lex;
+}
+
+void RewriteOutput::setOriginalQuery(const std::string query)
+{
+    original_query = query;
+}
+
+// FIXME: Implement.
+DBResult *RewriteOutput::doQuery(Connect *conn, Connect *e_conn)
+{
+    /*
+    if (false == queryAgain()) {
+        DBResult *dbres;
+        const std::string query = this->getQuery();
+        prettyPrintQuery(query);
+
+        assert(conn->execute(query, dbres));
+
+        return dbres;
+    }
+    */
+    return NULL;
+}
+
+bool RewriteOutput::queryAgain()
+{
+    return false;
+}
+
+std::string RewriteOutput::getQuery()
+{
+    std::ostringstream ss;
+    ss << *new_lex;
+    return ss.str();
+}
+
+DBResult *DMLOutput::doQuery(Connect *conn, Connect *e_conn)
+{
+    return RewriteOutput::doQuery(conn, e_conn);
+}
+
+// FIXME: Implement.
+DBResult *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn)
+{
+    return NULL;
+}
+
+DeltaOutput::~DeltaOutput()
+{;}
+
+void DeltaOutput::addDelta(Delta delta)
+{
+    deltas.push_back(delta);
+}
+
+DBResult *DeltaOutput::doQuery(Connect *conn, Connect *e_conn)
+{
+    for (auto it : deltas) {
+        assert(it.apply(e_conn));
+    }
+
+    return RewriteOutput::doQuery(conn, e_conn);
+}
+
+DBResult *DDLOutput::doQuery(Connect *conn, Connect *e_conn)
+{
+    assert(e_conn->execute(original_query));
+    return DeltaOutput::doQuery(conn, e_conn);
+}
+
+bool AdjustOnionOutput::queryAgain()
+{
+    return true;
+}
+
+DBResult *AdjustOnionOutput::doQuery(Connect *conn, Connect *e_conn)
+{
+    for (auto it : adjust_queries) {
+        assert(conn->execute(it));
+    }
+    return DeltaOutput::doQuery(conn, e_conn);
+}
+
+void AdjustOnionOutput::addAdjustQuery(const std::string &query)
+{
+    adjust_queries.push_back(query);
+}
 
 bool Analysis::addAlias(const std::string &alias,
                         const std::string &table)

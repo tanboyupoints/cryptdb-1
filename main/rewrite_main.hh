@@ -75,8 +75,9 @@ public:
     SQLDispatcher *dml_dispatcher;
     SQLDispatcher *ddl_dispatcher;
 
-private:
     ProxyState ps;
+
+private:
 };
 
 class ScopedMySQLRes {
@@ -92,6 +93,9 @@ public:
 private:
     MYSQL_RES *r;
 };
+
+bool
+executeQuery(Rewriter &r, ProxyState &ps, const std::string &q);
 
 ResType *
 executeQuery(Rewriter &r, const std::string &q, bool show=false);
@@ -110,9 +114,9 @@ class CItemType {
  public:
     virtual RewritePlan * do_gather(Item *, reason&, Analysis &) const = 0;
     virtual Item * do_optimize(Item *, Analysis &) const = 0;
-    virtual Item * do_rewrite(Item *,
-			      const OLK & constr, const RewritePlan * rp,
-			      Analysis &) const = 0;
+    virtual Item * do_rewrite(Item *, const OLK & constr,
+                              const RewritePlan * rp,
+                              Analysis &) const = 0;
     virtual void   do_rewrite_insert(Item *, Analysis &,
                                      std::vector<Item *> &,
                                      FieldMeta *fm) const = 0;
@@ -123,38 +127,46 @@ class CItemType {
  */
 template<class T>
 class CItemSubtype : public CItemType {
-    virtual RewritePlan * do_gather(Item *i, reason &tr, Analysis & a) const {
+    virtual RewritePlan * do_gather(Item *i, reason &tr,
+                                    Analysis & a) const
+    {
         return do_gather_type((T*) i, tr, a);
     }
-    virtual Item* do_optimize(Item *i, Analysis & a) const {
+    virtual Item* do_optimize(Item *i, Analysis & a) const
+    {
         return do_optimize_type((T*) i, a);
     }
-    virtual Item* do_rewrite(Item *i,
-			     const OLK & constr, const RewritePlan * rp,
-			     Analysis & a) const {
+    virtual Item* do_rewrite(Item *i, const OLK & constr,
+                             const RewritePlan * rp,
+                             Analysis & a) const
+    {
         return do_rewrite_type((T*) i, constr, rp, a);
     }
     virtual void  do_rewrite_insert(Item *i, Analysis & a,
                                     std::vector<Item *> &l,
-                                    FieldMeta *fm) const {
+                                    FieldMeta *fm) const
+    {
         do_rewrite_insert_type((T*) i, a, l, fm);
     }
  private:
     virtual RewritePlan * do_gather_type(T *, reason&, Analysis & a) const = 0;
-    virtual Item * do_optimize_type(T *i, Analysis & a) const {
-	UNIMPLEMENTED;
-	// do_optimize_const_item(i, a);
+    virtual Item * do_optimize_type(T *i, Analysis & a) const
+    {
+        UNIMPLEMENTED;
+        // do_optimize_const_item(i, a);
     }
-    virtual Item * do_rewrite_type(T *i,
-				   const OLK & constr, const RewritePlan * rp,
-				   Analysis & a) const {
+    virtual Item * do_rewrite_type(T *i, const OLK & constr,
+                                   const RewritePlan * rp,
+                                   Analysis & a) const
+    {
         LOG(cdb_v) << "do_rewrite_type L676 " << *i;
-	assert_s(false, "why is this rewrite called?");
+        assert_s(false, "why is this rewrite called?");
         return i;
     }
     virtual void   do_rewrite_insert_type(T *i, Analysis & a,
                                           std::vector<Item *> &l,
-                                          FieldMeta *fm) const {
+                                          FieldMeta *fm) const
+    {
         // default is un-implemented. we'll implement these as they come
         UNIMPLEMENTED;
     }
@@ -168,29 +180,33 @@ class CItemSubtype : public CItemType {
 template <class T>
 class CItemTypeDir : public CItemType {
  public:
-    void reg(T t, CItemType *ct) {
+    void reg(T t, CItemType *ct)
+    {
         auto x = types.find(t);
         if (x != types.end())
             thrower() << "duplicate key " << t;
         types[t] = ct;
     }
 
-    RewritePlan * do_gather(Item *i, reason &tr, Analysis &a) const {
+    RewritePlan * do_gather(Item *i, reason &tr, Analysis &a) const
+    {
         return lookup(i)->do_gather(i, tr, a);
     }
 
-    Item* do_optimize(Item *i, Analysis &a) const {
+    Item* do_optimize(Item *i, Analysis &a) const
+    {
         return lookup(i)->do_optimize(i, a);
     }
 
-    Item* do_rewrite(Item *i,
-		     const OLK & constr, const RewritePlan * rp,
-		     Analysis &a) const {
+    Item* do_rewrite(Item *i, const OLK & constr,
+                     const RewritePlan * rp, Analysis &a) const
+    {
         return lookup(i)->do_rewrite(i, constr, rp, a);
     }
 
     void do_rewrite_insert(Item *i, Analysis &a, std::vector<Item *> &l,
-                           FieldMeta *fm) const {
+                           FieldMeta *fm) const
+    {
         lookup(i)->do_rewrite_insert(i, a, l, fm);
     }
 

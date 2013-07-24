@@ -162,7 +162,6 @@ class ChangeDBHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
                                   const ProxyState &ps) const
     {
-
         throw CryptDBError("cryptdb does not support changing the db!");
     }
 };

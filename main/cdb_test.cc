@@ -93,8 +93,7 @@ static bool handle_line(Rewriter& r, const std::string& q)
     return true;
   }
 
-
-  return (bool)executeQuery(r, q, true);
+  return (bool)executeQuery(r, r.ps, q);
 }
 
 int

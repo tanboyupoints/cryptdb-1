@@ -763,6 +763,8 @@ Rewriter::rewrite(const std::string & q)
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
             std::cout << "Adjusting onion!" << std::endl;
+            delete analysis.output;
+            analysis.output = new AdjustOnionOutput;
             adjustOnion(analysis, ps, e.o, e.fm, e.tolevel, e.itf,
                         ps.dbName());
             continue;
@@ -878,6 +880,45 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
     }
 
     return res;
+}
+
+static void
+prettyPrintQueryResult(ResType res)
+{
+    throw CryptDBError("prettyPrintQueryResult!");
+}
+
+bool
+executeQuery(Rewriter &r, ProxyState &ps, const std::string &q)
+{
+    try {
+        QueryRewrite qr = r.rewrite(q);
+
+        DBResult *enc_res = qr.output->doQuery(ps.conn, ps.e_conn);
+        ResType res = enc_res->unpack();
+        if (!res.ok) {
+            return false;
+        }
+        prettyPrintQueryResult(res);
+
+        ResType dec_res = r.decryptResults(res, qr.rmeta);
+        prettyPrintQueryResult(dec_res);
+
+        if (true == qr.output->queryAgain()) {
+            return executeQuery(r, ps, q);
+        } else {
+            return true;
+        }
+    } catch (std::runtime_error &e) {
+        std::cout << "Unexpected Error: " << e.what() << " in query "
+                  << q << std::endl;
+        return false;
+    }  catch (CryptDBError &e) {
+        std::cout << "Internal Error: " << e.msg << " in query " << q
+                  << std::endl;
+        return false;
+    }
+
 }
 
 // @show defaults to false.
