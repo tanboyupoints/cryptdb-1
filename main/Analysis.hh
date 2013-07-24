@@ -236,7 +236,7 @@ typedef struct ProxyState {
     ProxyState()
         : conn(NULL), e_conn(NULL), encByDefault(true), masterKey(NULL) {}
     ~ProxyState();
-    std::string dbName() {return dbname;}
+    std::string dbName() const {return dbname;}
 
     ConnectionInfo ci;
 
@@ -314,18 +314,14 @@ class Rewriter;
 
 class Analysis {
 public:
-    Analysis(ProxyState * ps, SchemaInfo *schema)
-        : ps(ps), pos(0), rmeta(new ReturnMeta()), schema(schema) {}
+    Analysis(SchemaInfo *schema)
+        : pos(0), rmeta(new ReturnMeta()), schema(schema) {}
     // FIXME: Remove.
     Analysis()
-        : ps(NULL), pos(0), rmeta(new ReturnMeta()), schema(schema) {}
+        : pos(0), rmeta(new ReturnMeta()), schema(schema) {}
 
-    // pointer to proxy metadata
-    ProxyState * ps;
-
-    /* Temporary structures for processing one query */
-
-    unsigned int pos; //a counter indicating how many projection fields have been analyzed so far
+    unsigned int pos; // > a counter indicating how many projection
+                      // fields have been analyzed so far
     std::map<FieldMeta *, salt_type>    salts;
     std::map<Item *, RewritePlan *>     rewritePlans;
     std::map<std::string, std::string>  table_aliases;

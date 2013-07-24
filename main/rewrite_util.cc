@@ -303,9 +303,9 @@ string_to_bool(std::string s)
 }
 
 List<Create_field>
-createAndRewriteField(Create_field *cf, TableMeta *tm,
-                      const std::string &table, const std::string &dbname,
-                      Analysis &a, bool new_table,
+createAndRewriteField(Analysis &a, const ProxyState &ps,
+                      Create_field *cf, TableMeta *tm,
+                      bool new_table,
                       List<Create_field> &rewritten_cfield_list)
 {
     // -----------------------------
@@ -313,7 +313,7 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
     // -----------------------------
     const std::string name = std::string(cf->field_name);
     FieldMeta * const fm =
-        new FieldMeta(name, cf, a.ps->masterKey, tm->leaseIncUniq());
+        new FieldMeta(name, cf, ps.masterKey, tm->leaseIncUniq());
     // Here we store the key name for the first time. It will be applied
     // after the Delta is read out of the database.
     if (true == new_table) {

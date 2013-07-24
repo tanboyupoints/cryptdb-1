@@ -38,8 +38,6 @@ class CreateHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
                                   const ProxyState &ps) const
     {
-
-        char* dbname = lex->select_lex.table_list.first->db;
         char* table  = lex->select_lex.table_list.first->table_name;
         LEX *new_lex = copy(lex);
         
@@ -81,10 +79,10 @@ class CreateHandler : public DDLHandler {
                 List_iterator<Create_field>(lex->alter_info.create_list);
             new_lex->alter_info.create_list = 
                 reduceList<Create_field>(it, List<Create_field>(),
-                    [&tm, &a, dbname, table] (List<Create_field> out_list,
+                    [&a, ps, &tm] (List<Create_field> out_list,
                                               Create_field *cf) {
-                        return createAndRewriteField(cf, tm, table, dbname,
-                                                     a, true, out_list);
+                        return createAndRewriteField(a, ps, cf, tm, 
+                                                     true, out_list);
                 });
         } else { // Table already exists.
 

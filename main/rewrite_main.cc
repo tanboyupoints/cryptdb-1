@@ -273,8 +273,9 @@ buildTypeTextTranslator()
 
 //l gets updated to the new level
 static void
-removeOnionLayer(FieldMeta * fm, Item_field *itf, Analysis &a, onion o,
-                 SECLEVEL *new_level, const std::string &cur_db) {
+removeOnionLayer(Analysis &a, const ProxyState &ps, FieldMeta * fm,
+                 Item_field *itf, onion o, SECLEVEL *new_level,
+                 const std::string &cur_db) {
     OnionMeta *om = fm->getOnionMeta(o);
     assert(om);
     std::string fieldanon  = om->getAnonOnionName();
@@ -295,7 +296,7 @@ removeOnionLayer(FieldMeta * fm, Item_field *itf, Analysis &a, onion o,
     std::cerr << "\nADJUST: \n" << query.str() << "\n";
 
     //execute decryption query
-    assert_s(a.ps->conn->execute(query.str()), "failed to execute onion decryption query");
+    assert_s(ps.conn->execute(query.str()), "failed to execute onion decryption query");
 
     LOG(cdb_v) << "adjust onions: \n" << query.str() << "\n";
 
@@ -316,15 +317,15 @@ removeOnionLayer(FieldMeta * fm, Item_field *itf, Analysis &a, onion o,
  *
  */
 static void
-adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf,
-            Analysis & a, const std::string & cur_db)
+adjustOnion(Analysis &a, const ProxyState &ps, onion o, FieldMeta * fm,
+            SECLEVEL tolevel, Item_field *itf, const std::string &cur_db)
 {
     OnionMeta *om = fm->getOnionMeta(o);
     SECLEVEL newlevel = a.getOnionLevel(om);
     assert(newlevel != SECLEVEL::INVALID);
 
     while (newlevel > tolevel) {
-        removeOnionLayer(fm, itf, a, o, &newlevel, cur_db);
+        removeOnionLayer(a, ps, fm, itf, o, &newlevel, cur_db);
     }
     assert(newlevel == tolevel);
 }
@@ -690,28 +691,15 @@ Rewriter::setMasterKey(const std::string &mkey)
 }
 
 static std::list<std::string>
-processAnnotation(Annotation annot, Analysis &a)
-{
-    // TODO: Support ENC keyword in query.
-    assert(false);
-}
-
-
-static std::list<std::string>
-rewrite_helper(const std::string & q, Analysis & analysis,
-               query_parse & p) {
+rewrite_helper(const std::string & q, Analysis &analysis,
+               const ProxyState &ps, query_parse & p) {
     LOG(cdb_v) << "q " << q;
-
-    if (p.annot) {
-        return processAnnotation(*p.annot, analysis);
-    }
 
     LEX *lex = p.lex();
 
     LOG(cdb_v) << "pre-analyze " << *lex;
 
-    LEX *new_lex =
-        analysis.rewriter->dispatchOnLex(analysis, lex, *analysis.ps);
+    LEX *new_lex = analysis.rewriter->dispatchOnLex(analysis, lex, ps);
     assert(new_lex);
 
     // FIXME: This subsection needs to be moved around to fit our new
@@ -719,10 +707,10 @@ rewrite_helper(const std::string & q, Analysis & analysis,
     // --------------------------------------
     // HACK: To determine if we have a DDL.
     if (analysis.deltas.size() > 0) {
-        assert(analysis.ps->e_conn->execute(q));
+        assert(ps.e_conn->execute(q));
     }
     for (auto it : analysis.deltas) {
-        assert(it.apply(analysis.ps->e_conn));
+        assert(it.apply(ps.e_conn));
     }
 
     // --------------------------------------
@@ -779,7 +767,7 @@ Rewriter::rewrite(const std::string & q)
         // HACK(burrows): This 'Analysis' is dummy as we never call
         // addToReturn. But it works because this optimized cases don't
         // have anything to do in addToReturn anyways.
-        Analysis analysis = Analysis(&ps, NULL);
+        Analysis analysis = Analysis(NULL);
 
         res.wasRew = false;
         res.queries.push_back(q);
@@ -793,7 +781,7 @@ Rewriter::rewrite(const std::string & q)
     Analysis *old_analysis = NULL;
     while (true) {
         SchemaInfo * const schema = loadSchemaInfo(ps.e_conn);
-        Analysis analysis = Analysis(&ps, schema);
+        Analysis analysis = Analysis(schema);
         // HACK(burrows): Until redesign.
         analysis.rewriter = this;
         // HACK.
@@ -803,11 +791,11 @@ Rewriter::rewrite(const std::string & q)
             delete old_analysis;
         }
         try {
-            res.queries = rewrite_helper(q, analysis, p);
+            res.queries = rewrite_helper(q, analysis, ps, p);
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
             std::cout << "Adjusting onion!" << std::endl;
-            adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis,
+            adjustOnion(analysis, ps, e.o, e.fm, e.tolevel, e.itf,
                         ps.dbName());
             old_analysis = new Analysis(analysis);
             // HACK.

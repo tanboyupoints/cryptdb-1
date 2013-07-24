@@ -299,13 +299,13 @@ private:
         std::ostringstream push_stream;
         push_stream << " INSERT INTO " << plain_table
                     << " VALUES " << values_string << ";";
-        assert(a.ps->e_conn->execute(push_stream.str()));
+        assert(ps.e_conn->execute(push_stream.str()));
 
         // Run the original (unmodified) query on the data in the embedded
         // database.
         std::ostringstream query_stream;
         query_stream << *lex;
-        assert(a.ps->e_conn->execute(query_stream.str()));
+        assert(ps.e_conn->execute(query_stream.str()));
 
         // > Collect the results from the embedded database.
         // > This code relies on single threaded access to the database
@@ -314,7 +314,7 @@ private:
         DBResult *dbres;
         std::ostringstream select_results_stream;
         select_results_stream << " SELECT * FROM " << plain_table << ";";
-        assert(a.ps->e_conn->execute(select_results_stream.str(), dbres));
+        assert(ps.e_conn->execute(select_results_stream.str(), dbres));
 
         // FIXME(burrows): Use general join.
         ScopedMySQLRes r(dbres->n);
@@ -347,13 +347,13 @@ private:
         // Cleanup the embedded database.
         std::ostringstream cleanup_stream;
         cleanup_stream << "DELETE FROM " << plain_table << ";";
-        assert(a.ps->e_conn->execute(cleanup_stream.str()));
+        assert(ps.e_conn->execute(cleanup_stream.str()));
 
         // > Add each row from the embedded database to the data database.
         std::ostringstream push_results_stream;
         push_results_stream << " INSERT INTO " << plain_table
                             << " VALUES " << output_rows << ";";
-        Analysis insert_analysis = Analysis(a.ps, a.getSchema());
+        Analysis insert_analysis = Analysis(a.getSchema());
         insert_analysis.rewriter = a.rewriter;
         // FIXME(burrows): Memleak.
         // Freeing the query_parse (or using an automatic variable and
@@ -364,7 +364,7 @@ private:
         //     Query_arena::free_items
         //         Item::delete_self).
         query_parse * const parse =
-            new query_parse(a.ps->dbName(), push_results_stream.str());
+            new query_parse(ps.dbName(), push_results_stream.str());
         const SQLHandler *handler =
             a.rewriter->dml_dispatcher->dispatch(parse->lex());
         LEX * const final_insert_lex =
@@ -375,11 +375,11 @@ private:
         std::ostringstream delete_stream;
         delete_stream << " DELETE FROM " << plain_table
                       << " WHERE " << where_clause << ";";
-        Analysis delete_analysis = Analysis(a.ps, a.getSchema());
+        Analysis delete_analysis = Analysis(a.getSchema());
         delete_analysis.rewriter = a.rewriter;
         // FIXME(burrows): Identical memleak.
         query_parse * const delete_parse =
-            new query_parse(a.ps->dbName(), delete_stream.str());
+            new query_parse(ps.dbName(), delete_stream.str());
         const SQLHandler * const delete_handler =
             a.rewriter->dml_dispatcher->dispatch(delete_parse->lex());
         LEX * const delete_lex =

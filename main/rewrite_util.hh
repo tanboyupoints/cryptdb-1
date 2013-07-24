@@ -50,9 +50,9 @@ bool_to_string(bool b);
 bool string_to_bool(std::string s);
 
 List<Create_field>
-createAndRewriteField(Create_field *cf, TableMeta *tm,
-                      const std::string &table, const std::string &dbname,
-                      Analysis &a, bool new_table,
+createAndRewriteField(Analysis &a, const ProxyState &ps,
+                      Create_field *cf, TableMeta *tm,
+                      bool new_table,
                       List<Create_field> &rewritten_cfield_list);
 
 Item *

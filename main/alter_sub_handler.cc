@@ -11,7 +11,6 @@ class AddColumnSubHandler : public AlterSubHandler {
     {
         const std::string &table =
             lex->select_lex.table_list.first->table_name;
-        const std::string &dbname = lex->select_lex.table_list.first->db;
         LEX *new_lex = copy(lex);
 
         TableMeta *tm = a.getTableMeta(table);
@@ -26,9 +25,9 @@ class AddColumnSubHandler : public AlterSubHandler {
             List_iterator<Create_field>(lex->alter_info.create_list);
         new_lex->alter_info.create_list = 
             reduceList<Create_field>(add_it, List<Create_field>(),
-                [&tm, &a, dbname, table] (List<Create_field> out_list,
+                [&a, ps, &tm] (List<Create_field> out_list,
                                         Create_field *cf) {
-                    return createAndRewriteField(cf, tm, table, dbname, a,
+                    return createAndRewriteField(a, ps, cf, tm,
                                                  false, out_list);
             });
 
