@@ -314,7 +314,7 @@ class Rewriter;
 
 class RewriteOutput { 
 public:
-    RewriteOutput() {;}
+    RewriteOutput() : new_lex(NULL) {;}
     virtual ~RewriteOutput() = 0;
 
     void setNewLex(LEX *lex);

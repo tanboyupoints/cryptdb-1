@@ -1,4 +1,5 @@
 #include <main/Analysis.hh>
+#include <main/rewrite_util.hh>
 
 // FIXME: Memory leaks when we allocate MetaKey<...>, use smart pointer.
 
@@ -388,10 +389,16 @@ void RewriteOutput::setOriginalQuery(const std::string query)
     original_query = query;
 }
 
+static void
+prettyPrintQuery(std::string query)
+{
+    std::cout << std::endl << RED_BEGIN
+              << "QUERY: " << COLOR_END << query << std::endl;
+}
+
 // FIXME: Implement.
 DBResult *RewriteOutput::doQuery(Connect *conn, Connect *e_conn)
 {
-    /*
     if (false == queryAgain()) {
         DBResult *dbres;
         const std::string query = this->getQuery();
@@ -401,7 +408,6 @@ DBResult *RewriteOutput::doQuery(Connect *conn, Connect *e_conn)
 
         return dbres;
     }
-    */
     return NULL;
 }
 

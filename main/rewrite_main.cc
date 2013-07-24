@@ -749,56 +749,55 @@ Rewriter::rewrite(const std::string & q)
     //for as long as there are onion adjustments
     // HACK: Because we need to carry EncLayer adjustment information
     // to the next iteration.
-    while (true) {
-        const SchemaInfo * const schema = loadSchemaInfo(ps.e_conn);
-        Analysis analysis = Analysis(schema);
-        // HACK(burrows): Until redesign.
-        analysis.rewriter = this;
-        LEX *new_lex = NULL;
-        try {
-            LOG(cdb_v) << "pre-analyze " << *lex;
+    LEX *new_lex = NULL;
+    const SchemaInfo * const schema = loadSchemaInfo(ps.e_conn);
+    Analysis analysis = Analysis(schema);
+    // HACK(burrows): Until redesign.
+    analysis.rewriter = this;
+    try {
+        LOG(cdb_v) << "pre-analyze " << *lex;
 
-            new_lex = analysis.rewriter->dispatchOnLex(analysis, ps, lex);
-            assert(new_lex);
-        } catch (OnionAdjustExcept e) {
-            LOG(cdb_v) << "caught onion adjustment";
-            std::cout << "Adjusting onion!" << std::endl;
-            delete analysis.output;
-            analysis.output = new AdjustOnionOutput;
-            adjustOnion(analysis, ps, e.o, e.fm, e.tolevel, e.itf,
-                        ps.dbName());
-            continue;
-        }
-
-        analysis.output->setOriginalQuery(q);
-
-        res.output = analysis.output;
-        res.wasRew = true;
-        res.rmeta = analysis.rmeta;
-        SchemaInfo *old_schema = analysis.getSchema();
-        SchemaInfo *new_schema = loadSchemaInfo(ps.e_conn);
-        // HACK: The rmetas all have olks that refer to an older version
-        // of the FieldMeta that will not have the correct number of
-        // EncLayerz for each OnionMeta if there was an adjustment.
-        for (unsigned int i = 0; i < res.rmeta->rfmeta.size(); ++i) {
-            ReturnField *rf = &res.rmeta->rfmeta[i];
-            if (false == rf->is_salt) {
-                std::string table_name =
-                    old_schema->getTableNameFromFieldMeta(rf->olk.key);
-                IdentityMetaKey *table_key =
-                    new IdentityMetaKey(table_name);
-                TableMeta *tm = new_schema->getChild(table_key);
-                delete table_key;
-                IdentityMetaKey *field_key =
-                    new IdentityMetaKey(rf->olk.key->fname);
-                FieldMeta *new_fm = tm->getChild(field_key);
-                delete field_key;
-                rf->olk.key = new_fm;
-            }
-        }
-        printEmbeddedState(ps);
-        return res;
+        new_lex = analysis.rewriter->dispatchOnLex(analysis, ps, lex);
+        assert(new_lex);
+    } catch (OnionAdjustExcept e) {
+        LOG(cdb_v) << "caught onion adjustment";
+        std::cout << "Adjusting onion!" << std::endl;
+        delete analysis.output;
+        analysis.output = new AdjustOnionOutput;
+        adjustOnion(analysis, ps, e.o, e.fm, e.tolevel, e.itf,
+                    ps.dbName());
     }
+
+    analysis.output->setOriginalQuery(q);
+    analysis.output->setNewLex(new_lex);
+
+    res.output = analysis.output;
+    res.wasRew = true;
+    res.rmeta = analysis.rmeta;
+    /* FIXME: Move to decryptResults.
+    SchemaInfo *old_schema = analysis.getSchema();
+    SchemaInfo *new_schema = loadSchemaInfo(ps.e_conn);
+    // HACK: The rmetas all have olks that refer to an older version
+    // of the FieldMeta that will not have the correct number of
+    // EncLayerz for each OnionMeta if there was an adjustment.
+    for (unsigned int i = 0; i < res.rmeta->rfmeta.size(); ++i) {
+        ReturnField *rf = &res.rmeta->rfmeta[i];
+        if (false == rf->is_salt) {
+            std::string table_name =
+                old_schema->getTableNameFromFieldMeta(rf->olk.key);
+            IdentityMetaKey *table_key =
+                new IdentityMetaKey(table_name);
+            TableMeta *tm = new_schema->getChild(table_key);
+            delete table_key;
+            IdentityMetaKey *field_key =
+                new IdentityMetaKey(rf->olk.key->fname);
+            FieldMeta *new_fm = tm->getChild(field_key);
+            delete field_key;
+            rf->olk.key = new_fm;
+        }
+    }
+    */
+    return res;
 }
 
 //TODO: replace stringify with <<
@@ -885,7 +884,10 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
 static void
 prettyPrintQueryResult(ResType res)
 {
-    throw CryptDBError("prettyPrintQueryResult!");
+    std::cout << std::endl << RED_BEGIN
+              << "RESULTS: " << COLOR_END << std::endl;
+    printRes(res);
+    std::cout << std::endl;
 }
 
 bool
@@ -895,6 +897,10 @@ executeQuery(Rewriter &r, ProxyState &ps, const std::string &q)
         QueryRewrite qr = r.rewrite(q);
 
         DBResult *enc_res = qr.output->doQuery(ps.conn, ps.e_conn);
+        if (true == qr.output->queryAgain()) { // Onion adjustment.
+            return executeQuery(r, ps, q);
+        }
+
         ResType res = enc_res->unpack();
         if (!res.ok) {
             return false;
@@ -904,11 +910,8 @@ executeQuery(Rewriter &r, ProxyState &ps, const std::string &q)
         ResType dec_res = r.decryptResults(res, qr.rmeta);
         prettyPrintQueryResult(dec_res);
 
-        if (true == qr.output->queryAgain()) {
-            return executeQuery(r, ps, q);
-        } else {
-            return true;
-        }
+        printEmbeddedState(ps);
+        return true;
     } catch (std::runtime_error &e) {
         std::cout << "Unexpected Error: " << e.what() << " in query "
                   << q << std::endl;

@@ -100,15 +100,9 @@ executeQuery(Rewriter &r, ProxyState &ps, const std::string &q);
 ResType *
 executeQuery(Rewriter &r, const std::string &q, bool show=false);
 
-const std::string BOLD_BEGIN = "\033[1m";
-const std::string RED_BEGIN = "\033[1;31m";
-const std::string GREEN_BEGIN = "\033[1;92m";
-const std::string COLOR_END = "\033[0m";
-
 #define UNIMPLEMENTED \
         throw std::runtime_error(std::string("Unimplemented: ") + \
                         std::string(__PRETTY_FUNCTION__))
-
 
 class CItemType {
  public:
