@@ -7,8 +7,7 @@
 
 class AddColumnSubHandler : public AlterSubHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const SchemaInfo &schema) const
+                                  const ProxyState &ps) const
     {
         const std::string &table =
             lex->select_lex.table_list.first->table_name;
@@ -39,8 +38,7 @@ class AddColumnSubHandler : public AlterSubHandler {
 
 class DropColumnSubHandler : public AlterSubHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const SchemaInfo &schema) const
+                                  const ProxyState &ps) const
     {
         LEX *new_lex = copy(lex);
         const std::string &table =
@@ -106,8 +104,7 @@ class DropColumnSubHandler : public AlterSubHandler {
 
 class ChangeColumnSubHandler : public AlterSubHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const SchemaInfo &schema) const
+                                  const ProxyState &ps) const
     {
         assert(false);
     }
@@ -115,8 +112,7 @@ class ChangeColumnSubHandler : public AlterSubHandler {
 
 class ForeignKeySubHandler : public AlterSubHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const SchemaInfo &schema) const
+                                  const ProxyState &ps) const
     {
         assert(false);
     }
@@ -124,8 +120,7 @@ class ForeignKeySubHandler : public AlterSubHandler {
 
 class AddIndexSubHandler : public AlterSubHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const SchemaInfo &schema) const
+                                  const ProxyState &ps) const
     {
         const std::string &table =
             lex->select_lex.table_list.first->table_name;
@@ -160,8 +155,7 @@ class AddIndexSubHandler : public AlterSubHandler {
 
 class DropIndexSubHandler : public AlterSubHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const SchemaInfo &schema) const
+                                  const ProxyState &ps) const
     {
         LEX *new_lex = copy(lex);
         const std::string &table =
@@ -213,10 +207,9 @@ class DropIndexSubHandler : public AlterSubHandler {
 };
 
 LEX *AlterSubHandler::transformLex(Analysis &a, LEX *lex,
-                                   const ProxyState &ps,
-                                   const SchemaInfo &schema) const
+                                   const ProxyState &ps) const
 {
-    return this->rewriteAndUpdate(a, lex, ps, schema);
+    return this->rewriteAndUpdate(a, lex, ps);
 }
 
 AlterDispatcher *buildAlterSubDispatcher() {

@@ -9,8 +9,8 @@
 class SQLHandler {
 public:
     SQLHandler() {;}
-    virtual LEX *transformLex(Analysis &a, LEX *lex, const ProxyState &ps,
-                              const SchemaInfo &schema) const = 0;
+    virtual LEX *transformLex(Analysis &a, LEX *lex, const ProxyState &ps)
+        const = 0;
     virtual ~SQLHandler() {;}
 };
 

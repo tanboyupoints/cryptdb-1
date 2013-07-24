@@ -234,8 +234,7 @@ operator<<(std::ostream &out, const RewritePlan * rp);
 typedef struct ProxyState {
 
     ProxyState()
-        : conn(NULL), e_conn(NULL), encByDefault(true), masterKey(NULL),
-          schema(NULL) {}
+        : conn(NULL), e_conn(NULL), encByDefault(true), masterKey(NULL) {}
     ~ProxyState();
     std::string dbName() {return dbname;}
 
@@ -247,8 +246,6 @@ typedef struct ProxyState {
 
     bool           encByDefault;
     AES_KEY*       masterKey;
-
-    SchemaInfo*    schema;
 
 private:
     // FIXME: Remove once cryptdb supports multiple databases.
@@ -317,9 +314,11 @@ class Rewriter;
 
 class Analysis {
 public:
-    Analysis(ProxyState * ps) : ps(ps), pos(0), rmeta(new ReturnMeta()) {}
-
-    Analysis(): ps(NULL), pos(0), rmeta(new ReturnMeta()) {}
+    Analysis(ProxyState * ps, SchemaInfo *schema)
+        : ps(ps), pos(0), rmeta(new ReturnMeta()), schema(schema) {}
+    // FIXME: Remove.
+    Analysis()
+        : ps(NULL), pos(0), rmeta(new ReturnMeta()), schema(schema) {}
 
     // pointer to proxy metadata
     ProxyState * ps;
@@ -352,6 +351,8 @@ public:
     EncLayer *popBackEncLayer(OnionMeta * const om);
     SECLEVEL getOnionLevel(OnionMeta * const om) const;
     std::vector<EncLayer *> getEncLayers(OnionMeta * const om) const;
+    // HACK.
+    SchemaInfo *getSchema() {return const_cast<SchemaInfo *>(schema);}
 
     // HACK(burrows): This is a temporary solution until I redesign.
     Rewriter *rewriter;
@@ -363,6 +364,7 @@ public:
     std::map<OnionMeta *, std::vector<EncLayer *>> to_adjust_enc_layers;
 
 private:
+    const SchemaInfo * const schema;
     std::string unAliasTable(const std::string &table) const;
 };
 

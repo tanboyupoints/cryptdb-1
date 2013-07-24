@@ -12,13 +12,11 @@
 class DDLHandler : public SQLHandler {
 public:
     virtual LEX *transformLex(Analysis &analysis, LEX *lex, 
-                              const ProxyState &ps,
-                              const SchemaInfo &schema) const;
+                              const ProxyState &ps) const;
 
 private:
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const SchemaInfo &schema) const = 0;
+                                  const ProxyState &ps) const = 0;
 
 protected:
     DDLHandler() {;}

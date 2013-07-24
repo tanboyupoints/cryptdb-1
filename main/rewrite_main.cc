@@ -638,7 +638,6 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
     // Must be called before loadSchemaInfo.
     buildTypeTextTranslator();
-    ps.schema = loadSchemaInfo(ps.e_conn);
     // printEmbeddedState(ps);
 
     dml_dispatcher = buildDMLDispatcher();
@@ -653,10 +652,10 @@ Rewriter::Rewriter(ConnectionInfo ci,
 }
 
 LEX *
-Rewriter::dispatchAndTransformOnLex(Analysis &a, LEX *lex,
-                                    const ProxyState &ps,
-                                    const SchemaInfo &schema) {
-    const SQLHandler *handler;
+Rewriter::dispatchOnLex(Analysis &a, LEX *lex,
+                        const ProxyState &ps)
+{
+    SQLHandler *handler;
     if (dml_dispatcher->canDo(lex)) {
         handler = dml_dispatcher->dispatch(lex);
     } else if (ddl_dispatcher->canDo(lex)) {
@@ -665,7 +664,7 @@ Rewriter::dispatchAndTransformOnLex(Analysis &a, LEX *lex,
         throw CryptDBError("Rewriter can not dispatch bad lex");
     }
 
-    return handler->transformLex(a, lex, ps, schema);
+    return handler->transformLex(a, lex, ps);
 }
 
 ProxyState::~ProxyState()
@@ -712,9 +711,7 @@ rewrite_helper(const std::string & q, Analysis & analysis,
     LOG(cdb_v) << "pre-analyze " << *lex;
 
     LEX *new_lex =
-        analysis.rewriter->dispatchAndTransformOnLex(analysis, lex,
-                                                     *analysis.ps,
-                                                     *analysis.ps->schema);
+        analysis.rewriter->dispatchOnLex(analysis, lex, *analysis.ps);
     assert(new_lex);
 
     // FIXME: This subsection needs to be moved around to fit our new
@@ -782,7 +779,7 @@ Rewriter::rewrite(const std::string & q)
         // HACK(burrows): This 'Analysis' is dummy as we never call
         // addToReturn. But it works because this optimized cases don't
         // have anything to do in addToReturn anyways.
-        Analysis analysis = Analysis(&ps);
+        Analysis analysis = Analysis(&ps, NULL);
 
         res.wasRew = false;
         res.queries.push_back(q);
@@ -795,7 +792,8 @@ Rewriter::rewrite(const std::string & q)
     // to the next iteration.
     Analysis *old_analysis = NULL;
     while (true) {
-        Analysis analysis = Analysis(&ps);
+        SchemaInfo * const schema = loadSchemaInfo(ps.e_conn);
+        Analysis analysis = Analysis(&ps, schema);
         // HACK(burrows): Until redesign.
         analysis.rewriter = this;
         // HACK.
@@ -820,8 +818,8 @@ Rewriter::rewrite(const std::string & q)
         }
         res.wasRew = true;
         res.rmeta = analysis.rmeta;
-        SchemaInfo *old_schema = ps.schema;
-        ps.schema = loadSchemaInfo(ps.e_conn);
+        SchemaInfo *old_schema = analysis.getSchema();
+        SchemaInfo *new_schema = loadSchemaInfo(ps.e_conn);
         // HACK: The rmetas all have olks that refer to an older version
         // of the FieldMeta that will not have the correct number of
         // EncLayerz for each OnionMeta if there was an adjustment.
@@ -832,7 +830,7 @@ Rewriter::rewrite(const std::string & q)
                     old_schema->getTableNameFromFieldMeta(rf->olk.key);
                 IdentityMetaKey *table_key =
                     new IdentityMetaKey(table_name);
-                TableMeta *tm = ps.schema->getChild(table_key);
+                TableMeta *tm = new_schema->getChild(table_key);
                 delete table_key;
                 IdentityMetaKey *field_key =
                     new IdentityMetaKey(rf->olk.key->fname);

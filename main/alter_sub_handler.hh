@@ -10,14 +10,12 @@
 class AlterSubHandler : public SQLHandler {
 public:
     virtual LEX *transformLex(Analysis &a, LEX *lex,
-                              const ProxyState &ps,
-                              const SchemaInfo &schema) const;
+                              const ProxyState &ps) const;
     virtual ~AlterSubHandler() {;}
 
 private:
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const SchemaInfo &schema) const = 0;
+                                  const ProxyState &ps) const = 0;
 
 protected:
     AlterSubHandler() {;}

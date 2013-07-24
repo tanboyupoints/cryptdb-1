@@ -32,14 +32,13 @@ static void
 process_table_list(List<TABLE_LIST> *tll, Analysis & a);
 
 class InsertHandler : public DMLHandler {
-    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps,
-                        const SchemaInfo &schema) const
+    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps) const
     {
         process_select_lex(lex, a);
     }
 
-    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps,
-                          const SchemaInfo &schema) const
+    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+        const
     {
         LEX * new_lex = copy(lex);
 
@@ -121,8 +120,8 @@ class InsertHandler : public DMLHandler {
 };
 
 class UpdateHandler : public DMLHandler {
-    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps,
-                        const SchemaInfo &schema) const
+    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps)
+        const
     {
         process_table_list(&lex->select_lex.top_join_list, a);
 
@@ -146,8 +145,8 @@ class UpdateHandler : public DMLHandler {
 
         process_filters_lex(&lex->select_lex, a);
     }
-    virtual  LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps,
-                          const SchemaInfo &schema) const
+    virtual  LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+        const
     {
         LEX * new_lex = copy(lex);
 
@@ -255,14 +254,13 @@ class UpdateHandler : public DMLHandler {
         if (false == invalids) {
             return new_lex;
         } else {
-            return refresh_onions(a, lex, new_lex, ps, schema);
+            return refresh_onions(a, lex, new_lex, ps);
         }
     }
 
 private:
     LEX *refresh_onions(Analysis &a, LEX *lex, LEX *new_lex,
-                        const ProxyState &ps,
-                        const SchemaInfo &schema) const
+                        const ProxyState &ps) const
     {
         throw CryptDBError("UPDATEing with a column as rvalue is broken!");
 
@@ -355,7 +353,7 @@ private:
         std::ostringstream push_results_stream;
         push_results_stream << " INSERT INTO " << plain_table
                             << " VALUES " << output_rows << ";";
-        Analysis insert_analysis = Analysis(a.ps);
+        Analysis insert_analysis = Analysis(a.ps, a.getSchema());
         insert_analysis.rewriter = a.rewriter;
         // FIXME(burrows): Memleak.
         // Freeing the query_parse (or using an automatic variable and
@@ -370,15 +368,14 @@ private:
         const SQLHandler *handler =
             a.rewriter->dml_dispatcher->dispatch(parse->lex());
         LEX * const final_insert_lex =
-            handler->transformLex(insert_analysis, parse->lex(), ps,
-                                  schema);
+            handler->transformLex(insert_analysis, parse->lex(), ps);
         assert(final_insert_lex);
 
         // DELETE the rows matching the WHERE clause from the database.
         std::ostringstream delete_stream;
         delete_stream << " DELETE FROM " << plain_table
                       << " WHERE " << where_clause << ";";
-        Analysis delete_analysis = Analysis(a.ps);
+        Analysis delete_analysis = Analysis(a.ps, a.getSchema());
         delete_analysis.rewriter = a.rewriter;
         // FIXME(burrows): Identical memleak.
         query_parse * const delete_parse =
@@ -387,8 +384,7 @@ private:
             a.rewriter->dml_dispatcher->dispatch(delete_parse->lex());
         LEX * const delete_lex =
             delete_handler->transformLex(delete_analysis,
-                                         delete_parse->lex(), ps,
-                                         schema);
+                                         delete_parse->lex(), ps);
         assert(delete_lex);
 
         // FIXME: delete_lex and final_insert_lex must be used.
@@ -408,13 +404,13 @@ private:
 };
 
 class DeleteHandler : public DMLHandler {
-    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps,
-                        const SchemaInfo &schema) const
+    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps)
+        const
     {
         process_select_lex(lex, a);
     }
-    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps,
-                          const SchemaInfo &schema) const
+    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+        const
     {
         LEX * new_lex = copy(lex);
         new_lex->query_tables = rewrite_table_list(lex->query_tables, a);
@@ -425,13 +421,13 @@ class DeleteHandler : public DMLHandler {
 };
 
 class SelectHandler : public DMLHandler {
-    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps,
-                        const SchemaInfo &schema) const
+    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps)
+        const
     {
         process_select_lex(lex, a);
     }
-    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps,
-                          const SchemaInfo &schema) const
+    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+        const
     {
         LEX * new_lex = copy(lex);
         new_lex->select_lex.top_join_list = rewrite_table_list(lex->select_lex.top_join_list, a);
@@ -442,12 +438,11 @@ class SelectHandler : public DMLHandler {
 };
 
  LEX *DMLHandler::transformLex(Analysis &analysis, LEX *lex,
-                               const ProxyState &ps,
-                               const SchemaInfo &schema) const
+                               const ProxyState &ps) const
 {
-    this->gather(analysis, lex, ps, schema);
+    this->gather(analysis, lex, ps);
 
-    return this->rewrite(analysis, lex, ps, schema);
+    return this->rewrite(analysis, lex, ps);
 }
 
 // Helpers.

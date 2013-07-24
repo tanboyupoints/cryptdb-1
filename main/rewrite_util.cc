@@ -321,8 +321,8 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
     } else {
         Delta d(Delta::CREATE, fm, tm, new IdentityMetaKey(name));
         a.deltas.push_back(d);
-        const Delta d0(Delta::REPLACE, tm, a.ps->schema,
-                       a.ps->schema->getKey(tm));
+        const Delta d0(Delta::REPLACE, tm, a.getSchema(),
+                       a.getSchema()->getKey(tm));
         a.deltas.push_back(d0);
     }
 

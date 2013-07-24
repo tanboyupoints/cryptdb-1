@@ -16,14 +16,13 @@
 //     going to get changed.
 class AlterHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const SchemaInfo &schema) const
+                                  const ProxyState &ps) const
     {
         const AlterSubHandler *handler;
         assert(sub_dispatcher->canDo(lex));
         assert(handler =
             (const AlterSubHandler*)sub_dispatcher->dispatch(lex));
-        return handler->transformLex(a, lex, ps, schema);
+        return handler->transformLex(a, lex, ps);
     }
     
     AlterDispatcher *sub_dispatcher;
@@ -37,8 +36,7 @@ public:
 
 class CreateHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const SchemaInfo &schema) const
+                                  const ProxyState &ps) const
     {
 
         char* dbname = lex->select_lex.table_list.first->db;
@@ -60,7 +58,7 @@ class CreateHandler : public DDLHandler {
             // TODO: Use appropriate values for has_sensitive and has_salt.
             TableMeta *tm = new TableMeta(true, true);
             IdentityMetaKey *key = new IdentityMetaKey(table);
-            Delta delta(Delta::CREATE, tm, a.ps->schema, key);
+            Delta delta(Delta::CREATE, tm, a.getSchema(), key);
             a.deltas.push_back(delta);
            
             // -----------------------------
@@ -116,18 +114,16 @@ class CreateHandler : public DDLHandler {
 
 class DropHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const SchemaInfo &schema) const
+                                  const ProxyState &ps) const
     {
 
-        LEX *final_lex = rewrite(a, lex, ps, schema);
-        update(a, lex, ps, schema);
+        LEX *final_lex = rewrite(a, lex, ps);
+        update(a, lex, ps);
 
         return final_lex;
     }
     
-    LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps,
-                 const SchemaInfo &schema) const
+    LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps) const
     {
         LEX *new_lex = copy(lex);
         new_lex->select_lex.table_list =
@@ -136,8 +132,7 @@ class DropHandler : public DDLHandler {
         return new_lex;
     }
 
-    void update(Analysis &a, LEX *lex, const ProxyState &ps,
-                const SchemaInfo &schema) const
+    void update(Analysis &a, LEX *lex, const ProxyState &ps) const
     {
         TABLE_LIST *tbl = lex->select_lex.table_list.first;
         for (; tbl; tbl = tbl->next_local) {
@@ -152,7 +147,7 @@ class DropHandler : public DDLHandler {
             // Remove from *Meta structures.
             TableMeta *tm = a.getTableMeta(table);
             // FIXME: Key only necessary for CREATE.
-            Delta delta(Delta::DELETE, tm, a.ps->schema,
+            Delta delta(Delta::DELETE, tm, a.getSchema(),
                         new IdentityMetaKey(table));
             a.deltas.push_back(delta);
         }
@@ -162,8 +157,7 @@ class DropHandler : public DDLHandler {
 // TODO: Implement.
 class ChangeDBHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const SchemaInfo &schema) const
+                                  const ProxyState &ps) const
     {
 
         throw CryptDBError("cryptdb does not support changing the db!");
@@ -171,10 +165,9 @@ class ChangeDBHandler : public DDLHandler {
 };
 
 LEX *DDLHandler::transformLex(Analysis &a, LEX *lex,
-                              const ProxyState &ps,
-                              const SchemaInfo &schema) const
+                              const ProxyState &ps) const
 {
-    return this->rewriteAndUpdate(a, lex, ps, schema);
+    return this->rewriteAndUpdate(a, lex, ps);
 }
 
 // FIXME: Add test to make sure handler added successfully.

@@ -12,14 +12,13 @@
 class DMLHandler : public SQLHandler {
 public:
     virtual LEX *transformLex(Analysis &a, LEX *lex,
-                               const ProxyState &ps,
-                               const SchemaInfo &schema) const;
+                               const ProxyState &ps) const;
 
 private:
-    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps,
-                        const SchemaInfo &schema) const = 0;
-    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps,
-                         const SchemaInfo &schema) const = 0;
+    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps)
+        const = 0;
+    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+        const = 0;
 
 protected:
     DMLHandler() {;}

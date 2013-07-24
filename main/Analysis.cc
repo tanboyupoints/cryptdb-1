@@ -400,7 +400,7 @@ FieldMeta *Analysis::getFieldMeta(const std::string &table,
                                   const std::string &field) const
 {
     std::string real_table_name = unAliasTable(table);
-    FieldMeta *fm = ps->schema->getFieldMeta(real_table_name, field);
+    FieldMeta *fm = this->schema->getFieldMeta(real_table_name, field);
     assert(fm);
     return fm;
 }
@@ -409,7 +409,7 @@ TableMeta *Analysis::getTableMeta(const std::string &table) const
 {
     IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
                                  
-    TableMeta *tm = ps->schema->getChild(key);
+    TableMeta *tm = this->schema->getChild(key);
     assert(tm);
     return tm;
 }
@@ -419,7 +419,7 @@ bool Analysis::destroyFieldMeta(const std::string &table,
                                 const std::string &field)
 {
     IdentityMetaKey *table_key = new IdentityMetaKey(unAliasTable(table));
-    TableMeta *tm = ps->schema->getChild(table_key);
+    TableMeta *tm = this->schema->getChild(table_key);
     if (!tm) {
         return false;
     }
@@ -431,13 +431,13 @@ bool Analysis::destroyFieldMeta(const std::string &table,
 bool Analysis::destroyTableMeta(const std::string &table)
 {
     IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
-    return ps->schema->destroyChild(key);
+    return this->getSchema()->destroyChild(key);
 }
 
 bool Analysis::tableMetaExists(const std::string &table) const
 {
     IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
-    return ps->schema->childExists(key);
+    return this->schema->childExists(key);
 }
 
 std::string Analysis::getAnonTableName(const std::string &table) const

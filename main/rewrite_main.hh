@@ -68,9 +68,8 @@ public:
     // to carry around Connect objects.
     Connect *getConnection() {return ps.conn;}
 
-    LEX *dispatchAndTransformOnLex(Analysis &a, LEX *lex,
-                                   const ProxyState &ps,
-                                   const SchemaInfo &schema);
+    LEX *dispatchOnLex(Analysis &a, LEX *lex,
+                       const ProxyState &ps);
 
     SQLDispatcher *dml_dispatcher;
     SQLDispatcher *ddl_dispatcher;
