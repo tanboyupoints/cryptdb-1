@@ -394,7 +394,8 @@ private:
 class Analysis {
 public:
     Analysis(const SchemaInfo * const schema)
-        : pos(0), rmeta(new ReturnMeta()), schema(schema) {}
+        : pos(0), rmeta(new ReturnMeta()), special_update(false),
+          schema(schema) {}
 
     unsigned int pos; // > a counter indicating how many projection
                       // fields have been analyzed so far
@@ -404,6 +405,8 @@ public:
 
     // information for decrypting results
     ReturnMeta * rmeta;
+    
+    bool special_update;
 
     // These functions are prefered to their lower level counterparts.
     bool addAlias(const std::string &alias, const std::string &table);

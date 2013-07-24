@@ -694,7 +694,11 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         SQLHandler *handler = dml_dispatcher->dispatch(lex);
         try {
             LEX *out_lex = handler->transformLex(a, lex, ps);
-            return new DMLOutput(query, out_lex);
+            if (true == a.special_update) {
+                return new SpecialUpdate(query, out_lex);
+            } else {
+                return new DMLOutput(query, out_lex);
+            }
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
             std::cout << "Adjusting onion!" << std::endl;
