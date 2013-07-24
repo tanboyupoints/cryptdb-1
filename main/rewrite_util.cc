@@ -319,11 +319,13 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     if (true == new_table) {
         tm->addChild(new IdentityMetaKey(name), fm);
     } else {
-        Delta d(Delta::CREATE, fm, tm, new IdentityMetaKey(name));
-        a.deltas.push_back(d);
+        // FIXME: dynamic_cast
+        DDLOutput *ddl_output = static_cast<DDLOutput *>(a.output);
+        const Delta d(Delta::CREATE, fm, tm, new IdentityMetaKey(name));
+        ddl_output->addDelta(d);
         const Delta d0(Delta::REPLACE, tm, a.getSchema(),
                        a.getSchema()->getKey(tm));
-        a.deltas.push_back(d0);
+        ddl_output->addDelta(d0);
     }
 
     // -----------------------------

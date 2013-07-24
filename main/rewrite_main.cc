@@ -296,13 +296,15 @@ removeOnionLayer(Analysis &a, const ProxyState &ps, FieldMeta * fm,
     std::cerr << "\nADJUST: \n" << query.str() << "\n";
 
     //execute decryption query
-    assert_s(ps.conn->execute(query.str()), "failed to execute onion decryption query");
 
     LOG(cdb_v) << "adjust onions: \n" << query.str() << "\n";
 
-    //remove onion layer in schema
-    Delta d(Delta::DELETE, a.popBackEncLayer(om), om, NULL);	
-    a.deltas.push_back(d);
+    // FIXME: Should be dynamic_cast.
+    AdjustOnionOutput *adjust_output =
+        static_cast<AdjustOnionOutput *>(a.output);
+    Delta d(Delta::DELETE, a.popBackEncLayer(om), om, NULL);
+    adjust_output->addDelta(d);
+    adjust_output->addAdjustQuery(query.str());
 
     *new_level = a.getOnionLevel(om);
 }
@@ -747,19 +749,11 @@ Rewriter::rewrite(const std::string & q)
     //for as long as there are onion adjustments
     // HACK: Because we need to carry EncLayer adjustment information
     // to the next iteration.
-    Analysis *old_analysis = NULL;
     while (true) {
         const SchemaInfo * const schema = loadSchemaInfo(ps.e_conn);
         Analysis analysis = Analysis(schema);
         // HACK(burrows): Until redesign.
         analysis.rewriter = this;
-        // HACK.
-        if (old_analysis) {
-            analysis.to_adjust_enc_layers =
-                old_analysis->to_adjust_enc_layers;
-            delete old_analysis;
-        }
-
         LEX *new_lex = NULL;
         try {
             LOG(cdb_v) << "pre-analyze " << *lex;
@@ -771,27 +765,12 @@ Rewriter::rewrite(const std::string & q)
             std::cout << "Adjusting onion!" << std::endl;
             adjustOnion(analysis, ps, e.o, e.fm, e.tolevel, e.itf,
                         ps.dbName());
-            old_analysis = new Analysis(analysis);
-            // HACK.
-            for (auto it : analysis.deltas) {
-                assert(it.apply(ps.e_conn));
-            }
             continue;
         }
 
-        // HACK: To determine if we have a DDL.
-        if (analysis.deltas.size() > 0) {
-            assert(ps.e_conn->execute(q));
-        }
-        for (auto it : analysis.deltas) {
-            assert(it.apply(ps.e_conn));
-        }
+        analysis.output->setOriginalQuery(q);
 
-        std::list<std::string> queries;
-        std::ostringstream ss;
-        ss << *new_lex;
-        res.queries.push_back(ss.str());
-
+        res.output = analysis.output;
         res.wasRew = true;
         res.rmeta = analysis.rmeta;
         SchemaInfo *old_schema = analysis.getSchema();

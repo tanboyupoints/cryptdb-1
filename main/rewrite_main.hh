@@ -49,6 +49,7 @@ public:
     bool wasRew; //if query was rewritten
     std::list<std::string> queries;
     ReturnMeta * rmeta;
+    RewriteOutput *output;
 };
 
 // Main class processing rewriting

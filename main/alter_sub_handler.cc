@@ -67,9 +67,10 @@ class DropColumnSubHandler : public AlterSubHandler {
                     TableMeta *tm = a.getTableMeta(table);
                     List<Alter_drop> lst = this->rewrite(fm, adrop);
                     out_list.concat(&lst);
-                    // FIXME: Slow.
+                    DDLOutput *ddl_output =
+                        static_cast<DDLOutput *>(a.output);
                     Delta d(Delta::DELETE, fm, tm, tm->getKey(fm));
-                    a.deltas.push_back(d);
+                    ddl_output->addDelta(d);
                     return out_list; /* lambda */
                 });
 
