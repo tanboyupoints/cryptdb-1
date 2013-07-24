@@ -79,8 +79,8 @@ class CreateHandler : public DDLHandler {
                 List_iterator<Create_field>(lex->alter_info.create_list);
             new_lex->alter_info.create_list = 
                 reduceList<Create_field>(it, List<Create_field>(),
-                    [&a, ps, &tm] (List<Create_field> out_list,
-                                              Create_field *cf) {
+                    [&a, &ps, &tm] (List<Create_field> out_list,
+                                    Create_field *cf) {
                         return createAndRewriteField(a, ps, cf, tm, 
                                                      true, out_list);
                 });
