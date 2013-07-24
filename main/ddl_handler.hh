@@ -11,14 +11,14 @@
 // Abstract base class for command handler.
 class DDLHandler : public SQLHandler {
 public:
-    virtual LEX **transformLex(LEX *lex, Analysis &analysis,
-                               const std::string &q,
-                               unsigned *out_lex_count) const;
+    virtual LEX *transformLex(Analysis &analysis, LEX *lex, 
+                              const ProxyState &ps,
+                              const SchemaInfo &schema) const;
 
 private:
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
-                                   const std::string &q,
-                                   unsigned *out_lex_count) const = 0;
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
+                                  const ProxyState &ps,
+                                  const SchemaInfo &schema) const = 0;
 
 protected:
     DDLHandler() {;}

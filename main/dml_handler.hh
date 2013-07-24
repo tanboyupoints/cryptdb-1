@@ -11,14 +11,15 @@
 // Abstract base class for query handler.
 class DMLHandler : public SQLHandler {
 public:
-    virtual LEX** transformLex(LEX *lex, Analysis &analysis,
-                               const std::string &q,
-                               unsigned *out_lex_count) const;
+    virtual LEX *transformLex(Analysis &a, LEX *lex,
+                               const ProxyState &ps,
+                               const SchemaInfo &schema) const;
 
 private:
-    virtual void gather(LEX *lex, Analysis &a) const = 0;
-    virtual LEX **rewrite(LEX *lex, Analysis &a,
-                          unsigned *out_lex_count) const = 0;
+    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps,
+                        const SchemaInfo &schema) const = 0;
+    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps,
+                         const SchemaInfo &schema) const = 0;
 
 protected:
     DMLHandler() {;}

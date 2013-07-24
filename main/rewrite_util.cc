@@ -302,15 +302,6 @@ string_to_bool(std::string s)
     }
 }
 
-LEX **
-single_lex_output(LEX *out_me, unsigned *out_lex_count)
-{
-    LEX **out_lex = new LEX*[1];
-    out_lex[0] = out_me;
-    *out_lex_count = 1;
-    return out_lex;
-}
-
 List<Create_field>
 createAndRewriteField(Create_field *cf, TableMeta *tm,
                       const std::string &table, const std::string &dbname,

@@ -652,10 +652,10 @@ Rewriter::Rewriter(ConnectionInfo ci,
     ps.e_conn->execute("USE cryptdbtest;");
 }
 
-LEX **
-Rewriter::dispatchAndTransformOnLex(LEX *lex, Analysis &a,
-                                    const std::string &q,
-                                    unsigned *out_lex_count) {
+LEX *
+Rewriter::dispatchAndTransformOnLex(Analysis &a, LEX *lex,
+                                    const ProxyState &ps,
+                                    const SchemaInfo &schema) {
     const SQLHandler *handler;
     if (dml_dispatcher->canDo(lex)) {
         handler = dml_dispatcher->dispatch(lex);
@@ -665,7 +665,7 @@ Rewriter::dispatchAndTransformOnLex(LEX *lex, Analysis &a,
         throw CryptDBError("Rewriter can not dispatch bad lex");
     }
 
-    return handler->transformLex(lex, a, q, out_lex_count);
+    return handler->transformLex(a, lex, ps, schema);
 }
 
 ProxyState::~ProxyState()
@@ -675,15 +675,14 @@ ProxyState::~ProxyState()
         conn = NULL;
     }
     if (e_conn) {
-	delete e_conn;
-	e_conn = NULL;
+        delete e_conn;
+        e_conn = NULL;
     }
 }
 
 // TODO: Cleanup resources.
 Rewriter::~Rewriter()
-{
-}
+{}
 
 void
 Rewriter::setMasterKey(const std::string &mkey)
@@ -701,7 +700,7 @@ processAnnotation(Annotation annot, Analysis &a)
 
 static std::list<std::string>
 rewrite_helper(const std::string & q, Analysis & analysis,
-	       query_parse & p) {
+               query_parse & p) {
     LOG(cdb_v) << "q " << q;
 
     if (p.annot) {
@@ -712,11 +711,11 @@ rewrite_helper(const std::string & q, Analysis & analysis,
 
     LOG(cdb_v) << "pre-analyze " << *lex;
 
-    unsigned out_lex_count = 0;
-    LEX **new_lexes =
-        analysis.rewriter->dispatchAndTransformOnLex(lex, analysis, q,
-                                                     &out_lex_count);
-    assert(new_lexes && out_lex_count != 0);
+    LEX *new_lex =
+        analysis.rewriter->dispatchAndTransformOnLex(analysis, lex,
+                                                     *analysis.ps,
+                                                     *analysis.ps->schema);
+    assert(new_lex);
 
     // FIXME: This subsection needs to be moved around to fit our new
     // execution scheme.
@@ -732,13 +731,9 @@ rewrite_helper(const std::string & q, Analysis & analysis,
     // --------------------------------------
 
     std::list<std::string> queries;
-    for (unsigned i = 0; i < out_lex_count; ++i) {
-        LOG(cdb_v) << "FINAL QUERY [" << i+1 << "/" << out_lex_count
-                   << "]: " << new_lexes[i] << std::endl;
-        std::stringstream ss;
-        ss << *new_lexes[i];
-        queries.push_back(ss.str());
-    }
+    std::ostringstream ss;
+    ss << *new_lex;
+    queries.push_back(ss.str());
 
     return queries;
 }
@@ -751,12 +746,12 @@ noRewrite(LEX * lex) {
     case SQLCOM_BEGIN:
     case SQLCOM_COMMIT:
     case SQLCOM_SHOW_TABLES:
-	return true;
+        return true;
     case SQLCOM_SELECT: {
 
     }
     default:
-	return false;
+        return false;
     }
 
     return false;
@@ -865,7 +860,7 @@ std::string ReturnMeta::stringify() {
     std::stringstream res;
     res << "rmeta contains " << rfmeta.size() << " elements: \n";
     for (auto i : rfmeta) {
-	res << i.first << " " << i.second.stringify() << "\n";
+        res << i.first << " " << i.second.stringify() << "\n";
     }
     return res.str();
 }

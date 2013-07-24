@@ -6,9 +6,9 @@
 #include <main/dispatcher.hh>
 
 class AddColumnSubHandler : public AlterSubHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
-                                   const std::string &q,
-                                   unsigned *out_lex_count) const
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
+                                  const ProxyState &ps,
+                                  const SchemaInfo &schema) const
     {
         const std::string &table =
             lex->select_lex.table_list.first->table_name;
@@ -33,14 +33,15 @@ class AddColumnSubHandler : public AlterSubHandler {
                                                  false, out_list);
             });
 
-        return single_lex_output(new_lex, out_lex_count);
+        return new_lex;
     }
 };
 
 class DropColumnSubHandler : public AlterSubHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
-                                   const std::string &q,
-                                   unsigned *out_lex_count) const {
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
+                                  const ProxyState &ps,
+                                  const SchemaInfo &schema) const
+    {
         LEX *new_lex = copy(lex);
         const std::string &table =
             lex->select_lex.table_list.first->table_name;
@@ -75,7 +76,7 @@ class DropColumnSubHandler : public AlterSubHandler {
                     return out_list; /* lambda */
                 });
 
-        return single_lex_output(new_lex, out_lex_count);
+        return new_lex;
     }
 
     List<Alter_drop> rewrite(FieldMeta *fm, Alter_drop *adrop) const
@@ -104,25 +105,27 @@ class DropColumnSubHandler : public AlterSubHandler {
 };
 
 class ChangeColumnSubHandler : public AlterSubHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
-                                   const std::string &q,
-                                   unsigned *out_lex_count) const {
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
+                                  const ProxyState &ps,
+                                  const SchemaInfo &schema) const
+    {
         assert(false);
     }
 };
 
 class ForeignKeySubHandler : public AlterSubHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
-                                   const std::string &q,
-                                   unsigned *out_lex_count) const {
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
+                                  const ProxyState &ps,
+                                  const SchemaInfo &schema) const
+    {
         assert(false);
     }
 };
 
 class AddIndexSubHandler : public AlterSubHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
-                                   const std::string &q,
-                                   unsigned *out_lex_count) const
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
+                                  const ProxyState &ps,
+                                  const SchemaInfo &schema) const
     {
         const std::string &table =
             lex->select_lex.table_list.first->table_name;
@@ -151,14 +154,15 @@ class AddIndexSubHandler : public AlterSubHandler {
                     return out_list;
             });
  
-        return single_lex_output(new_lex, out_lex_count);
+        return new_lex;
     }
 };
 
 class DropIndexSubHandler : public AlterSubHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
-                                   const std::string &q,
-                                   unsigned *out_lex_count) const {
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
+                                  const ProxyState &ps,
+                                  const SchemaInfo &schema) const
+    {
         LEX *new_lex = copy(lex);
         const std::string &table =
             lex->select_lex.table_list.first->table_name;
@@ -190,7 +194,7 @@ class DropIndexSubHandler : public AlterSubHandler {
                     return out_list;
                 });
 
-        return single_lex_output(new_lex, out_lex_count);
+        return new_lex;
     }
 
     List<Alter_drop> rewrite(Analysis a, Alter_drop *adrop,
@@ -208,10 +212,11 @@ class DropIndexSubHandler : public AlterSubHandler {
     }
 };
 
-LEX **AlterSubHandler::transformLex(LEX *lex, Analysis &a,
-                                    const std::string &q,
-                                    unsigned *out_lex_count) const {
-    return this->rewriteAndUpdate(lex, a, q, out_lex_count);
+LEX *AlterSubHandler::transformLex(Analysis &a, LEX *lex,
+                                   const ProxyState &ps,
+                                   const SchemaInfo &schema) const
+{
+    return this->rewriteAndUpdate(a, lex, ps, schema);
 }
 
 AlterDispatcher *buildAlterSubDispatcher() {

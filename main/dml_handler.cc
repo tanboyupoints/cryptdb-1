@@ -32,11 +32,15 @@ static void
 process_table_list(List<TABLE_LIST> *tll, Analysis & a);
 
 class InsertHandler : public DMLHandler {
-    virtual void gather(LEX *lex, Analysis &a) const {
+    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps,
+                        const SchemaInfo &schema) const
+    {
         process_select_lex(lex, a);
     }
 
-    virtual LEX **rewrite(LEX *lex, Analysis &a, unsigned *out_lex_count) const {
+    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps,
+                          const SchemaInfo &schema) const
+    {
         LEX * new_lex = copy(lex);
 
         const std::string &table =
@@ -112,12 +116,14 @@ class InsertHandler : public DMLHandler {
             new_lex->many_values = newList;
         }
 
-        return single_lex_output(new_lex, out_lex_count);
+        return new_lex;
     }
 };
 
 class UpdateHandler : public DMLHandler {
-    virtual void gather(LEX *lex, Analysis &a) const {
+    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps,
+                        const SchemaInfo &schema) const
+    {
         process_table_list(&lex->select_lex.top_join_list, a);
 
         if (lex->select_lex.item_list.head()) {
@@ -140,8 +146,9 @@ class UpdateHandler : public DMLHandler {
 
         process_filters_lex(&lex->select_lex, a);
     }
-
-    virtual LEX **rewrite(LEX *lex, Analysis &a, unsigned *out_lex_count) const {
+    virtual  LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps,
+                          const SchemaInfo &schema) const
+    {
         LEX * new_lex = copy(lex);
 
         LOG(cdb_v) << "rewriting update \n";
@@ -246,27 +253,30 @@ class UpdateHandler : public DMLHandler {
         new_lex->value_list = res_vals;
 
         if (false == invalids) {
-            return single_lex_output(new_lex, out_lex_count);
+            return new_lex;
         } else {
-            return refresh_onions(lex, new_lex, a, out_lex_count);
+            return refresh_onions(a, lex, new_lex, ps, schema);
         }
     }
 
 private:
-    LEX ** refresh_onions(LEX *lex, LEX *new_lex, Analysis &a,
-                          unsigned *out_lex_count) const
+    LEX *refresh_onions(Analysis &a, LEX *lex, LEX *new_lex,
+                        const ProxyState &ps,
+                        const SchemaInfo &schema) const
     {
-        // TODO(burrows): Should support multiple tables in a single UPDATE.
+        throw CryptDBError("UPDATEing with a column as rvalue is broken!");
+
+        // TODO(burrows): Should support multiple tables in single UPDATE.
         const std::string plain_table =
             lex->select_lex.top_join_list.head()->table_name;
         std::string where_clause;
-		if (lex->select_lex.where) {
-			std::ostringstream where_stream;
-			where_stream << " " << *lex->select_lex.where << " ";
-			where_clause = where_stream.str();
-		} else {	// HACK: Handle empty WHERE clause.
-			where_clause = " TRUE ";
-		}
+        if (lex->select_lex.where) {
+            std::ostringstream where_stream;
+            where_stream << " " << *lex->select_lex.where << " ";
+            where_clause = where_stream.str();
+        } else {    // HACK: Handle empty WHERE clause.
+            where_clause = " TRUE ";
+        }
 
         // Retrieve rows from database.
         std::ostringstream select_stream;
@@ -276,11 +286,11 @@ private:
             executeQuery(*a.rewriter, select_stream.str());
         assert(select_res_type);
         if (select_res_type->rows.size() == 0) { // No work to be done.
-            return single_lex_output(new_lex, out_lex_count);
+            return new_lex;
         }
 
-		const auto itemJoin = [](std::vector<Item*> row) {
-			return "(" + vector_join<Item*>(row, ",", ItemToString) + ")";
+        const auto itemJoin = [](std::vector<Item*> row) {
+            return "(" + vector_join<Item*>(row, ",", ItemToString) + ")";
         };
         const std::string values_string =
             vector_join<std::vector<Item*>>(select_res_type->rows, ",",
@@ -301,8 +311,8 @@ private:
 
         // > Collect the results from the embedded database.
         // > This code relies on single threaded access to the database
-        //   and on the fact that the database is cleaned up after every such
-        //   operation.
+        //   and on the fact that the database is cleaned up after
+        //   every such operation.
         DBResult *dbres;
         std::ostringstream select_results_stream;
         select_results_stream << " SELECT * FROM " << plain_table << ";";
@@ -359,13 +369,10 @@ private:
             new query_parse(a.ps->dbName(), push_results_stream.str());
         const SQLHandler *handler =
             a.rewriter->dml_dispatcher->dispatch(parse->lex());
-        unsigned final_insert_out_lex_count;
-        LEX ** const final_insert_lex_arr =
-            handler->transformLex(parse->lex(), insert_analysis,
-                                  push_results_stream.str(),
-                                  &final_insert_out_lex_count);
-        assert(final_insert_lex_arr && 1 == final_insert_out_lex_count);
-        LEX * const final_insert_lex = final_insert_lex_arr[0];
+        LEX * const final_insert_lex =
+            handler->transformLex(insert_analysis, parse->lex(), ps,
+                                  schema);
+        assert(final_insert_lex);
 
         // DELETE the rows matching the WHERE clause from the database.
         std::ostringstream delete_stream;
@@ -378,23 +385,14 @@ private:
             new query_parse(a.ps->dbName(), delete_stream.str());
         const SQLHandler * const delete_handler =
             a.rewriter->dml_dispatcher->dispatch(delete_parse->lex());
-        unsigned delete_out_lex_count;
-        LEX ** const delete_lex_arr =
-            delete_handler->transformLex(delete_parse->lex(),
-                                         delete_analysis,
-                                         delete_stream.str(),
-                                         &delete_out_lex_count);
-        assert(delete_lex_arr && 1 == delete_out_lex_count);
-        LEX * const delete_lex = delete_lex_arr[0];
+        LEX * const delete_lex =
+            delete_handler->transformLex(delete_analysis,
+                                         delete_parse->lex(), ps,
+                                         schema);
+        assert(delete_lex);
 
-        // FIXME(burrows): Order matters, how to enforce?
-        LEX **out_lex = new LEX*[4];
-        out_lex[0] = begin_transaction_lex(a.ps->dbName());
-        out_lex[1] = delete_lex;
-        out_lex[2] = final_insert_lex;
-        out_lex[3] = commit_transaction_lex(a.ps->dbName());
-        *out_lex_count = 4;
-        return out_lex;
+        // FIXME: delete_lex and final_insert_lex must be used.
+        return final_insert_lex;
     }
 
     bool invalidates(FieldMeta * fm, const EncSet & es) const {
@@ -410,40 +408,46 @@ private:
 };
 
 class DeleteHandler : public DMLHandler {
-    virtual void gather(LEX *lex, Analysis &a) const {
+    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps,
+                        const SchemaInfo &schema) const
+    {
         process_select_lex(lex, a);
     }
-
-    virtual LEX **rewrite(LEX *lex, Analysis &a, unsigned *out_lex_count) const {
+    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps,
+                          const SchemaInfo &schema) const
+    {
         LEX * new_lex = copy(lex);
         new_lex->query_tables = rewrite_table_list(lex->query_tables, a);
         set_select_lex(new_lex, rewrite_select_lex(&new_lex->select_lex, a));
 
-        return single_lex_output(new_lex, out_lex_count);
+        return new_lex;
     }
 };
 
 class SelectHandler : public DMLHandler {
-    virtual void gather(LEX *lex, Analysis &a) const {
+    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps,
+                        const SchemaInfo &schema) const
+    {
         process_select_lex(lex, a);
     }
-
-    virtual LEX **rewrite(LEX *lex, Analysis &a, unsigned *out_lex_count) const {
+    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps,
+                          const SchemaInfo &schema) const
+    {
         LEX * new_lex = copy(lex);
         new_lex->select_lex.top_join_list = rewrite_table_list(lex->select_lex.top_join_list, a);
         set_select_lex(new_lex, rewrite_select_lex(&new_lex->select_lex, a));
 
-        return single_lex_output(new_lex, out_lex_count);
+        return new_lex;
     }
 };
 
-LEX **DMLHandler::transformLex(LEX *lex, Analysis &analysis,
-                               const std::string &q,
-                               unsigned *out_lex_count) const
+ LEX *DMLHandler::transformLex(Analysis &analysis, LEX *lex,
+                               const ProxyState &ps,
+                               const SchemaInfo &schema) const
 {
-    this->gather(lex, analysis);
+    this->gather(analysis, lex, ps, schema);
 
-    return this->rewrite(lex, analysis, out_lex_count);
+    return this->rewrite(analysis, lex, ps, schema);
 }
 
 // Helpers.
@@ -452,10 +456,9 @@ static void
 process_order(Analysis & a, SQL_I_List<ORDER> & lst) {
 
     for (ORDER *o = lst.first; o; o = o->next) {
-	reason r;
-	gather(*o->item, r, a);
+        reason r;
+        gather(*o->item, r, a);
     }
-
 }
 
 //TODO: not clear how these process_*_lex and rewrite_*_lex overlap, cleanup
@@ -463,7 +466,7 @@ static void
 process_filters_lex(st_select_lex * select_lex, Analysis & a) {
 
     if (select_lex->where) {
-	analyze(select_lex->where, a);
+        analyze(select_lex->where, a);
     }
 
     /*if (select_lex->join &&
@@ -524,7 +527,7 @@ analyze_update(Item_field * field, Item * val, Analysis & a) {
 
 static void
 rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
-	      const EncSet & constr, const std::string & name) {
+              const EncSet & constr, const std::string & name) {
     ORDER * prev = NULL;
     for (ORDER *o = lst.first; o; o = o->next) {
         Item * i = *o->item;
@@ -561,10 +564,10 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
         set_where(new_select_lex, rewrite(select_lex->where, PLAIN_OLK, a));
     }
     //  if (select_lex->join &&
-	//     select_lex->join->conds &&
+    //     select_lex->join->conds &&
     //    select_lex->where != select_lex->join->conds) {
-	//cerr << "select_lex join conds " << select_lex->join->conds << "\n";
-	//rewrite(&select_lex->join->conds, a);
+    //cerr << "select_lex join conds " << select_lex->join->conds << "\n";
+    //rewrite(&select_lex->join->conds, a);
     //}
 
     if (select_lex->having)

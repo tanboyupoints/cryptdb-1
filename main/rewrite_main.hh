@@ -68,9 +68,9 @@ public:
     // to carry around Connect objects.
     Connect *getConnection() {return ps.conn;}
 
-    LEX **dispatchAndTransformOnLex(LEX *lex, Analysis &a,
-                                    const std::string &q,
-                                    unsigned *out_lex_count);
+    LEX *dispatchAndTransformOnLex(Analysis &a, LEX *lex,
+                                   const ProxyState &ps,
+                                   const SchemaInfo &schema);
 
     SQLDispatcher *dml_dispatcher;
     SQLDispatcher *ddl_dispatcher;
