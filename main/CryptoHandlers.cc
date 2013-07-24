@@ -348,9 +348,8 @@ RND_int::newCreateField(Create_field * cf, std::string anonname) {
 Item *
 RND_int::encrypt(Item * ptext, uint64_t IV) {
     //TODO: should have encrypt_SEM work for any length
-    int64_t p = static_cast<Item_int *>(ptext)->val_int();
-    uint64_t c = bf.encrypt(((uint64_t)p) ^ IV);
-
+    uint64_t p = static_cast<Item_int *>(ptext)->value;
+    uint64_t c = bf.encrypt(p ^ IV);
     LOG(encl) << "RND_int encrypt " << p << " IV " << IV << "-->" << c;
 
     return new Item_int((ulonglong) c);
@@ -359,7 +358,7 @@ RND_int::encrypt(Item * ptext, uint64_t IV) {
 Item *
 RND_int::decrypt(Item * ctext, uint64_t IV) {
     uint64_t c = static_cast<Item_int*>(ctext)->value;
-    int64_t p = (int64_t)bf.decrypt(c) ^ IV;
+    uint64_t p = bf.decrypt(c) ^ IV;
     LOG(encl) << "RND_int decrypt " << c << " IV " << IV << " --> " << p;
 
     return new Item_int((ulonglong) p);
@@ -690,7 +689,6 @@ protected:
 EncLayer *
 DETFactory::create(Create_field * cf, std::string key) {
     if (IsMySQLTypeNumeric(cf->sql_type)) {
-        std::cout << "TYPEEE: " << cf->sql_type << std::endl;
         if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
             return new DET_dec(cf, key);
         } else if(cf->sql_type == MYSQL_TYPE_INT24) {
@@ -743,20 +741,54 @@ DET_int::newCreateField(Create_field * cf, std::string anonname) {
 
 Item *
 DET_int::encrypt(Item * ptext, uint64_t IV) {
-    //val_int() make sure we have the real signed value
-    longlong val = static_cast<Item_int *>(ptext)->val_int();
-    ulonglong res = bf.encrypt((ulonglong)val);
 
+    longlong ival = static_cast<Item_int *>(ptext)->val_int();
+
+    if(ival < 0 && (ival >= INT_MIN && ival < INT_MAX)) {
+        // sum type size
+        ulonglong uval = round_val<ulonglong, int64_t, int64_t>(ival, INT_MAX, true); 
+    
+        // encrypt
+        ulonglong res = bf.encrypt(uval);
+
+        LOG(encl) << __FUNCTION__ << ":" << "val_int:" << ival << ", new_val:" << uval << ", result:" << res;
+        return new Item_int(res);
+    }
+
+    ulonglong value = static_cast<Item_int *>(ptext)->value;
+        
+    // sum type size
+    ulonglong uvalue = round_val<ulonglong, uint64_t, int64_t>(value, INT_MAX, false); 
+
+    //encrypt
+    ulonglong res = (ulonglong) bf.encrypt(uvalue);
+        
+    LOG(encl) << __FUNCTION__ << ":" << "value:" << uvalue << ", new_val:" << uvalue << ", result:" << res;
     return new Item_int(res);
+
 }
 
 Item *
 DET_int::decrypt(Item * ctext, uint64_t IV) {
 
-    ulonglong val = static_cast<Item_int*>(ctext)->value;
-    longlong res = (longlong) bf.decrypt(val);
-    
-    Item * ni = new Item_int(res);
+    Item *ni;
+    bool signed_flag = !static_cast<Item_int *>(ctext)->unsigned_flag;
+    ulonglong value = static_cast<Item_int*>(ctext)->value;
+
+    //TODO/FIXME: signed_flag is always false, try to use Create_field 
+    //to get the real signdness value.
+    if(signed_flag) {
+        ulonglong retdec = bf.decrypt(value);
+        longlong res = round_val<longlong, ulonglong, int64_t>(value, INT_MAX, true); 
+        ni = new Item_int(res);
+        LOG(encl) << "iDET_int decrypt " << retdec << "--->" << value << "--->" << res;
+    } else {
+        ulonglong res = round_val<ulonglong, ulonglong, int64_t>(value, INT_MAX, false); 
+        ulonglong retdec = bf.decrypt(res);
+        ni = new Item_int(retdec);
+        LOG(encl) << "uDET_int decrypt " << retdec << "--->" << value << "--->" << res;
+    }
+
     return ni;
 }
 
@@ -1001,7 +1033,6 @@ private:
 EncLayer *
 DETJOINFactory::create(Create_field * cf, std::string key) {
     if (IsMySQLTypeNumeric(cf->sql_type)) {
-        std::cout << "DETJOIN TYPE: " << cf->sql_type << std::endl;
         if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
             return new DETJOIN_dec(cf, key);
         } else if (cf->sql_type == MYSQL_TYPE_INT24) {
@@ -1043,7 +1074,7 @@ public:
     // serialize and deserialize
     std::string doSerialize() const {return key;}
     OPE_int(unsigned int id, const std::string & serial);
-
+  
     SECLEVEL level() const {return SECLEVEL::OPE;}
     std::string name() const {return "OPE_int";}
     Create_field * newCreateField(Create_field * cf, std::string anonname = "");
@@ -1196,8 +1227,8 @@ OPE_int::newCreateField(Create_field * cf, std::string anonname) {
 
 Item *
 OPE_int::encrypt(Item * ptext, uint64_t IV) {
-    long pval =  static_cast<Item_int *>(ptext)->val_int();
-    ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ((ulong)pval)));
+    ulong pval =  (ulong)static_cast<Item_int *>(ptext)->value;
+    ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ(pval)));
     LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV << "--->" << enc;
 
     return new Item_int(enc);
@@ -1206,8 +1237,8 @@ OPE_int::encrypt(Item * ptext, uint64_t IV) {
 Item *
 OPE_int::decrypt(Item * ctext, uint64_t IV) {
     ulonglong cval = (ulonglong) static_cast<Item_int*>(ctext)->value;
-    longlong dec = (longlong)uint64FromZZ(ope.decrypt(ZZFromUint64(cval)));
-    LOG(encl) << "OPE_int decrypt " << cval << " IV " << IV << "--->" << dec;
+    ulonglong dec = uint64FromZZ(ope.decrypt(ZZFromUint64(cval)));
+    LOG(encl) << "OPE_int decrypt " << cval << " IV " << IV << "--->" << dec << std::endl;
 
     return new Item_int(dec);
 }
