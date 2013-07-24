@@ -46,10 +46,10 @@ struct SerialLayer;
 class LayerFactory {
 public:
     static EncLayer * create(Create_field * cf, std::string key) {
-	throw "needs to be inherited";
+        throw "needs to be inherited";
     };
     static EncLayer * deserialize(const SerialLayer & serial) {
-	throw "needs to be inherited";
+        throw "needs to be inherited";
     };
 };
 
@@ -124,26 +124,13 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf,
                           std::string key)
 {
     switch (sl) {
-    case SECLEVEL::RND: {
-	return RNDFactory::create(cf, key);
-    }
-    case SECLEVEL::DET: {
-	return DETFactory::create(cf, key);
-    }
-    case SECLEVEL::DETJOIN: {
-	return DETJOINFactory::create(cf, key);
-    }
-	
-    case SECLEVEL::OPE: {
-	return OPEFactory::create(cf, key);
-    }
-    case SECLEVEL::HOM: {
-	return HOMFactory::create(cf, key);
-    }
-    case SECLEVEL::SEARCH: {
-	return new Search(cf, key);
-    }
-    default:{}
+        case SECLEVEL::RND: {return RNDFactory::create(cf, key);}
+        case SECLEVEL::DET: {return DETFactory::create(cf, key);}
+        case SECLEVEL::DETJOIN: {return DETJOINFactory::create(cf, key);}
+        case SECLEVEL::OPE:{return OPEFactory::create(cf, key);}
+        case SECLEVEL::HOM: {return HOMFactory::create(cf, key);}
+        case SECLEVEL::SEARCH: {return new Search(cf, key);}
+        default:{}
     }
     throw CryptDBError("unknown or unimplemented security level \n");
 }
@@ -154,27 +141,27 @@ EncLayerFactory::deserializeLayer(unsigned int id,
 {
 
     SerialLayer li = serial_unpack(serial);
-    
-    switch (li.l) {
-    case SECLEVEL::RND: 
-	return RNDFactory::deserialize(id, li);
-	
-    case SECLEVEL::DET: 
-	return DETFactory::deserialize(id, li);
-	
-    case SECLEVEL::DETJOIN: 
-	return DETJOINFactory::deserialize(id, li);
 
-    case SECLEVEL::OPE: 
-	return OPEFactory::deserialize(id, li);
-	
-    case SECLEVEL::HOM: 
-	return new HOM(id, serial);
-	
-    case SECLEVEL::SEARCH: 
-	return new Search(id, serial);
-	
-    default:{}
+    switch (li.l) {
+        case SECLEVEL::RND: 
+            return RNDFactory::deserialize(id, li);
+
+        case SECLEVEL::DET: 
+            return DETFactory::deserialize(id, li);
+
+        case SECLEVEL::DETJOIN: 
+            return DETJOINFactory::deserialize(id, li);
+
+        case SECLEVEL::OPE: 
+            return OPEFactory::deserialize(id, li);
+
+        case SECLEVEL::HOM: 
+            return new HOM(id, serial);
+
+        case SECLEVEL::SEARCH: 
+            return new Search(id, serial);
+
+        default:{}
     }
     throw CryptDBError("unknown or unimplemented security level \n");
 }
@@ -202,23 +189,23 @@ type_len_for_AES_str(enum enum_field_types type, int len, bool pad) {
 
     int res_len = -1;
     enum enum_field_types res_type = type;
-    
+
     switch (type) {
-    case MYSQL_TYPE_TINY_BLOB:
-    case MYSQL_TYPE_MEDIUM_BLOB:
-    case MYSQL_TYPE_LONG_BLOB:
-    case MYSQL_TYPE_BLOB:
-	break;
-    case MYSQL_TYPE_VARCHAR:
-	res_len = rounded_len(len, AES_BLOCK_BYTES, pad);
-	break;
-    default: {
-	assert_s(false, "unexpected sql_type");
-    }
+        case MYSQL_TYPE_TINY_BLOB:
+        case MYSQL_TYPE_MEDIUM_BLOB:
+        case MYSQL_TYPE_LONG_BLOB:
+        case MYSQL_TYPE_BLOB:
+            break;
+        case MYSQL_TYPE_VARCHAR:
+            res_len = rounded_len(len, AES_BLOCK_BYTES, pad);
+            break;
+        default: {
+                     assert_s(false, "unexpected sql_type");
+                 }
     }
 
     return std::make_pair(res_type, res_len);
-  
+
 }
 
 //TODO: remove above newcreatefield
@@ -313,19 +300,19 @@ private:
 EncLayer *
 RNDFactory::create(Create_field * cf, std::string key) {
     if (IsMySQLTypeNumeric(cf->sql_type)) { // the ope case as well 
-	 return new RND_int(cf, key);
-     } else {
-	 return new RND_str(cf, key);
-     }
+        return new RND_int(cf, key);
+    } else {
+        return new RND_str(cf, key);
+    }
 }
 
 EncLayer *
 RNDFactory::deserialize(unsigned int id, const SerialLayer & sl)
 {
     if (sl.name == "RND_int") {
-	return new RND_int(id, sl.layer_info);
+        return new RND_int(id, sl.layer_info);
     } else {
-	return new RND_str(id, sl.layer_info);
+        return new RND_str(id, sl.layer_info);
     }
 }
 
@@ -411,7 +398,6 @@ RND_str::RND_str(unsigned int id, const std::string & serial)
     : EncLayer(id), rawkey(serial), enckey(get_AES_enc_key(rawkey)),
       deckey(get_AES_dec_key(rawkey))
  {}
-
 
 
 Create_field *
@@ -699,8 +685,8 @@ DETFactory::create(Create_field * cf, std::string key) {
             return new DET_int(cf, key);
         }
     } else {
-	 return new DET_str(cf, key);
-     }
+        return new DET_str(cf, key);
+    }
 }
 
 EncLayer *
@@ -713,9 +699,9 @@ DETFactory::deserialize(unsigned int id, const SerialLayer & sl)
     } else if(sl.name == "DET_tinyint") {
         return new DET_tinyint(id, sl.layer_info);
     } else if (sl.name == "DET_str") {
-	return new DET_str(id, sl.layer_info);
+        return new DET_str(id, sl.layer_info);
     } else {
-	return new DET_dec(id, sl.layer_info);
+        return new DET_dec(id, sl.layer_info);
     }
 }
 
@@ -846,7 +832,6 @@ parent_serial(uint & decimals, const std::string & serial) {
 DET_dec::DET_dec(unsigned int id, const std::string & serial)
     : DET_int(id, parent_serial(decimals, serial))
 {
-
     shift = pow(10, decimals);   
 }
 
@@ -1141,25 +1126,23 @@ private:
 EncLayer *
 OPEFactory::create(Create_field * cf, std::string key) {
     if (IsMySQLTypeNumeric(cf->sql_type)) { 
-	if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type ==  MYSQL_TYPE_NEWDECIMAL) {
-	    return new OPE_dec(cf, key);
-	} 
-	return new OPE_int(cf, key);
+        if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type ==  MYSQL_TYPE_NEWDECIMAL) {
+            return new OPE_dec(cf, key);
+        } 
+        return new OPE_int(cf, key);
     }
-    
     return new OPE_str(cf, key);
-    
 }
 
 EncLayer *
 OPEFactory::deserialize(unsigned int id, const SerialLayer & sl)
 {
     if (sl.name == "OPE_int") {
-	return new OPE_int(id, sl.layer_info);
+        return new OPE_int(id, sl.layer_info);
     } else if (sl.name == "OPE_str") {
-	return new OPE_str(id, sl.layer_info);
+        return new OPE_str(id, sl.layer_info);
     } else  {
-	return new OPE_dec(id, sl.layer_info);
+        return new OPE_dec(id, sl.layer_info);
     }
 }
 
@@ -1268,7 +1251,7 @@ OPE_str::encrypt(Item * ptext, uint64_t IV) {
     uint32_t pv = 0;
 
     for (uint i = 0; i < plain_size; i++) {
-	pv = pv * 256 + (int)ps[i];
+        pv = pv * 256 + (int)ps[i];
     }
 
     ZZ enc = ope.encrypt(to_ZZ(pv));
@@ -1314,7 +1297,7 @@ private:
 EncLayer *
 HOMFactory::create(Create_field *cf, std::string key) {
     if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
-	return new HOM_dec(cf, key);
+        return new HOM_dec(cf, key);
     }
 
     return new HOM(cf, key);
@@ -1324,7 +1307,7 @@ EncLayer *
 HOMFactory::deserialize(unsigned int id, const SerialLayer & serial)
 {
     if (serial.name == "HOM_dec") {
-	return new HOM_dec(id, serial.layer_info);
+        return new HOM_dec(id, serial.layer_info);
     }
     return new HOM(id, serial.layer_info);
 }
@@ -1390,7 +1373,7 @@ ItemDecToZZ(Item * ptext, const ZZ & shift, uint decimals) {
     if (ss_int == "") ss_int = "0";
     std::string ss_dec = "";
     if (ss.find('.') != std::string::npos) {
-	ss_dec = ss.substr(ss.find('.') + 1); // decimal part
+        ss_dec = ss.substr(ss.find('.') + 1); // decimal part
     }
 
     uint actual_decs = ss_dec.length();
@@ -1547,8 +1530,8 @@ assembleWords(std::list<std::string> * words)
     std::string res = "";
 
     for (std::list<std::string>::iterator it = words->begin();
-         it != words->end();
-         it++) {
+            it != words->end();
+            it++) {
         res = res + *it;
     }
 
@@ -1585,10 +1568,10 @@ tokenize(std::string text)
     std::list<std::string> * res = new std::list<std::string>();
 
     for (std::list<std::string>::iterator it = tokens.begin();
-         it != tokens.end();
-         it++) {
+            it != tokens.end();
+            it++) {
         if ((it->length() >= 3) &&
-            (search_tokens.find(*it) == search_tokens.end())) {
+                (search_tokens.find(*it) == search_tokens.end())) {
             std::string token = toLowerCase(*it);
             search_tokens.insert(token);
             res->push_back(token);
@@ -1643,11 +1626,11 @@ static udf_func u_search = {
 static std::string
 searchstrip(std::string s) {
     if (s[0] == '%') {
-	s = s.substr(1, s.length() - 1);
+        s = s.substr(1, s.length() - 1);
     }
     uint len = s.length();
     if (s[len-1] == '%') {
-	s = s.substr(0, len-1);
+        s = s.substr(0, len-1);
     }
 
     return s;
