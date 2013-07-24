@@ -496,7 +496,6 @@ class DET_mediumint : public DET_int {
     public:
     DET_mediumint(Create_field *,  const std::string & seed_key);
 
-    //std::string doSerialize() const;
     // create object from serialized contents
     DET_mediumint(unsigned int id, const std::string & serial);
 
@@ -504,8 +503,6 @@ class DET_mediumint : public DET_int {
 
     Item * encrypt(Item * ptext, uint64_t IV = 0);
     Item * decrypt(Item * ctext, uint64_t IV = 0);
-    
-    protected:
 };
 
 
@@ -521,42 +518,24 @@ DET_mediumint::DET_mediumint(unsigned int id, const std::string & serial)
 Item *
 DET_mediumint::encrypt(Item * ptext, uint64_t IV) {
     ulonglong val = static_cast<Item_int *>(ptext)->value;
-    ulonglong res;
-    
-    //TODO/FIXME(carlos)
-    //MYSql rounds down values if greater than type size, but
-    //it uses 'CAST() as unsigned' and it is disabled because
-    //of negative values. Fix and check negative functionality 
-    //as a whole and then double check this.
-    static const unsigned int medium_max = 0xffffff;
-    if(val > medium_max)
-        res = (ulonglong) bf.encrypt(medium_max);
-    else
-        res = (ulonglong) bf.encrypt(val);
 
-    LOG(encl) << "DET_mediumint encrypt " << val << "--->" << res;
-
-    return new Item_int(res);
+    static longlong medium_max = 0xffffff;
+    if(medium_max < static_cast<Item_int *>(ptext)->val_int())
+        throw CryptDBError("Backend storage unit it not MEDIUMINT, won't floor. ");
     
+    LOG(encl) << "DET_tinyint encrypt " << val << " IV " << IV << "--->";
+    return DET_int::encrypt(ptext, (ulong)val);
 }
 
 Item *
 DET_mediumint::decrypt(Item * ctext, uint64_t IV) {
-
-    longlong val = static_cast<Item_int*>(ctext)->value;
-    ulonglong res = (ulonglong) bf.decrypt(val);
-    LOG(encl) << "DET_mediumint decrypt " << val << "-->" << res;
-    Item * ni = new Item_int(res);
-
-    return ni;
-    
+    return DET_int::decrypt(ctext, IV);
 }
 
 class DET_tinyint : public DET_int {
     public:
     DET_tinyint(Create_field *,  const std::string & seed_key);
 
-    //std::string doSerialize() const;
     // create object from serialized contents
     DET_tinyint(unsigned int id, const std::string & serial);
 
@@ -564,8 +543,6 @@ class DET_tinyint : public DET_int {
 
     Item * encrypt(Item * ptext, uint64_t IV = 0);
     Item * decrypt(Item * ctext, uint64_t IV = 0);
-    
-    protected:
 };
 
 
@@ -580,37 +557,22 @@ DET_tinyint::DET_tinyint(unsigned int id, const std::string & serial)
 
 Item *
 DET_tinyint::encrypt(Item * ptext, uint64_t IV) {
+
     ulonglong val = static_cast<Item_int *>(ptext)->value;
-    ulonglong res;
     
-    //TODO/FIXME(carlos)
-    //MYSql rounds down values if greater than type size, but
-    //it uses 'CAST() as unsigned' and it is disabled because
-    //of negative values. Fix and check negative functionality 
-    //as a whole and then double check this.
-    static const unsigned int tiny_max = 0xff;
-
-    if(val > tiny_max)
-        res = (ulonglong) bf.encrypt(tiny_max);
-    else
-        res = (ulonglong) bf.encrypt(val);
-
-    LOG(encl) << "DET_tinyint encrypt " << val << "--->" << res;
-
-    return new Item_int(res);
-    
+    static longlong tiny_max = 0xff;
+    if(tiny_max < static_cast<Item_int *>(ptext)->val_int())
+        throw CryptDBError("Backend storage unit it not TINYINT, won't floor. ");
+        
+    LOG(encl) << "DET_tinyint encrypt " << val << " IV " << IV << "--->";
+    // delegates
+    return DET_int::encrypt(ptext, (ulong)val);
 }
 
 Item *
 DET_tinyint::decrypt(Item * ctext, uint64_t IV) {
-
-    longlong val = static_cast<Item_int*>(ctext)->value;
-    ulonglong res = (ulonglong) bf.decrypt(val);
-    LOG(encl) << "DET_tinyint decrypt " << val << "-->" << res;
-    Item * ni = new Item_int(res);
-
-    return ni;
-    
+    // delegates
+    return DET_int::decrypt(ctext, IV);
 }
 
 static udf_func u_decDETInt = {
@@ -1074,9 +1036,45 @@ private:
     static const size_t key_bytes = 16;
     static const size_t plain_size = 4;
     static const size_t ciph_size = 8;
-
 };
 
+class OPE_tinyint : public OPE_int {
+public:
+    OPE_tinyint(Create_field *, std::string seed_key);
+
+    // create object from serialized contents
+    OPE_tinyint(unsigned int id, const std::string & serial);
+
+    std::string name() const {return "OPE_tinyint";}
+
+    Item * encrypt(Item * p, uint64_t IV);
+    Item * decrypt(Item * c, uint64_t IV);
+};
+
+OPE_tinyint::OPE_tinyint(Create_field * cf, std::string seed_key)
+    : OPE_int(cf, seed_key)
+{}
+
+    OPE_tinyint::OPE_tinyint(unsigned int id, const std::string & serial)
+    : OPE_int(id, serial)
+{}
+
+Item *
+OPE_tinyint::encrypt(Item * ptext, uint64_t IV) {
+    ulonglong val = static_cast<Item_int *>(ptext)->value;
+    
+    static longlong tiny_max = 0xff;
+    if(tiny_max < static_cast<Item_int *>(ptext)->val_int())
+        throw CryptDBError("Backend storage unit it not TINYINT, won't floor. ");
+    
+    LOG(encl) << "OPE_tinyint encrypt " << val << " IV " << IV << "--->";
+    return OPE_int::encrypt(ptext, (ulong)val);
+}
+
+Item *
+OPE_tinyint::decrypt(Item * ctext, uint64_t IV) {
+    return OPE_int::decrypt(ctext, IV);
+}
 
 class OPE_str : public EncLayer {
 public:
@@ -1128,7 +1126,10 @@ OPEFactory::create(Create_field * cf, std::string key) {
     if (IsMySQLTypeNumeric(cf->sql_type)) { 
         if (cf->sql_type == MYSQL_TYPE_DECIMAL || cf->sql_type ==  MYSQL_TYPE_NEWDECIMAL) {
             return new OPE_dec(cf, key);
-        } 
+        } else if( cf->sql_type == MYSQL_TYPE_TINY) { 
+            return new OPE_tinyint(cf, key);
+        }
+
         return new OPE_int(cf, key);
     }
     return new OPE_str(cf, key);
@@ -1139,6 +1140,8 @@ OPEFactory::deserialize(unsigned int id, const SerialLayer & sl)
 {
     if (sl.name == "OPE_int") {
         return new OPE_int(id, sl.layer_info);
+    } else if (sl.name == "OPE_tinyint") {
+        return new OPE_tinyint(id, sl.layer_info);
     } else if (sl.name == "OPE_str") {
         return new OPE_str(id, sl.layer_info);
     } else  {
