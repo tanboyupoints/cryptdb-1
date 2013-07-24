@@ -220,8 +220,9 @@ public:
     std::string user;
     std::string passwd;
 
-    ConnectionInfo(std::string s, std::string u, std::string p, uint port = 0) :
-	server(s), port(port), user(u), passwd(p) {};
+    ConnectionInfo(std::string s, std::string u, std::string p,
+                   uint port = 0)
+        : server(s), port(port), user(u), passwd(p) {};
     ConnectionInfo() : server(""), port(0), user(""), passwd("") {};
 
 } ConnectionInfo;
@@ -232,7 +233,6 @@ operator<<(std::ostream &out, const RewritePlan * rp);
 
 // state maintained at the proxy
 typedef struct ProxyState {
-
     ProxyState()
         : conn(NULL), e_conn(NULL), encByDefault(true), masterKey(NULL) {}
     ~ProxyState();
@@ -314,10 +314,7 @@ class Rewriter;
 
 class Analysis {
 public:
-    Analysis(SchemaInfo *schema)
-        : pos(0), rmeta(new ReturnMeta()), schema(schema) {}
-    // FIXME: Remove.
-    Analysis()
+    Analysis(const SchemaInfo * const schema)
         : pos(0), rmeta(new ReturnMeta()), schema(schema) {}
 
     unsigned int pos; // > a counter indicating how many projection

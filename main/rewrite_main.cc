@@ -731,7 +731,7 @@ Rewriter::rewrite(const std::string & q)
      * updateMeta or something.
      */
     //optimization: do not process queries that we will not rewrite
-    if (noRewrite(p.lex())) {
+    if (noRewrite(lex)) {
         // HACK(burrows): This 'Analysis' is dummy as we never call
         // addToReturn. But it works because this optimized cases don't
         // have anything to do in addToReturn anyways.
@@ -748,7 +748,7 @@ Rewriter::rewrite(const std::string & q)
     // to the next iteration.
     Analysis *old_analysis = NULL;
     while (true) {
-        SchemaInfo * const schema = loadSchemaInfo(ps.e_conn);
+        const SchemaInfo * const schema = loadSchemaInfo(ps.e_conn);
         Analysis analysis = Analysis(schema);
         // HACK(burrows): Until redesign.
         analysis.rewriter = this;
