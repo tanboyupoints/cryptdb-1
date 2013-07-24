@@ -374,6 +374,8 @@ void Delta::replaceHandler(Connect *e_conn, const DBMeta * const object,
     return;
 }
 
+RewriteOutput::~RewriteOutput() {;}
+
 bool Analysis::addAlias(const std::string &alias,
                         const std::string &table)
 {

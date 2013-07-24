@@ -306,14 +306,104 @@ private:
     std::string serialize(const DBObject &parent) const 
     {
         throw CryptDBError("Calling Delta::serialize with a parent"
-                           "argument is nonsensical!");
+                           " argument is nonsensical!");
     }
 };
 
 class Rewriter;
 
+class RewriteOutput { 
+public:
+    RewriteOutput() {;}
+    virtual ~RewriteOutput() = 0;
+
+    void setNewLex(LEX *lex) {
+        assert(!new_lex && lex);
+        new_lex = lex;
+    }
+
+    virtual void doQuery(Connect *conn, Connect *e_conn) = 0;
+    virtual bool queryAgain() {return false;}
+
+protected:
+    std::string getQuery() {
+        std::ostringstream ss;
+        ss << *new_lex;
+        return ss.str();
+    }
+
+private:
+    LEX *new_lex;
+};
+
+class DMLOutput : public RewriteOutput {
+public:
+    DMLOutput() {;}
+    ~DMLOutput() {;}
+
+    void doQuery(Connect *conn, Connect *e_conn) {
+        /*
+        DBResult *dbres;
+        const std::string query = this->getQuery();
+        prettyPrintQuery(query);
+
+        assert(conn->execute(query, dbres));
+        prettyPrintQueryResult(dbres);
+
+        ResType dec_res = decryptResults(dbres, ???);
+        prettyPrintQueryResult(dec_res);
+        */
+        throw CryptDBError("DMLOutput::doQuery!");
+    }
+};
+
+// Special case of DML query.
+class SpecialUpdate : public RewriteOutput {
+public:
+    SpecialUpdate();
+    ~SpecialUpdate();
+
+    void doQuery(Connect *conn, Connect *e_conn) {
+        throw CryptDBError("SpecialUpdate::doQuery!");
+    }
+};
+
+class DeltaOutput : public RewriteOutput {
+public:
+    DeltaOutput() {;}
+    ~DeltaOutput() {;}
+
+    void addDelta(Delta *delta) {
+        assert(delta);
+        deltas.push_back(delta);
+    }
+    
+    void doQuery(Connect *conn, Connect *e_conn) {
+        throw CryptDBError("DeltaOutput::doQuery!");
+    }
+
+private:
+    std::list<Delta *> deltas;
+};
+
+class DDLOutput : public DeltaOutput {
+public:
+    DDLOutput() {;}
+    ~DDLOutput() {;}
+};
+
+class AdjustOnionOutput : public DeltaOutput {
+public:
+    AdjustOnionOutput() {;}
+    ~AdjustOnionOutput();
+
+    bool queryAgain() {return true;}
+};
+
 class Analysis {
 public:
+    enum QueryType {DDL, DML, SPECIAL_UPDATE};
+
     Analysis(const SchemaInfo * const schema)
         : pos(0), rmeta(new ReturnMeta()), schema(schema) {}
 
@@ -355,6 +445,9 @@ public:
 
     // TODO: Make private.
     std::map<OnionMeta *, std::vector<EncLayer *>> to_adjust_enc_layers;
+    
+    RewriteOutput *output;
+    QueryType query_type;
 
 private:
     const SchemaInfo * const schema;

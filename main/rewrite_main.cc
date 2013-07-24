@@ -653,13 +653,14 @@ Rewriter::Rewriter(ConnectionInfo ci,
 }
 
 LEX *
-Rewriter::dispatchOnLex(Analysis &a, LEX *lex,
-                        const ProxyState &ps)
+Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps, LEX *lex)
 {
     SQLHandler *handler;
     if (dml_dispatcher->canDo(lex)) {
+        a.output = new DMLOutput;
         handler = dml_dispatcher->dispatch(lex);
     } else if (ddl_dispatcher->canDo(lex)) {
+        a.output = new DDLOutput;
         handler = ddl_dispatcher->dispatch(lex);
     } else {
         throw CryptDBError("Rewriter can not dispatch bad lex");
@@ -763,7 +764,7 @@ Rewriter::rewrite(const std::string & q)
         try {
             LOG(cdb_v) << "pre-analyze " << *lex;
 
-            new_lex = analysis.rewriter->dispatchOnLex(analysis, lex, ps);
+            new_lex = analysis.rewriter->dispatchOnLex(analysis, ps, lex);
             assert(new_lex);
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
@@ -956,7 +957,7 @@ executeQuery(Rewriter &r, const std::string &q, bool show)
     }  catch (CryptDBError &e) {
         std::cout << "Internal Error: " << e.msg << " in query " << q
                   << std::endl;
-	return NULL;
+        return NULL;
     }
 }
 
