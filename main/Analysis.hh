@@ -350,7 +350,7 @@ public:
 class SpecialUpdate : public RewriteOutput {
 public:
     SpecialUpdate(const std::string &original_query, LEX *new_lex,
-                  Analysis &a, const ProxyState &ps);
+                  const ProxyState &ps);
     ~SpecialUpdate() {;}
 
     ResType *doQuery(Connect *conn, Connect *e_conn,
@@ -359,7 +359,6 @@ public:
 private:
     std::string plain_table;
     std::string where_clause;
-    Analysis &a;
     const ProxyState &ps;
 };
 

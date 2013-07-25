@@ -432,15 +432,14 @@ ResType *DMLOutput::doQuery(Connect *conn, Connect *e_conn,
 }
 
 SpecialUpdate::SpecialUpdate(const std::string &original_query,
-                             LEX *new_lex, Analysis &a,
-                             const ProxyState &ps)
-    : RewriteOutput(original_query, new_lex), a(a), ps(ps)
+                             LEX *old_lex, const ProxyState &ps)
+    : RewriteOutput(original_query, old_lex), ps(ps)
 {
     this->plain_table =
-        new_lex->select_lex.top_join_list.head()->table_name; 
-    if (new_lex->select_lex.where) {
+        old_lex->select_lex.top_join_list.head()->table_name; 
+    if (old_lex->select_lex.where) {
         std::ostringstream where_stream;
-        where_stream << " " << *new_lex->select_lex.where << " ";
+        where_stream << " " << *old_lex->select_lex.where << " ";
         this->where_clause = where_stream.str();
     } else {    // HACK: Handle empty WHERE clause.
         this->where_clause = " TRUE ";
@@ -524,58 +523,17 @@ ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
     cleanup_stream << "DELETE FROM " << this->plain_table << ";";
     assert(e_conn->execute(cleanup_stream.str()));
 
-    // > Add each row from the embedded database to the data database.
-    std::ostringstream push_results_stream;
-    push_results_stream << " INSERT INTO " << this->plain_table
-                        << " VALUES " << output_rows << ";";
-    const std::string insert_query = push_results_stream.str();
-    /*
-    Analysis insert_analysis = Analysis(this->a.getSchema());
-    insert_analysis.rewriter = this->a.rewriter;
-    // FIXME(burrows): Memleak.
-    // Freeing the query_parse (or using an automatic variable and
-    // letting it cleanup itself) will call the query_parse
-    // destructor which calls THD::cleanup_after_query which
-    // results in all of our Items_* being freed.
-    // THD::cleanup_after_query
-    //     Query_arena::free_items
-    //         Item::delete_self).
-    query_parse * const parse =
-        new query_parse(ps.dbName(), push_results_stream.str());
-    const SQLHandler *handler =
-        this->a.rewriter->dml_dispatcher->dispatch(parse->lex());
-    LEX * const final_insert_lex =
-        handler->transformLex(insert_analysis, parse->lex(), ps);
-    assert(final_insert_lex);
-    */
-
     // DELETE the rows matching the WHERE clause from the database.
     std::ostringstream delete_stream;
     delete_stream << " DELETE FROM " << this->plain_table
                   << " WHERE " << this->where_clause << ";";
-    const std::string delete_query = delete_stream.str();
-    /*
-    Analysis delete_analysis = Analysis(this->a.getSchema());
-    delete_analysis.rewriter = this->a.rewriter;
-    // FIXME(burrows): Identical memleak.
-    query_parse * const delete_parse =
-        new query_parse(ps.dbName(), delete_stream.str());
-    const SQLHandler * const delete_handler =
-        this->a.rewriter->dml_dispatcher->dispatch(delete_parse->lex());
-    LEX * const delete_lex =
-        delete_handler->transformLex(delete_analysis,
-                                     delete_parse->lex(), ps);
-    assert(delete_lex);
+    assert(executeQuery(*rewriter, this->ps, delete_stream.str()));
 
-    // Execute queries.
-    const std::string delete_query = getQuery(delete_lex);
-    const std::string insert_query = getQuery(final_insert_lex);
-
-    assert(sendQuery(conn, delete_query));
-    return sendQuery(conn, insert_query);
-    */
-    assert(executeQuery(*rewriter, this->ps, insert_query));
-    return executeQuery(*rewriter, this->ps, delete_query);
+    // > Add each row from the embedded database to the data database.
+    std::ostringstream push_results_stream;
+    push_results_stream << " INSERT INTO " << this->plain_table
+                        << " VALUES " << output_rows << ";";
+    return executeQuery(*rewriter, this->ps, push_results_stream.str());
 }
 
 DeltaOutput::~DeltaOutput()

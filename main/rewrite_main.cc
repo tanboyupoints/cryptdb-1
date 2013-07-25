@@ -683,8 +683,8 @@ RewriteOutput *
 Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
                         const std::string &query)
 {
-    assert(ps.e_conn->execute("USE cryptdbtest;"));
-    LEX *lex = parse.lex();
+    query_parse p(ps.dbName(), query);
+    LEX *lex = p.lex();
     LOG(cdb_v) << "pre-analyze " << *lex;
 
     // optimization: do not process queries that we will not rewrite
@@ -695,7 +695,7 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         try {
             LEX *out_lex = handler->transformLex(a, lex, ps);
             if (true == a.special_update) {
-                return new SpecialUpdate(query, out_lex, a, ps);
+                return new SpecialUpdate(query, lex, ps);
             } else {
                 return new DMLOutput(query, out_lex);
             }
