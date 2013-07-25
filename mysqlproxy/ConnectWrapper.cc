@@ -371,7 +371,8 @@ decrypt(lua_State *L)
         rd = res;
     } else {
         try {
-            rd = r->decryptResults(res, clients[client]->rmeta);
+            ResType *rt = r->decryptResults(res, clients[client]->rmeta);
+            rd = *rt;
         }
         catch(CryptDBError e) {
             lua_pushnil(L);

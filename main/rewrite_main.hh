@@ -62,7 +62,7 @@ public:
 
     void setMasterKey(const std::string &mkey);
     QueryRewrite rewrite(const std::string &q);
-    ResType decryptResults(ResType & dbres, ReturnMeta * rm);
+    ResType *decryptResults(ResType & dbres, ReturnMeta * rm);
 
     // HACK: ps probably shouldn't be embedded in Rewriter if it is going
     // to carry around Connect objects.
@@ -94,8 +94,8 @@ private:
     MYSQL_RES *r;
 };
 
-bool
-executeQuery(Rewriter &r, ProxyState &ps, const std::string &q);
+ResType *
+executeQuery(Rewriter &r, const ProxyState &ps, const std::string &q);
 
 #define UNIMPLEMENTED \
         throw std::runtime_error(std::string("Unimplemented: ") + \

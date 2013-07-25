@@ -152,7 +152,7 @@ printEC(Connect * e_conn, const std::string & command) {
 */
 
 static void
-printEmbeddedState(ProxyState & ps) {
+printEmbeddedState(const ProxyState & ps) {
     /*
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables from pdb;");
@@ -675,15 +675,15 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
     // HACK: This is necessary as above functions use a USE statement.
     // ie, loadUDFs.
-    ps.conn->execute("USE cryptdbtest;");
-    ps.e_conn->execute("USE cryptdbtest;");
+    assert(ps.conn->execute("USE cryptdbtest;"));
+    assert(ps.e_conn->execute("USE cryptdbtest;"));
 }
 
 RewriteOutput * 
 Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
                         const std::string &query)
 {
-    query_parse parse(ps.dbName(), query);
+    assert(ps.e_conn->execute("USE cryptdbtest;"));
     LEX *lex = parse.lex();
     LOG(cdb_v) << "pre-analyze " << *lex;
 
@@ -695,7 +695,7 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         try {
             LEX *out_lex = handler->transformLex(a, lex, ps);
             if (true == a.special_update) {
-                return new SpecialUpdate(query, out_lex);
+                return new SpecialUpdate(query, out_lex, a, ps);
             } else {
                 return new DMLOutput(query, out_lex);
             }
@@ -777,14 +777,14 @@ std::string ReturnMeta::stringify() {
     return res.str();
 }
 
-ResType
+ResType *
 Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
 {
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
     unsigned int cols = dbres.names.size();
 
-    ResType res = ResType();
+    ResType *res = new ResType();
 
     unsigned int index = 0;
 
@@ -794,19 +794,19 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
         ReturnField rf = rmeta->rfmeta[index];
         if (!rf.is_salt) {
             //need to return this field
-            res.names.push_back(rf.field_called);
+            res->names.push_back(rf.field_called);
             // switch types to original ones : TODO
 
         }
         index++;
     }
 
-    unsigned int real_cols = res.names.size();
+    unsigned int real_cols = res->names.size();
 
     //allocate space in results for decrypted rows
-    res.rows = std::vector<std::vector<Item*> >(rows);
+    res->rows = std::vector<std::vector<Item*> >(rows);
     for (unsigned int i = 0; i < rows; i++) {
-        res.rows[i] = std::vector<Item*>(real_cols);
+        res->rows[i] = std::vector<Item*>(real_cols);
     }
 
     // decrypt rows
@@ -818,7 +818,7 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
             for (unsigned int r = 0; r < rows; r++) {
                 if (!fm || !fm->isEncrypted() ||
                     dbres.rows[r][c]->is_null()) {
-                    res.rows[r][col_index] = dbres.rows[r][c];
+                    res->rows[r][col_index] = dbres.rows[r][c];
                 } else {
                     uint64_t salt = 0;
                     if (rf.pos_salt>=0) {
@@ -827,9 +827,9 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
                         salt = ((Item_int *)dbres.rows[r][rf.pos_salt])->value;
                     }
 
-                    res.rows[r][col_index] =
+                    res->rows[r][col_index] =
                         decrypt_item(fm, rf.olk.o, dbres.rows[r][c],
-                                     salt, res.rows[r]);
+                                     salt, res->rows[r]);
                 }
             }
             col_index++;
@@ -848,36 +848,39 @@ prettyPrintQueryResult(ResType res)
     std::cout << std::endl;
 }
 
-bool
-executeQuery(Rewriter &r, ProxyState &ps, const std::string &q)
+ResType *
+executeQuery(Rewriter &r, const ProxyState &ps, const std::string &q)
 {
     try {
         QueryRewrite qr = r.rewrite(q);
-
-        DBResult *enc_res = qr.output->doQuery(ps.conn, ps.e_conn);
+        // FIXME: HACK.
+        assert(ps.e_conn->execute("USE cryptdbtest;"));
+        // FIXME: Use smart pointer.
+        ResType *res = qr.output->doQuery(ps.conn, ps.e_conn, &r);
         if (true == qr.output->queryAgain()) { // Onion adjustment.
+            if (res) {
+                delete res;
+            }
             return executeQuery(r, ps, q);
         }
+        prettyPrintQueryResult(*res);
 
-        ResType res = enc_res->unpack();
-        if (!res.ok) {
-            return false;
+        ResType *dec_res = r.decryptResults(*res, qr.rmeta);
+        if (res) {
+            delete res;
         }
-        prettyPrintQueryResult(res);
-
-        ResType dec_res = r.decryptResults(res, qr.rmeta);
-        prettyPrintQueryResult(dec_res);
+        prettyPrintQueryResult(*dec_res);
 
         printEmbeddedState(ps);
-        return true;
+        return dec_res;
     } catch (std::runtime_error &e) {
         std::cout << "Unexpected Error: " << e.what() << " in query "
                   << q << std::endl;
-        return false;
+        return NULL;
     }  catch (CryptDBError &e) {
         std::cout << "Internal Error: " << e.msg << " in query " << q
                   << std::endl;
-        return false;
+        return NULL;
     }
 
 }

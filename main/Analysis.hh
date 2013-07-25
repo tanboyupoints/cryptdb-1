@@ -318,14 +318,16 @@ public:
         : original_query(original_query), new_query(getQuery(new_lex)) {}
     virtual ~RewriteOutput() = 0;
 
-    virtual DBResult *doQuery(Connect *conn, Connect *e_conn);
+    virtual ResType *doQuery(Connect *conn, Connect *e_conn,
+                             Rewriter *rewriter = NULL);
     virtual bool queryAgain();
 
 protected:
     const std::string original_query;
     const std::string new_query;
 
-    std::string getQuery(LEX *lex);
+    static std::string getQuery(LEX *lex);
+    static ResType *sendQuery(Connect *c, std::string q);
 };
 
 class SimpleOutput : public RewriteOutput {
@@ -340,17 +342,25 @@ public:
         : RewriteOutput(original_query, new_lex) {}
     ~DMLOutput() {;}
 
-    DBResult *doQuery(Connect *conn, Connect *e_conn);
+    ResType *doQuery(Connect *conn, Connect *e_conn,
+                    Rewriter *rewriter = NULL);
 };
 
 // Special case of DML query.
 class SpecialUpdate : public RewriteOutput {
 public:
-    SpecialUpdate(const std::string &original_query, LEX *new_lex)
-        : RewriteOutput(original_query, new_lex) {}
+    SpecialUpdate(const std::string &original_query, LEX *new_lex,
+                  Analysis &a, const ProxyState &ps);
     ~SpecialUpdate() {;}
 
-    DBResult *doQuery(Connect *conn, Connect *e_conn);
+    ResType *doQuery(Connect *conn, Connect *e_conn,
+                    Rewriter *rewriter = NULL);
+
+private:
+    std::string plain_table;
+    std::string where_clause;
+    Analysis &a;
+    const ProxyState &ps;
 };
 
 class DeltaOutput : public RewriteOutput {
@@ -359,7 +369,8 @@ public:
                 std::list<Delta> deltas)
         : RewriteOutput(original_query, new_lex), deltas(deltas) {}
     virtual ~DeltaOutput() = 0;
-    virtual DBResult *doQuery(Connect *conn, Connect *e_conn);
+    virtual ResType *doQuery(Connect *conn, Connect *e_conn,
+                            Rewriter *rewriter = NULL);
 
 private:
     const std::list<Delta> deltas;
@@ -372,7 +383,8 @@ public:
         : DeltaOutput(original_query, new_lex, deltas) {}
     ~DDLOutput() {;}
 
-    DBResult *doQuery(Connect *conn, Connect *e_conn);
+    ResType *doQuery(Connect *conn, Connect *e_conn,
+                    Rewriter *rewriter = NULL);
 };
 
 class AdjustOnionOutput : public DeltaOutput {
@@ -385,7 +397,8 @@ public:
     ~AdjustOnionOutput() {;}
 
     bool queryAgain();
-    DBResult *doQuery(Connect *conn, Connect *e_conn);
+    ResType *doQuery(Connect *conn, Connect *e_conn,
+                    Rewriter *rewriter = NULL);
 
 private:
     const std::list<std::string> adjust_queries;

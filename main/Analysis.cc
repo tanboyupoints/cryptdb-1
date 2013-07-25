@@ -1,5 +1,6 @@
 #include <main/Analysis.hh>
 #include <main/rewrite_util.hh>
+#include <main/rewrite_main.hh>
 
 // FIXME: Memory leaks when we allocate MetaKey<...>, use smart pointer.
 
@@ -386,15 +387,12 @@ prettyPrintQuery(std::string query)
 }
 
 // FIXME: Implement.
-DBResult *RewriteOutput::doQuery(Connect *conn, Connect *e_conn)
+ResType *RewriteOutput::doQuery(Connect *conn, Connect *e_conn,
+                                Rewriter *rewriter)
 {
     if (false == queryAgain()) {
-        DBResult *dbres;
         prettyPrintQuery(new_query);
-
-        assert(conn->execute(new_query, dbres));
-
-        return dbres;
+        return sendQuery(conn, new_query);
     }
     return NULL;
 }
@@ -415,33 +413,189 @@ std::string RewriteOutput::getQuery(LEX *lex)
     }
 }
 
-DBResult *DMLOutput::doQuery(Connect *conn, Connect *e_conn)
+ResType *RewriteOutput::sendQuery(Connect *c, std::string q)
 {
-    return RewriteOutput::doQuery(conn, e_conn);
+    DBResult *dbres;
+    assert(c->execute(q, dbres));
+    ResType *res = new ResType(dbres->unpack());
+    if (!res->ok) {
+        return NULL;
+    }
+
+    return res;
+}
+
+ResType *DMLOutput::doQuery(Connect *conn, Connect *e_conn,
+                            Rewriter *rewriter)
+{
+    return RewriteOutput::doQuery(conn, e_conn, rewriter);
+}
+
+SpecialUpdate::SpecialUpdate(const std::string &original_query,
+                             LEX *new_lex, Analysis &a,
+                             const ProxyState &ps)
+    : RewriteOutput(original_query, new_lex), a(a), ps(ps)
+{
+    this->plain_table =
+        new_lex->select_lex.top_join_list.head()->table_name; 
+    if (new_lex->select_lex.where) {
+        std::ostringstream where_stream;
+        where_stream << " " << *new_lex->select_lex.where << " ";
+        this->where_clause = where_stream.str();
+    } else {    // HACK: Handle empty WHERE clause.
+        this->where_clause = " TRUE ";
+    }
 }
 
 // FIXME: Implement.
-DBResult *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn)
+ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
+                                Rewriter *rewriter)
 {
-    return NULL;
+    std::cout << "SpecialUpdate::doQuery!" << std::endl;
+    assert(rewriter);
+    // Retrieve rows from database.
+    std::ostringstream select_stream;
+    select_stream << " SELECT * FROM " << this->plain_table
+                  << " WHERE " << this->where_clause << ";";
+    const ResType * const select_res_type =
+        executeQuery(*rewriter, this->ps, select_stream.str());
+    assert(select_res_type);
+    if (select_res_type->rows.size() == 0) { // No work to be done.
+        return RewriteOutput::doQuery(conn, e_conn, rewriter);
+    }
+
+    const auto itemJoin = [](std::vector<Item*> row) {
+        return "(" + vector_join<Item*>(row, ",", ItemToString) + ")";
+    };
+    const std::string values_string =
+        vector_join<std::vector<Item*>>(select_res_type->rows, ",",
+                                        itemJoin);
+    delete select_res_type;
+
+    // Push the plaintext rows to the embedded database.
+    std::ostringstream push_stream;
+    push_stream << " INSERT INTO " << this->plain_table
+                << " VALUES " << values_string << ";";
+    assert(e_conn->execute(push_stream.str()));
+
+    // Run the original (unmodified) query on the data in the embedded
+    // database.
+    assert(e_conn->execute(this->original_query));
+
+    // > Collect the results from the embedded database.
+    // > This code relies on single threaded access to the database
+    //   and on the fact that the database is cleaned up after
+    //   every such operation.
+    DBResult *dbres;
+    std::ostringstream select_results_stream;
+    select_results_stream << " SELECT * FROM " << this->plain_table << ";";
+    assert(e_conn->execute(select_results_stream.str(), dbres));
+
+    // FIXME(burrows): Use general join.
+    ScopedMySQLRes r(dbres->n);
+    MYSQL_ROW row;
+    std::string output_rows = " ";
+    const unsigned long field_count = r.res()->field_count;
+    while ((row = mysql_fetch_row(r.res()))) {
+        unsigned long *l = mysql_fetch_lengths(r.res());
+        assert(l != NULL);
+
+        output_rows.append(" ( ");
+        for (unsigned long field_index = 0; field_index < field_count;
+             ++field_index) {
+            std::string field_data;
+            if (row[field_index]) {
+                field_data = std::string(row[field_index],
+                                         l[field_index]);
+            } else {    // Handle NULL values.
+                field_data = std::string("NULL");
+            }
+            output_rows.append(field_data);
+            if (field_index + 1 < field_count) {
+                output_rows.append(", ");
+            }
+        }
+        output_rows.append(" ) ,");
+    }
+    output_rows = output_rows.substr(0, output_rows.length() - 1);
+
+    // Cleanup the embedded database.
+    std::ostringstream cleanup_stream;
+    cleanup_stream << "DELETE FROM " << this->plain_table << ";";
+    assert(e_conn->execute(cleanup_stream.str()));
+
+    // > Add each row from the embedded database to the data database.
+    std::ostringstream push_results_stream;
+    push_results_stream << " INSERT INTO " << this->plain_table
+                        << " VALUES " << output_rows << ";";
+    const std::string insert_query = push_results_stream.str();
+    /*
+    Analysis insert_analysis = Analysis(this->a.getSchema());
+    insert_analysis.rewriter = this->a.rewriter;
+    // FIXME(burrows): Memleak.
+    // Freeing the query_parse (or using an automatic variable and
+    // letting it cleanup itself) will call the query_parse
+    // destructor which calls THD::cleanup_after_query which
+    // results in all of our Items_* being freed.
+    // THD::cleanup_after_query
+    //     Query_arena::free_items
+    //         Item::delete_self).
+    query_parse * const parse =
+        new query_parse(ps.dbName(), push_results_stream.str());
+    const SQLHandler *handler =
+        this->a.rewriter->dml_dispatcher->dispatch(parse->lex());
+    LEX * const final_insert_lex =
+        handler->transformLex(insert_analysis, parse->lex(), ps);
+    assert(final_insert_lex);
+    */
+
+    // DELETE the rows matching the WHERE clause from the database.
+    std::ostringstream delete_stream;
+    delete_stream << " DELETE FROM " << this->plain_table
+                  << " WHERE " << this->where_clause << ";";
+    const std::string delete_query = delete_stream.str();
+    /*
+    Analysis delete_analysis = Analysis(this->a.getSchema());
+    delete_analysis.rewriter = this->a.rewriter;
+    // FIXME(burrows): Identical memleak.
+    query_parse * const delete_parse =
+        new query_parse(ps.dbName(), delete_stream.str());
+    const SQLHandler * const delete_handler =
+        this->a.rewriter->dml_dispatcher->dispatch(delete_parse->lex());
+    LEX * const delete_lex =
+        delete_handler->transformLex(delete_analysis,
+                                     delete_parse->lex(), ps);
+    assert(delete_lex);
+
+    // Execute queries.
+    const std::string delete_query = getQuery(delete_lex);
+    const std::string insert_query = getQuery(final_insert_lex);
+
+    assert(sendQuery(conn, delete_query));
+    return sendQuery(conn, insert_query);
+    */
+    assert(executeQuery(*rewriter, this->ps, insert_query));
+    return executeQuery(*rewriter, this->ps, delete_query);
 }
 
 DeltaOutput::~DeltaOutput()
 {;}
 
-DBResult *DeltaOutput::doQuery(Connect *conn, Connect *e_conn)
+ResType *DeltaOutput::doQuery(Connect *conn, Connect *e_conn,
+                              Rewriter *rewriter)
 {
     for (auto it : deltas) {
         assert(it.apply(e_conn));
     }
 
-    return RewriteOutput::doQuery(conn, e_conn);
+    return RewriteOutput::doQuery(conn, e_conn, rewriter);
 }
 
-DBResult *DDLOutput::doQuery(Connect *conn, Connect *e_conn)
+ResType *DDLOutput::doQuery(Connect *conn, Connect *e_conn,
+                            Rewriter *rewriter)
 {
     assert(e_conn->execute(original_query));
-    return DeltaOutput::doQuery(conn, e_conn);
+    return DeltaOutput::doQuery(conn, e_conn, rewriter);
 }
 
 bool AdjustOnionOutput::queryAgain()
@@ -449,7 +603,8 @@ bool AdjustOnionOutput::queryAgain()
     return true;
 }
 
-DBResult *AdjustOnionOutput::doQuery(Connect *conn, Connect *e_conn)
+ResType *AdjustOnionOutput::doQuery(Connect *conn, Connect *e_conn,
+                                    Rewriter *rewriter)
 {
     for (auto it : adjust_queries) {
         assert(conn->execute(it));
