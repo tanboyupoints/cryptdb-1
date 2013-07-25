@@ -316,8 +316,9 @@ class Rewriter;
 
 class RewriteOutput { 
 public:
-    RewriteOutput(const std::string &original_query, LEX *new_lex)
-        : original_query(original_query), new_query(getQuery(new_lex)) {}
+    RewriteOutput(const std::string &original_query, LEX *lex)
+        : original_query(original_query),
+          query_from_lex(getQuery(lex)) {}
     virtual ~RewriteOutput() = 0;
 
     virtual ResType *doQuery(Connect *conn, Connect *e_conn,
@@ -326,7 +327,7 @@ public:
 
 protected:
     const std::string original_query;
-    const std::string new_query;
+    const std::string query_from_lex;
 
     static std::string getQuery(LEX *lex);
     static ResType *sendQuery(Connect *c, std::string q);
@@ -340,8 +341,8 @@ public:
 
 class DMLOutput : public RewriteOutput {
 public:
-    DMLOutput(const std::string &original_query, LEX *new_lex)
-        : RewriteOutput(original_query, new_lex) {}
+    DMLOutput(const std::string &original_query, LEX *lex)
+        : RewriteOutput(original_query, lex) {}
     ~DMLOutput() {;}
 
     ResType *doQuery(Connect *conn, Connect *e_conn,
@@ -351,7 +352,8 @@ public:
 // Special case of DML query.
 class SpecialUpdate : public RewriteOutput {
 public:
-    SpecialUpdate(const std::string &original_query, LEX *new_lex,
+    // Requires the original lex.
+    SpecialUpdate(const std::string &original_query, LEX *lex,
                   const ProxyState &ps);
     ~SpecialUpdate() {;}
 
@@ -366,9 +368,9 @@ private:
 
 class DeltaOutput : public RewriteOutput {
 public:
-    DeltaOutput(const std::string &original_query, LEX *new_lex,
+    DeltaOutput(const std::string &original_query, LEX *lex,
                 std::list<Delta> deltas)
-        : RewriteOutput(original_query, new_lex), deltas(deltas) {}
+        : RewriteOutput(original_query, lex), deltas(deltas) {}
     virtual ~DeltaOutput() = 0;
     virtual ResType *doQuery(Connect *conn, Connect *e_conn,
                             Rewriter *rewriter = NULL);
@@ -379,9 +381,9 @@ private:
 
 class DDLOutput : public DeltaOutput {
 public:
-    DDLOutput(const std::string &original_query, LEX *new_lex,
+    DDLOutput(const std::string &original_query, LEX *lex,
               std::list<Delta> deltas)
-        : DeltaOutput(original_query, new_lex, deltas) {}
+        : DeltaOutput(original_query, lex, deltas) {}
     ~DDLOutput() {;}
 
     ResType *doQuery(Connect *conn, Connect *e_conn,

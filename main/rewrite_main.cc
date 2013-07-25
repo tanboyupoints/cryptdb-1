@@ -695,6 +695,8 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         SQLHandler *handler = dml_dispatcher->dispatch(lex);
         try {
             LEX *out_lex = handler->transformLex(a, lex, ps);
+            // SpecialUpdate wants the old lex, as it's going to
+            // handle it's own rewrite.
             if (true == a.special_update) {
                 return new SpecialUpdate(query, lex, ps);
             } else {
@@ -857,6 +859,8 @@ executeQuery(Rewriter &r, const ProxyState &ps, const std::string &q)
                                                         ps.e_conn, &r));
         if (true == qr.output->queryAgain()) { // Onion adjustment.
             return executeQuery(r, ps, q);
+        } else {
+            assert(res);
         }
         prettyPrintQueryResult(*res);
 
