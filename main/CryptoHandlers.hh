@@ -152,4 +152,22 @@ public:
     // static std::string serializeLayer(EncLayer * el, DBMeta *parent);
 };
 
+//#define ULONG_MAX_BIT (ULONG_MAX - (ULONG_MAX >> 1))
+//#define SET_MAX_BIT(x) (x | ULONG_MAX_BIT)
+//#define CLEAR_MAX_BIT(x) (x & ~ULONG_MAX_BIT)
+//#define IS_BIT_SET(x) (x & ULONG_MAX_BIT)
+
+// Trettype, Uargument, Nbase
+template <typename T, typename U, typename N>
+static T round_val(U arg, N base, bool signed_flag)
+{
+    T ret;
+    if(signed_flag == false) //do nothing 
+        return(ret = arg);
+
+    ret = arg += base;
+    //std::cout << "Convertion for " << ret << "/" << base << "\n";
+    return ret;
+}
+
 
