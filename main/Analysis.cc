@@ -103,7 +103,6 @@ EncSet::chooseOne() const
         oPLAIN,
     };
 
-
     static size_t onion_size = sizeof(onion_order) / sizeof(onion_order[0]);
     for (size_t i = 0; i < onion_size; i++) {
         onion o = onion_order[i];
@@ -391,8 +390,8 @@ ResType *RewriteOutput::doQuery(Connect *conn, Connect *e_conn,
                                 Rewriter *rewriter)
 {
     if (false == queryAgain()) {
-        prettyPrintQuery(new_query);
-        return sendQuery(conn, new_query);
+        prettyPrintQuery(query_from_lex);
+        return sendQuery(conn, query_from_lex);
     }
     return NULL;
 }
@@ -419,7 +418,7 @@ ResType *RewriteOutput::sendQuery(Connect *c, std::string q)
     assert(c->execute(q, dbres));
     ResType *res = new ResType(dbres->unpack());
     if (!res->ok) {
-        return NULL;
+        throw CryptDBError("Failed to unpack query results!");
     }
 
     return res;
@@ -432,25 +431,23 @@ ResType *DMLOutput::doQuery(Connect *conn, Connect *e_conn,
 }
 
 SpecialUpdate::SpecialUpdate(const std::string &original_query,
-                             LEX *old_lex, const ProxyState &ps)
-    : RewriteOutput(original_query, old_lex), ps(ps)
+                             LEX *lex, const ProxyState &ps)
+    : RewriteOutput(original_query, lex), ps(ps)
 {
     this->plain_table =
-        old_lex->select_lex.top_join_list.head()->table_name; 
-    if (old_lex->select_lex.where) {
+        lex->select_lex.top_join_list.head()->table_name; 
+    if (lex->select_lex.where) {
         std::ostringstream where_stream;
-        where_stream << " " << *old_lex->select_lex.where << " ";
+        where_stream << " " << *lex->select_lex.where << " ";
         this->where_clause = where_stream.str();
     } else {    // HACK: Handle empty WHERE clause.
         this->where_clause = " TRUE ";
     }
 }
 
-// FIXME: Implement.
 ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
                                 Rewriter *rewriter)
 {
-    std::cout << "SpecialUpdate::doQuery!" << std::endl;
     assert(rewriter);
     // Retrieve rows from database.
     std::ostringstream select_stream;
