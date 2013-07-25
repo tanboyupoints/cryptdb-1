@@ -1,4 +1,5 @@
 #include <string>
+#include <memory>
 #include <map>
 #include <iostream>
 #include <fstream>
@@ -115,7 +116,7 @@ sanityCheck(SchemaInfo *schema)
     return true;
 }
 
-// FIXME: This function will not build all of our tables when it is run
+// This function will not build all of our tables when it is run
 // on an empty database.  If you don't have a parent, your table won't be
 // built.  We probably want to seperate our database logic into 3 parts.
 //  1> Schema buildling (CREATE TABLE IF NOT EXISTS...)
@@ -748,10 +749,11 @@ Rewriter::rewrite(const std::string & q)
 
     // printEmbeddedState(ps);
 
-    //for as long as there are onion adjustments
+    // FIXME: Memleak 'schema'.
     const SchemaInfo * const schema = loadSchemaInfo(ps.e_conn);
     Analysis analysis = Analysis(schema);
 
+    // FIXME: Memleak return of 'dispatchOnLex()'
     return QueryRewrite(true, analysis.rmeta,
                         this->dispatchOnLex(analysis, ps, q));
 }
@@ -851,22 +853,14 @@ executeQuery(Rewriter &r, const ProxyState &ps, const std::string &q)
 {
     try {
         QueryRewrite qr = r.rewrite(q);
-        // FIXME: HACK.
-        assert(ps.e_conn->execute("USE cryptdbtest;"));
-        // FIXME: Use smart pointer.
-        ResType *res = qr.output->doQuery(ps.conn, ps.e_conn, &r);
+        std::unique_ptr<ResType> res(qr.output->doQuery(ps.conn,
+                                                        ps.e_conn, &r));
         if (true == qr.output->queryAgain()) { // Onion adjustment.
-            if (res) {
-                delete res;
-            }
             return executeQuery(r, ps, q);
         }
         prettyPrintQueryResult(*res);
 
         ResType *dec_res = r.decryptResults(*res, qr.rmeta);
-        if (res) {
-            delete res;
-        }
         prettyPrintQueryResult(*dec_res);
 
         printEmbeddedState(ps);
@@ -880,7 +874,6 @@ executeQuery(Rewriter &r, const ProxyState &ps, const std::string &q)
                   << std::endl;
         return NULL;
     }
-
 }
 
 void

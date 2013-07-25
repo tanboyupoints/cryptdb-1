@@ -15,6 +15,9 @@
 #include <sstream>
 #include <functional>
 
+// > FIXME: We are Memleaking
+// SchemaInfo/TableMeta/FieldMeta/OnionMeta/EncLayer and the keys.
+
 class Analysis;
 struct FieldMeta;
 /**
@@ -64,7 +67,6 @@ const OLK PLAIN_OLK = OLK(oPLAIN, SECLEVEL::PLAINVAL, NULL);
  * > Also note that like FieldMeta, OnionMeta's children have an explicit
  *   order that must be encoded.
  */
-// TODO: Fix the children.
 typedef class OnionMeta : public DBMeta {
 public:
     // New.
