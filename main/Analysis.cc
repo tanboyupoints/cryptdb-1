@@ -127,14 +127,13 @@ bool
 EncSet::contains(const OLK & olk) const {
     auto it = osl.find(olk.o);
     if (it == osl.end()) {
-	return false;
+        return false;
     }
     if (it->second.first == olk.l) {
-	return true;
+        return true;
     }
     return false;
 }
-
 
 bool
 needsSalt(EncSet es) {
@@ -146,7 +145,6 @@ needsSalt(EncSet es) {
 
     return false;
 }
-
 
 std::ostream&
 operator<<(std::ostream &out, const reason &r)
@@ -172,11 +170,11 @@ RewritePlan::restrict(const EncSet & es) {
     assert_s(!es_out.empty(), "after restrict rewrite plan has empty encset");
 
     if (plan.size()) { //node has children
-	for (auto pair = plan.begin(); pair != plan.end(); pair++) {
-	    if (!es.contains(pair->first)) {
-		plan.erase(pair);
-	    }
-	}
+        for (auto pair = plan.begin(); pair != plan.end(); pair++) {
+            if (!es.contains(pair->first)) {
+            plan.erase(pair);
+            }
+        }
     }
 }
 */
@@ -194,16 +192,28 @@ operator<<(std::ostream &out, const RewritePlan * rp)
     return out;
 }
 
+// FIXME: Implement serial number.
+// FIXME: Must be recursive.
 bool Delta::save(Connect *e_conn)
 {
-    std::string serial_object = meta->serialize(*parent_meta);
-    std::string parent_id =
+    const std::string serial_object = meta->serialize(*parent_meta);
+    const std::string parent_id =
         std::to_string(parent_meta->getDatabaseID());
-    std::string serial_key = key->getSerial();
-    std::string table_name = "Delta";
+    const std::string serial_key = key->getSerial();
+    const std::string table_name = "Delta";
+
+    // Make sure the table exists.
+    const std::string create_table_query =
+        " CREATE TABLE IF NOT EXISTS pdb." + table_name +
+        "   (action VARCHAR(100) NOT NULL,"
+        "    serial_object VARCHAR(200) NOT NULL,"
+        "    parent_id BIGINT NOT NULL,"
+        "    serial_key VARCHAR(200) NOT NULL),"
+        " ENGINE=InnoDB;";
+    assert(e_conn->execute(create_table_query));
 
     // TODO: Maybe we want to join on object_id as well.
-    std::string query =
+    const std::string query =
         " INSERT INTO pdb." + table_name +
         "    (action, serial_object, parent_id, serial_key) VALUES (" +
         " "  + std::to_string(action) + ", " +
@@ -243,6 +253,30 @@ bool Delta::apply(Connect *e_conn)
             throw CryptDBError("Unknown Delta::Action!");
         }
     }
+}
+
+// FIXME: Must be recursive.
+bool Delta::destroyRecord(Connect *e_conn)
+{
+    const std::string serial_object = meta->serialize(*parent_meta);
+    const std::string parent_id =
+        std::to_string(parent_meta->getDatabaseID());
+    const std::string serial_key = key->getSerial();
+    const std::string table_name = "Delta";
+
+    const std::string query =
+        " DELETE pdb." + table_name +
+        "   FROM pdb." + table_name +
+        "  WHERE pdb." + table_name + ".action" +
+        "      = '" +  std::to_string(action) + "' "
+        "    AND pdb." + table_name + ".serial_object" +
+        "      = '" + serial_object + "' "
+        "    AND pdb." + table_name + ".parent_id" +
+        "      = '" + parent_id + "' "
+        "    AND pdb." + table_name + ".serial_key" +
+        "      = '" + serial_key + "';";
+
+    return e_conn->execute(query);
 }
 
 // TODO: Remove asserts.
@@ -444,6 +478,7 @@ SpecialUpdate::SpecialUpdate(const std::string &original_query,
     }
 }
 
+// FIXME: Implement locking.
 ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
                                 Rewriter *rewriter)
 {
@@ -535,21 +570,66 @@ ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
 DeltaOutput::~DeltaOutput()
 {;}
 
-ResType *DeltaOutput::doQuery(Connect *conn, Connect *e_conn,
-                              Rewriter *rewriter)
+// FIXME: Implement.
+static bool saveQuery(Connect *e_conn, std::string query)
 {
-    for (auto it : deltas) {
-        assert(it.apply(e_conn));
+    return true;
+}
+
+// FIXME: Implement.
+static bool destroyQueryRecord(Connect *e_conn, std::string query)
+{
+    return true;
+}
+
+// FIXME: Test DB by reading out of it for later ops.
+ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
+                                    Rewriter *rewriter, bool do_original,
+                                    std::function<ResType *()> primary)
+{
+    // Store deltas and original query in embedded db.
+    {
+        assert(e_conn->execute("START TRANSACTION;"));
+        for (auto it : deltas) {
+            // assert(it.save(e_conn));
+        }
+        if (true == do_original) {
+            assert(saveQuery(e_conn, original_query));
+        }
+        assert(e_conn->execute("COMMIT;"));
     }
 
-    return RewriteOutput::doQuery(conn, e_conn, rewriter);
+    // Execute query @ remote.
+    ResType *result = primary();
+
+    // > Apply deltas and original query.
+    // > Remove deltas and original query from embedded db.
+    {
+        assert(e_conn->execute("START TRANSACTION;"));
+        for (auto it : deltas) {
+            assert(it.apply(e_conn));
+            // assert(it.destroyRecord(e_conn));
+        }
+        if (true == do_original) {
+            assert(e_conn->execute(original_query));
+            destroyQueryRecord(e_conn, original_query);
+        }
+        assert(e_conn->execute("COMMIT;"));
+    }
+
+    return result;
 }
 
 ResType *DDLOutput::doQuery(Connect *conn, Connect *e_conn,
                             Rewriter *rewriter)
 {
-    assert(e_conn->execute(original_query));
-    return DeltaOutput::doQuery(conn, e_conn, rewriter);
+    std::function<ResType *()> primary =
+        [this, &conn, &e_conn, &rewriter]()
+        {
+            return RewriteOutput::doQuery(conn, e_conn, rewriter);
+        };
+    return DeltaOutput::doQueryHelper(conn, e_conn, rewriter, true,
+                                      primary);
 }
 
 bool AdjustOnionOutput::queryAgain()
@@ -560,10 +640,16 @@ bool AdjustOnionOutput::queryAgain()
 ResType *AdjustOnionOutput::doQuery(Connect *conn, Connect *e_conn,
                                     Rewriter *rewriter)
 {
-    for (auto it : adjust_queries) {
-        assert(conn->execute(it));
-    }
-    return DeltaOutput::doQuery(conn, e_conn);
+    std::function<ResType *()> primary =
+        [this, &conn]() -> ResType*
+        {
+            for (auto it : adjust_queries) {
+                assert(conn->execute(it));
+            }
+            return NULL;
+        };
+    return DeltaOutput::doQueryHelper(conn, e_conn, rewriter, false,
+                                      primary);
 }
 
 bool Analysis::addAlias(const std::string &alias,

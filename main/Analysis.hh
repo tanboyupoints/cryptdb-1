@@ -288,6 +288,7 @@ public:
      * serialization semantics.
      */
     bool apply(Connect *e_conn);
+    bool destroyRecord(Connect *e_conn);
     void createHandler(Connect *e_conn, const DBMeta * const object,
                        const DBMeta * const parent,
                        const AbstractMetaKey * const k = NULL,
@@ -373,7 +374,13 @@ public:
         : RewriteOutput(original_query, lex), deltas(deltas) {}
     virtual ~DeltaOutput() = 0;
     virtual ResType *doQuery(Connect *conn, Connect *e_conn,
-                            Rewriter *rewriter = NULL);
+                            Rewriter *rewriter = NULL)
+    {
+        throw CryptDBError("DeltaOutput::doQuery should not be called!");
+    }
+    ResType *doQueryHelper(Connect *conn, Connect *e_conn,
+                           Rewriter *rewriter, bool do_original,
+                           std::function<ResType *()> primary);
 
 private:
     const std::list<Delta> deltas;
