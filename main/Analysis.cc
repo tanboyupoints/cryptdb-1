@@ -592,6 +592,7 @@ OnionMeta *Analysis::getOnionMeta(const std::string &table,
     return om;
 }
 
+// FIXME: Field aliasing.
 FieldMeta *Analysis::getFieldMeta(const std::string &table,
                                   const std::string &field) const
 {
@@ -608,26 +609,6 @@ TableMeta *Analysis::getTableMeta(const std::string &table) const
     TableMeta *tm = this->schema->getChild(key);
     assert(tm);
     return tm;
-}
-
-// FIXME: Field aliasing.
-bool Analysis::destroyFieldMeta(const std::string &table,
-                                const std::string &field)
-{
-    IdentityMetaKey *table_key = new IdentityMetaKey(unAliasTable(table));
-    TableMeta *tm = this->schema->getChild(table_key);
-    if (!tm) {
-        return false;
-    }
-
-    IdentityMetaKey *field_key = new IdentityMetaKey(field);
-    return tm->destroyChild(field_key);
-}
-
-bool Analysis::destroyTableMeta(const std::string &table)
-{
-    IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
-    return this->getSchema()->destroyChild(key);
 }
 
 bool Analysis::tableMetaExists(const std::string &table) const

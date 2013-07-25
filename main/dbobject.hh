@@ -185,7 +185,7 @@ class Connect;
  *    SchemaInfo?
  *  > Would likely require a function DBMeta::applyDelta(Delta *)
  *    because we don't have singluarly available interfaces to change
- *    a DBMeta from the outside, ie addChild/replaceChild/destroyChild.
+ *    a DBMeta from the outside, ie addChild.
  * ii) Apply Deltaz to SchemaInfo while all is still in database, then
  *  read SchemaInfo from database.
  *  > Logic is in SQL.
@@ -263,7 +263,6 @@ public:
     MappedDBMeta(unsigned int id) : DBMeta(id) {}
     virtual ~MappedDBMeta();
     virtual bool addChild(KeyType *key, ChildType *meta);
-    virtual bool destroyChild(KeyType *key);
     virtual bool childExists(KeyType * key) const;
     virtual ChildType *getChild(const KeyType * const key) const;
     AbstractMetaKey *getKey(const DBMeta *const child) const;

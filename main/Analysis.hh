@@ -32,7 +32,8 @@ public:
     bool singleton() const { return osl.size() == 1; }
 
     OLK extract_singleton() const {
-        assert_s(singleton(), std::string("encset has size ") + StringFromVal(osl.size()));
+        assert_s(singleton(), std::string("encset has size ") +
+                              StringFromVal(osl.size()));
         auto it = osl.begin();
         return OLK(it->first, it->second.first, it->second.second);
     }
@@ -261,8 +262,9 @@ public:
     enum Action {CREATE, REPLACE, DELETE};
 
     // New Delta.
-    Delta(Action action, DBMeta *meta, DBMeta *parent_meta,
-          AbstractMetaKey *key)
+    Delta(Action action, const DBMeta * const meta,
+          const DBMeta * const parent_meta,
+          const AbstractMetaKey * const key)
         : action(action), meta(meta), parent_meta(parent_meta), key(key) {}
     // FIXME: Unserialize old Delta.
     /*
@@ -427,9 +429,6 @@ public:
     FieldMeta *getFieldMeta(const std::string &table,
                             const std::string &field) const;
     TableMeta *getTableMeta(const std::string &table) const;
-    bool destroyFieldMeta(const std::string &table,
-                          const std::string &field);
-    bool destroyTableMeta(const std::string &table);
     bool tableMetaExists(const std::string &table) const;
     std::string getAnonTableName(const std::string &table) const;
     std::string getAnonIndexName(const std::string &table,
@@ -439,7 +438,7 @@ public:
     SECLEVEL getOnionLevel(OnionMeta * const om) const;
     std::vector<EncLayer *> getEncLayers(OnionMeta * const om) const;
     // HACK.
-    SchemaInfo *getSchema() {return const_cast<SchemaInfo *>(schema);}
+    const SchemaInfo *getSchema() {return schema;}
 
     // TODO: Make private.
     std::map<OnionMeta *, std::vector<EncLayer *>> to_adjust_enc_layers;

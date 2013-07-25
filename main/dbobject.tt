@@ -37,26 +37,6 @@ MappedDBMeta<ChildType, KeyType>::addChild(KeyType *key, ChildType *meta)
     return true;
 }
 
-template <typename ChildType, typename KeyType>
-bool
-MappedDBMeta<ChildType, KeyType>::destroyChild(KeyType *key)
-{
-    if (!childExists(key)) {
-        return false;
-    }
-
-    auto child = getChild(key);
-    auto erase_count = children.erase(key);
-    if (1 == erase_count) {
-        delete child;
-        return true;
-    } else if (0 == erase_count) {
-        return false;
-    } else {
-        throw CryptDBError("Bad erase amount in destroyChild!");
-    }
-}
-
 // FIXME: Slow.
 // > std::reference_wrapper should fix.
 template <typename ChildType, typename KeyType>
