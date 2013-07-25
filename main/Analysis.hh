@@ -441,9 +441,6 @@ public:
     // HACK.
     SchemaInfo *getSchema() {return const_cast<SchemaInfo *>(schema);}
 
-    // HACK(burrows): This is a temporary solution until I redesign.
-    Rewriter *rewriter;
-
     // TODO: Make private.
     std::map<OnionMeta *, std::vector<EncLayer *>> to_adjust_enc_layers;
     

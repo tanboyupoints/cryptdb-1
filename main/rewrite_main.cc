@@ -751,8 +751,6 @@ Rewriter::rewrite(const std::string & q)
     //for as long as there are onion adjustments
     const SchemaInfo * const schema = loadSchemaInfo(ps.e_conn);
     Analysis analysis = Analysis(schema);
-    // HACK(burrows): Until redesign.
-    analysis.rewriter = this;
 
     return QueryRewrite(true, analysis.rmeta,
                         this->dispatchOnLex(analysis, ps, q));
