@@ -32,7 +32,7 @@ class Learn
 
         Learn(mode_e mode, Rewriter& r, const std::string &dbname,
               const std::string &filename)
-            : m_totalnum(0), m_errnum(0),
+            : m_totalnum(0), m_success_num(0), m_errnum(0),
             m_mode(mode), m_r(r), m_dbname(dbname), m_filename(filename)
         {
             //TODO: setenv is just a sugestion took from test, but need to be
@@ -52,9 +52,11 @@ class Learn
         void trainFromFile(Rewriter &r);
         void trainFromScratch(Rewriter &r);
 
+        void status();
 
     private:
         int m_totalnum;
+        int m_success_num;
         int m_errnum;
         mode_e m_mode;
         Rewriter& m_r;

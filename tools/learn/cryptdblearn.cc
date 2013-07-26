@@ -22,6 +22,12 @@ ignore_line(const std::string& line)
     return(line.compare(0,2,begin_match) == 0); 
 }
 
+void 
+Learn::status()
+{
+    std::cout << "Total queries: " << this->m_totalnum << "\n";
+    std::cout << "Number of successfully executed queries: " << this->m_success_num << "\n";
+}
 
 void
 Learn::trainFromFile(Rewriter &r)
@@ -29,10 +35,6 @@ Learn::trainFromFile(Rewriter &r)
     std::string line;
     std::string s("");
     std::ifstream input(this->m_filename);
-    std::cout << "FILE: " << this->m_filename << std::endl;
-
-
-
     assert(input.is_open() == true); 
 
     while(std::getline(input, line )){
@@ -42,16 +44,18 @@ Learn::trainFromFile(Rewriter &r)
         if (!line.empty()){
             char lastChar = *line.rbegin();
             if(lastChar == ';'){
+                this->m_totalnum++;
                 s += line;
-
                 QueryRewrite qr = this->m_r.rewrite(s);
                 ResType *res = qr.output->doQuery(r.ps.conn, r.ps.e_conn, &r);
-                if (true == qr.output->queryAgain()){ 
-                    if (res) 
-                        delete res;
-                    if(executeQuery(r, r.ps, s) == 0)
-                        this->m_totalnum++;
+                if(res){
+                    if(res->ok)
+                        this->m_success_num++;
+                    delete res;
                 }
+                if (true == qr.output->queryAgain()){ 
+                    assert(executeQuery(r, r.ps, s));
+                } 
                 s.clear();
                 continue;
             }
@@ -136,9 +140,11 @@ int main(int argc, char **argv)
     {
         learn = new Learn(MODE_FILE, r, dbname, filename);
         learn->trainFromFile(r);
+        learn->status();
     }else{
         learn = new Learn(MODE_FROM_SCRATCH, r, dbname, "");
         learn->trainFromScratch(r);
+        learn->status();
     }
    
     delete learn;
