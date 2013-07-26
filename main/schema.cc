@@ -128,7 +128,8 @@ std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
     DBWriter dbw = DBWriter::factory<EncLayer>(this);
     std::function<DBMeta *(std::string, std::string, std::string)> deserialize =
         [this] (std::string key, std::string serial, std::string id)
-        -> DBMeta* {
+            -> DBMeta*
+        {
             std::function<unsigned int(std::string)> strToInt =
                 [](std::string s) {return atoi(s.c_str());};
             // > Probably going to want to use indexes in AbstractMetaKey

@@ -214,7 +214,7 @@ bool Delta::singleSave(Connect *e_conn, const DBMeta * const object,
         " CREATE TABLE IF NOT EXISTS pdb." + table_name +
         "   (serial_object VARBINARY(200) NOT NULL,"
         "    parent_id BIGINT NOT NULL,"
-        "    serial_key VARCHAR(200) NOT NULL)"
+        "    serial_key VARBINARY(200) NOT NULL)"
         " ENGINE=InnoDB;";
     assert(e_conn->execute(create_table_query));
 
@@ -230,7 +230,9 @@ bool Delta::singleSave(Connect *e_conn, const DBMeta * const object,
         " "  + parent_id + ", " +
         " '" + esc_serial_key + "');";
 
-    return e_conn->execute(query);
+    assert(e_conn->execute(query));
+
+    return true;
 }
 
 bool Delta::singleDestroy(Connect *e_conn, const DBMeta * const object,
@@ -264,24 +266,19 @@ bool Delta::singleDestroy(Connect *e_conn, const DBMeta * const object,
 // FIXME: Duplicates code with CreateDelta::destroyRecord
 bool CreateDelta::save(Connect *e_conn)
 {
-    static std::function<void(const DBMeta * const)> helper = 
-        [&helper, e_conn, this](const DBMeta * const parent)
-    {
-        auto saver = 
-            [parent, &helper, e_conn, this](const DBMeta *const child)
-        {
-            Delta::singleSave(e_conn, child, parent);
-            helper(child);
-        };
-        parent->applyToChildren(saver);
-    };
-
     // Must provide the key because we have not yet associated the child
     // with the parent.
-    Delta::singleSave(e_conn, meta, parent_meta, key);
-    helper(meta);
+    assert(Delta::singleSave(e_conn, meta, parent_meta, key));
+    assert(saveNewChildrenRecords(e_conn));
     
     return true;
+}
+
+bool CreateDelta::saveNewChildrenRecords(Connect *e_conn)
+{
+    // FIXME: This should use the recursive application in
+    // DeleteDelta::apply
+    return false;
 }
 
 // TODO: Remove asserts.
@@ -364,22 +361,19 @@ bool CreateDelta::apply(Connect *e_conn)
 
 bool CreateDelta::destroyRecord(Connect *e_conn)
 {
-    static std::function<void(const DBMeta * const)> helper = 
-        [&helper, e_conn, this](const DBMeta * const parent)
-    {
-        auto destroyer = 
-            [parent, &helper, e_conn, this](const DBMeta *const child)
-        {
-            Delta::singleDestroy(e_conn, child, parent);
-            helper(child);
-        };
-        parent->applyToChildren(destroyer);
-    };
-
-    Delta::singleDestroy(e_conn, meta, parent_meta, key);
-    helper(meta);
+    // Must provide key.
+    assert(Delta::singleDestroy(e_conn, meta, parent_meta, key));
+    assert(destroyNewChildrenRecords(e_conn));
     
     return true;
+}
+
+bool CreateDelta::destroyNewChildrenRecords(Connect *e_conn)
+{
+    // FIXME: This should use the recursive application in
+    // CreateDelta::apply
+    // > Create orphan tables.
+    return false;
 }
 
 bool ReplaceDelta::save(Connect *e_conn)

@@ -323,6 +323,10 @@ public:
     bool save(Connect *e_conn);
     bool apply(Connect *e_conn);
     bool destroyRecord(Connect *e_conn);
+
+private:
+    bool saveNewChildrenRecords(Connect *e_conn);
+    bool destroyNewChildrenRecords(Connect *e_conn);
 };
 
 class ReplaceDelta : public Delta {
