@@ -704,18 +704,15 @@ DET_int::encrypt(Item * ptext, uint64_t IV) {
 
     ulonglong value = static_cast<Item_int*>(ptext)->value;
 
-
     longlong ival = static_cast<Item_int*>(ptext)->val_int();
     if(shift && ival < 0)
     {
         longlong tmp = ival+shift;
-        std::cout << "ival: " << ival << " tmp: " << tmp << " shift: " << shift << "\n";
+        //std::cout << "ival: " << ival << " tmp: " << tmp << " shift: " << shift << "\n";
         ulonglong res = (ulonglong) bf.encrypt(tmp);
         LOG(encl) << "DET_int enc " << value << "--->" << res;
         return new Item_int(res);
     }
-    
-
 
     ulonglong res = (ulonglong) bf.encrypt(value+shift);
     LOG(encl) << "DET_int enc " << value << "--->" << res;
@@ -727,10 +724,9 @@ DET_int::decrypt(Item * ctext, uint64_t IV) {
 
     ulonglong value = static_cast<Item_int*>(ctext)->value;
 
-    // FIXME:working for positive, check whats is wrong
     if(shift)
     {
-        std::cout << "value: " << value <<  "shift: " << shift << "\n";
+        //std::cout << "value: " << value <<  " shift: " << shift << "\n";
 
         longlong retdec = (longlong)bf.decrypt(value);
         retdec -= shift;
@@ -1079,6 +1075,44 @@ OPE_tinyint::decrypt(Item * ctext, uint64_t IV) {
     return OPE_int::decrypt(ctext, IV);
 }
 
+class OPE_mediumint : public OPE_int {
+public:
+    OPE_mediumint(Create_field *, std::string seed_key);
+
+    // create object from serialized contents
+    OPE_mediumint(unsigned int id, const std::string & serial);
+
+    std::string name() const {return "OPE_mediumint";}
+
+    Item * encrypt(Item * p, uint64_t IV);
+    Item * decrypt(Item * c, uint64_t IV);
+};
+
+OPE_mediumint::OPE_mediumint(Create_field * cf, std::string seed_key)
+    : OPE_int(cf, seed_key)
+{}
+
+    OPE_mediumint::OPE_mediumint(unsigned int id, const std::string & serial)
+    : OPE_int(id, serial)
+{}
+
+Item *
+OPE_mediumint::encrypt(Item * ptext, uint64_t IV) {
+    ulonglong val = static_cast<Item_int *>(ptext)->value;
+    
+    static longlong medium_max = 0xffffff;
+    if(medium_max < static_cast<Item_int *>(ptext)->val_int())
+        throw CryptDBError("Backend storage unit it not MEDIUMINT, won't floor. ");
+    
+    LOG(encl) << "OPE_mediumint encrypt " << val << " IV " << IV << "--->";
+    return OPE_int::encrypt(ptext, (ulong)val);
+}
+
+Item *
+OPE_mediumint::decrypt(Item * ctext, uint64_t IV) {
+    return OPE_int::decrypt(ctext, IV);
+}
+
 class OPE_str : public EncLayer {
 public:
     OPE_str(Create_field *, std::string seed_key);
@@ -1131,8 +1165,9 @@ OPEFactory::create(Create_field * cf, std::string key) {
             return new OPE_dec(cf, key);
         } else if( cf->sql_type == MYSQL_TYPE_TINY) { 
             return new OPE_tinyint(cf, key);
+        } else if( cf->sql_type == MYSQL_TYPE_INT24) { 
+            return new OPE_mediumint(cf, key);
         }
-
         return new OPE_int(cf, key);
     }
     return new OPE_str(cf, key);
@@ -1145,6 +1180,8 @@ OPEFactory::deserialize(unsigned int id, const SerialLayer & sl)
         return new OPE_int(id, sl.layer_info);
     } else if (sl.name == "OPE_tinyint") {
         return new OPE_tinyint(id, sl.layer_info);
+    } else if (sl.name == "OPE_mediumint") {
+        return new OPE_mediumint(id, sl.layer_info);
     } else if (sl.name == "OPE_str") {
         return new OPE_str(id, sl.layer_info);
     } else  {
