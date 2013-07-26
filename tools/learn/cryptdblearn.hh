@@ -49,8 +49,8 @@ class Learn
             //TODO: Generate onions enc. layout
         }
 
-        void trainFromFile(void);
-        void trainFromScratch(void);
+        void trainFromFile(Rewriter &r);
+        void trainFromScratch(Rewriter &r);
 
 
     private:

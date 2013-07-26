@@ -12,6 +12,7 @@
 #include <onions.hh> //layout
 #include <Analysis.hh> //for intersect()
 #include <rewrite_main.hh>
+#include <parser/sql_utils.hh>
 
 static bool 
 ignore_line(const std::string& line)
@@ -23,11 +24,14 @@ ignore_line(const std::string& line)
 
 
 void
-Learn::trainFromFile(void)
+Learn::trainFromFile(Rewriter &r)
 {
     std::string line;
     std::string s("");
     std::ifstream input(this->m_filename);
+    std::cout << "FILE: " << this->m_filename << std::endl;
+
+
 
     assert(input.is_open() == true); 
 
@@ -40,20 +44,14 @@ Learn::trainFromFile(void)
             if(lastChar == ';'){
                 s += line;
 
-                /*
-                 * Indeed rewrite is the cleaner solution 
-                 * Note that refactory removing
-                 * query execution from rewrite is ongoing 
-                 * in CryptDB.
-                 */
-                this->m_r.rewrite(s);
-                /* FIXME.
                 QueryRewrite qr = this->m_r.rewrite(s);
-                if(qr.queries.size() == 0)
-                    this->m_errnum++;
-                */
-                this->m_totalnum++;
-
+                ResType *res = qr.output->doQuery(r.ps.conn, r.ps.e_conn, &r);
+                if (true == qr.output->queryAgain()){ 
+                    if (res) 
+                        delete res;
+                    if(executeQuery(r, r.ps, s) == 0)
+                        this->m_totalnum++;
+                }
                 s.clear();
                 continue;
             }
@@ -63,7 +61,7 @@ Learn::trainFromFile(void)
 }
         
 void 
-Learn::trainFromScratch(void)
+Learn::trainFromScratch(Rewriter &r)
 {
     //TODO: implement this
     /*
@@ -79,6 +77,9 @@ int main(int argc, char **argv)
 
     static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
+        {"username", required_argument, 0, 'u'},
+        {"password", required_argument, 0, 'p'},
+        {"dbname", required_argument, 0, 'd'},
         {"file", required_argument, 0, 'f'},
         {NULL, 0, 0, 0},
     };
@@ -120,6 +121,7 @@ int main(int argc, char **argv)
     assert(username != "");
     assert(password != "");
     assert(dbname != "");
+
     
     ConnectionInfo ci("localhost", username, password);
     Rewriter r(ci, "/var/lib/shadow-mysql", dbname, true);
@@ -133,10 +135,10 @@ int main(int argc, char **argv)
     if(filename != "")
     {
         learn = new Learn(MODE_FILE, r, dbname, filename);
-        learn->trainFromFile();
+        learn->trainFromFile(r);
     }else{
         learn = new Learn(MODE_FROM_SCRATCH, r, dbname, "");
-        learn->trainFromScratch();
+        learn->trainFromScratch(r);
     }
    
     delete learn;
