@@ -56,8 +56,7 @@ class CreateHandler : public DDLHandler {
             // TODO: Use appropriate values for has_sensitive and has_salt.
             TableMeta *tm = new TableMeta(true, true);
             IdentityMetaKey *key = new IdentityMetaKey(table);
-            Delta delta(Delta::CREATE, tm, a.getSchema(), key);
-            a.deltas.push_back(delta);
+            a.deltas.push_back(new CreateDelta(tm, a.getSchema(), key));
 
             // -----------------------------
             //         Rewrite TABLE       
@@ -145,10 +144,8 @@ class DropHandler : public DDLHandler {
             // Remove from *Meta structures.
             TableMeta *tm = a.getTableMeta(table);
             // FIXME: Key only necessary for CREATE.
-            Delta delta(Delta::DELETE, tm, a.getSchema(),
-                        new IdentityMetaKey(table));
-            a.deltas.push_back(delta);
-
+            a.deltas.push_back(new DeleteDelta(tm, a.getSchema(),
+                                               new IdentityMetaKey(table)));
         }
     }
 };

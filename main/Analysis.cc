@@ -192,6 +192,7 @@ operator<<(std::ostream &out, const RewritePlan * rp)
     return out;
 }
 
+/*
 // FIXME: Implement serial number.
 // FIXME: Must be recursive.
 bool Delta::save(Connect *e_conn)
@@ -228,25 +229,19 @@ bool Delta::apply(Connect *e_conn)
 {
     switch (action) {
         case CREATE: {
-            /*
              * We know that the Delta object is the top level in
              * a hierarchy of all new objects. Therefore we must
              * go through and recursively associate them all with their
              * parents.
-             */
             createHandler(e_conn, meta, parent_meta, key);
             return true;
             break;
         } case REPLACE: {
-            /*
              * Replace the particular meta.
-             */
             replaceHandler(e_conn, meta, parent_meta, key);
             return true;
         } case DELETE: {
-            /*
              * Recursively delete everything from this top level
-             */
             deleteHandler(e_conn, meta, parent_meta);
             return true;
         } default: {
@@ -278,73 +273,97 @@ bool Delta::destroyRecord(Connect *e_conn)
 
     return e_conn->execute(query);
 }
+*/
+
+bool CreateDelta::save(Connect *e_conn)
+{
+    return false;
+}
 
 // TODO: Remove asserts.
 // Recursive.
-void Delta::createHandler(Connect *e_conn, const DBMeta * const object,
-                          const DBMeta * const parent,
-                          const AbstractMetaKey * const k,
-                          const unsigned int * const ptr_parent_id)
+bool CreateDelta::apply(Connect *e_conn)
 {
-    DBWriter dbw(object, parent);
-    
-    // Ensure the tables exist.
-    assert(create_tables(e_conn, dbw));
-    
-    const std::string child_serial = object->serialize(*parent);
-    assert(0 == object->getDatabaseID());
-    unsigned int parent_id;
-    if (ptr_parent_id) {
-        parent_id = *ptr_parent_id;
-    } else {
-        parent_id = parent->getDatabaseID();
-    }
+    std::function<void(Connect *e_conn, const DBMeta * const,
+                       const DBMeta * const,
+                       const AbstractMetaKey * const,
+                       const unsigned int * const)> helper =
+        [&helper] (Connect *e_conn, const DBMeta * const object,
+                      const DBMeta * const parent,
+                      const AbstractMetaKey * const k,
+                      const unsigned int * const ptr_parent_id)
+    {
+        DBWriter dbw(object, parent);
+        
+        // Ensure the tables exist.
+        assert(create_tables(e_conn, dbw));
+        
+        const std::string child_serial = object->serialize(*parent);
+        assert(0 == object->getDatabaseID());
+        unsigned int parent_id;
+        if (ptr_parent_id) {
+            parent_id = *ptr_parent_id;
+        } else {
+            parent_id = parent->getDatabaseID();
+        }
 
-    // ------------------------
-    //    Build the queries.
-    // ------------------------
+        // ------------------------
+        //    Build the queries.
+        // ------------------------
 
-    // On CREATE, the database generates a unique ID for us.
-    const std::string esc_child_serial =
-        escapeString(e_conn, child_serial);
-    const unsigned int esc_child_serial_len = esc_child_serial.size();
-    const std::string query =
-        " INSERT INTO pdb." + dbw.table_name() + 
-        "    (serial_object, serial_object_len) VALUES (" 
-        " '" + esc_child_serial + "', "
-        " "  + std::to_string(esc_child_serial_len) + "); ";
+        // On CREATE, the database generates a unique ID for us.
+        const std::string esc_child_serial =
+            escapeString(e_conn, child_serial);
+        const unsigned int esc_child_serial_len = esc_child_serial.size();
+        const std::string query =
+            " INSERT INTO pdb." + dbw.table_name() + 
+            "    (serial_object, serial_object_len) VALUES (" 
+            " '" + esc_child_serial + "', "
+            " "  + std::to_string(esc_child_serial_len) + "); ";
 
-    assert(e_conn->execute(query));
+        assert(e_conn->execute(query));
 
-    const unsigned int object_id = e_conn->last_insert_id();
-    std::string serial_key;
-    if (NULL == k) {
-        AbstractMetaKey *ck = parent->getKey(object);
-        assert(ck);
-        serial_key = ck->getSerial();
-    } else {
-        serial_key = k->getSerial();
-    }
-    const std::string esc_serial_key = escapeString(e_conn, serial_key);
-    const unsigned int esc_serial_key_len = 
-        esc_serial_key.size();
-    const std::string join_query =
-        " INSERT INTO pdb." + dbw.join_table_name() +
-        "   (object_id, parent_id, serial_key, serial_key_len) VALUES ("
-        " "  + std::to_string(object_id) + ", " 
-        " "  + std::to_string(parent_id) + ", "
-        " '" + esc_serial_key + "', " +
-        " "  + std::to_string(esc_serial_key_len) + ");";
+        const unsigned int object_id = e_conn->last_insert_id();
+        std::string serial_key;
+        if (NULL == k) {
+            AbstractMetaKey *ck = parent->getKey(object);
+            assert(ck);
+            serial_key = ck->getSerial();
+        } else {
+            serial_key = k->getSerial();
+        }
+        const std::string esc_serial_key = escapeString(e_conn, serial_key);
+        const unsigned int esc_serial_key_len = 
+            esc_serial_key.size();
+        const std::string join_query =
+            " INSERT INTO pdb." + dbw.join_table_name() +
+            "   (object_id, parent_id, serial_key, serial_key_len) VALUES ("
+            " "  + std::to_string(object_id) + ", " 
+            " "  + std::to_string(parent_id) + ", "
+            " '" + esc_serial_key + "', " +
+            " "  + std::to_string(esc_serial_key_len) + ");";
 
-    assert(e_conn->execute(join_query));
+        assert(e_conn->execute(join_query));
 
-    std::function<void(const DBMeta * const)> localCreateHandler =
-        [&e_conn, &object, object_id, this] (const DBMeta * const child) {
-            this->createHandler(e_conn, child, object, NULL, &object_id);
-        };
-    object->applyToChildren(localCreateHandler);
+        std::function<void(const DBMeta * const)> localCreateHandler =
+            [&e_conn, &object, object_id, &helper]
+                (const DBMeta * const child)
+            {
+                helper(e_conn, child, object, NULL, &object_id);
+            };
+        object->applyToChildren(localCreateHandler);
+    };
+
+    helper(e_conn, meta, parent_meta, key, NULL);
+    return true;
 }
 
+bool CreateDelta::destroyRecord(Connect *e_conn)
+{
+    return false;
+}
+
+/*
 void Delta::deleteHandler(Connect *e_conn, const DBMeta * const object,
                           const DBMeta * const parent)
 {
@@ -408,6 +427,7 @@ void Delta::replaceHandler(Connect *e_conn, const DBMeta * const object,
 
     return;
 }
+*/
 
 RewriteOutput::~RewriteOutput()
 {;}
@@ -591,7 +611,7 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
     {
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
-            // assert(it.save(e_conn));
+            assert(it->save(e_conn));
         }
         if (true == do_original) {
             assert(saveQuery(e_conn, original_query));
@@ -607,8 +627,8 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
     {
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
-            assert(it.apply(e_conn));
-            // assert(it.destroyRecord(e_conn));
+            assert(it->apply(e_conn));
+            assert(it->destroyRecord(e_conn));
         }
         if (true == do_original) {
             assert(e_conn->execute(original_query));

@@ -304,8 +304,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps, FieldMeta * fm,
 
     LOG(cdb_v) << "adjust onions: \n" << query.str() << "\n";
 
-    Delta d(Delta::DELETE, a.popBackEncLayer(om), om, NULL);
-    a.deltas.push_back(d);
+    a.deltas.push_back(new DeleteDelta(a.popBackEncLayer(om), om, NULL));
 
     *new_level = a.getOnionLevel(om);
     return query.str();

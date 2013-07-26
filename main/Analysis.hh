@@ -259,13 +259,11 @@ private:
 // For REPLACE and DELETE we are duplicating the MetaKey information.
 class Delta : public DBObject {
 public:
-    enum Action {CREATE, REPLACE, DELETE};
-
     // New Delta.
-    Delta(Action action, const DBMeta * const meta,
+    Delta(const DBMeta * const meta,
           const DBMeta * const parent_meta,
           const AbstractMetaKey * const key)
-        : action(action), meta(meta), parent_meta(parent_meta), key(key) {}
+        : meta(meta), parent_meta(parent_meta), key(key) {}
     // FIXME: Unserialize old Delta.
     /*
     Delta(unsigned int id, std::string serial)
@@ -281,14 +279,65 @@ public:
     /*
      * This function is responsible for writing our Delta to the database.
      */
-    bool save(Connect *e_conn);
+    virtual bool save(Connect *e_conn) = 0;
 
     /*
      * Take the update action against the database. Contains high level
      * serialization semantics.
      */
+    virtual bool apply(Connect *e_conn) = 0;
+    virtual bool destroyRecord(Connect *e_conn) = 0;
+
+protected:
+    const DBMeta * const meta;
+    const DBMeta * const parent_meta;
+    const AbstractMetaKey * const key;
+
+private:
+    std::string serialize(const DBObject &parent) const 
+    {
+        throw CryptDBError("Calling Delta::serialize with a parent"
+                           " argument is nonsensical!");
+    }
+};
+
+class CreateDelta : public Delta {
+public:
+    CreateDelta(const DBMeta * const meta,
+                const DBMeta * const parent_meta,
+                const AbstractMetaKey * const key)
+        : Delta(meta, parent_meta, key) {}
+
+    bool save(Connect *e_conn);
     bool apply(Connect *e_conn);
     bool destroyRecord(Connect *e_conn);
+};
+
+class ReplaceDelta : public Delta {
+public:
+    ReplaceDelta(const DBMeta * const meta,
+                 const DBMeta * const parent_meta,
+                 const AbstractMetaKey * const key)
+        : Delta(meta, parent_meta, key) {}
+
+    bool save(Connect *e_conn);
+    bool apply(Connect *e_conn);
+    bool destroyRecord(Connect *e_conn);
+};
+
+class DeleteDelta : public Delta {
+public:
+    DeleteDelta(const DBMeta * const meta,
+                const DBMeta * const parent_meta,
+                const AbstractMetaKey * const key)
+        : Delta(meta, parent_meta, key) {}
+
+    bool save(Connect *e_conn);
+    bool apply(Connect *e_conn);
+    bool destroyRecord(Connect *e_conn);
+};
+
+/*
     void createHandler(Connect *e_conn, const DBMeta * const object,
                        const DBMeta * const parent,
                        const AbstractMetaKey * const k = NULL,
@@ -298,20 +347,7 @@ public:
     void replaceHandler(Connect *e_conn, const DBMeta * const object,
                         const DBMeta * const parent,
                         const AbstractMetaKey * const k);
-
-private:
-    Action action;
-    // Can't use references because of deserialization.
-    const DBMeta * const meta;
-    const DBMeta * const parent_meta;
-    const AbstractMetaKey * const key;
-
-    std::string serialize(const DBObject &parent) const 
-    {
-        throw CryptDBError("Calling Delta::serialize with a parent"
-                           " argument is nonsensical!");
-    }
-};
+*/
 
 class Rewriter;
 
@@ -370,7 +406,7 @@ private:
 class DeltaOutput : public RewriteOutput {
 public:
     DeltaOutput(const std::string &original_query, LEX *lex,
-                std::list<Delta> deltas)
+                std::list<Delta *> deltas)
         : RewriteOutput(original_query, lex), deltas(deltas) {}
     virtual ~DeltaOutput() = 0;
     virtual ResType *doQuery(Connect *conn, Connect *e_conn,
@@ -383,13 +419,13 @@ public:
                            std::function<ResType *()> primary);
 
 private:
-    const std::list<Delta> deltas;
+    const std::list<Delta *> deltas;
 };
 
 class DDLOutput : public DeltaOutput {
 public:
     DDLOutput(const std::string &original_query, LEX *lex,
-              std::list<Delta> deltas)
+              std::list<Delta *> deltas)
         : DeltaOutput(original_query, lex, deltas) {}
     ~DDLOutput() {;}
 
@@ -400,7 +436,7 @@ public:
 class AdjustOnionOutput : public DeltaOutput {
 public:
     AdjustOnionOutput(const std::string &original_query,
-                      std::list<Delta> deltas,
+                      std::list<Delta *> deltas,
                       std::list<std::string> adjust_queries)
         : DeltaOutput(original_query, NULL, deltas),
           adjust_queries(adjust_queries) {}
@@ -452,7 +488,7 @@ public:
     // TODO: Make private.
     std::map<OnionMeta *, std::vector<EncLayer *>> to_adjust_enc_layers;
     
-    std::list<Delta> deltas;
+    std::list<Delta *> deltas;
 
 private:
     const SchemaInfo * const schema;

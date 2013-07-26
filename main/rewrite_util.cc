@@ -319,11 +319,10 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     if (true == new_table) {
         tm->addChild(new IdentityMetaKey(name), fm);
     } else {
-        const Delta d(Delta::CREATE, fm, tm, new IdentityMetaKey(name));
-        a.deltas.push_back(d);
-        const Delta d0(Delta::REPLACE, tm, a.getSchema(),
-                       a.getSchema()->getKey(tm));
-        a.deltas.push_back(d0);
+        a.deltas.push_back(new CreateDelta(fm, tm,
+                                           new IdentityMetaKey(name)));
+        a.deltas.push_back(new ReplaceDelta(tm, a.getSchema(),
+                                            a.getSchema()->getKey(tm)));
     }
 
     // -----------------------------
