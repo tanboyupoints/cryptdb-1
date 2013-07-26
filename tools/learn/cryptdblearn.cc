@@ -54,6 +54,7 @@ Learn::trainFromFile(Rewriter &r)
                     delete res;
                 }
                 if (true == qr.output->queryAgain()){ 
+                    this->m_totalnum++;
                     assert(executeQuery(r, r.ps, s));
                     this->m_success_num++;
                 } 
