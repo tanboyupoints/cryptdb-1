@@ -254,14 +254,14 @@ bool CreateDelta::save(Connect *e_conn)
 // Recursive.
 bool CreateDelta::apply(Connect *e_conn)
 {
-    std::function<void(Connect *e_conn, const DBMeta * const,
-                       const DBMeta * const,
-                       const AbstractMetaKey * const,
-                       const unsigned int * const)> helper =
-        [helper] (Connect *e_conn, const DBMeta * const object,
-                  const DBMeta * const parent,
-                  const AbstractMetaKey * const k,
-                  const unsigned int * const ptr_parent_id)
+    static std::function<void(Connect *e_conn, const DBMeta * const,
+                              const DBMeta * const,
+                              const AbstractMetaKey * const,
+                              const unsigned int * const)> helper =
+        [&helper] (Connect *e_conn, const DBMeta * const object,
+                   const DBMeta * const parent,
+                   const AbstractMetaKey * const k,
+                   const unsigned int * const ptr_parent_id)
     {
         DBWriter dbw(object, parent);
         
@@ -316,7 +316,7 @@ bool CreateDelta::apply(Connect *e_conn)
         assert(e_conn->execute(join_query));
 
         std::function<void(const DBMeta * const)> localCreateHandler =
-            [&e_conn, &object, object_id, helper]
+            [&e_conn, &object, object_id, &helper]
                 (const DBMeta * const child)
             {
                 helper(e_conn, child, object, NULL, &object_id);
@@ -386,8 +386,8 @@ bool DeleteDelta::apply(Connect *e_conn)
 {
     std::function<void(Connect *, const DBMeta * const,
                        const DBMeta * const)> helper =
-        [helper](Connect *e_conn, const DBMeta * const object,
-           const DBMeta * const parent)
+        [&helper](Connect *e_conn, const DBMeta * const object,
+                  const DBMeta * const parent)
     {
         DBWriter dbw(object, parent);
         const unsigned int object_id = object->getDatabaseID();
@@ -408,7 +408,7 @@ bool DeleteDelta::apply(Connect *e_conn)
         assert(e_conn->execute(query));
 
         std::function<void(const DBMeta * const)> localDestroyHandler =
-            [&e_conn, &object, helper] (const DBMeta * const child) {
+            [&e_conn, &object, &helper] (const DBMeta * const child) {
                 helper(e_conn, child, object);
             };
         object->applyToChildren(localDestroyHandler);
@@ -605,7 +605,8 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
     {
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
-            assert(it->save(e_conn));
+            assert(it);
+            // assert(it->save(e_conn));
         }
         if (true == do_original) {
             assert(saveQuery(e_conn, original_query));
@@ -622,7 +623,7 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
             assert(it->apply(e_conn));
-            assert(it->destroyRecord(e_conn));
+            // assert(it->destroyRecord(e_conn));
         }
         if (true == do_original) {
             assert(e_conn->execute(original_query));
