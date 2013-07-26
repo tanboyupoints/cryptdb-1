@@ -470,7 +470,11 @@ class DET_int : public EncLayer {
 public:
     DET_int(Create_field *,  const std::string & seed_key);
     
-    std::string doSerialize() const {return key; }
+    std::string doSerialize() const {
+        std::stringstream layerinfo;
+        layerinfo << shift << " " << key;
+        return layerinfo.str();
+    }
     // create object from serialized contents
     DET_int(unsigned int id, const std::string & serial);
 
@@ -487,6 +491,7 @@ public:
 protected:
     std::string key;
     blowfish bf;
+    int64_t shift;
     static const int bf_key_size = 16;
     static const int ciph_size = 8;
 
@@ -668,17 +673,24 @@ DETFactory::deserialize(unsigned int id, const SerialLayer & sl)
 }
 
 
-
-
 DET_int::DET_int(Create_field * f, const std::string & seed_key)
     : key(prng_expand(seed_key, bf_key_size)),
       bf(key)
 {
+    if(f->flags & UNSIGNED_FLAG)
+        shift = 0;
+    else
+        shift = INT_MAX;
 }
 
 DET_int::DET_int(unsigned int id, const std::string & serial)
     : EncLayer(id), key(serial), bf(key)
 {
+    shift = atol(serial.substr(0, serial.find(' ')).c_str());
+    std::stringstream layerinfo(serial);
+    layerinfo >> shift;
+    uint pos = layerinfo.tellg();
+    serial.substr(pos+1, serial.length()-pos);
 }
 
 Create_field *
@@ -690,28 +702,13 @@ DET_int::newCreateField(Create_field * cf, std::string anonname) {
 Item *
 DET_int::encrypt(Item * ptext, uint64_t IV) {
 
-    longlong ival = static_cast<Item_int *>(ptext)->val_int();
-
-    if(ival < 0 && (ival >= INT_MIN && ival < INT_MAX)) {
-        // sum type size
-        ulonglong uval = round_val<ulonglong, int64_t, int64_t>(ival, INT_MAX, true); 
-    
-        // encrypt
-        ulonglong res = bf.encrypt(uval);
-
-        LOG(encl) << __FUNCTION__ << ":" << "val_int:" << ival << ", new_val:" << uval << ", result:" << res;
-        return new Item_int(res);
-    }
-
-    ulonglong value = static_cast<Item_int *>(ptext)->value;
-        
-    // sum type size
-    ulonglong uvalue = round_val<ulonglong, uint64_t, int64_t>(value, INT_MAX, false); 
-
+    ulonglong value = static_cast<Item_int*>(ptext)->value;
+    longlong ivalue = static_cast<Item_int*>(ptext)->val_int();
+    ulonglong res;
+    std::cout << "apply shift: +" << shift << " on:" << value << "/" << ivalue << std::endl; 
     //encrypt
-    ulonglong res = (ulonglong) bf.encrypt(uvalue);
-        
-    LOG(encl) << __FUNCTION__ << ":" << "value:" << uvalue << ", new_val:" << uvalue << ", result:" << res;
+    
+    res = (ulonglong) bf.encrypt(value+shift);
     return new Item_int(res);
 
 }
@@ -719,23 +716,13 @@ DET_int::encrypt(Item * ptext, uint64_t IV) {
 Item *
 DET_int::decrypt(Item * ctext, uint64_t IV) {
 
-    Item *ni;
-    bool signed_flag = !static_cast<Item_int *>(ctext)->unsigned_flag;
     ulonglong value = static_cast<Item_int*>(ctext)->value;
+    longlong ivalue = static_cast<Item_int*>(ctext)->val_int();
+    std::cout << "apply shift: -" << shift << " on:" << value << "/" << ivalue << std::endl; 
 
-    //TODO/FIXME: signed_flag is always false, try to use Create_field 
-    //to get the real signdness value.
-    if(signed_flag) {
-        ulonglong retdec = bf.decrypt(value);
-        longlong res = round_val<longlong, ulonglong, int64_t>(value, INT_MAX, true); 
-        ni = new Item_int(res);
-        LOG(encl) << "iDET_int decrypt " << retdec << "--->" << value << "--->" << res;
-    } else {
-        ulonglong res = round_val<ulonglong, ulonglong, int64_t>(value, INT_MAX, false); 
-        ulonglong retdec = bf.decrypt(res);
-        ni = new Item_int(retdec);
-        LOG(encl) << "uDET_int decrypt " << retdec << "--->" << value << "--->" << res;
-    }
+    std::cout << "decsign: " << shift << std::endl;
+    ulonglong retdec = bf.decrypt(value);
+    Item *ni = new Item_int(retdec-shift);
 
     return ni;
 }
