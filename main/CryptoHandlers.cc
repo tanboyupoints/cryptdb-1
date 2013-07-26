@@ -703,6 +703,20 @@ Item *
 DET_int::encrypt(Item * ptext, uint64_t IV) {
 
     ulonglong value = static_cast<Item_int*>(ptext)->value;
+
+
+    longlong ival = static_cast<Item_int*>(ptext)->val_int();
+    if(shift && ival < 0)
+    {
+        longlong tmp = ival+shift;
+        std::cout << "ival: " << ival << " tmp: " << tmp << " shift: " << shift << "\n";
+        ulonglong res = (ulonglong) bf.encrypt(tmp);
+        LOG(encl) << "DET_int enc " << value << "--->" << res;
+        return new Item_int(res);
+    }
+    
+
+
     ulonglong res = (ulonglong) bf.encrypt(value+shift);
     LOG(encl) << "DET_int enc " << value << "--->" << res;
     return new Item_int(res);
@@ -716,6 +730,8 @@ DET_int::decrypt(Item * ctext, uint64_t IV) {
     // FIXME:working for positive, check whats is wrong
     if(shift)
     {
+        std::cout << "value: " << value <<  "shift: " << shift << "\n";
+
         longlong retdec = (longlong)bf.decrypt(value);
         retdec -= shift;
         LOG(encl) << "DET_int dec " << value << "--->" << retdec;
