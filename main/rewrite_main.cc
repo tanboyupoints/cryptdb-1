@@ -141,6 +141,7 @@ loadSchemaInfo(Connect *e_conn)
      return schema;
 }
 
+/*
 static void
 printEC(Connect * e_conn, const std::string & command) {
     DBResult * dbres;
@@ -148,9 +149,11 @@ printEC(Connect * e_conn, const std::string & command) {
     ResType res = dbres->unpack();
     printRes(res);
 }
+*/
 
 static void
-printEmbeddedState(ProxyState & ps) {
+printEmbeddedState(const ProxyState & ps) {
+    /*
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables from pdb;");
     printEC(ps.e_conn, "selecT * from pdb.tableMeta_schemaInfo;");
@@ -161,6 +164,7 @@ printEmbeddedState(ProxyState & ps) {
     printEC(ps.e_conn, "select * from pdb.onionMeta;");
     printEC(ps.e_conn, "selecT * from pdb.encLayer_onionMeta;");
     printEC(ps.e_conn, "select * from pdb.encLayer;");
+    */
 }
 
 template <typename type> static void
@@ -272,9 +276,10 @@ buildTypeTextTranslator()
 }
 
 //l gets updated to the new level
-static void
-removeOnionLayer(FieldMeta * fm, Item_field *itf, Analysis &a, onion o,
-                 SECLEVEL *new_level, const std::string &cur_db) {
+static std::string
+removeOnionLayer(Analysis &a, const ProxyState &ps, FieldMeta * fm,
+                 Item_field *itf, onion o, SECLEVEL *new_level,
+                 const std::string &cur_db) {
     OnionMeta *om = fm->getOnionMeta(o);
     assert(om);
     std::string fieldanon  = om->getAnonOnionName();
@@ -295,15 +300,14 @@ removeOnionLayer(FieldMeta * fm, Item_field *itf, Analysis &a, onion o,
     std::cerr << "\nADJUST: \n" << query.str() << "\n";
 
     //execute decryption query
-    assert_s(a.ps->conn->execute(query.str()), "failed to execute onion decryption query");
 
     LOG(cdb_v) << "adjust onions: \n" << query.str() << "\n";
 
-    //remove onion layer in schema
-    Delta d(Delta::DELETE, a.popBackEncLayer(om), om, NULL);	
+    Delta d(Delta::DELETE, a.popBackEncLayer(om), om, NULL);
     a.deltas.push_back(d);
 
     *new_level = a.getOnionLevel(om);
+    return query.str();
 }
 
 /*
@@ -315,18 +319,23 @@ removeOnionLayer(FieldMeta * fm, Item_field *itf, Analysis &a, onion o,
  * changed schema to persistent storage.
  *
  */
-static void
-adjustOnion(onion o, FieldMeta * fm, SECLEVEL tolevel, Item_field *itf,
-            Analysis & a, const std::string & cur_db)
+static std::list<std::string>
+adjustOnion(Analysis &a, const ProxyState &ps, onion o, FieldMeta * fm,
+            SECLEVEL tolevel, Item_field *itf, const std::string &cur_db)
 {
     OnionMeta *om = fm->getOnionMeta(o);
     SECLEVEL newlevel = a.getOnionLevel(om);
     assert(newlevel != SECLEVEL::INVALID);
 
+    std::list<std::string> adjust_queries;
     while (newlevel > tolevel) {
-        removeOnionLayer(fm, itf, a, o, &newlevel, cur_db);
+        auto query =
+            removeOnionLayer(a, ps, fm, itf, o, &newlevel, cur_db);
+        adjust_queries.push_back(query);
     }
     assert(newlevel == tolevel);
+
+    return adjust_queries;
 }
 //TODO: propagate these adjustments in the embedded database?
 
@@ -619,6 +628,25 @@ loadUDFs(Connect * conn) {
     LOG(cdb_v) << "Loaded CryptDB's UDFs.";
 }
 
+static bool
+noRewrite(LEX * lex) {
+    switch (lex->sql_command) {
+    case SQLCOM_SHOW_DATABASES:
+    case SQLCOM_SET_OPTION:
+    case SQLCOM_BEGIN:
+    case SQLCOM_COMMIT:
+    case SQLCOM_SHOW_TABLES:
+        return true;
+    case SQLCOM_SELECT: {
+
+    }
+    default:
+        return false;
+    }
+
+    return false;
+}
+
 Rewriter::Rewriter(ConnectionInfo ci,
                    const std::string &embed_dir,
                    const std::string &dbname,
@@ -638,7 +666,6 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
     // Must be called before loadSchemaInfo.
     buildTypeTextTranslator();
-    ps.schema = loadSchemaInfo(ps.e_conn);
     // printEmbeddedState(ps);
 
     dml_dispatcher = buildDMLDispatcher();
@@ -648,24 +675,45 @@ Rewriter::Rewriter(ConnectionInfo ci,
 
     // HACK: This is necessary as above functions use a USE statement.
     // ie, loadUDFs.
-    ps.conn->execute("USE cryptdbtest;");
-    ps.e_conn->execute("USE cryptdbtest;");
+    assert(ps.conn->execute("USE cryptdbtest;"));
+    assert(ps.e_conn->execute("USE cryptdbtest;"));
 }
 
-LEX **
-Rewriter::dispatchAndTransformOnLex(LEX *lex, Analysis &a,
-                                    const std::string &q,
-                                    unsigned *out_lex_count) {
-    const SQLHandler *handler;
-    if (dml_dispatcher->canDo(lex)) {
-        handler = dml_dispatcher->dispatch(lex);
+RewriteOutput * 
+Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
+                        const std::string &query)
+{
+    query_parse p(ps.dbName(), query);
+    LEX *lex = p.lex();
+    LOG(cdb_v) << "pre-analyze " << *lex;
+
+    // optimization: do not process queries that we will not rewrite
+    if (noRewrite(lex)) {
+        return new SimpleOutput(query);
+    } else if (dml_dispatcher->canDo(lex)) {
+        SQLHandler *handler = dml_dispatcher->dispatch(lex);
+        try {
+            LEX *out_lex = handler->transformLex(a, lex, ps);
+            if (true == a.special_update) {
+                return new SpecialUpdate(query, lex, ps);
+            } else {
+                return new DMLOutput(query, out_lex);
+            }
+        } catch (OnionAdjustExcept e) {
+            LOG(cdb_v) << "caught onion adjustment";
+            std::cout << "Adjusting onion!" << std::endl;
+            auto adjust_queries = 
+                adjustOnion(a, ps, e.o, e.fm, e.tolevel, e.itf,
+                            ps.dbName());
+            return new AdjustOnionOutput(query, a.deltas, adjust_queries);
+        }
     } else if (ddl_dispatcher->canDo(lex)) {
-        handler = ddl_dispatcher->dispatch(lex);
+        SQLHandler *handler = ddl_dispatcher->dispatch(lex);
+        LEX *out_lex = handler->transformLex(a, lex, ps);
+        return new DDLOutput(query, out_lex, a.deltas);
     } else {
         throw CryptDBError("Rewriter can not dispatch bad lex");
     }
-
-    return handler->transformLex(lex, a, q, out_lex_count);
 }
 
 ProxyState::~ProxyState()
@@ -675,15 +723,14 @@ ProxyState::~ProxyState()
         conn = NULL;
     }
     if (e_conn) {
-	delete e_conn;
-	e_conn = NULL;
+        delete e_conn;
+        e_conn = NULL;
     }
 }
 
 // TODO: Cleanup resources.
 Rewriter::~Rewriter()
-{
-}
+{}
 
 void
 Rewriter::setMasterKey(const std::string &mkey)
@@ -691,164 +738,22 @@ Rewriter::setMasterKey(const std::string &mkey)
     ps.masterKey = getKey(mkey);
 }
 
-static std::list<std::string>
-processAnnotation(Annotation annot, Analysis &a)
-{
-    // TODO: Support ENC keyword in query.
-    assert(false);
-}
-
-
-static std::list<std::string>
-rewrite_helper(const std::string & q, Analysis & analysis,
-	       query_parse & p) {
-    LOG(cdb_v) << "q " << q;
-
-    if (p.annot) {
-        return processAnnotation(*p.annot, analysis);
-    }
-
-    LEX *lex = p.lex();
-
-    LOG(cdb_v) << "pre-analyze " << *lex;
-
-    unsigned out_lex_count = 0;
-    LEX **new_lexes =
-        analysis.rewriter->dispatchAndTransformOnLex(lex, analysis, q,
-                                                     &out_lex_count);
-    assert(new_lexes && out_lex_count != 0);
-
-    // FIXME: This subsection needs to be moved around to fit our new
-    // execution scheme.
-    // --------------------------------------
-    // HACK: To determine if we have a DDL.
-    if (analysis.deltas.size() > 0) {
-        assert(analysis.ps->e_conn->execute(q));
-    }
-    for (auto it : analysis.deltas) {
-        assert(it.apply(analysis.ps->e_conn));
-    }
-
-    // --------------------------------------
-
-    std::list<std::string> queries;
-    for (unsigned i = 0; i < out_lex_count; ++i) {
-        LOG(cdb_v) << "FINAL QUERY [" << i+1 << "/" << out_lex_count
-                   << "]: " << new_lexes[i] << std::endl;
-        std::stringstream ss;
-        ss << *new_lexes[i];
-        queries.push_back(ss.str());
-    }
-
-    return queries;
-}
-
-static bool
-noRewrite(LEX * lex) {
-    switch (lex->sql_command) {
-    case SQLCOM_SHOW_DATABASES:
-    case SQLCOM_SET_OPTION:
-    case SQLCOM_BEGIN:
-    case SQLCOM_COMMIT:
-    case SQLCOM_SHOW_TABLES:
-	return true;
-    case SQLCOM_SELECT: {
-
-    }
-    default:
-	return false;
-    }
-
-    return false;
-}
-
 // TODO: we don't need to pass analysis, enough to pass returnmeta
 QueryRewrite
 Rewriter::rewrite(const std::string & q)
 {
-
+    LOG(cdb_v) << "q " << q;
     assert(0 == mysql_thread_init());
     //assert(0 == create_embedded_thd(0));
 
     // printEmbeddedState(ps);
 
-    query_parse p(ps.dbName(), q);
-    QueryRewrite res;
-
-    /*
-     * At minimum we must create a valid Analysis object here because we
-     * res requires a valid rmeta object.
-     *
-     * The optimization is dubious however as we may still want to
-     * updateMeta or something.
-     */
-    //optimization: do not process queries that we will not rewrite
-    if (noRewrite(p.lex())) {
-        // HACK(burrows): This 'Analysis' is dummy as we never call
-        // addToReturn. But it works because this optimized cases don't
-        // have anything to do in addToReturn anyways.
-        Analysis analysis = Analysis(&ps);
-
-        res.wasRew = false;
-        res.queries.push_back(q);
-        res.rmeta = analysis.rmeta;
-        return res;
-    }
-
     //for as long as there are onion adjustments
-    // HACK: Because we need to carry EncLayer adjustment information
-    // to the next iteration.
-    Analysis *old_analysis = NULL;
-    while (true) {
-        Analysis analysis = Analysis(&ps);
-        // HACK(burrows): Until redesign.
-        analysis.rewriter = this;
-        // HACK.
-        if (old_analysis) {
-            analysis.to_adjust_enc_layers =
-                old_analysis->to_adjust_enc_layers;
-            delete old_analysis;
-        }
-        try {
-            res.queries = rewrite_helper(q, analysis, p);
-        } catch (OnionAdjustExcept e) {
-            LOG(cdb_v) << "caught onion adjustment";
-            std::cout << "Adjusting onion!" << std::endl;
-            adjustOnion(e.o, e.fm, e.tolevel, e.itf, analysis,
-                        ps.dbName());
-            old_analysis = new Analysis(analysis);
-            // HACK.
-            for (auto it : analysis.deltas) {
-                assert(it.apply(ps.e_conn));
-            }
-            continue;
-        }
-        res.wasRew = true;
-        res.rmeta = analysis.rmeta;
-        SchemaInfo *old_schema = ps.schema;
-        ps.schema = loadSchemaInfo(ps.e_conn);
-        // HACK: The rmetas all have olks that refer to an older version
-        // of the FieldMeta that will not have the correct number of
-        // EncLayerz for each OnionMeta if there was an adjustment.
-        for (unsigned int i = 0; i < res.rmeta->rfmeta.size(); ++i) {
-            ReturnField *rf = &res.rmeta->rfmeta[i];
-            if (false == rf->is_salt) {
-                std::string table_name =
-                    old_schema->getTableNameFromFieldMeta(rf->olk.key);
-                IdentityMetaKey *table_key =
-                    new IdentityMetaKey(table_name);
-                TableMeta *tm = ps.schema->getChild(table_key);
-                delete table_key;
-                IdentityMetaKey *field_key =
-                    new IdentityMetaKey(rf->olk.key->fname);
-                FieldMeta *new_fm = tm->getChild(field_key);
-                delete field_key;
-                rf->olk.key = new_fm;
-            }
-        }
-        printEmbeddedState(ps);
-        return res;
-    }
+    const SchemaInfo * const schema = loadSchemaInfo(ps.e_conn);
+    Analysis analysis = Analysis(schema);
+
+    return QueryRewrite(true, analysis.rmeta,
+                        this->dispatchOnLex(analysis, ps, q));
 }
 
 //TODO: replace stringify with <<
@@ -856,7 +761,7 @@ std::string ReturnField::stringify() {
     std::stringstream res;
 
     res << " is_salt: " << is_salt << " filed_called " << field_called;
-    res <<" fm  " << olk.key << " onion " << olk.o;
+    res << " fm  " << olk.key << " onion " << olk.o;
     res << " pos_salt " << pos_salt;
 
     return res.str();
@@ -865,19 +770,19 @@ std::string ReturnMeta::stringify() {
     std::stringstream res;
     res << "rmeta contains " << rfmeta.size() << " elements: \n";
     for (auto i : rfmeta) {
-	res << i.first << " " << i.second.stringify() << "\n";
+        res << i.first << " " << i.second.stringify() << "\n";
     }
     return res.str();
 }
 
-ResType
+ResType *
 Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
 {
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
     unsigned int cols = dbres.names.size();
 
-    ResType res = ResType();
+    ResType *res = new ResType();
 
     unsigned int index = 0;
 
@@ -887,19 +792,19 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
         ReturnField rf = rmeta->rfmeta[index];
         if (!rf.is_salt) {
             //need to return this field
-            res.names.push_back(rf.field_called);
+            res->names.push_back(rf.field_called);
             // switch types to original ones : TODO
 
         }
         index++;
     }
 
-    unsigned int real_cols = res.names.size();
+    unsigned int real_cols = res->names.size();
 
     //allocate space in results for decrypted rows
-    res.rows = std::vector<std::vector<Item*> >(rows);
+    res->rows = std::vector<std::vector<Item*> >(rows);
     for (unsigned int i = 0; i < rows; i++) {
-        res.rows[i] = std::vector<Item*>(real_cols);
+        res->rows[i] = std::vector<Item*>(real_cols);
     }
 
     // decrypt rows
@@ -911,7 +816,7 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
             for (unsigned int r = 0; r < rows; r++) {
                 if (!fm || !fm->isEncrypted() ||
                     dbres.rows[r][c]->is_null()) {
-                    res.rows[r][col_index] = dbres.rows[r][c];
+                    res->rows[r][col_index] = dbres.rows[r][c];
                 } else {
                     uint64_t salt = 0;
                     if (rf.pos_salt>=0) {
@@ -920,9 +825,9 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
                         salt = ((Item_int *)dbres.rows[r][rf.pos_salt])->value;
                     }
 
-                    res.rows[r][col_index] =
+                    res->rows[r][col_index] =
                         decrypt_item(fm, rf.olk.o, dbres.rows[r][c],
-                                     salt, res.rows[r]);
+                                     salt, res->rows[r]);
                 }
             }
             col_index++;
@@ -932,55 +837,40 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
     return res;
 }
 
-// @show defaults to false.
+static void
+prettyPrintQueryResult(ResType res)
+{
+    std::cout << std::endl << RED_BEGIN
+              << "RESULTS: " << COLOR_END << std::endl;
+    printRes(res);
+    std::cout << std::endl;
+}
+
 ResType *
-executeQuery(Rewriter &r, const std::string &q, bool show)
+executeQuery(Rewriter &r, const ProxyState &ps, const std::string &q)
 {
     try {
-        DBResult *dbres;
-
         QueryRewrite qr = r.rewrite(q);
-        if (qr.queries.size() == 0) {
-          return NULL;
-        }
-
-        unsigned i = 0;
-        for (auto query : qr.queries) {
-            if (show) {
-                std::cerr << std::endl
-                     << RED_BEGIN << "ENCRYPTED QUERY [" << i+1 << "/"
-                     << qr.queries.size() << "]:" << COLOR_END << std::endl
-                     << query << std::endl;
+        // FIXME: HACK.
+        assert(ps.e_conn->execute("USE cryptdbtest;"));
+        // FIXME: Use smart pointer.
+        ResType *res = qr.output->doQuery(ps.conn, ps.e_conn, &r);
+        if (true == qr.output->queryAgain()) { // Onion adjustment.
+            if (res) {
+                delete res;
             }
-            assert(r.getConnection()->execute(query, dbres));
-            if (!dbres) {
-                return NULL;
-            }
-            ++i;
+            return executeQuery(r, ps, q);
         }
+        prettyPrintQueryResult(*res);
 
-        ResType res = dbres->unpack();
-
-        if (!res.ok) {
-          return NULL;
+        ResType *dec_res = r.decryptResults(*res, qr.rmeta);
+        if (res) {
+            delete res;
         }
+        prettyPrintQueryResult(*dec_res);
 
-        if (show) {
-            std::cerr << std::endl << RED_BEGIN
-                      << "ENCRYPTED RESULTS FROM DB:" << COLOR_END
-                      << std::endl;
-            printRes(res);
-            std::cerr << std::endl;
-        }
-
-        ResType dec_res = r.decryptResults(res, qr.rmeta);
-
-        if (show) {
-            std::cerr << std::endl << RED_BEGIN << "DECRYPTED RESULTS:" << COLOR_END << std::endl;
-            printRes(dec_res);
-        }
-
-        return new ResType(dec_res);
+        printEmbeddedState(ps);
+        return dec_res;
     } catch (std::runtime_error &e) {
         std::cout << "Unexpected Error: " << e.what() << " in query "
                   << q << std::endl;
@@ -988,8 +878,9 @@ executeQuery(Rewriter &r, const std::string &q, bool show)
     }  catch (CryptDBError &e) {
         std::cout << "Internal Error: " << e.msg << " in query " << q
                   << std::endl;
-	return NULL;
+        return NULL;
     }
+
 }
 
 void

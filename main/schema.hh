@@ -71,7 +71,8 @@ public:
     OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
               Create_field *cf, unsigned long uniq_count);
     // Restore.
-    static OnionMeta *deserialize(unsigned int id, std::string serial);
+    static OnionMeta *deserialize(unsigned int id,
+                                  const std::string &serial);
     OnionMeta(unsigned int id, std::string onionname,
               unsigned long uniq_count)
         : DBMeta(id), onionname(onionname), uniq_count(uniq_count) {}
@@ -123,7 +124,8 @@ public:
               unsigned long uniq_count);
     // Restore (WARN: Creates an incomplete type as it will not have it's
     // OnionMetas until they are added by the caller).
-    static FieldMeta *deserialize(unsigned int id, std::string serial);
+    static FieldMeta *deserialize(unsigned int id,
+                                  const std::string &serial);
     FieldMeta(unsigned int id, std::string fname, bool has_salt,
               std::string salt_name, onionlayout onion_layout,
               unsigned long uniq_count, unsigned long counter)
@@ -173,7 +175,8 @@ public:
           anon_table_name("table_" + getpRandomName()),
           counter(0) {}
     // Restore.
-    static TableMeta *deserialize(unsigned int id, std::string serial);
+    static TableMeta *deserialize(unsigned int id,
+                                  const std::string &serial);
     TableMeta(unsigned int id, std::string anon_table_name,
               bool has_sensitive, bool has_salt, std::string salt_name,
               unsigned int counter)
@@ -197,7 +200,7 @@ private:
     constexpr static const char *type_name = "tableMeta";
     unsigned int counter;
 
-    std::string getAnonIndexName(std::string index_name) const;
+    std::string getAnonIndexName(const std::string &index_name) const;
 } TableMeta;
 
 
@@ -220,8 +223,8 @@ private:
 
     // These functions do not support Aliasing, use Analysis::getTableMeta
     // and Analysis::getFieldMeta.
-    FieldMeta * getFieldMeta(std::string & table,
-                             std::string & field) const;
+    FieldMeta * getFieldMeta(const std::string & table,
+                             const std::string & field) const;
     std::string serialize(const DBObject &parent) const {
         throw CryptDBError("SchemaInfo can not be serialized!");
     }

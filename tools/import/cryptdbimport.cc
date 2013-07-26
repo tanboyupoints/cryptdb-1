@@ -77,7 +77,7 @@ Import::executeQueries(Rewriter& r)
             if(lastChar == ';'){
                 s += line;
                 std::cout << s << std::endl;
-                executeQuery(r, s, true);
+                executeQuery(r, r.ps, s);
                 s.clear();
                 continue;
             }

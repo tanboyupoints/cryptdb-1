@@ -46,9 +46,12 @@ Learn::trainFromFile(void)
                  * query execution from rewrite is ongoing 
                  * in CryptDB.
                  */
+                this->m_r.rewrite(s);
+                /* FIXME.
                 QueryRewrite qr = this->m_r.rewrite(s);
                 if(qr.queries.size() == 0)
                     this->m_errnum++;
+                */
                 this->m_totalnum++;
 
                 s.clear();

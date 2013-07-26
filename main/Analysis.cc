@@ -1,4 +1,6 @@
 #include <main/Analysis.hh>
+#include <main/rewrite_util.hh>
+#include <main/rewrite_main.hh>
 
 // FIXME: Memory leaks when we allocate MetaKey<...>, use smart pointer.
 
@@ -374,7 +376,202 @@ void Delta::replaceHandler(Connect *e_conn, const DBMeta * const object,
     return;
 }
 
-bool Analysis::addAlias(std::string alias, std::string table)
+RewriteOutput::~RewriteOutput()
+{;}
+
+static void
+prettyPrintQuery(std::string query)
+{
+    std::cout << std::endl << RED_BEGIN
+              << "QUERY: " << COLOR_END << query << std::endl;
+}
+
+// FIXME: Implement.
+ResType *RewriteOutput::doQuery(Connect *conn, Connect *e_conn,
+                                Rewriter *rewriter)
+{
+    if (false == queryAgain()) {
+        prettyPrintQuery(new_query);
+        return sendQuery(conn, new_query);
+    }
+    return NULL;
+}
+
+bool RewriteOutput::queryAgain()
+{
+    return false;
+}
+
+std::string RewriteOutput::getQuery(LEX *lex)
+{
+    if (NULL == lex) {
+        return std::string("");
+    } else {
+        std::ostringstream ss;
+        ss << *lex;
+        return ss.str();
+    }
+}
+
+ResType *RewriteOutput::sendQuery(Connect *c, std::string q)
+{
+    DBResult *dbres;
+    assert(c->execute(q, dbres));
+    ResType *res = new ResType(dbres->unpack());
+    if (!res->ok) {
+        return NULL;
+    }
+
+    return res;
+}
+
+ResType *DMLOutput::doQuery(Connect *conn, Connect *e_conn,
+                            Rewriter *rewriter)
+{
+    return RewriteOutput::doQuery(conn, e_conn, rewriter);
+}
+
+SpecialUpdate::SpecialUpdate(const std::string &original_query,
+                             LEX *old_lex, const ProxyState &ps)
+    : RewriteOutput(original_query, old_lex), ps(ps)
+{
+    this->plain_table =
+        old_lex->select_lex.top_join_list.head()->table_name; 
+    if (old_lex->select_lex.where) {
+        std::ostringstream where_stream;
+        where_stream << " " << *old_lex->select_lex.where << " ";
+        this->where_clause = where_stream.str();
+    } else {    // HACK: Handle empty WHERE clause.
+        this->where_clause = " TRUE ";
+    }
+}
+
+// FIXME: Implement.
+ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
+                                Rewriter *rewriter)
+{
+    std::cout << "SpecialUpdate::doQuery!" << std::endl;
+    assert(rewriter);
+    // Retrieve rows from database.
+    std::ostringstream select_stream;
+    select_stream << " SELECT * FROM " << this->plain_table
+                  << " WHERE " << this->where_clause << ";";
+    const ResType * const select_res_type =
+        executeQuery(*rewriter, this->ps, select_stream.str());
+    assert(select_res_type);
+    if (select_res_type->rows.size() == 0) { // No work to be done.
+        return RewriteOutput::doQuery(conn, e_conn, rewriter);
+    }
+
+    const auto itemJoin = [](std::vector<Item*> row) {
+        return "(" + vector_join<Item*>(row, ",", ItemToString) + ")";
+    };
+    const std::string values_string =
+        vector_join<std::vector<Item*>>(select_res_type->rows, ",",
+                                        itemJoin);
+    delete select_res_type;
+
+    // Push the plaintext rows to the embedded database.
+    std::ostringstream push_stream;
+    push_stream << " INSERT INTO " << this->plain_table
+                << " VALUES " << values_string << ";";
+    assert(e_conn->execute(push_stream.str()));
+
+    // Run the original (unmodified) query on the data in the embedded
+    // database.
+    assert(e_conn->execute(this->original_query));
+
+    // > Collect the results from the embedded database.
+    // > This code relies on single threaded access to the database
+    //   and on the fact that the database is cleaned up after
+    //   every such operation.
+    DBResult *dbres;
+    std::ostringstream select_results_stream;
+    select_results_stream << " SELECT * FROM " << this->plain_table << ";";
+    assert(e_conn->execute(select_results_stream.str(), dbres));
+
+    // FIXME(burrows): Use general join.
+    ScopedMySQLRes r(dbres->n);
+    MYSQL_ROW row;
+    std::string output_rows = " ";
+    const unsigned long field_count = r.res()->field_count;
+    while ((row = mysql_fetch_row(r.res()))) {
+        unsigned long *l = mysql_fetch_lengths(r.res());
+        assert(l != NULL);
+
+        output_rows.append(" ( ");
+        for (unsigned long field_index = 0; field_index < field_count;
+             ++field_index) {
+            std::string field_data;
+            if (row[field_index]) {
+                field_data = std::string(row[field_index],
+                                         l[field_index]);
+            } else {    // Handle NULL values.
+                field_data = std::string("NULL");
+            }
+            output_rows.append(field_data);
+            if (field_index + 1 < field_count) {
+                output_rows.append(", ");
+            }
+        }
+        output_rows.append(" ) ,");
+    }
+    output_rows = output_rows.substr(0, output_rows.length() - 1);
+
+    // Cleanup the embedded database.
+    std::ostringstream cleanup_stream;
+    cleanup_stream << "DELETE FROM " << this->plain_table << ";";
+    assert(e_conn->execute(cleanup_stream.str()));
+
+    // DELETE the rows matching the WHERE clause from the database.
+    std::ostringstream delete_stream;
+    delete_stream << " DELETE FROM " << this->plain_table
+                  << " WHERE " << this->where_clause << ";";
+    assert(executeQuery(*rewriter, this->ps, delete_stream.str()));
+
+    // > Add each row from the embedded database to the data database.
+    std::ostringstream push_results_stream;
+    push_results_stream << " INSERT INTO " << this->plain_table
+                        << " VALUES " << output_rows << ";";
+    return executeQuery(*rewriter, this->ps, push_results_stream.str());
+}
+
+DeltaOutput::~DeltaOutput()
+{;}
+
+ResType *DeltaOutput::doQuery(Connect *conn, Connect *e_conn,
+                              Rewriter *rewriter)
+{
+    for (auto it : deltas) {
+        assert(it.apply(e_conn));
+    }
+
+    return RewriteOutput::doQuery(conn, e_conn, rewriter);
+}
+
+ResType *DDLOutput::doQuery(Connect *conn, Connect *e_conn,
+                            Rewriter *rewriter)
+{
+    assert(e_conn->execute(original_query));
+    return DeltaOutput::doQuery(conn, e_conn, rewriter);
+}
+
+bool AdjustOnionOutput::queryAgain()
+{
+    return true;
+}
+
+ResType *AdjustOnionOutput::doQuery(Connect *conn, Connect *e_conn,
+                                    Rewriter *rewriter)
+{
+    for (auto it : adjust_queries) {
+        assert(conn->execute(it));
+    }
+    return DeltaOutput::doQuery(conn, e_conn);
+}
+
+bool Analysis::addAlias(const std::string &alias,
+                        const std::string &table)
 {
     auto alias_pair = table_aliases.find(alias);
     if (table_aliases.end() != alias_pair) {
@@ -385,7 +582,8 @@ bool Analysis::addAlias(std::string alias, std::string table)
     return true;
 }
 
-OnionMeta *Analysis::getOnionMeta(std::string table, std::string field,
+OnionMeta *Analysis::getOnionMeta(const std::string &table,
+                                  const std::string &field,
                                   onion o) const
 {
     OnionMeta *om = this->getFieldMeta(table, field)->getOnionMeta(o);
@@ -394,30 +592,30 @@ OnionMeta *Analysis::getOnionMeta(std::string table, std::string field,
     return om;
 }
 
-FieldMeta *Analysis::getFieldMeta(std::string table, std::string field) const
+FieldMeta *Analysis::getFieldMeta(const std::string &table,
+                                  const std::string &field) const
 {
     std::string real_table_name = unAliasTable(table);
-    FieldMeta *fm = ps->schema->getFieldMeta(real_table_name, field);
+    FieldMeta *fm = this->schema->getFieldMeta(real_table_name, field);
     assert(fm);
     return fm;
 }
 
-TableMeta *Analysis::getTableMeta(std::string table) const
+TableMeta *Analysis::getTableMeta(const std::string &table) const
 {
     IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
                                  
-    TableMeta *tm =
-        static_cast<TableMeta *>(ps->schema->getChild(key));
+    TableMeta *tm = this->schema->getChild(key);
     assert(tm);
     return tm;
 }
 
 // FIXME: Field aliasing.
-bool Analysis::destroyFieldMeta(std::string table, std::string field)
+bool Analysis::destroyFieldMeta(const std::string &table,
+                                const std::string &field)
 {
     IdentityMetaKey *table_key = new IdentityMetaKey(unAliasTable(table));
-    TableMeta *tm = 
-        static_cast<TableMeta *>(ps->schema->getChild(table_key));
+    TableMeta *tm = this->schema->getChild(table_key);
     if (!tm) {
         return false;
     }
@@ -426,16 +624,16 @@ bool Analysis::destroyFieldMeta(std::string table, std::string field)
     return tm->destroyChild(field_key);
 }
 
-bool Analysis::destroyTableMeta(std::string table)
+bool Analysis::destroyTableMeta(const std::string &table)
 {
     IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
-    return ps->schema->destroyChild(key);
+    return this->getSchema()->destroyChild(key);
 }
 
-bool Analysis::tableMetaExists(std::string table) const
+bool Analysis::tableMetaExists(const std::string &table) const
 {
     IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
-    return ps->schema->childExists(key);
+    return this->schema->childExists(key);
 }
 
 std::string Analysis::getAnonTableName(const std::string &table) const
@@ -443,13 +641,13 @@ std::string Analysis::getAnonTableName(const std::string &table) const
     return this->getTableMeta(table)->getAnonTableName();
 }
 
-std::string Analysis::getAnonIndexName(std::string table,
-                                       std::string index_name) const
+std::string Analysis::getAnonIndexName(const std::string &table,
+                                       const std::string &index_name) const
 {
     return this->getTableMeta(table)->getAnonIndexName(index_name); 
 }
 
-std::string Analysis::unAliasTable(std::string table) const
+std::string Analysis::unAliasTable(const std::string &table) const
 {
     auto alias_pair = table_aliases.find(table);
     if (table_aliases.end() != alias_pair) {
@@ -459,7 +657,7 @@ std::string Analysis::unAliasTable(std::string table) const
     }
 }
 
-EncLayer *Analysis::getBackEncLayer(OnionMeta *om) const
+EncLayer *Analysis::getBackEncLayer(OnionMeta * const om) const
 {
     auto it = to_adjust_enc_layers.find(om);
     if (to_adjust_enc_layers.end() == it) {
@@ -469,7 +667,7 @@ EncLayer *Analysis::getBackEncLayer(OnionMeta *om) const
     }
 }
 
-EncLayer *Analysis::popBackEncLayer(OnionMeta *om)
+EncLayer *Analysis::popBackEncLayer(OnionMeta * const om)
 {
     auto it = to_adjust_enc_layers.find(om);
     if (to_adjust_enc_layers.end() == it) { // First onion adjustment
@@ -483,7 +681,7 @@ EncLayer *Analysis::popBackEncLayer(OnionMeta *om)
     }
 }
 
-SECLEVEL Analysis::getOnionLevel(OnionMeta *om) const
+SECLEVEL Analysis::getOnionLevel(OnionMeta * const om) const
 {
     auto it = to_adjust_enc_layers.find(om);
     if (to_adjust_enc_layers.end() == it) {

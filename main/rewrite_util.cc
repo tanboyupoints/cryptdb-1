@@ -302,19 +302,10 @@ string_to_bool(std::string s)
     }
 }
 
-LEX **
-single_lex_output(LEX *out_me, unsigned *out_lex_count)
-{
-    LEX **out_lex = new LEX*[1];
-    out_lex[0] = out_me;
-    *out_lex_count = 1;
-    return out_lex;
-}
-
 List<Create_field>
-createAndRewriteField(Create_field *cf, TableMeta *tm,
-                      const std::string &table, const std::string &dbname,
-                      Analysis &a, bool new_table,
+createAndRewriteField(Analysis &a, const ProxyState &ps,
+                      Create_field *cf, TableMeta *tm,
+                      bool new_table,
                       List<Create_field> &rewritten_cfield_list)
 {
     // -----------------------------
@@ -322,16 +313,16 @@ createAndRewriteField(Create_field *cf, TableMeta *tm,
     // -----------------------------
     const std::string name = std::string(cf->field_name);
     FieldMeta * const fm =
-        new FieldMeta(name, cf, a.ps->masterKey, tm->leaseIncUniq());
+        new FieldMeta(name, cf, ps.masterKey, tm->leaseIncUniq());
     // Here we store the key name for the first time. It will be applied
     // after the Delta is read out of the database.
     if (true == new_table) {
         tm->addChild(new IdentityMetaKey(name), fm);
     } else {
-        Delta d(Delta::CREATE, fm, tm, new IdentityMetaKey(name));
+        const Delta d(Delta::CREATE, fm, tm, new IdentityMetaKey(name));
         a.deltas.push_back(d);
-        const Delta d0(Delta::REPLACE, tm, a.ps->schema,
-                       a.ps->schema->getKey(tm));
+        const Delta d0(Delta::REPLACE, tm, a.getSchema(),
+                       a.getSchema()->getKey(tm));
         a.deltas.push_back(d0);
     }
 

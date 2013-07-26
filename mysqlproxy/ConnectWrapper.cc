@@ -260,12 +260,15 @@ rewrite(lua_State *L)
             new_queries.push_back(query);
         } else {
             try {
+                throw CryptDBError("rewrite, not implemented!");
                 // TODO: May need to set current db in ProxyState.
+                /* FIXME.
                 QueryRewrite rew = r->rewrite(query);
-		new_queries = rew.queries;
-		clients[client]->rmeta = rew.rmeta;
-		clients[client]->considered = rew.wasRew;
+                new_queries = rew.queries;
+                clients[client]->rmeta = rew.rmeta;
+                clients[client]->considered = rew.wasRew;
                 //cerr << "query: " << *new_queries.begin() << " considered ? " << clients[client]->considered << "\n";
+                */
             } catch (CryptDBError &e) {
                 LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
                 lua_pushnil(L);
@@ -368,7 +371,8 @@ decrypt(lua_State *L)
         rd = res;
     } else {
         try {
-            rd = r->decryptResults(res, clients[client]->rmeta);
+            ResType *rt = r->decryptResults(res, clients[client]->rmeta);
+            rd = *rt;
         }
         catch(CryptDBError e) {
             lua_pushnil(L);

@@ -7,6 +7,11 @@
 #include <sql_list.h>
 #include <sql_table.h>
 
+const std::string BOLD_BEGIN = "\033[1m";
+const std::string RED_BEGIN = "\033[1;31m";
+const std::string GREEN_BEGIN = "\033[1;92m";
+const std::string COLOR_END = "\033[0m";
+
 Item *
 rewrite(Item *i, const OLK & constr, Analysis &a, std::string context = "");
 
@@ -49,13 +54,10 @@ bool_to_string(bool b);
 
 bool string_to_bool(std::string s);
 
-LEX **
-single_lex_output(LEX *out_me, unsigned *out_lex_count);
-
 List<Create_field>
-createAndRewriteField(Create_field *cf, TableMeta *tm,
-                      const std::string &table, const std::string &dbname,
-                      Analysis &a, bool new_table,
+createAndRewriteField(Analysis &a, const ProxyState &ps,
+                      Create_field *cf, TableMeta *tm,
+                      bool new_table,
                       List<Create_field> &rewritten_cfield_list);
 
 Item *

@@ -9,14 +9,13 @@
 
 class AlterSubHandler : public SQLHandler {
 public:
-    virtual LEX **transformLex(LEX *lex, Analysis &a, const std::string &q,
-                               unsigned *out_lex_count) const;
+    virtual LEX *transformLex(Analysis &a, LEX *lex,
+                              const ProxyState &ps) const;
     virtual ~AlterSubHandler() {;}
 
 private:
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
-                                   const std::string &q,
-                                   unsigned *out_lex_count) const = 0;
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
+                                  const ProxyState &ps) const = 0;
 
 protected:
     AlterSubHandler() {;}

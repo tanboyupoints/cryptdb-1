@@ -23,6 +23,7 @@
 #include <readline/history.h>
 
 #include <main/rewrite_main.hh>
+#include <main/rewrite_util.hh>
 #include <parser/embedmysql.hh>
 #include <parser/stringify.hh>
 #include <crypto/ecjoin.hh>
@@ -93,8 +94,7 @@ static bool handle_line(Rewriter& r, const std::string& q)
     return true;
   }
 
-
-  return (bool)executeQuery(r, q, true);
+  return (bool)executeQuery(r, r.ps, q);
 }
 
 int

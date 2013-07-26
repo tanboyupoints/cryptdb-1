@@ -220,8 +220,9 @@ public:
     std::string user;
     std::string passwd;
 
-    ConnectionInfo(std::string s, std::string u, std::string p, uint port = 0) :
-	server(s), port(port), user(u), passwd(p) {};
+    ConnectionInfo(std::string s, std::string u, std::string p,
+                   uint port = 0)
+        : server(s), port(port), user(u), passwd(p) {};
     ConnectionInfo() : server(""), port(0), user(""), passwd("") {};
 
 } ConnectionInfo;
@@ -232,12 +233,10 @@ operator<<(std::ostream &out, const RewritePlan * rp);
 
 // state maintained at the proxy
 typedef struct ProxyState {
-
     ProxyState()
-        : conn(NULL), e_conn(NULL), encByDefault(true), masterKey(NULL),
-          schema(NULL) {}
+        : conn(NULL), e_conn(NULL), encByDefault(true), masterKey(NULL) {}
     ~ProxyState();
-    std::string dbName() {return dbname;}
+    std::string dbName() const {return dbname;}
 
     ConnectionInfo ci;
 
@@ -247,8 +246,6 @@ typedef struct ProxyState {
 
     bool           encByDefault;
     AES_KEY*       masterKey;
-
-    SchemaInfo*    schema;
 
 private:
     // FIXME: Remove once cryptdb supports multiple databases.
@@ -308,59 +305,149 @@ private:
 
     std::string serialize(const DBObject &parent) const 
     {
-        throw CryptDBError("Calling Delta::serialize with a parent argument"
-                           " is nonsensical!");
+        throw CryptDBError("Calling Delta::serialize with a parent"
+                           " argument is nonsensical!");
     }
 };
 
 class Rewriter;
 
+class RewriteOutput { 
+public:
+    RewriteOutput(const std::string &original_query, LEX *new_lex)
+        : original_query(original_query), new_query(getQuery(new_lex)) {}
+    virtual ~RewriteOutput() = 0;
+
+    virtual ResType *doQuery(Connect *conn, Connect *e_conn,
+                             Rewriter *rewriter = NULL);
+    virtual bool queryAgain();
+
+protected:
+    const std::string original_query;
+    const std::string new_query;
+
+    static std::string getQuery(LEX *lex);
+    static ResType *sendQuery(Connect *c, std::string q);
+};
+
+class SimpleOutput : public RewriteOutput {
+public:
+    SimpleOutput(const std::string &original_query)
+        : RewriteOutput(original_query, NULL) {}
+};
+
+class DMLOutput : public RewriteOutput {
+public:
+    DMLOutput(const std::string &original_query, LEX *new_lex)
+        : RewriteOutput(original_query, new_lex) {}
+    ~DMLOutput() {;}
+
+    ResType *doQuery(Connect *conn, Connect *e_conn,
+                    Rewriter *rewriter = NULL);
+};
+
+// Special case of DML query.
+class SpecialUpdate : public RewriteOutput {
+public:
+    SpecialUpdate(const std::string &original_query, LEX *new_lex,
+                  const ProxyState &ps);
+    ~SpecialUpdate() {;}
+
+    ResType *doQuery(Connect *conn, Connect *e_conn,
+                    Rewriter *rewriter = NULL);
+
+private:
+    std::string plain_table;
+    std::string where_clause;
+    const ProxyState &ps;
+};
+
+class DeltaOutput : public RewriteOutput {
+public:
+    DeltaOutput(const std::string &original_query, LEX *new_lex,
+                std::list<Delta> deltas)
+        : RewriteOutput(original_query, new_lex), deltas(deltas) {}
+    virtual ~DeltaOutput() = 0;
+    virtual ResType *doQuery(Connect *conn, Connect *e_conn,
+                            Rewriter *rewriter = NULL);
+
+private:
+    const std::list<Delta> deltas;
+};
+
+class DDLOutput : public DeltaOutput {
+public:
+    DDLOutput(const std::string &original_query, LEX *new_lex,
+              std::list<Delta> deltas)
+        : DeltaOutput(original_query, new_lex, deltas) {}
+    ~DDLOutput() {;}
+
+    ResType *doQuery(Connect *conn, Connect *e_conn,
+                    Rewriter *rewriter = NULL);
+};
+
+class AdjustOnionOutput : public DeltaOutput {
+public:
+    AdjustOnionOutput(const std::string &original_query,
+                      std::list<Delta> deltas,
+                      std::list<std::string> adjust_queries)
+        : DeltaOutput(original_query, NULL, deltas),
+          adjust_queries(adjust_queries) {}
+    ~AdjustOnionOutput() {;}
+
+    bool queryAgain();
+    ResType *doQuery(Connect *conn, Connect *e_conn,
+                    Rewriter *rewriter = NULL);
+
+private:
+    const std::list<std::string> adjust_queries;
+};
+
 class Analysis {
 public:
-    Analysis(ProxyState * ps) : ps(ps), pos(0), rmeta(new ReturnMeta()) {}
+    Analysis(const SchemaInfo * const schema)
+        : pos(0), rmeta(new ReturnMeta()), special_update(false),
+          schema(schema) {}
 
-    Analysis(): ps(NULL), pos(0), rmeta(new ReturnMeta()) {}
-
-    // pointer to proxy metadata
-    ProxyState * ps;
-
-    /* Temporary structures for processing one query */
-
-    unsigned int pos; //a counter indicating how many projection fields have been analyzed so far
+    unsigned int pos; // > a counter indicating how many projection
+                      // fields have been analyzed so far
     std::map<FieldMeta *, salt_type>    salts;
     std::map<Item *, RewritePlan *>     rewritePlans;
     std::map<std::string, std::string>  table_aliases;
 
     // information for decrypting results
     ReturnMeta * rmeta;
+    
+    bool special_update;
 
     // These functions are prefered to their lower level counterparts.
-    bool addAlias(std::string alias, std::string table);
-    OnionMeta *getOnionMeta(std::string table, std::string field,
-                            onion o) const;
-    FieldMeta *getFieldMeta(std::string table, std::string field) const;
-    TableMeta *getTableMeta(std::string table) const;
-    bool destroyFieldMeta(std::string table, std::string field);
-    bool destroyTableMeta(std::string table);
-    bool tableMetaExists(std::string table) const;
+    bool addAlias(const std::string &alias, const std::string &table);
+    OnionMeta *getOnionMeta(const std::string &table,
+                            const std::string &field, onion o) const;
+    FieldMeta *getFieldMeta(const std::string &table,
+                            const std::string &field) const;
+    TableMeta *getTableMeta(const std::string &table) const;
+    bool destroyFieldMeta(const std::string &table,
+                          const std::string &field);
+    bool destroyTableMeta(const std::string &table);
+    bool tableMetaExists(const std::string &table) const;
     std::string getAnonTableName(const std::string &table) const;
-    std::string getAnonIndexName(std::string table,
-                                 std::string index_name) const;
-    EncLayer *getBackEncLayer(OnionMeta *om) const;
-    EncLayer *popBackEncLayer(OnionMeta *om);
-    SECLEVEL getOnionLevel(OnionMeta *om) const;
+    std::string getAnonIndexName(const std::string &table,
+                                 const std::string &index_name) const;
+    EncLayer *getBackEncLayer(OnionMeta * const om) const;
+    EncLayer *popBackEncLayer(OnionMeta * const om);
+    SECLEVEL getOnionLevel(OnionMeta * const om) const;
     std::vector<EncLayer *> getEncLayers(OnionMeta * const om) const;
-
-    // HACK(burrows): This is a temporary solution until I redesign.
-    Rewriter *rewriter;
-
-    // TODO: Make private.
-    std::list<Delta> deltas;
+    // HACK.
+    SchemaInfo *getSchema() {return const_cast<SchemaInfo *>(schema);}
 
     // TODO: Make private.
     std::map<OnionMeta *, std::vector<EncLayer *>> to_adjust_enc_layers;
+    
+    std::list<Delta> deltas;
 
 private:
-    std::string unAliasTable(std::string table) const;
+    const SchemaInfo * const schema;
+    std::string unAliasTable(const std::string &table) const;
 };
 

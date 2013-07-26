@@ -15,29 +15,29 @@
 //   > If we drop Keys and Columns in the same query the order is probably
 //     going to get changed.
 class AlterHandler : public DDLHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
-                                   const std::string &q,
-                                   unsigned *out_lex_count) const {
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
+                                  const ProxyState &ps) const
+    {
         const AlterSubHandler *handler;
         assert(sub_dispatcher->canDo(lex));
-        assert(handler = (const AlterSubHandler*)sub_dispatcher->dispatch(lex));
-        return handler->transformLex(lex, a, q, out_lex_count);
+        assert(handler =
+            (const AlterSubHandler*)sub_dispatcher->dispatch(lex));
+        return handler->transformLex(a, lex, ps);
     }
     
     AlterDispatcher *sub_dispatcher;
     
 public:
-    AlterHandler() {
+    AlterHandler()
+    {
         sub_dispatcher = buildAlterSubDispatcher();
     }
 };
 
 class CreateHandler : public DDLHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
-                                   const std::string &q,
-                                   unsigned *out_lex_count) const
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
+                                  const ProxyState &ps) const
     {
-        char* dbname = lex->select_lex.table_list.first->db;
         char* table  = lex->select_lex.table_list.first->table_name;
         LEX *new_lex = copy(lex);
         
@@ -56,9 +56,9 @@ class CreateHandler : public DDLHandler {
             // TODO: Use appropriate values for has_sensitive and has_salt.
             TableMeta *tm = new TableMeta(true, true);
             IdentityMetaKey *key = new IdentityMetaKey(table);
-            Delta delta(Delta::CREATE, tm, a.ps->schema, key);
+            Delta delta(Delta::CREATE, tm, a.getSchema(), key);
             a.deltas.push_back(delta);
-           
+
             // -----------------------------
             //         Rewrite TABLE       
             // -----------------------------
@@ -79,10 +79,10 @@ class CreateHandler : public DDLHandler {
                 List_iterator<Create_field>(lex->alter_info.create_list);
             new_lex->alter_info.create_list = 
                 reduceList<Create_field>(it, List<Create_field>(),
-                    [&tm, &a, dbname, table] (List<Create_field> out_list,
-                                              Create_field *cf) {
-                        return createAndRewriteField(cf, tm, table, dbname,
-                                                     a, true, out_list);
+                    [&a, &ps, &tm] (List<Create_field> out_list,
+                                    Create_field *cf) {
+                        return createAndRewriteField(a, ps, cf, tm, 
+                                                     true, out_list);
                 });
         } else { // Table already exists.
 
@@ -106,29 +106,32 @@ class CreateHandler : public DDLHandler {
             // with the credit card field every time the server boots)
         }
 
-        return single_lex_output(new_lex, out_lex_count);
+        return new_lex;
     }
 };
 
 class DropHandler : public DDLHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
-                                   const std::string &q,
-                                   unsigned *out_lex_count) const {
-        LEX **out_lex = rewrite(lex, a, out_lex_count);
-        update(q, lex, a);
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
+                                  const ProxyState &ps) const
+    {
 
-        return out_lex;
+        LEX *final_lex = rewrite(a, lex, ps);
+        update(a, lex, ps);
+
+        return final_lex;
     }
     
-    LEX **rewrite(LEX *lex, Analysis &a, unsigned *out_lex_count) const {
-        LEX * new_lex = copy(lex);
+    LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps) const
+    {
+        LEX *new_lex = copy(lex);
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a, true);
 
-        return single_lex_output(new_lex, out_lex_count);
+        return new_lex;
     }
 
-    void update(const std::string &q, LEX *lex, Analysis &a) const {
+    void update(Analysis &a, LEX *lex, const ProxyState &ps) const
+    {
         TABLE_LIST *tbl = lex->select_lex.table_list.first;
         for (; tbl; tbl = tbl->next_local) {
             char* table  = tbl->table_name;
@@ -142,26 +145,27 @@ class DropHandler : public DDLHandler {
             // Remove from *Meta structures.
             TableMeta *tm = a.getTableMeta(table);
             // FIXME: Key only necessary for CREATE.
-            Delta delta(Delta::DELETE, tm, a.ps->schema,
+            Delta delta(Delta::DELETE, tm, a.getSchema(),
                         new IdentityMetaKey(table));
             a.deltas.push_back(delta);
+
         }
     }
 };
 
 // TODO: Implement.
 class ChangeDBHandler : public DDLHandler {
-    virtual LEX **rewriteAndUpdate(LEX *lex, Analysis &a,
-                                   const std::string &q,
-                                   unsigned *out_lex_count) const {
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
+                                  const ProxyState &ps) const
+    {
         throw CryptDBError("cryptdb does not support changing the db!");
     }
 };
 
-LEX** DDLHandler::transformLex(LEX *lex, Analysis &analysis,
-                               const std::string &q,
-                               unsigned *out_lex_count) const {
-    return this->rewriteAndUpdate(lex, analysis, q, out_lex_count);
+LEX *DDLHandler::transformLex(Analysis &a, LEX *lex,
+                              const ProxyState &ps) const
+{
+    return this->rewriteAndUpdate(a, lex, ps);
 }
 
 // FIXME: Add test to make sure handler added successfully.
