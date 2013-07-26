@@ -288,6 +288,12 @@ public:
     virtual bool apply(Connect *e_conn) = 0;
     virtual bool destroyRecord(Connect *e_conn) = 0;
 
+    static bool singleSave(Connect *e_conn, const DBMeta * const object,
+                           const DBMeta * const parent);
+    static bool singleDestroy(Connect *e_conn,
+                              const DBMeta * const object,
+                              const DBMeta * const parent);
+
 protected:
     const DBMeta * const meta;
     const DBMeta * const parent_meta;
@@ -336,18 +342,6 @@ public:
     bool apply(Connect *e_conn);
     bool destroyRecord(Connect *e_conn);
 };
-
-/*
-    void createHandler(Connect *e_conn, const DBMeta * const object,
-                       const DBMeta * const parent,
-                       const AbstractMetaKey * const k = NULL,
-                       const unsigned int * const ptr_parent_id = NULL);
-    void deleteHandler(Connect *e_conn, const DBMeta * const object,
-                       const DBMeta * const parent);
-    void replaceHandler(Connect *e_conn, const DBMeta * const object,
-                        const DBMeta * const parent,
-                        const AbstractMetaKey * const k);
-*/
 
 class Rewriter;
 

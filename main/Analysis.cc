@@ -192,15 +192,14 @@ operator<<(std::ostream &out, const RewritePlan * rp)
     return out;
 }
 
-/*
 // FIXME: Implement serial number.
-// FIXME: Must be recursive.
-bool Delta::save(Connect *e_conn)
+bool Delta::singleSave(Connect *e_conn, const DBMeta * const object,
+                       const DBMeta * const parent)
 {
-    const std::string serial_object = meta->serialize(*parent_meta);
+    const std::string serial_object = object->serialize(*parent);
     const std::string parent_id =
-        std::to_string(parent_meta->getDatabaseID());
-    const std::string serial_key = key->getSerial();
+        std::to_string(parent->getDatabaseID());
+    const std::string serial_key = parent->getKey(object)->getSerial();
     const std::string table_name = "Delta";
 
     // Make sure the table exists.
@@ -216,8 +215,7 @@ bool Delta::save(Connect *e_conn)
     // TODO: Maybe we want to join on object_id as well.
     const std::string query =
         " INSERT INTO pdb." + table_name +
-        "    (action, serial_object, parent_id, serial_key) VALUES (" +
-        " "  + std::to_string(action) + ", " +
+        "    (serial_object, parent_id, serial_key) VALUES (" +
         " '" + serial_object + "', " +
         " "  + parent_id + ", " +
         " '" + serial_key + "');";
@@ -225,46 +223,19 @@ bool Delta::save(Connect *e_conn)
     return e_conn->execute(query);
 }
 
-bool Delta::apply(Connect *e_conn) 
+bool Delta::singleDestroy(Connect *e_conn, const DBMeta * const object,
+                          const DBMeta * const parent)
 {
-    switch (action) {
-        case CREATE: {
-             * We know that the Delta object is the top level in
-             * a hierarchy of all new objects. Therefore we must
-             * go through and recursively associate them all with their
-             * parents.
-            createHandler(e_conn, meta, parent_meta, key);
-            return true;
-            break;
-        } case REPLACE: {
-             * Replace the particular meta.
-            replaceHandler(e_conn, meta, parent_meta, key);
-            return true;
-        } case DELETE: {
-             * Recursively delete everything from this top level
-            deleteHandler(e_conn, meta, parent_meta);
-            return true;
-        } default: {
-            throw CryptDBError("Unknown Delta::Action!");
-        }
-    }
-}
-
-// FIXME: Must be recursive.
-bool Delta::destroyRecord(Connect *e_conn)
-{
-    const std::string serial_object = meta->serialize(*parent_meta);
+    const std::string serial_object = object->serialize(*parent);
     const std::string parent_id =
-        std::to_string(parent_meta->getDatabaseID());
-    const std::string serial_key = key->getSerial();
+        std::to_string(parent->getDatabaseID());
+    const std::string serial_key = parent->getKey(object)->getSerial();
     const std::string table_name = "Delta";
 
     const std::string query =
         " DELETE pdb." + table_name +
         "   FROM pdb." + table_name +
-        "  WHERE pdb." + table_name + ".action" +
-        "      = '" +  std::to_string(action) + "' "
-        "    AND pdb." + table_name + ".serial_object" +
+        "  WHERE pdb." + table_name + ".serial_object" +
         "      = '" + serial_object + "' "
         "    AND pdb." + table_name + ".parent_id" +
         "      = '" + parent_id + "' "
@@ -273,7 +244,6 @@ bool Delta::destroyRecord(Connect *e_conn)
 
     return e_conn->execute(query);
 }
-*/
 
 bool CreateDelta::save(Connect *e_conn)
 {
@@ -288,10 +258,10 @@ bool CreateDelta::apply(Connect *e_conn)
                        const DBMeta * const,
                        const AbstractMetaKey * const,
                        const unsigned int * const)> helper =
-        [&helper] (Connect *e_conn, const DBMeta * const object,
-                      const DBMeta * const parent,
-                      const AbstractMetaKey * const k,
-                      const unsigned int * const ptr_parent_id)
+        [helper] (Connect *e_conn, const DBMeta * const object,
+                  const DBMeta * const parent,
+                  const AbstractMetaKey * const k,
+                  const unsigned int * const ptr_parent_id)
     {
         DBWriter dbw(object, parent);
         
@@ -346,7 +316,7 @@ bool CreateDelta::apply(Connect *e_conn)
         assert(e_conn->execute(join_query));
 
         std::function<void(const DBMeta * const)> localCreateHandler =
-            [&e_conn, &object, object_id, &helper]
+            [&e_conn, &object, object_id, helper]
                 (const DBMeta * const child)
             {
                 helper(e_conn, child, object, NULL, &object_id);
@@ -363,44 +333,18 @@ bool CreateDelta::destroyRecord(Connect *e_conn)
     return false;
 }
 
-/*
-void Delta::deleteHandler(Connect *e_conn, const DBMeta * const object,
-                          const DBMeta * const parent)
+bool ReplaceDelta::save(Connect *e_conn)
 {
-    DBWriter dbw(object, parent);
-    const unsigned int object_id = object->getDatabaseID();
-    const unsigned int parent_id = parent->getDatabaseID();
-
-    const std::string query =
-        " DELETE pdb." + dbw.table_name() + ", "
-        "        pdb." + dbw.join_table_name() +
-        "   FROM pdb." + dbw.table_name() + 
-        " INNER JOIN pdb." + dbw.join_table_name() +
-        "  WHERE pdb." + dbw.table_name() + ".id" +
-        "      = pdb." + dbw.join_table_name() + ".object_id" +
-        "    AND pdb." + dbw.table_name() + ".id" +
-        "      = "     + std::to_string(object_id) + 
-        "    AND pdb." + dbw.join_table_name() + ".parent_id" +
-        "      = "     + std::to_string(parent_id) + ";";
-
-    assert(e_conn->execute(query));
-
-    std::function<void(const DBMeta * const)> localDestroyHandler =
-        [&e_conn, &object, this] (const DBMeta * const child) {
-            this->deleteHandler(e_conn, child, object);
-        };
-    object->applyToChildren(localDestroyHandler);
+    return false;
 }
 
-void Delta::replaceHandler(Connect *e_conn, const DBMeta * const object,
-                           const DBMeta * const parent,
-                           const AbstractMetaKey * const k)
+bool ReplaceDelta::apply(Connect *e_conn)
 {
-    DBWriter dbw(object, parent);
+    DBWriter dbw(meta, parent_meta);
 
-    const std::string child_serial = object->serialize(*parent);
-    const unsigned int child_id = object->getDatabaseID();
-    const unsigned int parent_id = parent->getDatabaseID();
+    const std::string child_serial = meta->serialize(*parent_meta);
+    const unsigned int child_id = meta->getDatabaseID();
+    const unsigned int parent_id = parent_meta->getDatabaseID();
     
     const std::string esc_child_serial =
         escapeString(e_conn, child_serial);
@@ -413,7 +357,7 @@ void Delta::replaceHandler(Connect *e_conn, const DBMeta * const object,
 
     assert(e_conn->execute(query));
 
-    const std::string serial_key = k->getSerial();
+    const std::string serial_key = key->getSerial();
     const std::string esc_serial_key = escapeString(e_conn, serial_key);
     const unsigned int esc_serial_key_len = esc_serial_key.size();
     const std::string join_query =
@@ -425,9 +369,59 @@ void Delta::replaceHandler(Connect *e_conn, const DBMeta * const object,
     
     assert(e_conn->execute(join_query)); 
 
-    return;
+    return true;
 }
-*/
+
+bool ReplaceDelta::destroyRecord(Connect *e_conn)
+{
+    return false;
+}
+
+bool DeleteDelta::save(Connect *e_conn)
+{
+    return false;
+}
+
+bool DeleteDelta::apply(Connect *e_conn)
+{
+    std::function<void(Connect *, const DBMeta * const,
+                       const DBMeta * const)> helper =
+        [helper](Connect *e_conn, const DBMeta * const object,
+           const DBMeta * const parent)
+    {
+        DBWriter dbw(object, parent);
+        const unsigned int object_id = object->getDatabaseID();
+        const unsigned int parent_id = parent->getDatabaseID();
+
+        const std::string query =
+            " DELETE pdb." + dbw.table_name() + ", "
+            "        pdb." + dbw.join_table_name() +
+            "   FROM pdb." + dbw.table_name() + 
+            " INNER JOIN pdb." + dbw.join_table_name() +
+            "  WHERE pdb." + dbw.table_name() + ".id" +
+            "      = pdb." + dbw.join_table_name() + ".object_id" +
+            "    AND pdb." + dbw.table_name() + ".id" +
+            "      = "     + std::to_string(object_id) + 
+            "    AND pdb." + dbw.join_table_name() + ".parent_id" +
+            "      = "     + std::to_string(parent_id) + ";";
+
+        assert(e_conn->execute(query));
+
+        std::function<void(const DBMeta * const)> localDestroyHandler =
+            [&e_conn, &object, helper] (const DBMeta * const child) {
+                helper(e_conn, child, object);
+            };
+        object->applyToChildren(localDestroyHandler);
+    };
+
+    helper(e_conn, meta, parent_meta); 
+    return true;
+}
+
+bool DeleteDelta::destroyRecord(Connect *e_conn)
+{
+    return false;
+}
 
 RewriteOutput::~RewriteOutput()
 {;}
