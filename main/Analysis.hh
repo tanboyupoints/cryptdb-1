@@ -289,10 +289,12 @@ public:
     virtual bool destroyRecord(Connect *e_conn) = 0;
 
     static bool singleSave(Connect *e_conn, const DBMeta * const object,
-                           const DBMeta * const parent);
+                           const DBMeta * const parent,
+                           const AbstractMetaKey * const key=NULL);
     static bool singleDestroy(Connect *e_conn,
                               const DBMeta * const object,
-                              const DBMeta * const parent);
+                              const DBMeta * const parent,
+                              const AbstractMetaKey * const key=NULL);
 
 protected:
     const DBMeta * const meta;
@@ -307,6 +309,10 @@ private:
     }
 };
 
+// When using singleSave and singleDestroy with respect to meta and
+// parent_meta, CreateDelta calls must provide the key.  meta and
+// parent_meta have not yet been associated such that the key can be
+// functionally derived.
 class CreateDelta : public Delta {
 public:
     CreateDelta(const DBMeta * const meta,

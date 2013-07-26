@@ -193,43 +193,59 @@ operator<<(std::ostream &out, const RewritePlan * rp)
 }
 
 // FIXME: Implement serial number.
+// > key default argument is NULL
 bool Delta::singleSave(Connect *e_conn, const DBMeta * const object,
-                       const DBMeta * const parent)
+                       const DBMeta * const parent,
+                       const AbstractMetaKey * const key)
 {
     const std::string serial_object = object->serialize(*parent);
     const std::string parent_id =
         std::to_string(parent->getDatabaseID());
-    const std::string serial_key = parent->getKey(object)->getSerial();
+    std::string serial_key;
+    if (NULL == key) {
+        serial_key = parent->getKey(object)->getSerial();
+    } else {
+        serial_key = key->getSerial();
+    }
     const std::string table_name = "Delta";
 
     // Make sure the table exists.
     const std::string create_table_query =
         " CREATE TABLE IF NOT EXISTS pdb." + table_name +
-        "   (action VARCHAR(100) NOT NULL,"
-        "    serial_object VARCHAR(200) NOT NULL,"
+        "   (serial_object VARBINARY(200) NOT NULL,"
         "    parent_id BIGINT NOT NULL,"
-        "    serial_key VARCHAR(200) NOT NULL),"
+        "    serial_key VARCHAR(200) NOT NULL)"
         " ENGINE=InnoDB;";
     assert(e_conn->execute(create_table_query));
 
     // TODO: Maybe we want to join on object_id as well.
+    const std::string esc_serial_object =
+        escapeString(e_conn, serial_object);
+    const std::string esc_serial_key =
+        escapeString(e_conn, serial_key);
     const std::string query =
         " INSERT INTO pdb." + table_name +
         "    (serial_object, parent_id, serial_key) VALUES (" +
-        " '" + serial_object + "', " +
+        " '" + esc_serial_object + "', " +
         " "  + parent_id + ", " +
-        " '" + serial_key + "');";
+        " '" + esc_serial_key + "');";
 
     return e_conn->execute(query);
 }
 
 bool Delta::singleDestroy(Connect *e_conn, const DBMeta * const object,
-                          const DBMeta * const parent)
+                          const DBMeta * const parent,
+                          const AbstractMetaKey * const key)
 {
     const std::string serial_object = object->serialize(*parent);
     const std::string parent_id =
         std::to_string(parent->getDatabaseID());
-    const std::string serial_key = parent->getKey(object)->getSerial();
+    std::string serial_key;
+    if (NULL == key) {
+        serial_key = parent->getKey(object)->getSerial();
+    } else {
+        serial_key = key->getSerial();
+    }
     const std::string table_name = "Delta";
 
     const std::string query =
@@ -251,16 +267,18 @@ bool CreateDelta::save(Connect *e_conn)
     static std::function<void(const DBMeta * const)> helper = 
         [&helper, e_conn, this](const DBMeta * const parent)
     {
-        auto destroyer = 
+        auto saver = 
             [parent, &helper, e_conn, this](const DBMeta *const child)
         {
             Delta::singleSave(e_conn, child, parent);
             helper(child);
         };
-        parent->applyToChildren(destroyer);
+        parent->applyToChildren(saver);
     };
 
-    Delta::singleSave(e_conn, meta, parent_meta);
+    // Must provide the key because we have not yet associated the child
+    // with the parent.
+    Delta::singleSave(e_conn, meta, parent_meta, key);
     helper(meta);
     
     return true;
@@ -323,7 +341,7 @@ bool CreateDelta::apply(Connect *e_conn)
             esc_serial_key.size();
         const std::string join_query =
             " INSERT INTO pdb." + dbw.join_table_name() +
-            "   (object_id, parent_id, serial_key, serial_key_len) VALUES ("
+            "  (object_id, parent_id, serial_key, serial_key_len) VALUES ("
             " "  + std::to_string(object_id) + ", " 
             " "  + std::to_string(parent_id) + ", "
             " '" + esc_serial_key + "', " +
@@ -358,7 +376,7 @@ bool CreateDelta::destroyRecord(Connect *e_conn)
         parent->applyToChildren(destroyer);
     };
 
-    Delta::singleDestroy(e_conn, meta, parent_meta);
+    Delta::singleDestroy(e_conn, meta, parent_meta, key);
     helper(meta);
     
     return true;
@@ -636,8 +654,7 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
     {
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
-            assert(it);
-            // assert(it->save(e_conn));
+            assert(it->save(e_conn));
         }
         if (true == do_original) {
             assert(saveQuery(e_conn, original_query));
@@ -654,7 +671,7 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
             assert(it->apply(e_conn));
-            // assert(it->destroyRecord(e_conn));
+            assert(it->destroyRecord(e_conn));
         }
         if (true == do_original) {
             assert(e_conn->execute(original_query));
