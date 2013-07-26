@@ -245,9 +245,25 @@ bool Delta::singleDestroy(Connect *e_conn, const DBMeta * const object,
     return e_conn->execute(query);
 }
 
+// FIXME: Duplicates code with CreateDelta::destroyRecord
 bool CreateDelta::save(Connect *e_conn)
 {
-    return false;
+    static std::function<void(const DBMeta * const)> helper = 
+        [&helper, e_conn, this](const DBMeta * const parent)
+    {
+        auto destroyer = 
+            [parent, &helper, e_conn, this](const DBMeta *const child)
+        {
+            Delta::singleSave(e_conn, child, parent);
+            helper(child);
+        };
+        parent->applyToChildren(destroyer);
+    };
+
+    Delta::singleSave(e_conn, meta, parent_meta);
+    helper(meta);
+    
+    return true;
 }
 
 // TODO: Remove asserts.
@@ -330,12 +346,27 @@ bool CreateDelta::apply(Connect *e_conn)
 
 bool CreateDelta::destroyRecord(Connect *e_conn)
 {
-    return false;
+    static std::function<void(const DBMeta * const)> helper = 
+        [&helper, e_conn, this](const DBMeta * const parent)
+    {
+        auto destroyer = 
+            [parent, &helper, e_conn, this](const DBMeta *const child)
+        {
+            Delta::singleDestroy(e_conn, child, parent);
+            helper(child);
+        };
+        parent->applyToChildren(destroyer);
+    };
+
+    Delta::singleDestroy(e_conn, meta, parent_meta);
+    helper(meta);
+    
+    return true;
 }
 
 bool ReplaceDelta::save(Connect *e_conn)
 {
-    return false;
+    return Delta::singleSave(e_conn, meta, parent_meta);
 }
 
 bool ReplaceDelta::apply(Connect *e_conn)
@@ -374,12 +405,12 @@ bool ReplaceDelta::apply(Connect *e_conn)
 
 bool ReplaceDelta::destroyRecord(Connect *e_conn)
 {
-    return false;
+    return Delta::singleDestroy(e_conn, meta, parent_meta);
 }
 
 bool DeleteDelta::save(Connect *e_conn)
 {
-    return false;
+    return Delta::singleSave(e_conn, meta, parent_meta);
 }
 
 bool DeleteDelta::apply(Connect *e_conn)
@@ -420,7 +451,7 @@ bool DeleteDelta::apply(Connect *e_conn)
 
 bool DeleteDelta::destroyRecord(Connect *e_conn)
 {
-    return false;
+    return Delta::singleDestroy(e_conn, meta, parent_meta);
 }
 
 RewriteOutput::~RewriteOutput()
