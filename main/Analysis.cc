@@ -274,11 +274,68 @@ bool CreateDelta::save(Connect *e_conn)
     return true;
 }
 
+// FIXME: TESTME.
+// FIXME: Use this model for CreateDelta::apply as well.
 bool CreateDelta::saveNewChildrenRecords(Connect *e_conn)
 {
-    // FIXME: This should use the recursive application in
-    // DeleteDelta::apply
-    return false;
+    std::function<void(Connect *, const DBMeta * const,
+                       const DBMeta * const,
+                       const AbstractMetaKey * const,
+                       const unsigned int * const)> helper = 
+        [&helper] (Connect *e_conn, const DBMeta * const object,
+                   const DBMeta * const parent,
+                   const AbstractMetaKey * const k,
+                   const unsigned int * const ptr_parent_id)
+    {
+        const std::string table_name = "newChildren";
+
+        // Ensure the table exists.
+        const std::string create_table_query = 
+            " CREATE TABLE IF NOT EXISTS pdb." + table_name +
+            "   (serial_object VARBINARY(200) NOT NULL,"
+            "    serial_key VARBINARY(200) NOT NULL,"
+            "    parent_id BIGINT NOT NULL,"
+            "    id SERIAL PRIMARY KEY)"
+            " ENGINE=InnoDB;";
+        assert(e_conn->execute(create_table_query));
+
+        const std::string child_serial = object->serialize(*parent);
+        std::string key_serial;
+        if (NULL == k) {
+            AbstractMetaKey *ak = parent->getKey(object);
+            assert(ak);
+            key_serial = ak->getSerial();
+        } else {
+            key_serial = k->getSerial();
+        }
+
+        unsigned long parent_id = parent->getDatabaseID();
+        if (ptr_parent_id) {
+            parent_id = *ptr_parent_id;
+        } else {
+            parent_id = parent->getDatabaseID();
+        }
+        // Database generates a unique ID.
+        const std::string query =
+            " INSERT INTO pdb." + table_name +
+            "   (serial_object, serial_key, parent_id) VALUES ("
+            " '" + escapeString(e_conn, child_serial) + "',"
+            " '" + escapeString(e_conn, key_serial) + "',"
+            " "  + std::to_string(parent_id) + ";";
+        assert(e_conn->execute(query));
+        const unsigned int object_id = e_conn->last_insert_id();
+
+        std::function<void(const DBMeta * const)> recur =
+            [&e_conn, &object, object_id, &helper]
+                (const DBMeta * const child)
+            {
+                helper(e_conn, child, object, NULL, &object_id);
+            };
+        object->applyToChildren(recur);
+    };
+
+    helper(e_conn, meta, parent_meta, key, NULL);
+    return true;
 }
 
 // TODO: Remove asserts.
@@ -368,12 +425,50 @@ bool CreateDelta::destroyRecord(Connect *e_conn)
     return true;
 }
 
+// FIXME: TESTME.
 bool CreateDelta::destroyNewChildrenRecords(Connect *e_conn)
 {
-    // FIXME: This should use the recursive application in
-    // CreateDelta::apply
-    // > Create orphan tables.
-    return false;
+    std::function<void(Connect *, const DBMeta * const,
+                       const DBMeta * const,
+                       const AbstractMetaKey * const)> helper = 
+        [&helper] (Connect *e_conn, const DBMeta * const object,
+                   const DBMeta * const parent,
+                   const AbstractMetaKey * const k)
+    {
+        const std::string table_name = "newChildren";
+
+        // FIXME: Duplicated in saveNewChildrenRecords
+        const std::string child_serial = object->serialize(*parent);
+        std::string key_serial;
+        if (NULL == k) {
+            AbstractMetaKey *ak = parent->getKey(object);
+            assert(ak);
+            key_serial = ak->getSerial();
+        } else {
+            key_serial = k->getSerial();
+        }
+
+        // This algorithm can break because object + key is not
+        // guarenteed to be unqiue.
+        const std::string query =
+            " DELETE pdb." + table_name +
+            "  WHERE pdb." + table_name + ".serial_object"
+            "      = '"    + escapeString(e_conn, child_serial) + "' "
+            "    AND pdb." + table_name + ".serial_key"
+            "      = '"    + escapeString(e_conn, key_serial) + "';";
+        assert(e_conn->execute(query));
+
+        std::function<void(const DBMeta * const)> recur =
+            [&e_conn, &object, &helper]
+                (const DBMeta * const child)
+            {
+                helper(e_conn, child, object, NULL);
+            };
+        object->applyToChildren(recur);
+    };
+
+    helper(e_conn, meta, parent_meta, key);
+    return true;
 }
 
 bool ReplaceDelta::save(Connect *e_conn)
