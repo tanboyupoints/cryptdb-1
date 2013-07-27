@@ -288,10 +288,12 @@ public:
     virtual bool apply(Connect *e_conn) = 0;
     virtual bool destroyRecord(Connect *e_conn) = 0;
 
-    static bool singleSave(Connect *e_conn, const DBMeta * const object,
+    static bool singleSave(Connect *e_conn, unsigned long *delta_id,
+                           const DBMeta * const object,
                            const DBMeta * const parent,
                            const AbstractMetaKey * const key=NULL);
     static bool singleDestroy(Connect *e_conn,
+                              unsigned long *destroyed_id,
                               const DBMeta * const object,
                               const DBMeta * const parent,
                               const AbstractMetaKey * const key=NULL);
@@ -325,8 +327,9 @@ public:
     bool destroyRecord(Connect *e_conn);
 
 private:
-    bool saveNewChildrenRecords(Connect *e_conn);
-    bool destroyNewChildrenRecords(Connect *e_conn);
+    bool saveNewChildrenRecords(Connect *e_conn, unsigned long delta_id);
+    bool destroyNewChildrenRecords(Connect *e_conn,
+                                   unsigned long delta_id);
 };
 
 class ReplaceDelta : public Delta {
