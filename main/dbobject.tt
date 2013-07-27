@@ -102,8 +102,6 @@ template <typename ChildType, typename KeyType>
 std::vector<DBMeta *>
 MappedDBMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
 {
-    DBWriter dbw = DBWriter::factory<ChildType>(this);
-
     // Perhaps it's conceptually cleaner to have this lambda return
     // pairs of keys and children and then add the children from local
     // scope.
@@ -122,7 +120,7 @@ MappedDBMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
             return new_old_meta;
         };
 
-    return DBMeta::doFetchChildren(e_conn, dbw, deserialize);
+    return DBMeta::doFetchChildren(e_conn, deserialize);
 }
 
 template <typename ChildType, typename KeyType>

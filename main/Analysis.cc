@@ -285,13 +285,12 @@ bool Delta::singleDestroy(Connect *e_conn, unsigned long *destroyed_id,
     return e_conn->execute(delete_query);
 }
 
-bool CreateDelta::save(Connect *e_conn)
+bool CreateDelta::save(Connect *e_conn, unsigned long *delta_id)
 {
     // Must provide the key because we have not yet associated the child
     // with the parent.
-    unsigned long delta_id;
-    assert(Delta::singleSave(e_conn, &delta_id, meta, parent_meta, key));
-    assert(saveNewChildrenRecords(e_conn, delta_id));
+    assert(Delta::singleSave(e_conn, delta_id, meta, parent_meta, key));
+    assert(saveNewChildrenRecords(e_conn, *delta_id));
     
     return true;
 }
@@ -376,10 +375,9 @@ bool CreateDelta::apply(Connect *e_conn)
                    const AbstractMetaKey * const k,
                    const unsigned int * const ptr_parent_id)
     {
-        DBWriter dbw(object, parent);
-        
+        const std::string table_name = "MetaObject";
         // Ensure the tables exist.
-        assert(create_tables(e_conn, dbw));
+        assert(create_tables(e_conn));
         
         const std::string child_serial = object->serialize(*parent);
         assert(0 == object->getDatabaseID());
@@ -390,23 +388,6 @@ bool CreateDelta::apply(Connect *e_conn)
             parent_id = parent->getDatabaseID();
         }
 
-        // ------------------------
-        //    Build the queries.
-        // ------------------------
-
-        // On CREATE, the database generates a unique ID for us.
-        const std::string esc_child_serial =
-            escapeString(e_conn, child_serial);
-        const unsigned int esc_child_serial_len = esc_child_serial.size();
-        const std::string query =
-            " INSERT INTO pdb." + dbw.table_name() + 
-            "    (serial_object, serial_object_len) VALUES (" 
-            " '" + esc_child_serial + "', "
-            " "  + std::to_string(esc_child_serial_len) + "); ";
-
-        assert(e_conn->execute(query));
-
-        const unsigned int object_id = e_conn->last_insert_id();
         std::string serial_key;
         if (NULL == k) {
             AbstractMetaKey *ck = parent->getKey(object);
@@ -415,18 +396,26 @@ bool CreateDelta::apply(Connect *e_conn)
         } else {
             serial_key = k->getSerial();
         }
-        const std::string esc_serial_key = escapeString(e_conn, serial_key);
-        const unsigned int esc_serial_key_len = 
-            esc_serial_key.size();
-        const std::string join_query =
-            " INSERT INTO pdb." + dbw.join_table_name() +
-            "  (object_id, parent_id, serial_key, serial_key_len) VALUES ("
-            " "  + std::to_string(object_id) + ", " 
-            " "  + std::to_string(parent_id) + ", "
-            " '" + esc_serial_key + "', " +
-            " "  + std::to_string(esc_serial_key_len) + ");";
+        const std::string esc_serial_key =
+            escapeString(e_conn, serial_key);
 
-        assert(e_conn->execute(join_query));
+        // ------------------------
+        //    Build the queries.
+        // ------------------------
+
+        // On CREATE, the database generates a unique ID for us.
+        const std::string esc_child_serial =
+            escapeString(e_conn, child_serial);
+        
+        const std::string query =
+            " INSERT INTO pdb." + table_name + 
+            "    (serial_object, serial_key, parent_id) VALUES (" 
+            " '" + esc_child_serial + "',"
+            " '" + esc_serial_key + "',"
+            " " + std::to_string(parent_id) + ");";
+        assert(e_conn->execute(query));
+
+        const unsigned int object_id = e_conn->last_insert_id();
 
         std::function<void(const DBMeta * const)> localCreateHandler =
             [&e_conn, &object, object_id, &helper]
@@ -517,42 +506,30 @@ bool CreateDelta::destroyNewChildrenRecords(Connect *e_conn,
 }
 */
 
-bool ReplaceDelta::save(Connect *e_conn)
+bool ReplaceDelta::save(Connect *e_conn, unsigned long *delta_id)
 {
-    unsigned long delta_id;
-    return Delta::singleSave(e_conn, &delta_id, meta, parent_meta);
+    return Delta::singleSave(e_conn, delta_id, meta, parent_meta);
 }
 
 bool ReplaceDelta::apply(Connect *e_conn)
 {
-    DBWriter dbw(meta, parent_meta);
+    const std::string table_name = "MetaObject";
 
-    const std::string child_serial = meta->serialize(*parent_meta);
     const unsigned int child_id = meta->getDatabaseID();
-    const unsigned int parent_id = parent_meta->getDatabaseID();
     
+    const std::string child_serial = meta->serialize(*parent_meta);
     const std::string esc_child_serial =
         escapeString(e_conn, child_serial);
-    const unsigned int esc_child_serial_len = esc_child_serial.size();
-    const std::string query = 
-        " UPDATE pdb." + dbw.table_name() +
-        "    SET serial_object='" + esc_child_serial + "', "
-        "        serial_object_len=" + std::to_string(esc_child_serial_len) +
-        "  WHERE id=" + std::to_string(child_id) + ";";
-
-    assert(e_conn->execute(query));
-
     const std::string serial_key = key->getSerial();
     const std::string esc_serial_key = escapeString(e_conn, serial_key);
-    const unsigned int esc_serial_key_len = esc_serial_key.size();
-    const std::string join_query =
-        " UPDATE pdb." + dbw.join_table_name() +
-        "    SET serial_key='" + esc_serial_key + "', "
-        "        serial_key_len=" + std::to_string(esc_serial_key_len) +
-        "  WHERE object_id=" + std::to_string(child_id) +
-        "    AND parent_id=" + std::to_string(parent_id) + "; ";
-    
-    assert(e_conn->execute(join_query)); 
+
+    const std::string query = 
+        " UPDATE pdb." + table_name +
+        "    SET serial_object = '" + esc_child_serial + "', "
+        "        serial_key = '" + esc_serial_key + "'"
+        "  WHERE id = " + std::to_string(child_id) + ";";
+
+    assert(e_conn->execute(query));
 
     return true;
 }
@@ -563,10 +540,9 @@ bool ReplaceDelta::destroyRecord(Connect *e_conn)
     return Delta::singleDestroy(e_conn, &delta_id, meta, parent_meta);
 }
 
-bool DeleteDelta::save(Connect *e_conn)
+bool DeleteDelta::save(Connect *e_conn, unsigned long *delta_id)
 {
-    unsigned long delta_id;
-    return Delta::singleSave(e_conn, &delta_id, meta, parent_meta);
+    return Delta::singleSave(e_conn, delta_id, meta, parent_meta);
 }
 
 bool DeleteDelta::apply(Connect *e_conn)
@@ -576,20 +552,16 @@ bool DeleteDelta::apply(Connect *e_conn)
         [&helper](Connect *e_conn, const DBMeta * const object,
                   const DBMeta * const parent)
     {
-        DBWriter dbw(object, parent);
+        const std::string table_name = "MetaObject";
         const unsigned int object_id = object->getDatabaseID();
         const unsigned int parent_id = parent->getDatabaseID();
 
         const std::string query =
-            " DELETE pdb." + dbw.table_name() + ", "
-            "        pdb." + dbw.join_table_name() +
-            "   FROM pdb." + dbw.table_name() + 
-            " INNER JOIN pdb." + dbw.join_table_name() +
-            "  WHERE pdb." + dbw.table_name() + ".id" +
-            "      = pdb." + dbw.join_table_name() + ".object_id" +
-            "    AND pdb." + dbw.table_name() + ".id" +
+            " DELETE pdb." + table_name + " "
+            "   FROM pdb." + table_name + 
+            "  WHERE pdb." + table_name + ".id" +
             "      = "     + std::to_string(object_id) + 
-            "    AND pdb." + dbw.join_table_name() + ".parent_id" +
+            "    AND pdb." + table_name + ".parent_id" +
             "      = "     + std::to_string(parent_id) + ";";
 
         assert(e_conn->execute(query));
@@ -776,6 +748,8 @@ DeltaOutput::~DeltaOutput()
 static std::list<Delta *>
 fetchDeltas(Connect *e_conn, unsigned long delta_id)
 {
+    return std::list<Delta *>();
+
     const std::string delta_table_name = "Delta";
     const std::string children_table_name = "newChildren";
 
@@ -824,10 +798,12 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
                                     std::function<ResType *()> primary)
 {
     // Store deltas and original query in embedded db.
+    unsigned long delta_id = 0;
     {
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
-            assert(it->save(e_conn));
+            // assert(it->save(e_conn, &delta_id));
+            assert(it);
         }
         if (true == do_original) {
             assert(saveQuery(e_conn, original_query));
@@ -841,13 +817,12 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
     // > Apply deltas and original query.
     // > Remove deltas and original query from embedded db.
     {
-        // Read Deltas from database (make sure algorithm works)
-        // FIXME: Use serial number.
-        auto db_deltas = fetchDeltas(e_conn, 1);
+        // FIXME: Read Deltas from database (make sure algorithm works)
+        fetchDeltas(e_conn, delta_id);
         assert(e_conn->execute("START TRANSACTION;"));
-        for (auto it : db_deltas) {
+        for (auto it : deltas) {
             assert(it->apply(e_conn));
-            assert(it->destroyRecord(e_conn));
+            // assert(it->destroyRecord(e_conn));
         }
         if (true == do_original) {
             assert(e_conn->execute(original_query));

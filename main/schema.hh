@@ -232,5 +232,5 @@ private:
     }
 } SchemaInfo;
 
-bool create_tables(Connect *e_conn, DBWriter dbw);
+bool create_tables(Connect *e_conn);
 

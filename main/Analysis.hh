@@ -285,7 +285,7 @@ public:
     /*
      * This function is responsible for writing our Delta to the database.
      */
-    virtual bool save(Connect *e_conn) = 0;
+    virtual bool save(Connect *e_conn, unsigned long *delta_id) = 0;
 
     /*
      * Take the update action against the database. Contains high level
@@ -328,7 +328,7 @@ public:
                 const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
-    bool save(Connect *e_conn);
+    bool save(Connect *e_conn, unsigned long *delta_id);
     bool apply(Connect *e_conn);
     bool destroyRecord(Connect *e_conn);
 
@@ -345,7 +345,7 @@ public:
                  const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
-    bool save(Connect *e_conn);
+    bool save(Connect *e_conn, unsigned long *delta_id);
     bool apply(Connect *e_conn);
     bool destroyRecord(Connect *e_conn);
 };
@@ -357,7 +357,7 @@ public:
                 const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
-    bool save(Connect *e_conn);
+    bool save(Connect *e_conn, unsigned long *delta_id);
     bool apply(Connect *e_conn);
     bool destroyRecord(Connect *e_conn);
 };

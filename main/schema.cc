@@ -10,29 +10,25 @@
 #include <main/dbobject.hh>
 
 std::vector<DBMeta *>
-DBMeta::doFetchChildren(Connect *e_conn, DBWriter dbw,
+DBMeta::doFetchChildren(Connect *e_conn,
                         std::function<DBMeta *(std::string, std::string,
                                                std::string)>
                             deserialHandler)
 {
+    const std::string table_name = "MetaObject";
     // Ensure the tables exist.
-    assert(create_tables(e_conn, dbw));
+    assert(create_tables(e_conn));
 
     // Now that we know the table exists, SELECT the data we want.
     std::vector<DBMeta *> out_vec;
     DBResult *db_res;
     const std::string parent_id = std::to_string(this->getDatabaseID());
     const std::string serials_query = 
-        " SELECT pdb." + dbw.table_name() + ".serial_object,"
-        "        pdb." + dbw.table_name() + ".serial_object_len,"
-        "        pdb." + dbw.table_name() + ".id,"
-        "        pdb." + dbw.join_table_name() + ".serial_key,"
-        "        pdb." + dbw.join_table_name() + ".serial_key_len"
-        " FROM pdb." + dbw.table_name() + 
-        "   INNER JOIN pdb." + dbw.join_table_name() +
-        "       ON (pdb." + dbw.table_name() + ".id"
-        "       =   pdb." + dbw.join_table_name() + ".object_id)"
-        " WHERE pdb." + dbw.join_table_name() + ".parent_id"
+        " SELECT pdb." + table_name + ".serial_object,"
+        "        pdb." + table_name + ".serial_key,"
+        "        pdb." + table_name + ".id"
+        " FROM pdb." + table_name + 
+        " WHERE pdb." + table_name + ".parent_id"
         "   = " + parent_id + ";";
     assert(e_conn->execute(serials_query, db_res));
     ScopedMySQLRes r(db_res->n);
@@ -41,26 +37,12 @@ DBMeta::doFetchChildren(Connect *e_conn, DBWriter dbw,
         unsigned long *l = mysql_fetch_lengths(r.res());
         assert(l != NULL);
 
-        std::string child_serial(row[0], l[0]);
-        std::string child_serial_length(row[1], l[1]);
-        std::string child_id(row[2], l[2]);
-        std::string child_key(row[3], l[3]);
-        std::string child_key_length(row[4], l[4]);
-
-        if (child_serial.size() >
-            (unsigned int)atoi(child_serial_length.c_str())) {
-            child_serial.erase(atoi(child_serial_length.c_str()),
-                               std::string::npos);
-        }
-
-        if (child_key.size() >
-            (unsigned int)atoi(child_key_length.c_str())) {
-            child_key.erase(atoi(child_key_length.c_str()),
-                            std::string::npos);
-        }
+        const std::string child_serial_object(row[0], l[0]);
+        const std::string child_key(row[1], l[1]);
+        const std::string child_id(row[2], l[2]);
 
         DBMeta *new_old_meta =
-            deserialHandler(child_key, child_serial, child_id);
+            deserialHandler(child_key, child_serial_object, child_id);
         out_vec.push_back(new_old_meta);
     }
 
@@ -125,7 +107,6 @@ std::string OnionMeta::getAnonOnionName() const
 // TODO: TESTME.
 std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
 {
-    DBWriter dbw = DBWriter::factory<EncLayer>(this);
     std::function<DBMeta *(std::string, std::string, std::string)> deserialize =
         [this] (std::string key, std::string serial, std::string id)
             -> DBMeta*
@@ -151,7 +132,7 @@ std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
 
     // FIXME: Add sanity check to make sure that onions match
     // OnionMeta::onion_layout.
-    return DBMeta::doFetchChildren(e_conn, dbw, deserialize);
+    return DBMeta::doFetchChildren(e_conn, deserialize);
 }
 
 void OnionMeta::applyToChildren(std::function<void(const DBMeta * const)> fn) const
@@ -420,34 +401,23 @@ SchemaInfo::getTableNameFromFieldMeta(FieldMeta *fm) const
     throw CryptDBError("Failed to get table name from FieldMeta");
 }
 
-bool create_tables(Connect *e_conn, DBWriter dbw)
+bool create_tables(Connect *e_conn)
 {
+    const std::string table_name =  "MetaObject";
+
     // FIXME: Elsewhere.
     const std::string create_db =
         " CREATE DATABASE IF NOT EXISTS pdb;";
-    
     assert(e_conn->execute(create_db));
 
     const std::string create_query =
-        " CREATE TABLE IF NOT EXISTS pdb." + dbw.table_name() +
-        "   (serial_object VARBINARY(100) NOT NULL,"
-        "    serial_object_len BIGINT NOT NULL,"
-        "    id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-
-    assert(e_conn->execute(create_query));
-
-    // Do the same for the JOIN table.
-    const std::string join_create_query = 
-        " CREATE TABLE IF NOT EXISTS pdb." + dbw.join_table_name() +
-        "   (object_id BIGINT NOT NULL,"
+        " CREATE TABLE IF NOT EXISTS pdb." + table_name +
+        "   (serial_object VARBINARY(200) NOT NULL,"
+        "    serial_key VARBINARY(200) NOT NULL,"
         "    parent_id BIGINT NOT NULL,"
-        "    serial_key VARBINARY(100) NOT NULL,"
-        "    serial_key_len BIGINT NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
-
-    assert(e_conn->execute(join_create_query));
+    assert(e_conn->execute(create_query));
 
     return true;
 }
