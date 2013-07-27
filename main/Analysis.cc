@@ -263,7 +263,9 @@ bool Delta::singleDestroy(Connect *e_conn, const DBMeta * const object,
     return e_conn->execute(query);
 }
 
-// FIXME: Duplicates code with CreateDelta::destroyRecord
+// FIXME: This function could introduce state so that it knows the IDs
+// of the database elements to DELETE when it does destroyRecord. This
+// avoids the unique ID problem in destroyRecord.
 bool CreateDelta::save(Connect *e_conn)
 {
     // Must provide the key because we have not yet associated the child
@@ -426,6 +428,7 @@ bool CreateDelta::destroyRecord(Connect *e_conn)
 }
 
 // FIXME: TESTME.
+// FIXME: Use this model for DeleteDelta::apply as well.
 bool CreateDelta::destroyNewChildrenRecords(Connect *e_conn)
 {
     std::function<void(Connect *, const DBMeta * const,
@@ -448,8 +451,9 @@ bool CreateDelta::destroyNewChildrenRecords(Connect *e_conn)
             key_serial = k->getSerial();
         }
 
-        // This algorithm can break because object + key is not
-        // guarenteed to be unqiue.
+        // This algorithm works because key's are randomly generated.
+        // However, if we lose this psuedo-randomness, this algorithm
+        // will require a new unique key.
         const std::string query =
             " DELETE pdb." + table_name +
             "   FROM pdb." + table_name +
