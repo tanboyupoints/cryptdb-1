@@ -254,11 +254,11 @@ bool Delta::singleDestroy(Connect *e_conn, const DBMeta * const object,
         " DELETE pdb." + table_name +
         "   FROM pdb." + table_name +
         "  WHERE pdb." + table_name + ".serial_object" +
-        "      = '" + serial_object + "' "
+        "      = '" + escapeString(e_conn, serial_object) + "' "
         "    AND pdb." + table_name + ".parent_id" +
         "      = '" + parent_id + "' "
         "    AND pdb." + table_name + ".serial_key" +
-        "      = '" + serial_key + "';";
+        "      = '" + escapeString(e_conn, serial_key) + "';";
 
     return e_conn->execute(query);
 }
@@ -321,7 +321,7 @@ bool CreateDelta::saveNewChildrenRecords(Connect *e_conn)
             "   (serial_object, serial_key, parent_id) VALUES ("
             " '" + escapeString(e_conn, child_serial) + "',"
             " '" + escapeString(e_conn, key_serial) + "',"
-            " "  + std::to_string(parent_id) + ";";
+            " "  + std::to_string(parent_id) + ");";
         assert(e_conn->execute(query));
         const unsigned int object_id = e_conn->last_insert_id();
 
@@ -452,6 +452,7 @@ bool CreateDelta::destroyNewChildrenRecords(Connect *e_conn)
         // guarenteed to be unqiue.
         const std::string query =
             " DELETE pdb." + table_name +
+            "   FROM pdb." + table_name +
             "  WHERE pdb." + table_name + ".serial_object"
             "      = '"    + escapeString(e_conn, child_serial) + "' "
             "    AND pdb." + table_name + ".serial_key"
