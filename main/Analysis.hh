@@ -275,6 +275,12 @@ public:
         throw CryptDBError("implement!");
     }
     */
+    static Delta *deserialize(const std::string &serial_meta,
+                              const std::string &serial_key,
+                              const DBMeta * const parent)
+    {
+        throw CryptDBError("Whatever");
+    }
 
     /*
      * This function is responsible for writing our Delta to the database.

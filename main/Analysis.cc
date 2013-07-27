@@ -772,6 +772,40 @@ ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
 DeltaOutput::~DeltaOutput()
 {;}
 
+// FIXME: Lookup the Delta by it's serial number not it's ID.
+static std::list<Delta *>
+fetchDeltas(Connect *e_conn, unsigned long delta_id)
+{
+    const std::string delta_table_name = "Delta";
+    const std::string children_table_name = "newChildren";
+
+    DBResult *db_res;
+    const std::string query =
+        " SELECT serial_object, parent_id, serial_key"
+        "   FROM pdb." + delta_table_name +
+        "  WHERE id = " + std::to_string(delta_id) + ";";
+    assert(e_conn->execute(query, db_res));
+
+    std::list<Delta *> deltas;
+    ScopedMySQLRes r(db_res->n);
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(r.res()))) {
+        unsigned long *l = mysql_fetch_lengths(r.res());
+        assert(l != NULL);
+
+        const std::string delta_serial_object(row[0], l[0]);
+        const std::string delta_parent_id(row[1], l[1]);
+        const std::string delta_serial_key(row[2], l[2]);
+
+        // FIXME: Use parent_id to get the parent DBMeta and pass to
+        // deserializer.
+        deltas.push_back(Delta::deserialize(delta_serial_object,
+                                            delta_serial_key, NULL));
+    }
+
+    return deltas;
+}
+
 // FIXME: Implement.
 static bool saveQuery(Connect *e_conn, std::string query)
 {
@@ -807,8 +841,11 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
     // > Apply deltas and original query.
     // > Remove deltas and original query from embedded db.
     {
+        // Read Deltas from database (make sure algorithm works)
+        // FIXME: Use serial number.
+        auto db_deltas = fetchDeltas(e_conn, 1);
         assert(e_conn->execute("START TRANSACTION;"));
-        for (auto it : deltas) {
+        for (auto it : db_deltas) {
             assert(it->apply(e_conn));
             assert(it->destroyRecord(e_conn));
         }
