@@ -244,10 +244,6 @@ public:
     virtual bool childExists(KeyType * key) const;
     virtual ChildType *getChild(const KeyType * const key) const;
     AbstractMetaKey *getKey(const DBMeta *const child) const;
-    // Virtual constructor to deserialize from embedded database.
-    template <typename ConcreteMeta>
-        static ConcreteMeta *deserialize(unsigned int id,
-                                         std::string serial);
     virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn);
     void applyToChildren(std::function<void(const DBMeta * const)> fn) const;
 

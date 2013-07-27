@@ -88,16 +88,6 @@ MappedDBMeta<ChildType, KeyType>::getKey(const DBMeta * const child) const
     return NULL;
 }
 
-// Virtual constructor to deserialize from embedded database.
-template <typename ChildType, typename KeyType>
-template <typename ConcreteMeta>
-ConcreteMeta *
-MappedDBMeta<ChildType, KeyType>::deserialize(unsigned int id,
-                                              std::string serial)
-{
-    return new ConcreteMeta(id, serial);
-}
-
 template <typename ChildType, typename KeyType>
 std::vector<DBMeta *>
 MappedDBMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)

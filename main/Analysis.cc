@@ -192,7 +192,13 @@ operator<<(std::ostream &out, const RewritePlan * rp)
     return out;
 }
 
-// FIXME: Implement serial number.
+Delta *Delta::deserialize(const std::string &serial_meta,
+                          const std::string &serial_key,
+                          const DBMeta * const parent)
+{
+    return NULL;
+}
+
 // > key default argument is NULL
 bool Delta::singleSave(Connect *e_conn, unsigned long *delta_id,
                        const DBMeta * const object,
@@ -282,7 +288,9 @@ bool Delta::singleDestroy(Connect *e_conn, unsigned long *destroyed_id,
         "   FROM pdb." + table_name +
         "  WHERE pdb." + table_name + ".id" +
         "      = "     + std::to_string(*destroyed_id) + ";";
-    return e_conn->execute(delete_query);
+    assert(e_conn->execute(delete_query));
+
+    return true;
 }
 
 bool CreateDelta::save(Connect *e_conn, unsigned long *delta_id)
