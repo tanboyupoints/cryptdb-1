@@ -275,9 +275,11 @@ public:
         throw CryptDBError("implement!");
     }
     */
-    static Delta *deserialize(const std::string &serial_meta,
+    static Delta *deserialize(const std::string &tag,
+                              const std::string &serial_meta,
                               const std::string &serial_key,
                               const DBMeta * const parent);
+    virtual std::string tag() const = 0;
 
     /*
      * This function is responsible for writing our Delta to the database.
@@ -325,6 +327,7 @@ public:
                 const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
+    std::string tag() const {return "Create";}
     bool save(Connect *e_conn, unsigned long *delta_id);
     bool apply(Connect *e_conn);
     bool destroyRecord(Connect *e_conn);
@@ -342,6 +345,7 @@ public:
                  const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
+    std::string tag() const {return "Replace";}
     bool save(Connect *e_conn, unsigned long *delta_id);
     bool apply(Connect *e_conn);
     bool destroyRecord(Connect *e_conn);
@@ -354,6 +358,7 @@ public:
                 const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
+    std::string tag() const {return "Delete";}
     bool save(Connect *e_conn, unsigned long *delta_id);
     bool apply(Connect *e_conn);
     bool destroyRecord(Connect *e_conn);

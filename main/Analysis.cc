@@ -192,11 +192,24 @@ operator<<(std::ostream &out, const RewritePlan * rp)
     return out;
 }
 
-Delta *Delta::deserialize(const std::string &serial_meta,
+Delta *Delta::deserialize(const std::string &tag,
+                          const std::string &serial_meta,
                           const std::string &serial_key,
                           const DBMeta * const parent)
 {
-    return NULL;
+    const DBMeta * const meta = parent->deserializeChild(0, serial_meta);
+    const AbstractMetaKey * const key =
+        parent->deserializeKey(serial_key);
+
+    if ("Create" == tag) {
+        return new CreateDelta(meta, parent, key);
+    } else if ("Replace" == tag) {
+        return new ReplaceDelta(meta, parent, key);
+    } else if ("Delete" == tag) {
+        return new DeleteDelta(meta, parent, key);
+    } else {
+        throw CryptDBError("Delta cannot be deserialized!");
+    }
 }
 
 // > key default argument is NULL
@@ -756,15 +769,12 @@ DeltaOutput::~DeltaOutput()
 static std::list<Delta *>
 fetchDeltas(Connect *e_conn, unsigned long delta_id)
 {
-    return std::list<Delta *>();
-
-    const std::string delta_table_name = "Delta";
-    const std::string children_table_name = "newChildren";
+    const std::string table_name = "Delta";
 
     DBResult *db_res;
     const std::string query =
         " SELECT serial_object, parent_id, serial_key"
-        "   FROM pdb." + delta_table_name +
+        "   FROM pdb." + table_name +
         "  WHERE id = " + std::to_string(delta_id) + ";";
     assert(e_conn->execute(query, db_res));
 
@@ -781,7 +791,26 @@ fetchDeltas(Connect *e_conn, unsigned long delta_id)
 
         // FIXME: Use parent_id to get the parent DBMeta and pass to
         // deserializer.
-        deltas.push_back(Delta::deserialize(delta_serial_object,
+        const std::string meta_table_name = "MetaObject";
+
+        DBResult *parent_db_res;
+        const std::string parent_query =
+            " SELECT id, serial_object FROM " + meta_table_name +
+            "  WHERE id = " + delta_parent_id + ";";
+        assert(e_conn->execute(parent_query, parent_db_res));
+
+        ScopedMySQLRes parent_r(parent_db_res->n);
+        MYSQL_ROW parent_row;
+        parent_row = mysql_fetch_row(parent_r.res());
+        unsigned long *parent_l = mysql_fetch_lengths(parent_r.res());
+        assert(parent_l != NULL);
+        assert(NULL == parent_r.res());
+        
+        const std::string parent_id(parent_row[0], parent_l[0]);
+        const std::string serial_object(parent_row[1], parent_l[1]);
+
+        // FIXME: Must build parent here. Need type tags.
+        deltas.push_back(Delta::deserialize("tag", delta_serial_object,
                                             delta_serial_key, NULL));
     }
 
@@ -810,8 +839,7 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
     {
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
-            // assert(it->save(e_conn, &delta_id));
-            assert(it);
+            assert(it->save(e_conn, &delta_id));
         }
         if (true == do_original) {
             assert(saveQuery(e_conn, original_query));
@@ -830,7 +858,7 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
             assert(it->apply(e_conn));
-            // assert(it->destroyRecord(e_conn));
+            assert(it->destroyRecord(e_conn));
         }
         if (true == do_original) {
             assert(e_conn->execute(original_query));

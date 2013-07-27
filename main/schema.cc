@@ -153,6 +153,19 @@ AbstractMetaKey *OnionMeta::getKey(const DBMeta *const child) const
     return NULL;
 }
 
+EncLayer *OnionMeta::deserializeChild(unsigned int id,
+                                      const std::string &serial_child)
+    const
+{
+    return EncLayerFactory::deserializeLayer(id, serial_child);
+}
+
+UIntMetaKey *OnionMeta::deserializeKey(const std::string &serial_key)
+    const
+{
+    return AbstractMetaKey::factory<UIntMetaKey>(serial_key);
+}
+
 void OnionMeta::addLayerBack(EncLayer *layer) {
     layers.push_back(layer);
 }

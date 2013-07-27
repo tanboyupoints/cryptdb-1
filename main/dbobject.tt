@@ -89,6 +89,23 @@ MappedDBMeta<ChildType, KeyType>::getKey(const DBMeta * const child) const
 }
 
 template <typename ChildType, typename KeyType>
+ChildType *
+MappedDBMeta<ChildType, KeyType>::deserializeChild(unsigned int id,
+                                                   const std::string &child_serial) const
+{
+    auto dChild = ChildType::deserialize;
+    return dChild(id, child_serial); 
+}
+
+template <typename ChildType, typename KeyType>
+KeyType *
+MappedDBMeta<ChildType, KeyType>::deserializeKey(const std::string &key_serial)
+    const
+{
+    return AbstractMetaKey::factory<KeyType>(key_serial);
+}
+
+template <typename ChildType, typename KeyType>
 std::vector<DBMeta *>
 MappedDBMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
 {
@@ -100,9 +117,9 @@ MappedDBMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
         [this] (std::string key, std::string serial, std::string id) {
             KeyType *meta_key =
                 AbstractMetaKey::factory<KeyType>(key);
-            auto deserializeChild = ChildType::deserialize;
+            auto dChild = ChildType::deserialize;
             ChildType *new_old_meta =
-                deserializeChild(atoi(id.c_str()), serial);
+                dChild(atoi(id.c_str()), serial);
 
             // Gobble the child.
             this->addChild(meta_key, new_old_meta);

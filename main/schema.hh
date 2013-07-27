@@ -87,6 +87,9 @@ public:
     std::vector<DBMeta *> fetchChildren(Connect *e_conn);
     void applyToChildren(std::function<void(const DBMeta * const)>) const;
     AbstractMetaKey *getKey(const DBMeta *const child) const;
+    EncLayer *deserializeChild(unsigned int id,
+                               const std::string &serial_child) const;
+    UIntMetaKey *deserializeKey(const std::string &serial_key) const;
     unsigned long getUniq() const {return uniq_count;}
 
     // Need access to layers.

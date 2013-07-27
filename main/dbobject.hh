@@ -197,8 +197,14 @@ public:
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;
     virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn) = 0;
-    virtual void applyToChildren(std::function<void(const DBMeta * const)>) const = 0;
+    virtual void applyToChildren(std::function<void(const DBMeta * const)>)
+        const = 0;
     virtual AbstractMetaKey *getKey(const DBMeta *const child) const = 0;
+    virtual DBMeta *deserializeChild(unsigned int id,
+                                     const std::string &serial_child)
+        const = 0;
+    virtual AbstractMetaKey *deserializeKey(const std::string &serial_key)
+        const = 0;
 
 protected:
     std::vector<DBMeta *>
@@ -217,13 +223,26 @@ public:
     {
         return std::vector<DBMeta *>();
     }
+
     void applyToChildren(std::function<void(const DBMeta * const)> func) const
     {
         return;
     }
+
     AbstractMetaKey *getKey(const DBMeta *const child) const
     {
         return NULL;
+    }
+
+    DBMeta *deserializeChild(unsigned int id,
+                             const std::string &serial_child) const
+    {
+        throw CryptDBError("I don't have children!");
+    }
+    
+    AbstractMetaKey *deserializeKey(const std::string &serial_key) const
+    {
+        throw CryptDBError("I don't have keys!");
     }
 };
 
@@ -244,6 +263,9 @@ public:
     virtual bool childExists(KeyType * key) const;
     virtual ChildType *getChild(const KeyType * const key) const;
     AbstractMetaKey *getKey(const DBMeta *const child) const;
+    ChildType *deserializeChild(unsigned int id,
+                                const std::string &serial_child) const;
+    KeyType *deserializeKey(const std::string &serial_key) const;
     virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn);
     void applyToChildren(std::function<void(const DBMeta * const)> fn) const;
 
