@@ -259,6 +259,8 @@ private:
 // For REPLACE and DELETE we are duplicating the MetaKey information.
 class Delta : public DBObject {
 public:
+    enum TableType {REGULAR_TABLE, SHADOW_TABLE};
+
     // New Delta.
     Delta(const DBMeta * const meta,
           const DBMeta * const parent_meta,
@@ -284,29 +286,21 @@ public:
     /*
      * This function is responsible for writing our Delta to the database.
      */
-    virtual bool save(Connect *e_conn, unsigned long *delta_id) = 0;
+    bool save(Connect *e_conn, unsigned long *delta_id);
 
     /*
      * Take the update action against the database. Contains high level
      * serialization semantics.
      */
-    virtual bool apply(Connect *e_conn) = 0;
-    virtual bool destroyRecord(Connect *e_conn) = 0;
-
-    static bool singleSave(Connect *e_conn, unsigned long *delta_id,
-                           const DBMeta * const object,
-                           const DBMeta * const parent,
-                           const AbstractMetaKey * const key=NULL);
-    static bool singleDestroy(Connect *e_conn,
-                              unsigned long *destroyed_id,
-                              const DBMeta * const object,
-                              const DBMeta * const parent,
-                              const AbstractMetaKey * const key=NULL);
+    virtual bool apply(Connect *e_conn, TableType table_type) = 0;
+    bool destroyRecord(Connect *e_conn, unsigned long delta_id);
 
 protected:
     const DBMeta * const meta;
     const DBMeta * const parent_meta;
     const AbstractMetaKey * const key;
+
+    std::string tableNameFromType(TableType table_type) const;
 
 private:
     std::string serialize(const DBObject &parent) const 
@@ -329,13 +323,8 @@ public:
 
     std::string tag() const {return "Create";}
     bool save(Connect *e_conn, unsigned long *delta_id);
-    bool apply(Connect *e_conn);
+    bool apply(Connect *e_conn, TableType table_type);
     bool destroyRecord(Connect *e_conn);
-
-private:
-    bool saveNewChildrenRecords(Connect *e_conn, unsigned long delta_id);
-    bool destroyNewChildrenRecords(Connect *e_conn,
-                                   unsigned long delta_id);
 };
 
 class ReplaceDelta : public Delta {
@@ -347,7 +336,7 @@ public:
 
     std::string tag() const {return "Replace";}
     bool save(Connect *e_conn, unsigned long *delta_id);
-    bool apply(Connect *e_conn);
+    bool apply(Connect *e_conn, TableType table_type);
     bool destroyRecord(Connect *e_conn);
 };
 
@@ -360,7 +349,7 @@ public:
 
     std::string tag() const {return "Delete";}
     bool save(Connect *e_conn, unsigned long *delta_id);
-    bool apply(Connect *e_conn);
+    bool apply(Connect *e_conn, TableType table_type);
     bool destroyRecord(Connect *e_conn);
 };
 
