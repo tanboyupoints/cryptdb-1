@@ -192,26 +192,6 @@ operator<<(std::ostream &out, const RewritePlan * rp)
     return out;
 }
 
-Delta *Delta::deserialize(const std::string &tag,
-                          const std::string &serial_meta,
-                          const std::string &serial_key,
-                          const DBMeta * const parent)
-{
-    const DBMeta * const meta = parent->deserializeChild(0, serial_meta);
-    const AbstractMetaKey * const key =
-        parent->deserializeKey(serial_key);
-
-    if ("Create" == tag) {
-        return new CreateDelta(meta, parent, key);
-    } else if ("Replace" == tag) {
-        return new ReplaceDelta(meta, parent, key);
-    } else if ("Delete" == tag) {
-        return new DeleteDelta(meta, parent, key);
-    } else {
-        throw CryptDBError("Delta cannot be deserialized!");
-    }
-}
-
 bool Delta::save(Connect *e_conn, unsigned long *delta_id)
 {
     const std::string table_name = "Delta";
@@ -307,7 +287,7 @@ bool CreateDelta::apply(Connect *e_conn, TableType table_type)
         // On CREATE, the database generates a unique ID for us.
         const std::string esc_child_serial =
             escapeString(e_conn, child_serial);
-        
+
         const std::string query =
             " INSERT INTO pdb." + table_name + 
             "    (serial_object, serial_key, parent_id) VALUES (" 
@@ -330,54 +310,6 @@ bool CreateDelta::apply(Connect *e_conn, TableType table_type)
     helper(e_conn, meta, parent_meta, key, NULL);
     return true;
 }
-
-/*
-// FIXME: Use this model for DeleteDelta::apply as well.
-    std::function<void(Connect *, const DBMeta * const,
-                       const DBMeta * const,
-                       const AbstractMetaKey * const)> helper = 
-        [&helper] (Connect *e_conn, const DBMeta * const object,
-                   const DBMeta * const parent,
-                   const AbstractMetaKey * const k)
-    {
-        const std::string table_name = "newChildren";
-
-        // FIXME: Duplicated in saveNewChildrenRecords
-        const std::string child_serial = object->serialize(*parent);
-        std::string key_serial;
-        if (NULL == k) {
-            AbstractMetaKey *ak = parent->getKey(object);
-            assert(ak);
-            key_serial = ak->getSerial();
-        } else {
-            key_serial = k->getSerial();
-        }
-
-        // This algorithm works because key's are randomly generated.
-        // However, if we lose this psuedo-randomness, this algorithm
-        // will require a new unique key.
-        const std::string query =
-            " DELETE pdb." + table_name +
-            "   FROM pdb." + table_name +
-            "  WHERE pdb." + table_name + ".serial_object"
-            "      = '"    + escapeString(e_conn, child_serial) + "' "
-            "    AND pdb." + table_name + ".serial_key"
-            "      = '"    + escapeString(e_conn, key_serial) + "';";
-        assert(e_conn->execute(query));
-
-        std::function<void(const DBMeta * const)> recur =
-            [&e_conn, &object, &helper]
-                (const DBMeta * const child)
-            {
-                helper(e_conn, child, object, NULL);
-            };
-        object->applyToChildren(recur);
-    };
-
-    helper(e_conn, meta, parent_meta, key);
-    return true;
-}
-*/
 
 bool ReplaceDelta::apply(Connect *e_conn, TableType table_type)
 {
