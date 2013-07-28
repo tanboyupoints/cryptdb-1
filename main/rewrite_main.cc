@@ -697,7 +697,9 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
             // SpecialUpdate wants the old lex, as it's going to
             // handle it's own rewrite.
             if (true == a.special_update) {
-                return new SpecialUpdate(query, lex, ps);
+                auto crypted_table =
+                    out_lex->select_lex.top_join_list.head()->table_name;
+                return new SpecialUpdate(query, lex, ps, crypted_table);
             } else {
                 return new DMLOutput(query, out_lex);
             }

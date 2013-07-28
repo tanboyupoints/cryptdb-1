@@ -422,8 +422,10 @@ ResType *DMLOutput::doQuery(Connect *conn, Connect *e_conn,
 }
 
 SpecialUpdate::SpecialUpdate(const std::string &original_query,
-                             LEX *lex, const ProxyState &ps)
-    : RewriteOutput(original_query, lex), ps(ps)
+                             LEX *lex, const ProxyState &ps,
+                             std::string crypted_table)
+    : RewriteOutput(original_query, lex), crypted_table(crypted_table),
+      ps(ps)
 {
     this->plain_table =
         lex->select_lex.top_join_list.head()->table_name; 
@@ -441,6 +443,12 @@ ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
                                 Rewriter *rewriter)
 {
     assert(rewriter);
+
+    // Acquire lock.
+    std::ostringstream lock_stream;
+    lock_stream << "LOCK TABLES " << this->crypted_table << " WRITE;";
+    assert(conn->execute(lock_stream.str()));
+
     // Retrieve rows from database.
     std::ostringstream select_stream;
     select_stream << " SELECT * FROM " << this->plain_table
@@ -522,21 +530,55 @@ ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
     std::ostringstream push_results_stream;
     push_results_stream << " INSERT INTO " << this->plain_table
                         << " VALUES " << output_rows << ";";
-    return executeQuery(*rewriter, this->ps, push_results_stream.str());
+    ResType * const ret_value =
+        executeQuery(*rewriter, this->ps, push_results_stream.str());
+    assert(ret_value);
+
+    // Release lock.
+    std::ostringstream unlock_stream;
+    unlock_stream << "UNLOCK TABLES;";
+    assert(conn->execute(unlock_stream.str()));
+
+    return ret_value;
 }
 
 DeltaOutput::~DeltaOutput()
 {;}
 
-// FIXME: Implement.
-static bool saveQuery(Connect *e_conn, std::string query)
+static bool saveQuery(Connect *e_conn, std::string query,
+                      unsigned long delta_id)
 {
+    const std::string table_name = "Query";
+    // Ensure the table exists.
+    const std::string create_query =
+        " CREATE TABLE IF NOT EXISTS pdb." + table_name +
+        "   (query VARCHAR(200) NOT NULL,"
+        "    delta_id BIGINT NOT NULL,"
+        "    id SERIAL PRIMARY KEY)"
+        " ENGINE=InnoDB;";
+    assert(e_conn->execute(create_query));
+
+    const std::string insert_query =
+        " INSERT INTO pdb." + table_name +
+        "   (query, delta_id) VALUES ("
+        " '" + escapeString(e_conn, query) + "', "
+        " "  + std::to_string(delta_id) + ");";
+    assert(e_conn->execute(insert_query));
+
     return true;
 }
 
-// FIXME: Implement.
-static bool destroyQueryRecord(Connect *e_conn, std::string query)
+static bool destroyQueryRecord(Connect *e_conn, unsigned long delta_id)
 {
+    const std::string table_name = "Query";
+    
+    const std::string delete_query =
+        " DELETE pdb." + table_name +
+        "   FROM pdb." + table_name +
+        "  WHERE pdb." + table_name + ".delta_id"
+        "      = "     + std::to_string(delta_id) + ";";
+    assert(e_conn->execute(delete_query));
+
     return true;
 }
 
@@ -556,12 +598,13 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
             new_delta_ids.push_back(temp_delta_id);
         }
         if (true == do_original) {
-            assert(saveQuery(e_conn, original_query));
+            assert(saveQuery(e_conn, original_query,
+                             new_delta_ids.back()));
         }
         assert(e_conn->execute("COMMIT;"));
     }
 
-    // Execute query @ remote.
+    // Execute rewritten query @ remote.
     ResType *result = primary();
 
     // > Write to shadow table and apply original query.
@@ -575,10 +618,11 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
         }
         for (auto it : new_delta_ids) {
             assert(Delta::destroyRecord(e_conn, it));
+            // Only the last ID will actually result in a DELETEion.
+            destroyQueryRecord(e_conn, it);
         }
         if (true == do_original) {
             assert(e_conn->execute(original_query));
-            destroyQueryRecord(e_conn, original_query);
         }
         assert(e_conn->execute("COMMIT;"));
     }
@@ -609,9 +653,11 @@ ResType *AdjustOnionOutput::doQuery(Connect *conn, Connect *e_conn,
     std::function<ResType *()> primary =
         [this, &conn]() -> ResType*
         {
+            assert(conn->execute("START TRANSACTION;"));
             for (auto it : adjust_queries) {
                 assert(conn->execute(it));
             }
+            assert(conn->execute("COMMIT;"));
             return NULL;
         };
     return DeltaOutput::doQueryHelper(conn, e_conn, rewriter, false,

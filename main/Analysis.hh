@@ -395,7 +395,7 @@ class SpecialUpdate : public RewriteOutput {
 public:
     // Requires the original lex.
     SpecialUpdate(const std::string &original_query, LEX *lex,
-                  const ProxyState &ps);
+                  const ProxyState &ps, std::string crypted_table);
     ~SpecialUpdate() {;}
 
     ResType *doQuery(Connect *conn, Connect *e_conn,
@@ -403,6 +403,7 @@ public:
 
 private:
     std::string plain_table;
+    std::string crypted_table;
     std::string where_clause;
     const ProxyState &ps;
 };
