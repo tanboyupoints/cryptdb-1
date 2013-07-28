@@ -267,10 +267,10 @@ std::string Delta::tableNameFromType(TableType table_type) const
 bool CreateDelta::apply(Connect *e_conn, TableType table_type)
 {
     const std::string table_name = tableNameFromType(table_type);
-    static std::function<void(Connect *e_conn, const DBMeta * const,
-                              const DBMeta * const,
-                              const AbstractMetaKey * const,
-                              const unsigned int * const)> helper =
+    std::function<void(Connect *e_conn, const DBMeta * const,
+                       const DBMeta * const,
+                       const AbstractMetaKey * const,
+                       const unsigned int * const)> helper =
         [&helper, table_name] (Connect *e_conn,
                                const DBMeta * const object,
                                const DBMeta * const parent,
@@ -613,13 +613,15 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
                                     Rewriter *rewriter, bool do_original,
                                     std::function<ResType *()> primary)
 {
-    // Store deltas and original query in embedded db.
-    unsigned long delta_id = 0;
+    // Write to the regular table, store delta and store query.
+    std::vector<unsigned long> new_delta_ids;
     {
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
+            unsigned long temp_delta_id;
             assert(it->apply(e_conn, Delta::REGULAR_TABLE));
-            assert(it->save(e_conn, &delta_id));
+            assert(it->save(e_conn, &temp_delta_id));
+            new_delta_ids.push_back(temp_delta_id);
         }
         if (true == do_original) {
             assert(saveQuery(e_conn, original_query));
@@ -630,15 +632,17 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
     // Execute query @ remote.
     ResType *result = primary();
 
-    // > Apply deltas and original query.
-    // > Remove deltas and original query from embedded db.
+    // > Write to shadow table and apply original query.
+    // > Remove delta and original query from embedded db.
     {
         // FIXME: Use table copy.
+        assert(deltas.size() == new_delta_ids.size());
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
             assert(it->apply(e_conn, Delta::SHADOW_TABLE));
-            // FIXME: Passing delta_id does not have the correct effect.
-            assert(it->destroyRecord(e_conn, delta_id));
+        }
+        for (auto it : new_delta_ids) {
+            assert(Delta::destroyRecord(e_conn, it));
         }
         if (true == do_original) {
             assert(e_conn->execute(original_query));

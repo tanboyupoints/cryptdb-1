@@ -145,7 +145,7 @@ class DropHandler : public DDLHandler {
             TableMeta *tm = a.getTableMeta(table);
             // FIXME: Key only necessary for CREATE.
             a.deltas.push_back(new DeleteDelta(tm, a.getSchema(),
-                                               new IdentityMetaKey(table)));
+                                               a.getSchema()->getKey(tm)));
         }
     }
 };

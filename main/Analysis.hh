@@ -293,7 +293,7 @@ public:
      * serialization semantics.
      */
     virtual bool apply(Connect *e_conn, TableType table_type) = 0;
-    bool destroyRecord(Connect *e_conn, unsigned long delta_id);
+    static bool destroyRecord(Connect *e_conn, unsigned long delta_id);
 
 protected:
     const DBMeta * const meta;
@@ -410,7 +410,7 @@ private:
 class DeltaOutput : public RewriteOutput {
 public:
     DeltaOutput(const std::string &original_query, LEX *lex,
-                std::list<Delta *> deltas)
+                std::vector<Delta *> deltas)
         : RewriteOutput(original_query, lex), deltas(deltas) {}
     virtual ~DeltaOutput() = 0;
     virtual ResType *doQuery(Connect *conn, Connect *e_conn,
@@ -423,13 +423,13 @@ public:
                            std::function<ResType *()> primary);
 
 private:
-    const std::list<Delta *> deltas;
+    const std::vector<Delta *> deltas;
 };
 
 class DDLOutput : public DeltaOutput {
 public:
     DDLOutput(const std::string &original_query, LEX *lex,
-              std::list<Delta *> deltas)
+              std::vector<Delta *> deltas)
         : DeltaOutput(original_query, lex, deltas) {}
     ~DDLOutput() {;}
 
@@ -440,7 +440,7 @@ public:
 class AdjustOnionOutput : public DeltaOutput {
 public:
     AdjustOnionOutput(const std::string &original_query,
-                      std::list<Delta *> deltas,
+                      std::vector<Delta *> deltas,
                       std::list<std::string> adjust_queries)
         : DeltaOutput(original_query, NULL, deltas),
           adjust_queries(adjust_queries) {}
@@ -492,7 +492,7 @@ public:
     // TODO: Make private.
     std::map<OnionMeta *, std::vector<EncLayer *>> to_adjust_enc_layers;
     
-    std::list<Delta *> deltas;
+    std::vector<Delta *> deltas;
 
 private:
     const SchemaInfo * const schema;

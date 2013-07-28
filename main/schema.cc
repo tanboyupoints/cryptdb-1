@@ -417,6 +417,7 @@ SchemaInfo::getTableNameFromFieldMeta(FieldMeta *fm) const
 bool create_tables(Connect *e_conn)
 {
     const std::string table_name =  "MetaObject";
+    const std::string shadow_table_name = "ShadowMetaObject";
 
     // FIXME: Elsewhere.
     const std::string create_db =
@@ -431,6 +432,15 @@ bool create_tables(Connect *e_conn)
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
     assert(e_conn->execute(create_query));
+
+    const std::string shadow_create_query =
+        " CREATE TABLE IF NOT EXISTS pdb." + shadow_table_name +
+        "   (serial_object VARBINARY(200) NOT NULL,"
+        "    serial_key VARBINARY(200) NOT NULL,"
+        "    parent_id BIGINT NOT NULL,"
+        "    id SERIAL PRIMARY KEY)"
+        " ENGINE=InnoDB;";
+    assert(e_conn->execute(shadow_create_query));
 
     return true;
 }
