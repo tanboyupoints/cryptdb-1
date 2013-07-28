@@ -470,7 +470,11 @@ class DET_int : public EncLayer {
 public:
     DET_int(Create_field *,  const std::string & seed_key);
     
-    std::string doSerialize() const {return key; }
+    std::string doSerialize() const {
+        std::stringstream layerinfo;
+        layerinfo << shift << " " << key;
+        return layerinfo.str();
+    }
     // create object from serialized contents
     DET_int(unsigned int id, const std::string & serial);
 
@@ -487,6 +491,7 @@ public:
 protected:
     std::string key;
     blowfish bf;
+    int64_t shift;
     static const int bf_key_size = 16;
     static const int ciph_size = 8;
 
@@ -668,17 +673,24 @@ DETFactory::deserialize(unsigned int id, const SerialLayer & sl)
 }
 
 
-
-
 DET_int::DET_int(Create_field * f, const std::string & seed_key)
     : key(prng_expand(seed_key, bf_key_size)),
       bf(key)
 {
+    if(f->flags & UNSIGNED_FLAG)
+        shift = 0;
+    else
+        shift = INT_MAX;
 }
 
 DET_int::DET_int(unsigned int id, const std::string & serial)
     : EncLayer(id), key(serial), bf(key)
 {
+    shift = atol(serial.substr(0, serial.find(' ')).c_str());
+    std::stringstream layerinfo(serial);
+    layerinfo >> shift;
+    uint pos = layerinfo.tellg();
+    serial.substr(pos+1, serial.length()-pos);
 }
 
 Create_field *
@@ -690,56 +702,43 @@ DET_int::newCreateField(Create_field * cf, std::string anonname) {
 Item *
 DET_int::encrypt(Item * ptext, uint64_t IV) {
 
-    longlong ival = static_cast<Item_int *>(ptext)->val_int();
+    ulonglong value = static_cast<Item_int*>(ptext)->value;
 
-    if(ival < 0 && (ival >= INT_MIN && ival < INT_MAX)) {
-        // sum type size
-        ulonglong uval = round_val<ulonglong, int64_t, int64_t>(ival, INT_MAX, true); 
-    
-        // encrypt
-        ulonglong res = bf.encrypt(uval);
-
-        LOG(encl) << __FUNCTION__ << ":" << "val_int:" << ival << ", new_val:" << uval << ", result:" << res;
+    longlong ival = static_cast<Item_int*>(ptext)->val_int();
+    if(shift && ival < 0)
+    {
+        longlong tmp = ival+shift;
+        //std::cout << "ival: " << ival << " tmp: " << tmp << " shift: " << shift << "\n";
+        ulonglong res = (ulonglong) bf.encrypt(tmp);
+        LOG(encl) << "DET_int enc " << value << "--->" << res;
         return new Item_int(res);
     }
 
-    ulonglong value = static_cast<Item_int *>(ptext)->value;
-        
-    // sum type size
-    ulonglong uvalue = round_val<ulonglong, uint64_t, int64_t>(value, INT_MAX, false); 
-
-    //encrypt
-    ulonglong res = (ulonglong) bf.encrypt(uvalue);
-        
-    LOG(encl) << __FUNCTION__ << ":" << "value:" << uvalue << ", new_val:" << uvalue << ", result:" << res;
+    ulonglong res = (ulonglong) bf.encrypt(value+shift);
+    LOG(encl) << "DET_int enc " << value << "--->" << res;
     return new Item_int(res);
-
 }
 
 Item *
 DET_int::decrypt(Item * ctext, uint64_t IV) {
 
-    Item *ni;
-    bool signed_flag = !static_cast<Item_int *>(ctext)->unsigned_flag;
     ulonglong value = static_cast<Item_int*>(ctext)->value;
 
-    //TODO/FIXME: signed_flag is always false, try to use Create_field 
-    //to get the real signdness value.
-    if(signed_flag) {
-        ulonglong retdec = bf.decrypt(value);
-        longlong res = round_val<longlong, ulonglong, int64_t>(value, INT_MAX, true); 
-        ni = new Item_int(res);
-        LOG(encl) << "iDET_int decrypt " << retdec << "--->" << value << "--->" << res;
-    } else {
-        ulonglong res = round_val<ulonglong, ulonglong, int64_t>(value, INT_MAX, false); 
-        ulonglong retdec = bf.decrypt(res);
-        ni = new Item_int(retdec);
-        LOG(encl) << "uDET_int decrypt " << retdec << "--->" << value << "--->" << res;
+    if(shift)
+    {
+        //std::cout << "value: " << value <<  " shift: " << shift << "\n";
+
+        longlong retdec = (longlong)bf.decrypt(value);
+        retdec -= shift;
+        LOG(encl) << "DET_int dec " << value << "--->" << retdec;
+        return new Item_int(retdec);
     }
 
-    return ni;
+    ulonglong retdec = bf.decrypt(value);
+    retdec -= shift;
+    LOG(encl) << "DET_int dec " << value << "--->" << retdec;
+    return new Item_int(retdec);
 }
-
 
 
 Item *
@@ -1076,6 +1075,44 @@ OPE_tinyint::decrypt(Item * ctext, uint64_t IV) {
     return OPE_int::decrypt(ctext, IV);
 }
 
+class OPE_mediumint : public OPE_int {
+public:
+    OPE_mediumint(Create_field *, std::string seed_key);
+
+    // create object from serialized contents
+    OPE_mediumint(unsigned int id, const std::string & serial);
+
+    std::string name() const {return "OPE_mediumint";}
+
+    Item * encrypt(Item * p, uint64_t IV);
+    Item * decrypt(Item * c, uint64_t IV);
+};
+
+OPE_mediumint::OPE_mediumint(Create_field * cf, std::string seed_key)
+    : OPE_int(cf, seed_key)
+{}
+
+    OPE_mediumint::OPE_mediumint(unsigned int id, const std::string & serial)
+    : OPE_int(id, serial)
+{}
+
+Item *
+OPE_mediumint::encrypt(Item * ptext, uint64_t IV) {
+    ulonglong val = static_cast<Item_int *>(ptext)->value;
+    
+    static longlong medium_max = 0xffffff;
+    if(medium_max < static_cast<Item_int *>(ptext)->val_int())
+        throw CryptDBError("Backend storage unit it not MEDIUMINT, won't floor. ");
+    
+    LOG(encl) << "OPE_mediumint encrypt " << val << " IV " << IV << "--->";
+    return OPE_int::encrypt(ptext, (ulong)val);
+}
+
+Item *
+OPE_mediumint::decrypt(Item * ctext, uint64_t IV) {
+    return OPE_int::decrypt(ctext, IV);
+}
+
 class OPE_str : public EncLayer {
 public:
     OPE_str(Create_field *, std::string seed_key);
@@ -1128,8 +1165,9 @@ OPEFactory::create(Create_field * cf, std::string key) {
             return new OPE_dec(cf, key);
         } else if( cf->sql_type == MYSQL_TYPE_TINY) { 
             return new OPE_tinyint(cf, key);
+        } else if( cf->sql_type == MYSQL_TYPE_INT24) { 
+            return new OPE_mediumint(cf, key);
         }
-
         return new OPE_int(cf, key);
     }
     return new OPE_str(cf, key);
@@ -1142,6 +1180,8 @@ OPEFactory::deserialize(unsigned int id, const SerialLayer & sl)
         return new OPE_int(id, sl.layer_info);
     } else if (sl.name == "OPE_tinyint") {
         return new OPE_tinyint(id, sl.layer_info);
+    } else if (sl.name == "OPE_mediumint") {
+        return new OPE_mediumint(id, sl.layer_info);
     } else if (sl.name == "OPE_str") {
         return new OPE_str(id, sl.layer_info);
     } else  {
