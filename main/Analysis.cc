@@ -233,8 +233,8 @@ std::string Delta::tableNameFromType(TableType table_type) const
         case REGULAR_TABLE: {
             return "MetaObject";
         }
-        case SHADOW_TABLE: {
-            return "ShadowMetaObject";
+        case BLEEDING_TABLE: {
+            return "BleedingMetaObject";
         }
         default: {
             throw CryptDBError("Unrecognized table type!");
@@ -583,17 +583,18 @@ static bool destroyQueryRecord(Connect *e_conn, unsigned long delta_id)
 }
 
 // FIXME: Test DB by reading out of it for later ops.
+// FIXME: Needs lock?
 ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
                                     Rewriter *rewriter, bool do_original,
                                     std::function<ResType *()> primary)
 {
-    // Write to the regular table, store delta and store query.
+    // Write to the bleeding table, store delta and store query.
     std::vector<unsigned long> new_delta_ids;
     {
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
             unsigned long temp_delta_id;
-            assert(it->apply(e_conn, Delta::REGULAR_TABLE));
+            assert(it->apply(e_conn, Delta::BLEEDING_TABLE));
             assert(it->save(e_conn, &temp_delta_id));
             new_delta_ids.push_back(temp_delta_id);
         }
@@ -607,14 +608,14 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
     // Execute rewritten query @ remote.
     ResType *result = primary();
 
-    // > Write to shadow table and apply original query.
+    // > Write to regular table and apply original query.
     // > Remove delta and original query from embedded db.
     {
         // FIXME: Use table copy.
         assert(deltas.size() == new_delta_ids.size());
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
-            assert(it->apply(e_conn, Delta::SHADOW_TABLE));
+            assert(it->apply(e_conn, Delta::REGULAR_TABLE));
         }
         for (auto it : new_delta_ids) {
             assert(Delta::destroyRecord(e_conn, it));

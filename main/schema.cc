@@ -417,7 +417,7 @@ SchemaInfo::getTableNameFromFieldMeta(FieldMeta *fm) const
 bool create_tables(Connect *e_conn)
 {
     const std::string table_name =  "MetaObject";
-    const std::string shadow_table_name = "ShadowMetaObject";
+    const std::string bleeding_table_name = "BleedingMetaObject";
 
     // FIXME: Elsewhere.
     const std::string create_db =
@@ -433,14 +433,14 @@ bool create_tables(Connect *e_conn)
         " ENGINE=InnoDB;";
     assert(e_conn->execute(create_query));
 
-    const std::string shadow_create_query =
-        " CREATE TABLE IF NOT EXISTS pdb." + shadow_table_name +
+    const std::string bleeding_create_query =
+        " CREATE TABLE IF NOT EXISTS pdb." + bleeding_table_name +
         "   (serial_object VARBINARY(200) NOT NULL,"
         "    serial_key VARBINARY(200) NOT NULL,"
         "    parent_id BIGINT NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
-    assert(e_conn->execute(shadow_create_query));
+    assert(e_conn->execute(bleeding_create_query));
 
     return true;
 }

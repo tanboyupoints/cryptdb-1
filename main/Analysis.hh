@@ -259,7 +259,7 @@ private:
 // For REPLACE and DELETE we are duplicating the MetaKey information.
 class Delta : public DBObject {
 public:
-    enum TableType {REGULAR_TABLE, SHADOW_TABLE};
+    enum TableType {REGULAR_TABLE, BLEEDING_TABLE};
 
     // New Delta.
     Delta(const DBMeta * const meta,
