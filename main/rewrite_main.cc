@@ -116,6 +116,47 @@ sanityCheck(SchemaInfo *schema)
     return true;
 }
 
+static bool
+deltaSanityCheck(Connect *e_conn)
+{
+    const std::string table_name = "Delta";
+
+    // Make sure the table exists.
+    const std::string create_table_query =
+        " CREATE TABLE IF NOT EXISTS pdb." + table_name +
+        "    (remote_complete BOOLEAN NOT NULL,"
+        "     id SERIAL PRIMARY KEY)"
+        " ENGINE=InnoDB;";
+    assert(e_conn->execute(create_table_query));
+
+    DBResult *dbres;
+    const std::string get_bleeding_deltas =
+        " SELECT * FROM pdb." + table_name + 
+        "  WHERE remote_complete = FALSE;";
+    assert(e_conn->execute(get_bleeding_deltas, dbres));
+
+    ScopedMySQLRes r(dbres->n);
+    const unsigned long long bleeding_row_count =
+        mysql_num_rows(r.res());
+
+    const std::string get_remoted_deltas =
+        " SELECT * FROM pdb." + table_name +
+        "  WHERE remote_complete = TRUE;";
+    assert(e_conn->execute(get_remoted_deltas, dbres));
+
+    ScopedMySQLRes r2(dbres->n);
+    const unsigned long long remoted_row_count =
+        mysql_num_rows(r2.res());
+
+    std::cerr << "There are " << bleeding_row_count
+              << " bleeding deltas!" << std::endl;
+    std::cerr << "There are " << remoted_row_count
+              << " remotely actioned deltas that are missing local"
+              << " completion!" << std::endl;
+
+    return 0 == bleeding_row_count || 0 == remoted_row_count;
+}
+
 // This function will not build all of our tables when it is run
 // on an empty database.  If you don't have a parent, your table won't be
 // built.  We probably want to seperate our database logic into 3 parts.
@@ -137,9 +178,13 @@ loadSchemaInfo(Connect *e_conn)
             return parent;  /* lambda */
         };
 
-     loadChildren(schema);
-     assert(sanityCheck(schema));
-     return schema;
+    loadChildren(schema);
+    // FIXME: Ideally we would do this before loading the schema.
+    // But first we must decide on a place to create the database from.
+    assert(deltaSanityCheck(e_conn));
+    assert(sanityCheck(schema));
+    
+    return schema;
 }
 
 /*
