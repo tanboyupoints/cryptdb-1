@@ -254,46 +254,25 @@ private:
 } ProxyState;
 
 
-// FIXME: Use RTTI as we are going to need a way to determine what the
-// parent is.
 // For REPLACE and DELETE we are duplicating the MetaKey information.
-class Delta : public DBObject {
+class Delta {
 public:
     enum TableType {REGULAR_TABLE, BLEEDING_TABLE};
 
-    // New Delta.
     Delta(const DBMeta * const meta,
           const DBMeta * const parent_meta,
           const AbstractMetaKey * const key)
         : meta(meta), parent_meta(parent_meta), key(key) {}
-    // FIXME: Unserialize old Delta.
-    /*
-    Delta(unsigned int id, std::string serial)
-        : DBObject(id)
-    {
-        // FIXME: Determine key.
-        // return Delta(CREATE, NULL, NULL);
-        std::vector<std::string> split_serials = unserialize_string(serial);
-        throw CryptDBError("implement!");
-    }
-    */
-    static Delta *deserialize(const std::string &tag,
-                              const std::string &serial_meta,
-                              const std::string &serial_key,
-                              const DBMeta * const parent);
-    virtual std::string tag() const = 0;
 
-    /*
-     * This function is responsible for writing our Delta to the database.
-     */
-    bool save(Connect *e_conn, unsigned long *delta_id);
+    static bool save(Connect *e_conn, unsigned long *delta_id);
+    static bool finalizeSave(Connect *e_conn, unsigned long delta_id);
+    static bool destroyRecord(Connect *e_conn, unsigned long delta_id);
 
     /*
      * Take the update action against the database. Contains high level
      * serialization semantics.
      */
     virtual bool apply(Connect *e_conn, TableType table_type) = 0;
-    static bool destroyRecord(Connect *e_conn, unsigned long delta_id);
 
 protected:
     const DBMeta * const meta;
@@ -301,17 +280,9 @@ protected:
     const AbstractMetaKey * const key;
 
     std::string tableNameFromType(TableType table_type) const;
-
-private:
-    std::string serialize(const DBObject &parent) const 
-    {
-        throw CryptDBError("Calling Delta::serialize with a parent"
-                           " argument is nonsensical!");
-    }
 };
 
-// When using singleSave and singleDestroy with respect to meta and
-// parent_meta, CreateDelta calls must provide the key.  meta and
+// CreateDelta calls must provide the key.  meta and
 // parent_meta have not yet been associated such that the key can be
 // functionally derived.
 class CreateDelta : public Delta {
@@ -321,7 +292,6 @@ public:
                 const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
-    std::string tag() const {return "Create";}
     bool save(Connect *e_conn, unsigned long *delta_id);
     bool apply(Connect *e_conn, TableType table_type);
     bool destroyRecord(Connect *e_conn);
@@ -334,7 +304,6 @@ public:
                  const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
-    std::string tag() const {return "Replace";}
     bool save(Connect *e_conn, unsigned long *delta_id);
     bool apply(Connect *e_conn, TableType table_type);
     bool destroyRecord(Connect *e_conn);
@@ -347,7 +316,6 @@ public:
                 const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
-    std::string tag() const {return "Delete";}
     bool save(Connect *e_conn, unsigned long *delta_id);
     bool apply(Connect *e_conn, TableType table_type);
     bool destroyRecord(Connect *e_conn);

@@ -199,16 +199,30 @@ bool Delta::save(Connect *e_conn, unsigned long *delta_id)
     // Make sure the table exists.
     const std::string create_table_query =
         " CREATE TABLE IF NOT EXISTS pdb." + table_name +
-        "    (id SERIAL PRIMARY KEY)"
+        "    (remote_complete BOOLEAN NOT NULL,"
+        "     id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
     assert(e_conn->execute(create_table_query));
 
     const std::string query =
         " INSERT INTO pdb." + table_name +
-        "    () VALUES ();";
+        "    (remote_complete) VALUES ("
+        "     FALSE);";
     assert(e_conn->execute(query));
 
     *delta_id = e_conn->last_insert_id();
+
+    return true;
+}
+
+bool Delta::finalizeSave(Connect *e_conn, unsigned long delta_id)
+{
+    const std::string table_name = "Delta";
+
+    const std::string query =
+        " UPDATE pdb." + table_name +
+        "    SET remote_complete = TRUE;";
+    assert(e_conn->execute(query));
 
     return true;
 }
@@ -445,9 +459,9 @@ ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
     assert(rewriter);
 
     // Acquire lock.
-    std::ostringstream lock_stream;
-    lock_stream << "LOCK TABLES " << this->crypted_table << " WRITE;";
-    assert(conn->execute(lock_stream.str()));
+    const std::string lock_query = "LOCK TABLES " + this->crypted_table
+        + " WRITE;";
+    assert(conn->execute(lock_query));
 
     // Retrieve rows from database.
     std::ostringstream select_stream;
@@ -535,9 +549,8 @@ ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
     assert(ret_value);
 
     // Release lock.
-    std::ostringstream unlock_stream;
-    unlock_stream << "UNLOCK TABLES;";
-    assert(conn->execute(unlock_stream.str()));
+    const std::string unlock_query = "UNLOCK TABLES;";
+    assert(conn->execute(unlock_query));
 
     return ret_value;
 }
@@ -595,7 +608,7 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
         for (auto it : deltas) {
             unsigned long temp_delta_id;
             assert(it->apply(e_conn, Delta::BLEEDING_TABLE));
-            assert(it->save(e_conn, &temp_delta_id));
+            Delta::save(e_conn, &temp_delta_id);
             new_delta_ids.push_back(temp_delta_id);
         }
         if (true == do_original) {
@@ -606,7 +619,24 @@ ResType *DeltaOutput::doQueryHelper(Connect *conn, Connect *e_conn,
     }
 
     // Execute rewritten query @ remote.
-    ResType *result = primary();
+    ResType *result;
+    {
+        assert(e_conn->execute("START TRANSACTION;"));
+        bool success = true;
+        for (auto it : new_delta_ids) {
+            success = success && Delta::finalizeSave(e_conn, it);
+        }
+        if (false == success) {
+            assert(e_conn->execute("ROLLBACK;"));
+        }
+
+        result = primary();
+        // If the query failed, rollback.
+        if (!result || !result->ok) {
+            assert(e_conn->execute("ROLLBACK;"));
+        }
+        assert(e_conn->execute("COMMIT;"));
+    }
 
     // > Write to regular table and apply original query.
     // > Remove delta and original query from embedded db.
