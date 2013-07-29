@@ -154,7 +154,7 @@ deltaSanityCheck(Connect *e_conn)
               << " remotely actioned deltas that are missing local"
               << " completion!" << std::endl;
 
-    return 0 == bleeding_row_count || 0 == remoted_row_count;
+    return 0 == bleeding_row_count && 0 == remoted_row_count;
 }
 
 // This function will not build all of our tables when it is run
