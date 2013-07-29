@@ -116,6 +116,50 @@ sanityCheck(SchemaInfo *schema)
     return true;
 }
 
+// FIXME: TESTME.
+static bool
+fixBleeding(Connect *e_conn)
+{
+    const std::string regular_table_name =
+        "MetaObject";
+    const std::string bleeding_table_name =
+        "BleedingMetaObject";
+
+    const std::string drop_query =
+        " DELETE pdb." + bleeding_table_name +
+        "   FROM pdb." + bleeding_table_name + ";";
+    assert(e_conn->execute(drop_query));
+
+    const std::string insert_query =
+        " INSERT pdb." + bleeding_table_name +
+        "   SELECT * FROM pdb." + regular_table_name + ";";
+    assert(e_conn->execute(insert_query));
+
+    return true;
+}
+
+// FIXME: TESTME.
+static bool
+fixRemoted(Connect *e_conn)
+{
+    const std::string regular_table_name =
+        "MetaObject";
+    const std::string bleeding_table_name =
+        "BleedingMetaObject";
+
+    const std::string drop_query =
+        " DELETE pdb." + regular_table_name +
+        "   FROM pdb." + regular_table_name + ";";
+    assert(e_conn->execute(drop_query));
+
+    const std::string insert_query =
+        " INSERT pdb." + regular_table_name +
+        "   SELECT * FROM pdb." + bleeding_table_name + ";";
+    assert(e_conn->execute(insert_query));
+
+    return true;
+}
+
 static bool
 deltaSanityCheck(Connect *e_conn)
 {
@@ -154,7 +198,15 @@ deltaSanityCheck(Connect *e_conn)
               << " remotely actioned deltas that are missing local"
               << " completion!" << std::endl;
 
-    return 0 == bleeding_row_count && 0 == remoted_row_count;
+    if (!(0 == bleeding_row_count || 0 == remoted_row_count)) {
+        return false;
+    } else if (1 == bleeding_row_count) {
+        return fixBleeding(e_conn);
+    } else if (1 == remoted_row_count) {
+        return fixRemoted(e_conn);
+    } else {
+        return true;
+    }
 }
 
 // This function will not build all of our tables when it is run
