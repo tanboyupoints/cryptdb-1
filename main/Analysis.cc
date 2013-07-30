@@ -698,7 +698,6 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
             assert(conn->execute("COMMIT;"));
         }
     }
-return NULL;
 
     // > Write to regular table and apply original query.
     // > Remove delta and original query from embedded db.
