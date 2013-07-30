@@ -605,6 +605,7 @@ ResType *DeltaOutput::doQuery(Connect *conn, Connect *e_conn,
         for (auto it : new_delta_ids) {
             assert(Delta::destroyRecord(e_conn, it));
         }
+        // FIXME: local_qz can have DDL.
         for (auto it : local_qz) {
             assert(e_conn->execute(it));
         }
