@@ -146,7 +146,6 @@ Connect::getError()
     return mysql_error(conn);
 }
 
-
 my_ulonglong
 Connect::last_insert_id()
 {
@@ -158,6 +157,12 @@ Connect::real_escape_string(char *to, const char *from,
                             unsigned long length)
 {
     return mysql_real_escape_string(conn, to, from, length);
+}
+
+unsigned int
+Connect::get_mysql_errno()
+{
+    return mysql_errno(conn);
 }
 
 Connect::~Connect()

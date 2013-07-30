@@ -116,6 +116,24 @@ sanityCheck(SchemaInfo *schema)
     return true;
 }
 
+/*
+    Other interesting error codes
+    > ER_DUP_KEY
+    > ER_KEY_DOES_NOT_EXIST
+*/
+static bool
+recoverableDeltaError(unsigned int err)
+{
+    bool ret =
+        ER_TABLE_EXISTS_ERROR == err ||     // Table already exists.
+        ER_DUP_FIELDNAME == err ||          // Column already exists.
+        ER_DUP_KEYNAME == err ||            // Key already exists.
+        ER_BAD_TABLE_ERROR == err ||        // Table doesn't exist.
+        ER_CANT_DROP_FIELD_OR_KEY == err;   // Key/Col doesn't exist.
+
+    return ret;
+}
+
 // FIXME: TESTME.
 static bool
 fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
@@ -139,12 +157,12 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
         mysql_fetch_lengths(local_r.res());
     const std::string local_query(local_row[0], local_l[0]);
 
-    // Get remote queries.
+    // Get remote queries (ORDER matters).
     const std::string remote_query =
         " SELECT query, local FROM pdb." + query_table_name +
         "  WHERE delta_id = " + std::to_string(delta_id) +
         "    AND local = FALSE;"
-        "  ORDER BY id";
+        "  ORDER BY ASC id";
     assert(e_conn->execute(remote_query, dbres));
 
     ScopedMySQLRes remote_r(dbres->n);
@@ -157,9 +175,36 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
         remote_queries.push_back(remote_query);
     }
 
-    // FIXME: Send the remote queries to determine what actions
+    // Send the remote queries to determine what actions
     // we need to take.
-    return true;
+    // HACKy: Maybe a way to make this cleaner.
+    bool failure = false;
+    bool success = false;
+    for (auto it : remote_queries) {
+        if (conn->execute(it, dbres)) {
+            if (true == failure) {
+                throw CryptDBError("All queries must fail or succeed"
+                                   " in delta recovery!");
+            }
+
+            success = true;
+        } else {
+            if (true == success) {
+                throw CryptDBError("All queries must fail or succeed"
+                                   " in delta recovery!");
+            }
+    
+            unsigned int err = conn->get_mysql_errno();
+            if (recoverableDeltaError(err)) {
+                failure = true;
+            } else {
+                throw CryptDBError("Unrecoverable error in Delta"
+                                   " recovery!");
+            }
+        }
+    }
+
+    return failure && !success;
 }
 
 static bool

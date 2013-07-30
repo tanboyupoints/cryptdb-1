@@ -49,6 +49,7 @@ class Connect {
     my_ulonglong last_insert_id();
     unsigned long real_escape_string(char *to, const char *from,
                                      unsigned long length);
+    unsigned int get_mysql_errno();
 
     ~Connect();
 

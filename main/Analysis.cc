@@ -520,7 +520,7 @@ static bool saveQuery(Connect *e_conn, std::string query,
 
     const std::string insert_query =
         " INSERT INTO pdb." + table_name +
-        "   (query, delta_id) VALUES ("
+        "   (query, delta_id, local) VALUES ("
         " '" + escapeString(e_conn, query) + "', "
         " "  + std::to_string(delta_id) + ","
         " "  + bool_to_string(local) + ");";
