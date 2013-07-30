@@ -118,30 +118,10 @@ sanityCheck(SchemaInfo *schema)
 
 // FIXME: TESTME.
 static bool
-fixBleeding(Connect *e_conn)
+fixDelta(Connect *e_conn, unsigned long delta_id)
 {
-    const std::string regular_table_name =
-        "MetaObject";
-    const std::string bleeding_table_name =
-        "BleedingMetaObject";
-
-    const std::string drop_query =
-        " DELETE pdb." + bleeding_table_name +
-        "   FROM pdb." + bleeding_table_name + ";";
-    assert(e_conn->execute(drop_query));
-
-    const std::string insert_query =
-        " INSERT pdb." + bleeding_table_name +
-        "   SELECT * FROM pdb." + regular_table_name + ";";
-    assert(e_conn->execute(insert_query));
-
-    return true;
-}
-
-// FIXME: TESTME.
-static bool
-fixRemoted(Connect *e_conn)
-{
+    throw CryptDBError("implement fixDelta!");
+    /*
     const std::string regular_table_name =
         "MetaObject";
     const std::string bleeding_table_name =
@@ -158,6 +138,7 @@ fixRemoted(Connect *e_conn)
     assert(e_conn->execute(insert_query));
 
     return true;
+    */
 }
 
 static bool
@@ -174,38 +155,21 @@ deltaSanityCheck(Connect *e_conn)
     assert(e_conn->execute(create_table_query));
 
     DBResult *dbres;
-    const std::string get_bleeding_deltas =
-        " SELECT * FROM pdb." + table_name + 
-        "  WHERE remote_complete = FALSE;";
-    assert(e_conn->execute(get_bleeding_deltas, dbres));
+    const std::string get_deltas =
+        " SELECT id FROM pdb." + table_name + ";";
+    assert(e_conn->execute(get_deltas, dbres));
 
     ScopedMySQLRes r(dbres->n);
-    const unsigned long long bleeding_row_count =
-        mysql_num_rows(r.res());
-
-    const std::string get_remoted_deltas =
-        " SELECT * FROM pdb." + table_name +
-        "  WHERE remote_complete = TRUE;";
-    assert(e_conn->execute(get_remoted_deltas, dbres));
-
-    ScopedMySQLRes r2(dbres->n);
-    const unsigned long long remoted_row_count =
-        mysql_num_rows(r2.res());
-
-    std::cerr << "There are " << bleeding_row_count
-              << " bleeding deltas!" << std::endl;
-    std::cerr << "There are " << remoted_row_count
-              << " remotely actioned deltas that are missing local"
-              << " completion!" << std::endl;
-
-    if (!(0 == bleeding_row_count || 0 == remoted_row_count)) {
-        return false;
-    } else if (1 == bleeding_row_count) {
-        return fixBleeding(e_conn);
-    } else if (1 == remoted_row_count) {
-        return fixRemoted(e_conn);
-    } else {
+    const unsigned long long row_count = mysql_num_rows(r.res());
+    std::cerr << "There are " << row_count << " deltas!" << std::endl;
+    // FIXME.
+    const unsigned long delta_id = 0;
+    if (0 == row_count) {
         return true;
+    } else if (1 == row_count) {
+        return fixDelta(e_conn, delta_id);
+    } else {
+        throw CryptDBError("Too many deltas!");
     }
 }
 
@@ -776,6 +740,14 @@ Rewriter::Rewriter(ConnectionInfo ci,
     assert(ps.e_conn->execute("USE cryptdbtest;"));
 }
 
+static std::string
+lex_to_query(LEX *lex)
+{
+    std::ostringstream o;
+    o << *lex;
+    return o.str();
+}
+
 RewriteOutput * 
 Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
                         const std::string &query)
@@ -791,14 +763,24 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         SQLHandler *handler = dml_dispatcher->dispatch(lex);
         try {
             LEX *out_lex = handler->transformLex(a, lex, ps);
-            // SpecialUpdate wants the old lex, as it's going to
-            // handle it's own rewrite.
             if (true == a.special_update) {
-                auto crypted_table =
+                const auto plain_table =
+                    lex->select_lex.top_join_list.head()->table_name;
+                const auto crypted_table =
                     out_lex->select_lex.top_join_list.head()->table_name;
-                return new SpecialUpdate(query, lex, ps, crypted_table);
+                std::string where_clause;
+                if (lex->select_lex.where) {
+                    std::ostringstream where_stream;
+                    where_stream << " " << *lex->select_lex.where << " ";
+                    where_clause = where_stream.str();
+                } else {
+                    where_clause = " TRUE ";
+                }
+                return new SpecialUpdate(query, lex_to_query(out_lex),
+                                         plain_table, crypted_table,
+                                         where_clause, ps);
             } else {
-                return new DMLOutput(query, out_lex);
+                return new DMLOutput(query, lex_to_query(out_lex));
             }
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
@@ -806,12 +788,12 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
             auto adjust_queries = 
                 adjustOnion(a, ps, e.o, e.fm, e.tolevel, e.itf,
                             ps.dbName());
-            return new AdjustOnionOutput(query, a.deltas, adjust_queries);
+            return new AdjustOnionOutput(a.deltas, adjust_queries);
         }
     } else if (ddl_dispatcher->canDo(lex)) {
         SQLHandler *handler = ddl_dispatcher->dispatch(lex);
         LEX *out_lex = handler->transformLex(a, lex, ps);
-        return new DDLOutput(query, out_lex, a.deltas);
+        return new DDLOutput(query, lex_to_query(out_lex), a.deltas);
     } else {
         throw CryptDBError("Rewriter can not dispatch bad lex");
     }
