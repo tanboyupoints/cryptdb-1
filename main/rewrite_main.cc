@@ -136,7 +136,7 @@ recoverableDeltaError(unsigned int err)
 
 // FIXME: TESTME.
 static bool
-fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
+fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
 {
     const std::string query_table_name = "Query";
 
@@ -144,7 +144,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
     DBResult *dbres;
     const std::string get_local_query_query =
         " SELECT query FROM pdb." + query_table_name +
-        "  WHERE delta_id = " + std::to_string(delta_id) +
+        "  WHERE delta_output_id = " + std::to_string(delta_output_id) +
         "    AND local = TRUE;";
     assert(e_conn->execute(get_local_query_query, dbres));
 
@@ -160,7 +160,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
     // Get remote queries (ORDER matters).
     const std::string remote_query =
         " SELECT query, ddl FROM pdb." + query_table_name +
-        "  WHERE delta_id = " + std::to_string(delta_id) +
+        "  WHERE delta_output_id = " + std::to_string(delta_output_id) +
         "    AND local = FALSE;"
         "  ORDER BY ASC id";
     assert(e_conn->execute(remote_query, dbres));
@@ -192,7 +192,8 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
         const std::string dml_table = "DMLCompletion";
         const std::string dml_query =
             " SELECT * FROM " + dml_table +
-            "  WHERE delta_id = " + std::to_string(delta_id) + ";";
+            "  WHERE delta_output_id = " +
+            " " +    std::to_string(delta_output_id) + ";";
         assert(conn->execute(dml_query, dbres));
         
         ScopedMySQLRes r(dbres->n);
@@ -203,7 +204,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
             for (auto it : remote_queries) {
                 assert(conn->execute(it));
             }
-            assert(saveDMLCompletion(conn, delta_id));
+            assert(saveDMLCompletion(conn, delta_output_id));
             assert(conn->execute("COMMIT"));
         } else if (1 > dml_row_count) {
             throw CryptDBError("Too many DML table results!");
@@ -214,7 +215,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
     {
         const std::string regular_table_name = "MetaObject";
         const std::string bleeding_table_name = "BleedingMetaObject";
-        const std::string delta_table_name = "Delta";
+        const std::string delta_table_name = "DeltaOutput";
         const std::string query_table_name = "Query";
 
         const std::string delete_query =
@@ -228,9 +229,9 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
             "   FROM pdb." + delta_table_name + ","
             "        pdb." + query_table_name +
             "  WHERE pdb." + delta_table_name + ".id"
-            "      = "     + std::to_string(delta_id) +
+            "      = "     + std::to_string(delta_output_id) +
             "    AND pdb." + delta_table_name + ".id"
-            "      = pdb." + query_table_name + ".delta_id;";
+            "      = pdb." + query_table_name + ".delta_output_id;";
 
         assert(e_conn->execute("START TRANSACTION;"));
         assert(e_conn->execute(delete_query));
@@ -247,7 +248,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
 static bool
 deltaSanityCheck(Connect *conn, Connect *e_conn)
 {
-    const std::string table_name = "Delta";
+    const std::string table_name = "DeltaOutput";
 
     // Make sure the table exists.
     const std::string create_table_query =
@@ -271,9 +272,10 @@ deltaSanityCheck(Connect *conn, Connect *e_conn)
     } else if (1 == row_count) {
         MYSQL_ROW row = mysql_fetch_row(r.res());
         const unsigned long * const l = mysql_fetch_lengths(r.res());
-        const std::string string_delta_id(row[0], l[0]);
-        const unsigned long delta_id = atoi(string_delta_id.c_str());
-        return fixDelta(conn, e_conn, delta_id);
+        const std::string string_delta_output_id(row[0], l[0]);
+        const unsigned long delta_output_id =
+            atoi(string_delta_output_id.c_str());
+        return fixDelta(conn, e_conn, delta_output_id);
     } else {
         throw CryptDBError("Too many deltas!");
     }

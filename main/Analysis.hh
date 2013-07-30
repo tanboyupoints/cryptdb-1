@@ -264,9 +264,6 @@ public:
           const AbstractMetaKey * const key)
         : meta(meta), parent_meta(parent_meta), key(key) {}
 
-    static bool save(Connect *e_conn, unsigned long *delta_id);
-    static bool destroyRecord(Connect *e_conn, unsigned long delta_id);
-
     /*
      * Take the update action against the database. Contains high level
      * serialization semantics.
@@ -291,7 +288,7 @@ public:
                 const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
-    bool save(Connect *e_conn, unsigned long *delta_id);
+    bool save(Connect *e_conn, unsigned long *delta_output_id);
     bool apply(Connect *e_conn, TableType table_type);
     bool destroyRecord(Connect *e_conn);
 };
@@ -303,7 +300,7 @@ public:
                  const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
-    bool save(Connect *e_conn, unsigned long *delta_id);
+    bool save(Connect *e_conn, unsigned long *delta_output_id);
     bool apply(Connect *e_conn, TableType table_type);
     bool destroyRecord(Connect *e_conn);
 };
@@ -315,7 +312,7 @@ public:
                 const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
-    bool save(Connect *e_conn, unsigned long *delta_id);
+    bool save(Connect *e_conn, unsigned long *delta_output_id);
     bool apply(Connect *e_conn, TableType table_type);
     bool destroyRecord(Connect *e_conn);
 };
@@ -331,7 +328,7 @@ public:
     virtual ResType *doQuery(Connect *conn, Connect *e_conn,
                              Rewriter *rewriter = NULL) = 0;
     virtual bool queryAgain();
-    static ResType *sendQuery(Connect *c, std::string q);
+    static ResType *sendQuery(Connect *c, const std::string &q);
 
 protected:
     const std::string original_query;
@@ -392,6 +389,9 @@ public:
     virtual ~DeltaOutput() = 0;
     virtual ResType *doQuery(Connect *conn, Connect *e_conn,
                             Rewriter *rewriter = NULL) = 0;
+    static bool save(Connect *e_conn, unsigned long *delta_output_id);
+    static bool destroyRecord(Connect *e_conn,
+                              unsigned long delta_output_id);
 
 protected:
     const std::vector<Delta *> deltas;
@@ -426,7 +426,7 @@ private:
     const std::list<std::string> adjust_queries;
 };
 
-bool saveDMLCompletion(Connect *conn, unsigned long delta_id);
+bool saveDMLCompletion(Connect *conn, unsigned long delta_output_id);
 
 class Analysis {
 public:

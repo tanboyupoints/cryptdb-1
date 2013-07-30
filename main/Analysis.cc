@@ -4,8 +4,8 @@
 
 // FIXME: Memory leaks when we allocate MetaKey<...>, use smart pointer.
 
-inline std::string
-escapeString(Connect *e_conn, std::string escape_me)
+static std::string
+escapeString(Connect *e_conn, const std::string &escape_me)
 {
     unsigned int escaped_length = escape_me.size() * 2 + 1;
     char *escaped = new char[escaped_length];
@@ -192,34 +192,6 @@ operator<<(std::ostream &out, const RewritePlan * rp)
     return out;
 }
 
-bool Delta::save(Connect *e_conn, unsigned long *delta_id)
-{
-    const std::string table_name = "Delta";
-
-    const std::string query =
-        " INSERT INTO pdb." + table_name +
-        "    () VALUES ();";
-    assert(e_conn->execute(query));
-
-    *delta_id = e_conn->last_insert_id();
-
-    return true;
-}
-
-bool Delta::destroyRecord(Connect *e_conn, unsigned long delta_id)
-{
-    const std::string table_name = "Delta";
-
-    const std::string delete_query =
-        " DELETE pdb." + table_name +
-        "   FROM pdb." + table_name +
-        "  WHERE pdb." + table_name + ".id" +
-        "      = "     + std::to_string(delta_id) + ";";
-    assert(e_conn->execute(delete_query));
-
-    return true;
-}
-
 std::string Delta::tableNameFromType(TableType table_type) const
 {
     switch (table_type) {
@@ -364,7 +336,7 @@ RewriteOutput::~RewriteOutput()
 {;}
 
 static void
-prettyPrintQuery(std::string query)
+prettyPrintQuery(const std::string &query)
 {
     std::cout << std::endl << RED_BEGIN
               << "QUERY: " << COLOR_END << query << std::endl;
@@ -375,7 +347,7 @@ bool RewriteOutput::queryAgain()
     return false;
 }
 
-ResType *RewriteOutput::sendQuery(Connect *c, std::string q)
+ResType *RewriteOutput::sendQuery(Connect *c, const std::string &q)
 {
     DBResult *dbres;
     assert(c->execute(q, dbres));
@@ -504,15 +476,44 @@ ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
 DeltaOutput::~DeltaOutput()
 {;}
 
-static bool saveQuery(Connect *e_conn, std::string query,
-                      unsigned long delta_id, bool local, bool ddl)
+bool DeltaOutput::save(Connect *e_conn, unsigned long *delta_output_id)
+{
+    const std::string table_name = "DeltaOutput";
+
+    const std::string query =
+        " INSERT INTO pdb." + table_name +
+        "    () VALUES ();";
+    assert(e_conn->execute(query));
+
+    *delta_output_id = e_conn->last_insert_id();
+
+    return true;
+}
+
+bool DeltaOutput::destroyRecord(Connect *e_conn,
+                                unsigned long delta_output_id)
+{
+    const std::string table_name = "DeltaOutput";
+
+    const std::string delete_query =
+        " DELETE pdb." + table_name +
+        "   FROM pdb." + table_name +
+        "  WHERE pdb." + table_name + ".id" +
+        "      = "     + std::to_string(delta_output_id) + ";";
+    assert(e_conn->execute(delete_query));
+
+    return true;
+}
+
+static bool saveQuery(Connect *e_conn, const std::string &query,
+                      unsigned long delta_output_id, bool local, bool ddl)
 {
     const std::string table_name = "Query";
     // Ensure the table exists.
     const std::string create_query =
         " CREATE TABLE IF NOT EXISTS pdb." + table_name +
         "   (query VARCHAR(200) NOT NULL,"
-        "    delta_id BIGINT NOT NULL,"
+        "    delta_output_id BIGINT NOT NULL,"
         "    local BOOLEAN NOT NULL,"
         "    ddl BOOLEAN NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
@@ -521,9 +522,9 @@ static bool saveQuery(Connect *e_conn, std::string query,
 
     const std::string insert_query =
         " INSERT INTO pdb." + table_name +
-        "   (query, delta_id, local, ddl) VALUES ("
+        "   (query, delta_output_id, local, ddl) VALUES ("
         " '" + escapeString(e_conn, query) + "', "
-        " "  + std::to_string(delta_id) + ","
+        " "  + std::to_string(delta_output_id) + ","
         " "  + bool_to_string(local) + ","
         " "  + bool_to_string(ddl) + ");";
     assert(e_conn->execute(insert_query));
@@ -531,36 +532,37 @@ static bool saveQuery(Connect *e_conn, std::string query,
     return true;
 }
 
-static bool destroyQueryRecord(Connect *e_conn, unsigned long delta_id)
+static bool destroyQueryRecord(Connect *e_conn,
+                               unsigned long delta_output_id)
 {
     const std::string table_name = "Query";
     
     const std::string delete_query =
         " DELETE pdb." + table_name +
         "   FROM pdb." + table_name +
-        "  WHERE pdb." + table_name + ".delta_id"
-        "      = "     + std::to_string(delta_id) + ";";
+        "  WHERE pdb." + table_name + ".delta_output_id"
+        "      = "     + std::to_string(delta_output_id) + ";";
     assert(e_conn->execute(delete_query));
 
     return true;
 }
 
 bool
-saveDMLCompletion(Connect *conn, unsigned long delta_id)
+saveDMLCompletion(Connect *conn, unsigned long delta_output_id)
 {
     const std::string dml_table = "DMLCompletion";
     // Ensure table exists.
     const std::string dml_create_query =
         " CREATE TABLE IF NOT EXISTS " + dml_table +
-        "   (delta_id BIGINT NOT NULL,"
+        "   (delta_output_id BIGINT NOT NULL,"
         "    id SERIAL)"
         " ENGINE=InnoDB;";
     assert(conn->execute(dml_create_query));
 
     const std::string dml_insert_query =
         " INSERT INTO " + dml_table +
-        "   (delta_id) VALUES ("
-        " " + std::to_string(delta_id) + ");";
+        "   (delta_output_id) VALUES ("
+        " " + std::to_string(delta_output_id) + ");";
     assert(conn->execute(dml_insert_query));
 
     return true;
@@ -582,21 +584,22 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
 
     // Write to the bleeding table, store delta and store query.
     // -----------------------------------------------------------
-    std::vector<unsigned long> new_delta_ids;
-    assert(e_conn->execute("START TRANSACTION;"));
-    for (auto it : deltas) {
-        unsigned long temp_delta_id;
-        assert(it->apply(e_conn, Delta::BLEEDING_TABLE));
-        Delta::save(e_conn, &temp_delta_id);
-        new_delta_ids.push_back(temp_delta_id);
-    }
+    unsigned long delta_output_id;
+    {
+        assert(e_conn->execute("START TRANSACTION;"));
+        for (auto it : deltas) {
+            assert(it->apply(e_conn, Delta::BLEEDING_TABLE));
+        }
 
-    const unsigned long query_delta_id = new_delta_ids.back();
-    for (auto it : local_qz) {
-        assert(saveQuery(e_conn, it, query_delta_id, true, false));
-    }
-    for (auto it : remote_qz) {
-        assert(saveQuery(e_conn, it, query_delta_id, false, remote_ddl));
+        DeltaOutput::save(e_conn, &delta_output_id);
+
+        for (auto it : local_qz) {
+            assert(saveQuery(e_conn, it, delta_output_id, true, false));
+        }
+        for (auto it : remote_qz) {
+            assert(saveQuery(e_conn, it, delta_output_id, false,
+                             remote_ddl));
+        }
     }
     assert(e_conn->execute("COMMIT;"));
     // -----------------------------------------------------------
@@ -625,7 +628,7 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
                     throw CryptDBError("implement DeltaOutput::doQuery!");
                 }
             }
-            saveDMLCompletion(conn, query_delta_id);
+            saveDMLCompletion(conn, delta_output_id);
             assert(conn->execute("COMMIT;"));
         }
     }
@@ -633,20 +636,18 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
     // > Write to regular table and apply original query.
     // > Remove delta and original query from embedded db.
     {
-        // FIXME: Use table copy.
-        assert(deltas.size() == new_delta_ids.size());
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
             assert(it->apply(e_conn, Delta::REGULAR_TABLE));
         }
-        for (auto it : new_delta_ids) {
-            assert(Delta::destroyRecord(e_conn, it));
-        }
+
+        assert(DeltaOutput::destroyRecord(e_conn, delta_output_id));
+
         // FIXME: local_qz can have DDL.
         for (auto it : local_qz) {
             assert(e_conn->execute(it));
         }
-        destroyQueryRecord(e_conn, query_delta_id);
+        destroyQueryRecord(e_conn, delta_output_id);
         assert(e_conn->execute("COMMIT;"));
     }
 
