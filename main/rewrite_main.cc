@@ -233,17 +233,31 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
 }
 
 static bool
+doesDatabaseExist(Connect *c, const std::string &db)
+{
+    DBResult *dbres;
+    const std::string query =
+        " SHOW DATABASES LIKE '" + db  + "';";
+    assert(c->execute(query, dbres));
+
+    ScopedMySQLRes r(dbres->n);
+    const unsigned long long row_count = mysql_num_rows(r.res());
+    if (1 < row_count) {
+        throw CryptDBError("Too many databases with same name!");
+    }
+
+    return 1 == row_count;
+}
+
+static bool
 deltaSanityCheck(Connect *conn, Connect *e_conn)
 {
-    const std::string table_name = "DeltaOutput";
+    // Nothing to check if this is the first time running the proxy.
+    if (!doesDatabaseExist(e_conn, "pdb")) {
+        return true;
+    }
 
-    // Make sure the table exists.
-    const std::string create_table_query =
-        " CREATE TABLE IF NOT EXISTS pdb." + table_name +
-        "    (remote_complete BOOLEAN NOT NULL,"
-        "     id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-    assert(e_conn->execute(create_table_query));
+    const std::string table_name = "DeltaOutput";
 
     DBResult *dbres;
     const std::string get_deltas =
@@ -278,6 +292,9 @@ deltaSanityCheck(Connect *conn, Connect *e_conn)
 static SchemaInfo *
 loadSchemaInfo(Connect *conn, Connect *e_conn)
 {
+    // Must be done before loading the children.
+    assert(deltaSanityCheck(conn, e_conn));
+
     SchemaInfo *schema = new SchemaInfo(); 
     // Recursively rebuild the AbstractMeta<Whatever> and it's children.
     std::function<DBMeta*(DBMeta *)> loadChildren =
@@ -293,12 +310,12 @@ loadSchemaInfo(Connect *conn, Connect *e_conn)
     loadChildren(schema);
     // FIXME: Ideally we would do this before loading the schema.
     // But first we must decide on a place to create the database from.
-    assert(deltaSanityCheck(conn, e_conn));
     assert(sanityCheck(schema));
     
     return schema;
 }
 
+/*
 static void
 printEC(Connect * e_conn, const std::string & command) {
     DBResult * dbres;
@@ -306,9 +323,11 @@ printEC(Connect * e_conn, const std::string & command) {
     ResType res = dbres->unpack();
     printRes(res);
 }
+*/
 
 static void
 printEmbeddedState(const ProxyState & ps) {
+/*
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables from pdb;");
     std::cout << "regular" << std::endl << std::endl;
@@ -317,6 +336,7 @@ printEmbeddedState(const ProxyState & ps) {
     printEC(ps.e_conn, "select * from pdb.BleedingMetaObject;");
     printEC(ps.e_conn, "select * from pdb.Query;");
     printEC(ps.e_conn, "select * from pdb.DeltaOutput;");
+*/
 }
 
 template <typename type> static void

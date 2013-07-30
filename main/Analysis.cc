@@ -480,6 +480,14 @@ bool DeltaOutput::save(Connect *e_conn, unsigned long *delta_output_id)
 {
     const std::string table_name = "DeltaOutput";
 
+    // Make sure the table exists.
+    const std::string create_table_query =
+        " CREATE TABLE IF NOT EXISTS pdb." + table_name +
+        "    (remote_complete BOOLEAN NOT NULL,"
+        "     id SERIAL PRIMARY KEY)"
+        " ENGINE=InnoDB;";
+    assert(e_conn->execute(create_table_query));
+
     const std::string query =
         " INSERT INTO pdb." + table_name +
         "    () VALUES ();";
