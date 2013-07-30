@@ -134,11 +134,10 @@ recoverableDeltaError(unsigned int err)
     return ret;
 }
 
-// FIXME: TESTME.
 static bool
 fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
 {
-    std::list<std::string> local_qz;
+    std::list<std::string> local_queries;
     bool expect_ddl;
 
     const std::string query_table_name = "Query";
@@ -161,7 +160,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
         const unsigned long * const local_l =
             mysql_fetch_lengths(local_r.res());
         const std::string local_query(local_row[0], local_l[0]);
-        local_qz.push_back(local_query);
+        local_queries.push_back(local_query);
     } else if (0 == local_row_count) {
         expect_ddl = false;
     } else {
@@ -193,8 +192,13 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
         remote_queries.push_back(remote_query);
     }
 
+    // Do sanity check.
+    assert((expect_ddl && remote_queries.size() == 1 &&
+            local_queries.size() == 1) ||
+           (!expect_ddl && remote_queries.size() >= 1 &&
+            local_queries.size() == 0));
+
     if (expect_ddl) {  // Handle single DDL query.
-        assert(remote_queries.size() == 1);
         if (false == conn->execute(remote_queries.back())) {
             unsigned int err = conn->get_mysql_errno();
             if (false == recoverableDeltaError(err)) {
@@ -239,7 +243,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
             throw CryptDBError("cleaning up delta fail!");
         }
         // FIXME: local_query can be DDL.
-        for (auto it : local_qz) {
+        for (auto it : local_queries) {
             assert(e_conn->execute(it));
         }
         assert(e_conn->execute("COMMIT;"));
