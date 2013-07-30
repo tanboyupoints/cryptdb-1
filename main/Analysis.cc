@@ -568,6 +568,54 @@ saveDMLCompletion(Connect *conn, unsigned long delta_output_id)
     return true;
 }
 
+static bool
+tableCopy(Connect *c, const std::string &src, const std::string &dest)
+{
+    const std::string delete_query =
+        " DELETE FROM dest;";
+    assert(c->execute(delete_query));
+
+    const std::string insert_query =
+        " INSERT " + dest +
+        "   SELECT * FROM " + src + ";";
+    assert(c->execute(insert_query));
+
+    return true;
+}
+
+bool
+setRegularTableToBleedingTable(Connect *e_conn)
+{
+    return tableCopy(e_conn, "pdb.BleedingMetaObject", "pdb.MetaObject");
+}
+
+static bool
+setBleedingTableToRegularTable(Connect *e_conn)
+{
+    return tableCopy(e_conn, "pdb.MetaObject", "pdb.BleedingMetaObject");
+}
+
+static bool
+revertAndCleanupEmbedded(Connect *e_conn, unsigned long delta_output_id)
+{
+    assert(e_conn->execute("START TRANSACTION;"));
+    assert(setBleedingTableToRegularTable(e_conn));
+    assert(cleanupDeltaOutputAndQuery(e_conn, delta_output_id));
+    assert(e_conn->execute("COMMIT;"));
+
+    return true;
+}
+
+bool
+cleanupDeltaOutputAndQuery(Connect *e_conn,
+                           unsigned long delta_output_id)
+{
+    assert(DeltaOutput::destroyRecord(e_conn, delta_output_id));
+    assert(destroyQueryRecord(e_conn, delta_output_id));
+
+    return true;
+}
+
 // FIXME: Test DB by reading out of it for later ops.
 // FIXME: Needs lock?
 static
@@ -612,9 +660,9 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
         if (true == remote_ddl) {
             result = RewriteOutput::sendQuery(conn, remote_qz.back());
             if (!result || !result->ok) {
-                // FIXME: Set Bleeding table to Regular table.
-                // FIXME: Destroy query records.
-                throw CryptDBError("implement DeltaOutput::doQuery!");
+                assert(revertAndCleanupEmbedded(e_conn,
+                                                delta_output_id));
+                return NULL;
             }
         } else {
             assert(conn->execute("START TRANSACTION;"));
@@ -623,9 +671,10 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
                 // If the query failed, rollback.
                 if (!result || !result->ok) {
                     assert(conn->execute("ROLLBACK;"));
-                    // FIXME: Set Bleeding table to Regular table.
-                    // FIXME: Destroy query records.
-                    throw CryptDBError("implement DeltaOutput::doQuery!");
+
+                    assert(revertAndCleanupEmbedded(e_conn,
+                                                    delta_output_id));
+                    return NULL;
                 }
             }
             saveDMLCompletion(conn, delta_output_id);
@@ -641,13 +690,12 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
             assert(it->apply(e_conn, Delta::REGULAR_TABLE));
         }
 
-        assert(DeltaOutput::destroyRecord(e_conn, delta_output_id));
+        cleanupDeltaOutputAndQuery(e_conn, delta_output_id);
 
         // FIXME: local_qz can have DDL.
         for (auto it : local_qz) {
             assert(e_conn->execute(it));
         }
-        destroyQueryRecord(e_conn, delta_output_id);
         assert(e_conn->execute("COMMIT;"));
     }
 

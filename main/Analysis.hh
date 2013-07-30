@@ -427,6 +427,9 @@ private:
 };
 
 bool saveDMLCompletion(Connect *conn, unsigned long delta_output_id);
+bool setRegularTableToBleedingTable(Connect *e_conn);
+bool cleanupDeltaOutputAndQuery(Connect *e_conn,
+                                unsigned long delta_output_id);
 
 class Analysis {
 public:

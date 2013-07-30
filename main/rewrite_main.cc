@@ -213,30 +213,9 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
 
     // Cleanup database and do local query.
     {
-        const std::string regular_table_name = "MetaObject";
-        const std::string bleeding_table_name = "BleedingMetaObject";
-        const std::string delta_table_name = "DeltaOutput";
-        const std::string query_table_name = "Query";
-
-        const std::string delete_query =
-            " DELETE FROM pdb." + regular_table_name + ";";
-        const std::string insert_query =
-            " INSERT pdb." + regular_table_name +
-            "   SELECT * FROM pdb." + bleeding_table_name + ";";
-        const std::string delete_delta_query =
-            " DELETE pdb." + delta_table_name + ","
-            "        pdb." + query_table_name +
-            "   FROM pdb." + delta_table_name + ","
-            "        pdb." + query_table_name +
-            "  WHERE pdb." + delta_table_name + ".id"
-            "      = "     + std::to_string(delta_output_id) +
-            "    AND pdb." + delta_table_name + ".id"
-            "      = pdb." + query_table_name + ".delta_output_id;";
-
         assert(e_conn->execute("START TRANSACTION;"));
-        assert(e_conn->execute(delete_query));
-        assert(e_conn->execute(insert_query));
-        assert(e_conn->execute(delete_delta_query));
+        setRegularTableToBleedingTable(e_conn);
+        cleanupDeltaOutputAndQuery(e_conn, delta_output_id);
         // FIXME: local_query can be DDL.
         assert(e_conn->execute(local_query));
         assert(e_conn->execute("COMMIT;"));
