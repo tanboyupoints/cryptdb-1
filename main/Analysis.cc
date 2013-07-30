@@ -222,9 +222,6 @@ bool CreateDelta::apply(Connect *e_conn, TableType table_type)
                                const AbstractMetaKey * const k,
                                const unsigned int * const ptr_parent_id)
     {
-        // Ensure the tables exist.
-        assert(create_tables(e_conn));
-        
         const std::string child_serial = object->serialize(*parent);
         assert(0 == object->getDatabaseID());
         unsigned int parent_id;
@@ -479,15 +476,6 @@ DeltaOutput::~DeltaOutput()
 bool DeltaOutput::save(Connect *e_conn, unsigned long *delta_output_id)
 {
     const std::string table_name = "DeltaOutput";
-
-    // Make sure the table exists.
-    const std::string create_table_query =
-        " CREATE TABLE IF NOT EXISTS pdb." + table_name +
-        "    (remote_complete BOOLEAN NOT NULL,"
-        "     id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-    assert(e_conn->execute(create_table_query));
-
     const std::string query =
         " INSERT INTO pdb." + table_name +
         "    () VALUES ();";
@@ -502,7 +490,6 @@ bool DeltaOutput::destroyRecord(Connect *e_conn,
                                 unsigned long delta_output_id)
 {
     const std::string table_name = "DeltaOutput";
-
     const std::string delete_query =
         " DELETE pdb." + table_name +
         "   FROM pdb." + table_name +
@@ -517,17 +504,6 @@ static bool saveQuery(Connect *e_conn, const std::string &query,
                       unsigned long delta_output_id, bool local, bool ddl)
 {
     const std::string table_name = "Query";
-    // Ensure the table exists.
-    const std::string create_query =
-        " CREATE TABLE IF NOT EXISTS pdb." + table_name +
-        "   (query VARCHAR(200) NOT NULL,"
-        "    delta_output_id BIGINT NOT NULL,"
-        "    local BOOLEAN NOT NULL,"
-        "    ddl BOOLEAN NOT NULL,"
-        "    id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-    assert(e_conn->execute(create_query));
-
     const std::string insert_query =
         " INSERT INTO pdb." + table_name +
         "   (query, delta_output_id, local, ddl) VALUES ("
@@ -544,7 +520,6 @@ static bool destroyQueryRecord(Connect *e_conn,
                                unsigned long delta_output_id)
 {
     const std::string table_name = "Query";
-    
     const std::string delete_query =
         " DELETE pdb." + table_name +
         "   FROM pdb." + table_name +
@@ -559,14 +534,6 @@ bool
 saveDMLCompletion(Connect *conn, unsigned long delta_output_id)
 {
     const std::string dml_table = "DMLCompletion";
-    // Ensure table exists.
-    const std::string dml_create_query =
-        " CREATE TABLE IF NOT EXISTS " + dml_table +
-        "   (delta_output_id BIGINT NOT NULL,"
-        "    id SERIAL)"
-        " ENGINE=InnoDB;";
-    assert(conn->execute(dml_create_query));
-
     const std::string dml_insert_query =
         " INSERT INTO " + dml_table +
         "   (delta_output_id) VALUES ("
