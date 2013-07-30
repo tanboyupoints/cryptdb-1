@@ -545,6 +545,27 @@ static bool destroyQueryRecord(Connect *e_conn, unsigned long delta_id)
     return true;
 }
 
+bool
+saveDMLCompletion(Connect *conn, unsigned long delta_id)
+{
+    const std::string dml_table = "DMLCompletion";
+    // Ensure table exists.
+    const std::string dml_create_query =
+        " CREATE TABLE IF NOT EXISTS " + dml_table +
+        "   (delta_id BIGINT NOT NULL,"
+        "    id SERIAL)"
+        " ENGINE=InnoDB;";
+    assert(conn->execute(dml_create_query));
+
+    const std::string dml_insert_query =
+        " INSERT INTO " + dml_table +
+        "   (delta_id) VALUES ("
+        " " + std::to_string(delta_id) + ");";
+    assert(conn->execute(dml_insert_query));
+
+    return true;
+}
+
 // FIXME: Test DB by reading out of it for later ops.
 // FIXME: Needs lock?
 static
@@ -585,34 +606,28 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
     //   or multiple DML queries.
     ResType *result;
     {
-        assert(conn->execute("START TRANSACTION;"));
-        for (auto it : remote_qz) {
-            result = RewriteOutput::sendQuery(conn, it);
-            // If the query failed, rollback.
+        if (true == remote_ddl) {
+            result = RewriteOutput::sendQuery(conn, remote_qz.back());
             if (!result || !result->ok) {
-                assert(conn->execute("ROLLBACK;"));
                 // FIXME: Set Bleeding table to Regular table.
                 // FIXME: Destroy query records.
                 throw CryptDBError("implement DeltaOutput::doQuery!");
             }
+        } else {
+            assert(conn->execute("START TRANSACTION;"));
+            for (auto it : remote_qz) {
+                result = RewriteOutput::sendQuery(conn, it);
+                // If the query failed, rollback.
+                if (!result || !result->ok) {
+                    assert(conn->execute("ROLLBACK;"));
+                    // FIXME: Set Bleeding table to Regular table.
+                    // FIXME: Destroy query records.
+                    throw CryptDBError("implement DeltaOutput::doQuery!");
+                }
+            }
+            saveDMLCompletion(conn, query_delta_id);
+            assert(conn->execute("COMMIT;"));
         }
-        if (false == remote_ddl) {
-            // FIXME: Duplicated.
-            const std::string dml_table = "DMLCompletion";
-            const std::string dml_create_query =
-                " CREATE TABLE " + dml_table +
-                "   (delta_id BIGINT NOT NULL,"
-                "    id SERIAL)"
-                " ENGINE=InnoDB;";
-            assert(conn->execute(dml_create_query));
-
-            const std::string dml_insert_query =
-                " INSERT INTO " + dml_table +
-                "   (delta_id) VALUES ("
-                " " + std::to_string(query_delta_id) + ");";
-            assert(conn->execute(dml_insert_query));
-        }
-        assert(conn->execute("COMMIT;"));
     }
 
     // > Write to regular table and apply original query.

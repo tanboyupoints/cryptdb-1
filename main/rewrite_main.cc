@@ -203,12 +203,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
             for (auto it : remote_queries) {
                 assert(conn->execute(it));
             }
-            // FIXME: Duplicated.
-            const std::string dml_insert_query =
-                " INSERT INTO " + dml_table +
-                "   (delta_id) VALUES ("
-                " " + std::to_string(delta_id) + ");";
-            assert(conn->execute(dml_insert_query));
+            assert(saveDMLCompletion(conn, delta_id));
             assert(conn->execute("COMMIT"));
         } else if (1 > dml_row_count) {
             throw CryptDBError("Too many DML table results!");

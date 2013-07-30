@@ -426,6 +426,8 @@ private:
     const std::list<std::string> adjust_queries;
 };
 
+bool saveDMLCompletion(Connect *conn, unsigned long delta_id);
+
 class Analysis {
 public:
     Analysis(const SchemaInfo * const schema)
