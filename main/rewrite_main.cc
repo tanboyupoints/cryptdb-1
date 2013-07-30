@@ -242,11 +242,13 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
             assert(e_conn->execute("ROLLBACK;"));
             throw CryptDBError("cleaning up delta fail!");
         }
-        // FIXME: local_query can be DDL.
-        for (auto it : local_queries) {
-            assert(e_conn->execute(it));
-        }
         assert(e_conn->execute("COMMIT;"));
+    }
+
+    // FIXME: local_query can be DDL.
+    // > This can be fixed with a bleeding table.
+    for (auto it : local_queries) {
+        assert(e_conn->execute(it));
     }
 
     return true;

@@ -675,12 +675,14 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
         b = cleanupDeltaOutputAndQuery(e_conn, delta_output_id);
         ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, NULL);
 
-        // FIXME: local_qz can have DDL.
-        for (auto it : local_qz) {
-            b = e_conn->execute(it);
-            ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, NULL);
-        }
         assert(e_conn->execute("COMMIT;"));
+    }
+
+    // FIXME: local_qz can have DDL.
+    // > This can be fixed with a bleeding table.
+    assert(local_qz.size() <= 1);
+    for (auto it : local_qz) {
+        assert(e_conn->execute(it));
     }
 
     return result;
