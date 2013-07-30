@@ -587,7 +587,7 @@ ResType *DeltaOutput::doQuery(Connect *conn, Connect *e_conn,
                 assert(e_conn->execute("ROLLBACK;"));
                 // FIXME: Set Bleeding table to Regular table.
                 // FIXME: Destroy query records.
-                return result;
+                throw CryptDBError("implement DeltaOutput::doQuery!");
             }
         }
         assert(e_conn->execute("COMMIT;"));
