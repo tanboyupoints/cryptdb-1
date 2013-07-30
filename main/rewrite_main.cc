@@ -245,7 +245,8 @@ deltaSanityCheck(Connect *conn, Connect *e_conn)
     ScopedMySQLRes r(dbres->n);
     const unsigned long long row_count = mysql_num_rows(r.res());
 
-    std::cerr << "There are " << row_count << " deltas!" << std::endl;
+    std::cerr << "There are " << row_count << " DeltaOutputz!"
+              << std::endl;
     if (0 == row_count) {
         return true;
     } else if (1 == row_count) {

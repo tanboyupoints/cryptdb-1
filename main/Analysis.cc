@@ -599,8 +599,14 @@ static bool
 revertAndCleanupEmbedded(Connect *e_conn, unsigned long delta_output_id)
 {
     assert(e_conn->execute("START TRANSACTION;"));
-    assert(setBleedingTableToRegularTable(e_conn));
-    assert(cleanupDeltaOutputAndQuery(e_conn, delta_output_id));
+
+    if (!setBleedingTableToRegularTable(e_conn)) {
+        throw CryptDBError("bleedingTable=regularTable failed!");
+    }
+    if (!cleanupDeltaOutputAndQuery(e_conn, delta_output_id)) {
+        throw CryptDBError("cleaning up delta failed!");
+    }
+
     assert(e_conn->execute("COMMIT;"));
 
     return true;
@@ -630,23 +636,35 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
     }
     assert(local_qz.size() == 0 || local_qz.size() == 1);
 
+    bool b;
+    #define ROLLBACK_AND_RETURN_ON_FAIL(status, c, ret)     \
+        {                                                   \
+            if (!status) {                                  \
+                assert(c->execute("ROLLBACK;"));            \
+                return ret;                                 \
+            }                                               \
+        }                                                   
+
     // Write to the bleeding table, store delta and store query.
     // -----------------------------------------------------------
     unsigned long delta_output_id;
     {
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
-            assert(it->apply(e_conn, Delta::BLEEDING_TABLE));
+            b = it->apply(e_conn, Delta::BLEEDING_TABLE);
+            ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, NULL);
         }
 
-        DeltaOutput::save(e_conn, &delta_output_id);
+        b = DeltaOutput::save(e_conn, &delta_output_id);
+        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, NULL);
 
         for (auto it : local_qz) {
-            assert(saveQuery(e_conn, it, delta_output_id, true, false));
+            b = saveQuery(e_conn, it, delta_output_id, true, false);
+            ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, NULL);
         }
         for (auto it : remote_qz) {
-            assert(saveQuery(e_conn, it, delta_output_id, false,
-                             remote_ddl));
+            b = saveQuery(e_conn, it, delta_output_id, false, remote_ddl);
+            ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, NULL);
         }
     }
     assert(e_conn->execute("COMMIT;"));
@@ -660,8 +678,7 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
         if (true == remote_ddl) {
             result = RewriteOutput::sendQuery(conn, remote_qz.back());
             if (!result || !result->ok) {
-                assert(revertAndCleanupEmbedded(e_conn,
-                                                delta_output_id));
+                revertAndCleanupEmbedded(e_conn, delta_output_id);
                 return NULL;
             }
         } else {
@@ -671,13 +688,13 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
                 // If the query failed, rollback.
                 if (!result || !result->ok) {
                     assert(conn->execute("ROLLBACK;"));
-
-                    assert(revertAndCleanupEmbedded(e_conn,
-                                                    delta_output_id));
+                    revertAndCleanupEmbedded(e_conn, delta_output_id);
                     return NULL;
                 }
             }
-            saveDMLCompletion(conn, delta_output_id);
+            b = saveDMLCompletion(conn, delta_output_id);
+            ROLLBACK_AND_RETURN_ON_FAIL(b, conn, NULL);
+
             assert(conn->execute("COMMIT;"));
         }
     }
@@ -687,14 +704,17 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
     {
         assert(e_conn->execute("START TRANSACTION;"));
         for (auto it : deltas) {
-            assert(it->apply(e_conn, Delta::REGULAR_TABLE));
+            b = it->apply(e_conn, Delta::REGULAR_TABLE);
+            ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, NULL);
         }
 
-        cleanupDeltaOutputAndQuery(e_conn, delta_output_id);
+        b = cleanupDeltaOutputAndQuery(e_conn, delta_output_id);
+        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, NULL);
 
         // FIXME: local_qz can have DDL.
         for (auto it : local_qz) {
-            assert(e_conn->execute(it));
+            b = e_conn->execute(it);
+            ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, NULL);
         }
         assert(e_conn->execute("COMMIT;"));
     }
