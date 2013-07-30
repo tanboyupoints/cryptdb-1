@@ -1106,10 +1106,9 @@ executeQuery(Rewriter &r, const ProxyState &ps, const std::string &q)
         QueryRewrite qr = r.rewrite(q);
         std::unique_ptr<ResType> res(qr.output->doQuery(ps.conn,
                                                         ps.e_conn, &r));
+        assert(res);
         if (true == qr.output->queryAgain()) { // Onion adjustment.
             return executeQuery(r, ps, q);
-        } else {
-            assert(res);
         }
         prettyPrintQueryResult(*res);
 
