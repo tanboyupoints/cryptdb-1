@@ -118,31 +118,52 @@ sanityCheck(SchemaInfo *schema)
 
 // FIXME: TESTME.
 static bool
-fixDelta(Connect *e_conn, unsigned long delta_id)
+fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
 {
-    throw CryptDBError("implement fixDelta!");
-    /*
-    const std::string regular_table_name =
-        "MetaObject";
-    const std::string bleeding_table_name =
-        "BleedingMetaObject";
+    const std::string query_table_name = "Query";
 
-    const std::string drop_query =
-        " DELETE pdb." + regular_table_name +
-        "   FROM pdb." + regular_table_name + ";";
-    assert(e_conn->execute(drop_query));
+    // Get local queries (should only be one).
+    DBResult *dbres;
+    const std::string get_local_query_query =
+        " SELECT query, local FROM pdb." + query_table_name +
+        "  WHERE delta_id = " + std::to_string(delta_id) +
+        "    AND local = TRUE;";
+    assert(e_conn->execute(get_local_query_query, dbres));
 
-    const std::string insert_query =
-        " INSERT pdb." + regular_table_name +
-        "   SELECT * FROM pdb." + bleeding_table_name + ";";
-    assert(e_conn->execute(insert_query));
+    ScopedMySQLRes local_r(dbres->n);
+    const unsigned long long local_row_count =
+        mysql_num_rows(local_r.res());
+    assert(1 == local_row_count);
+    const MYSQL_ROW local_row = mysql_fetch_row(local_r.res());
+    const unsigned long * const local_l =
+        mysql_fetch_lengths(local_r.res());
+    const std::string local_query(local_row[0], local_l[0]);
 
+    // Get remote queries.
+    const std::string remote_query =
+        " SELECT query, local FROM pdb." + query_table_name +
+        "  WHERE delta_id = " + std::to_string(delta_id) +
+        "    AND local = FALSE;"
+        "  ORDER BY id";
+    assert(e_conn->execute(remote_query, dbres));
+
+    ScopedMySQLRes remote_r(dbres->n);
+    MYSQL_ROW remote_row;
+    std::list<std::string> remote_queries;
+    while ((remote_row = mysql_fetch_row(remote_r.res()))) {
+        const unsigned long * const remote_l =
+            mysql_fetch_lengths(remote_r.res());
+        const std::string remote_query(remote_row[0], remote_l[0]);
+        remote_queries.push_back(remote_query);
+    }
+
+    // FIXME: Send the remote queries to determine what actions
+    // we need to take.
     return true;
-    */
 }
 
 static bool
-deltaSanityCheck(Connect *e_conn)
+deltaSanityCheck(Connect *conn, Connect *e_conn)
 {
     const std::string table_name = "Delta";
 
@@ -161,13 +182,16 @@ deltaSanityCheck(Connect *e_conn)
 
     ScopedMySQLRes r(dbres->n);
     const unsigned long long row_count = mysql_num_rows(r.res());
+
     std::cerr << "There are " << row_count << " deltas!" << std::endl;
-    // FIXME.
-    const unsigned long delta_id = 0;
     if (0 == row_count) {
         return true;
     } else if (1 == row_count) {
-        return fixDelta(e_conn, delta_id);
+        MYSQL_ROW row = mysql_fetch_row(r.res());
+        const unsigned long * const l = mysql_fetch_lengths(r.res());
+        const std::string string_delta_id(row[0], l[0]);
+        const unsigned long delta_id = atoi(string_delta_id.c_str());
+        return fixDelta(conn, e_conn, delta_id);
     } else {
         throw CryptDBError("Too many deltas!");
     }
@@ -180,7 +204,7 @@ deltaSanityCheck(Connect *e_conn)
 //  2> INSERTing
 //  3> SELECTing
 static SchemaInfo *
-loadSchemaInfo(Connect *e_conn)
+loadSchemaInfo(Connect *conn, Connect *e_conn)
 {
     SchemaInfo *schema = new SchemaInfo(); 
     // Recursively rebuild the AbstractMeta<Whatever> and it's children.
@@ -197,7 +221,7 @@ loadSchemaInfo(Connect *e_conn)
     loadChildren(schema);
     // FIXME: Ideally we would do this before loading the schema.
     // But first we must decide on a place to create the database from.
-    assert(deltaSanityCheck(e_conn));
+    assert(deltaSanityCheck(conn, e_conn));
     assert(sanityCheck(schema));
     
     return schema;
@@ -832,7 +856,7 @@ Rewriter::rewrite(const std::string & q)
     // printEmbeddedState(ps);
 
     // FIXME: Memleak 'schema'.
-    const SchemaInfo * const schema = loadSchemaInfo(ps.e_conn);
+    const SchemaInfo * const schema = loadSchemaInfo(ps.conn, ps.e_conn);
     Analysis analysis = Analysis(schema);
 
     // FIXME: Memleak return of 'dispatchOnLex()'

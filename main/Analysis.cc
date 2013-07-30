@@ -505,7 +505,7 @@ DeltaOutput::~DeltaOutput()
 {;}
 
 static bool saveQuery(Connect *e_conn, std::string query,
-                      unsigned long delta_id)
+                      unsigned long delta_id, bool local)
 {
     const std::string table_name = "Query";
     // Ensure the table exists.
@@ -513,6 +513,7 @@ static bool saveQuery(Connect *e_conn, std::string query,
         " CREATE TABLE IF NOT EXISTS pdb." + table_name +
         "   (query VARCHAR(200) NOT NULL,"
         "    delta_id BIGINT NOT NULL,"
+        "    local BOOLEAN NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
     assert(e_conn->execute(create_query));
@@ -521,7 +522,8 @@ static bool saveQuery(Connect *e_conn, std::string query,
         " INSERT INTO pdb." + table_name +
         "   (query, delta_id) VALUES ("
         " '" + escapeString(e_conn, query) + "', "
-        " "  + std::to_string(delta_id) + ");";
+        " "  + std::to_string(delta_id) + ","
+        " "  + bool_to_string(local) + ");";
     assert(e_conn->execute(insert_query));
 
     return true;
@@ -564,10 +566,10 @@ ResType *DeltaOutput::doQuery(Connect *conn, Connect *e_conn,
 
     const unsigned long query_delta_id = new_delta_ids.back();
     for (auto it : local_qz) {
-        assert(saveQuery(e_conn, it, query_delta_id));
+        assert(saveQuery(e_conn, it, query_delta_id, true));
     }
     for (auto it : remote_qz) {
-        assert(saveQuery(e_conn, it, query_delta_id));
+        assert(saveQuery(e_conn, it, query_delta_id, false));
     }
     assert(e_conn->execute("COMMIT;"));
     // -----------------------------------------------------------
