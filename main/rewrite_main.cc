@@ -138,6 +138,9 @@ recoverableDeltaError(unsigned int err)
 static bool
 fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
 {
+    std::list<std::string> local_qz;
+    bool expect_ddl;
+
     const std::string query_table_name = "Query";
 
     // Get local queries (should only be one).
@@ -152,11 +155,19 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
     ScopedMySQLRes local_r(dbres->n);
     const unsigned long long local_row_count =
         mysql_num_rows(local_r.res());
-    assert(1 == local_row_count);
-    const MYSQL_ROW local_row = mysql_fetch_row(local_r.res());
-    const unsigned long * const local_l =
-        mysql_fetch_lengths(local_r.res());
-    const std::string local_query(local_row[0], local_l[0]);
+    if (1 == local_row_count) {
+        expect_ddl = true;
+        const MYSQL_ROW local_row = mysql_fetch_row(local_r.res());
+        const unsigned long * const local_l =
+            mysql_fetch_lengths(local_r.res());
+        const std::string local_query(local_row[0], local_l[0]);
+        local_qz.push_back(local_query);
+    } else if (0 == local_row_count) {
+        expect_ddl = false;
+    } else {
+        throw CryptDBError("Too many local queries!");
+    }
+
 
     // Get remote queries (ORDER matters).
     const std::string remote_query =
@@ -169,17 +180,20 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
     ScopedMySQLRes remote_r(dbres->n);
     MYSQL_ROW remote_row;
     std::list<std::string> remote_queries;
-    bool has_ddl = false;
     while ((remote_row = mysql_fetch_row(remote_r.res()))) {
         const unsigned long * const remote_l =
             mysql_fetch_lengths(remote_r.res());
         const std::string remote_query(remote_row[0], remote_l[0]);
         const std::string remote_ddl(remote_row[1], remote_l[1]);
-        has_ddl = has_ddl || string_to_bool(remote_ddl);
+        const bool ddl = string_to_bool(remote_ddl);
+        if (ddl != expect_ddl) {
+            throw CryptDBError("Expectations of DDLness are unmatched!");
+        }
+
         remote_queries.push_back(remote_query);
     }
 
-    if (has_ddl) {  // Handle single DDL query.
+    if (expect_ddl) {  // Handle single DDL query.
         assert(remote_queries.size() == 1);
         if (false == conn->execute(remote_queries.back())) {
             unsigned int err = conn->get_mysql_errno();
@@ -225,7 +239,9 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
             throw CryptDBError("cleaning up delta fail!");
         }
         // FIXME: local_query can be DDL.
-        assert(e_conn->execute(local_query));
+        for (auto it : local_qz) {
+            assert(e_conn->execute(it));
+        }
         assert(e_conn->execute("COMMIT;"));
     }
 
