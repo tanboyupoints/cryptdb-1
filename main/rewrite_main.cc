@@ -148,6 +148,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
         "    AND local = TRUE;";
     assert(e_conn->execute(get_local_query_query, dbres));
 
+    // FIXME: Onion adjustment queries do not have local.
     ScopedMySQLRes local_r(dbres->n);
     const unsigned long long local_row_count =
         mysql_num_rows(local_r.res());
@@ -214,8 +215,15 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
     // Cleanup database and do local query.
     {
         assert(e_conn->execute("START TRANSACTION;"));
-        setRegularTableToBleedingTable(e_conn);
-        cleanupDeltaOutputAndQuery(e_conn, delta_output_id);
+        if (false == setRegularTableToBleedingTable(e_conn)) {
+            assert(e_conn->execute("ROLLBACK;"));
+            throw CryptDBError("regular=bleeding fail!");
+        }
+
+        if (false == cleanupDeltaOutputAndQuery(e_conn,delta_output_id)) {
+            assert(e_conn->execute("ROLLBACK;"));
+            throw CryptDBError("cleaning up delta fail!");
+        }
         // FIXME: local_query can be DDL.
         assert(e_conn->execute(local_query));
         assert(e_conn->execute("COMMIT;"));
@@ -257,7 +265,7 @@ deltaSanityCheck(Connect *conn, Connect *e_conn)
             atoi(string_delta_output_id.c_str());
         return fixDelta(conn, e_conn, delta_output_id);
     } else {
-        throw CryptDBError("Too many deltas!");
+        throw CryptDBError("Too many DeltaOutputz!");
     }
 }
 
@@ -291,7 +299,6 @@ loadSchemaInfo(Connect *conn, Connect *e_conn)
     return schema;
 }
 
-/*
 static void
 printEC(Connect * e_conn, const std::string & command) {
     DBResult * dbres;
@@ -299,22 +306,17 @@ printEC(Connect * e_conn, const std::string & command) {
     ResType res = dbres->unpack();
     printRes(res);
 }
-*/
 
 static void
 printEmbeddedState(const ProxyState & ps) {
-    /*
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables from pdb;");
-    printEC(ps.e_conn, "selecT * from pdb.tableMeta_schemaInfo;");
-    printEC(ps.e_conn, "select * from pdb.tableMeta;");
-    printEC(ps.e_conn, "selecT * from pdb.fieldMeta_tableMeta;");
-    printEC(ps.e_conn, "select * from pdb.fieldMeta;");
-    printEC(ps.e_conn, "selecT * from pdb.onionMeta_fieldMeta;");
-    printEC(ps.e_conn, "select * from pdb.onionMeta;");
-    printEC(ps.e_conn, "selecT * from pdb.encLayer_onionMeta;");
-    printEC(ps.e_conn, "select * from pdb.encLayer;");
-    */
+    std::cout << "regular" << std::endl << std::endl;
+    printEC(ps.e_conn, "select * from pdb.MetaObject;");
+    std::cout << "bleeding" << std::endl << std::endl;
+    printEC(ps.e_conn, "select * from pdb.BleedingMetaObject;");
+    printEC(ps.e_conn, "select * from pdb.Query;");
+    printEC(ps.e_conn, "select * from pdb.DeltaOutput;");
 }
 
 template <typename type> static void

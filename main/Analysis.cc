@@ -572,7 +572,7 @@ static bool
 tableCopy(Connect *c, const std::string &src, const std::string &dest)
 {
     const std::string delete_query =
-        " DELETE FROM dest;";
+        " DELETE FROM " + dest + ";";
     assert(c->execute(delete_query));
 
     const std::string insert_query =
@@ -698,6 +698,7 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
             assert(conn->execute("COMMIT;"));
         }
     }
+return NULL;
 
     // > Write to regular table and apply original query.
     // > Remove delta and original query from embedded db.
