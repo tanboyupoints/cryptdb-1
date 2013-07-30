@@ -143,7 +143,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
     // Get local queries (should only be one).
     DBResult *dbres;
     const std::string get_local_query_query =
-        " SELECT query, local FROM pdb." + query_table_name +
+        " SELECT query FROM pdb." + query_table_name +
         "  WHERE delta_id = " + std::to_string(delta_id) +
         "    AND local = TRUE;";
     assert(e_conn->execute(get_local_query_query, dbres));
@@ -159,7 +159,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
 
     // Get remote queries (ORDER matters).
     const std::string remote_query =
-        " SELECT query, local FROM pdb." + query_table_name +
+        " SELECT query, ddl FROM pdb." + query_table_name +
         "  WHERE delta_id = " + std::to_string(delta_id) +
         "    AND local = FALSE;"
         "  ORDER BY ASC id";
@@ -168,39 +168,50 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
     ScopedMySQLRes remote_r(dbres->n);
     MYSQL_ROW remote_row;
     std::list<std::string> remote_queries;
+    bool has_ddl = false;
     while ((remote_row = mysql_fetch_row(remote_r.res()))) {
         const unsigned long * const remote_l =
             mysql_fetch_lengths(remote_r.res());
         const std::string remote_query(remote_row[0], remote_l[0]);
+        const std::string remote_ddl(remote_row[1], remote_l[1]);
+        has_ddl = has_ddl || string_to_bool(remote_ddl);
         remote_queries.push_back(remote_query);
     }
 
-    // Send the remote queries to determine what actions
-    // we need to take.
-    // HACKy: Maybe a way to make this cleaner.
-    bool failure = false;
-    bool success = false;
-    for (auto it : remote_queries) {
-        if (conn->execute(it, dbres)) {
-            if (true == failure) {
-                throw CryptDBError("All queries must fail or succeed"
-                                   " in delta recovery!");
-            }
-
-            success = true;
-        } else {
-            if (true == success) {
-                throw CryptDBError("All queries must fail or succeed"
-                                   " in delta recovery!");
-            }
-    
+    if (has_ddl) {  // Handle single DDL query.
+        assert(remote_queries.size() == 1);
+        if (false == conn->execute(remote_queries.back())) {
             unsigned int err = conn->get_mysql_errno();
-            if (recoverableDeltaError(err)) {
-                failure = true;
-            } else {
-                throw CryptDBError("Unrecoverable error in Delta"
+            if (false == recoverableDeltaError(err)) {
+                throw CryptDBError("Unrecoverable error in Delta "
                                    " recovery!");
             }
+        }
+    } else {        // Handle one or more DML queries.
+        DBResult *dbres;
+        const std::string dml_table = "DMLCompletion";
+        const std::string dml_query =
+            " SELECT * FROM " + dml_table +
+            "  WHERE delta_id = " + std::to_string(delta_id) + ";";
+        assert(conn->execute(dml_query, dbres));
+        
+        ScopedMySQLRes r(dbres->n);
+        const unsigned long long dml_row_count =
+            mysql_num_rows(r.res());
+        if (0 == dml_row_count) {
+            assert(conn->execute("START TRANSACTION;"));
+            for (auto it : remote_queries) {
+                assert(conn->execute(it));
+            }
+            // FIXME: Duplicated.
+            const std::string dml_insert_query =
+                " INSERT INTO " + dml_table +
+                "   (delta_id) VALUES ("
+                " " + std::to_string(delta_id) + ");";
+            assert(conn->execute(dml_insert_query));
+            assert(conn->execute("COMMIT"));
+        } else if (1 > dml_row_count) {
+            throw CryptDBError("Too many DML table results!");
         }
     }
 
@@ -235,7 +246,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_id)
         assert(e_conn->execute("COMMIT;"));
     }
 
-    return failure != success;
+    return true;
 }
 
 static bool

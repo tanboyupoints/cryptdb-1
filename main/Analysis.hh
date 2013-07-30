@@ -391,11 +391,9 @@ public:
         : RewriteOutput(original_query), deltas(deltas) {}
     virtual ~DeltaOutput() = 0;
     virtual ResType *doQuery(Connect *conn, Connect *e_conn,
-                            Rewriter *rewriter = NULL);
-    virtual std::list<std::string> localQueries() = 0;
-    virtual std::list<std::string> remoteQueries() = 0;
+                            Rewriter *rewriter = NULL) = 0;
 
-private:
+protected:
     const std::vector<Delta *> deltas;
 };
 
@@ -405,9 +403,8 @@ public:
               std::vector<Delta *> deltas)
         : DeltaOutput(original_query, deltas), new_query(new_query) {}
     ~DDLOutput() {;}
-
-    std::list<std::string> localQueries();
-    std::list<std::string> remoteQueries();
+    ResType *doQuery(Connect *conn, Connect *e_conn,
+                     Rewriter *rewriter = NULL);
 
 private:
     const std::string new_query;
@@ -420,10 +417,10 @@ public:
         : DeltaOutput("", deltas),
           adjust_queries(adjust_queries) {}
     ~AdjustOnionOutput() {;}
+    ResType *doQuery(Connect *conn, Connect *e_conn,
+                     Rewriter *rewriter = NULL);
 
     bool queryAgain();
-    std::list<std::string> localQueries();
-    std::list<std::string> remoteQueries();
 
 private:
     const std::list<std::string> adjust_queries;
