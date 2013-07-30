@@ -367,16 +367,10 @@ ResType *DMLOutput::doQuery(Connect *conn, Connect *e_conn,
     return sendQuery(conn, new_query);
 }
 
-// FIXME: Implement locking.
 ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
                                 Rewriter *rewriter)
 {
     assert(rewriter);
-
-    // Acquire lock.
-    const std::string lock_query = "LOCK TABLES " + this->crypted_table
-        + " WRITE;";
-    assert(conn->execute(lock_query));
 
     // Retrieve rows from database.
     std::ostringstream select_stream;
@@ -462,10 +456,6 @@ ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
     ResType * const ret_value =
         executeQuery(*rewriter, this->ps, push_results_stream.str());
     assert(ret_value);
-
-    // Release lock.
-    const std::string unlock_query = "UNLOCK TABLES;";
-    assert(conn->execute(unlock_query));
 
     return ret_value;
 }
@@ -598,7 +588,6 @@ cleanupDeltaOutputAndQuery(Connect *e_conn,
 }
 
 // FIXME: Test DB by reading out of it for later ops.
-// FIXME: Needs lock?
 static
 ResType *
 handleDeltaQuery(Connect *conn, Connect *e_conn,
