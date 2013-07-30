@@ -830,7 +830,7 @@ initializeMetaDataTables(Connect *conn, Connect *e_conn)
     const std::string query_table_name = "Query";
     const std::string create_query_table =
         " CREATE TABLE IF NOT EXISTS pdb." + query_table_name +
-        "   (query VARCHAR(200) NOT NULL,"
+        "   (query VARCHAR(500) NOT NULL,"
         "    delta_output_id BIGINT NOT NULL,"
         "    local BOOLEAN NOT NULL,"
         "    ddl BOOLEAN NOT NULL,"
@@ -850,8 +850,8 @@ initializeMetaDataTables(Connect *conn, Connect *e_conn)
 
     const std::string create_meta_table =
         " CREATE TABLE IF NOT EXISTS pdb." + meta_table_name +
-        "   (serial_object VARBINARY(200) NOT NULL,"
-        "    serial_key VARBINARY(200) NOT NULL,"
+        "   (serial_object VARBINARY(500) NOT NULL,"
+        "    serial_key VARBINARY(500) NOT NULL,"
         "    parent_id BIGINT NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
@@ -860,8 +860,8 @@ initializeMetaDataTables(Connect *conn, Connect *e_conn)
     const std::string bleeding_table_name = "BleedingMetaObject";
     const std::string create_bleeding_table =
         " CREATE TABLE IF NOT EXISTS pdb." + bleeding_table_name +
-        "   (serial_object VARBINARY(200) NOT NULL,"
-        "    serial_key VARBINARY(200) NOT NULL,"
+        "   (serial_object VARBINARY(500) NOT NULL,"
+        "    serial_key VARBINARY(500) NOT NULL,"
         "    parent_id BIGINT NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
