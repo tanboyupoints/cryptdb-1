@@ -995,7 +995,12 @@ Connection::executeRewriter(std::string query) {
 
     //cout << query << endl;
     Rewriter *r = *re_it;
-    return ResType((bool)executeQuery(*r, r->ps, query)); 
+    ResType *dec_res = executeQuery(*r, r->ps, query);
+    if (dec_res) {
+        return *dec_res;
+    } else {
+        return ResType(false);
+    }
 }
 
 my_ulonglong
