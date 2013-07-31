@@ -192,7 +192,6 @@ public:
     EncSet es_out; // encset that this item can output
 
     RewritePlan(const EncSet & es, reason r) : r(r), es_out(es) {};
-    RewritePlan() {};
 
     //only keep plans that have parent_olk in es
 //    void restrict(const EncSet & es);
