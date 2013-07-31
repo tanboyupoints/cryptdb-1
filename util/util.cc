@@ -412,7 +412,7 @@ split(std::string s, const char * separators) {
     std::list<std::string> parts = std::list<std::string>();
     while (tok != NULL) {
         parts.push_back(std::string(tok));
-        tok = strtok(NULL, ",");
+        tok = strtok(NULL, separators);
     }
     return parts;
 }
