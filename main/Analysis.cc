@@ -734,7 +734,6 @@ OnionMeta *Analysis::getOnionMeta(const std::string &table,
     return om;
 }
 
-// FIXME: Field aliasing.
 FieldMeta *Analysis::getFieldMeta(const std::string &table,
                                   const std::string &field) const
 {

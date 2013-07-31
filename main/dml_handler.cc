@@ -476,6 +476,8 @@ rewrite_proj(Item * i, const RewritePlan * rp, Analysis & a, List<Item> & newLis
     newList.push_back(ir);
     bool use_salt = needsSalt(olk);
 
+    // This line implicity handles field aliasing for at least some cases.
+    // As i->name can/will be the alias.
     addToReturn(a.rmeta, a.pos++, olk, use_salt, i->name);
 
     if (use_salt) {
