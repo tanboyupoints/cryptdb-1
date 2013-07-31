@@ -22,6 +22,7 @@
 #include <main/dml_handler.hh>
 #include <main/ddl_handler.hh>
 #include <main/List_helpers.hh>
+#include <main/metadata_tables.hh>
 
 #include "field.h"
 
@@ -140,7 +141,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
     std::list<std::string> local_queries;
     bool expect_ddl;
 
-    const std::string query_table_name = "Query";
+    const std::string query_table_name = MetaDataTables::Name::query();
 
     // Get local queries (should only be one).
     DBResult *dbres;
@@ -208,7 +209,8 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
         }
     } else {        // Handle one or more DML queries.
         DBResult *dbres;
-        const std::string dml_table = "DMLCompletion";
+        const std::string dml_table =
+            MetaDataTables::Name::dmlCompletion();
         const std::string dml_query =
             " SELECT * FROM " + dml_table +
             "  WHERE delta_output_id = " +
@@ -247,6 +249,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
 
     // FIXME: local_query can be DDL.
     // > This can be fixed with a bleeding table.
+    assert(local_queries.size() <= 1);
     for (auto it : local_queries) {
         assert(e_conn->execute(it));
     }
@@ -257,7 +260,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
 static bool
 deltaSanityCheck(Connect *conn, Connect *e_conn)
 {
-    const std::string table_name = "DeltaOutput";
+    const std::string table_name = MetaDataTables::Name::delta();
 
     DBResult *dbres;
     const std::string get_deltas =
@@ -818,64 +821,6 @@ noRewrite(LEX * lex) {
     return false;
 }
 
-static void
-initializeMetaDataTables(Connect *conn, Connect *e_conn)
-{
-    const std::string create_db =
-        " CREATE DATABASE IF NOT EXISTS pdb;";
-    assert(e_conn->execute(create_db));
-
-    const std::string delta_table_name = "DeltaOutput";
-    const std::string create_delta_table =
-        " CREATE TABLE IF NOT EXISTS pdb." + delta_table_name +
-        "    (remote_complete BOOLEAN NOT NULL,"
-        "     id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-    assert(e_conn->execute(create_delta_table));
-
-    const std::string query_table_name = "Query";
-    const std::string create_query_table =
-        " CREATE TABLE IF NOT EXISTS pdb." + query_table_name +
-        "   (query VARCHAR(500) NOT NULL,"
-        "    delta_output_id BIGINT NOT NULL,"
-        "    local BOOLEAN NOT NULL,"
-        "    ddl BOOLEAN NOT NULL,"
-        "    id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-    assert(e_conn->execute(create_query_table));
-
-    const std::string dml_table_name = "DMLCompletion";
-    const std::string create_dml_table =
-        " CREATE TABLE IF NOT EXISTS " + dml_table_name +
-        "   (delta_output_id BIGINT NOT NULL,"
-        "    id SERIAL)"
-        " ENGINE=InnoDB;";
-    assert(conn->execute(create_dml_table));
-
-    const std::string meta_table_name =  "MetaObject";
-
-    const std::string create_meta_table =
-        " CREATE TABLE IF NOT EXISTS pdb." + meta_table_name +
-        "   (serial_object VARBINARY(500) NOT NULL,"
-        "    serial_key VARBINARY(500) NOT NULL,"
-        "    parent_id BIGINT NOT NULL,"
-        "    id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-    assert(e_conn->execute(create_meta_table));
-
-    const std::string bleeding_table_name = "BleedingMetaObject";
-    const std::string create_bleeding_table =
-        " CREATE TABLE IF NOT EXISTS pdb." + bleeding_table_name +
-        "   (serial_object VARBINARY(500) NOT NULL,"
-        "    serial_key VARBINARY(500) NOT NULL,"
-        "    parent_id BIGINT NOT NULL,"
-        "    id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-    assert(e_conn->execute(create_bleeding_table));
-
-    return;
-}
-
 Rewriter::Rewriter(ConnectionInfo ci,
                    const std::string &embed_dir,
                    const std::string &dbname,
@@ -896,7 +841,7 @@ Rewriter::Rewriter(ConnectionInfo ci,
     // Must be called before loadSchemaInfo.
     buildTypeTextTranslator();
     // printEmbeddedState(ps);
-    initializeMetaDataTables(ps.conn, ps.e_conn);
+    MetaDataTables::initialize(ps.conn, ps.e_conn);
 
     dml_dispatcher = buildDMLDispatcher();
     ddl_dispatcher = buildDDLDispatcher();
