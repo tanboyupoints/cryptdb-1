@@ -21,6 +21,16 @@
  'port'=>"",#optional
  'chset'=>"utf8",#optional, default charset
  );
+
+ $CRYPTDBDEF=array(
+ 'user'=>"",#required
+ 'pwd'=>"", #required
+ 'db'=>"",  #optional, default DB
+ 'host'=>"",#optional
+ 'port'=>"",#optional
+ 'chset'=>"utf8",#optional, default charset
+ );
+
  date_default_timezone_set('UTC');#required by PHP 5.1+
 
 //constants
@@ -30,6 +40,8 @@
  $BOM=chr(239).chr(187).chr(191);
  $SHOW_T="SHOW TABLE STATUS";
  $DB=array(); #working copy for DB settings
+ $CRYPTDB=array(); #working copy for CryptDB settings
+
 
  $self=$_SERVER['PHP_SELF'];
 
@@ -95,6 +107,8 @@
  $SQLq=trim($_REQUEST['q']);
  $page=$_REQUEST['p']+0;
  if ($_REQUEST['refresh'] && $DB['db'] && preg_match('/^show/',$SQLq) ) $SQLq=$SHOW_T;
+ 
+  //cryptdb_connect('nodie');
 
  if (db_connect('nodie')){
     $time_start=microtime_float();
@@ -249,7 +263,7 @@ function display_select($sth,$q){
 }
 
 function print_header(){
- global $err_msg,$VERSION,$DB,$dbh,$self,$is_sht,$xurl,$SHOW_T;
+ global $err_msg,$VERSION,$DB,$CRYPTDB,$dbh,$self,$is_sht,$xurl,$SHOW_T;
  $dbn=$DB['db'];
 ?>
 <!DOCTYPE html>
@@ -432,6 +446,7 @@ Tables:
 ?>
 </select>
 
+<?php echo $z.'&q='.urlencode($SHOW_T)?>'>show tables</a>
 
 <?php } ?>
 <?php } ?>
@@ -505,19 +520,34 @@ Password: <input type="password" name="pwd" value="">
 
 
 function print_cfg(){
- global $DB,$err_msg,$self;
+ global $DB,$CRYPTDB,$err_msg,$self;
  print_header();
 ?>
 <center>
-<h3>DB Connection Settings</h3>
+<h3>CryptDB</h3>
 <div class="frm">
-<label class="l">DB user name:</label><input type="text" name="v[user]" value="<?php echo $DB['user']?>"><br>
+
+<label class="l">DB user:</label><input type="text" name="v[user]" value="<?php echo $DB['user']?>"><br>
 <label class="l">Password:</label><input type="password" name="v[pwd]" value=""><br>
+<br>
+
+<label class="l">CryptDB user:</label><input type="text" name="c[user]" value="<?php echo $CRYPTDB['user']?>"><br>
+<label class="l">Password:</label><input type="password" name="c[pwd]" value=""><br>
+<label class="l">Port:</label><input type="text" name="c[port]" value="<?php echo $CRYPTDB['port']?>" size="4"><br>
+
 <div style="text-align:right"><a href="#" class="ajax" onclick="cfg_toggle()">advanced settings</a></div>
 <div id="cfg-adv" style="display:none;">
-<label class="l">DB name:</label><input type="text" name="v[db]" value="<?php echo $DB['db']?>"><br>
-<label class="l">MySQL host:</label><input type="text" name="v[host]" value="<?php echo $DB['host']?>"> port: <input type="text" name="v[port]" value="<?php echo $DB['port']?>" size="4"><br>
-<label class="l">Charset:</label><select name="v[chset]"><option value="">- default -</option><?php echo chset_select($DB['chset'])?></select><br>
+
+
+
+<label class="l">Charset:</label>
+
+<select name="v[chset]"><option value="">- default -</option><?php echo chset_select($DB['chset'])?>
+</select><br>
+
+<br>
+
+
 <br><input type="checkbox" name="rmb" value="1" checked> Remember in cookies for 30 days
 </div>
 <center>
@@ -554,6 +584,35 @@ function db_connect($nodie=0){
  return $dbh;
 }
 
+function cryptdb_connect($nodie=0){
+ global $cryptdbh,$CRYPTDB,$err_msg;
+
+ echo "#".$CRYPTDB['host'].($CRYPTDB['port']?":$CRYPTDB[port]":''),$CRYPTDB['user'],$CRYPTDB['pwd'];
+ $cryptdbh=@mysql_connect($CRYPTDB['host'].($CRYPTDB['port']?":$CRYPTDB[port]":''),$CRYPTDB['user'],$CRYPTDB['pwd']);
+ if (!$cryptdbh) 
+ {
+    $err_msg='Cannot connect to the CryptDB proxy database because: '.mysql_error();
+    echo $err_msg;
+    //TODO:FIX this
+    die($err_msg);
+ }
+
+ if ($cryptdbh && $CRYPTDB['db']) {
+  $res=mysql_select_db($CRYPTDB['db'], $cryptdbh);
+  if (!$res) {
+     $err_msg='Cannot select cryptdb because: '.mysql_error();
+     if (!$nodie) 
+     {
+         die($err_msg);
+     }
+  }else{
+     if ($CRYPTDB['chset']) db_query("SET NAMES ".$CRYPTDB['chset']);
+  }
+ }
+
+ return $cryptdbh;
+}
+
 function db_checkconnect($dbh1=NULL, $skiperr=0){
  global $dbh;
  if (!$dbh1) $dbh1=&$dbh;
@@ -562,6 +621,16 @@ function db_checkconnect($dbh1=NULL, $skiperr=0){
     $dbh1=&$dbh;
  }
  return $dbh1;
+}
+
+function cryptdb_checkconnect($cryptdbh1=NULL, $skiperr=0){
+ global $cryptdbh;
+ if (!$cryptdbh1) $cryptdbh1=&$cryptdbh;
+ if (!$cryptdbh1 or !mysql_ping($cryptdbh1)) {
+    cryptdb_connect($skiperr);
+    $cryptdbh1=&$cryptdbh;
+ }
+ return $cryptdbh1;
 }
 
 function db_disconnect(){
@@ -734,6 +803,8 @@ function killmq($value){
 function savecfg(){
  $v=$_REQUEST['v'];
  $_SESSION['DB']=$v;
+ $c=$_REQUEST['c'];
+ $_SESSION['CRYPTDB']=$c;
  unset($_SESSION['sql_sd']);
 
  if ($_REQUEST['rmb']){
@@ -744,6 +815,15 @@ function savecfg(){
     setcookie("conn[host]",$v['host'],$tm);
     setcookie("conn[port]",$v['port'],$tm);
     setcookie("conn[chset]",$v['chset'],$tm);
+
+    setcookie("cconn[db]",  $c['db'],$tm);
+    setcookie("cconn[user]",$c['user'],$tm);
+    setcookie("cconn[pwd]", $c['pwd'],$tm);
+    setcookie("cconn[host]",$c['host'],$tm);
+    setcookie("cconn[port]",$c['port'],$tm);
+    setcookie("cconn[chset]",$c['chset'],$tm);
+
+
  }else{
     setcookie("conn[db]",  FALSE,-1);
     setcookie("conn[user]",FALSE,-1);
@@ -751,12 +831,20 @@ function savecfg(){
     setcookie("conn[host]",FALSE,-1);
     setcookie("conn[port]",FALSE,-1);
     setcookie("conn[chset]",FALSE,-1);
+
+
+    setcookie("cconn[db]",  FALSE,-1);
+    setcookie("cconn[user]",FALSE,-1);
+    setcookie("cconn[pwd]", FALSE,-1);
+    setcookie("cconn[host]",FALSE,-1);
+    setcookie("cconn[port]",FALSE,-1);
+    setcookie("cconn[chset]",FALSE,-1);
  }
 }
 
 //during login only - from cookies or use defaults;
 function loadcfg(){
- global $DBDEF;
+ global $DBDEF, $CRYPTDBDEF;
 
  if( isset($_COOKIE['conn']) ){
     $a=$_COOKIE['conn'];
@@ -765,11 +853,21 @@ function loadcfg(){
     $_SESSION['DB']=$DBDEF;
  }
  if (!strlen($_SESSION['DB']['chset'])) $_SESSION['DB']['chset']=$DBDEF['chset'];#don't allow empty charset
+
+
+ if( isset($_COOKIE['cconn']) ){
+    $a=$_COOKIE['cconn'];
+    $_SESSION['CRYPTDB']=$_COOKIE['cconn'];
+ }else{
+    $_SESSION['CRYPTDB']=$CRYPTDBDEF;
+ }
+ if (!strlen($_SESSION['CRYPTDB']['chset'])) $_SESSION['CRYPTDB']['chset']=$CRYPTDBDEF['chset'];#don't allow empty charset
+
 }
 
 //each time - from session to $DB_*
 function loadsess(){
- global $DB;
+ global $DB, $CRYPTDB;
 
  $DB=$_SESSION['DB'];
 
@@ -778,6 +876,16 @@ function loadsess(){
  if ($rdb) {
     $DB['db']=$rdb;
  }
+
+ $CRYPTDB=$_SESSION['CRYPTDB'];
+
+ $cryptrdb=$_REQUEST['db'];
+ if ($cryptrdb=='*') $cryptrdb='';
+ if ($cryptrdb) {
+    $CRYPTDB['db']=$cryptrdb;
+ }
+
+
 }
 
 function print_export(){
