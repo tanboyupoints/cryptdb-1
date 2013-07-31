@@ -247,6 +247,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
 
     // FIXME: local_query can be DDL.
     // > This can be fixed with a bleeding table.
+    assert(local_queries.size() <= 1);
     for (auto it : local_queries) {
         assert(e_conn->execute(it));
     }
