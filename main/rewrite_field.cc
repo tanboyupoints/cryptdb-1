@@ -39,7 +39,6 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
         std::string fieldname = i->field_name;
         std::string table = i->table_name;
-        std::string fullname = fullName(fieldname, table);
 
         FieldMeta * fm = a.getFieldMeta(table, fieldname);
 

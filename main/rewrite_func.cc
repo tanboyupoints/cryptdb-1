@@ -225,7 +225,7 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
         tr = reason(out_es, why, i);
 
         RewritePlan **childr_rp = new RewritePlan*[2];
-    
+
         auto it = List_iterator<Item>(*i->argument_list());
         unsigned int index = 0;
         for (;;) {
@@ -237,11 +237,9 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
             reason r;
             childr_rp[index] = gather(argitem, r, a);
             tr.add_child(r);
-            /*
             if (!childr_rp[index]->es_out.contains(PLAIN_OLK)) {
                 thrower() << "cannot obtain PLAIN for " << *argitem;
             }
-            */
             ++index;
         }
 
@@ -259,6 +257,8 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
                                    const RewritePlan * rp, Analysis & a) const
     {
         Item **items = new Item*[2];
+        const RewritePlanOneOLK * const rp_one =
+            static_cast<const RewritePlanOneOLK * const>(rp);
         auto it = List_iterator<Item>(*i->argument_list());
         unsigned int index = 0;
         for (;;) {
@@ -268,11 +268,14 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
             }
             assert(index < 2);
         
-            items[index++] = argitem;
+            items[index] =
+                itemTypes.do_rewrite(argitem, rp_one->olk,
+                                    rp_one->childr_rp[index], a);
+            items[index]->name = NULL;
+            ++index;
         }
 
         IT * res = new IT(items[0], items[1]);
-        rewrite_args_FN(res, olk, (const RewritePlanOneOLK *)rp, a);
         return res;
     }
 };
@@ -288,7 +291,7 @@ class CItemNullcheck : public CItemSubtypeFT<Item_bool_func, FT> {
         assert(i->argument_count() == 1);
 
         reason r;
-        RewritePlan **child_rp = new RewritePlan*[2];
+        RewritePlan **child_rp = new RewritePlan*[1];
         child_rp[0] = gather(args[0], r, a);
 
         EncSet solution = child_rp[0]->es_out;
