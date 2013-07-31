@@ -216,7 +216,8 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
     virtual RewritePlan * do_gather_type(Item_cond *i, reason &tr,
                                          Analysis & a) const
     {
-        assert(2 == i->argument_list()->elements);
+        const unsigned int arg_count = i->argument_list()->elements;
+        assert(2 <= arg_count);
 
         EncSet out_es = PLAIN_EncSet;
         EncSet child_es = PLAIN_EncSet;
@@ -232,7 +233,7 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
             Item *argitem = it++;
             if (!argitem)
                 break;
-            assert(index < 2);
+            assert(index < arg_count);
 
             reason r;
             childr_rp[index] = gather(argitem, r, a);
@@ -256,7 +257,9 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
     virtual Item * do_rewrite_type(Item_cond *i, const OLK & olk,
                                    const RewritePlan * rp, Analysis & a) const
     {
+        const unsigned int arg_count = i->argument_list()->elements;
         Item **items = new Item*[2];
+
         const RewritePlanOneOLK * const rp_one =
             static_cast<const RewritePlanOneOLK * const>(rp);
         auto it = List_iterator<Item>(*i->argument_list());
@@ -266,7 +269,7 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
             if (!argitem) {
                 break;
             }
-            assert(index < 2);
+            assert(index < arg_count);
         
             items[index] =
                 itemTypes.do_rewrite(argitem, rp_one->olk,
