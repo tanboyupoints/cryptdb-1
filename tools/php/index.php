@@ -108,28 +108,41 @@ $CRYPTDBDEF=array(
  $page=$_REQUEST['p']+0;
  if ($_REQUEST['refresh'] && $DB['db'] && preg_match('/^show/',$SQLq) ) $SQLq=$SHOW_T;
  
-  //cryptdb_connect('nodie');
+  cryptdb_connect('nodie');
 
+
+ /*
+  * Commands handler
+  */
  if (db_connect('nodie')){
      $time_start=microtime_float();
+
+     echo "->$" . "." . $DB['db'] . "." . $_POST['describe_table'] . "." . "$<-"; 
+     if($_POST['describe_table'])
+     {
+         echo "DESCRIBE ON";
+     }
+
 
      if ($_REQUEST['phpinfo']){
          ob_start();phpinfo();$sqldr='<div style="font-size:130%">'.ob_get_clean().'</div>';
      }else{
          if ($DB['db']){
-             if ($_REQUEST['shex']){
-                 print_export();
-             }elseif ($_REQUEST['doex']){
-                 check_xss();do_export();
-             }elseif ($_REQUEST['shim']){
-                 print_import();
-             }elseif ($_REQUEST['doim']){
-                 check_xss();do_import();
-             }elseif ($_REQUEST['dosht']){
-                 check_xss();do_sht();
-             }elseif (!$_REQUEST['refresh'] || preg_match('/^select|show|explain|desc/i',$SQLq) ){
-                 if ($SQLq)check_xss();
-                 do_sql($SQLq);#perform non-select SQL only if not refresh (to avoid dangerous delete/drop)
+
+             // commands
+             if($_POST['cryptdb_describe_table'])
+             {
+                 $q = "describe " . $DB['db'] . "." . $_POST['cryptdb_describe_table'];
+                 do_sql($q);
+
+                 //TODO: handle all cryptdb web commands
+             } else {
+                 if ($_REQUEST['shex']){
+                     print_export();
+                 }elseif (!$_REQUEST['refresh'] || preg_match('/^select|show|explain|desc/i',$SQLq) ){
+                     if ($SQLq)check_xss();
+                     do_sql($SQLq);#perform non-select SQL only if not refresh (to avoid dangerous delete/drop)
+                 }
              }
          }else{
              if ( $_REQUEST['refresh'] ){
@@ -405,6 +418,8 @@ function chkall(cab){
 function sht(f){
     document.DF.dosht.value=f;
 }
+
+
 <?php }?>
 </script>
 
@@ -427,27 +442,27 @@ function sht(f){
 </select>
 
 <?php if($dbn){ $z=" &#183; <a href='$self?$xurl&db=$dbn"; ?>
-
-
-
+<?php if($_POST['cryptdb_describe_table'] && $dbn) { 
+    $z.'&q='.urlencode($var);
+} ?>
 Tables:
 
 
-<select name="table">
-
+<form action="'<?php echo $self?>'" method="post">
+<select name="cryptdb_describe_table" onChange="location.href='<?php $var = "describe " . $_POST['cryptdb_describe_table']; echo $z.'&q='.urlencode($var)?>'">
 <?php 
  $a=0;
- $array = get_db_tables($dbn) ; foreach($array as $key=>$value) { 
+ $array = get_db_tables($dbn) ; foreach($array as $key=>$value) 
+{ 
      $accesskey = "Tables_in_" . $dbn;
 ?>
 <option value="<?php echo $value[$accesskey]; ?>"><?php echo $value[$accesskey]; ?></option>
-<?php } 
+<?php } ?>
 
-//<?php echo $z.'&q='.urlencode($SHOW_T)?>'>show tables</a>
-?>
 </select>
+<input type="submit" value="Describe table">
+</form>
 
-<?php echo $z.'&q='.urlencode($SHOW_T)?>'>show tables</a>
 
 <?php } ?>
 <?php } ?>
@@ -589,6 +604,7 @@ function cryptdb_connect($nodie=0){
     global $cryptdbh,$CRYPTDB,$err_msg;
 
     echo "#".$CRYPTDB['host'].($CRYPTDB['port']?":$CRYPTDB[port]":''),$CRYPTDB['user'],$CRYPTDB['pwd'];
+    return;
     $cryptdbh=@mysql_connect($CRYPTDB['host'].($CRYPTDB['port']?":$CRYPTDB[port]":''),$CRYPTDB['user'],$CRYPTDB['pwd']);
     if (!$cryptdbh) 
     {
@@ -694,7 +710,6 @@ function get_db_select($sel=''){
     }
     return @sel($arr,'Database',$sel);
 }
-
 
 function get_db_tables($sel='') {
     $query = "show tables from " . $_REQUEST['db'];
@@ -919,52 +934,6 @@ function print_export(){
     exit;
 }
 
-function do_export(){
-    global $DB,$VERSION,$D,$BOM,$ex_isgz;
-    $rt=str_replace('`','',$_REQUEST['t']);
-    $t=explode(",",$rt);
-    $th=array_flip($t);
-    $ct=count($t);
-    $z=db_row("show variables like 'max_allowed_packet'");
-    $MAXI=floor($z['Value']*0.8);
-    if(!$MAXI)$MAXI=838860;
-    $aext='';$ctp='';
-
-    $ex_isgz=($_REQUEST['gz'])?1:0;
-    if ($ex_isgz) {
-        $aext='.gz';$ctp='application/x-gzip';
-    }
-    ex_start();
-
-    if ($ct==1&&$_REQUEST['et']=='csv'){
-        ex_hdr($ctp?$ctp:'text/csv',"$t[0].csv$aext");
-        if ($DB['chset']=='utf8') ex_end($BOM);
-
-        $sth=db_query("select * from `$t[0]`");
-        $fn=mysql_num_fields($sth);
-        for($i=0;$i<$fn;$i++){
-            $m=mysql_fetch_field($sth,$i);
-            ex_w(qstr($m->name).(($i<$fn-1)?",":""));
-        }
-        ex_w($D);
-        while($row=mysql_fetch_row($sth)) ex_w(to_csv_row($row));
-        ex_end();
-        exit;
-    }
-
-    ex_hdr($ctp?$ctp:'text/plain',"$DB[db]".(($ct==1&&$t[0])?".$t[0]":(($ct>1)?'.'.$ct.'tables':'')).".sql$aext");
-    ex_w("-- phpMiniAdmin dump $VERSION$D-- Datetime: ".date('Y-m-d H:i:s')."$D-- Host: $DB[host]$D-- Database: $DB[db]$D$D");
-    ex_w("/*!40030 SET NAMES $DB[chset] */;$D/*!40030 SET GLOBAL max_allowed_packet=16777216 */;$D$D");
-
-    $sth=db_query("show tables from `$DB[db]`");
-    while($row=mysql_fetch_row($sth)){
-        if (!$rt||array_key_exists($row[0],$th)) do_export_table($row[0],1,$MAXI);
-    }
-
-    ex_w("$D-- phpMiniAdmin dump end$D");
-    ex_end();
-    exit;
-}
 
 function do_export_table($t='',$isvar=0,$MAXI=838860){
     global $D;
@@ -1020,80 +989,6 @@ function ex_end(){
         gzclose($ex_gz);
         readfile($ex_tmpf);
     }
-}
-
-function print_import(){
-    global $self,$xurl,$DB;
-    print_header();
-?>
-<center>
-<h3>Import DB</h3>
-<div class="frm">
-<b>.sql</b> or <b>.gz</b> file: <input type="file" name="file1" value="" size=40><br>
-<input type="hidden" name="doim" value="1">
-<input type="submit" value=" Upload and Import " onclick="return ays()"><input type="button" value=" Cancel " onclick="window.location='<?php echo $self.'?'.$xurl.'&db='.$DB['db']?>'">
-</div>
-<br><br><br>
-<!--
-<h3>Import one Table from CSV</h3>
-<div class="frm">
-.csv file (Excel style): <input type="file" name="file2" value="" size=40><br>
-<input type="checkbox" name="r1" value="1" checked> first row contain field names<br>
-<small>(note: for success, field names should be exactly the same as in DB)</small><br>
-Character set of the file: <select name="chset"><?php echo chset_select('utf8')?></select>
-<br><br>
-Import into:<br>
-<input type="radio" name="tt" value="1" checked="checked"> existing table:
- <select name="t">
- <option value=''>- select -</option>
- <?php echo sel(db_array('show tables',NULL,0,1), 0, ''); ?>
-</select>
-<div style="margin-left:20px">
- <input type="checkbox" name="ttr" value="1"> replace existing DB data<br>
- <input type="checkbox" name="tti" value="1"> ignore duplicate rows
-</div>
-<input type="radio" name="tt" value="2"> create new table with name <input type="text" name="tn" value="" size="20">
-<br><br>
-<input type="hidden" name="doimcsv" value="1">
-<input type="submit" value=" Upload and Import " onclick="return ays()"><input type="button" value=" Cancel " onclick="window.location='<?php echo $self?>'">
-</div>
--->
-</center>
-<?php
-    print_footer();
-    exit;
-}
-
-function do_import(){
-    global $err_msg,$out_message,$dbh,$SHOW_T;
-    $err_msg='';
-    $F=$_FILES['file1'];
-
-    if ($F && $F['name']){
-        $filename=$F['tmp_name'];
-        $pi=pathinfo($F['name']);
-        if ($pi['extension']!='sql'){//if not sql - assume .gz
-            $tmpf=tempnam(sys_get_temp_dir(),'pma');
-            if (($gz=gzopen($filename,'rb')) && ($tf=fopen($tmpf,'wb'))){
-                while(!gzeof($gz)){
-                    if (fwrite($tf,gzread($gz,8192),8192)===FALSE){$err_msg='Error during gz file extraction to tmp file';break;}
-                }//extract to tmp file
-                gzclose($gz);fclose($tf);$filename=$tmpf;
-            }else{$err_msg='Error opening gz file';}
-        }
-        if (!$err_msg){
-            if (!do_multi_sql('', $filename)){
-                $err_msg='Import Error: '.mysql_error($dbh);
-            }else{
-                $out_message='Import done successfully';
-                do_sql($SHOW_T);
-                return;
-            }}
-    }else{
-        $err_msg="Error: Please select file first";
-    }
-    print_import();
-    exit;
 }
 
 // multiple SQL statements splitter
@@ -1217,25 +1112,6 @@ function do_one_sql($sql){
     return 1;
 }
 
-function do_sht(){
-    global $SHOW_T;
-    $cb=$_REQUEST['cb'];
-    if (!is_array($cb)) $cb=array();
-    switch ($_REQUEST['dosht']){
-    case 'exp':$_REQUEST['t']=join(",",$cb);print_export();exit;
-    case 'drop':$sq='DROP TABLE';break;
-    case 'trunc':$sq='TRUNCATE TABLE';break;
-    case 'opt':$sq='OPTIMIZE TABLE';break;
-    }
-    if ($sq){
-        $sql='';
-        foreach($cb as $v){
-            $sql.=$sq." $v;\n";
-        }
-        if ($sql) do_sql($sql);
-    }
-    do_sql($SHOW_T);
-}
 
 function to_csv_row($adata){
     global $D;
