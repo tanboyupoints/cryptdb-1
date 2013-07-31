@@ -116,96 +116,170 @@ sanityCheck(SchemaInfo *schema)
     return true;
 }
 
-// FIXME: TESTME.
+/*
+    Other interesting error codes
+    > ER_DUP_KEY
+    > ER_KEY_DOES_NOT_EXIST
+*/
 static bool
-fixBleeding(Connect *e_conn)
+recoverableDeltaError(unsigned int err)
 {
-    const std::string regular_table_name =
-        "MetaObject";
-    const std::string bleeding_table_name =
-        "BleedingMetaObject";
+    bool ret =
+        ER_TABLE_EXISTS_ERROR == err ||     // Table already exists.
+        ER_DUP_FIELDNAME == err ||          // Column already exists.
+        ER_DUP_KEYNAME == err ||            // Key already exists.
+        ER_BAD_TABLE_ERROR == err ||        // Table doesn't exist.
+        ER_CANT_DROP_FIELD_OR_KEY == err;   // Key/Col doesn't exist.
 
-    const std::string drop_query =
-        " DELETE pdb." + bleeding_table_name +
-        "   FROM pdb." + bleeding_table_name + ";";
-    assert(e_conn->execute(drop_query));
+    return ret;
+}
 
-    const std::string insert_query =
-        " INSERT pdb." + bleeding_table_name +
-        "   SELECT * FROM pdb." + regular_table_name + ";";
-    assert(e_conn->execute(insert_query));
+static bool
+fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
+{
+    std::list<std::string> local_queries;
+    bool expect_ddl;
+
+    const std::string query_table_name = "Query";
+
+    // Get local queries (should only be one).
+    DBResult *dbres;
+    const std::string get_local_query_query =
+        " SELECT query FROM pdb." + query_table_name +
+        "  WHERE delta_output_id = " + std::to_string(delta_output_id) +
+        "    AND local = TRUE;";
+    assert(e_conn->execute(get_local_query_query, dbres));
+
+    // FIXME: Onion adjustment queries do not have local.
+    ScopedMySQLRes local_r(dbres->n);
+    const unsigned long long local_row_count =
+        mysql_num_rows(local_r.res());
+    if (1 == local_row_count) {
+        expect_ddl = true;
+        const MYSQL_ROW local_row = mysql_fetch_row(local_r.res());
+        const unsigned long * const local_l =
+            mysql_fetch_lengths(local_r.res());
+        const std::string local_query(local_row[0], local_l[0]);
+        local_queries.push_back(local_query);
+    } else if (0 == local_row_count) {
+        expect_ddl = false;
+    } else {
+        throw CryptDBError("Too many local queries!");
+    }
+
+
+    // Get remote queries (ORDER matters).
+    const std::string remote_query =
+        " SELECT query, ddl FROM pdb." + query_table_name +
+        "  WHERE delta_output_id = " + std::to_string(delta_output_id) +
+        "    AND local = FALSE;"
+        "  ORDER BY ASC id";
+    assert(e_conn->execute(remote_query, dbres));
+
+    ScopedMySQLRes remote_r(dbres->n);
+    MYSQL_ROW remote_row;
+    std::list<std::string> remote_queries;
+    while ((remote_row = mysql_fetch_row(remote_r.res()))) {
+        const unsigned long * const remote_l =
+            mysql_fetch_lengths(remote_r.res());
+        const std::string remote_query(remote_row[0], remote_l[0]);
+        const std::string remote_ddl(remote_row[1], remote_l[1]);
+        const bool ddl = string_to_bool(remote_ddl);
+        if (ddl != expect_ddl) {
+            throw CryptDBError("Expectations of DDLness are unmatched!");
+        }
+
+        remote_queries.push_back(remote_query);
+    }
+
+    // Do sanity check.
+    assert((expect_ddl && remote_queries.size() == 1 &&
+            local_queries.size() == 1) ||
+           (!expect_ddl && remote_queries.size() >= 1 &&
+            local_queries.size() == 0));
+
+    if (expect_ddl) {  // Handle single DDL query.
+        if (false == conn->execute(remote_queries.back())) {
+            unsigned int err = conn->get_mysql_errno();
+            if (false == recoverableDeltaError(err)) {
+                throw CryptDBError("Unrecoverable error in Delta "
+                                   " recovery!");
+            }
+        }
+    } else {        // Handle one or more DML queries.
+        DBResult *dbres;
+        const std::string dml_table = "DMLCompletion";
+        const std::string dml_query =
+            " SELECT * FROM " + dml_table +
+            "  WHERE delta_output_id = " +
+            " " +    std::to_string(delta_output_id) + ";";
+        assert(conn->execute(dml_query, dbres));
+        
+        ScopedMySQLRes r(dbres->n);
+        const unsigned long long dml_row_count =
+            mysql_num_rows(r.res());
+        if (0 == dml_row_count) {
+            assert(conn->execute("START TRANSACTION;"));
+            for (auto it : remote_queries) {
+                assert(conn->execute(it));
+            }
+            assert(saveDMLCompletion(conn, delta_output_id));
+            assert(conn->execute("COMMIT"));
+        } else if (1 > dml_row_count) {
+            throw CryptDBError("Too many DML table results!");
+        }
+    }
+
+    // Cleanup database and do local query.
+    {
+        assert(e_conn->execute("START TRANSACTION;"));
+        if (false == setRegularTableToBleedingTable(e_conn)) {
+            assert(e_conn->execute("ROLLBACK;"));
+            throw CryptDBError("regular=bleeding fail!");
+        }
+
+        if (false == cleanupDeltaOutputAndQuery(e_conn,delta_output_id)) {
+            assert(e_conn->execute("ROLLBACK;"));
+            throw CryptDBError("cleaning up delta fail!");
+        }
+        assert(e_conn->execute("COMMIT;"));
+    }
+
+    // FIXME: local_query can be DDL.
+    // > This can be fixed with a bleeding table.
+    for (auto it : local_queries) {
+        assert(e_conn->execute(it));
+    }
 
     return true;
 }
 
-// FIXME: TESTME.
 static bool
-fixRemoted(Connect *e_conn)
+deltaSanityCheck(Connect *conn, Connect *e_conn)
 {
-    const std::string regular_table_name =
-        "MetaObject";
-    const std::string bleeding_table_name =
-        "BleedingMetaObject";
-
-    const std::string drop_query =
-        " DELETE pdb." + regular_table_name +
-        "   FROM pdb." + regular_table_name + ";";
-    assert(e_conn->execute(drop_query));
-
-    const std::string insert_query =
-        " INSERT pdb." + regular_table_name +
-        "   SELECT * FROM pdb." + bleeding_table_name + ";";
-    assert(e_conn->execute(insert_query));
-
-    return true;
-}
-
-static bool
-deltaSanityCheck(Connect *e_conn)
-{
-    const std::string table_name = "Delta";
-
-    // Make sure the table exists.
-    const std::string create_table_query =
-        " CREATE TABLE IF NOT EXISTS pdb." + table_name +
-        "    (remote_complete BOOLEAN NOT NULL,"
-        "     id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-    assert(e_conn->execute(create_table_query));
+    const std::string table_name = "DeltaOutput";
 
     DBResult *dbres;
-    const std::string get_bleeding_deltas =
-        " SELECT * FROM pdb." + table_name + 
-        "  WHERE remote_complete = FALSE;";
-    assert(e_conn->execute(get_bleeding_deltas, dbres));
+    const std::string get_deltas =
+        " SELECT id FROM pdb." + table_name + ";";
+    assert(e_conn->execute(get_deltas, dbres));
 
     ScopedMySQLRes r(dbres->n);
-    const unsigned long long bleeding_row_count =
-        mysql_num_rows(r.res());
+    const unsigned long long row_count = mysql_num_rows(r.res());
 
-    const std::string get_remoted_deltas =
-        " SELECT * FROM pdb." + table_name +
-        "  WHERE remote_complete = TRUE;";
-    assert(e_conn->execute(get_remoted_deltas, dbres));
-
-    ScopedMySQLRes r2(dbres->n);
-    const unsigned long long remoted_row_count =
-        mysql_num_rows(r2.res());
-
-    std::cerr << "There are " << bleeding_row_count
-              << " bleeding deltas!" << std::endl;
-    std::cerr << "There are " << remoted_row_count
-              << " remotely actioned deltas that are missing local"
-              << " completion!" << std::endl;
-
-    if (!(0 == bleeding_row_count || 0 == remoted_row_count)) {
-        return false;
-    } else if (1 == bleeding_row_count) {
-        return fixBleeding(e_conn);
-    } else if (1 == remoted_row_count) {
-        return fixRemoted(e_conn);
-    } else {
+    std::cerr << "There are " << row_count << " DeltaOutputz!"
+              << std::endl;
+    if (0 == row_count) {
         return true;
+    } else if (1 == row_count) {
+        MYSQL_ROW row = mysql_fetch_row(r.res());
+        const unsigned long * const l = mysql_fetch_lengths(r.res());
+        const std::string string_delta_output_id(row[0], l[0]);
+        const unsigned long delta_output_id =
+            atoi(string_delta_output_id.c_str());
+        return fixDelta(conn, e_conn, delta_output_id);
+    } else {
+        throw CryptDBError("Too many DeltaOutputz!");
     }
 }
 
@@ -216,8 +290,11 @@ deltaSanityCheck(Connect *e_conn)
 //  2> INSERTing
 //  3> SELECTing
 static SchemaInfo *
-loadSchemaInfo(Connect *e_conn)
+loadSchemaInfo(Connect *conn, Connect *e_conn)
 {
+    // Must be done before loading the children.
+    assert(deltaSanityCheck(conn, e_conn));
+
     SchemaInfo *schema = new SchemaInfo(); 
     // Recursively rebuild the AbstractMeta<Whatever> and it's children.
     std::function<DBMeta*(DBMeta *)> loadChildren =
@@ -233,7 +310,6 @@ loadSchemaInfo(Connect *e_conn)
     loadChildren(schema);
     // FIXME: Ideally we would do this before loading the schema.
     // But first we must decide on a place to create the database from.
-    assert(deltaSanityCheck(e_conn));
     assert(sanityCheck(schema));
     
     return schema;
@@ -251,18 +327,16 @@ printEC(Connect * e_conn, const std::string & command) {
 
 static void
 printEmbeddedState(const ProxyState & ps) {
-    /*
+/*
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables from pdb;");
-    printEC(ps.e_conn, "selecT * from pdb.tableMeta_schemaInfo;");
-    printEC(ps.e_conn, "select * from pdb.tableMeta;");
-    printEC(ps.e_conn, "selecT * from pdb.fieldMeta_tableMeta;");
-    printEC(ps.e_conn, "select * from pdb.fieldMeta;");
-    printEC(ps.e_conn, "selecT * from pdb.onionMeta_fieldMeta;");
-    printEC(ps.e_conn, "select * from pdb.onionMeta;");
-    printEC(ps.e_conn, "selecT * from pdb.encLayer_onionMeta;");
-    printEC(ps.e_conn, "select * from pdb.encLayer;");
-    */
+    std::cout << "regular" << std::endl << std::endl;
+    printEC(ps.e_conn, "select * from pdb.MetaObject;");
+    std::cout << "bleeding" << std::endl << std::endl;
+    printEC(ps.e_conn, "select * from pdb.BleedingMetaObject;");
+    printEC(ps.e_conn, "select * from pdb.Query;");
+    printEC(ps.e_conn, "select * from pdb.DeltaOutput;");
+*/
 }
 
 template <typename type> static void
@@ -744,6 +818,64 @@ noRewrite(LEX * lex) {
     return false;
 }
 
+static void
+initializeMetaDataTables(Connect *conn, Connect *e_conn)
+{
+    const std::string create_db =
+        " CREATE DATABASE IF NOT EXISTS pdb;";
+    assert(e_conn->execute(create_db));
+
+    const std::string delta_table_name = "DeltaOutput";
+    const std::string create_delta_table =
+        " CREATE TABLE IF NOT EXISTS pdb." + delta_table_name +
+        "    (remote_complete BOOLEAN NOT NULL,"
+        "     id SERIAL PRIMARY KEY)"
+        " ENGINE=InnoDB;";
+    assert(e_conn->execute(create_delta_table));
+
+    const std::string query_table_name = "Query";
+    const std::string create_query_table =
+        " CREATE TABLE IF NOT EXISTS pdb." + query_table_name +
+        "   (query VARCHAR(500) NOT NULL,"
+        "    delta_output_id BIGINT NOT NULL,"
+        "    local BOOLEAN NOT NULL,"
+        "    ddl BOOLEAN NOT NULL,"
+        "    id SERIAL PRIMARY KEY)"
+        " ENGINE=InnoDB;";
+    assert(e_conn->execute(create_query_table));
+
+    const std::string dml_table_name = "DMLCompletion";
+    const std::string create_dml_table =
+        " CREATE TABLE IF NOT EXISTS " + dml_table_name +
+        "   (delta_output_id BIGINT NOT NULL,"
+        "    id SERIAL)"
+        " ENGINE=InnoDB;";
+    assert(conn->execute(create_dml_table));
+
+    const std::string meta_table_name =  "MetaObject";
+
+    const std::string create_meta_table =
+        " CREATE TABLE IF NOT EXISTS pdb." + meta_table_name +
+        "   (serial_object VARBINARY(500) NOT NULL,"
+        "    serial_key VARBINARY(500) NOT NULL,"
+        "    parent_id BIGINT NOT NULL,"
+        "    id SERIAL PRIMARY KEY)"
+        " ENGINE=InnoDB;";
+    assert(e_conn->execute(create_meta_table));
+
+    const std::string bleeding_table_name = "BleedingMetaObject";
+    const std::string create_bleeding_table =
+        " CREATE TABLE IF NOT EXISTS pdb." + bleeding_table_name +
+        "   (serial_object VARBINARY(500) NOT NULL,"
+        "    serial_key VARBINARY(500) NOT NULL,"
+        "    parent_id BIGINT NOT NULL,"
+        "    id SERIAL PRIMARY KEY)"
+        " ENGINE=InnoDB;";
+    assert(e_conn->execute(create_bleeding_table));
+
+    return;
+}
+
 Rewriter::Rewriter(ConnectionInfo ci,
                    const std::string &embed_dir,
                    const std::string &dbname,
@@ -764,6 +896,7 @@ Rewriter::Rewriter(ConnectionInfo ci,
     // Must be called before loadSchemaInfo.
     buildTypeTextTranslator();
     // printEmbeddedState(ps);
+    initializeMetaDataTables(ps.conn, ps.e_conn);
 
     dml_dispatcher = buildDMLDispatcher();
     ddl_dispatcher = buildDDLDispatcher();
@@ -774,6 +907,14 @@ Rewriter::Rewriter(ConnectionInfo ci,
     // ie, loadUDFs.
     assert(ps.conn->execute("USE cryptdbtest;"));
     assert(ps.e_conn->execute("USE cryptdbtest;"));
+}
+
+static std::string
+lex_to_query(LEX *lex)
+{
+    std::ostringstream o;
+    o << *lex;
+    return o.str();
 }
 
 RewriteOutput * 
@@ -791,14 +932,24 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         SQLHandler *handler = dml_dispatcher->dispatch(lex);
         try {
             LEX *out_lex = handler->transformLex(a, lex, ps);
-            // SpecialUpdate wants the old lex, as it's going to
-            // handle it's own rewrite.
             if (true == a.special_update) {
-                auto crypted_table =
+                const auto plain_table =
+                    lex->select_lex.top_join_list.head()->table_name;
+                const auto crypted_table =
                     out_lex->select_lex.top_join_list.head()->table_name;
-                return new SpecialUpdate(query, lex, ps, crypted_table);
+                std::string where_clause;
+                if (lex->select_lex.where) {
+                    std::ostringstream where_stream;
+                    where_stream << " " << *lex->select_lex.where << " ";
+                    where_clause = where_stream.str();
+                } else {
+                    where_clause = " TRUE ";
+                }
+                return new SpecialUpdate(query, lex_to_query(out_lex),
+                                         plain_table, crypted_table,
+                                         where_clause, ps);
             } else {
-                return new DMLOutput(query, out_lex);
+                return new DMLOutput(query, lex_to_query(out_lex));
             }
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
@@ -806,12 +957,12 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
             auto adjust_queries = 
                 adjustOnion(a, ps, e.o, e.fm, e.tolevel, e.itf,
                             ps.dbName());
-            return new AdjustOnionOutput(query, a.deltas, adjust_queries);
+            return new AdjustOnionOutput(a.deltas, adjust_queries);
         }
     } else if (ddl_dispatcher->canDo(lex)) {
         SQLHandler *handler = ddl_dispatcher->dispatch(lex);
         LEX *out_lex = handler->transformLex(a, lex, ps);
-        return new DDLOutput(query, out_lex, a.deltas);
+        return new DDLOutput(query, lex_to_query(out_lex), a.deltas);
     } else {
         throw CryptDBError("Rewriter can not dispatch bad lex");
     }
@@ -850,7 +1001,7 @@ Rewriter::rewrite(const std::string & q)
     // printEmbeddedState(ps);
 
     // FIXME: Memleak 'schema'.
-    const SchemaInfo * const schema = loadSchemaInfo(ps.e_conn);
+    const SchemaInfo * const schema = loadSchemaInfo(ps.conn, ps.e_conn);
     Analysis analysis = Analysis(schema);
 
     // FIXME: Memleak return of 'dispatchOnLex()'
@@ -955,10 +1106,9 @@ executeQuery(Rewriter &r, const ProxyState &ps, const std::string &q)
         QueryRewrite qr = r.rewrite(q);
         std::unique_ptr<ResType> res(qr.output->doQuery(ps.conn,
                                                         ps.e_conn, &r));
+        assert(res);
         if (true == qr.output->queryAgain()) { // Onion adjustment.
             return executeQuery(r, ps, q);
-        } else {
-            assert(res);
         }
         prettyPrintQueryResult(*res);
 

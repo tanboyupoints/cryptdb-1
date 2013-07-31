@@ -16,8 +16,6 @@ DBMeta::doFetchChildren(Connect *e_conn,
                             deserialHandler)
 {
     const std::string table_name = "MetaObject";
-    // Ensure the tables exist.
-    assert(create_tables(e_conn));
 
     // Now that we know the table exists, SELECT the data we want.
     std::vector<DBMeta *> out_vec;
@@ -412,36 +410,5 @@ SchemaInfo::getTableNameFromFieldMeta(FieldMeta *fm) const
     }
 
     throw CryptDBError("Failed to get table name from FieldMeta");
-}
-
-bool create_tables(Connect *e_conn)
-{
-    const std::string table_name =  "MetaObject";
-    const std::string bleeding_table_name = "BleedingMetaObject";
-
-    // FIXME: Elsewhere.
-    const std::string create_db =
-        " CREATE DATABASE IF NOT EXISTS pdb;";
-    assert(e_conn->execute(create_db));
-
-    const std::string create_query =
-        " CREATE TABLE IF NOT EXISTS pdb." + table_name +
-        "   (serial_object VARBINARY(200) NOT NULL,"
-        "    serial_key VARBINARY(200) NOT NULL,"
-        "    parent_id BIGINT NOT NULL,"
-        "    id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-    assert(e_conn->execute(create_query));
-
-    const std::string bleeding_create_query =
-        " CREATE TABLE IF NOT EXISTS pdb." + bleeding_table_name +
-        "   (serial_object VARBINARY(200) NOT NULL,"
-        "    serial_key VARBINARY(200) NOT NULL,"
-        "    parent_id BIGINT NOT NULL,"
-        "    id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-    assert(e_conn->execute(bleeding_create_query));
-
-    return true;
 }
 
