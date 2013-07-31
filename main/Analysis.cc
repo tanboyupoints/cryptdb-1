@@ -1,6 +1,7 @@
 #include <main/Analysis.hh>
 #include <main/rewrite_util.hh>
 #include <main/rewrite_main.hh>
+#include <main/metadata_tables.hh>
 
 // FIXME: Memory leaks when we allocate MetaKey<...>, use smart pointer.
 
@@ -196,10 +197,10 @@ std::string Delta::tableNameFromType(TableType table_type) const
 {
     switch (table_type) {
         case REGULAR_TABLE: {
-            return "MetaObject";
+            return MetaDataTables::Name::metaObject();
         }
         case BLEEDING_TABLE: {
-            return "BleedingMetaObject";
+            return MetaDataTables::Name::bleedingMetaObject();
         }
         default: {
             throw CryptDBError("Unrecognized table type!");
@@ -493,7 +494,7 @@ bool DeltaOutput::destroyRecord(Connect *e_conn,
 static bool saveQuery(Connect *e_conn, const std::string &query,
                       unsigned long delta_output_id, bool local, bool ddl)
 {
-    const std::string table_name = "Query";
+    const std::string table_name = MetaDataTables::Name::query();
     const std::string insert_query =
         " INSERT INTO pdb." + table_name +
         "   (query, delta_output_id, local, ddl) VALUES ("
@@ -509,7 +510,7 @@ static bool saveQuery(Connect *e_conn, const std::string &query,
 static bool destroyQueryRecord(Connect *e_conn,
                                unsigned long delta_output_id)
 {
-    const std::string table_name = "Query";
+    const std::string table_name = MetaDataTables::Name::query();
     const std::string delete_query =
         " DELETE pdb." + table_name +
         "   FROM pdb." + table_name +
@@ -523,7 +524,8 @@ static bool destroyQueryRecord(Connect *e_conn,
 bool
 saveDMLCompletion(Connect *conn, unsigned long delta_output_id)
 {
-    const std::string dml_table = "DMLCompletion";
+    const std::string dml_table =
+        MetaDataTables::Name::dmlCompletion();
     const std::string dml_insert_query =
         " INSERT INTO " + dml_table +
         "   (delta_output_id) VALUES ("
@@ -551,13 +553,21 @@ tableCopy(Connect *c, const std::string &src, const std::string &dest)
 bool
 setRegularTableToBleedingTable(Connect *e_conn)
 {
-    return tableCopy(e_conn, "pdb.BleedingMetaObject", "pdb.MetaObject");
+    const std::string src = "pdb." +
+                            MetaDataTables::Name::bleedingMetaObject();
+    const std::string dest = "pdb." +
+                             MetaDataTables::Name::metaObject();
+    return tableCopy(e_conn, src, dest);
 }
 
 static bool
 setBleedingTableToRegularTable(Connect *e_conn)
 {
-    return tableCopy(e_conn, "pdb.MetaObject", "pdb.BleedingMetaObject");
+    const std::string src = "pdb." +
+                            MetaDataTables::Name::metaObject();
+    const std::string dest = "pdb." +
+                             MetaDataTables::Name::bleedingMetaObject();
+    return tableCopy(e_conn, src, dest);
 }
 
 static bool

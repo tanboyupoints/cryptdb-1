@@ -8,6 +8,7 @@
 #include <main/init_onions.hh>
 #include <main/rewrite_util.hh>
 #include <main/dbobject.hh>
+#include <main/metadata_tables.hh>
 
 std::vector<DBMeta *>
 DBMeta::doFetchChildren(Connect *e_conn,
@@ -15,7 +16,7 @@ DBMeta::doFetchChildren(Connect *e_conn,
                                                std::string)>
                             deserialHandler)
 {
-    const std::string table_name = "MetaObject";
+    const std::string table_name = MetaDataTables::Name::metaObject();
 
     // Now that we know the table exists, SELECT the data we want.
     std::vector<DBMeta *> out_vec;
