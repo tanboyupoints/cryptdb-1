@@ -27,12 +27,14 @@
 #define ANON                ANON_NAME(__anon_id_sum_)
 
 static void
-check_if_empty(const EncSet & sol, Item * i, const EncSet & my_es, const reason & child_r) {
+check_if_empty(const EncSet & sol, Item * i, const EncSet & my_es,
+               const reason & child_r)
+{
     if (sol.empty()) {
-        std::cerr << "current crypto schemes do not support this query \n"
-	          << "BECAUSE " << i << " NEEDS " << my_es << "\n"
-	          << "AND children have " << child_r << "\n";
-	assert(false);
+        std::cerr << "current crypto schemes do not support this query" << std::endl
+                  << "BECAUSE " << i << " NEEDS " << my_es << std::endl
+                  << "AND children have " << child_r << std::endl;
+        assert(false);
     }
 }
 
@@ -41,20 +43,24 @@ check_if_empty(const EncSet & sol, Item * i, const EncSet & my_es, const reason 
 // no_args specifies a certain number of arguments that I must have
 // if negative, i can have any no. of arguments
 static std::list<Item *>
-rewrite_agg_args(Item_sum * oldi, const OLK & constr, const RewritePlanOneOLK * rp,
-		 Analysis & a, int no_args = -1) {
+rewrite_agg_args(Item_sum * oldi, const OLK & constr,
+                 const RewritePlanOneOLK * rp, Analysis & a,
+                 int no_args = -1)
+{
     if (no_args >= 0) {
-	assert_s(oldi->get_arg_count() == (uint)no_args,
-		 "support for aggregation with this number of arguments not currently implemented");
+        assert_s(oldi->get_arg_count() == (uint)no_args,
+                 "support for aggregation with this number of arguments "
+                    " not currently implemented");
     } else {
-	no_args = oldi->get_arg_count();
+        no_args = oldi->get_arg_count();
     }
 
     std::list<Item *> res = std::list<Item *>();
     for (int j = 0; j < no_args; j++) {
-	Item * child_item = oldi->get_arg(j);
-	child_item = itemTypes.do_rewrite(child_item, rp->olk, rp->childr_rp[j], a);
-	res.push_back(child_item);
+        Item * child_item = oldi->get_arg(j);
+        child_item =
+            itemTypes.do_rewrite(child_item, rp->olk, rp->childr_rp[j], a);
+        res.push_back(child_item);
     }
 
     return res;
@@ -63,33 +69,37 @@ rewrite_agg_args(Item_sum * oldi, const OLK & constr, const RewritePlanOneOLK * 
 
 template<Item_sum::Sumfunctype SFT>
 class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
-    virtual RewritePlan * do_gather_type(Item_sum_count *i, reason &tr, Analysis & a) const {
-	/*
-        if (i->has_with_distinct()) {
-	    reason new_tr(tr.encset.intersect(EQ_EncSet), "count distinct", i);
-            EncSet e = gather(i->get_arg(0), new_tr, a);
-            if (e.intersect(EQ_EncSet).empty())
-                thrower() << "count distinct";
-	}
-	return PLAIN_EncSet;*/
-	UNIMPLEMENTED;
+    virtual RewritePlan * do_gather_type(Item_sum_count *i, reason &tr,
+                                         Analysis & a) const
+    {
+        /*
+            if (i->has_with_distinct()) {
+            reason new_tr(tr.encset.intersect(EQ_EncSet), "count distinct", i);
+                EncSet e = gather(i->get_arg(0), new_tr, a);
+                if (e.intersect(EQ_EncSet).empty())
+                    thrower() << "count distinct";
+        }
+        return PLAIN_EncSet;*/
+        UNIMPLEMENTED;
 
     }
     virtual Item * do_rewrite_type(Item_sum_count *i,
-				   const OLK & constr, const RewritePlan * rp,
-				   Analysis & a) const {
-/*	Item_sum_count * res = new Item_sum_count(current_thd, i);
+                                   const OLK & constr,
+                                   const RewritePlan * rp,
+                                   Analysis & a) const
+    {
+    /*  Item_sum_count * res = new Item_sum_count(current_thd, i);
 
-	if (i->has_with_distinct()) {
-	    rewrite_agg_args(res, a);
-	}
-	ItemMeta *im = getAssert(a.itemToMeta, (Item *)i);
+        if (i->has_with_distinct()) {
+            rewrite_agg_args(res, a);
+        }
+        ItemMeta *im = getAssert(a.itemToMeta, (Item *)i);
 
-	addToReturn(a.rmeta, a.pos++, im, false, i->name);
+        addToReturn(a.rmeta, a.pos++, im, false, i->name);
 
-	return res;
-*/
-	UNIMPLEMENTED;
+        return res;
+    */
+        UNIMPLEMENTED;
     }
 };
 
@@ -130,47 +140,50 @@ static CItemChooseOrder<Item_sum::Sumfunctype::MAX_FUNC, Item_sum_max> ANON;
 
 template<Item_sum::Sumfunctype SFT>
 class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
-    virtual RewritePlan * do_gather_type(Item_sum_sum *i, reason &tr, Analysis & a) const {
+    virtual RewritePlan * do_gather_type(Item_sum_sum *i, reason &tr,
+                                         Analysis & a) const
+    {
+        LOG(cdb_v) << "gather Item_sum_sum " << *i;
+        assert_s(i->get_arg_count() == 1, "expected one argument for sum");
+        Item * child_item = i->get_arg(0);
+        reason child_r;
+        RewritePlan ** childr_rp = new RewritePlan*[1];
+        RewritePlan * child_rp = gather(child_item, child_r, a);
+        childr_rp[0] = child_rp;
+        EncSet child_es = child_rp->es_out;
 
-	LOG(cdb_v) << "gather Item_sum_sum " << *i;
-	assert_s(i->get_arg_count() == 1, "expected one argument for sum");
-	Item * child_item = i->get_arg(0);
-	reason child_r;
-	RewritePlan ** childr_rp = new RewritePlan*[1];
-	RewritePlan * child_rp = gather(child_item, child_r, a);
-	childr_rp[0] = child_rp;
-	EncSet child_es = child_rp->es_out;
+        if (i->has_with_distinct()) {
+            UNIMPLEMENTED;
+        }
 
-	if (i->has_with_distinct()) {
-	    UNIMPLEMENTED;
-	}
+        EncSet my_es = ADD_EncSet;
 
-	EncSet my_es = ADD_EncSet;
+        EncSet solution = my_es.intersect(child_es);
 
-	EncSet solution = my_es.intersect(child_es);
+        check_if_empty(solution, i, my_es, child_r);
 
-	check_if_empty(solution, i, my_es, child_r);
+        OLK olk = solution.chooseOne();
 
-	OLK olk = solution.chooseOne();
+        EncSet return_es = EncSet(olk);
+        tr = reason(return_es, "summation", i);
 
-	EncSet return_es = EncSet(olk);
-	tr = reason(return_es, "summation", i);
-
-	return new RewritePlanOneOLK(return_es, olk, childr_rp, tr); ;
-
+        return new RewritePlanOneOLK(return_es, olk, childr_rp, tr); ;
     }
+
     virtual Item * do_rewrite_type(Item_sum_sum * i,
-				   const OLK & constr, const RewritePlan * rp,
-				   Analysis & a) const {
-		LOG(cdb_v) << "Item_sum_sum rewrite " << *i;
+                                   const OLK & constr,
+                                   const RewritePlan * rp,
+                                   Analysis & a) const
+    {
+        LOG(cdb_v) << "Item_sum_sum rewrite " << *i;
 
         std::list<Item *> args = rewrite_agg_args(i, constr, (RewritePlanOneOLK *)rp, a, 1);
 
-		OnionMeta * om = constr.key->getOnionMeta(oAGG);
+        OnionMeta * om = constr.key->getOnionMeta(oAGG);
         assert(om);
         EncLayer *el = a.getBackEncLayer(om);
-		assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
-		return ((HOM *)el)->sumUDA(args.front());
+        assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
+        return ((HOM *)el)->sumUDA(args.front());
     }
 };
 
@@ -182,63 +195,72 @@ static CItemSum<Item_sum::Sumfunctype::AVG_FUNC> ANON;
 static CItemSum<Item_sum::Sumfunctype::AVG_DISTINCT_FUNC> ANON;
 
 static class ANON : public CItemSubtypeST<Item_sum_bit, Item_sum::Sumfunctype::SUM_BIT_FUNC> {
-    virtual RewritePlan * do_gather_type(Item_sum_bit *i, reason &tr, Analysis & a) const {
-	/* LOG(cdb_v) << "do_a_t Item_sum_bit reason " << tr;
-        analyze(i->get_arg(0), reason(EMPTY_EncSet, "bitagg", i, &tr, false), a);
-        return tr.encset;
-	*/
-	UNIMPLEMENTED;
+    virtual RewritePlan * do_gather_type(Item_sum_bit *i, reason &tr,
+                                         Analysis & a) const
+    {
+        /* LOG(cdb_v) << "do_a_t Item_sum_bit reason " << tr;
+            analyze(i->get_arg(0), reason(EMPTY_EncSet, "bitagg", i, &tr, false), a);
+            return tr.encset;
+        */
+        UNIMPLEMENTED;
     }
 } ANON;
 
-
-
 static class ANON : public CItemSubtypeST<Item_func_group_concat, Item_sum::Sumfunctype::GROUP_CONCAT_FUNC> {
-    virtual RewritePlan * do_gather_type(Item_func_group_concat *i, reason &tr, Analysis & a) const {
-	/*  LOG(cdb_v) << "do_a_t Item_func_group reason " << tr;
-        uint arg_count_field = i->*rob<Item_func_group_concat, uint,
-                &Item_func_group_concat::arg_count_field>::ptr();
-        for (uint x = 0; x < arg_count_field; x++) {
-            // XXX could perform in the proxy..
-            analyze(i->get_arg(x), reason(EMPTY_EncSet, "group_concat", i, &tr), a);
-        }
+    virtual RewritePlan * do_gather_type(Item_func_group_concat *i,
+                                         reason &tr, Analysis & a) const
+    {
+        /*  LOG(cdb_v) << "do_a_t Item_func_group reason " << tr;
+            uint arg_count_field = i->*rob<Item_func_group_concat, uint,
+                    &Item_func_group_concat::arg_count_field>::ptr();
+            for (uint x = 0; x < arg_count_field; x++) {
+                // XXX could perform in the proxy..
+                analyze(i->get_arg(x), reason(EMPTY_EncSet, "group_concat", i, &tr), a);
+            }
 
-        // XXX order, unused in trace queries..
-        return tr.encset;
-    */
-	UNIMPLEMENTED;
+            // XXX order, unused in trace queries..
+            return tr.encset;
+        */
+        UNIMPLEMENTED;
     }
     // TODO(stephentu): figure out how to rob the arg fields for optimization
 } ANON;
 
 static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
-    virtual RewritePlan * do_gather_type(Item_ref *i, reason &tr, Analysis & a) const {
+    virtual RewritePlan * do_gather_type(Item_ref *i, reason &tr,
+                                         Analysis & a) const
+    {
         LOG(cdb_v) << "do_a_t Item_ref reason " << tr;
-	/* if (i->ref) {
-            analyze(*i->ref, tr, a);
-            return tr.encset;
-        } else {
-            thrower() << "how to resolve Item_ref::ref?";
-            UNIMPLEMENTED;
-	    }*/
-	UNIMPLEMENTED;
+        /* if (i->ref) {
+                analyze(*i->ref, tr, a);
+                return tr.encset;
+            } else {
+                thrower() << "how to resolve Item_ref::ref?";
+                UNIMPLEMENTED;
+            }*/
+        UNIMPLEMENTED;
     }
 } ANON;
 
 static class ANON : public CItemSubtypeIT<Item_null, Item::Type::NULL_ITEM> {
-    virtual RewritePlan * do_gather_type(Item_null *i, reason &tr, Analysis & a) const {
+    virtual RewritePlan * do_gather_type(Item_null *i, reason &tr,
+                                         Analysis & a) const
+    {
         tr = reason(FULL_EncSet, "is a constant", i);
         return new RewritePlan(FULL_EncSet, tr);
     }
     virtual Item * do_rewrite_type(Item_null *i,
-				   const OLK & constr, const RewritePlan * rp,
-				   Analysis & a) const {
+                                   const OLK & constr,
+                                   const RewritePlan * rp,
+                                   Analysis & a) const
+    {
         return i;
         // return encrypt_item(i, constr, a);
     }
-    virtual void
-    do_rewrite_insert_type(Item_null *i, Analysis & a,
-                           std::vector<Item *> &l, FieldMeta *fm) const
+
+    virtual void do_rewrite_insert_type(Item_null *i, Analysis & a,
+                                        std::vector<Item *> &l,
+                                        FieldMeta *fm) const
     {
         for (uint j = 0; j < fm->children.size(); ++j) {
             l.push_back(make_item(i));
