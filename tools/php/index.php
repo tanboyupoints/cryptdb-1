@@ -413,22 +413,6 @@ function lsclean(from,to){
         delete ls[LSK+i];ls[LSKM]=i+1;
     }
 }
-function q_prev(){
-    var ls=localStorage;
-    if(!lschk())return;
-    qcur--;
-    var x=parseInt(ls[LSKM]);
-    if(qcur<x)qcur=x;
-    $('q').value=ls[LSK+qcur];
-}
-function q_next(){
-    var ls=localStorage;
-    if(!lschk())return;
-    qcur++;
-    var x=parseInt(ls[LSKX]);
-    if(qcur>x)qcur=x;
-    $('q').value=ls[LSK+qcur];
-}
 function after_load(){
     qcur=lsmax();
 }
