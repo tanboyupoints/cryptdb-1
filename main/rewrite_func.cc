@@ -226,7 +226,7 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
 
         tr = reason(out_es, why, i);
 
-        RewritePlan **childr_rp = new RewritePlan*[2];
+        RewritePlan **childr_rp = new RewritePlan*[arg_count];
 
         auto it = List_iterator<Item>(*i->argument_list());
         unsigned int index = 0;
@@ -259,7 +259,7 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
                                    const RewritePlan * rp, Analysis & a) const
     {
         const unsigned int arg_count = i->argument_list()->elements;
-        Item **items = new Item*[2];
+        Item **items = new Item*[arg_count];
 
         const RewritePlanOneOLK * const rp_one =
             static_cast<const RewritePlanOneOLK * const>(rp);
