@@ -240,15 +240,15 @@ typedef struct ProxyState {
     std::string dbName() const {return dbname;}
 
     // connection to remote and embedded server
-    Connect*       conn;
-    Connect*       e_conn;
+    Connect *conn;
+    Connect *e_conn;
 
-    bool           encByDefault;
-    AES_KEY*       masterKey;
+    const bool encByDefault;
+    const AES_KEY * const masterKey;
 
 private:
     // FIXME: Remove once cryptdb supports multiple databases.
-    constexpr static const char *dbname = "cryptdbtest";
+    const std::string dbname;
 } ProxyState;
 
 

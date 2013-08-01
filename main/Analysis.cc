@@ -235,15 +235,12 @@ loadUDFs(Connect * conn) {
 ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                        const std::string &dbname, bool encByDefault,
                        const std::string &master_key)
+    : encByDefault(encByDefault), masterKey(getKey(master_key)),
+      dbname(dbname)
 {
     init_mysql(embed_dir);
 
-    encByDefault = encByDefault;
-
-    masterKey = getKey(master_key);
-
     e_conn = Connect::getEmbedded(embed_dir, dbname);
-
     conn = new Connect(ci.server, ci.user, ci.passwd, dbname, ci.port);
 
     MetaDataTables::initialize(conn, e_conn);

@@ -48,7 +48,8 @@ DBMeta::doFetchChildren(Connect *e_conn,
     return out_vec;
 }
 
-OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
+OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels,
+                     const AES_KEY * const m_key,
                      Create_field *cf, unsigned long uniq_count)
     : onionname(getpRandomName() + TypeText<onion>::toText(o)),
       uniq_count(uniq_count)
@@ -216,7 +217,8 @@ FieldMeta *FieldMeta::deserialize(unsigned int id,
                          uniq_count, counter);
 }
 
-FieldMeta::FieldMeta(std::string name, Create_field *field, AES_KEY *m_key,
+FieldMeta::FieldMeta(std::string name, Create_field *field,
+                     const AES_KEY * const m_key,
                      unsigned long uniq_count)
     : fname(name), has_salt(static_cast<bool>(m_key)),
       salt_name(BASE_SALT_NAME + getpRandomName()), 
@@ -311,7 +313,8 @@ OnionMeta *FieldMeta::getOnionMeta(onion o) const
     return om;
 }
 
-onionlayout FieldMeta::getOnionLayout(AES_KEY *m_key, Create_field *f)
+onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
+                                      Create_field *f)
 {
     if (NULL == m_key) {
         return PLAIN_ONION_LAYOUT;

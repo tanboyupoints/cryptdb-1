@@ -16,15 +16,15 @@ using namespace std;
 
 uint rounded_len(uint len, uint block_size, bool dopad) {
     if (dopad || (len % block_size)) {
-	return (len/block_size + 1) * block_size;
+        return (len/block_size + 1) * block_size;
     } else {
-	return len;
+        return len;
     }
 }
 
 
 string
-getKey(AES_KEY * masterKeyArg, const string &uniqueFieldName,
+getKey(const AES_KEY * const masterKeyArg, const string &uniqueFieldName,
                       SECLEVEL sec)
 {
     string id = uniqueFieldName + strFromVal((unsigned int) sec);
@@ -428,10 +428,10 @@ freeKey(PKCS * key)
 
 
 string
-getLayerKey(AES_KEY * mKey, string uniqueFieldName, SECLEVEL l) {
+getLayerKey(const AES_KEY * const mKey, string uniqueFieldName,
+            SECLEVEL l) {
     if (l == SECLEVEL::DETJOIN) {
-	return getKey(mKey, "joinjoin", l);
+        return getKey(mKey, "joinjoin", l);
     }
     return getKey(mKey, uniqueFieldName, l);
-
 }

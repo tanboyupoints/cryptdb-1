@@ -19,7 +19,8 @@
 
 #include <util/onions.hh>
 
-std::string getLayerKey(AES_KEY * mKey, std::string uniqueFieldName, SECLEVEL l);
+std::string getLayerKey(const AES_KEY * const mKey,
+                        std::string uniqueFieldName, SECLEVEL l);
 
 AES_KEY * getKey(const std::string & key);
 /**
@@ -27,7 +28,8 @@ AES_KEY * getKey(const std::string & key);
  * master key and some unique field name. Result will be AES_KEY_SIZE
  * long.
  */
-std::string getKey(AES_KEY * mkey, const std::string &uniqueFieldName, SECLEVEL sec);
+std::string getKey(const AES_KEY * const mkey,
+                   const std::string &uniqueFieldName, SECLEVEL sec);
 
 AES_KEY * get_AES_KEY(const std::string &key);
 AES_KEY * get_AES_enc_key(const std::string & key);
