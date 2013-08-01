@@ -11,7 +11,7 @@ class Import
         Import(const char *fname) : filename(fname){}
         ~Import(){}
 
-        void executeQueries(Rewriter& r);
+        void executeQueries(ProxyState& ps);
         void printOutOnly(void);
 
     private:

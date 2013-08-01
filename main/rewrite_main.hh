@@ -54,19 +54,12 @@ public:
 // Main class processing rewriting
 class Rewriter {
 public:
-    Rewriter(ConnectionInfo ci,
-             const std::string &embed_dir,
-             const std::string &dbname,
-             bool encByDefault = true);
-    ~Rewriter();
+    Rewriter();
+    // FIXME: Cleanup resources.
+    ~Rewriter() {;}
 
-    void setMasterKey(const std::string &mkey);
-    QueryRewrite rewrite(const std::string &q);
+    QueryRewrite rewrite(const ProxyState &ps, const std::string &q);
     ResType *decryptResults(ResType & dbres, ReturnMeta * rm);
-
-    // HACK: ps probably shouldn't be embedded in Rewriter if it is going
-    // to carry around Connect objects.
-    Connect *getConnection() {return ps.conn;}
 
     RewriteOutput *
         dispatchOnLex(Analysis &a, const ProxyState &ps,
@@ -74,10 +67,6 @@ public:
 
     SQLDispatcher *dml_dispatcher;
     SQLDispatcher *ddl_dispatcher;
-
-    ProxyState ps;
-
-private:
 };
 
 class ScopedMySQLRes {
@@ -95,7 +84,7 @@ private:
 };
 
 ResType *
-executeQuery(Rewriter &r, const ProxyState &ps, const std::string &q);
+executeQuery(const ProxyState &ps, const std::string &q);
 
 #define UNIMPLEMENTED \
         throw std::runtime_error(std::string("Unimplemented: ") + \

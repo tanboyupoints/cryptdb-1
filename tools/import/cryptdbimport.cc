@@ -60,7 +60,7 @@ Import::printOutOnly(void)
 }
 
 void
-Import::executeQueries(Rewriter& r)
+Import::executeQueries(ProxyState& ps)
 {
     std::string line;
     std::string s("");
@@ -77,7 +77,7 @@ Import::executeQueries(Rewriter& r)
             if(lastChar == ';'){
                 s += line;
                 std::cout << s << std::endl;
-                executeQuery(r, r.ps, s);
+                executeQuery(ps, s);
                 s.clear();
                 continue;
             }
@@ -120,17 +120,15 @@ int main(int argc, char **argv)
                     Import import(optarg);
                     if(exec == true){
                         ConnectionInfo ci("localhost", username, password);
-                        Rewriter r(ci, "/var/lib/shadow-mysql",
-                                   "cryptdbtest", true);
-
-                        // Onion layer keys are derived from master key.
-                        // here using the same as cdb_test.
-                        r.setMasterKey("2392834");
+                        const std::string master_key = "2392834";
+                        ProxyState ps(ci, "/var/lib/shadow-mysql",
+                                      "cryptdbtest", true, master_key);
 
                         // Execute queries
-                        import.executeQueries(r);
-                    } else
+                        import.executeQueries(ps);
+                    } else {
                         import.printOutOnly();
+                    }
                 }
                 break;
             case 'p':

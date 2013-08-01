@@ -193,6 +193,81 @@ operator<<(std::ostream &out, const RewritePlan * rp)
     return out;
 }
 
+static void
+dropAll(Connect * conn)
+{
+    for (udf_func* u: udf_list) {
+        std::stringstream ss;
+        ss << "DROP FUNCTION IF EXISTS " << convert_lex_str(u->name) << ";";
+        assert_s(conn->execute(ss.str()), ss.str());
+    }
+}
+
+static void
+createAll(Connect * conn)
+{
+    for (udf_func* u: udf_list) {
+        std::stringstream ss;
+        ss << "CREATE ";
+        if (u->type == UDFTYPE_AGGREGATE) ss << "AGGREGATE ";
+        ss << "FUNCTION " << u->name.str << " RETURNS ";
+        switch (u->returns) {
+            case INT_RESULT:    ss << "INTEGER"; break;
+            case STRING_RESULT: ss << "STRING";  break;
+            default:            thrower() << "unknown return " << u->returns;
+        }
+        ss << " SONAME 'edb.so';";
+        assert_s(conn->execute(ss.str()), ss.str());
+    }
+}
+
+static void
+loadUDFs(Connect * conn) {
+    //need a database for the UDFs
+    assert_s(conn->execute("DROP DATABASE IF EXISTS cryptdb_udf"), "cannot drop db for udfs even with 'if exists'");
+    assert_s(conn->execute("CREATE DATABASE cryptdb_udf;"), "cannot create db for udfs");
+    assert_s(conn->execute("USE cryptdb_udf;"), "cannot use db");
+    dropAll(conn);
+    createAll(conn);
+    LOG(cdb_v) << "Loaded CryptDB's UDFs.";
+}
+
+ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
+                       const std::string &dbname, bool encByDefault,
+                       const std::string &master_key)
+{
+    init_mysql(embed_dir);
+
+    encByDefault = encByDefault;
+
+    masterKey = getKey(master_key);
+
+    e_conn = Connect::getEmbedded(embed_dir, dbname);
+
+    conn = new Connect(ci.server, ci.user, ci.passwd, dbname, ci.port);
+
+    MetaDataTables::initialize(conn, e_conn);
+
+    loadUDFs(conn);
+
+    // HACK: This is necessary as above functions use a USE statement.
+    // ie, loadUDFs.
+    assert(conn->execute("USE cryptdbtest;"));
+    assert(e_conn->execute("USE cryptdbtest;"));
+}
+
+ProxyState::~ProxyState()
+{
+    if (conn) {
+        delete conn;
+        conn = NULL;
+    }
+    if (e_conn) {
+        delete e_conn;
+        e_conn = NULL;
+    }
+}
+
 std::string Delta::tableNameFromType(TableType table_type) const
 {
     switch (table_type) {
@@ -354,31 +429,26 @@ ResType *RewriteOutput::sendQuery(Connect *c, const std::string &q)
     return res;
 }
 
-ResType *SimpleOutput::doQuery(Connect *conn, Connect *e_con,
-                               Rewriter *rewriter)
+ResType *SimpleOutput::doQuery(Connect *conn, Connect *e_conn)
 {
     prettyPrintQuery(original_query);
     return sendQuery(conn, original_query);
 }
 
-ResType *DMLOutput::doQuery(Connect *conn, Connect *e_conn,
-                            Rewriter *rewriter)
+ResType *DMLOutput::doQuery(Connect *conn, Connect *e_conn)
 {
     prettyPrintQuery(new_query);
     return sendQuery(conn, new_query);
 }
 
-ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
-                                Rewriter *rewriter)
+ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn)
 {
-    assert(rewriter);
-
     // Retrieve rows from database.
     std::ostringstream select_stream;
     select_stream << " SELECT * FROM " << this->plain_table
                   << " WHERE " << this->where_clause << ";";
     const ResType * const select_res_type =
-        executeQuery(*rewriter, this->ps, select_stream.str());
+        executeQuery(this->ps, select_stream.str());
     assert(select_res_type);
     if (select_res_type->rows.size() == 0) { // No work to be done.
         return sendQuery(conn, new_query);
@@ -448,14 +518,14 @@ ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn,
     std::ostringstream delete_stream;
     delete_stream << " DELETE FROM " << this->plain_table
                   << " WHERE " << this->where_clause << ";";
-    assert(executeQuery(*rewriter, this->ps, delete_stream.str()));
+    assert(executeQuery(this->ps, delete_stream.str()));
 
     // > Add each row from the embedded database to the data database.
     std::ostringstream push_results_stream;
     push_results_stream << " INSERT INTO " << this->plain_table
                         << " VALUES " << output_rows << ";";
     ResType * const ret_value =
-        executeQuery(*rewriter, this->ps, push_results_stream.str());
+        executeQuery(this->ps, push_results_stream.str());
     assert(ret_value);
 
     return ret_value;
@@ -698,8 +768,7 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
     return result;
 }
 
-ResType *DDLOutput::doQuery(Connect *conn, Connect *e_conn,
-                            Rewriter *rewriter)
+ResType *DDLOutput::doQuery(Connect *conn, Connect *e_conn)
 {
     std::list<std::string> local_qz, remote_qz;
     local_qz.push_back(original_query);
@@ -714,8 +783,7 @@ bool AdjustOnionOutput::queryAgain()
     return true;
 }
 
-ResType *AdjustOnionOutput::doQuery(Connect *conn, Connect *e_conn,
-                                    Rewriter *rewriter)
+ResType *AdjustOnionOutput::doQuery(Connect *conn, Connect *e_conn)
 {
     return handleDeltaQuery(conn, e_conn, deltas,
                             std::list<std::string>(),

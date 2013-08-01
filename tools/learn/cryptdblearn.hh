@@ -30,10 +30,10 @@ class Learn
 {
     public:
 
-        Learn(mode_e mode, Rewriter& r, const std::string &dbname,
+        Learn(mode_e mode, ProxyState& ps, const std::string &dbname,
               const std::string &filename)
             : m_totalnum(0), m_success_num(0), m_errnum(0),
-            m_mode(mode), m_r(r), m_dbname(dbname), m_filename(filename)
+            m_mode(mode), m_ps(ps), m_dbname(dbname), m_filename(filename)
         {
             //TODO: setenv is just a sugestion took from test, but need to be
             //better than this.
@@ -49,8 +49,8 @@ class Learn
             //TODO: Generate onions enc. layout
         }
 
-        void trainFromFile(Rewriter &r);
-        void trainFromScratch(Rewriter &r);
+        void trainFromFile(ProxyState &ps);
+        void trainFromScratch(ProxyState &ps);
 
         void status();
 
@@ -59,7 +59,7 @@ class Learn
         int m_success_num;
         int m_errnum;
         mode_e m_mode;
-        Rewriter& m_r;
+        ProxyState& m_ps;
         std::string m_dbname;
         std::string m_filename;
         std::vector<query_parse*>qvec;

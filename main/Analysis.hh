@@ -233,12 +233,11 @@ operator<<(std::ostream &out, const RewritePlan * rp);
 
 // state maintained at the proxy
 typedef struct ProxyState {
-    ProxyState()
-        : conn(NULL), e_conn(NULL), encByDefault(true), masterKey(NULL) {}
+    ProxyState(ConnectionInfo ci, const std::string &embed_dir,
+               const std::string &dbname, bool encByDefault,
+               const std::string &master_key);
     ~ProxyState();
     std::string dbName() const {return dbname;}
-
-    ConnectionInfo ci;
 
     // connection to remote and embedded server
     Connect*       conn;
@@ -324,8 +323,7 @@ public:
         : original_query(original_query) {}
     virtual ~RewriteOutput() = 0;
 
-    virtual ResType *doQuery(Connect *conn, Connect *e_conn,
-                             Rewriter *rewriter = NULL) = 0;
+    virtual ResType *doQuery(Connect *conn, Connect *e_conn) = 0;
     virtual bool queryAgain();
     static ResType *sendQuery(Connect *c, const std::string &q);
 
@@ -339,8 +337,7 @@ public:
         : RewriteOutput(original_query) {}
     ~SimpleOutput() {;}
 
-    ResType *doQuery(Connect *conn, Connect *e_con,
-                     Rewriter *rewriter);
+    ResType *doQuery(Connect *conn, Connect *e_conn);
 };
 
 class DMLOutput : public RewriteOutput {
@@ -349,8 +346,7 @@ public:
         : RewriteOutput(original_query), new_query(new_query) {}
     ~DMLOutput() {;}
 
-    ResType *doQuery(Connect *conn, Connect *e_conn,
-                    Rewriter *rewriter = NULL);
+    ResType *doQuery(Connect *conn, Connect *e_conn);
 
 private:
     const std::string new_query;
@@ -370,14 +366,14 @@ public:
       where_clause(where_clause), ps(ps) {}
     ~SpecialUpdate() {;}
 
-    ResType *doQuery(Connect *conn, Connect *e_conn,
-                    Rewriter *rewriter = NULL);
+    ResType *doQuery(Connect *conn, Connect *e_conn);
 
 private:
     const std::string new_query;
     const std::string plain_table;
     const std::string crypted_table;
     const std::string where_clause;
+    // FIXME: Use const.
     const ProxyState &ps;
 };
 
@@ -386,8 +382,7 @@ public:
     DeltaOutput(std::string original_query, std::vector<Delta *> deltas)
         : RewriteOutput(original_query), deltas(deltas) {}
     virtual ~DeltaOutput() = 0;
-    virtual ResType *doQuery(Connect *conn, Connect *e_conn,
-                            Rewriter *rewriter = NULL) = 0;
+    virtual ResType *doQuery(Connect *conn, Connect *e_conn) = 0;
     static bool save(Connect *e_conn, unsigned long *delta_output_id);
     static bool destroyRecord(Connect *e_conn,
                               unsigned long delta_output_id);
@@ -402,8 +397,7 @@ public:
               std::vector<Delta *> deltas)
         : DeltaOutput(original_query, deltas), new_query(new_query) {}
     ~DDLOutput() {;}
-    ResType *doQuery(Connect *conn, Connect *e_conn,
-                     Rewriter *rewriter = NULL);
+    ResType *doQuery(Connect *conn, Connect *e_conn);
 
 private:
     const std::string new_query;
@@ -416,8 +410,7 @@ public:
         : DeltaOutput("", deltas),
           adjust_queries(adjust_queries) {}
     ~AdjustOnionOutput() {;}
-    ResType *doQuery(Connect *conn, Connect *e_conn,
-                     Rewriter *rewriter = NULL);
+    ResType *doQuery(Connect *conn, Connect *e_conn);
 
     bool queryAgain();
 

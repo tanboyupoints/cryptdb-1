@@ -30,7 +30,7 @@ Learn::status()
 }
 
 void
-Learn::trainFromFile(Rewriter &r)
+Learn::trainFromFile(ProxyState &ps)
 {
     std::string line;
     std::string s("");
@@ -46,8 +46,10 @@ Learn::trainFromFile(Rewriter &r)
             if(lastChar == ';'){
                 this->m_totalnum++;
                 s += line;
-                QueryRewrite qr = this->m_r.rewrite(s);
-                ResType *res = qr.output->doQuery(r.ps.conn, r.ps.e_conn, &r);
+                Rewriter r;
+                QueryRewrite qr = r.rewrite(ps, s);
+                ResType *res =
+                    qr.output->doQuery(ps.conn, ps.e_conn);
                 if(res){
                     if(res->ok)
                         this->m_success_num++;
@@ -55,7 +57,7 @@ Learn::trainFromFile(Rewriter &r)
                 }
                 if (true == qr.output->queryAgain()){ 
                     this->m_totalnum++;
-                    assert(executeQuery(r, r.ps, s));
+                    assert(executeQuery(ps, s));
                     this->m_success_num++;
                 } 
                 s.clear();
@@ -67,7 +69,7 @@ Learn::trainFromFile(Rewriter &r)
 }
         
 void 
-Learn::trainFromScratch(Rewriter &r)
+Learn::trainFromScratch(ProxyState &ps)
 {
     //TODO: implement this
     /*
@@ -130,22 +132,19 @@ int main(int argc, char **argv)
 
     
     ConnectionInfo ci("localhost", username, password);
-    Rewriter r(ci, "/var/lib/shadow-mysql", dbname, true);
-
-    // Onion layer keys are derived from master key.
-    // here using the same as cdb_test.
-    r.setMasterKey("2392834");
+    const std::string master_key = "2392834";
+    ProxyState ps(ci, "/var/lib/shadow-mysql", dbname, true, master_key);
 
     Learn *learn; 
     
     if(filename != "")
     {
-        learn = new Learn(MODE_FILE, r, dbname, filename);
-        learn->trainFromFile(r);
+        learn = new Learn(MODE_FILE, ps, dbname, filename);
+        learn->trainFromFile(ps);
         learn->status();
     }else{
-        learn = new Learn(MODE_FROM_SCRATCH, r, dbname, "");
-        learn->trainFromScratch(r);
+        learn = new Learn(MODE_FROM_SCRATCH, ps, dbname, "");
+        learn->trainFromScratch(ps);
         learn->status();
     }
    

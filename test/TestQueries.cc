@@ -890,10 +890,12 @@ Connection::start() {
         case PROXYSINGLE:
             {
                 ConnectionInfo ci(tc.host, tc.user, tc.pass);
-                re_proxy = new Rewriter(ci, tc.shadowdb_dir, tc.db, true);
-                re_set.insert(re_proxy);
+                const std::string master_key = "2392834";
+                ProxyState *ps =
+                    new ProxyState(ci, tc.shadowdb_dir, tc.db, true,
+                                   master_key);
+                re_set.insert(ps);
                 this->re_it = re_set.begin();
-                re_proxy->setMasterKey("2392834");
             }
             break;
         default:
@@ -989,8 +991,8 @@ Connection::executeRewriter(std::string query) {
     }
 
     //cout << query << endl;
-    Rewriter *r = *re_it;
-    ResType *dec_res = executeQuery(*r, r->ps, query);
+    ProxyState *ps = *re_it;
+    ResType *dec_res = executeQuery(*ps, query);
     if (dec_res) {
         return *dec_res;
     } else {

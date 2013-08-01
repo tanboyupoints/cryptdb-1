@@ -22,7 +22,7 @@ public:
 static Timer t;
 
 //static EDBProxy * cl = NULL;
-static Rewriter * r = NULL;
+static ProxyState * ps = NULL;
 static pthread_mutex_t big_lock;
 
 static bool DO_CRYPT = true;
@@ -103,7 +103,7 @@ connect(lua_State *L)
 
     clients[client] = ws;
 
-    if (!r) {
+    if (!ps) {
         std::cerr << "starting proxy\n";
         //cryptdb_logger::setConf(string(getenv("CRYPTDB_LOG")?:""));
 
@@ -117,22 +117,20 @@ connect(lua_State *L)
         // Connect object supports this property.
         std::string dbname = "cryptdbtest";
         std::string mode = getenv("CRYPTDB_MODE")?:"";
+        const std::string mkey = "113341234";  // XXX do not change as
+                                               // it's used for tpcc exps
         if (mode == "single") {
             std::string encbydefault = getenv("ENC_BY_DEFAULT");
-	    if (encbydefault == "false") {
-            std::cerr << "\n\n enc by default false " << "\n\n";
-		    r = new Rewriter(ci, embed_dir, dbname, false);
-	    } else {
-            std::cerr << "\n\nenc by default true" << "\n\n";
-		    r = new Rewriter(ci, embed_dir, dbname, true);
-	    }
-
-	} else {
+            if (encbydefault == "false") {
+                std::cerr << "\n\n enc by default false " << "\n\n";
+                ps = new ProxyState(ci, embed_dir, dbname, false, mkey);
+            } else {
+                std::cerr << "\n\nenc by default true" << "\n\n";
+                ps = new ProxyState(ci, embed_dir, dbname, true, mkey);
+            }
+        } else {
             throw CryptDBError("Unsupported cryptdb mode!");
         }
-
-        uint64_t mkey = 113341234;  // XXX do not change as it's used for tpcc exps
-        r->setMasterKey(BytesFromInt(mkey, AES_KEY_BYTES));
 
         //may need to do training
         char * ev = getenv("TRAIN_QUERY");
@@ -140,8 +138,9 @@ connect(lua_State *L)
             std::string trainQuery = ev;
             LOG(wrapper) << "proxy trains using " << trainQuery;
             if (trainQuery != "") {
+                Rewriter r;
                 // TODO: May need to set current database in ProxyState.
-                r->rewrite(trainQuery);
+                r.rewrite(*ps, trainQuery);
             } else {
                 std::cerr << "empty training!\n";
             }
@@ -371,7 +370,8 @@ decrypt(lua_State *L)
         rd = res;
     } else {
         try {
-            ResType *rt = r->decryptResults(res, clients[client]->rmeta);
+            Rewriter r;
+            ResType *rt = r.decryptResults(res, clients[client]->rmeta);
             rd = *rt;
         }
         catch(CryptDBError e) {

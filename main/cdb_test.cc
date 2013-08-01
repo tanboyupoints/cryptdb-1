@@ -61,7 +61,7 @@ static inline std::string &trim(std::string &s) {
 }
 
 /** returns true if should stop, to keep looping */
-static bool handle_line(Rewriter& r, const std::string& q)
+static bool handle_line(ProxyState& ps, const std::string& q)
 {
   if (q == "\\q") {
     std::cerr << "Goodbye!\n";
@@ -85,7 +85,7 @@ static bool handle_line(Rewriter& r, const std::string& q)
       if (line.empty())
         continue;
       std::cerr << GREEN_BEGIN << line << COLOR_END << std::endl;
-      if (!handle_line(r, line)) {
+      if (!handle_line(ps, line)) {
         f.close();
         return false;
       }
@@ -94,7 +94,7 @@ static bool handle_line(Rewriter& r, const std::string& q)
     return true;
   }
 
-  return (bool)executeQuery(r, r.ps, q);
+  return executeQuery(ps, q);
 }
 
 int
@@ -110,10 +110,10 @@ main(int ac, char **av)
     atexit(__write_history);
 
     ConnectionInfo ci("localhost", "root", "letmein");
-    Rewriter r(ci, av[1], "cryptdbtest", encByDefault);
-    r.setMasterKey("2392834");
+    const std::string master_key = "2392834";
+    ProxyState ps(ci, av[1], "cryptdbtest", encByDefault, master_key);
 
-    std::string prompt = BOLD_BEGIN + "CryptDB=#" + COLOR_END + " ";
+    const std::string prompt = BOLD_BEGIN + "CryptDB=#" + COLOR_END + " ";
 
     for (;;) {
         char *input = readline(prompt.c_str());
@@ -121,7 +121,7 @@ main(int ac, char **av)
         std::string q(input);
         if (q.empty()) continue;
         else{
-            if (!handle_line(r, q))
+            if (!handle_line(ps, q))
                 break;
         }
     }

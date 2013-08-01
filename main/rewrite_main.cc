@@ -763,45 +763,6 @@ optimize_table_list(List<TABLE_LIST> *tll, Analysis &a)
     }
 }
 
-static void
-dropAll(Connect * conn)
-{
-    for (udf_func* u: udf_list) {
-        std::stringstream ss;
-        ss << "DROP FUNCTION IF EXISTS " << convert_lex_str(u->name) << ";";
-        assert_s(conn->execute(ss.str()), ss.str());
-    }
-}
-
-static void
-createAll(Connect * conn)
-{
-    for (udf_func* u: udf_list) {
-        std::stringstream ss;
-        ss << "CREATE ";
-        if (u->type == UDFTYPE_AGGREGATE) ss << "AGGREGATE ";
-        ss << "FUNCTION " << u->name.str << " RETURNS ";
-        switch (u->returns) {
-            case INT_RESULT:    ss << "INTEGER"; break;
-            case STRING_RESULT: ss << "STRING";  break;
-            default:            thrower() << "unknown return " << u->returns;
-        }
-        ss << " SONAME 'edb.so';";
-        assert_s(conn->execute(ss.str()), ss.str());
-    }
-}
-
-static void
-loadUDFs(Connect * conn) {
-    //need a database for the UDFs
-    assert_s(conn->execute("DROP DATABASE IF EXISTS cryptdb_udf"), "cannot drop db for udfs even with 'if exists'");
-    assert_s(conn->execute("CREATE DATABASE cryptdb_udf;"), "cannot create db for udfs");
-    assert_s(conn->execute("USE cryptdb_udf;"), "cannot use db");
-    dropAll(conn);
-    createAll(conn);
-    LOG(cdb_v) << "Loaded CryptDB's UDFs.";
-}
-
 static bool
 noRewrite(LEX * lex) {
     switch (lex->sql_command) {
@@ -821,37 +782,13 @@ noRewrite(LEX * lex) {
     return false;
 }
 
-Rewriter::Rewriter(ConnectionInfo ci,
-                   const std::string &embed_dir,
-                   const std::string &dbname,
-                   bool encByDefault)
+Rewriter::Rewriter()
 {
-    init_mysql(embed_dir);
-
-    ps.ci = ci;
-    ps.encByDefault = encByDefault;
-
-    urandom u;
-    ps.masterKey = getKey(u.rand_string(AES_KEY_BYTES));
-
-    ps.e_conn = Connect::getEmbedded(embed_dir, dbname);
-
-    ps.conn = new Connect(ci.server, ci.user, ci.passwd, dbname, ci.port);
-
     // Must be called before loadSchemaInfo.
     buildTypeTextTranslator();
-    // printEmbeddedState(ps);
-    MetaDataTables::initialize(ps.conn, ps.e_conn);
 
     dml_dispatcher = buildDMLDispatcher();
     ddl_dispatcher = buildDDLDispatcher();
-
-    loadUDFs(ps.conn);
-
-    // HACK: This is necessary as above functions use a USE statement.
-    // ie, loadUDFs.
-    assert(ps.conn->execute("USE cryptdbtest;"));
-    assert(ps.e_conn->execute("USE cryptdbtest;"));
 }
 
 static std::string
@@ -913,31 +850,9 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
     }
 }
 
-ProxyState::~ProxyState()
-{
-    if (conn) {
-        delete conn;
-        conn = NULL;
-    }
-    if (e_conn) {
-        delete e_conn;
-        e_conn = NULL;
-    }
-}
-
-// TODO: Cleanup resources.
-Rewriter::~Rewriter()
-{}
-
-void
-Rewriter::setMasterKey(const std::string &mkey)
-{
-    ps.masterKey = getKey(mkey);
-}
-
 // TODO: we don't need to pass analysis, enough to pass returnmeta
 QueryRewrite
-Rewriter::rewrite(const std::string & q)
+Rewriter::rewrite(const ProxyState &ps, const std::string & q)
 {
     LOG(cdb_v) << "q " << q;
     assert(0 == mysql_thread_init());
@@ -1045,15 +960,16 @@ prettyPrintQueryResult(ResType res)
 }
 
 ResType *
-executeQuery(Rewriter &r, const ProxyState &ps, const std::string &q)
+executeQuery(const ProxyState &ps, const std::string &q)
 {
     try {
-        QueryRewrite qr = r.rewrite(q);
+        Rewriter r;
+        QueryRewrite qr = r.rewrite(ps, q);
         std::unique_ptr<ResType> res(qr.output->doQuery(ps.conn,
-                                                        ps.e_conn, &r));
+                                                        ps.e_conn));
         assert(res);
         if (true == qr.output->queryAgain()) { // Onion adjustment.
-            return executeQuery(r, ps, q);
+            return executeQuery(ps, q);
         }
         prettyPrintQueryResult(*res);
 
