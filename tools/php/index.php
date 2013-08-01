@@ -117,19 +117,19 @@ $CRYPTDBDEF=array(
  if (db_connect('nodie')){
      $time_start=microtime_float();
 
-     echo "->$" . "." . $DB['db'] . "." . $_POST['describe_table'] . "." . "$<-"; 
-     if($_POST['describe_table'])
-     {
-         echo "DESCRIBE ON";
-     }
-
+     //echo "->$" . "." . $DB['db'] . "." . $_POST['describe_table'] . "." . "$<-"; 
 
      if ($_REQUEST['phpinfo']){
          ob_start();phpinfo();$sqldr='<div style="font-size:130%">'.ob_get_clean().'</div>';
      }else{
          if ($DB['db']){
 
-             // commands
+             /*
+              * Commands:
+              * describe_table
+              *
+              *
+              */
              if($_POST['cryptdb_describe_table'])
              {
                  $q = "describe " . $DB['db'] . "." . $_POST['cryptdb_describe_table'];
@@ -184,7 +184,31 @@ function do_sql($q){
  }
 }
 
+function do_cryptdb_sql($q){
+ global $cryptdbh,$last_sth,$last_sql,$reccount,$out_message,$SQLq,$SHOW_T;
+ $SQLq=$q;
+
+ if (!do_multi_sql($q)){
+     $out_message="Error: ".mysql_error($cryptdbh);
+ }else{
+     if ($last_sth && $last_sql){
+         $SQLq=$last_sql;
+         if (preg_match("/^select|show|explain|desc/i",$last_sql)) {
+             if ($q!=$last_sql) $out_message="Results of the last select displayed:";
+             display_select($last_sth,$last_sql);
+         } else {
+             $reccount=mysql_affected_rows($cryptdbh);
+             $out_message="Done.";
+             if (preg_match("/^insert|replace/i",$last_sql)) $out_message.=" Last inserted id=".get_identity();
+             if (preg_match("/^drop|truncate/i",$last_sql)) do_sql($SHOW_T);
+         }
+     }
+ }
+}
+
+
 function display_select($sth,$q){
+    //echo $q;
     global $dbh,$DB,$sqldr,$reccount,$is_sht,$xurl;
     $rc=array("o","e");
     $dbn=$DB['db'];
@@ -269,8 +293,20 @@ function display_select($sth,$q){
             }
             if ($is_show_crt) $v="<pre>$v</pre>";
             $sqldr.="<td>$v".(!strlen($v)?"<br>":'')."</td>";
+
         }
-        $sqldr.="</tr>\n";
+            if($_POST['cryptdb_describe_table'])
+            {
+                $sqldr.= "<td><select name=\"teste\" id=\"xxx\"> 
+                    <option selected>Sensitive Field</option> 
+                    <option>Best Effort Encryption</option> 
+                    <option>Unencrypted</option>
+                    </select></td>";
+                $sqldr.= "<td><form action=\"\" method=\"post\">
+                    <button name=\"foo\" value=\"upvote\">Execute</button>
+                    </form></td>";
+            }
+            $sqldr.= "</td></tr>\n";
     }
     $sqldr.="</table>\n".$abtn;
 
@@ -280,20 +316,27 @@ function print_header(){
  global $err_msg,$VERSION,$DB,$CRYPTDB,$dbh,$self,$is_sht,$xurl,$SHOW_T;
  $dbn=$DB['db'];
 ?>
+
+<!-- HTML BODY -->
+
+
 <!DOCTYPE html>
 <html>
-<head><title>phpMiniAdmin</title>
+<head><title>CryptDB</title>
 <meta charset="utf-8">
+
+
+<!-- CSS STYLE DEFINITIONS -->
 <style type="text/css">
-body{font-family:Arial,sans-serif;font-size:80%;padding:0;margin:0}
+body{font-family:Arial,sans-serif;font-size:80%;padding:2;margin:2}
 th,td{padding:0;margin:0}
 div{padding:3px}
-pre{font-size:125%}
+pre{font-size:50%}
 .nav{text-align:center}
-.ft{text-align:right;margin-top:20px;font-size:smaller}
+.ft{text-align:right;margin-top:10px;font-size:smaller}
 .inv{background-color:#069;color:#FFF}
 .inv a{color:#FFF}
-table.res{width:100%;border-collapse:collapse;}
+table.res{width:50%;border-collapse:collapse;}
 table.wa{width:auto}
 table.res th,table.res td{padding:2px;border:1px solid #fff}
 table.restr{vertical-align:top}
@@ -426,13 +469,14 @@ function sht(f){
 </head>
 
 
-<
 <body onload="after_load()">
 <form method="post" name="DF" action="<?php echo $self?>" enctype="multipart/form-data">
 <input type="hidden" name="XSS" value="<?php echo $_SESSION['XSS']?>">
 <input type="hidden" name="refresh" value="">
 <input type="hidden" name="p" value="">
 
+
+<!-- HEADER MENU -->
 <div class="inv">
 <?php if ($_SESSION['is_logged'] && $dbh){ ?>
  <a href="?<?php echo $xurl?>&q=show+databases">Databases</a>: 
@@ -446,7 +490,6 @@ function sht(f){
     $z.'&q='.urlencode($var);
 } ?>
 Tables:
-
 
 <form action="'<?php echo $self?>'" method="post">
 <select name="cryptdb_describe_table" onChange="location.href='<?php $var = "describe " . $_POST['cryptdb_describe_table']; echo $z.'&q='.urlencode($var)?>'">
@@ -462,19 +505,14 @@ Tables:
 </select>
 <input type="submit" value="Describe table">
 </form>
-
-
 <?php } ?>
 <?php } ?>
-
-
 
 
 
 
 <?php if ($GLOBALS['ACCESS_PWD']){?> | <a href="?<?php echo $xurl?>&logoff=1" onclick="logoff()">Logoff</a> <?php }?>
 </div>
-
 <div class="err"><?php echo $err_msg?></div>
 
 <?php
@@ -512,9 +550,6 @@ Records: <b><?php echo $reccount?></b> in <b><?php echo $time_all?></b> sec<br>
 function print_footer(){
 ?>
 </form>
-<div class="ft">
-&copy; 2004-2012 <a href="http://osalabs.com" target="_blank">Oleg Savchuk</a>
-</div>
 </body></html>
 <?php
 }
@@ -551,7 +586,6 @@ function print_cfg(){
 <label class="l">Password:</label><input type="password" name="c[pwd]" value=""><br>
 <label class="l">Port:</label><input type="text" name="c[port]" value="<?php echo $CRYPTDB['port']?>" size="4"><br>
 
-<div style="text-align:right"><a href="#" class="ajax" onclick="cfg_toggle()">advanced settings</a></div>
 <div id="cfg-adv" style="display:none;">
 
 
@@ -603,8 +637,10 @@ function db_connect($nodie=0){
 function cryptdb_connect($nodie=0){
     global $cryptdbh,$CRYPTDB,$err_msg;
 
-    echo "#".$CRYPTDB['host'].($CRYPTDB['port']?":$CRYPTDB[port]":''),$CRYPTDB['user'],$CRYPTDB['pwd'];
+    //TODO: Test this implementation
     return;
+
+
     $cryptdbh=@mysql_connect($CRYPTDB['host'].($CRYPTDB['port']?":$CRYPTDB[port]":''),$CRYPTDB['user'],$CRYPTDB['pwd']);
     if (!$cryptdbh) 
     {
