@@ -804,13 +804,12 @@ EncLayer *Analysis::popBackEncLayer(OnionMeta * const om)
     auto it = to_adjust_enc_layers.find(om);
     if (to_adjust_enc_layers.end() == it) { // First onion adjustment
         to_adjust_enc_layers[om] = om->layers;
-        EncLayer *out_layer = to_adjust_enc_layers[om].back();
-        to_adjust_enc_layers[om].pop_back();
-        return out_layer;
-    } else { // Second onion adjustment for this query.
-        // FIXME: Maybe we want to support this case.
-        throw CryptDBError("Trying to adjust onion twice in same round!");
     }
+
+    EncLayer *out_layer = to_adjust_enc_layers[om].back();
+    to_adjust_enc_layers[om].pop_back();
+
+    return out_layer;
 }
 
 SECLEVEL Analysis::getOnionLevel(OnionMeta * const om) const

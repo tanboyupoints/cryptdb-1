@@ -213,21 +213,41 @@ static CItemCompare<Item_func::Functype::LE_FUNC,    Item_func_le>    ANON;
 
 template<Item_func::Functype FT, class IT>
 class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
-    virtual RewritePlan * do_gather_type(Item_cond *i, reason &tr, Analysis & a) const
+    virtual RewritePlan * do_gather_type(Item_cond *i, reason &tr,
+                                         Analysis & a) const
     {
-   /*   auto it = List_iterator<Item>(*i->argument_list());
+        const unsigned int arg_count = i->argument_list()->elements;
+        assert(2 <= arg_count);
+
+        EncSet out_es = PLAIN_EncSet;
+        EncSet child_es = PLAIN_EncSet;
+        const std::string why = "and/or";
+
+        tr = reason(out_es, why, i);
+
+        RewritePlan **childr_rp = new RewritePlan*[2];
+
+        auto it = List_iterator<Item>(*i->argument_list());
+        unsigned int index = 0;
         for (;;) {
             Item *argitem = it++;
             if (!argitem)
                 break;
-            reason new_tr(tr.encset.intersect(EQ_EncSet), "and/or", i);
-            RewritePlan * rp = gather(argitem, tr, a);
-            if (!rp->es_out.contains(PLAIN_OLK))
+            assert(index < arg_count);
+
+            reason r;
+            childr_rp[index] = gather(argitem, r, a);
+            tr.add_child(r);
+            if (!childr_rp[index]->es_out.contains(PLAIN_OLK)) {
                 thrower() << "cannot obtain PLAIN for " << *argitem;
+            }
+            ++index;
         }
 
-        return rp;*/
-        UNIMPLEMENTED;
+        // Must be an OLK for each argument.
+        return new RewritePlanOneOLK(out_es.extract_singleton(),
+                                     child_es.chooseOne(),
+                                     childr_rp, tr);
     }
 
     virtual Item * do_optimize_type(Item_cond *i, Analysis & a) const {
@@ -237,17 +257,28 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
     virtual Item * do_rewrite_type(Item_cond *i, const OLK & olk,
                                    const RewritePlan * rp, Analysis & a) const
     {
-        List<Item> newlist;
+        const unsigned int arg_count = i->argument_list()->elements;
+        Item **items = new Item*[2];
+
+        const RewritePlanOneOLK * const rp_one =
+            static_cast<const RewritePlanOneOLK * const>(rp);
         auto it = List_iterator<Item>(*i->argument_list());
+        unsigned int index = 0;
         for (;;) {
             Item *argitem = it++;
             if (!argitem) {
-            break;
+                break;
             }
-            newlist.push_back(rewrite(argitem, olk, a));
+            assert(index < arg_count);
+        
+            items[index] =
+                itemTypes.do_rewrite(argitem, rp_one->olk,
+                                    rp_one->childr_rp[index], a);
+            items[index]->name = NULL;
+            ++index;
         }
 
-        IT * res = new IT(newlist);
+        IT * res = new IT(items[0], items[1]);
         return res;
     }
 };
@@ -263,7 +294,7 @@ class CItemNullcheck : public CItemSubtypeFT<Item_bool_func, FT> {
         assert(i->argument_count() == 1);
 
         reason r;
-        RewritePlan **child_rp = new RewritePlan*[2];
+        RewritePlan **child_rp = new RewritePlan*[1];
         child_rp[0] = gather(args[0], r, a);
 
         EncSet solution = child_rp[0]->es_out;
