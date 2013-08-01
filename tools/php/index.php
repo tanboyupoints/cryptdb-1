@@ -529,17 +529,10 @@ function print_screen(){
     print_header();
 ?>
 
-<div class="dot" style="padding:0 0 5px 20px">
-Type query:&nbsp;<button type="button" class="qnav" onclick="q_prev()">&lt;</button><button type="button" class="qnav" onclick="q_next()">&gt;</button><br>
-<textarea id="q" name="q" cols="70" rows="10" style="width:50%"><?php echo $SQLq?></textarea><br>
-<input type="submit" name="GoSQL" value="Go" onclick="return chksql()" style="width:100px">&nbsp;&nbsp;
-<input type="button" name="Clear" value=" Clear " onclick="document.DF.q.value=''" style="width:100px">
-</div>
+<textarea readonly id="q" name="q" cols="70" rows="5" style="width:50%"><?php echo $SQLq?></textarea><br>
 
-<div class="dot" style="padding:5px 0 5px 20px">
 Records: <b><?php echo $reccount?></b> in <b><?php echo $time_all?></b> sec<br>
 <b><?php echo $out_message?></b>
-</div>
 <div class="sqldr">
 <?php echo $nav.$sqldr.$nav; ?>
 </div>
