@@ -19,10 +19,13 @@ escapeString(Connect *e_conn, const std::string &escape_me)
     return out;
 }
 
-EncSet::EncSet() : osl(FULL_EncSet.osl) {}
-
 // FIXME: Wrong interfaces.
 EncSet::EncSet(Analysis &a, FieldMeta * fm) {
+    // FIXME: Safe to throw exception in constructor?
+    if (0 == fm->children.size()) {
+        throw CryptDBError("FieldMeta has no children!");
+    }
+
     osl.clear();
     for (auto pair : fm->children) {
         OnionMeta *om = pair.second;
@@ -118,7 +121,7 @@ EncSet::chooseOne() const
                 continue;
             }
 
-            return OLK(o,  it->second.first, it->second.second);
+            return OLK(o, it->second.first, it->second.second);
         }
     }
     return OLK();

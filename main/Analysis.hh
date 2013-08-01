@@ -14,7 +14,6 @@
 class EncSet {
 public:
     EncSet(OnionLevelFieldMap input) : osl(input) {}
-    EncSet(); // TODO(stephentu): move ctor here
     EncSet(Analysis &a, FieldMeta * fm);
     EncSet(const OLK & olk);
 
@@ -191,7 +190,7 @@ public:
     reason r;
     EncSet es_out; // encset that this item can output
 
-    RewritePlan(const EncSet & es, reason r) : r(r), es_out(es) {};
+    RewritePlan(const EncSet &es, reason r) : r(r), es_out(es) {};
 
     //only keep plans that have parent_olk in es
 //    void restrict(const EncSet & es);

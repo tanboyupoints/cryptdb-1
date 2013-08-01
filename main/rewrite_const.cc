@@ -118,14 +118,17 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
 } ANON;
 
 static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
-    virtual RewritePlan * do_gather_type(Item_num *i, reason &tr, Analysis & a) const {
+    virtual RewritePlan * do_gather_type(Item_num *i, reason &tr,
+                                         Analysis & a) const
+    {
         LOG(cdb_v) << "CItemSubtypeIT (L966) num do_gather " << *i;
         /* constant ints are always ok */
         tr = reason(FULL_EncSet, "is a constant", i);
         return new RewritePlan(FULL_EncSet_Int, tr);
     }
 
-    virtual Item * do_optimize_type(Item_num *i, Analysis & a) const {
+    virtual Item * do_optimize_type(Item_num *i, Analysis & a) const
+    {
         return i;
     }
 
