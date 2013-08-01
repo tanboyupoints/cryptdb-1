@@ -72,34 +72,38 @@ class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
     virtual RewritePlan * do_gather_type(Item_sum_count *i, reason &tr,
                                          Analysis & a) const
     {
-        /*
-            if (i->has_with_distinct()) {
-            reason new_tr(tr.encset.intersect(EQ_EncSet), "count distinct", i);
-                EncSet e = gather(i->get_arg(0), new_tr, a);
-                if (e.intersect(EQ_EncSet).empty())
-                    thrower() << "count distinct";
+        reason r;
+        RewritePlan **childr_rp = new RewritePlan*[1];
+        childr_rp[0] = gather(i->get_arg(0), r, a);
+        const EncSet solution = childr_rp[0]->es_out.intersect(EQ_EncSet);
+        
+        std::string why = "count";
+        if (i->has_with_distinct()) {
+            if (solution.empty()) {
+                throw CryptDBError("count distinct must support equality");
+            }
+            why += " distinct";
         }
-        return PLAIN_EncSet;*/
-        UNIMPLEMENTED;
 
+        OLK out_olk = PLAIN_EncSet.extract_singleton();
+
+        tr = reason(out_olk, why, i);
+        tr.add_child(r);
+
+        return new RewritePlanOneOLK(out_olk, solution.chooseOne(),
+                                     childr_rp, tr);
     }
+
     virtual Item * do_rewrite_type(Item_sum_count *i,
                                    const OLK & constr,
                                    const RewritePlan * rp,
                                    Analysis & a) const
     {
-    /*  Item_sum_count * res = new Item_sum_count(current_thd, i);
-
-        if (i->has_with_distinct()) {
-            rewrite_agg_args(res, a);
-        }
-        ItemMeta *im = getAssert(a.itemToMeta, (Item *)i);
-
-        addToReturn(a.rmeta, a.pos++, im, false, i->name);
-
-        return res;
-    */
-        UNIMPLEMENTED;
+        std::list<Item *> args =
+            rewrite_agg_args(i, constr, (RewritePlanOneOLK *)rp, a, 1);
+        auto out_item = new Item_sum_count(args.front());
+        out_item->set_distinct(i->has_with_distinct());
+        return out_item;
     }
 };
 
@@ -128,10 +132,11 @@ class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
 
     virtual Item * do_rewrite_type(Item_sum_hybrid *i,
            const OLK & constr, const RewritePlan * rp,
-           Analysis & a) const {
+           Analysis & a) const
+    {
         std::list<Item *> args =
-        rewrite_agg_args(i, constr, (RewritePlanOneOLK *)rp, a, 1);
-      return new IT(args.front());
+            rewrite_agg_args(i, constr, (RewritePlanOneOLK *)rp, a, 1);
+        return new IT(args.front());
     }
 };
 

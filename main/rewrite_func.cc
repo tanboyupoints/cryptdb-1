@@ -79,8 +79,9 @@ typical_gather(Analysis & a, Item_func * i, const EncSet & my_es,
     childr_rp[0] = gather(args[0], r1, a);
     childr_rp[1] = gather(args[1], r2, a);
 
-    EncSet solution = my_es.intersect(childr_rp[0]->es_out).
-	                    intersect(childr_rp[1]->es_out);
+    EncSet solution =
+        my_es.intersect(childr_rp[0]->es_out).
+              intersect(childr_rp[1]->es_out);
 
     if (solution.empty()) {
         std::cerr << "crypto schemes does not support this query BECAUSE "
