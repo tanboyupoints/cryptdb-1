@@ -120,16 +120,11 @@ static QueryList Select = QueryList("SingleSelect",
 //migrated from TestSinglePrinc TestJoin
 static QueryList Join = QueryList("SingleJoin",
     { "CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)",
-      "CREATE TABLE test_join2 (id integer, books integer, name text)" ,
+      "CREATE TABLE test_join2 (id integer, books integer, name text)",
       "", "", "", "", "" },
     { "CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)",
-
-     "",
-     "",
-     "",
-     "",
-     "",
-     "" },
+      "CREATE TABLE test_join2 (id integer, books integer, name text)",
+      "", "", "", "", "" },
 #if 0
      // Fail
      "CRYPTDB test_join1.age ENC",
