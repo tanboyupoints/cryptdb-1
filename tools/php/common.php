@@ -23,6 +23,14 @@ $CRYPTDBDEF=array(
     'chset'=>"utf8",#optional, default charset
 );
 
+$SESSIONSDEF=array(
+
+    's_PROXY'=>"",
+    's_DB'=>"",
+    's_QUERY'=>"",
+    's_ID'=>"",
+);
+
  date_default_timezone_set('UTC');#required by PHP 5.1+
 
 //constants
@@ -94,7 +102,24 @@ $CRYPTDBDEF=array(
  /*
   * TODO(ccarvalho) Manage $_SESSIONs
   */
- function session_manager() {
+ function session_add($id, $val) {
+     $_SESSION[$id] = $val;
+ }
+ 
+ function session_append($id, $val) {
+     $_SESSION[$id] .= $val;
+ }
+ 
+ function session_remove($id) {
+     if(isset($_SESSION[$id]))
+         unset($_SESSION[$id]);
+ }
+ 
+ function session_debug($id) {
+     if(isset($_SESSION[$id]))
+         echo "SESSION $id:" . $_SESSION[$id] . "<br>";
+     else
+         echo "SESSION: not found<br>";
  }
 
 // More generic functions
