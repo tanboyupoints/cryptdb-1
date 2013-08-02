@@ -19,10 +19,13 @@ escapeString(Connect *e_conn, const std::string &escape_me)
     return out;
 }
 
-EncSet::EncSet() : osl(FULL_EncSet.osl) {}
-
 // FIXME: Wrong interfaces.
 EncSet::EncSet(Analysis &a, FieldMeta * fm) {
+    // FIXME: Safe to throw exception in constructor?
+    if (0 == fm->children.size()) {
+        throw CryptDBError("FieldMeta has no children!");
+    }
+
     osl.clear();
     for (auto pair : fm->children) {
         OnionMeta *om = pair.second;
@@ -118,7 +121,7 @@ EncSet::chooseOne() const
                 continue;
             }
 
-            return OLK(o,  it->second.first, it->second.second);
+            return OLK(o, it->second.first, it->second.second);
         }
     }
     return OLK();
@@ -235,15 +238,12 @@ loadUDFs(Connect * conn) {
 ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                        const std::string &dbname, bool encByDefault,
                        const std::string &master_key)
+    : encByDefault(encByDefault), masterKey(getKey(master_key)),
+      dbname(dbname)
 {
     init_mysql(embed_dir);
 
-    encByDefault = encByDefault;
-
-    masterKey = getKey(master_key);
-
     e_conn = Connect::getEmbedded(embed_dir, dbname);
-
     conn = new Connect(ci.server, ci.user, ci.passwd, dbname, ci.port);
 
     MetaDataTables::initialize(conn, e_conn);

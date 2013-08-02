@@ -14,7 +14,6 @@
 class EncSet {
 public:
     EncSet(OnionLevelFieldMap input) : osl(input) {}
-    EncSet(); // TODO(stephentu): move ctor here
     EncSet(Analysis &a, FieldMeta * fm);
     EncSet(const OLK & olk);
 
@@ -191,7 +190,7 @@ public:
     reason r;
     EncSet es_out; // encset that this item can output
 
-    RewritePlan(const EncSet & es, reason r) : r(r), es_out(es) {};
+    RewritePlan(const EncSet &es, reason r) : r(r), es_out(es) {};
 
     //only keep plans that have parent_olk in es
 //    void restrict(const EncSet & es);
@@ -240,15 +239,15 @@ typedef struct ProxyState {
     std::string dbName() const {return dbname;}
 
     // connection to remote and embedded server
-    Connect*       conn;
-    Connect*       e_conn;
+    Connect *conn;
+    Connect *e_conn;
 
-    bool           encByDefault;
-    AES_KEY*       masterKey;
+    const bool encByDefault;
+    const AES_KEY * const masterKey;
 
 private:
     // FIXME: Remove once cryptdb supports multiple databases.
-    constexpr static const char *dbname = "cryptdbtest";
+    const std::string dbname;
 } ProxyState;
 
 

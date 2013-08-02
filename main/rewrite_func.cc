@@ -66,7 +66,7 @@ rewrite_args_FN(T * i, const OLK & constr, const RewritePlanOneOLK * rp,
 // Only works with nodes with one outgoing encset, which could be other_encset
 // if encset_from_intersection is false, or else is the intersection with the children
 static RewritePlan *
-typical_gather(Analysis & a, Item_func * i, const EncSet & my_es,
+typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
                std::string why, reason & my_r,
                bool encset_from_intersection,
                const EncSet & other_encset = PLAIN_EncSet)
@@ -91,19 +91,19 @@ typical_gather(Analysis & a, Item_func * i, const EncSet & my_es,
         assert(false);
     }
 
-    EncSet out_es;
+    const EncSet *out_es;
     if (encset_from_intersection) {
         assert_s(solution.singleton(), "cannot use basic_gather with more outgoing encsets");
-        out_es = solution;
+        out_es = &solution;
     } else {
-        out_es = PLAIN_EncSet;
+        out_es = &PLAIN_EncSet;
     }
 
-    my_r = reason(out_es, why, i);
+    my_r = reason(*out_es, why, i);
     my_r.add_child(r1);
     my_r.add_child(r2);
 
-    return new RewritePlanOneOLK(out_es.extract_singleton(),
+    return new RewritePlanOneOLK(out_es->extract_singleton(),
                                  solution.chooseOne(), childr_rp, my_r);
 }
 
@@ -162,16 +162,16 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
     {
         LOG(cdb_v) << "CItemCompare (L1139) do_gather func " << *i;
 
-        EncSet my_es;
+        const EncSet *my_es;
         std::string why = "";
 
         if (FT == Item_func::Functype::EQ_FUNC ||
             FT == Item_func::Functype::EQUAL_FUNC ||
             FT == Item_func::Functype::NE_FUNC) {
-            my_es = EQ_EncSet;
+            my_es = &EQ_EncSet;
             why = "compare equality";
         } else {
-            my_es = ORD_EncSet;
+            my_es = &ORD_EncSet;
             why = "compare order";
         }
 
@@ -180,10 +180,10 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
         if (!args[0]->const_item() && !args[1]->const_item()) {
             why = why + "; join";
             std::cerr << "join";
-            my_es = JOIN_EncSet;
+            my_es = &JOIN_EncSet;
         }
 
-        return typical_gather(a, i, my_es, why, tr, false, PLAIN_EncSet);
+        return typical_gather(a, i, *my_es, why, tr, false, PLAIN_EncSet);
     }
 
     virtual Item * do_optimize_type(Item_func *i, Analysis & a) const
@@ -367,17 +367,16 @@ class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
 
         std::cerr << "Rewrite plan is " << rp << "\n";
 
-        Item * arg0 = itemTypes.do_rewrite(args[0],
-                           rp->olk, rp->childr_rp[0], a);
-        Item * arg1 = itemTypes.do_rewrite(args[1],
-                           rp->olk, rp->childr_rp[1], a);
+        Item * arg0 =
+            itemTypes.do_rewrite(args[0], rp->olk, rp->childr_rp[0], a);
+        Item * arg1 =
+            itemTypes.do_rewrite(args[1], rp->olk, rp->childr_rp[1], a);
 
         OnionMeta *om = constr.key->getOnionMeta(oAGG);
         assert(om);
         EncLayer *el = a.getBackEncLayer(om);
         assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
         return ((HOM*)el)->sumUDF(arg0, arg1);
-
     }
 };
 
@@ -387,36 +386,53 @@ static CItemAdditive<str_plus> ANON;
 extern const char str_minus[] = "-";
 static CItemAdditive<str_minus> ANON;
 
-template<const char *NAME>
-class CItemMath : public CItemSubtypeFN<Item_func, NAME> {
-    virtual RewritePlan * do_gather_type(Item_func *i, /* TODO reason not necessary */ reason &tr, Analysis & a) const
+template<class IT, const char *NAME>
+class CItemMath : public CItemSubtypeFN<IT, NAME> {
+    virtual RewritePlan * do_gather_type(IT *i,
+                                         reason &tr, Analysis & a) const
     {
-        Item **args = i->arguments();
-        for (uint x = 0; x < i->argument_count(); x++)
-            analyze(args[x], a);
-        return a.rewritePlans.find(i)->second;
+        return typical_gather(a, i, PLAIN_EncSet, "math op", tr, true);
     }
 
-    virtual Item * do_optimize_type(Item_func *i, Analysis & a) const
+    virtual Item * do_optimize_type(IT *i, Analysis & a) const
     {
         return do_optimize_type_self_and_args(i, a);
+    }
+
+    virtual Item * do_rewrite_type(IT *i, const OLK & constr,
+                                   const RewritePlan * _rp,
+                                   Analysis & a) const
+    {
+        assert(i->argument_count() == 2);
+        Item **args = i->arguments();
+
+        RewritePlanOneOLK * rp = (RewritePlanOneOLK *) _rp;
+
+        Item * arg0 =
+            itemTypes.do_rewrite(args[0], rp->olk, rp->childr_rp[0], a);
+        Item * arg1 =
+            itemTypes.do_rewrite(args[1], rp->olk, rp->childr_rp[1], a);
+
+        Item_func *out_i = new IT(arg0, arg1);
+        return out_i;
     }
 };
 
 extern const char str_mul[] = "*";
-static CItemMath<str_mul> ANON;
+static CItemMath<Item_func_mul, str_mul> ANON;
 
 extern const char str_div[] = "/";
-static CItemMath<str_div> ANON;
+static CItemMath<Item_func_div, str_div> ANON;
 
 extern const char str_idiv[] = "div";
-static CItemMath<str_idiv> ANON;
+static CItemMath<Item_func_int_div, str_idiv> ANON;
 
+/*
 extern const char str_sqrt[] = "sqrt";
-static CItemMath<str_sqrt> ANON;
+static CItemMath<Item_func_sqrt, str_sqrt> ANON;
 
 extern const char str_round[] = "round";
-static CItemMath<str_round> ANON;
+static CItemMath<Item_func_round, str_round> ANON;
 
 extern const char str_sin[] = "sin";
 static CItemMath<str_sin> ANON;
@@ -426,21 +442,24 @@ static CItemMath<str_cos> ANON;
 
 extern const char str_acos[] = "acos";
 static CItemMath<str_acos> ANON;
+*/
 
 extern const char str_pow[] = "pow";
-static CItemMath<str_pow> ANON;
+static CItemMath<Item_func_pow, str_pow> ANON;
 
+// FIXME: Supports one argument version as well.
 extern const char str_log[] = "log";
-static CItemMath<str_log> ANON;
+static CItemMath<Item_func_log, str_log> ANON;
 
-extern const char str_radians[] = "radians";
-static CItemMath<str_radians> ANON;
+// extern const char str_radians[] = "radians";
+// static CItemMath<str_radians> ANON;
 
 
 template<const char *NAME>
 class CItemLeafFunc : public CItemSubtypeFN<Item_func, NAME> {
-    virtual RewritePlan * do_gather_type(Item_func *i, reason &tr, Analysis & a) const {
-	UNIMPLEMENTED;
+    virtual RewritePlan * do_gather_type(Item_func *i, reason &tr, Analysis & a) const
+    {
+        UNIMPLEMENTED;
     }
 };
 

@@ -70,8 +70,9 @@ const OLK PLAIN_OLK = OLK(oPLAIN, SECLEVEL::PLAINVAL, NULL);
 typedef class OnionMeta : public DBMeta {
 public:
     // New.
-    OnionMeta(onion o, std::vector<SECLEVEL> levels, AES_KEY *m_key,
-              Create_field *cf, unsigned long uniq_count);
+    OnionMeta(onion o, std::vector<SECLEVEL> levels,
+              const AES_KEY * const m_key, Create_field *cf,
+              unsigned long uniq_count);
     // Restore.
     static OnionMeta *deserialize(unsigned int id,
                                   const std::string &serial);
@@ -125,8 +126,8 @@ public:
     const onionlayout onion_layout;
 
     // New.
-    FieldMeta(std::string name, Create_field *field, AES_KEY *mKey,
-              unsigned long uniq_count);
+    FieldMeta(std::string name, Create_field *field,
+              const AES_KEY * const mKey, unsigned long uniq_count);
     // Restore (WARN: Creates an incomplete type as it will not have it's
     // OnionMetas until they are added by the caller).
     static FieldMeta *deserialize(unsigned int id,
@@ -163,7 +164,8 @@ private:
 
     SECLEVEL getOnionLevel(onion o) const;
     bool setOnionLevel(onion o, SECLEVEL maxl);
-    static onionlayout getOnionLayout(AES_KEY *m_key, Create_field *f);
+    static onionlayout getOnionLayout(const AES_KEY * const m_key,
+                                      Create_field *f);
 } FieldMeta;
 
 typedef class TableMeta : public MappedDBMeta<FieldMeta, IdentityMetaKey> {
