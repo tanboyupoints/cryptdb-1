@@ -1,6 +1,6 @@
 <?php
 
-require("headercss.php");
+require("select.php");
  $ACCESS_PWD=''; #!!!IMPORTANT!!! this is script access password, SET IT if you want to protect you DB from public access
 
  #DEFAULT db connection settings
@@ -89,6 +89,12 @@ $CRYPTDBDEF=array(
  if ($_REQUEST['showcfg']){
      print_cfg();
      exit;
+ }
+
+ /*
+  * TODO(ccarvalho) Manage $_SESSIONs
+  */
+ function session_manager() {
  }
 
 // More generic functions
