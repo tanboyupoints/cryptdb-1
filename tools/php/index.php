@@ -27,9 +27,11 @@ if (db_connect('nodie')){
              * Execute query (proxy db)
              */
             $num = -1;
+            $type = "";
             // only first one is of interest
             foreach($_POST as $key=>$value)
             {
+                $type = $value;
                 $num = strtok($key, "_");
                 if(!is_numeric($num))
                     die("Parse error");
@@ -40,11 +42,18 @@ if (db_connect('nodie')){
                 die("Parse error");
 
             //TODO(ccarvalho): parse s_ID and format  & execute query in CryptDB
+            //do_sql($q);
+            //echo "NUM:" . $num . "<br>";
+            //echo "TYPE:" . $value . "<br>"; 
+            //session_debug('s_PROXY');
+            //session_debug('s_DB');
+            //session_debug('s_QUERY');
+            //session_debug('s_ID');
 
-            unset($_SESSION['s_PROXY']); 
-            unset($_SESSION['s_DB']); 
-            unset($_SESSION['s_QUERY']); 
-            unset($_SESSION['s_ID']); 
+            session_remove('s_PROXY');
+            session_remove('s_DB');
+            session_remove('s_QUERY');
+            session_remove('s_ID');
 
         } else if (isset($DB['db']))
         {
