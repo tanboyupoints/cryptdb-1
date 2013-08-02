@@ -99,9 +99,6 @@ $SESSIONSDEF=array(
      exit;
  }
 
- /*
-  * TODO(ccarvalho) Manage $_SESSIONs
-  */
  function session_add($id, $val) {
      $_SESSION[$id] = $val;
  }
