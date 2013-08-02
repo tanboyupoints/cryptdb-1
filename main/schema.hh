@@ -97,8 +97,7 @@ public:
     friend class Analysis;
     friend class FieldMeta;
     friend bool sanityCheck(FieldMeta *);
-    friend Item *decrypt_item_layers(Item *, onion, OnionMeta *, uint64_t,
-                                     FieldMeta *,
+    friend Item *decrypt_item_layers(Item *, FieldMeta *, onion, uint64_t,
                                      const std::vector<Item *> &);
 
 private:

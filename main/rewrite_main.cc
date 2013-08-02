@@ -613,8 +613,8 @@ do_optimize_const_item(T *i, Analysis &a) {
 }
 
 Item *
-decrypt_item_layers(Item * i, onion o, OnionMeta *om, uint64_t IV,
-                    FieldMeta *fm, const std::vector<Item *> &res)
+decrypt_item_layers(Item * i, FieldMeta *fm, onion o, uint64_t IV,
+                    const std::vector<Item *> &res)
 {
     assert(!i->is_null());
 
@@ -627,6 +627,7 @@ decrypt_item_layers(Item * i, onion o, OnionMeta *om, uint64_t IV,
     Item * dec = i;
     Item * prev_dec = NULL;
 
+    OnionMeta *om = fm->getOnionMeta(o);
     auto enc_layers = om->layers;
     for (auto it = enc_layers.rbegin(); it != enc_layers.rend(); ++it) {
         dec = (*it)->decrypt(dec, IV);
@@ -639,14 +640,6 @@ decrypt_item_layers(Item * i, onion o, OnionMeta *om, uint64_t IV,
     }
 
     return dec;
-}
-
-static Item *
-decrypt_item(FieldMeta * fm, onion o, Item * i, uint64_t IV,
-             std::vector<Item *> &res)
-{
-    assert(!i->is_null());
-    return decrypt_item_layers(i, o, fm->getOnionMeta(o), IV, fm, res);
 }
 
 
@@ -939,8 +932,9 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
                     }
 
                     res->rows[r][col_index] =
-                        decrypt_item(fm, rf.olk.o, dbres.rows[r][c],
-                                     salt, res->rows[r]);
+                        decrypt_item_layers(dbres.rows[r][c], fm,
+                                            rf.olk.o, salt,
+                                            res->rows[r]);
                 }
             }
             col_index++;
