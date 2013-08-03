@@ -29,6 +29,7 @@ $SESSIONSDEF=array(
     's_DB'=>"",
     's_QUERY'=>"",
     's_ID'=>"",
+    's_TABLE'=>"",
 );
 
  date_default_timezone_set('UTC');#required by PHP 5.1+
