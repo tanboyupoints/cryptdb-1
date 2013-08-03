@@ -77,6 +77,7 @@ function display_select($sth,$q){
         $sqldr.=$headers;
         $swapper=false;
         $idpos = 0;
+        //$x;
         while($row=mysql_fetch_row($sth))
         {
             $identifier = $row[0];
@@ -84,17 +85,21 @@ function display_select($sth,$q){
             $sqldr.="<tr class='".$rc[$swp=!$swp]."' onmouseover='tmv(this)' onmouseout='tmo(this)' onclick='tc(this)'>";
             for($i=0;$i<$fields_num;$i++){
                 $v=$row[$i];
+
+                //$x .= $v . "<br>";
                 $more='';
 
                 if ($is_show_crt) $v="<pre>$v</pre>";
                 $sqldr.="<td>$v".(!strlen($v)?"<br>":'')."</td>";
 
             }
+            //$x = "";
             $sqldr.= "<td><form  action=\"$self\" value=$dbn  method=\"post\">";
 
             session_add('s_PROXY', "CryptDBProxy");
             session_add('s_DB', $DB['db']);
             session_add('s_QUERY', $q);
+            session_add('s_TABLE', $_POST['cryptdb_describe_table']);
             session_append('s_ID', $identifier . "&");
 
             $var = $idpos . '_cryptdb_sensitive';
