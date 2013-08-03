@@ -16,6 +16,16 @@ require("common.php");
   * Commands handler
   */
 if (db_connect('nodie')){
+
+    // Make sure mysql is available
+    // $dbh is global.
+    if(!$dbh)
+        die("Fatal: Backend DB not connected.");
+
+    // Going to fail here, proxy DB connection impl. is not finished yet.
+    //if(!$cryptdbh)
+    //    die("Fatal: Proxy DB not connected. (unfinished impl.)");
+
     $time_start=microtime_float();
 
     if ($_REQUEST['phpinfo']){
@@ -43,8 +53,8 @@ if (db_connect('nodie')){
 
             //TODO(ccarvalho): parse s_ID and format  & execute query in CryptDB
             //do_sql($q);
-            //echo "NUM:" . $num . "<br>";
             //echo "TYPE:" . $value . "<br>"; 
+            //echo "Pos:" . $num . "<br>";
             //session_debug('s_PROXY');
             //session_debug('s_DB');
             //session_debug('s_QUERY');
