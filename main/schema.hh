@@ -37,7 +37,6 @@ typedef std::map<onion, LevelFieldPair> OnionLevelFieldMap;
 class OLK {
 public:
     OLK(onion o, SECLEVEL l, FieldMeta * key) : o(o), l(l), key(key) {}
-    OLK() : o(oINVALID), l(SECLEVEL::INVALID), key(NULL) {}
     onion o;
     SECLEVEL l;
     FieldMeta * key; // a field meta is a key because each encryption key
@@ -49,6 +48,9 @@ public:
     }
     bool operator==(const OLK & olk ) const {
         return (o == olk.o) && (l == olk.l);
+    }
+    static OLK invalidOLK() {
+        return OLK(oINVALID, SECLEVEL::INVALID, NULL);
     }
 };
 

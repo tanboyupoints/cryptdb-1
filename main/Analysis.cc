@@ -124,7 +124,8 @@ EncSet::chooseOne() const
             return OLK(o, it->second.first, it->second.second);
         }
     }
-    return OLK();
+
+    return OLK::invalidOLK();
 }
 
 bool
@@ -764,6 +765,8 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
     for (auto it : local_qz) {
         assert(e_conn->execute(it));
     }
+
+    #undef ROLLBACK_AND_RETURN_ON_FAIL
 
     return result;
 }
