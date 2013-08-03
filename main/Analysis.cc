@@ -766,6 +766,8 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
         assert(e_conn->execute(it));
     }
 
+    #undef ROLLBACK_AND_RETURN_ON_FAIL
+
     return result;
 }
 
