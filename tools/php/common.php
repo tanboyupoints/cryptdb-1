@@ -108,8 +108,9 @@ $SESSIONSDEF=array(
  }
  
  function session_remove($id) {
-     if(isset($_SESSION[$id]))
-         unset($_SESSION[$id]);
+    $value = $_SESSION[$id];
+    unset($_SESSION[$id]);
+    return $value;
  }
  
  function session_debug($id) {
