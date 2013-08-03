@@ -124,7 +124,8 @@ EncSet::chooseOne() const
             return OLK(o, it->second.first, it->second.second);
         }
     }
-    return OLK();
+
+    return OLK::invalidOLK();
 }
 
 bool

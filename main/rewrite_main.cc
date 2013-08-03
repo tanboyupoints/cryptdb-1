@@ -868,15 +868,15 @@ std::string ReturnField::stringify() {
 
     res << " is_salt: " << is_salt << " filed_called " << field_called;
     res << " fm  " << olk.key << " onion " << olk.o;
-    res << " pos_salt " << pos_salt;
+    res << " salt_pos " << salt_pos;
 
     return res.str();
 }
 std::string ReturnMeta::stringify() {
     std::stringstream res;
     res << "rmeta contains " << rfmeta.size() << " elements: \n";
-    for (auto i : rfmeta) {
-        res << i.first << " " << i.second.stringify() << "\n";
+    for (auto it : rfmeta) {
+        res << it.first << " " << it.second.stringify() << "\n";
     }
     return res.str();
 }
@@ -890,15 +890,14 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
 
     ResType *res = new ResType();
 
-    unsigned int index = 0;
-
     // un-anonymize the names
+    unsigned int index = 0;
     for (auto it = dbres.names.begin();
         it != dbres.names.end(); it++) {
-        ReturnField rf = rmeta->rfmeta[index];
-        if (!rf.is_salt) {
+        const ReturnField &rf = rmeta->rfmeta.at(index);
+        if (!rf.getIsSalt()) {
             //need to return this field
-            res->names.push_back(rf.field_called);
+            res->names.push_back(rf.fieldCalled());
             // switch types to original ones : TODO
 
         }
@@ -916,24 +915,26 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
     // decrypt rows
     unsigned int col_index = 0;
     for (unsigned int c = 0; c < cols; c++) {
-        ReturnField rf = rmeta->rfmeta[c];
-        FieldMeta * fm = rf.olk.key;
-        if (!rf.is_salt) {
+        const ReturnField &rf = rmeta->rfmeta.at(c);
+        FieldMeta * fm = rf.getOLK().key;
+        if (!rf.getIsSalt()) {
             for (unsigned int r = 0; r < rows; r++) {
                 if (!fm || !fm->isEncrypted() ||
                     dbres.rows[r][c]->is_null()) {
                     res->rows[r][col_index] = dbres.rows[r][c];
                 } else {
                     uint64_t salt = 0;
-                    if (rf.pos_salt>=0) {
-                        Item * salt_item = dbres.rows[r][rf.pos_salt];
+                    const int salt_pos = rf.getSaltPosition();
+                    if (salt_pos >= 0) {
+                        Item * salt_item = dbres.rows[r][salt_pos];
                         assert_s(!salt_item->null_value, "salt item is null");
-                        salt = ((Item_int *)dbres.rows[r][rf.pos_salt])->value;
+                        salt =
+                            ((Item_int *)dbres.rows[r][salt_pos])->value;
                     }
 
                     res->rows[r][col_index] =
                         decrypt_item_layers(dbres.rows[r][c], fm,
-                                            rf.olk.o, salt,
+                                            rf.getOLK().o, salt,
                                             res->rows[r]);
                 }
             }

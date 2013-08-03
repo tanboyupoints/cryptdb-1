@@ -131,14 +131,27 @@ needsSalt(EncSet ed);
 
 extern "C" void *create_embedded_thd(int client_flag);
 
-typedef struct ReturnField {
-    bool is_salt;
-    std::string field_called;
-    OLK olk; // if !olk.key, field is not encrypted
-    int pos_salt; //position of salt of this field in the query results,
-                  // or -1 if such salt was not requested
+class ReturnField {
+public:
+    ReturnField(bool is_salt, const std::string &field_called,
+                const OLK &olk, int salt_pos)
+        : is_salt(is_salt), field_called(field_called), olk(olk),
+          salt_pos(salt_pos) {}
+
+    bool getIsSalt() const {return is_salt;}
+    std::string fieldCalled() const {return field_called;}
+    const OLK getOLK() const {return olk;}
+    int getSaltPosition() const {return salt_pos;}
     std::string stringify();
-} ReturnField;
+
+private:
+    const bool is_salt;
+    const std::string field_called;
+    const OLK olk;      // if !olk.key, field is not encrypted
+    const int salt_pos; // position of salt of this field in
+                        // the query results, or -1 if such
+                        // salt was not requested
+};
 
 typedef struct ReturnMeta {
     std::map<int, ReturnField> rfmeta;
@@ -148,8 +161,8 @@ typedef struct ReturnMeta {
 
 class OnionAdjustExcept {
 public:
-    OnionAdjustExcept(onion o, FieldMeta * fm, SECLEVEL l, Item_field * itf) :
-	o(o), fm(fm), tolevel(l), itf(itf) {}
+    OnionAdjustExcept(onion o, FieldMeta *fm, SECLEVEL l, Item_field *itf)
+        : o(o), fm(fm), tolevel(l), itf(itf) {}
 
     onion o;
     FieldMeta * fm;

@@ -440,36 +440,30 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
 }
 
 static void
-addToReturn(ReturnMeta * rm, int pos, const OLK & constr,  bool has_salt) {
-    ReturnField rf = ReturnField();
-    rf.is_salt = false;
-    rf.olk = constr;
-    if (has_salt) {
-        rf.pos_salt = pos+1;
-    } else {
-        rf.pos_salt = -1;
-    }
-    rm->rfmeta[pos] = rf;
-}
-
-static void
 addToReturn(ReturnMeta * rm, int pos, const OLK & constr, bool has_salt,
             std::string name) {
-    addToReturn(rm, pos, constr, has_salt);
-    rm->rfmeta[pos].field_called = name;
+    if ((unsigned int)pos != rm->rfmeta.size()) {
+        throw CryptDBError("ReturnMeta has badly ordered ReturnFields!");
+    }
+    const int salt_pos = has_salt ? pos + 1 : -1;
+    std::pair<int, ReturnField>
+        pair(pos, ReturnField(false, name, constr, salt_pos));
+    rm->rfmeta.insert(pair);
 }
 
 static void
 addSaltToReturn(ReturnMeta * rm, int pos) {
-    ReturnField rf = ReturnField();
-    rf.is_salt = true;
-    rf.olk = OLK();
-    rf.pos_salt = -1;
-    rm->rfmeta[pos] = rf;
+    if ((unsigned int)pos != rm->rfmeta.size()) {
+        throw CryptDBError("ReturnMeta has badly ordered ReturnFields!");
+    }
+    std::pair<int, ReturnField>
+        pair(pos, ReturnField(true, "", OLK::invalidOLK(), -1));
+    rm->rfmeta.insert(pair);
 }
 
 static void
-rewrite_proj(Item * i, const RewritePlan * rp, Analysis & a, List<Item> & newList)
+rewrite_proj(Item * i, const RewritePlan * rp, Analysis & a,
+             List<Item> & newList)
 {
     OLK olk = rp->es_out.chooseOne();
     Item *ir = rewrite(i, olk, a);
