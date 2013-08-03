@@ -9,8 +9,6 @@ require("common.php");
  if ($_REQUEST['refresh'] && $DB['db'] && preg_match('/^show/',$SQLq) ) $SQLq=$SHOW_T;
  
 
- // Connects to CryptDB proxy
-//cryptdb_connect('nodie');
 
  /*
   * Commands handler
@@ -22,10 +20,6 @@ if (db_connect('nodie')){
     if(!$dbh)
         die("Fatal: Backend DB not connected.");
 
-    // Going to fail here, proxy DB connection impl. is not finished yet.
-    //if(!$cryptdbh)
-    //    die("Fatal: Proxy DB not connected. (unfinished impl.)");
-
     $time_start=microtime_float();
 
     if ($_REQUEST['phpinfo']){
@@ -33,37 +27,37 @@ if (db_connect('nodie')){
     }else{
         if(isset($_SESSION['s_PROXY']) && !isset($DB['db']))
         {
+            session_remove('s_PROXY');
+           
+            $s_db = session_remove('s_DB');
+            $s_query = session_remove('s_QUERY');
+            $s_id = session_remove('s_ID');
+            $s_table = session_remove('s_TABLE');
+
             /*
              * Execute query (proxy db)
              */
-            $num = -1;
+            $index = -1;
+
             $type = "";
             // only first one is of interest
             foreach($_POST as $key=>$value)
             {
+                // $type is either sensitive, best effort or unencrypted.
                 $type = $value;
-                $num = strtok($key, "_");
-                if(!is_numeric($num))
+                $index = strtok($key, "_");
+                if(!is_numeric($index))
                     die("Parse error");
 
                 break;
             }
-            if($num == -1)
+            if($index == -1)
                 die("Parse error");
 
-            //TODO(ccarvalho): parse s_ID and format  & execute query in CryptDB
-            //do_sql($q);
-            //echo "TYPE:" . $value . "<br>"; 
-            //echo "Pos:" . $num . "<br>";
-            //session_debug('s_PROXY');
-            //session_debug('s_DB');
-            //session_debug('s_QUERY');
-            //session_debug('s_ID');
+            $fieldname = preg_split("/\&/", $s_id);
 
-            session_remove('s_PROXY');
-            session_remove('s_DB');
-            session_remove('s_QUERY');
-            session_remove('s_ID');
+            $query = "show columns from " . $s_db . "."  . $s_table . " where Field = " . "'" . $fieldname[$index] . "';";
+            //TODO: Connect to proxy and execute query then display. Use $type. 
 
         } else if (isset($DB['db']))
         {
@@ -382,37 +376,6 @@ function db_connect($nodie=0){
     return $dbh;
 }
 
-function cryptdb_connect($nodie=0){
-    global $cryptdbh,$CRYPTDB,$err_msg;
-
-    //TODO: Test this implementation
-    return;
-
-
-    $cryptdbh=@mysql_connect($CRYPTDB['host'].($CRYPTDB['port']?":$CRYPTDB[port]":''),$CRYPTDB['user'],$CRYPTDB['pwd']);
-    if (!$cryptdbh) 
-    {
-        $err_msg='Cannot connect to the CryptDB proxy database because: '.mysql_error();
-        echo $err_msg;
-        //TODO:FIX this
-        die($err_msg);
-    }
-
-    if ($cryptdbh && $CRYPTDB['db']) {
-        $res=mysql_select_db($CRYPTDB['db'], $cryptdbh);
-        if (!$res) {
-            $err_msg='Cannot select cryptdb because: '.mysql_error();
-            if (!$nodie) 
-            {
-                die($err_msg);
-            }
-        }else{
-            if ($CRYPTDB['chset']) db_query("SET NAMES ".$CRYPTDB['chset']);
-        }
-    }
-
-    return $cryptdbh;
-}
 
 function db_checkconnect($dbh1=NULL, $skiperr=0){
     global $dbh;
@@ -424,15 +387,6 @@ function db_checkconnect($dbh1=NULL, $skiperr=0){
     return $dbh1;
 }
 
-function cryptdb_checkconnect($cryptdbh1=NULL, $skiperr=0){
-    global $cryptdbh;
-    if (!$cryptdbh1) $cryptdbh1=&$cryptdbh;
-    if (!$cryptdbh1 or !mysql_ping($cryptdbh1)) {
-        cryptdb_connect($skiperr);
-        $cryptdbh1=&$cryptdbh;
-    }
-    return $cryptdbh1;
-}
 
 function db_disconnect(){
     global $dbh;
