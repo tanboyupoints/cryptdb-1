@@ -238,9 +238,10 @@ loadUDFs(Connect * conn) {
 
 ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                        const std::string &dbname, bool encByDefault,
-                       const std::string &master_key)
+                       const std::string &master_key,
+                       bool best_effort)
     : encByDefault(encByDefault), masterKey(getKey(master_key)),
-      dbname(dbname)
+      dbname(dbname), best_effort(best_effort)
 {
     init_mysql(embed_dir);
 

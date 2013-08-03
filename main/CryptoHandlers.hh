@@ -152,4 +152,26 @@ public:
     // static std::string serializeLayer(EncLayer * el, DBMeta *parent);
 };
 
+class PlainText : public EncLayer {
+public:
+    PlainText() {;}
+    virtual ~PlainText() {;}
+
+    SECLEVEL level() const {return SECLEVEL::PLAINVAL;}
+    std::string name() const {return "PLAINTEXT";}
+
+    Create_field *newCreateField(Create_field *cf,
+                                 std::string anonname = "")
+    {
+        // FIXME: Change name.
+        return cf;
+    }
+
+    Item *encrypt(Item *ptext, uint64_t = 0) {return ptext;}
+    Item *decrypt(Item *ctext, uint64_t = 0) {return ctext;}
+
+    std::string doSerialize() const {
+        return std::string("");
+    }
+};
 

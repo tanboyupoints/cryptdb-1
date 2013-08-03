@@ -128,7 +128,8 @@ public:
 
     // New.
     FieldMeta(std::string name, Create_field *field,
-              const AES_KEY * const mKey, unsigned long uniq_count);
+              const AES_KEY * const mKey, unsigned long uniq_count,
+              bool best_effort);
     // Restore (WARN: Creates an incomplete type as it will not have it's
     // OnionMetas until they are added by the caller).
     static FieldMeta *deserialize(unsigned int id,
@@ -166,7 +167,7 @@ private:
     SECLEVEL getOnionLevel(onion o) const;
     bool setOnionLevel(onion o, SECLEVEL maxl);
     static onionlayout getOnionLayout(const AES_KEY * const m_key,
-                                      Create_field *f);
+                                      Create_field *f, bool best_effort);
 } FieldMeta;
 
 typedef class TableMeta : public MappedDBMeta<FieldMeta, IdentityMetaKey> {

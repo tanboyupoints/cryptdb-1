@@ -130,6 +130,7 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * cf,
         case SECLEVEL::OPE:{return OPEFactory::create(cf, key);}
         case SECLEVEL::HOM: {return HOMFactory::create(cf, key);}
         case SECLEVEL::SEARCH: {return new Search(cf, key);}
+        case SECLEVEL::PLAINVAL: {return new PlainText();}
         default:{}
     }
     throw CryptDBError("unknown or unimplemented security level \n");
@@ -160,6 +161,9 @@ EncLayerFactory::deserializeLayer(unsigned int id,
 
         case SECLEVEL::SEARCH: 
             return new Search(id, serial);
+        
+        case SECLEVEL::PLAINVAL:
+            return new PlainText();
 
         default:{}
     }
@@ -211,8 +215,9 @@ type_len_for_AES_str(enum enum_field_types type, int len, bool pad) {
 //TODO: remove above newcreatefield
 static Create_field*
 createFieldHelper(const Create_field *f, int field_length,
-		  enum enum_field_types type, std::string anonname = "",
-		  CHARSET_INFO * charset = NULL) {
+                  enum enum_field_types type, std::string anonname = "",
+                  CHARSET_INFO * charset = NULL)
+{
     THD *thd = current_thd;
     Create_field *f0 = f->clone(thd->mem_root);
     if (field_length != -1) {
@@ -237,8 +242,9 @@ createFieldHelper(const Create_field *f, int field_length,
 
 static Item *
 get_key_item(const std::string & key) {
-    Item_string * keyI = new Item_string(make_thd_string(key),
-					 key.length(), &my_charset_bin);
+    Item_string * keyI =
+        new Item_string(make_thd_string(key), key.length(),
+                        &my_charset_bin);
     keyI->name = NULL; // no alias
     return keyI;
 }
@@ -1688,13 +1694,15 @@ Search::searchUDF(Item * field, Item * expr) {
     // Add token
 
     Token t = token(key, std::string(searchstrip(ItemToString(expr))));
-    Item_string * t1 =  new Item_string(newmem(t.ciph),
-					t.ciph.length(), &my_charset_bin);
+    Item_string * t1 =
+        new Item_string(newmem(t.ciph), t.ciph.length(),
+                        &my_charset_bin);
     t1->name = NULL; //no alias
     l.push_back(t1);
 
-    Item_string * t2 = new Item_string(newmem(t.wordKey),
-				       t.wordKey.length(), &my_charset_bin);
+    Item_string * t2 =
+        new Item_string(newmem(t.wordKey), t.wordKey.length(),
+                        &my_charset_bin);
     t2->name = NULL;
     l.push_back(t2);
 
@@ -1710,3 +1718,4 @@ const std::vector<udf_func*> udf_list = {
     &u_sum_a,
     &u_search
 };
+

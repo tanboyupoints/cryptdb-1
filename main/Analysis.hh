@@ -247,9 +247,10 @@ operator<<(std::ostream &out, const RewritePlan * rp);
 typedef struct ProxyState {
     ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                const std::string &dbname, bool encByDefault,
-               const std::string &master_key);
+               const std::string &master_key, bool best_effort=true);
     ~ProxyState();
     std::string dbName() const {return dbname;}
+    bool bestEffort() const {return best_effort;}
 
     // connection to remote and embedded server
     Connect *conn;
@@ -261,6 +262,7 @@ typedef struct ProxyState {
 private:
     // FIXME: Remove once cryptdb supports multiple databases.
     const std::string dbname;
+    const bool best_effort;
 } ProxyState;
 
 
