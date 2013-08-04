@@ -34,6 +34,12 @@ $SESSIONSDEF=array(
 
  date_default_timezone_set('UTC');#required by PHP 5.1+
 
+//Default host, port and user for proxydb
+// mysqli ignores port if host is 'localhost' - weird
+ini_set("mysqli.default_host", "127.0.0.1");
+ini_set("mysqli.default_port", "3307");
+ini_set("mysqli.default_user", "root");
+
 //constants
  $VERSION='1.8.120510';
  $MAX_ROWS_PER_PAGE=50; #max number of rows in select per one page
