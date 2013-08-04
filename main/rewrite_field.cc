@@ -69,14 +69,8 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         }
 
         Item_field * res = make_item(i);
-
-        if (!fm->isEncrypted()) { // Not encrypted
-            return res;
-        }
-
-        // Encrypted item
-
-        res->table_name = make_thd_string(a.getAnonTableName(i->table_name));
+        res->table_name =
+            make_thd_string(a.getAnonTableName(i->table_name));
         res->field_name = make_thd_string(om->getAnonOnionName());
 
         return res;

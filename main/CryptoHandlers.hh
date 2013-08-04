@@ -170,6 +170,10 @@ public:
     Item *encrypt(Item *ptext, uint64_t = 0) {return ptext;}
     Item *decrypt(Item *ctext, uint64_t = 0) {return ctext;}
 
+    Item *decryptUDF(Item *col, Item *ivcol = NULL) {
+        return col;
+    }
+
     std::string doSerialize() const {
         return std::string("");
     }

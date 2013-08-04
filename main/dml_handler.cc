@@ -186,17 +186,8 @@ class UpdateHandler : public DMLHandler {
             Item_field * fd = static_cast<Item_field*>(i);
 
             FieldMeta * fm = a.getFieldMeta(fd->table_name, fd->field_name);
-
             Item * val = val_it++;
             assert(val != NULL);
-
-            if (!fm->isEncrypted()) { // not encrypted field
-                res_items.push_back(fd);
-                res_vals.push_back(val);
-                continue;
-            }
-
-            // Encrypted field
 
             RewritePlan * rp = getAssert(a.rewritePlans, val);
             EncSet r_es = rp->es_out.intersect(EncSet(a, fm));

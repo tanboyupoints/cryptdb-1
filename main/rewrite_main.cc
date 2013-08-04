@@ -470,7 +470,9 @@ removeOnionLayer(Analysis &a, const ProxyState &ps, FieldMeta * fm,
           << "    SET " << fieldanon  << " = ";
 
     Item_field *field = stringToItemField(fieldanon, tableanon, itf);
-    Item_field *salt = stringToItemField(fm->getSaltName(), tableanon, itf);
+    Item_field *salt =
+        stringToItemField(fm->getSaltName(), tableanon, itf);
+    std::cout << TypeText<onion>::toText(o) << std::endl;
     Item * decUDF = a.getBackEncLayer(om)->decryptUDF(field, salt);
 
     query << *decUDF << ";";
