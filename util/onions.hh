@@ -76,7 +76,8 @@ static onionlayout BEST_EFFORT_NUM_ONION_LAYOUT = {
                                   SECLEVEL::RND})},
     {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
     {oAGG, std::vector<SECLEVEL>({SECLEVEL::HOM})},
-    {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL, SECLEVEL::RND})}
+    {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL,
+                                    SECLEVEL::RND})}
 };
 
 static onionlayout STR_ONION_LAYOUT = {
@@ -90,7 +91,10 @@ static onionlayout BEST_EFFORT_STR_ONION_LAYOUT = {
                                   SECLEVEL::RND})},
     {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
     {oSWP, std::vector<SECLEVEL>({SECLEVEL::SEARCH})},
-    {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL, SECLEVEL::RND})}
+    // HACK: RND_str expects the data to be a multiple of 16, so we use
+    // OPE to handle the padding for us.
+    {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL, SECLEVEL::OPE,
+                                    SECLEVEL::RND})}
 };
 
 

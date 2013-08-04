@@ -93,6 +93,7 @@ public:
     EncLayer *deserializeChild(unsigned int id,
                                const std::string &serial_child) const;
     UIntMetaKey *deserializeKey(const std::string &serial_key) const;
+    EncLayer *getLayerBack() const;
     unsigned long getUniq() const {return uniq_count;}
 
     // Need access to layers.
@@ -110,7 +111,6 @@ private:
 
     SECLEVEL getSecLevel();
     void addLayerBack(EncLayer *layer);
-    EncLayer *getLayerBack() const;
     void removeLayerBack();
     void replaceLayerBack(EncLayer *layer);
 } OnionMeta;

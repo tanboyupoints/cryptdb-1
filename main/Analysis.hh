@@ -30,6 +30,20 @@ public:
 
     bool singleton() const { return osl.size() == 1; }
 
+    bool single_crypted_and_or_plain() const {
+        unsigned int crypted = 0;
+        unsigned int plain = 0;
+        for (auto it : osl) {
+            if (it.first != oPLAIN) {
+                ++crypted;
+            } else {
+                ++plain;
+            }
+        }
+
+        return 1 >= crypted && 1 >= plain;
+    }
+
     OLK extract_singleton() const {
         assert_s(singleton(), std::string("encset has size ") +
                               StringFromVal(osl.size()));

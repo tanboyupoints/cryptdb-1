@@ -416,29 +416,29 @@ RND_str::newCreateField(Create_field * cf, std::string anonname) {
 
 Item *
 RND_str::encrypt(Item * ptext, uint64_t IV) {
-    std::string enc = encrypt_AES_CBC(
-                 ItemToString(ptext),
-                 enckey,
-		 BytesFromInt(IV, SALT_LEN_BYTES),
-		 false);
+    std::string enc =
+        encrypt_AES_CBC(ItemToString(ptext), enckey,
+                        BytesFromInt(IV, SALT_LEN_BYTES), false);
     
-    LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV " << IV << "--->"
-	      << "len of enc " << enc.length() << " enc " << enc;
+    LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV "
+              << IV << "--->" << "len of enc " << enc.length()
+              << " enc " << enc;
 
-    return new Item_string(make_thd_string(enc), enc.length(), &my_charset_bin);
+    return new Item_string(make_thd_string(enc), enc.length(),
+                           &my_charset_bin);
 }
 
 Item *
 RND_str::decrypt(Item * ctext, uint64_t IV) {
-    std::string dec = decrypt_AES_CBC(
-	ItemToString(ctext),
-	deckey,
-	BytesFromInt(IV, SALT_LEN_BYTES),
-	false);
-    LOG(encl) << "RND_str decrypt " << ItemToString(ctext) << " IV " << IV << "-->"
-	      << "len of dec " << dec.length() << " dec: " << dec;
+    std::string dec =
+        decrypt_AES_CBC(ItemToString(ctext), deckey,
+                        BytesFromInt(IV, SALT_LEN_BYTES), false);
+    LOG(encl) << "RND_str decrypt " << ItemToString(ctext) << " IV "
+              << IV << "-->" << "len of dec " << dec.length()
+              << " dec: " << dec;
 
-    return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
+    return new Item_string(make_thd_string(dec), dec.length(),
+                           &my_charset_bin);
 }
 
 

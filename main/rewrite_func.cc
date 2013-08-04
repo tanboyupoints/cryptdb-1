@@ -93,7 +93,8 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
 
     const EncSet *out_es;
     if (encset_from_intersection) {
-        assert_s(solution.singleton(), "cannot use basic_gather with more outgoing encsets");
+        assert_s(solution.single_crypted_and_or_plain(),
+                 "cannot use typical_gather with more outgoing encsets");
         out_es = &solution;
     } else {
         out_es = &PLAIN_EncSet;
@@ -103,7 +104,7 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
     my_r.add_child(r1);
     my_r.add_child(r2);
 
-    return new RewritePlanOneOLK(out_es->extract_singleton(),
+    return new RewritePlanOneOLK(out_es->chooseOne(),
                                  solution.chooseOne(), childr_rp, my_r);
 }
 
@@ -247,7 +248,7 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
 
         // Must be an OLK for each argument.
         return new RewritePlanOneOLK(out_es.extract_singleton(),
-                                     child_es.chooseOne(),
+                                     child_es.extract_singleton(),
                                      childr_rp, tr);
     }
 
