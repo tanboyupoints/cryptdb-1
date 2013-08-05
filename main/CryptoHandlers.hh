@@ -163,8 +163,13 @@ public:
     Create_field *newCreateField(Create_field *cf,
                                  std::string anonname = "")
     {
-        // FIXME: Change name.
-        return cf;
+        THD *thd = current_thd;
+        Create_field *f0 = cf->clone(thd->mem_root);
+        if (anonname.size() > 0) {
+            f0->field_name = make_thd_string(anonname);
+        }
+
+        return f0;
     }
 
     Item *encrypt(Item *ptext, uint64_t = 0) {return ptext;}
