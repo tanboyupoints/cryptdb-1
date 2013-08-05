@@ -10,8 +10,8 @@
 struct Preamble {
     Preamble(const std::string &dbname, const std::string &table)
         : dbname(dbname), table(table) {}
-    std::string dbname;
-    std::string table;
+    const std::string dbname;
+    const std::string table;
 };
 
 class AlterSubHandler : public SQLHandler {
