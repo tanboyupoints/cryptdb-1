@@ -30,6 +30,11 @@ encrypt_item(Item * i, const OLK & olk, Analysis & a)
 {
     assert(!i->is_null());
 
+    // HACK: Remove.
+    if (SECLEVEL::PLAINVAL == olk.l) {
+        return i;
+    }
+
     FieldMeta * const fm = olk.key;
     assert(fm);
 
