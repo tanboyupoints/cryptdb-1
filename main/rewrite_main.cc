@@ -918,8 +918,7 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
         FieldMeta * fm = rf.getOLK().key;
         if (!rf.getIsSalt()) {
             for (unsigned int r = 0; r < rows; r++) {
-                if (!fm || !fm->isEncrypted() ||
-                    dbres.rows[r][c]->is_null()) {
+                if (!fm || dbres.rows[r][c]->is_null()) {
                     res->rows[r][col_index] = dbres.rows[r][c];
                 } else {
                     uint64_t salt = 0;

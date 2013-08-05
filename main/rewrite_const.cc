@@ -67,15 +67,6 @@ static void
 typical_rewrite_insert_type(ItemType *i, Analysis &a,
                             std::vector<Item *> &l, FieldMeta *fm)
 {
-/*
-    if (!fm->isEncrypted()) {
-        l.push_back(make_item(i));
-        return;
-    }
-*/
-
-    // Encrypted
-
     uint64_t salt = 0;
 
     if (fm->has_salt) {

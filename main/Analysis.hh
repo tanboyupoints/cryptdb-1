@@ -87,7 +87,6 @@ const EncSet ORD_EncSet = {
 
 const EncSet PLAIN_EncSet = {
     {
-        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
     }
 };

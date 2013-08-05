@@ -120,13 +120,6 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
                                         std::vector<Item *> &l,
                                         FieldMeta *fm) const
     {
-    
-        //TODO: check this.
-        //if (!fm->isEncrypted()) {
-        //    l.push_back(make_item(i));
-        //    return;
-        //}
-
         uint64_t salt = randomValue();
     
         if (fm->has_salt) {

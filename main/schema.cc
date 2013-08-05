@@ -296,15 +296,6 @@ bool FieldMeta::setOnionLevel(onion o, SECLEVEL maxl) {
     return false;
 }
 
-// FIXME: This is a HACK.
-bool FieldMeta::isEncrypted() {
-    OnionMetaKey *key = new OnionMetaKey(oPLAIN);
-    const bool status =  ((children.size() != 1) ||
-                          (children.find(key) == children.end()));
-    delete key;
-    return status;
-}
-
 OnionMeta *FieldMeta::getOnionMeta(onion o) const
 {
     const OnionMetaKey * const key = new OnionMetaKey(o);

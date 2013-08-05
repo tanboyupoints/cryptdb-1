@@ -99,19 +99,8 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     do_rewrite_insert_type(Item_field *i, Analysis & a,
                            std::vector<Item *> &l, FieldMeta *fm) const
     {
-        assert(fm==NULL);
+        assert(NULL == fm);
         fm = a.getFieldMeta(i->table_name, i->field_name);
-
-        assert(fm->isEncrypted());
-        /*
-         * TODO: Give the FieldMeta a plaintext onion
-        if (!fm->isEncrypted()) {
-            l.push_back(make_item(i, fm->fname));
-            return;
-        }
-        */
-
-        // Encrypted field
 
         Item_field * new_field = NULL;
         for (auto it : fm->orderedOnionMetas()) {

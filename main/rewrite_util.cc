@@ -205,15 +205,6 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
 
     std::vector<Create_field *> output_cfields;
 
-    // FIXME: This sequence checking for encryption is broken.
-    if (!fm->isEncrypted()) {
-        // Unencrypted field
-        output_cfields.push_back(f);
-        return output_cfields;
-    }
-
-    // Encrypted field
-
     //check if field is not encrypted
     if (fm->children.empty()) {
         output_cfields.push_back(f);

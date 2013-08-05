@@ -149,7 +149,6 @@ public:
     std::string getSaltName() const;
     unsigned long getUniq() const {return uniq_count;}
 
-    bool isEncrypted();
     OnionMeta *getOnionMeta(onion o) const;
     // FIXME: Use rtti.
     std::string typeName() const {return type_name;}
