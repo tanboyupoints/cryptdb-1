@@ -118,8 +118,8 @@ EncSet::chooseOne() const
         oOPE,
         oAGG,
         oSWP,
-        oPLAIN,
-        oBESTEFFORT
+        oBESTEFFORT,
+        oPLAIN
     };
 
     static size_t onion_size =

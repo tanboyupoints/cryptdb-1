@@ -854,7 +854,7 @@ static QueryList BestEffort = QueryList("BestEffort",
       Query("SELECT 2+2 FROM t", false),
       Query("SELECT x+2+x FROM t", false),
       Query("SELECT 2+x+2 FROM t", false),
-      // Query("SELECT 2+2+x FROM t", false),
+      Query("SELECT 2+2+x FROM t", false),
       Query("SELECT x+y+3+4 FROM t", false),
       Query("SELECT 2*x*2*y FROM t", false) },
     { "DROP TABLE t"},
@@ -1222,7 +1222,7 @@ RunTest(const TestConfig &tc) {
     // Pass 19/19
     scores.push_back(CheckQueryList(tc, Null));
 
-    // Pass 17/17 (with one throwing an exception)
+    // Pass 18/18 (with one throwing an exception)
     scores.push_back(CheckQueryList(tc, BestEffort));
 
     for (auto it : scores) {
