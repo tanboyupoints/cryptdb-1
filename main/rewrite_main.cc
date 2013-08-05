@@ -363,8 +363,8 @@ buildTypeTextTranslator()
 {
     // Onions.
     const char *onion_chars[] =
-        {"oPLAIN", "oDET", "oOPE", "oAGG", "oSWP"};
-    onion onions[] = {oPLAIN, oDET, oOPE, oAGG, oSWP};
+        {"oBESTEFFORT", "oPLAIN", "oDET", "oOPE", "oAGG", "oSWP"};
+    onion onions[] = {oBESTEFFORT, oPLAIN, oDET, oOPE, oAGG, oSWP};
     assert(arraysize(onion_chars) == arraysize(onions));
     int count = arraysize(onion_chars);
     translatorHelper((const char **)onion_chars, (onion *)onions, count);

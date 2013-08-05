@@ -110,9 +110,11 @@ EncSet::chooseOne() const
         oAGG,
         oSWP,
         oPLAIN,
+        oBESTEFFORT
     };
 
-    static size_t onion_size = sizeof(onion_order) / sizeof(onion_order[0]);
+    static size_t onion_size =
+        sizeof(onion_order) / sizeof(onion_order[0]);
     for (size_t i = 0; i < onion_size; i++) {
         onion o = onion_order[i];
         auto it = osl.find(o);

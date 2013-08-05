@@ -1168,37 +1168,37 @@ RunTest(const TestConfig &tc) {
     std::vector<Score> scores;
 
     // Pass 33/34
-    // scores.push_back(CheckQueryList(tc, Select));
+    scores.push_back(CheckQueryList(tc, Select));
 
     // PAss 24/24
-    // scores.push_back(CheckQueryList(tc, HOM));
+    scores.push_back(CheckQueryList(tc, HOM));
 
     // Pass 19/19
-    // scores.push_back(CheckQueryList(tc, Insert));
+    scores.push_back(CheckQueryList(tc, Insert));
 
     // Pass 23/23
-    // scores.push_back(CheckQueryList(tc, Join));
+    scores.push_back(CheckQueryList(tc, Join));
 
     // Pass 21/21
     scores.push_back(CheckQueryList(tc, Basic));
 
     // Pass 30/31
-    // scores.push_back(CheckQueryList(tc, Update));
+    scores.push_back(CheckQueryList(tc, Update));
 
     // Pass 28/28
-    // scores.push_back(CheckQueryList(tc, Delete));
+    scores.push_back(CheckQueryList(tc, Delete));
 
     // Pass 8/16
-    // scores.push_back(CheckQueryList(tc, Search));
+    scores.push_back(CheckQueryList(tc, Search));
 
     // Pass 20/22
-    // scores.push_back(CheckQueryList(tc, PrivMessages));
+    scores.push_back(CheckQueryList(tc, PrivMessages));
 
     // Pass 44/47
-    // scores.push_back(CheckQueryList(tc, UserGroupForum));
+    scores.push_back(CheckQueryList(tc, UserGroupForum));
 
     // Pass 19/19
-    // scores.push_back(CheckQueryList(tc, Null));
+    scores.push_back(CheckQueryList(tc, Null));
 
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;

@@ -30,11 +30,11 @@ public:
 
     bool singleton() const { return osl.size() == 1; }
 
-    bool single_crypted_and_or_plain() const {
+    bool single_crypted_and_or_best_effort() const {
         unsigned int crypted = 0;
         unsigned int plain = 0;
         for (auto it : osl) {
-            if (it.first != oPLAIN) {
+            if (it.first != oBESTEFFORT) {
                 ++crypted;
             } else {
                 ++plain;
@@ -91,7 +91,8 @@ const EncSet PLAIN_EncSet = {
 //todo: there should be a map of FULL_EncSets depending on item type
 const EncSet FULL_EncSet = {
     {
-        {oPLAIN, LevelFieldPair(SECLEVEL::RND, NULL)},
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::RND, NULL)},
+        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
@@ -101,7 +102,8 @@ const EncSet FULL_EncSet = {
 
 const EncSet FULL_EncSet_Str = {
     {
-        {oPLAIN, LevelFieldPair(SECLEVEL::RND, NULL)},
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::RND, NULL)},
+        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
@@ -110,7 +112,8 @@ const EncSet FULL_EncSet_Str = {
 
 const EncSet FULL_EncSet_Int = {
     {
-        {oPLAIN, LevelFieldPair(SECLEVEL::RND, NULL)},
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::RND, NULL)},
+        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},

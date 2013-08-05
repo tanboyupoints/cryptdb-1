@@ -13,6 +13,7 @@ typedef enum onion {
     oAGG,
     oSWP,
     oPLAIN,
+    oBESTEFFORT,
     oINVALID,
 } onion;
 
@@ -22,14 +23,14 @@ typedef enum onion {
 // (note, this is not "iff")
 #define SECLEVELS(m)    \
     m(INVALID)          \
-    m(PLAINVAL)            \
-    m(OPEJOIN)     	\
-    m(OPE)		\
+    m(PLAINVAL)         \
+    m(OPEJOIN)          \
+    m(OPE)              \
     m(DETJOIN)          \
     m(DET)              \
     m(SEARCH)           \
     m(HOM)              \
-    m(RND) 		\
+    m(RND)              \
     m(SECLEVEL_LAST)
 
 typedef enum class SECLEVEL {
@@ -76,8 +77,8 @@ static onionlayout BEST_EFFORT_NUM_ONION_LAYOUT = {
                                   SECLEVEL::RND})},
     {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
     {oAGG, std::vector<SECLEVEL>({SECLEVEL::HOM})},
-    {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL,
-                                    SECLEVEL::RND})}
+    {oBESTEFFORT, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL,
+                                         SECLEVEL::RND})}
 };
 
 static onionlayout STR_ONION_LAYOUT = {
@@ -94,8 +95,9 @@ static onionlayout BEST_EFFORT_STR_ONION_LAYOUT = {
     {oSWP, std::vector<SECLEVEL>({SECLEVEL::SEARCH})},
     // HACK: RND_str expects the data to be a multiple of 16, so we use
     // DET (it supports decryption UDF) to handle the padding for us.
-    {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL, SECLEVEL::DET,
-                                    SECLEVEL::RND})}
+    {oBESTEFFORT, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL,
+                                         SECLEVEL::DET,
+                                         SECLEVEL::RND})}
 };
 
 

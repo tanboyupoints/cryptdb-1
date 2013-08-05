@@ -93,7 +93,7 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
 
     const EncSet *out_es;
     if (encset_from_intersection) {
-        assert_s(solution.single_crypted_and_or_plain(),
+        assert_s(solution.single_crypted_and_or_best_effort(),
                  "cannot use typical_gather with more outgoing encsets");
         out_es = &solution;
     } else {
