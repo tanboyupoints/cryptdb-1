@@ -62,6 +62,7 @@ operator<<(std::ostream &out, const EncSet & es);
 
 const EncSet EQ_EncSet = {
     {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET,   LevelFieldPair(SECLEVEL::DET, NULL)},
         {oOPE,   LevelFieldPair(SECLEVEL::OPE, NULL)},
@@ -70,6 +71,7 @@ const EncSet EQ_EncSet = {
 
 const EncSet JOIN_EncSet = {
     {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET,   LevelFieldPair(SECLEVEL::DETJOIN, NULL)},
     }
@@ -77,6 +79,7 @@ const EncSet JOIN_EncSet = {
 
 const EncSet ORD_EncSet = {
     {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
     }
@@ -84,6 +87,7 @@ const EncSet ORD_EncSet = {
 
 const EncSet PLAIN_EncSet = {
     {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
     }
 };
