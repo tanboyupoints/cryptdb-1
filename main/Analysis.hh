@@ -91,6 +91,12 @@ const EncSet PLAIN_EncSet = {
     }
 };
 
+const EncSet BESTEFFORT_EncSet = {
+    {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)}
+    }
+};
+
 //todo: there should be a map of FULL_EncSets depending on item type
 const EncSet FULL_EncSet = {
     {

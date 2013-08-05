@@ -385,7 +385,8 @@ class CItemMath : public CItemSubtypeFN<IT, NAME> {
     virtual RewritePlan * do_gather_type(IT *i,
                                          reason &tr, Analysis & a) const
     {
-        return typical_gather(a, i, PLAIN_EncSet, "math op", tr, true);
+        return typical_gather(a, i, BESTEFFORT_EncSet, "math op", tr,
+                              true);
     }
 
     virtual Item * do_optimize_type(IT *i, Analysis & a) const
