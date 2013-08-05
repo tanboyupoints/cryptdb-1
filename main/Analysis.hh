@@ -238,7 +238,6 @@ public:
 
 };
 
-
 //rewrite plan in which we only need to remember one olk
 // to know how to rewrite
 class RewritePlanOneOLK: public RewritePlan {

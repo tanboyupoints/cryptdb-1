@@ -7,13 +7,12 @@
 
 class AddColumnSubHandler : public AlterSubHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps) const
+                                  const ProxyState &ps,
+                                  const Preamble &preamble) const
     {
-        const std::string &table =
-            lex->select_lex.table_list.first->table_name;
         LEX *new_lex = copy(lex);
 
-        TableMeta *tm = a.getTableMeta(table);
+        TableMeta *tm = a.getTableMeta(preamble.table);
         // -----------------------------
         //         Rewrite TABLE
         // -----------------------------
@@ -26,7 +25,8 @@ class AddColumnSubHandler : public AlterSubHandler {
         new_lex->alter_info.create_list = 
             reduceList<Create_field>(add_it, List<Create_field>(),
                 [&a, &ps, &tm] (List<Create_field> out_list,
-                                Create_field *cf) {
+                                Create_field *cf)
+            {
                     return createAndRewriteField(a, ps, cf, tm,
                                                  false, out_list);
             });
@@ -37,13 +37,10 @@ class AddColumnSubHandler : public AlterSubHandler {
 
 class DropColumnSubHandler : public AlterSubHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps) const
+                                  const ProxyState &ps,
+                                  const Preamble &preamble) const
     {
         LEX *new_lex = copy(lex);
-        const std::string &table =
-            lex->select_lex.table_list.first->table_name;
-        const std::string &dbname =
-            lex->select_lex.table_list.first->db;
 
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a);
@@ -53,7 +50,8 @@ class DropColumnSubHandler : public AlterSubHandler {
             List_iterator<Alter_drop>(lex->alter_info.drop_list);
         List<Alter_drop> col_drop_list =
             filterList(drop_it,
-                [](Alter_drop *adrop) {
+                [](Alter_drop *adrop)
+                {
                     return Alter_drop::COLUMN == adrop->type;
                 });
 
@@ -61,10 +59,12 @@ class DropColumnSubHandler : public AlterSubHandler {
         drop_it = List_iterator<Alter_drop>(col_drop_list);
         new_lex->alter_info.drop_list =
             reduceList<Alter_drop>(drop_it, List<Alter_drop>(),
-                [table, dbname, &a, this] (List<Alter_drop> out_list,
-                                           Alter_drop *adrop) {
-                    FieldMeta *fm = a.getFieldMeta(table, adrop->name);
-                    TableMeta *tm = a.getTableMeta(table);
+                [preamble, &a, this] (List<Alter_drop> out_list,
+                                            Alter_drop *adrop)
+                {
+                    FieldMeta *fm =
+                        a.getFieldMeta(preamble.table, adrop->name);
+                    TableMeta *tm = a.getTableMeta(preamble.table);
                     List<Alter_drop> lst = this->rewrite(fm, adrop);
                     out_list.concat(&lst);
                     a.deltas.push_back(new DeleteDelta(fm, tm,
@@ -102,7 +102,8 @@ class DropColumnSubHandler : public AlterSubHandler {
 
 class ChangeColumnSubHandler : public AlterSubHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps) const
+                                  const ProxyState &ps,
+                                  const Preamble &preamble) const
     {
         assert(false);
     }
@@ -110,21 +111,21 @@ class ChangeColumnSubHandler : public AlterSubHandler {
 
 class ForeignKeySubHandler : public AlterSubHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps) const
+                                  const ProxyState &ps,
+                                  const Preamble &preamble) const
     {
-        assert(false);
+        throw CryptDBError("implement ForeignKeySubHandler!");
     }
 };
 
 class AddIndexSubHandler : public AlterSubHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps) const
+                                  const ProxyState &ps,
+                                  const Preamble &preamble) const
     {
-        const std::string &table =
-            lex->select_lex.table_list.first->table_name;
         LEX *new_lex = copy(lex);
 
-        TableMeta *tm = a.getTableMeta(table);
+        TableMeta *tm = a.getTableMeta(preamble.table);
 
         // -----------------------------
         //         Rewrite TABLE
@@ -137,11 +138,11 @@ class AddIndexSubHandler : public AlterSubHandler {
             List_iterator<Key>(lex->alter_info.key_list);
         new_lex->alter_info.key_list = 
             reduceList<Key>(key_it, List<Key>(),
-                [&table, &tm, &a] (List<Key> out_list, Key *key) {
+                [preamble, &tm, &a] (List<Key> out_list, Key *key) {
                     // -----------------------------
                     //         Rewrite INDEX
                     // -----------------------------
-                    auto new_keys = rewrite_key(table, key, a);
+                    auto new_keys = rewrite_key(preamble.table, key, a);
                     out_list.concat(vectorToList(new_keys));
 
                     return out_list;
@@ -153,14 +154,11 @@ class AddIndexSubHandler : public AlterSubHandler {
 
 class DropIndexSubHandler : public AlterSubHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps) const
+                                  const ProxyState &ps,
+                                  const Preamble &preamble) const
     {
         LEX *new_lex = copy(lex);
-        const std::string &table =
-            lex->select_lex.table_list.first->table_name;
-        const std::string &dbname =
-            lex->select_lex.table_list.first->db;
-        TableMeta *tm = a.getTableMeta(table);
+        TableMeta *tm = a.getTableMeta(preamble.table);
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a);
 
@@ -169,7 +167,8 @@ class DropIndexSubHandler : public AlterSubHandler {
             List_iterator<Alter_drop>(lex->alter_info.drop_list);
         List<Alter_drop> key_drop_list =
             filterList(drop_it,
-                [](Alter_drop *adrop) {
+                [](Alter_drop *adrop)
+                {
                     return Alter_drop::KEY == adrop->type;
                 });
 
@@ -179,11 +178,13 @@ class DropIndexSubHandler : public AlterSubHandler {
             List_iterator<Alter_drop>(key_drop_list);
         new_lex->alter_info.drop_list =
             reduceList<Alter_drop>(drop_it, List<Alter_drop>(),
-                [table, dbname, tm, &a, this] (List<Alter_drop> out_list,
-                                               Alter_drop *adrop) {
-                    List<Alter_drop> lst = this->rewrite(a, adrop, table);
-                    out_list.concat(&lst); 
-                    return out_list;
+                [preamble, tm, &a, this]
+                    (List<Alter_drop> out_list, Alter_drop *adrop)
+                {
+                        List<Alter_drop> lst =
+                            this->rewrite(a, adrop, preamble.table);
+                        out_list.concat(&lst); 
+                        return out_list;
                 });
 
         return new_lex;
@@ -207,7 +208,9 @@ class DropIndexSubHandler : public AlterSubHandler {
 LEX *AlterSubHandler::transformLex(Analysis &a, LEX *lex,
                                    const ProxyState &ps) const
 {
-    return this->rewriteAndUpdate(a, lex, ps);
+    Preamble preamble(lex->select_lex.table_list.first->db,
+                      lex->select_lex.table_list.first->table_name);
+    return this->rewriteAndUpdate(a, lex, ps, preamble);
 }
 
 AlterDispatcher *buildAlterSubDispatcher() {
