@@ -837,7 +837,29 @@ static QueryList ManyConnections = QueryList("Multiple connections",
       "DROP TABLE u_conn",
       ""} );
 
-
+static QueryList BestEffort = QueryList("BestEffort",
+    { "CREATE TABLE t (x integer, y integer)",
+      "", "", ""},
+    { "CREATE TABLE t (x integer, y integer)",
+      "", "", ""},
+    { "CREATE TABLE t (x integer, y integer)",
+      "", "", ""},
+    { Query("INSERT INTO t VALUES (1, 100)", false),
+      Query("INSERT INTO t VALUES (22, 413)", false),
+      Query("INSERT INTO t VALUES (1001, 15)", false),
+      Query("INSERT INTO t VALUES (19, 18)", false),
+      Query("SELECT * FROM t", false),
+      Query("SELECT x*x FROM t", false),
+      Query("SELECT x*y FROM t", false),
+      Query("SELECT 2+2 FROM t", false),
+      Query("SELECT x+2+x FROM t", false),
+      Query("SELECT 2+x+2 FROM t", false),
+      // Query("SELECT 2+2+x FROM t", false),
+      Query("SELECT x+y+3+4 FROM t", false),
+      Query("SELECT 2*x*2*y FROM t", false) },
+    { "DROP TABLE t"},
+    { "DROP TABLE t"},
+    { "DROP TABLE t"});
 
 
 //-----------------------------------------------------------------------
@@ -1199,6 +1221,9 @@ RunTest(const TestConfig &tc) {
 
     // Pass 19/19
     scores.push_back(CheckQueryList(tc, Null));
+
+    // Pass 17/17 (with one throwing an exception)
+    scores.push_back(CheckQueryList(tc, BestEffort));
 
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;

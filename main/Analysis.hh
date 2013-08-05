@@ -30,18 +30,18 @@ public:
 
     bool singleton() const { return osl.size() == 1; }
 
-    bool single_crypted_and_or_best_effort() const {
+    bool single_crypted_and_or_plainvals() const {
         unsigned int crypted = 0;
         unsigned int plain = 0;
         for (auto it : osl) {
-            if (it.first != oBESTEFFORT) {
-                ++crypted;
-            } else {
+            if (SECLEVEL::PLAINVAL == it.second.first) {
                 ++plain;
+            } else {
+                ++crypted;
             }
         }
 
-        return 1 >= crypted && 1 >= plain;
+        return 1 >= crypted || plain > 0;
     }
 
     OLK extract_singleton() const {
@@ -131,6 +131,7 @@ const EncSet FULL_EncSet_Int = {
 
 const EncSet Search_EncSet = {
     {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
     }
@@ -138,6 +139,7 @@ const EncSet Search_EncSet = {
 
 const EncSet ADD_EncSet = {
     {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
     }
