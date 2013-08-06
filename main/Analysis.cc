@@ -157,6 +157,18 @@ EncSet::contains(const OLK & olk) const {
 }
 
 bool
+EncSet::hasSecLevel(SECLEVEL level) const
+{
+    for (auto it : osl) {
+        if (level == it.second.first) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool
 needsSalt(EncSet es) {
     for (auto pair : es.osl) {
         if (pair.second.first == SECLEVEL::RND) {

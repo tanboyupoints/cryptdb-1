@@ -214,8 +214,8 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
         const unsigned int arg_count = i->argument_list()->elements;
         assert(2 <= arg_count);
 
-        EncSet out_es = PLAIN_EncSet;
-        EncSet child_es = PLAIN_EncSet;
+        EncSet out_es = FILTER_EncSet;
+        EncSet child_es = FILTER_EncSet;
         const std::string why = "and/or";
 
         tr = reason(out_es, why, i);
@@ -233,15 +233,16 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
             reason r;
             childr_rp[index] = gather(argitem, r, a);
             tr.add_child(r);
-            if (!childr_rp[index]->es_out.contains(PLAIN_OLK)) {
+            const SECLEVEL plain = SECLEVEL::PLAINVAL;
+            if (!childr_rp[index]->es_out.hasSecLevel(plain)) {
                 thrower() << "cannot obtain PLAIN for " << *argitem;
             }
             ++index;
         }
 
         // Must be an OLK for each argument.
-        return new RewritePlanOneOLK(out_es.extract_singleton(),
-                                     child_es.extract_singleton(),
+        return new RewritePlanOneOLK(out_es.chooseOne(),
+                                     child_es.chooseOne(),
                                      childr_rp, tr);
     }
 

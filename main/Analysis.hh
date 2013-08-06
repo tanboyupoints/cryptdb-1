@@ -23,6 +23,8 @@ public:
     OLK chooseOne() const;
 
     bool contains(const OLK & olk) const;
+    
+    bool hasSecLevel(SECLEVEL level) const;
 
     EncSet intersect(const EncSet & es2) const;
 
@@ -82,6 +84,13 @@ const EncSet ORD_EncSet = {
         {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
+    }
+};
+
+const EncSet FILTER_EncSet = {
+    {
+        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)}
     }
 };
 

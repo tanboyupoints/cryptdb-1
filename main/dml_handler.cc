@@ -412,7 +412,8 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
     st_select_lex * new_select_lex = copy(select_lex);
 
     if (select_lex->where) {
-        set_where(new_select_lex, rewrite(select_lex->where, PLAIN_OLK, a));
+        set_where(new_select_lex, rewrite(select_lex->where,
+                                          FILTER_EncSet, a));
     }
     //  if (select_lex->join &&
     //     select_lex->join->conds &&
@@ -422,7 +423,8 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
     //}
 
     if (select_lex->having)
-        new_select_lex->having = rewrite(select_lex->having, PLAIN_OLK, a);
+        new_select_lex->having = rewrite(select_lex->having,
+                                         FILTER_EncSet, a);
 
     rewrite_order(a, new_select_lex->group_list, EQ_EncSet, "group by");
     rewrite_order(a, new_select_lex->order_list, ORD_EncSet, "order by");
@@ -457,7 +459,7 @@ rewrite_proj(Item * i, const RewritePlan * rp, Analysis & a,
              List<Item> & newList)
 {
     OLK olk = rp->es_out.chooseOne();
-    Item *ir = rewrite(i, olk, a);
+    Item *ir = rewrite(i, rp->es_out, a);
     newList.push_back(ir);
     bool use_salt = needsSalt(olk);
 
