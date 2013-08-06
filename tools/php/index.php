@@ -60,12 +60,14 @@ if (db_connect('nodie')){
             $host = ini_get("mysqli.default_host"); 
 
             $user = $CRYPTDB['user'] ?  $CRYPTDB['user'] : ini_get("mysqli.default_user"); 
-            $port = (int)$CRYPTDB['port'] ?  $CRYPTDB['port'] : ini_get("mysqli.default_port"); 
+
+            // Force default
+            $port = ini_get("mysqli.default_port"); 
             $pwd = $CRYPTDB['pwd'];
 
             $query = "show columns from " . $s_db . "."  . $s_table . " where Field = " . "'" . $fieldname[$index] . "';";
 
-            $proxy = proxy_connect($host, $user, $pwd, $port);
+            $proxy = proxy_connect($host, $user, $pwd, $s_db, $port);
             // TODO: Execute query and display results
             // TODO: close is to be placed in session's destructor (logoff link)
             //$proxy->mysqli_close();
@@ -265,26 +267,41 @@ Databases:
 <?php echo get_db_select($dbn)?>
 </select>
 
-<?php if($dbn){ $z=" &#183; <a href='$self?$xurl&db=$dbn"; ?>
-<?php if($_POST['cryptdb_describe_table'] && $dbn) { 
-    $z.'&q='.urlencode($var);
-} ?>
 
 Tables:
-<form action="'<?php echo $self?>'" method="post">
-<select name="cryptdb_describe_table" onChange="location.href='<?php $var = "describe " . $_POST['cryptdb_describe_table']; echo $z.'&q='.urlencode($var)?>'">
+<select name="cryptdb_describe_table">
 <?php 
  $a=0;
  $array = get_db_tables($dbn) ; foreach($array as $key=>$value) 
 { 
      $accesskey = "Tables_in_" . $dbn;
 ?>
+
+<?php
+     if(isset($_POST['cryptdb_describe_table']) && $_POST['cryptdb_describe_table'] == $value[$accesskey])
+     {
+?>
+<option selected value="<?php echo $value[$accesskey]; ?>"><?php echo $value[$accesskey]; ?></option>
+<?php } else { ?>
+
 <option value="<?php echo $value[$accesskey]; ?>"><?php echo $value[$accesskey]; ?></option>
 <?php } ?>
 
+
+<?php } ?>
 </select>
 <input type="submit" value="Describe table">
-</form>
+
+
+<?php if($dbn){ $z=" &#183; <a href='$self?$xurl&db=$dbn"; ?>
+<?php if($_POST['cryptdb_describe_table'] && $dbn) { 
+    $z.'&q='.urlencode($var);
+?>
+
+<?php
+} ?>
+
+
 <?php } ?>
 <?php } ?>
 
@@ -309,7 +326,7 @@ function print_screen(){
     print_header();
 ?>
 
-<!--<textarea readonly id="q" name="q" cols="70" rows="5" style="width:50%"><?php echo $SQLq?></textarea><br>-->
+<textarea readonly id="q" name="q" cols="70" rows="10" style="width:50%"><?php echo curr_q("",FALSE)?></textarea><br>
 
 Records: <b><?php echo $reccount?></b> in <b><?php echo $time_all?></b> sec<br>
 <b><?php echo $out_message?></b>
@@ -329,13 +346,15 @@ function print_cfg(){
 <h3>CryptDB</h3>
 <div class="frm">
 
+<label class="l">MYSQL host/ip:</label><input type="text" name="v[host]" value="<?php echo $DB['host']?>"><br>
 <label class="l">DB user:</label><input type="text" name="v[user]" value="<?php echo $DB['user']?>"><br>
 <label class="l">Password:</label><input type="password" name="v[pwd]" value=""><br>
 <br>
 
-<label class="l">CryptDB user:</label><input type="text" name="c[user]" value="<?php echo $CRYPTDB['user']?>"><br>
+<label class="l">CryptDB host/ip:</label><input type="text" readonly name="c[host]" value="localhost"><br>
+<label class="l">DB user:</label><input type="text" name="c[user]" value="<?php echo $CRYPTDB['user']?>"><br>
 <label class="l">Password:</label><input type="password" name="c[pwd]" value=""><br>
-<label class="l">Port [<?php echo ini_get("mysqli.default_port") ?>]:</label><input type="text" name="c[port]" value="<?php echo $CRYPTDB['port']?>" size="4"><br>
+<!--<label class="l">Port:</label><input type="text" readonly name="c[port]" value="<?php echo $CRYPTDB['port']?>" size="4"><br>-->
 
 <div id="cfg-adv" style="display:none;">
 
@@ -364,17 +383,20 @@ function print_cfg(){
 /*
  * Proxy OO style connection
  */
-function proxy_connect($host, $user, $pwd, $port)
+function proxy_connect($host, $user, $pwd, $dbname, $port)
 {
     static $proxy = FALSE;
+    //global $cryptq;
     
     if($proxy != FALSE)
         return $proxy;
     
     $proxy = mysqli_init();
 
-    if(!$proxy->real_connect($host, $user, $pwd, "", $port))
+    if(!$proxy->real_connect($host, $user, $pwd, $dbname, $port))
         die(mysqli_connect_errno());
+
+
 
     return $proxy;
 }
