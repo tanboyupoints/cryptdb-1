@@ -34,6 +34,9 @@ $SESSIONSDEF=array(
 
  date_default_timezone_set('UTC');#required by PHP 5.1+
 
+/*
+ * Proxy defaults 
+ */
 ini_set("mysqli.default_host", "localhost");
 ini_set("mysqli.database_name", "cryptdbtest");
 ini_set("mysqli.default_port", "3306");
