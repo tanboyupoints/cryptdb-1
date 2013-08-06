@@ -14,6 +14,12 @@
 #include <rewrite_main.hh>
 #include <parser/sql_utils.hh>
 
+static void help(const char *prog)
+{
+    std::cout << "Usage: " << prog << 
+        " -u user -p password -d database [-f input file]" << "\n";
+}
+
 static bool 
 ignore_line(const std::string& line)
 {
@@ -106,7 +112,8 @@ int main(int argc, char **argv)
         switch(c)
         {
             case 'h':
-                break;
+                help(argv[0]);
+                exit(0);
             case 'f':
                 filename = optarg;
                 break;
