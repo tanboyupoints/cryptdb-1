@@ -1,7 +1,8 @@
 <?php
 
 
-function do_sql($q, $go = FALSE){ //temporary hack
+//print_r($_POST);
+function do_sql($q){ 
  global $dbh,$last_sth,$last_sql,$reccount,$out_message,$SQLq,$SHOW_T;
  $SQLq=$q;
 
@@ -12,7 +13,7 @@ function do_sql($q, $go = FALSE){ //temporary hack
          $SQLq=$last_sql;
          if (preg_match("/^select|show|explain|desc/i",$last_sql)) {
              if ($q!=$last_sql) $out_message="Results of the last select displayed:";
-             display_select($last_sth,$last_sql, $go);
+             display_select($last_sth,$last_sql);
          } else {
              $reccount=mysql_affected_rows($dbh);
              $out_message="Done.";
@@ -45,13 +46,15 @@ function do_cryptdb_sql($cdbh, $q){
  }
 }
 
-function display_select($sth,$q, $go=FALSE){
+function display_select($sth,$q){
     global $dbh,$DB,$sqldr,$reccount,$is_sht,$xurl;
     $rc=array("o","e");
     $dbn=$DB['db'];
     $sqldr='';
 
-    if(isset($_POST['cryptdb_describe_table']) || $go == TRUE)
+    $keys = array_keys($_POST);
+    $is_cryptdb = strstr($keys[0], "cryptdb");
+    if(isset($_POST['cryptdb_describe_table']) || $is_cryptdb != FALSE)
     {
         $is_shd=(preg_match('/^show\s+databases/i',$q));
         $is_sht=(preg_match('/^show\s+tables|^SHOW\s+TABLE\s+STATUS/',$q));
@@ -77,30 +80,32 @@ function display_select($sth,$q, $go=FALSE){
         $sqldr.=$headers;
         $swapper=false;
         $idpos = 0;
-        //$x;
         while($row=mysql_fetch_row($sth))
         {
+
             $identifier = $row[0];
-            
+
             $sqldr.="<tr class='".$rc[$swp=!$swp]."' onmouseover='tmv(this)' onmouseout='tmo(this)' onclick='tc(this)' align=\"center\">";
             for($i=0;$i<$fields_num;$i++){
                 $v=$row[$i];
+                echo $row[$i] . " ";
 
-                //$x .= $v . "<br>";
                 $more='';
 
                 if ($is_show_crt) $v="<pre>$v</pre>";
                 $sqldr.="<td>$v".(!strlen($v)?"<br>":'')."</td>";
 
             }
-            //$x = "";
             $sqldr.= "<td><form  action=\"$self\" value=$dbn$idpos  method=\"post\">";
-
-            session_add('s_PROXY', "CryptDBProxy");
-            //session_add('s_QUERY', $q);
-            session_add('s_DB', $DB['db']);
-            session_add('s_TABLE', $_POST['cryptdb_describe_table']);
-            session_append('s_ID', $identifier . "&");
+    
+            if($is_cryptdb == FALSE)
+            {
+                session_add('s_PROXY', "CryptDBProxy");
+                session_add('s_QUERY', $q);
+                session_add('s_DB', $DB['db']);
+                session_add('s_TABLE', $_POST['cryptdb_describe_table']);
+                session_append('s_ID', $identifier . "&");
+            }
 
             $var = $idpos . '_cryptdb_sensitive';
             $sqldr.= "<select name=\"$var\" id=\"$var\" onChange=\"\"> 
