@@ -45,20 +45,6 @@ function do_cryptdb_sql($cdbh, $q){
  }
 }
 
-function test_post()
-{
-    print_r($_POST);
-    if(isset($_POST['sensitive_field']) || 
-        isset($_POST['best_effort_encryption']) || isset($_POST['unencrypted']))
-    {
-        echo "TRUEEE" . "<br>";
-        return TRUE;
-    }
-
-    echo "FALSEEE" . "<br>";
-    return FALSE;
-}
-
 function display_select($sth,$q, $go=FALSE){
     global $dbh,$DB,$sqldr,$reccount,$is_sht,$xurl;
     $rc=array("o","e");
@@ -67,7 +53,6 @@ function display_select($sth,$q, $go=FALSE){
 
     if(isset($_POST['cryptdb_describe_table']) || $go == TRUE)
     {
-        echo "HERE " . $q . "<br>";
         $is_shd=(preg_match('/^show\s+databases/i',$q));
         $is_sht=(preg_match('/^show\s+tables|^SHOW\s+TABLE\s+STATUS/',$q));
         $is_show_crt=(preg_match('/^show\s+create\s+table/i',$q));
