@@ -73,6 +73,7 @@ function display_select($sth,$q){
             $meta=mysql_fetch_field($sth,$i);
             $headers.="<th>".$meta->name."</th>";
         }
+        $headers.="<th>Submit column for analysis</th>";
         $headers.="</tr>\n";
         $sqldr.=$headers;
         $swapper=false;

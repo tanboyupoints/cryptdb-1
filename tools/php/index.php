@@ -128,7 +128,7 @@ pre{font-size:50%}
 .ft{text-align:right;margin-top:10px;font-size:smaller}
 .inv{background-color:#069;color:#FFF}
 .inv a{color:#FFF}
-table.res{width:50%;border-collapse:collapse;}
+table.res{width:100%;border-collapse:collapse;}
 table.wa{width:auto}
 table.res th,table.res td{padding:2px;border:1px solid #fff}
 table.restr{vertical-align:top}
@@ -142,6 +142,11 @@ tr.s{background-color:#FF9}
 .dot{border-bottom:1px dotted #000}
 .ajax{text-decoration: none;border-bottom: 1px dashed;}
 .qnav{width:30px}
+.boxsizingBorder {
+    -webkit-box-sizing: border-box;
+       -moz-box-sizing: border-box;
+            box-sizing: border-box;
+}
 </style>
 
 <script type="text/javascript">
@@ -325,9 +330,10 @@ function print_screen(){
 
     print_header();
 ?>
-
-<textarea readonly id="q" name="q" cols="70" rows="10" style="width:50%"><?php echo curr_q("",FALSE)?></textarea><br>
-
+<div class="boxsizingBorder">
+<textarea style="overflow:auto;" readonly id="query_output" name="q" cols="100" rows="10" style="width:50%;overflow:auto;"><?php echo curr_q("",FALSE)?></textarea><br>
+<input type="button" value="Clear board" onclick="this.form.elements['query_output'].value=''">
+</div>
 Records: <b><?php echo $reccount?></b> in <b><?php echo $time_all?></b> sec<br>
 <b><?php echo $out_message?></b>
 <div class="sqldr">
