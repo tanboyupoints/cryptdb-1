@@ -214,8 +214,8 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
         const unsigned int arg_count = i->argument_list()->elements;
         assert(2 <= arg_count);
 
-        EncSet out_es = FILTER_EncSet;
-        EncSet child_es = FILTER_EncSet;
+        EncSet out_es = PLAIN_EncSet;
+        EncSet child_es = PLAIN_EncSet;
         const std::string why = "and/or";
 
         tr = reason(out_es, why, i);
@@ -299,7 +299,7 @@ class CItemNullcheck : public CItemSubtypeFT<Item_bool_func, FT> {
         tr = reason(out_es, "nullcheck", i);
         tr.add_child(r);
 
-        return new RewritePlanOneOLK(out_es.extract_singleton(),
+        return new RewritePlanOneOLK(out_es.chooseOne(),
                                      solution.chooseOne(),
                                      child_rp, tr);
     }
@@ -393,8 +393,7 @@ class CItemMath : public CItemSubtypeFN<IT, NAME> {
     virtual RewritePlan * do_gather_type(IT *i,
                                          reason &tr, Analysis & a) const
     {
-        return typical_gather(a, i, BESTEFFORT_EncSet, "math op", tr,
-                              true);
+        return typical_gather(a, i, PLAIN_EncSet, "math op", tr, true);
     }
 
     virtual Item * do_optimize_type(IT *i, Analysis & a) const
@@ -409,7 +408,8 @@ class CItemMath : public CItemSubtypeFN<IT, NAME> {
         assert(i->argument_count() == 2);
         Item **args = i->arguments();
 
-        RewritePlanOneOLK * rp = (RewritePlanOneOLK *) _rp;
+        const RewritePlanOneOLK * const rp =
+            static_cast<const RewritePlanOneOLK *>(_rp);
 
         Item * arg0 =
             itemTypes.do_rewrite(args[0], rp->olk, rp->childr_rp[0], a);

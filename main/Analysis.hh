@@ -87,21 +87,9 @@ const EncSet ORD_EncSet = {
     }
 };
 
-const EncSet FILTER_EncSet = {
-    {
-        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)}
-    }
-};
-
 const EncSet PLAIN_EncSet = {
     {
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-    }
-};
-
-const EncSet BESTEFFORT_EncSet = {
-    {
         {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)}
     }
 };

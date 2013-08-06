@@ -85,7 +85,7 @@ class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
             why += " distinct";
         }
 
-        OLK out_olk = PLAIN_EncSet.extract_singleton();
+        OLK out_olk = PLAIN_EncSet.chooseOne();
 
         tr = reason(out_olk, why, i);
         tr.add_child(r);

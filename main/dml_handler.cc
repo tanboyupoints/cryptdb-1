@@ -413,7 +413,7 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
 
     if (select_lex->where) {
         set_where(new_select_lex, rewrite(select_lex->where,
-                                          FILTER_EncSet, a));
+                                          PLAIN_EncSet, a));
     }
     //  if (select_lex->join &&
     //     select_lex->join->conds &&
@@ -424,7 +424,7 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
 
     if (select_lex->having)
         new_select_lex->having = rewrite(select_lex->having,
-                                         FILTER_EncSet, a);
+                                         PLAIN_EncSet, a);
 
     rewrite_order(a, new_select_lex->group_list, EQ_EncSet, "group by");
     rewrite_order(a, new_select_lex->order_list, ORD_EncSet, "order by");
