@@ -37,22 +37,12 @@ if (db_connect('nodie')){
             /*
              * Execute query (proxy db)
              */
-            $index = -1;
 
-            $type = "";
-            // only first one is of interest
-            foreach($_POST as $key=>$value)
-            {
-                // $type is either sensitive, best effort or unencrypted.
-                $type = $value;
-                $index = strtok($key, "_");
-                if(!is_numeric($index))
-                    die("Parse error");
-
-                break;
-            }
-            if($index == -1)
+            $keys = array_keys($_POST);
+            if(strstr($keys[0], "cryptdb") == FALSE)
                 die("Parse error");
+    
+            $index =  $keys[0][0];
 
             $fieldname = preg_split("/\&/", $s_id);
 
@@ -67,9 +57,10 @@ if (db_connect('nodie')){
             $pwd = $CRYPTDB['pwd'];
 
             $query = "show columns from " . $s_db . "."  . $s_table . " where Field = " . "'" . $fieldname[$index] . "';";
+            //$SQLq = $query;
 
             $proxy = proxy_connect($host, $user, $pwd, $s_db, $port);            
-            do_sql($query, TRUE); //temporary hack
+            do_sql($query);
             //do_cryptdb_sql($proxy, $query);
             // TODO: Execute query and display results
             // TODO: close is to be placed in session's destructor (logoff link?)
@@ -329,7 +320,7 @@ function print_screen(){
     print_header();
 ?>
 <div class="boxsizingBorder">
-<textarea style="overflow:auto;" readonly id="query_output" name="q" cols="100" rows="10" style="width:50%;overflow:auto;"><?php echo curr_q("",FALSE)?>Results will be displayed here.</textarea><br>
+<textarea style="overflow:auto;" readonly id="query_output" name="q" cols="100" rows="10" style="width:50%;overflow:auto;"><?php echo curr_q("",FALSE)?><?php echo $SQLq; ?></textarea><br>
 <input type="button" value="Clear board" onclick="this.form.elements['query_output'].value=''">
 </div>
 Records: <b><?php echo $reccount?></b> in <b><?php echo $time_all?></b> sec<br>
