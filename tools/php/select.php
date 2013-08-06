@@ -1,7 +1,7 @@
 <?php
 
 
-function do_sql($q){
+function do_sql($q, $go = FALSE){ //temporary hack
  global $dbh,$last_sth,$last_sql,$reccount,$out_message,$SQLq,$SHOW_T;
  $SQLq=$q;
 
@@ -12,7 +12,7 @@ function do_sql($q){
          $SQLq=$last_sql;
          if (preg_match("/^select|show|explain|desc/i",$last_sql)) {
              if ($q!=$last_sql) $out_message="Results of the last select displayed:";
-             display_select($last_sth,$last_sql);
+             display_select($last_sth,$last_sql, $go);
          } else {
              $reccount=mysql_affected_rows($dbh);
              $out_message="Done.";
@@ -23,12 +23,12 @@ function do_sql($q){
  }
 }
 
-function do_cryptdb_sql($q){
- global $cryptdbh,$last_sth,$last_sql,$reccount,$out_message,$SQLq,$SHOW_T;
+function do_cryptdb_sql($cdbh, $q){
+ global $last_sth,$last_sql,$reccount,$out_message,$SQLq,$SHOW_T;
  $SQLq=$q;
 
  if (!do_multi_sql($q)){
-     $out_message="Error: ".mysql_error($cryptdbh);
+     $out_message="Error: ".$cdbh->error;
  }else{
      if ($last_sth && $last_sql){
          $SQLq=$last_sql;
@@ -45,15 +45,29 @@ function do_cryptdb_sql($q){
  }
 }
 
+function test_post()
+{
+    print_r($_POST);
+    if(isset($_POST['sensitive_field']) || 
+        isset($_POST['best_effort_encryption']) || isset($_POST['unencrypted']))
+    {
+        echo "TRUEEE" . "<br>";
+        return TRUE;
+    }
 
-function display_select($sth,$q){
+    echo "FALSEEE" . "<br>";
+    return FALSE;
+}
+
+function display_select($sth,$q, $go=FALSE){
     global $dbh,$DB,$sqldr,$reccount,$is_sht,$xurl;
     $rc=array("o","e");
     $dbn=$DB['db'];
     $sqldr='';
 
-    if(isset($_POST['cryptdb_describe_table']))
+    if(isset($_POST['cryptdb_describe_table']) || $go == TRUE)
     {
+        echo "HERE " . $q . "<br>";
         $is_shd=(preg_match('/^show\s+databases/i',$q));
         $is_sht=(preg_match('/^show\s+tables|^SHOW\s+TABLE\s+STATUS/',$q));
         $is_show_crt=(preg_match('/^show\s+create\s+table/i',$q));
@@ -98,8 +112,8 @@ function display_select($sth,$q){
             $sqldr.= "<td><form  action=\"$self\" value=$dbn$idpos  method=\"post\">";
 
             session_add('s_PROXY', "CryptDBProxy");
+            //session_add('s_QUERY', $q);
             session_add('s_DB', $DB['db']);
-            session_add('s_QUERY', $q);
             session_add('s_TABLE', $_POST['cryptdb_describe_table']);
             session_append('s_ID', $identifier . "&");
 

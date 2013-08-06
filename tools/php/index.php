@@ -58,6 +58,7 @@ if (db_connect('nodie')){
 
             //Using hardocded default. If user inputs 'localhost' mysqli ignores port...
             $host = ini_get("mysqli.default_host"); 
+            //$database = ini_get("mysqli.default_database"); 
 
             $user = $CRYPTDB['user'] ?  $CRYPTDB['user'] : ini_get("mysqli.default_user"); 
 
@@ -67,7 +68,9 @@ if (db_connect('nodie')){
 
             $query = "show columns from " . $s_db . "."  . $s_table . " where Field = " . "'" . $fieldname[$index] . "';";
 
-            $proxy = proxy_connect($host, $user, $pwd, $s_db, $port);
+            $proxy = proxy_connect($host, $user, $pwd, $s_db, $port);            
+            do_sql($query, TRUE); //temporary hack
+            //do_cryptdb_sql($proxy, $query);
             // TODO: Execute query and display results
             // TODO: close is to be placed in session's destructor (logoff link?)
             //$proxy->mysqli_close();
@@ -326,7 +329,7 @@ function print_screen(){
     print_header();
 ?>
 <div class="boxsizingBorder">
-<textarea style="overflow:auto;" readonly id="query_output" name="q" cols="100" rows="10" style="width:50%;overflow:auto;"><?php echo curr_q("",FALSE)?></textarea><br>
+<textarea style="overflow:auto;" readonly id="query_output" name="q" cols="100" rows="10" style="width:50%;overflow:auto;"><?php echo curr_q("",FALSE)?>Results will be displayed here.</textarea><br>
 <input type="button" value="Clear board" onclick="this.form.elements['query_output'].value=''">
 </div>
 Records: <b><?php echo $reccount?></b> in <b><?php echo $time_all?></b> sec<br>
