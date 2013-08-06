@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 #
 # CryptDB onion tool installer
 
@@ -8,13 +8,17 @@
 apache2="/etc/apache2/sites-enabled/000-default"
 declare -a files=(./index.php ./common.php ./select.php ./favicon.ico)
 
-function checkenv() {
+function do_install() {
 
     # be faithful
     if [ $UID != 0 ] ; then
         echo "Root?"
         exit
     fi
+
+    docroot=$1
+    type=$2
+    currdir=$(pwd)
 
     ps ax |grep apache2 >/dev/null 2>&1
     if [ $? -ne 0 ] ; then
@@ -30,19 +34,18 @@ function checkenv() {
     fi
     
     # Installing...
-    total=$(ls -l $1 |head -1| awk '{print $2}')
+    total=$(ls -l $docroot |head -1| awk '{print $2}')
     if [ $total -gt 0 ] ; then
 
         # Even after backup, keep all data there, but files with
         # the same name will be overwritten.
-        echo -n "[!] DocumentRoot directory $1 is not empty. Backup data? [Y/n]: "
+        echo -n "[!] DocumentRoot directory $docroot is not empty. Backup data? [Y/n]: "
         read opt
 
         if [ "$opt" != "n" ] ; then
-            currdir=$(pwd)
-            cd `dirname $1`
+            cd `dirname $docroot`
             currtime=$(date +"%m-%d-%Y_%H:%M")
-            tar -vcjf $currdir/www-bkp-$currtime.tar.bz2 `basename $1`
+            tar -vcjf $currdir/www-bkp-$currtime.tar.bz2 `basename $docroot`
             cd - >/dev/null
         fi
     fi
@@ -53,7 +56,21 @@ function checkenv() {
             break;
         fi
 
-        cp -Rpv ${files[$a]} $1/
+        if [ ! -z $type ] && [ $type == "devel" ] ; then
+            sufix=$(echo ${files[$a]} |cut -d "." -f3)
+            if [ $sufix == "php" ] ; then
+                cd $docroot/
+                rm -rf $docroot/${files[$a]}
+                ln -s $currdir/${files[$a]} .
+                cd - >/dev/null
+            else
+                rm -rf $docroot/${files[$a]}
+                cp -Rpv ${files[$a]} $docroot/
+            fi
+        else
+            rm -rf $docroot/${files[$a]}
+            cp -Rpv ${files[$a]} $docroot/
+        fi
         a=$(expr $a + 1)
     done
     echo "Done."
@@ -75,10 +92,11 @@ function install
         exit
     fi
 
-    checkenv $docroot
+    type=$1
+    do_install $docroot $type
 }
 
 #do it
-install
+install $1
 
 
