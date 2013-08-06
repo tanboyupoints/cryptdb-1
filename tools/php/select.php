@@ -83,7 +83,7 @@ function display_select($sth,$q){
         {
             $identifier = $row[0];
             
-            $sqldr.="<tr class='".$rc[$swp=!$swp]."' onmouseover='tmv(this)' onmouseout='tmo(this)' onclick='tc(this)'>";
+            $sqldr.="<tr class='".$rc[$swp=!$swp]."' onmouseover='tmv(this)' onmouseout='tmo(this)' onclick='tc(this)' align=\"center\">";
             for($i=0;$i<$fields_num;$i++){
                 $v=$row[$i];
 
@@ -105,7 +105,7 @@ function display_select($sth,$q){
 
             $var = $idpos . '_cryptdb_sensitive';
             $sqldr.= "<select name=\"$var\" id=\"xxx\" onChange=\"\"> 
-                <option name=sensitive_field value=\"sensitive_field\" selected>Sensitive Field</option> 
+                <option name=sensitive_field value=\"sensitive_field\"  selected>Sensitive Field</option> 
                 <option name=best_effort_encryption value=\"best_effort_encryption\">Best Effort Encryption</option> 
                 <option name=unencrypted value=\"unencrypted\">Unencrypted</option>
                 </select><input type=\"submit\" value=\"Submit\" /></td>
