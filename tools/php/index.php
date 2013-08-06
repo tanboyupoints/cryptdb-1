@@ -58,16 +58,21 @@ if (db_connect('nodie')){
 
             //Using hardocded default. If user inputs 'localhost' mysqli ignores port...
             $host = ini_get("mysqli.default_host"); 
+            //$database = ini_get("mysqli.default_database"); 
 
             $user = $CRYPTDB['user'] ?  $CRYPTDB['user'] : ini_get("mysqli.default_user"); 
-            $port = (int)$CRYPTDB['port'] ?  $CRYPTDB['port'] : ini_get("mysqli.default_port"); 
+
+            // Force default
+            $port = ini_get("mysqli.default_port"); 
             $pwd = $CRYPTDB['pwd'];
 
             $query = "show columns from " . $s_db . "."  . $s_table . " where Field = " . "'" . $fieldname[$index] . "';";
 
-            $proxy = proxy_connect($host, $user, $pwd, $port);
+            $proxy = proxy_connect($host, $user, $pwd, $s_db, $port);            
+            do_sql($query, TRUE); //temporary hack
+            //do_cryptdb_sql($proxy, $query);
             // TODO: Execute query and display results
-            // TODO: close is to be placed in session's destructor (logoff link)
+            // TODO: close is to be placed in session's destructor (logoff link?)
             //$proxy->mysqli_close();
 
         } else if (isset($DB['db']))
@@ -126,7 +131,7 @@ pre{font-size:50%}
 .ft{text-align:right;margin-top:10px;font-size:smaller}
 .inv{background-color:#069;color:#FFF}
 .inv a{color:#FFF}
-table.res{width:50%;border-collapse:collapse;}
+table.res{width:100%;border-collapse:collapse;}
 table.wa{width:auto}
 table.res th,table.res td{padding:2px;border:1px solid #fff}
 table.restr{vertical-align:top}
@@ -140,6 +145,11 @@ tr.s{background-color:#FF9}
 .dot{border-bottom:1px dotted #000}
 .ajax{text-decoration: none;border-bottom: 1px dashed;}
 .qnav{width:30px}
+.boxsizingBorder {
+    -webkit-box-sizing: border-box;
+       -moz-box-sizing: border-box;
+            box-sizing: border-box;
+}
 </style>
 
 <script type="text/javascript">
@@ -272,16 +282,26 @@ Databases:
 
 Tables:
 <form action="'<?php echo $self?>'" method="post">
-<select name="cryptdb_describe_table" onChange="location.href='<?php $var = "describe " . $_POST['cryptdb_describe_table']; echo $z.'&q='.urlencode($var)?>'">
+<select name="cryptdb_describe_table">
 <?php 
  $a=0;
  $array = get_db_tables($dbn) ; foreach($array as $key=>$value) 
 { 
      $accesskey = "Tables_in_" . $dbn;
 ?>
+
+<?php
+     if(isset($_POST['cryptdb_describe_table']) && $_POST['cryptdb_describe_table'] == $value[$accesskey])
+     {
+?>
+<option selected value="<?php echo $value[$accesskey]; ?>"><?php echo $value[$accesskey]; ?></option>
+<?php } else { ?>
+
 <option value="<?php echo $value[$accesskey]; ?>"><?php echo $value[$accesskey]; ?></option>
 <?php } ?>
 
+
+<?php } ?>
 </select>
 <input type="submit" value="Describe table">
 </form>
@@ -308,9 +328,10 @@ function print_screen(){
 
     print_header();
 ?>
-
-<!--<textarea readonly id="q" name="q" cols="70" rows="5" style="width:50%"><?php echo $SQLq?></textarea><br>-->
-
+<div class="boxsizingBorder">
+<textarea style="overflow:auto;" readonly id="query_output" name="q" cols="100" rows="10" style="width:50%;overflow:auto;"><?php echo curr_q("",FALSE)?>Results will be displayed here.</textarea><br>
+<input type="button" value="Clear board" onclick="this.form.elements['query_output'].value=''">
+</div>
 Records: <b><?php echo $reccount?></b> in <b><?php echo $time_all?></b> sec<br>
 <b><?php echo $out_message?></b>
 <div class="sqldr">
@@ -329,13 +350,15 @@ function print_cfg(){
 <h3>CryptDB</h3>
 <div class="frm">
 
+<label class="l">MYSQL host/ip:</label><input type="text" name="v[host]" value="<?php echo $DB['host']?>"><br>
 <label class="l">DB user:</label><input type="text" name="v[user]" value="<?php echo $DB['user']?>"><br>
 <label class="l">Password:</label><input type="password" name="v[pwd]" value=""><br>
 <br>
 
-<label class="l">CryptDB user:</label><input type="text" name="c[user]" value="<?php echo $CRYPTDB['user']?>"><br>
+<label class="l">CryptDB host/ip:</label><input type="text" readonly name="c[host]" value="localhost"><br>
+<label class="l">DB user:</label><input type="text" name="c[user]" value="<?php echo $CRYPTDB['user']?>"><br>
 <label class="l">Password:</label><input type="password" name="c[pwd]" value=""><br>
-<label class="l">Port [<?php echo ini_get("mysqli.default_port") ?>]:</label><input type="text" name="c[port]" value="<?php echo $CRYPTDB['port']?>" size="4"><br>
+<!--<label class="l">Port:</label><input type="text" readonly name="c[port]" value="<?php echo $CRYPTDB['port']?>" size="4"><br>-->
 
 <div id="cfg-adv" style="display:none;">
 
@@ -364,16 +387,20 @@ function print_cfg(){
 /*
  * Proxy OO style connection
  */
-function proxy_connect($host, $user, $pwd, $port)
+function proxy_connect($host, $user, $pwd, $dbname, $port)
 {
     static $proxy = FALSE;
+    //global $cryptq;
     
     if($proxy != FALSE)
         return $proxy;
     
     $proxy = mysqli_init();
 
-    if(!$proxy->real_connect($host, $user, $pwd, "", $port))
+    // Note 1:For security reasons MULTI_STATEMENTS flag is not supported on php,
+    // we'll use instead, if necessary, mysqli->multi_query() and mysqli->next_result()
+    // Note 2: What about MYSQLI_CLIENT_SSL?
+    if(!$proxy->real_connect($host, $user, $pwd, $dbname, $port))
         die(mysqli_connect_errno());
 
     return $proxy;

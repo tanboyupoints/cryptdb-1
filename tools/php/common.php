@@ -34,10 +34,12 @@ $SESSIONSDEF=array(
 
  date_default_timezone_set('UTC');#required by PHP 5.1+
 
-//Default host, port and user for proxydb
-// mysqli ignores port if host is 'localhost' - weird
-ini_set("mysqli.default_host", "127.0.0.1");
-ini_set("mysqli.default_port", "3307");
+/*
+ * Proxy defaults 
+ */
+ini_set("mysqli.default_host", "localhost");
+ini_set("mysqli.database_name", "cryptdbtest");
+ini_set("mysqli.default_port", "3306");
 ini_set("mysqli.default_user", "root");
 
 //constants
@@ -104,6 +106,15 @@ ini_set("mysqli.default_user", "root");
  if ($_REQUEST['showcfg']){
      print_cfg();
      exit;
+ }
+
+ function curr_q($q, $action)
+ {
+     static $query = "";
+     if(!$action)
+         return $query;
+
+     return($query = $q);
  }
 
  function session_add($id, $val) {
