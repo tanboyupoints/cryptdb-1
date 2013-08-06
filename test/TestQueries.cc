@@ -837,7 +837,29 @@ static QueryList ManyConnections = QueryList("Multiple connections",
       "DROP TABLE u_conn",
       ""} );
 
-
+static QueryList BestEffort = QueryList("BestEffort",
+    { "CREATE TABLE t (x integer, y integer)",
+      "", "", ""},
+    { "CREATE TABLE t (x integer, y integer)",
+      "", "", ""},
+    { "CREATE TABLE t (x integer, y integer)",
+      "", "", ""},
+    { Query("INSERT INTO t VALUES (1, 100)", false),
+      Query("INSERT INTO t VALUES (22, 413)", false),
+      Query("INSERT INTO t VALUES (1001, 15)", false),
+      Query("INSERT INTO t VALUES (19, 18)", false),
+      Query("SELECT * FROM t", false),
+      Query("SELECT x*x FROM t", false),
+      Query("SELECT x*y FROM t", false),
+      Query("SELECT 2+2 FROM t", false),
+      Query("SELECT x+2+x FROM t", false),
+      Query("SELECT 2+x+2 FROM t", false),
+      Query("SELECT 2+2+x FROM t", false),
+      Query("SELECT x+y+3+4 FROM t", false),
+      Query("SELECT 2*x*2*y FROM t", false) },
+    { "DROP TABLE t"},
+    { "DROP TABLE t"},
+    { "DROP TABLE t"});
 
 
 //-----------------------------------------------------------------------
@@ -1035,7 +1057,7 @@ Connection::executeLastEDB() {
 
 //----------------------------------------------------------------------
 
-static void
+static bool
 CheckAnnotatedQuery(const TestConfig &tc, std::string control_query,
                     std::string test_query)
 {
@@ -1043,7 +1065,7 @@ CheckAnnotatedQuery(const TestConfig &tc, std::string control_query,
 
     ResType control_res;
     ResType test_res;
-
+    
     LOG(test) << "control query: " << control_query;
     if (control_query == "") {
         control_res = ResType(true);
@@ -1066,6 +1088,7 @@ CheckAnnotatedQuery(const TestConfig &tc, std::string control_query,
 
         if (tc.stop_if_fail)
             thrower() << "stop on failure";
+        return false;
     } else if (!match(test_res, control_res)) {
         LOG(warn) << "result mismatch for query: " << test_query;
         LOG(warn) << "control is:";
@@ -1077,12 +1100,14 @@ CheckAnnotatedQuery(const TestConfig &tc, std::string control_query,
             LOG(warn) << "RESULT: " << npass << "/" << ntest;
             thrower() << "stop on failure";
         }
+        return false;
     } else {
         npass++;
+        return true;
     }
 }
 
-static void
+static bool
 CheckQuery(const TestConfig &tc, std::string query) {
     std::cerr << "--------------------------------------------------------------------------------" << "\n";
     //TODO: should be case insensitive
@@ -1098,19 +1123,38 @@ CheckQuery(const TestConfig &tc, std::string query) {
                 LOG(test) << "not a valid case of this test; skipped";
                 break;
         }
+
         npass++;
-        return;
+        return true;
     }
-    CheckAnnotatedQuery(tc, query, query);
+
+    return CheckAnnotatedQuery(tc, query, query);
 }
 
-static void
+struct Score {
+    Score(const std::string &name) : success(0), total(0), name(name) {}
+    void mark(bool t) {t ? pass() : fail();}
+    std::string stringify() {
+        return name + ":\t" + std::to_string(success) + "/" +
+               std::to_string(total);
+    }
+
+private:
+    unsigned int success;
+    unsigned int total;
+    std::string name;
+
+    void pass() {++success, ++total;}
+    void fail() {++total;}
+};
+
+static Score
 CheckQueryList(const TestConfig &tc, const QueryList &queries) {
+    Score score(queries.name);
     for (unsigned int i = 0; i < queries.create.size(); i++) {
         std::string control_query = queries.create.choose(control_type)[i];
-        std::string test_query = queries.create.choose(test_type)[i];
-
-        CheckAnnotatedQuery(tc, control_query, test_query);
+        std::string test_query = queries.create.choose(test_type)[i]; 
+        score.mark(CheckAnnotatedQuery(tc, control_query, test_query));
     }
 
     for (auto q = queries.common.begin(); q != queries.common.end(); q++) {
@@ -1120,7 +1164,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
         case PROXYPLAIN:
            // break;
         case PROXYSINGLE:
-            CheckQuery(tc, q->query);
+            score.mark(CheckQuery(tc, q->query));
             break;
 
         default:
@@ -1131,52 +1175,59 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
     for (unsigned int i = 0; i < queries.drop.size(); i++) {
         std::string control_query = queries.drop.choose(control_type)[i];
         std::string test_query = queries.drop.choose(test_type)[i];
-        CheckAnnotatedQuery(tc, control_query, test_query);
+        score.mark(CheckAnnotatedQuery(tc, control_query, test_query));
     }
+
+    return score;
 }
 
 static void
 RunTest(const TestConfig &tc) {
-#if 1
-    /*
-     * (ccarvalho)
-     * Total, executing in a row: 
-     * 
-     * RESULT: 168/284
-     */
-    
-    // Pass 10/34
-    CheckQueryList(tc, Select);
+    // ###############################
+    //      TOTAL RESULT: 269/284
+    // ###############################
 
-    // PAss 14/24
-    CheckQueryList(tc, HOM);
+    std::vector<Score> scores;
 
-    // Pass 12/19
-    CheckQueryList(tc, Insert);
+    // Pass 33/34
+    scores.push_back(CheckQueryList(tc, Select));
 
-    // Pass 13/23
-    CheckQueryList(tc, Join);
+    // PAss 24/24
+    scores.push_back(CheckQueryList(tc, HOM));
 
-    // 13/21
-    CheckQueryList(tc, Basic); 
-#endif
-    // Pass 18/31
-    CheckQueryList(tc, Update);
+    // Pass 19/19
+    scores.push_back(CheckQueryList(tc, Insert));
 
-    // Pass 20/28
-    CheckQueryList(tc, Delete);
+    // Pass 23/23
+    scores.push_back(CheckQueryList(tc, Join));
 
-    // 6/16
-    CheckQueryList(tc, Search);
+    // Pass 21/21
+    scores.push_back(CheckQueryList(tc, Basic));
 
-    // Pass 18/22
-    CheckQueryList(tc, PrivMessages);
+    // Pass 30/31
+    scores.push_back(CheckQueryList(tc, Update));
 
-    // Pass 31/47
-    CheckQueryList(tc, UserGroupForum);
+    // Pass 28/28
+    scores.push_back(CheckQueryList(tc, Delete));
 
-    // Pass 13/19
-    CheckQueryList(tc, Null);
+    // Pass 8/16
+    scores.push_back(CheckQueryList(tc, Search));
+
+    // Pass 20/22
+    scores.push_back(CheckQueryList(tc, PrivMessages));
+
+    // Pass 44/47
+    scores.push_back(CheckQueryList(tc, UserGroupForum));
+
+    // Pass 19/19
+    scores.push_back(CheckQueryList(tc, Null));
+
+    // Pass 18/18 (with one throwing an exception)
+    scores.push_back(CheckQueryList(tc, BestEffort));
+
+    for (auto it : scores) {
+        std::cout << it.stringify() << std::endl;
+    }
 
     /*
     // Auto increment doesn't run

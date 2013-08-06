@@ -219,11 +219,11 @@ FieldMeta *FieldMeta::deserialize(unsigned int id,
 
 FieldMeta::FieldMeta(std::string name, Create_field *field,
                      const AES_KEY * const m_key,
-                     unsigned long uniq_count)
+                     unsigned long uniq_count, bool best_effort)
     : fname(name), has_salt(static_cast<bool>(m_key)),
       salt_name(BASE_SALT_NAME + getpRandomName()), 
-      onion_layout(getOnionLayout(m_key, field)), uniq_count(uniq_count),
-      counter(0)
+      onion_layout(getOnionLayout(m_key, field, best_effort)),
+      uniq_count(uniq_count), counter(0)
 {
     init_onions_layout(m_key, this, field);
 }
@@ -296,15 +296,6 @@ bool FieldMeta::setOnionLevel(onion o, SECLEVEL maxl) {
     return false;
 }
 
-// FIXME: This is a HACK.
-bool FieldMeta::isEncrypted() {
-    OnionMetaKey *key = new OnionMetaKey(oPLAIN);
-    const bool status =  ((children.size() != 1) ||
-                          (children.find(key) == children.end()));
-    delete key;
-    return status;
-}
-
 OnionMeta *FieldMeta::getOnionMeta(onion o) const
 {
     const OnionMetaKey * const key = new OnionMetaKey(o);
@@ -314,14 +305,22 @@ OnionMeta *FieldMeta::getOnionMeta(onion o) const
 }
 
 onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
-                                      Create_field *f)
+                                      Create_field *f, bool best_effort)
 {
     if (NULL == m_key) {
         return PLAIN_ONION_LAYOUT;
-    } else if (true == IsMySQLTypeNumeric(f->sql_type)) {
-        return NUM_ONION_LAYOUT;
+    } else if (true == best_effort) {
+        if (true == IsMySQLTypeNumeric(f->sql_type)) {
+            return BEST_EFFORT_NUM_ONION_LAYOUT;
+        } else {
+            return BEST_EFFORT_STR_ONION_LAYOUT;
+        }
     } else {
-        return STR_ONION_LAYOUT;
+        if (true == IsMySQLTypeNumeric(f->sql_type)) {
+            return NUM_ONION_LAYOUT;
+        } else {
+            return STR_ONION_LAYOUT;
+        }
     }
 }
 

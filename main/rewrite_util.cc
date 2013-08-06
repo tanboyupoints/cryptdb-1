@@ -205,15 +205,6 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
 
     std::vector<Create_field *> output_cfields;
 
-    // FIXME: This sequence checking for encryption is broken.
-    if (!fm->isEncrypted()) {
-        // Unencrypted field
-        output_cfields.push_back(f);
-        return output_cfields;
-    }
-
-    // Encrypted field
-
     //check if field is not encrypted
     if (fm->children.empty()) {
         output_cfields.push_back(f);
@@ -313,7 +304,8 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     // -----------------------------
     const std::string name = std::string(cf->field_name);
     FieldMeta * const fm =
-        new FieldMeta(name, cf, ps.masterKey, tm->leaseIncUniq());
+        new FieldMeta(name, cf, ps.masterKey, tm->leaseIncUniq(),
+                      ps.bestEffort());
     // Here we store the key name for the first time. It will be applied
     // after the Delta is read out of the database.
     if (true == new_table) {
@@ -339,12 +331,6 @@ Item *
 encrypt_item_layers(Item * i, onion o, OnionMeta * const om,
                     Analysis &a, uint64_t IV) {
     assert(!i->is_null());
-
-    if (o == oPLAIN) {//Unencrypted item
-        return i;
-    }
-
-    // Encrypted item
 
     const auto enc_layers = a.getEncLayers(om);
     assert_s(enc_layers.size() > 0, "field must have at least one layer");

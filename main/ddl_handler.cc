@@ -113,7 +113,6 @@ class DropHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
                                   const ProxyState &ps) const
     {
-
         LEX *final_lex = rewrite(a, lex, ps);
         update(a, lex, ps);
 

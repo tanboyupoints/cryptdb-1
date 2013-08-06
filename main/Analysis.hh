@@ -30,6 +30,20 @@ public:
 
     bool singleton() const { return osl.size() == 1; }
 
+    bool single_crypted_and_or_plainvals() const {
+        unsigned int crypted = 0;
+        unsigned int plain = 0;
+        for (auto it : osl) {
+            if (SECLEVEL::PLAINVAL == it.second.first) {
+                ++plain;
+            } else {
+                ++crypted;
+            }
+        }
+
+        return 1 >= crypted || plain > 0;
+    }
+
     OLK extract_singleton() const {
         assert_s(singleton(), std::string("encset has size ") +
                               StringFromVal(osl.size()));
@@ -48,6 +62,7 @@ operator<<(std::ostream &out, const EncSet & es);
 
 const EncSet EQ_EncSet = {
     {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET,   LevelFieldPair(SECLEVEL::DET, NULL)},
         {oOPE,   LevelFieldPair(SECLEVEL::OPE, NULL)},
@@ -56,6 +71,7 @@ const EncSet EQ_EncSet = {
 
 const EncSet JOIN_EncSet = {
     {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET,   LevelFieldPair(SECLEVEL::DETJOIN, NULL)},
     }
@@ -63,6 +79,7 @@ const EncSet JOIN_EncSet = {
 
 const EncSet ORD_EncSet = {
     {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
     }
@@ -74,9 +91,16 @@ const EncSet PLAIN_EncSet = {
     }
 };
 
+const EncSet BESTEFFORT_EncSet = {
+    {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)}
+    }
+};
+
 //todo: there should be a map of FULL_EncSets depending on item type
 const EncSet FULL_EncSet = {
     {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
@@ -87,6 +111,7 @@ const EncSet FULL_EncSet = {
 
 const EncSet FULL_EncSet_Str = {
     {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
@@ -96,6 +121,7 @@ const EncSet FULL_EncSet_Str = {
 
 const EncSet FULL_EncSet_Int = {
     {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
@@ -105,6 +131,7 @@ const EncSet FULL_EncSet_Int = {
 
 const EncSet Search_EncSet = {
     {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
     }
@@ -112,6 +139,7 @@ const EncSet Search_EncSet = {
 
 const EncSet ADD_EncSet = {
     {
+        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
     }
@@ -210,7 +238,6 @@ public:
 
 };
 
-
 //rewrite plan in which we only need to remember one olk
 // to know how to rewrite
 class RewritePlanOneOLK: public RewritePlan {
@@ -247,9 +274,10 @@ operator<<(std::ostream &out, const RewritePlan * rp);
 typedef struct ProxyState {
     ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                const std::string &dbname, bool encByDefault,
-               const std::string &master_key);
+               const std::string &master_key, bool best_effort=true);
     ~ProxyState();
     std::string dbName() const {return dbname;}
+    bool bestEffort() const {return best_effort;}
 
     // connection to remote and embedded server
     Connect *conn;
@@ -261,6 +289,7 @@ typedef struct ProxyState {
 private:
     // FIXME: Remove once cryptdb supports multiple databases.
     const std::string dbname;
+    const bool best_effort;
 } ProxyState;
 
 

@@ -30,8 +30,16 @@ encrypt_item(Item * i, const OLK & olk, Analysis & a)
 {
     assert(!i->is_null());
 
-    if (olk.l == SECLEVEL::PLAINVAL)
+/*
+    // Necessary because gathering PLAINVAL is not going to have
+    // a FieldMeta associated with it when we are doing an operation
+    // on a constant without a field.
+    // > SELECT 2 FROM t
+    // > SELECT 8*9 FROM t
+*/
+    if (SECLEVEL::PLAINVAL == olk.l) {
         return i;
+    }
 
     FieldMeta * const fm = olk.key;
     assert(fm);
@@ -65,13 +73,6 @@ static void
 typical_rewrite_insert_type(ItemType *i, Analysis &a,
                             std::vector<Item *> &l, FieldMeta *fm)
 {
-    if (!fm->isEncrypted()) {
-        l.push_back(make_item(i));
-        return;
-    }
-
-    // Encrypted
-
     uint64_t salt = 0;
 
     if (fm->has_salt) {
@@ -92,7 +93,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     virtual RewritePlan * do_gather_type(Item_string *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << " String item do_gather " << *i;
         /* constant strings are always ok */
-        tr = reason(FULL_EncSet, "is a constant", i);
+        tr = reason(FULL_EncSet_Str, "is a constant", i);
         return new RewritePlan(FULL_EncSet_Str, tr);
     }
 
@@ -123,7 +124,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     {
         LOG(cdb_v) << "CItemSubtypeIT (L966) num do_gather " << *i;
         /* constant ints are always ok */
-        tr = reason(FULL_EncSet, "is a constant", i);
+        tr = reason(FULL_EncSet_Int, "is a constant", i);
         return new RewritePlan(FULL_EncSet_Int, tr);
     }
 

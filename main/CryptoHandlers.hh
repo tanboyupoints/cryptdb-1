@@ -152,4 +152,35 @@ public:
     // static std::string serializeLayer(EncLayer * el, DBMeta *parent);
 };
 
+class PlainText : public EncLayer {
+public:
+    PlainText() {;}
+    virtual ~PlainText() {;}
+
+    SECLEVEL level() const {return SECLEVEL::PLAINVAL;}
+    std::string name() const {return "PLAINTEXT";}
+
+    Create_field *newCreateField(Create_field *cf,
+                                 std::string anonname = "")
+    {
+        THD *thd = current_thd;
+        Create_field *f0 = cf->clone(thd->mem_root);
+        if (anonname.size() > 0) {
+            f0->field_name = make_thd_string(anonname);
+        }
+
+        return f0;
+    }
+
+    Item *encrypt(Item *ptext, uint64_t = 0) {return ptext;}
+    Item *decrypt(Item *ctext, uint64_t = 0) {return ctext;}
+
+    Item *decryptUDF(Item *col, Item *ivcol = NULL) {
+        return col;
+    }
+
+    std::string doSerialize() const {
+        return std::string("");
+    }
+};
 

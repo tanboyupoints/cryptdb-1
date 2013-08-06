@@ -85,7 +85,7 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
 
     if (solution.empty()) {
         std::cerr << "crypto schemes does not support this query BECAUSE "
-                  << i << "NEEDS " << my_es << "\n"
+                  << i << " NEEDS " << my_es << "\n"
                   << " BECAUSE " << why << "\n" \
                   << " AND children have:  " << r1 << r2 << "\n";
         assert(false);
@@ -93,7 +93,8 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
 
     const EncSet *out_es;
     if (encset_from_intersection) {
-        assert_s(solution.singleton(), "cannot use basic_gather with more outgoing encsets");
+        assert_s(solution.single_crypted_and_or_plainvals(),
+                 "cannot use typical_gather with more outgoing encsets");
         out_es = &solution;
     } else {
         out_es = &PLAIN_EncSet;
@@ -103,7 +104,7 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
     my_r.add_child(r1);
     my_r.add_child(r2);
 
-    return new RewritePlanOneOLK(out_es->extract_singleton(),
+    return new RewritePlanOneOLK(out_es->chooseOne(),
                                  solution.chooseOne(), childr_rp, my_r);
 }
 
@@ -119,13 +120,6 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
                                         std::vector<Item *> &l,
                                         FieldMeta *fm) const
     {
-    
-        //TODO: check this.
-        //if (!fm->isEncrypted()) {
-        //    l.push_back(make_item(i));
-        //    return;
-        //}
-
         uint64_t salt = randomValue();
     
         if (fm->has_salt) {
@@ -247,7 +241,7 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
 
         // Must be an OLK for each argument.
         return new RewritePlanOneOLK(out_es.extract_singleton(),
-                                     child_es.chooseOne(),
+                                     child_es.extract_singleton(),
                                      childr_rp, tr);
     }
 
@@ -342,17 +336,19 @@ static class ANON : public CItemSubtypeFT<Item_func_get_system_var, Item_func::F
     }
 } ANON;
 
-template<const char *NAME>
-class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
-    virtual RewritePlan * do_gather_type(Item_func_additive_op *i, reason &tr, Analysis & a) const {
+template<class IT, const char *NAME>
+class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
+    virtual RewritePlan * do_gather_type(IT *i, reason &tr,
+                                         Analysis & a) const
+    {
         return typical_gather(a, i, ADD_EncSet, "additive", tr, true);
     }
-    virtual Item * do_optimize_type(Item_func_additive_op *i, Analysis & a) const
+    virtual Item * do_optimize_type(IT *i, Analysis & a) const
     {
         return do_optimize_type_self_and_args(i, a);
     }
 
-    virtual Item * do_rewrite_type(Item_func_additive_op *i,
+    virtual Item * do_rewrite_type(IT *i,
                                    const OLK & constr,
                                    const RewritePlan * _rp,
                                    Analysis & a) const
@@ -372,26 +368,32 @@ class CItemAdditive : public CItemSubtypeFN<Item_func_additive_op, NAME> {
         Item * arg1 =
             itemTypes.do_rewrite(args[1], rp->olk, rp->childr_rp[1], a);
 
-        OnionMeta *om = constr.key->getOnionMeta(oAGG);
-        assert(om);
-        EncLayer *el = a.getBackEncLayer(om);
-        assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
-        return ((HOM*)el)->sumUDF(arg0, arg1);
+        if (oAGG == constr.o) {
+            OnionMeta *om = constr.key->getOnionMeta(oAGG);
+            assert(om);
+            EncLayer *el = a.getBackEncLayer(om);
+            assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
+            return ((HOM*)el)->sumUDF(arg0, arg1);
+        } else {
+            IT *out_i = new IT(arg0, arg1);
+            return out_i;
+        }
     }
 };
 
 extern const char str_plus[] = "+";
-static CItemAdditive<str_plus> ANON;
+static CItemAdditive<Item_func_plus, str_plus> ANON;
 
 extern const char str_minus[] = "-";
-static CItemAdditive<str_minus> ANON;
+static CItemAdditive<Item_func_minus, str_minus> ANON;
 
 template<class IT, const char *NAME>
 class CItemMath : public CItemSubtypeFN<IT, NAME> {
     virtual RewritePlan * do_gather_type(IT *i,
                                          reason &tr, Analysis & a) const
     {
-        return typical_gather(a, i, PLAIN_EncSet, "math op", tr, true);
+        return typical_gather(a, i, BESTEFFORT_EncSet, "math op", tr,
+                              true);
     }
 
     virtual Item * do_optimize_type(IT *i, Analysis & a) const

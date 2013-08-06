@@ -362,8 +362,9 @@ static void
 buildTypeTextTranslator()
 {
     // Onions.
-    const char *onion_chars[] = {"oPLAIN", "oDET", "oOPE", "oAGG", "oSWP"};
-    onion onions[] = {oPLAIN, oDET, oOPE, oAGG, oSWP};
+    const char *onion_chars[] =
+        {"oBESTEFFORT", "oPLAIN", "oDET", "oOPE", "oAGG", "oSWP"};
+    onion onions[] = {oBESTEFFORT, oPLAIN, oDET, oOPE, oAGG, oSWP};
     assert(arraysize(onion_chars) == arraysize(onions));
     int count = arraysize(onion_chars);
     translatorHelper((const char **)onion_chars, (onion *)onions, count);
@@ -415,13 +416,15 @@ buildTypeTextTranslator()
     // Onion Layouts.
     const char *onion_layout_chars[] =
     {
-        "PLAIN_ONION_LAYOUT", "NUM_ONION_LAYOUT", "MP_NUM_ONION_LAYOUT",
-        "STR_ONION_LAYOUT"
+        "PLAIN_ONION_LAYOUT", "NUM_ONION_LAYOUT",
+        "BEST_EFFORT_NUM_ONION_LAYOUT", "STR_ONION_LAYOUT",
+        "BEST_EFFORT_STR_ONION_LAYOUT"
     };
     onionlayout onion_layouts[] =
     {
-        PLAIN_ONION_LAYOUT, NUM_ONION_LAYOUT, MP_NUM_ONION_LAYOUT,
-        STR_ONION_LAYOUT
+        PLAIN_ONION_LAYOUT, NUM_ONION_LAYOUT,
+        BEST_EFFORT_NUM_ONION_LAYOUT,
+        STR_ONION_LAYOUT, BEST_EFFORT_STR_ONION_LAYOUT
     };
     assert(arraysize(onion_layout_chars) == arraysize(onion_layouts));
     count = arraysize(onion_layout_chars);
@@ -467,7 +470,9 @@ removeOnionLayer(Analysis &a, const ProxyState &ps, FieldMeta * fm,
           << "    SET " << fieldanon  << " = ";
 
     Item_field *field = stringToItemField(fieldanon, tableanon, itf);
-    Item_field *salt = stringToItemField(fm->getSaltName(), tableanon, itf);
+    Item_field *salt =
+        stringToItemField(fm->getSaltName(), tableanon, itf);
+    std::cout << TypeText<onion>::toText(o) << std::endl;
     Item * decUDF = a.getBackEncLayer(om)->decryptUDF(field, salt);
 
     query << *decUDF << ";";
@@ -617,12 +622,6 @@ decrypt_item_layers(Item * i, FieldMeta *fm, onion o, uint64_t IV,
                     const std::vector<Item *> &res)
 {
     assert(!i->is_null());
-
-    if (o == oPLAIN) {// Unencrypted item
-        return i;
-    }
-
-    // Encrypted item
 
     Item * dec = i;
     Item * prev_dec = NULL;
@@ -919,8 +918,7 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
         FieldMeta * fm = rf.getOLK().key;
         if (!rf.getIsSalt()) {
             for (unsigned int r = 0; r < rows; r++) {
-                if (!fm || !fm->isEncrypted() ||
-                    dbres.rows[r][c]->is_null()) {
+                if (!fm || dbres.rows[r][c]->is_null()) {
                     res->rows[r][col_index] = dbres.rows[r][c];
                 } else {
                     uint64_t salt = 0;

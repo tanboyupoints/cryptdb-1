@@ -93,6 +93,7 @@ public:
     EncLayer *deserializeChild(unsigned int id,
                                const std::string &serial_child) const;
     UIntMetaKey *deserializeKey(const std::string &serial_key) const;
+    EncLayer *getLayerBack() const;
     unsigned long getUniq() const {return uniq_count;}
 
     // Need access to layers.
@@ -110,7 +111,6 @@ private:
 
     SECLEVEL getSecLevel();
     void addLayerBack(EncLayer *layer);
-    EncLayer *getLayerBack() const;
     void removeLayerBack();
     void replaceLayerBack(EncLayer *layer);
 } OnionMeta;
@@ -128,7 +128,8 @@ public:
 
     // New.
     FieldMeta(std::string name, Create_field *field,
-              const AES_KEY * const mKey, unsigned long uniq_count);
+              const AES_KEY * const mKey, unsigned long uniq_count,
+              bool best_effort);
     // Restore (WARN: Creates an incomplete type as it will not have it's
     // OnionMetas until they are added by the caller).
     static FieldMeta *deserialize(unsigned int id,
@@ -148,7 +149,6 @@ public:
     std::string getSaltName() const;
     unsigned long getUniq() const {return uniq_count;}
 
-    bool isEncrypted();
     OnionMeta *getOnionMeta(onion o) const;
     // FIXME: Use rtti.
     std::string typeName() const {return type_name;}
@@ -166,7 +166,7 @@ private:
     SECLEVEL getOnionLevel(onion o) const;
     bool setOnionLevel(onion o, SECLEVEL maxl);
     static onionlayout getOnionLayout(const AES_KEY * const m_key,
-                                      Create_field *f);
+                                      Create_field *f, bool best_effort);
 } FieldMeta;
 
 typedef class TableMeta : public MappedDBMeta<FieldMeta, IdentityMetaKey> {

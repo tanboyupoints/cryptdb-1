@@ -46,23 +46,37 @@ EncSet::intersect(const EncSet & es2) const
             it2 != es2.osl.end(); ++it2) {
         auto it = osl.find(it2->first);
 
-        FieldMeta *fm = it->second.second;
-        FieldMeta *fm2 = it2->second.second;
-
         if (it != osl.end()) {
-            SECLEVEL sl = (SECLEVEL)min((int)it->second.first,
-                    (int)it2->second.first);
+            FieldMeta *fm = it->second.second;
+            FieldMeta *fm2 = it2->second.second;
+
             onion o = it->first;
+            onion o2 = it2->first;
+            
+            // AWARE: While there isn't a reason why we can't share
+            // keys across onions, as of now it seems like unintentional
+            // behavior.
+            if (o != o2) {
+                continue;
+            }
+
+            SECLEVEL sl = (SECLEVEL)min((int)it->second.first, 
+                                        (int)it2->second.first);
 
             if (fm == NULL) {
                 m[o] = LevelFieldPair(sl, fm2);
             } else if (fm2 == NULL) {
                 m[it->first] = LevelFieldPair(sl, fm);
-            } else if (fm != NULL && fm2 != NULL) {
-                // TODO(burrows): Guarentee that the keys are the same.
-                if (sl == SECLEVEL::DETJOIN) {
-                    m[o] = LevelFieldPair(sl, fm);
-                } else if (sl == SECLEVEL::HOM) {
+            } else {
+                // This can hypothetically succeed in two cases.
+                // 1> Same field, so same key.
+                // 2> Different fields, but SECLEVEL is PLAINVAL,
+                //    HOM or DETJOIN so same key.
+                OnionMeta *om = fm->getOnionMeta(o);
+                OnionMeta *om2 = fm->getOnionMeta(o);
+                // HACK: To determine if the keys are the same.
+                if (om->getLayerBack()->doSerialize() ==
+                    om2->getLayerBack()->doSerialize()) {
                     m[o] = LevelFieldPair(sl, fm);
                 }
             }
@@ -104,10 +118,12 @@ EncSet::chooseOne() const
         oOPE,
         oAGG,
         oSWP,
-        oPLAIN,
+        oBESTEFFORT,
+        oPLAIN
     };
 
-    static size_t onion_size = sizeof(onion_order) / sizeof(onion_order[0]);
+    static size_t onion_size =
+        sizeof(onion_order) / sizeof(onion_order[0]);
     for (size_t i = 0; i < onion_size; i++) {
         onion o = onion_order[i];
         auto it = osl.find(o);
@@ -238,9 +254,10 @@ loadUDFs(Connect * conn) {
 
 ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                        const std::string &dbname, bool encByDefault,
-                       const std::string &master_key)
+                       const std::string &master_key,
+                       bool best_effort)
     : encByDefault(encByDefault), masterKey(getKey(master_key)),
-      dbname(dbname)
+      dbname(dbname), best_effort(best_effort)
 {
     init_mysql(embed_dir);
 
