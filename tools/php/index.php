@@ -69,7 +69,7 @@ if (db_connect('nodie')){
 
             $proxy = proxy_connect($host, $user, $pwd, $s_db, $port);
             // TODO: Execute query and display results
-            // TODO: close is to be placed in session's destructor (logoff link)
+            // TODO: close is to be placed in session's destructor (logoff link?)
             //$proxy->mysqli_close();
 
         } else if (isset($DB['db']))
@@ -399,10 +399,11 @@ function proxy_connect($host, $user, $pwd, $dbname, $port)
     
     $proxy = mysqli_init();
 
+    // Note 1:For security reasons MULTI_STATEMENTS flag is not supported on php,
+    // we'll use instead, if necessary, mysqli->multi_query() and mysqli->next_result()
+    // Note 2: What about MYSQLI_CLIENT_SSL?
     if(!$proxy->real_connect($host, $user, $pwd, $dbname, $port))
         die(mysqli_connect_errno());
-
-
 
     return $proxy;
 }

@@ -95,7 +95,7 @@ function display_select($sth,$q){
 
             }
             //$x = "";
-            $sqldr.= "<td><form  action=\"$self\" value=$dbn  method=\"post\">";
+            $sqldr.= "<td><form  action=\"$self\" value=$dbn$idpos  method=\"post\">";
 
             session_add('s_PROXY', "CryptDBProxy");
             session_add('s_DB', $DB['db']);
@@ -104,12 +104,11 @@ function display_select($sth,$q){
             session_append('s_ID', $identifier . "&");
 
             $var = $idpos . '_cryptdb_sensitive';
-            $sqldr.= "<select name=\"$var\" id=\"xxx\" onChange=\"\"> 
+            $sqldr.= "<select name=\"$var\" id=\"$var\" onChange=\"\"> 
                 <option name=sensitive_field value=\"sensitive_field\"  selected>Sensitive Field</option> 
                 <option name=best_effort_encryption value=\"best_effort_encryption\">Best Effort Encryption</option> 
                 <option name=unencrypted value=\"unencrypted\">Unencrypted</option>
-                </select><input type=\"submit\" value=\"Submit\" /></td>
-                ";
+                </select><input type=\"submit\" value=\"Submit\" /></td>";
             $sqldr.= "</form></td>";
             $idpos++;
         }
