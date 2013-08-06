@@ -15,7 +15,7 @@ class EncSet {
 public:
     EncSet(OnionLevelFieldMap input) : osl(input) {}
     EncSet(Analysis &a, FieldMeta * fm);
-    EncSet(const OLK & olk);
+    explicit EncSet(const OLK & olk);
 
     /**
      * decides which encryption scheme to use out of multiple in a set

@@ -87,10 +87,10 @@ class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
 
         OLK out_olk = PLAIN_EncSet.chooseOne();
 
-        tr = reason(out_olk, why, i);
+        tr = reason(EncSet(out_olk), why, i);
         tr.add_child(r);
 
-        return new RewritePlanOneOLK(out_olk, solution.chooseOne(),
+        return new RewritePlanOneOLK(EncSet(out_olk), solution.chooseOne(),
                                      childr_rp, tr);
     }
 

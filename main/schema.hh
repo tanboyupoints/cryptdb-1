@@ -54,8 +54,6 @@ public:
     }
 };
 
-const OLK PLAIN_OLK = OLK(oPLAIN, SECLEVEL::PLAINVAL, NULL);
-
 /*
  * The name must be unique as it is used as a unique identifier when
  * generating the encryption layers.

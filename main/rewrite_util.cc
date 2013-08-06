@@ -128,7 +128,7 @@ rewrite_table_list(List<TABLE_LIST> tll, Analysis & a)
         }
 
         if (t->on_expr) {
-            new_t->on_expr = rewrite(t->on_expr, PLAIN_OLK, a);
+            new_t->on_expr = rewrite(t->on_expr, PLAIN_EncSet, a);
         }
 
 	/* TODO: derived tables
