@@ -5,57 +5,6 @@
 #include <main/enum_text.hh>
 #include <main/serializers.hh>
 
-/*
- * Table Layout
- * > Join table format <objectTableName>_<parentObjectTableName>
- * > Other Data
- *   > EncLayerz.
- *   > Index mappings.
- * 
- *                 Delta
- * id | action | serial_object | parent_id
- * ---------------------------------------
- *    |        |               |
- * ---------------------------------------
-
- *   TableMeta
- * id | serial |
- * -------------
- *    |        |
- * -------------
- *
- *   FieldMeta
- * id | serial | 
- * -------------
- *    |        |
- * -------------
- *
- *   OnionMeta
- * id | serial |
- * -------------
- *    |        |
- * -------------
- *  
- *      TableMeta_SchemaInfo
- * id | object_id | parent_id | key
- * --------------------------------
- *    |           |   NULL    |
- * --------------------------------
- *
- *       FieldMeta_TableMeta
- * id | object_id | parent_id | key
- * --------------------------------
- *    |           |           |
- * --------------------------------
- *
- *       OnionMeta_FieldMeta
- * id | object_id | parent_id | key
- * --------------------------------
- *    |           |           |
- * --------------------------------
- *
- */
-
 // FIXME: Maybe should inherit from DBObject.
 class AbstractMetaKey {
 public:
@@ -158,14 +107,12 @@ class DBObject {
     const unsigned int id;
 
 public:
-    // Building new objects.
+    // 0 indicates that the object does not have a database id.
+    // This is the state of the object before it is written to
+    // the database for the first time.
     DBObject() : id(0) {}
     // Unserializing old objects.
     explicit DBObject(unsigned int id) : id(id) {}
-    // 0 indicates that the object does not have a database id.
-    // This is the state of the object before it is written to the database
-    // for the first time.
-    // DBObject() : id(0) {}
     virtual ~DBObject() {;}
     unsigned int getDatabaseID() const {return id;}
     // FIXME: This should possibly be a part of DBMeta.
