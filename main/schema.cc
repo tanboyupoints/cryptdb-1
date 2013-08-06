@@ -104,7 +104,6 @@ std::string OnionMeta::getAnonOnionName() const
     return onionname;
 }
 
-// TODO: TESTME.
 std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
 {
     std::function<DBMeta *(std::string, std::string, std::string)> deserialize =

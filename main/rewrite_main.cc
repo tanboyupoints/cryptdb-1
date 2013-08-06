@@ -151,7 +151,7 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
         "    AND local = TRUE;";
     assert(e_conn->execute(get_local_query_query, dbres));
 
-    // FIXME: Onion adjustment queries do not have local.
+    // Onion adjustment queries do not have local.
     ScopedMySQLRes local_r(dbres->n);
     const unsigned long long local_row_count =
         mysql_num_rows(local_r.res());
