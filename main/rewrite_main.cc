@@ -867,6 +867,32 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
     }
 }
 
+// FIXME: Implement.
+RewriteOutput * 
+Rewriter::handleDirective(Analysis &a, const ProxyState &ps,
+                          const std::string &query)
+{
+    return NULL;
+}
+
+static
+bool
+cryptdbDirective(const std::string query)
+{
+    std::size_t found = query.find("DIRECTIVE");
+    if (std::string::npos == found) {
+        return false;
+    }
+    
+    for (std::size_t i = 0; i < found; ++i) {
+        if (!std::isspace(query[i])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 // TODO: we don't need to pass analysis, enough to pass returnmeta
 QueryRewrite
 Rewriter::rewrite(const ProxyState &ps, const std::string & q)
@@ -881,9 +907,15 @@ Rewriter::rewrite(const ProxyState &ps, const std::string & q)
     const SchemaInfo * const schema = loadSchemaInfo(ps.conn, ps.e_conn);
     Analysis analysis = Analysis(schema);
 
-    // FIXME: Memleak return of 'dispatchOnLex()'
-    return QueryRewrite(true, analysis.rmeta,
-                        this->dispatchOnLex(analysis, ps, q));
+    if (cryptdbDirective(q)) {
+        RewriteOutput *output = this->handleDirective(analysis, ps, q);
+        return QueryRewrite(true, *analysis.rmeta, output);
+                            
+    } else {
+        // FIXME: Memleak return of 'dispatchOnLex()'
+        RewriteOutput *output = this->dispatchOnLex(analysis, ps, q);
+        return QueryRewrite(true, *analysis.rmeta, output);
+    }
 }
 
 //TODO: replace stringify with <<
@@ -906,7 +938,7 @@ std::string ReturnMeta::stringify() {
 }
 
 ResType *
-Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
+Rewriter::decryptResults(ResType &dbres, const ReturnMeta &rmeta)
 {
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
@@ -918,7 +950,7 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
     unsigned int index = 0;
     for (auto it = dbres.names.begin();
         it != dbres.names.end(); it++) {
-        const ReturnField &rf = rmeta->rfmeta.at(index);
+        const ReturnField &rf = rmeta.rfmeta.at(index);
         if (!rf.getIsSalt()) {
             //need to return this field
             res->names.push_back(rf.fieldCalled());
@@ -939,7 +971,7 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
     // decrypt rows
     unsigned int col_index = 0;
     for (unsigned int c = 0; c < cols; c++) {
-        const ReturnField &rf = rmeta->rfmeta.at(c);
+        const ReturnField &rf = rmeta.rfmeta.at(c);
         FieldMeta * fm = rf.getOLK().key;
         if (!rf.getIsSalt()) {
             for (unsigned int r = 0; r < rows; r++) {

@@ -373,7 +373,7 @@ decrypt(lua_State *L)
     } else {
         try {
             Rewriter r;
-            ResType *rt = r.decryptResults(res, clients[client]->rmeta);
+            ResType *rt = r.decryptResults(res, *clients[client]->rmeta);
             rd = *rt;
         }
         catch(CryptDBError e) {
