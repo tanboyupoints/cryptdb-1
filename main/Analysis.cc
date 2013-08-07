@@ -438,12 +438,14 @@ bool DeleteDelta::apply(Connect *e_conn, TableType table_type)
 RewriteOutput::~RewriteOutput()
 {;}
 
+/*
 static void
 prettyPrintQuery(const std::string &query)
 {
     std::cout << std::endl << RED_BEGIN
               << "QUERY: " << COLOR_END << query << std::endl;
 }
+*/
 
 bool RewriteOutput::queryAgain()
 {
@@ -459,18 +461,78 @@ ResType *RewriteOutput::sendQuery(Connect *c, const std::string &q)
     return res;
 }
 
-ResType *SimpleOutput::doQuery(Connect *conn, Connect *e_conn)
+bool SimpleOutput::beforeQuery(Connect *conn, Connect *e_conn,
+                               std::string *before_query_data)
 {
-    prettyPrintQuery(original_query);
-    return sendQuery(conn, original_query);
+    return true;
 }
 
-ResType *DMLOutput::doQuery(Connect *conn, Connect *e_conn)
+bool SimpleOutput::getQuery(const std::string before_query_data,
+                            std::string *query)
 {
-    prettyPrintQuery(new_query);
-    return sendQuery(conn, new_query);
+    *query = original_query;
+    return true;
 }
 
+bool SimpleOutput::handleQueryFailure()
+{
+    return true;
+}
+
+bool SimpleOutput::afterQuery(Connect *e_conn)
+{
+    return true;
+}
+
+bool DMLOutput::beforeQuery(Connect *conn, Connect *e_conn,
+                            std::string *before_query_data)
+{
+    return true;
+}
+
+bool DMLOutput::getQuery(const std::string before_query_data,
+                         std::string *query)
+{
+    *query = new_query;
+    return true;
+}
+
+bool DMLOutput::handleQueryFailure()
+{
+    return true;
+}
+
+bool DMLOutput::afterQuery(Connect *e_conn)
+{
+    return true;
+}
+
+// FIXME: Implement.
+bool SpecialUpdate::beforeQuery(Connect *conn, Connect *e_conn,
+                                std::string *before_query_data)
+{
+    return false;
+}
+
+// FIXME: Implement.
+bool SpecialUpdate::getQuery(const std::string before_query_data,
+                             std::string *query)
+{
+    return false;
+}
+
+// FIXME: Implement.
+bool SpecialUpdate::handleQueryFailure()
+{
+    return false;
+}
+
+bool SpecialUpdate::afterQuery(Connect *e_conn)
+{
+    return true;
+}
+
+/*
 ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn)
 {
     // Retrieve rows from database.
@@ -560,9 +622,23 @@ ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn)
 
     return ret_value;
 }
+*/
 
 DeltaOutput::~DeltaOutput()
 {;}
+
+// FIXME: Implement.
+bool DeltaOutput::beforeQuery(Connect *conn, Connect *e_conn,
+                              std::string *before_query_data)
+{
+    return false;
+}
+
+// FIXME: Implement.
+bool DeltaOutput::afterQuery(Connect *e_conn)
+{
+    return false;
+}
 
 bool DeltaOutput::save(Connect *e_conn, unsigned long *delta_output_id)
 {
@@ -591,6 +667,7 @@ bool DeltaOutput::destroyRecord(Connect *e_conn,
     return true;
 }
 
+/*
 static bool saveQuery(Connect *e_conn, const std::string &query,
                       unsigned long delta_output_id, bool local, bool ddl)
 {
@@ -606,6 +683,7 @@ static bool saveQuery(Connect *e_conn, const std::string &query,
 
     return true;
 }
+*/
 
 static bool destroyQueryRecord(Connect *e_conn,
                                unsigned long delta_output_id)
@@ -660,6 +738,7 @@ setRegularTableToBleedingTable(Connect *e_conn)
     return tableCopy(e_conn, src, dest);
 }
 
+/*
 static bool
 setBleedingTableToRegularTable(Connect *e_conn)
 {
@@ -686,6 +765,7 @@ revertAndCleanupEmbedded(Connect *e_conn, unsigned long delta_output_id)
 
     return true;
 }
+*/
 
 bool
 cleanupDeltaOutputAndQuery(Connect *e_conn,
@@ -697,6 +777,7 @@ cleanupDeltaOutputAndQuery(Connect *e_conn,
     return true;
 }
 
+/*
 // FIXME: Test DB by reading out of it for later ops.
 static
 ResType *
@@ -799,7 +880,22 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
 
     return result;
 }
+*/
 
+// FIXME: Implement.
+bool DDLOutput::getQuery(const std::string before_query_data,
+                         std::string *query)
+{
+    return false;
+}
+
+// FIXME: Implement.
+bool DDLOutput::handleQueryFailure()
+{
+    return false;
+}
+
+/*
 ResType *DDLOutput::doQuery(Connect *conn, Connect *e_conn)
 {
     std::list<std::string> local_qz, remote_qz;
@@ -809,18 +905,33 @@ ResType *DDLOutput::doQuery(Connect *conn, Connect *e_conn)
     return handleDeltaQuery(conn, e_conn, deltas, local_qz, remote_qz,
                             true);
 }
+*/
 
+// FIXME: Implement.
+bool AdjustOnionOutput::getQuery(const std::string before_query_data,
+                                 std::string *query)
+{
+    return false;
+}
+
+// FIXME: Implement.
+bool AdjustOnionOutput::handleQueryFailure()
+{
+    return false;
+}
 bool AdjustOnionOutput::queryAgain()
 {
     return true;
 }
 
+/*
 ResType *AdjustOnionOutput::doQuery(Connect *conn, Connect *e_conn)
 {
     return handleDeltaQuery(conn, e_conn, deltas,
                             std::list<std::string>(),
                             adjust_queries, false);
 }
+*/
 
 bool Analysis::addAlias(const std::string &alias,
                         const std::string &table)

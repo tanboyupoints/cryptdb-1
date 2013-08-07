@@ -328,9 +328,9 @@ printEC(Connect * e_conn, const std::string & command) {
 }
 */
 
+/*
 static void
 printEmbeddedState(const ProxyState & ps) {
-/*
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables from pdb;");
     std::cout << "regular" << std::endl << std::endl;
@@ -339,8 +339,8 @@ printEmbeddedState(const ProxyState & ps) {
     printEC(ps.e_conn, "select * from pdb.BleedingMetaObject;");
     printEC(ps.e_conn, "select * from pdb.Query;");
     printEC(ps.e_conn, "select * from pdb.DeltaOutput;");
-*/
 }
+*/
 
 template <typename type> static void
 translatorHelper(const char **texts, type *enums, int count)
@@ -842,7 +842,6 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
     }
 }
 
-// TODO: we don't need to pass analysis, enough to pass returnmeta
 QueryRewrite
 Rewriter::rewrite(const ProxyState &ps, const std::string & q)
 {
@@ -943,6 +942,7 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
     return res;
 }
 
+/*
 static void
 prettyPrintQueryResult(ResType res)
 {
@@ -951,11 +951,14 @@ prettyPrintQueryResult(ResType res)
     printRes(res);
     std::cout << std::endl;
 }
+*/
 
 ResType *
 executeQuery(const ProxyState &ps, const std::string &q)
 {
     try {
+/*
+        // FIXME: Reimplement.
         Rewriter r;
         QueryRewrite qr = r.rewrite(ps, q);
         std::unique_ptr<ResType> res(qr.output->doQuery(ps.conn,
@@ -971,6 +974,8 @@ executeQuery(const ProxyState &ps, const std::string &q)
 
         printEmbeddedState(ps);
         return dec_res;
+*/
+        return NULL;
     } catch (std::runtime_error &e) {
         std::cout << "Unexpected Error: " << e.what() << " in query "
                   << q << std::endl;

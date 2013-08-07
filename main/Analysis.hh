@@ -361,8 +361,14 @@ public:
         : original_query(original_query) {}
     virtual ~RewriteOutput() = 0;
 
-    virtual ResType *doQuery(Connect *conn, Connect *e_conn) = 0;
+    virtual bool beforeQuery(Connect *conn, Connect *e_conn,
+                             std::string *before_query_data) = 0;
+    virtual bool getQuery(const std::string before_query_data,
+                          std::string *query) = 0;
+    virtual bool handleQueryFailure() = 0;
+    virtual bool afterQuery(Connect *e_conn) = 0;
     virtual bool queryAgain();
+
     static ResType *sendQuery(Connect *c, const std::string &q);
 
 protected:
@@ -375,7 +381,12 @@ public:
         : RewriteOutput(original_query) {}
     ~SimpleOutput() {;}
 
-    ResType *doQuery(Connect *conn, Connect *e_conn);
+    bool beforeQuery(Connect *conn, Connect *e_conn,
+                     std::string *before_query_data);
+    bool getQuery(const std::string before_query_data,
+                  std::string *query);
+    bool handleQueryFailure();
+    bool afterQuery(Connect *e_conn);
 };
 
 class DMLOutput : public RewriteOutput {
@@ -384,7 +395,12 @@ public:
         : RewriteOutput(original_query), new_query(new_query) {}
     ~DMLOutput() {;}
 
-    ResType *doQuery(Connect *conn, Connect *e_conn);
+    bool beforeQuery(Connect *conn, Connect *e_conn,
+                     std::string *before_query_data);
+    bool getQuery(const std::string before_query_data,
+                  std::string *query);
+    bool handleQueryFailure();
+    bool afterQuery(Connect *e_conn);
 
 private:
     const std::string new_query;
@@ -404,7 +420,12 @@ public:
       where_clause(where_clause), ps(ps) {}
     ~SpecialUpdate() {;}
 
-    ResType *doQuery(Connect *conn, Connect *e_conn);
+    bool beforeQuery(Connect *conn, Connect *e_conn,
+                     std::string *before_query_data);
+    bool getQuery(const std::string before_query_data,
+                  std::string *query);
+    bool handleQueryFailure();
+    bool afterQuery(Connect *e_conn);
 
 private:
     const std::string new_query;
@@ -420,7 +441,14 @@ public:
     DeltaOutput(std::string original_query, std::vector<Delta *> deltas)
         : RewriteOutput(original_query), deltas(deltas) {}
     virtual ~DeltaOutput() = 0;
-    virtual ResType *doQuery(Connect *conn, Connect *e_conn) = 0;
+
+    bool beforeQuery(Connect *conn, Connect *e_conn,
+                     std::string *before_query_data);
+    virtual bool getQuery(const std::string before_query_data,
+                          std::string *query) = 0;
+    virtual bool handleQueryFailure() = 0;
+    bool afterQuery(Connect *e_conn);
+
     static bool save(Connect *e_conn, unsigned long *delta_output_id);
     static bool destroyRecord(Connect *e_conn,
                               unsigned long delta_output_id);
@@ -435,7 +463,10 @@ public:
               std::vector<Delta *> deltas)
         : DeltaOutput(original_query, deltas), new_query(new_query) {}
     ~DDLOutput() {;}
-    ResType *doQuery(Connect *conn, Connect *e_conn);
+
+    bool getQuery(const std::string before_query_data,
+                  std::string *query);
+    bool handleQueryFailure();
 
 private:
     const std::string new_query;
@@ -450,6 +481,9 @@ public:
     ~AdjustOnionOutput() {;}
     ResType *doQuery(Connect *conn, Connect *e_conn);
 
+    bool getQuery(const std::string before_query_data,
+                  std::string *query);
+    bool handleQueryFailure();
     bool queryAgain();
 
 private:
