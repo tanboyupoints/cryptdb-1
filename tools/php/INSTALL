@@ -58,6 +58,9 @@
 
     [ Running ]
 
+        Restart Apache: 
+        $ sudo service apache2 restart
+
         Simply open your browser and point to http://localhost
 
 EOF
