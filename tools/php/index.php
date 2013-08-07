@@ -243,8 +243,8 @@ Databases:
 <?php echo get_db_select($dbn)?>
 </select>
 Tables:
-<form action="'<?php echo $self?>'" method="post">
-<select name="cryptdb_describe_table">
+<form action="'<?php echo $self?>'" method="post" >
+<select name="cryptdb_describe_table" onChange="this.form.submit()">
 <?php 
  $a=0;
  $array = get_db_tables($dbn) ; foreach($array as $key=>$value) 
@@ -258,14 +258,12 @@ Tables:
 ?>
 <option selected value="<?php echo $value[$accesskey]; ?>"><?php echo $value[$accesskey]; ?></option>
 <?php } else { ?>
-
 <option value="<?php echo $value[$accesskey]; ?>"><?php echo $value[$accesskey]; ?></option>
 <?php } ?>
 
 
 <?php } ?>
 </select>
-<input type="submit" value="Describe table">
 </form>
 
 <?php if($dbn){ $z=" &#183; <a href='$self?$xurl&db=$dbn"; ?>
@@ -314,7 +312,8 @@ function print_screen(){
 </table>
 
 <input type="button" value="Clear board" onclick="this.form.elements['query_output'].value=''">
-Records: <b><?php echo $reccount?></b> in <b><?php echo $time_all?></b> sec<br>
+<input type="button" value="Export Results" onclick=""> <!-- add .js here to export output to txt file -->
+Records: <b><?php echo $reccount?></b> in <b><?php echo $time_all?></b> sec<br><br>
 <b><?php echo $out_message?></b>
 <div class="sqldr">
 <?php echo $nav.$sqldr.$nav; ?>
