@@ -1,7 +1,6 @@
 <?php
 
 require("common.php");
-//print_r($_POST);
 
  //get initial values
  $SQLq=trim($_REQUEST['q']);
@@ -257,7 +256,7 @@ Tables:
      {
 ?>
 <option selected value="<?php echo $value[$accesskey]; ?>"><?php echo $value[$accesskey]; ?></option>
-<?php } else { ?>
+<?php } else  { ?>
 <option value="<?php echo $value[$accesskey]; ?>"><?php echo $value[$accesskey]; ?></option>
 <?php } ?>
 
@@ -297,15 +296,18 @@ function print_screen(){
 <table>
 <tr>
 <td>
-<textarea style="overflow:auto;" readonly id="query_output" name="q" cols="120" rows="10" style="width:50%;overflow:auto;"><?php echo curr_q("",FALSE)?><?php echo $SQLq; ?></textarea><br>
+
+<textarea style="overflow:auto;" readonly id="query_output" name="q" cols="120" rows="10" 
+style="width:50%;overflow:auto;"><?php echo curr_q("",FALSE)?><?php echo $SQLq; ?></textarea><br>
+
 </td>
 <td>
 <div id='cssmenu'>
 <ul>
    <li class='active'><a href='index.php'><span>Home</span></a></li>
-   <li class=''><a href='#'><span>Products</span></a></li>
    <li><a href='http://css.csail.mit.edu/cryptdb/' target="_blank"><span>About CryptDB</span></a></li>
-   <li class='last'><a href='#'><span>Contact</span></a></li>
+   <li class=''><a href='#'><span>somelink</span></a></li>
+   <li class='last'><a href='#'><span>somelink</span></a></li>
 </ul>
 </div>
 </td>
