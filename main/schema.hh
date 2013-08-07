@@ -167,7 +167,8 @@ private:
     SECLEVEL getOnionLevel(onion o) const;
     bool setOnionLevel(onion o, SECLEVEL maxl);
     static onionlayout getOnionLayout(const AES_KEY * const m_key,
-                                      Create_field *f);
+                                      Create_field *f,
+                                      SECURITY_RATING sec_rating);
 } FieldMeta;
 
 typedef class TableMeta : public MappedDBMeta<FieldMeta, IdentityMetaKey> {

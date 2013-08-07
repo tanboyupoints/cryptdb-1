@@ -132,7 +132,6 @@ EncSet::chooseOne() const
                 it->second.first != SECLEVEL::PLAINVAL) {
                 /*
                  * If no key, skip this OLK.
-                 * What are the semantics of chooseOne() anyway?
                  */
                 continue;
             }

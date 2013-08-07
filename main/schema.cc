@@ -224,7 +224,7 @@ FieldMeta::FieldMeta(std::string name, Create_field *field,
                      unsigned long uniq_count)
     : fname(name), has_salt(static_cast<bool>(m_key)),
       salt_name(BASE_SALT_NAME + getpRandomName()), 
-      onion_layout(getOnionLayout(m_key, field)),
+      onion_layout(getOnionLayout(m_key, field, sec_rating)),
       sec_rating(sec_rating), uniq_count(uniq_count), counter(0)
 {
     init_onions_layout(m_key, this, field);
@@ -308,14 +308,33 @@ OnionMeta *FieldMeta::getOnionMeta(onion o) const
 }
 
 onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
-                                      Create_field *f)
+                                      Create_field *f,
+                                      SECURITY_RATING sec_rating)
 {
-    if (NULL == m_key) {
+    if (sec_rating == SECURITY_RATING::PLAIN) {
+        assert(!m_key);
         return PLAIN_ONION_LAYOUT;
-    } else if (true == IsMySQLTypeNumeric(f->sql_type)) {
-        return NUM_ONION_LAYOUT;
+    }
+
+    if (!m_key) {
+        throw CryptDBError("Should be using SECURITY_RATING::PLAIN!");
+    }
+
+    onionlayout basic_layout;
+    if (SECURITY_RATING::SENSITIVE == sec_rating) {
+        if (true == IsMySQLTypeNumeric(f->sql_type)) {
+            return NUM_ONION_LAYOUT;
+        } else {
+            return STR_ONION_LAYOUT;
+        }
+    } else if (SECURITY_RATING::BEST_EFFORT == sec_rating) {
+        if (true == IsMySQLTypeNumeric(f->sql_type)) {
+            return BEST_EFFORT_NUM_ONION_LAYOUT;
+        } else {
+            return BEST_EFFORT_STR_ONION_LAYOUT;
+        }
     } else {
-        return STR_ONION_LAYOUT;
+        throw CryptDBError("Bad SECURITY_RATING in getOnionLayout!");
     }
 }
 

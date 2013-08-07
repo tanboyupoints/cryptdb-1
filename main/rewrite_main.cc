@@ -419,12 +419,16 @@ buildTypeTextTranslator()
     // Onion Layouts.
     const char *onion_layout_chars[] =
     {
-        "PLAIN_ONION_LAYOUT", "NUM_ONION_LAYOUT", "STR_ONION_LAYOUT"
+        "PLAIN_ONION_LAYOUT", "NUM_ONION_LAYOUT",
+        "BEST_EFFORT_NUM_ONION_LAYOUT", "STR_ONION_LAYOUT",
+        "BEST_EFFORT_STR_ONION_LAYOUT"
         
     };
     onionlayout onion_layouts[] =
     {
-        PLAIN_ONION_LAYOUT, NUM_ONION_LAYOUT, STR_ONION_LAYOUT 
+        PLAIN_ONION_LAYOUT, NUM_ONION_LAYOUT,
+        BEST_EFFORT_NUM_ONION_LAYOUT, STR_ONION_LAYOUT,
+        BEST_EFFORT_STR_ONION_LAYOUT
     };
     static_assert(arraysize(onion_layout_chars) ==
                     arraysize(onion_layouts),
