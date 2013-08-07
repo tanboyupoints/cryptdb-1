@@ -116,7 +116,7 @@ body
 background-color:#E0E0E0;
 }
 </style>
-<h1 align="center" style="colort:red;">CryptDB</h1>
+<h1 align="center" style="color:#990000;">CryptDB</h1>
 <meta charset="utf-8">
 
 <script type="text/javascript">
