@@ -943,6 +943,13 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
 }
 
 static void
+prettyPrintQuery(const std::string &query)
+{
+    std::cout << std::endl << RED_BEGIN
+              << "QUERY: " << COLOR_END << query << std::endl;
+}
+
+static void
 prettyPrintQueryResult(ResType res)
 {
     std::cout << std::endl << RED_BEGIN
@@ -968,6 +975,7 @@ executeQuery(const ProxyState &ps, const std::string &q)
         if (!qr.output->getQuery(before_data, &out_query)) {
             throw CryptDBError("Failed to retrieve query!");
         }
+        prettyPrintQuery(out_query);
         
         if (!ps.conn->execute(out_query, dbres)) {
             qr.output->handleQueryFailure();

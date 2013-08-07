@@ -443,11 +443,11 @@ public:
     virtual ~DeltaOutput() = 0;
 
     bool beforeQuery(Connect *conn, Connect *e_conn,
-                     std::string *before_query_data);
+                     std::string *before_query_data) = 0;
     virtual bool getQuery(const std::string before_query_data,
                           std::string *query) = 0;
     virtual bool handleQueryFailure() = 0;
-    bool afterQuery(Connect *e_conn);
+    bool afterQuery(Connect *e_conn) = 0;
 
     static bool save(Connect *e_conn, unsigned long *delta_output_id);
     static bool destroyRecord(Connect *e_conn,
@@ -464,9 +464,12 @@ public:
         : DeltaOutput(original_query, deltas), new_query(new_query) {}
     ~DDLOutput() {;}
 
+    bool beforeQuery(Connect *conn, Connect *e_conn,
+                     std::string *before_query_data);
     bool getQuery(const std::string before_query_data,
                   std::string *query);
     bool handleQueryFailure();
+    bool afterQuery(Connect *e_conn);
 
 private:
     const std::string new_query;
@@ -481,9 +484,12 @@ public:
     ~AdjustOnionOutput() {;}
     ResType *doQuery(Connect *conn, Connect *e_conn);
 
+    bool beforeQuery(Connect *conn, Connect *e_conn,
+                     std::string *before_query_data);
     bool getQuery(const std::string before_query_data,
                   std::string *query);
     bool handleQueryFailure();
+    bool afterQuery(Connect *e_conn);
     bool queryAgain();
 
 private:
