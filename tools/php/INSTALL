@@ -35,7 +35,7 @@
 
         -= All at once (see Notes first!)
         $sudo ./install.sh (deploy)
-        $sudo ./install.sh (for development, i.e., symbolic links instead of hard copy.)
+        $sudo ./install.sh devel (for development, i.e., symbolic links instead of hard copy.)
             
         -= Notes:
         
