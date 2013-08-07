@@ -88,7 +88,6 @@ function display_select($sth,$q){
             $sqldr.="<tr class='".$rc[$swp=!$swp]."' onmouseover='tmv(this)' onmouseout='tmo(this)' onclick='tc(this)' align=\"center\">";
             for($i=0;$i<$fields_num;$i++){
                 $v=$row[$i];
-                echo $row[$i] . " ";
 
                 $more='';
 

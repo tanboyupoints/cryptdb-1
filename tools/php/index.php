@@ -109,6 +109,15 @@ function print_header(){
 <!DOCTYPE html>
 <html>
 <head><title>CryptDB</title>
+<link href="/menu_assets/styles.css" rel="stylesheet" type="text/css">
+
+<style>
+body
+{
+background-color:#E0E0E0;
+}
+</style>
+<h1 align="center">CryptDB</h1>
 <meta charset="utf-8">
 
 
@@ -319,10 +328,24 @@ function print_screen(){
 
     print_header();
 ?>
-<div class="boxsizingBorder">
-<textarea style="overflow:auto;" readonly id="query_output" name="q" cols="100" rows="10" style="width:50%;overflow:auto;"><?php echo curr_q("",FALSE)?><?php echo $SQLq; ?></textarea><br>
-<input type="button" value="Clear board" onclick="this.form.elements['query_output'].value=''">
+<table>
+<tr>
+<td>
+<textarea style="overflow:auto;" readonly id="query_output" name="q" cols="120" rows="10" style="width:50%;overflow:auto;"><?php echo curr_q("",FALSE)?><?php echo $SQLq; ?></textarea><br>
+</td>
+<td>
+<div id='cssmenu'>
+<ul>
+   <li class='active'><a href='index.php'><span>Home</span></a></li>
+   <li class=''><a href='#'><span>Products</span></a></li>
+   <li><a href='http://css.csail.mit.edu/cryptdb/' target="_blank"><span>About CryptDB</span></a></li>
+   <li class='last'><a href='#'><span>Contact</span></a></li>
+</ul>
 </div>
+</td>
+</table>
+
+<input type="button" value="Clear board" onclick="this.form.elements['query_output'].value=''">
 Records: <b><?php echo $reccount?></b> in <b><?php echo $time_all?></b> sec<br>
 <b><?php echo $out_message?></b>
 <div class="sqldr">
@@ -338,7 +361,6 @@ function print_cfg(){
     print_header();
 ?>
 <center>
-<h3>CryptDB</h3>
 <div class="frm">
 
 <label class="l">MYSQL host/ip:</label><input type="text" name="v[host]" value="<?php echo $DB['host']?>"><br>
