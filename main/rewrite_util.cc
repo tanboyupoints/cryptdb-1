@@ -27,21 +27,20 @@ optimize(Item **i, Analysis &a) {
 // that should be rewritten
 // @context defaults to empty string.
 Item *
-rewrite(Item *i, const OLK & constr, Analysis &a, std::string context)
+rewrite(Item *i, const EncSet &req_enc, Analysis &a, std::string context)
 {
     if (context.size()) {
         context = " for " + context;
     }
     RewritePlan * const rp = getAssert(a.rewritePlans, i);
     assert(rp);
-    if (!rp->es_out.contains(constr)) {
-        std::cerr << "query cannot be supported because " << i
-                  << " needs to return " << constr << context << "\n"
-                  << "BUT it can only return " << rp->es_out
-                  << " BECAUSE " << rp->r << "\n";
+    EncSet solution = rp->es_out.intersect(req_enc);
+    if (solution.empty()) {
+        // FIXME: Error message;
         assert(false);
     }
-    return itemTypes.do_rewrite(i, constr, rp, a);
+    
+    return itemTypes.do_rewrite(i, solution.chooseOne(), rp, a);
 }
 
 TABLE_LIST *
@@ -129,7 +128,7 @@ rewrite_table_list(List<TABLE_LIST> tll, Analysis & a)
         }
 
         if (t->on_expr) {
-            new_t->on_expr = rewrite(t->on_expr, PLAIN_OLK, a);
+            new_t->on_expr = rewrite(t->on_expr, PLAIN_EncSet, a);
         }
 
 	/* TODO: derived tables

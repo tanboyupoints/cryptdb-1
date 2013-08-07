@@ -15,7 +15,7 @@ class EncSet {
 public:
     EncSet(OnionLevelFieldMap input) : osl(input) {}
     EncSet(Analysis &a, FieldMeta * fm);
-    EncSet(const OLK & olk);
+    explicit EncSet(const OLK & olk);
 
     /**
      * decides which encryption scheme to use out of multiple in a set
@@ -23,6 +23,8 @@ public:
     OLK chooseOne() const;
 
     bool contains(const OLK & olk) const;
+    
+    bool hasSecLevel(SECLEVEL level) const;
 
     EncSet intersect(const EncSet & es2) const;
 
@@ -88,11 +90,6 @@ const EncSet ORD_EncSet = {
 const EncSet PLAIN_EncSet = {
     {
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-    }
-};
-
-const EncSet BESTEFFORT_EncSet = {
-    {
         {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)}
     }
 };

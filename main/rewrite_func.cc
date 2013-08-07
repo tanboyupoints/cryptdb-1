@@ -104,7 +104,7 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
     my_r.add_child(r1);
     my_r.add_child(r2);
 
-    return new RewritePlanOneOLK(out_es->chooseOne(),
+    return new RewritePlanOneOLK(EncSet(out_es->chooseOne()),
                                  solution.chooseOne(), childr_rp, my_r);
 }
 
@@ -188,7 +188,8 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
     virtual Item * do_rewrite_type(Item_func *i, const OLK & constr,
                                    const RewritePlan * rp, Analysis & a) const
     {
-        LOG(cdb_v) << "do_rewrite_type Item_func " << *i << " constr " << constr;
+        LOG(cdb_v) << "do_rewrite_type Item_func " << *i << " constr "
+                   << EncSet(constr);
         Item ** args = i->arguments();
         assert_s(i->argument_count() == 2, "compare function does not have two arguments as expected");
         IT *res = new IT(args[0], args[1]);
@@ -233,15 +234,16 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
             reason r;
             childr_rp[index] = gather(argitem, r, a);
             tr.add_child(r);
-            if (!childr_rp[index]->es_out.contains(PLAIN_OLK)) {
+            const SECLEVEL plain = SECLEVEL::PLAINVAL;
+            if (!childr_rp[index]->es_out.hasSecLevel(plain)) {
                 thrower() << "cannot obtain PLAIN for " << *argitem;
             }
             ++index;
         }
 
         // Must be an OLK for each argument.
-        return new RewritePlanOneOLK(out_es.extract_singleton(),
-                                     child_es.extract_singleton(),
+        return new RewritePlanOneOLK(EncSet(out_es.chooseOne()),
+                                     child_es.chooseOne(),
                                      childr_rp, tr);
     }
 
@@ -298,7 +300,7 @@ class CItemNullcheck : public CItemSubtypeFT<Item_bool_func, FT> {
         tr = reason(out_es, "nullcheck", i);
         tr.add_child(r);
 
-        return new RewritePlanOneOLK(out_es.extract_singleton(),
+        return new RewritePlanOneOLK(EncSet(out_es.chooseOne()),
                                      solution.chooseOne(),
                                      child_rp, tr);
     }
@@ -353,7 +355,8 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
                                    const RewritePlan * _rp,
                                    Analysis & a) const
     {
-        LOG(cdb_v) << "do_rewrite_type Item_func_additive_op" << *i << " with constr " << constr;
+        LOG(cdb_v) << "do_rewrite_type Item_func_additive_op" << *i
+                   << " with constr " << EncSet(constr);
 
         //rewrite children
         assert_s(i->argument_count() == 2, " expecting two arguments for additive operator ");
@@ -392,8 +395,7 @@ class CItemMath : public CItemSubtypeFN<IT, NAME> {
     virtual RewritePlan * do_gather_type(IT *i,
                                          reason &tr, Analysis & a) const
     {
-        return typical_gather(a, i, BESTEFFORT_EncSet, "math op", tr,
-                              true);
+        return typical_gather(a, i, PLAIN_EncSet, "math op", tr, true);
     }
 
     virtual Item * do_optimize_type(IT *i, Analysis & a) const
@@ -408,7 +410,8 @@ class CItemMath : public CItemSubtypeFN<IT, NAME> {
         assert(i->argument_count() == 2);
         Item **args = i->arguments();
 
-        RewritePlanOneOLK * rp = (RewritePlanOneOLK *) _rp;
+        const RewritePlanOneOLK * const rp =
+            static_cast<const RewritePlanOneOLK *>(_rp);
 
         Item * arg0 =
             itemTypes.do_rewrite(args[0], rp->olk, rp->childr_rp[0], a);
@@ -752,7 +755,7 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
     {
         RewritePlanOneOLK * rp = (RewritePlanOneOLK *) _rp;
 
-        if (rp->olk == PLAIN_OLK) { // no change
+        if (SECLEVEL::PLAINVAL == rp->olk.l) { // no change
             return i;
         }
 

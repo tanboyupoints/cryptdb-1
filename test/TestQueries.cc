@@ -856,7 +856,11 @@ static QueryList BestEffort = QueryList("BestEffort",
       Query("SELECT 2+x+2 FROM t", false),
       Query("SELECT 2+2+x FROM t", false),
       Query("SELECT x+y+3+4 FROM t", false),
-      Query("SELECT 2*x*2*y FROM t", false) },
+      Query("SELECT 2*x*2*y FROM t", false),
+      Query("SELECT x, y FROM t WHERE x AND y", false), 
+      Query("SELECT x, y FROM t WHERE x = 1 AND y < 200", false), 
+      Query("SELECT x, y FROM t WHERE x AND y = 15", false), 
+      Query("SELECT 10, x+y FROM t WHERE x", false) },
     { "DROP TABLE t"},
     { "DROP TABLE t"},
     { "DROP TABLE t"});
@@ -1184,7 +1188,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 269/284
+    //      TOTAL RESULT: 291/306
     // ###############################
 
     std::vector<Score> scores;
@@ -1222,7 +1226,7 @@ RunTest(const TestConfig &tc) {
     // Pass 19/19
     scores.push_back(CheckQueryList(tc, Null));
 
-    // Pass 18/18 (with one throwing an exception)
+    // Pass 22/22
     scores.push_back(CheckQueryList(tc, BestEffort));
 
     for (auto it : scores) {
