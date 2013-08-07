@@ -120,8 +120,6 @@ background-color:#E0E0E0;
 <h1 align="center">CryptDB</h1>
 <meta charset="utf-8">
 
-
-
 <script type="text/javascript">
 var LSK='pma_',LSKX=LSK+'max',LSKM=LSK+'min',qcur=0,LSMAX=32;
 
