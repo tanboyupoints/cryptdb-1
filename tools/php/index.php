@@ -116,7 +116,7 @@ body
 background-color:#E0E0E0;
 }
 </style>
-<h1 align="center">CryptDB</h1>
+<h1 align="center" style="colort:red;">CryptDB</h1>
 <meta charset="utf-8">
 
 <script type="text/javascript">
@@ -332,12 +332,12 @@ function print_cfg(){
 <center>
 <div class="frm">
 
-<label class="l">MYSQL host/ip:</label><input type="text" name="v[host]" value="<?php echo $DB['host']?>"><br>
+<label class="l">MYSQL host:</label><input type="text" name="v[host]" value="<?php echo $DB['host']?>"><br>
 <label class="l">DB user:</label><input type="text" name="v[user]" value="<?php echo $DB['user']?>"><br>
 <label class="l">Password:</label><input type="password" name="v[pwd]" value=""><br>
 <br>
 
-<label class="l">CryptDB host/ip:</label><input type="text" readonly name="c[host]" value="localhost"><br>
+<label class="l">CryptDB host:</label><input type="text" readonly name="c[host]" value="localhost"><br>
 <label class="l">DB user:</label><input type="text" name="c[user]" value="<?php echo $CRYPTDB['user']?>"><br>
 <label class="l">Password:</label><input type="password" name="c[pwd]" value=""><br>
 <!--<label class="l">Port:</label><input type="text" readonly name="c[port]" value="<?php echo $CRYPTDB['port']?>" size="4"><br>-->
