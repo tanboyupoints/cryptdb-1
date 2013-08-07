@@ -121,36 +121,6 @@ background-color:#E0E0E0;
 <meta charset="utf-8">
 
 
-<!-- CSS STYLE DEFINITIONS -->
-<style type="text/css">
-body{font-family:Arial,sans-serif;font-size:80%;padding:2;margin:2}
-th,td{padding:0;margin:0}
-div{padding:3px}
-pre{font-size:50%}
-.nav{text-align:center}
-.ft{text-align:right;margin-top:10px;font-size:smaller}
-.inv{background-color:#069;color:#FFF}
-.inv a{color:#FFF}
-table.res{width:100%;border-collapse:collapse;}
-table.wa{width:auto}
-table.res th,table.res td{padding:2px;border:1px solid #fff}
-table.restr{vertical-align:top}
-tr.e{background-color:#CCC}
-tr.o{background-color:#EEE}
-tr.h{background-color:#99C}
-tr.s{background-color:#FF9}
-.err{color:#F33;font-weight:bold;text-align:center}
-.frm{width:400px;border:1px solid #999;background-color:#eee;text-align:left}
-.frm label.l{width:100px;float:left}
-.dot{border-bottom:1px dotted #000}
-.ajax{text-decoration: none;border-bottom: 1px dashed;}
-.qnav{width:30px}
-.boxsizingBorder {
-    -webkit-box-sizing: border-box;
-       -moz-box-sizing: border-box;
-            box-sizing: border-box;
-}
-</style>
 
 <script type="text/javascript">
 var LSK='pma_',LSKX=LSK+'max',LSKM=LSK+'min',qcur=0,LSMAX=32;

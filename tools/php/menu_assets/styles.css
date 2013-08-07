@@ -182,3 +182,33 @@ li {
 #cssmenu .has-sub:hover:after {
   background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAJCAMAAAA8eE0hAAAAUVBMVEX////d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3e3t729vbx8fHq6urd3d3z8/Pj4+Pv7+/h4eHm5ub09PTn5+f19fXt7e3g4ODi4uLUsVdlAAAAC3RSTlMAM2YekAmlPHuEAwArv7wAAAA/SURBVHheY2Dl5mdigABGKV5BNnYok4dHQpKFGcrkEefj5gAzQUBABM7kFYQyRcX4mUBMkEpOLrA2IWGwfgYAn0UDZszv8IwAAAAASUVORK5CYII=);
 }
+
+<style type="text/css">
+body{font-family:Arial,sans-serif;font-size:80%;padding:2;margin:2}
+th,td{padding:0;margin:0}
+div{padding:3px}
+pre{font-size:50%}
+.nav{text-align:center}
+.ft{text-align:right;margin-top:10px;font-size:smaller}
+.inv{background-color:#069;color:#FFF}
+.inv a{color:#FFF}
+table.res{width:100%;border-collapse:collapse;}
+table.wa{width:auto}
+table.res th,table.res td{padding:2px;border:1px solid #fff}
+table.restr{vertical-align:top}
+tr.e{background-color:#CCC}
+tr.o{background-color:#EEE}
+tr.h{background-color:#99C}
+tr.s{background-color:#FF9}
+.err{color:#F33;font-weight:bold;text-align:center}
+.frm{width:400px;border:1px solid #999;background-color:#eee;text-align:left}
+.frm label.l{width:100px;float:left}
+.dot{border-bottom:1px dotted #000}
+.ajax{text-decoration: none;border-bottom: 1px dashed;}
+.qnav{width:30px}
+.boxsizingBorder {
+    -webkit-box-sizing: border-box;
+       -moz-box-sizing: border-box;
+            box-sizing: border-box;
+}
+</style>
