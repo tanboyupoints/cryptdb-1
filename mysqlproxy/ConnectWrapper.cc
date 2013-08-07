@@ -86,22 +86,20 @@ connect(lua_State *L)
     scoped_lock l(&big_lock);
     assert(0 == mysql_thread_init());
 
-    std::string client = xlua_tolstring(L, 1);
-    std::string server = xlua_tolstring(L, 2);
-    uint port = luaL_checkint(L, 3);
-    std::string user = xlua_tolstring(L, 4);
-    std::string psswd = xlua_tolstring(L, 5);
-    std::string embed_dir = xlua_tolstring(L, 6);
+    const std::string client = xlua_tolstring(L, 1);
+    const std::string server = xlua_tolstring(L, 2);
+    const uint port = luaL_checkint(L, 3);
+    const std::string user = xlua_tolstring(L, 4);
+    const std::string psswd = xlua_tolstring(L, 5);
+    const std::string embed_dir = xlua_tolstring(L, 6);
 
     ConnectionInfo ci = ConnectionInfo(server, user, psswd, port);
-
-    WrapperState *ws = new WrapperState();
 
     if (clients.find(client) != clients.end()) {
            LOG(warn) << "duplicate client entry";
     }
 
-    clients[client] = ws;
+    clients[client] = new WrapperState();
 
     if (!ps) {
         std::cerr << "starting proxy\n";
@@ -115,12 +113,12 @@ connect(lua_State *L)
         // HACK: This code may require the support of databaseless 'Connect'
         // objects.  If so, use a derived type to make it clear that the 
         // Connect object supports this property.
-        std::string dbname = "cryptdbtest";
-        std::string mode = getenv("CRYPTDB_MODE")?:"";
+        const std::string dbname = "cryptdbtest";
         const std::string mkey = "113341234";  // XXX do not change as
                                                // it's used for tpcc exps
-        if (mode == "single") {
-            std::string encbydefault = getenv("ENC_BY_DEFAULT");
+        char * ev = getenv("ENC_BY_DEFAULT");
+        if (ev) {
+            const std::string encbydefault = ev;
             if (encbydefault == "false") {
                 std::cerr << "\n\n enc by default false " << "\n\n";
                 ps = new ProxyState(ci, embed_dir, dbname, false, mkey);
@@ -128,12 +126,10 @@ connect(lua_State *L)
                 std::cerr << "\n\nenc by default true" << "\n\n";
                 ps = new ProxyState(ci, embed_dir, dbname, true, mkey);
             }
-        } else {
-            throw CryptDBError("Unsupported cryptdb mode!");
         }
 
         //may need to do training
-        char * ev = getenv("TRAIN_QUERY");
+        ev = getenv("TRAIN_QUERY");
         if (ev) {
             std::string trainQuery = ev;
             LOG(wrapper) << "proxy trains using " << trainQuery;
@@ -261,13 +257,12 @@ rewrite(lua_State *L)
             try {
                 throw CryptDBError("rewrite, not implemented!");
                 // TODO: May need to set current db in ProxyState.
-                /* FIXME.
-                QueryRewrite rew = r->rewrite(query);
+                /*
                 new_queries = rew.queries;
                 clients[client]->rmeta = rew.rmeta;
                 clients[client]->considered = rew.wasRew;
-                //cerr << "query: " << *new_queries.begin() << " considered ? " << clients[client]->considered << "\n";
                 */
+                //cerr << "query: " << *new_queries.begin() << " considered ? " << clients[client]->considered << "\n";
             } catch (CryptDBError &e) {
                 LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
                 lua_pushnil(L);
@@ -304,7 +299,7 @@ decrypt(lua_State *L)
     assert(0 == mysql_thread_init());
 
     THD *thd = (THD*) create_embedded_thd(0);
-    auto thd_cleanup = cleanup([&]
+    auto thd_cleanup = cleanup([&thd]
         {
             thd->clear_data_list();
             thd->store_globals();
