@@ -328,9 +328,9 @@ printEC(Connect * e_conn, const std::string & command) {
 }
 */
 
-/*
 static void
 printEmbeddedState(const ProxyState & ps) {
+/*
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables from pdb;");
     std::cout << "regular" << std::endl << std::endl;
@@ -339,8 +339,8 @@ printEmbeddedState(const ProxyState & ps) {
     printEC(ps.e_conn, "select * from pdb.BleedingMetaObject;");
     printEC(ps.e_conn, "select * from pdb.Query;");
     printEC(ps.e_conn, "select * from pdb.DeltaOutput;");
-}
 */
+}
 
 template <typename type> static void
 translatorHelper(const char **texts, type *enums, int count)
@@ -942,7 +942,6 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
     return res;
 }
 
-/*
 static void
 prettyPrintQueryResult(ResType res)
 {
@@ -951,31 +950,45 @@ prettyPrintQueryResult(ResType res)
     printRes(res);
     std::cout << std::endl;
 }
-*/
 
 ResType *
 executeQuery(const ProxyState &ps, const std::string &q)
 {
     try {
-/*
-        // FIXME: Reimplement.
         Rewriter r;
         QueryRewrite qr = r.rewrite(ps, q);
-        std::unique_ptr<ResType> res(qr.output->doQuery(ps.conn,
-                                                        ps.e_conn));
-        assert(res);
-        if (true == qr.output->queryAgain()) { // Onion adjustment.
-            return executeQuery(ps, q);
-        }
-        prettyPrintQueryResult(*res);
+        
+        // Query preamble.
+        std::string before_data;
+        assert(qr.output->beforeQuery(ps.conn, ps.e_conn, &before_data));
 
-        ResType *dec_res = r.decryptResults(*res, qr.rmeta);
+        // Execute query.
+        DBResult *dbres;
+        std::string out_query;
+        if (!qr.output->getQuery(before_data, &out_query)) {
+            throw CryptDBError("Failed to retrieve query!");
+        }
+        
+        if (!ps.conn->execute(out_query, dbres)) {
+            qr.output->handleQueryFailure();
+            throw CryptDBError("Failed to execute query!");
+        }
+
+        // Query cleanup.
+        assert(qr.output->afterQuery(ps.e_conn));
+        if (qr.output->queryAgain()) {
+            return executeQuery(ps, q);
+        } 
+
+        ResType *enc_res = new ResType(dbres->unpack());
+        prettyPrintQueryResult(*enc_res);
+
+        ResType *dec_res = r.decryptResults(*enc_res, qr.rmeta);
         prettyPrintQueryResult(*dec_res);
 
         printEmbeddedState(ps);
+
         return dec_res;
-*/
-        return NULL;
     } catch (std::runtime_error &e) {
         std::cout << "Unexpected Error: " << e.what() << " in query "
                   << q << std::endl;
