@@ -303,8 +303,8 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     // -----------------------------
     const std::string name = std::string(cf->field_name);
     FieldMeta * const fm =
-        new FieldMeta(name, cf, ps.masterKey, tm->leaseIncUniq(),
-                      ps.bestEffort());
+        new FieldMeta(name, cf, ps.masterKey, ps.defaultSecurityRating(),
+                      tm->leaseIncUniq());
     // Here we store the key name for the first time. It will be applied
     // after the Delta is read out of the database.
     if (true == new_table) {

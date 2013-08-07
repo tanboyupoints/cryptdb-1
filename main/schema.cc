@@ -209,20 +209,23 @@ FieldMeta *FieldMeta::deserialize(unsigned int id,
     const bool has_salt = string_to_bool(vec[1]);
     const std::string salt_name = vec[2];
     const onionlayout onion_layout = TypeText<onionlayout>::toType(vec[3]);
-    const unsigned int uniq_count = atoi(vec[4].c_str());
-    const unsigned int counter = atoi(vec[5].c_str());
+    const SECURITY_RATING sec_rating =
+        TypeText<SECURITY_RATING>::toType(vec[4]);
+    const unsigned int uniq_count = atoi(vec[5].c_str());
+    const unsigned int counter = atoi(vec[6].c_str());
 
     return new FieldMeta(id, fname, has_salt, salt_name, onion_layout,
-                         uniq_count, counter);
+                         sec_rating, uniq_count, counter);
 }
 
 FieldMeta::FieldMeta(std::string name, Create_field *field,
                      const AES_KEY * const m_key,
-                     unsigned long uniq_count, bool best_effort)
+                     SECURITY_RATING sec_rating,
+                     unsigned long uniq_count)
     : fname(name), has_salt(static_cast<bool>(m_key)),
       salt_name(BASE_SALT_NAME + getpRandomName()), 
-      onion_layout(getOnionLayout(m_key, field, best_effort)),
-      uniq_count(uniq_count), counter(0)
+      onion_layout(getOnionLayout(m_key, field)),
+      sec_rating(sec_rating), uniq_count(uniq_count), counter(0)
 {
     init_onions_layout(m_key, this, field);
 }
@@ -234,6 +237,7 @@ std::string FieldMeta::serialize(const DBObject &parent) const
         serialize_string(bool_to_string(has_salt)) +
         serialize_string(getSaltName()) +
         serialize_string(TypeText<onionlayout>::toText(onion_layout)) +
+        serialize_string(TypeText<SECURITY_RATING>::toText(sec_rating)) +
         serialize_string(std::to_string(uniq_count)) +
         serialize_string(std::to_string(counter));
 
@@ -304,22 +308,14 @@ OnionMeta *FieldMeta::getOnionMeta(onion o) const
 }
 
 onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
-                                      Create_field *f, bool best_effort)
+                                      Create_field *f)
 {
     if (NULL == m_key) {
         return PLAIN_ONION_LAYOUT;
-    } else if (true == best_effort) {
-        if (true == IsMySQLTypeNumeric(f->sql_type)) {
-            return BEST_EFFORT_NUM_ONION_LAYOUT;
-        } else {
-            return BEST_EFFORT_STR_ONION_LAYOUT;
-        }
+    } else if (true == IsMySQLTypeNumeric(f->sql_type)) {
+        return NUM_ONION_LAYOUT;
     } else {
-        if (true == IsMySQLTypeNumeric(f->sql_type)) {
-            return NUM_ONION_LAYOUT;
-        } else {
-            return STR_ONION_LAYOUT;
-        }
+        return STR_ONION_LAYOUT;
     }
 }
 

@@ -266,27 +266,29 @@ public:
 std::ostream&
 operator<<(std::ostream &out, const RewritePlan * rp);
 
-
 // state maintained at the proxy
 typedef struct ProxyState {
     ProxyState(ConnectionInfo ci, const std::string &embed_dir,
-               const std::string &dbname, bool encByDefault,
-               const std::string &master_key, bool best_effort=true);
+               const std::string &dbname, const std::string &master_key,
+               SECURITY_RATING default_sec_rating =
+                SECURITY_RATING::BEST_EFFORT);
     ~ProxyState();
     std::string dbName() const {return dbname;}
-    bool bestEffort() const {return best_effort;}
+    SECURITY_RATING defaultSecurityRating() const
+    {
+        return default_sec_rating;
+    }
 
     // connection to remote and embedded server
     Connect *conn;
     Connect *e_conn;
 
-    const bool encByDefault;
     const AES_KEY * const masterKey;
 
 private:
     // FIXME: Remove once cryptdb supports multiple databases.
     const std::string dbname;
-    const bool best_effort;
+    const SECURITY_RATING default_sec_rating;
 } ProxyState;
 
 

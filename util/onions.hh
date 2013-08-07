@@ -70,25 +70,11 @@ static onionlayout NUM_ONION_LAYOUT = {
                                   SECLEVEL::RND})},
     {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
     {oAGG, std::vector<SECLEVEL>({SECLEVEL::HOM})},
-};
-
-static onionlayout BEST_EFFORT_NUM_ONION_LAYOUT = {
-    {oDET, std::vector<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET,
-                                  SECLEVEL::RND})},
-    {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
-    {oAGG, std::vector<SECLEVEL>({SECLEVEL::HOM})},
     {oBESTEFFORT, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL,
                                          SECLEVEL::RND})}
 };
 
 static onionlayout STR_ONION_LAYOUT = {
-    {oDET, std::vector<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET,
-                                  SECLEVEL::RND})},
-    {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
-    {oSWP, std::vector<SECLEVEL>({SECLEVEL::SEARCH})}
-};
-
-static onionlayout BEST_EFFORT_STR_ONION_LAYOUT = {
     {oDET, std::vector<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET,
                                   SECLEVEL::RND})},
     {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
@@ -103,3 +89,4 @@ static onionlayout BEST_EFFORT_STR_ONION_LAYOUT = {
 
 typedef std::map<onion, SECLEVEL>  OnionLevelMap;
 
+enum class SECURITY_RATING {SENSITIVE, BEST_EFFORT, PLAIN};

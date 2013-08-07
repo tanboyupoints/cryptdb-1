@@ -265,11 +265,11 @@ loadUDFs(Connect * conn) {
 }
 
 ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
-                       const std::string &dbname, bool encByDefault,
+                       const std::string &dbname,
                        const std::string &master_key,
-                       bool best_effort)
-    : encByDefault(encByDefault), masterKey(getKey(master_key)),
-      dbname(dbname), best_effort(best_effort)
+                       SECURITY_RATING default_sec_rating)
+    : masterKey(getKey(master_key)), dbname(dbname),
+      default_sec_rating(default_sec_rating)
 {
     init_mysql(embed_dir);
 
@@ -856,7 +856,7 @@ FieldMeta *Analysis::getFieldMeta(const std::string &table,
 TableMeta *Analysis::getTableMeta(const std::string &table) const
 {
     IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
-                                 
+
     TableMeta *tm = this->schema->getChild(key);
     assert(tm);
     return tm;

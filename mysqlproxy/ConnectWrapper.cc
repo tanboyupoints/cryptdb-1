@@ -123,10 +123,12 @@ connect(lua_State *L)
             std::string encbydefault = getenv("ENC_BY_DEFAULT");
             if (encbydefault == "false") {
                 std::cerr << "\n\n enc by default false " << "\n\n";
-                ps = new ProxyState(ci, embed_dir, dbname, false, mkey);
+                ps = new ProxyState(ci, embed_dir, dbname, mkey,
+                                    SECURITY_RATING::BEST_EFFORT);
             } else {
                 std::cerr << "\n\nenc by default true" << "\n\n";
-                ps = new ProxyState(ci, embed_dir, dbname, true, mkey);
+                ps = new ProxyState(ci, embed_dir, dbname, mkey,
+                                    SECURITY_RATING::PLAIN);
             }
         } else {
             throw CryptDBError("Unsupported cryptdb mode!");

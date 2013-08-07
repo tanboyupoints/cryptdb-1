@@ -365,7 +365,8 @@ buildTypeTextTranslator()
     const char *onion_chars[] =
         {"oBESTEFFORT", "oPLAIN", "oDET", "oOPE", "oAGG", "oSWP"};
     onion onions[] = {oBESTEFFORT, oPLAIN, oDET, oOPE, oAGG, oSWP};
-    assert(arraysize(onion_chars) == arraysize(onions));
+    static_assert(arraysize(onion_chars) == arraysize(onions),
+                  "onion size mismatch!");
     int count = arraysize(onion_chars);
     translatorHelper((const char **)onion_chars, (onion *)onions, count);
 
@@ -376,7 +377,8 @@ buildTypeTextTranslator()
                             SECLEVEL::DETJOIN, SECLEVEL::OPE,
                             SECLEVEL::HOM, SECLEVEL::SEARCH,
                             SECLEVEL::PLAINVAL};
-    assert(arraysize(seclevel_chars) == arraysize(seclevels));
+    static_assert(arraysize(seclevel_chars) == arraysize(seclevels),
+                  "SECLEVEL size mismatch!");
     count = arraysize(seclevel_chars);
     translatorHelper((const char **)seclevel_chars, (SECLEVEL *)seclevels,
                      count);
@@ -408,7 +410,8 @@ buildTypeTextTranslator()
         MYSQL_TYPE_TINY_BLOB, MYSQL_TYPE_VAR_STRING,
         MYSQL_TYPE_VARCHAR, MYSQL_TYPE_YEAR
     };
-    assert(arraysize(mysql_type_chars) == arraysize(mysql_types));
+    static_assert(arraysize(mysql_type_chars) == arraysize(mysql_types),
+                  "mysql type size mismatch!");
     count = arraysize(mysql_type_chars);
     translatorHelper((const char **)mysql_type_chars,
                      (enum enum_field_types *)mysql_types, count);
@@ -416,17 +419,16 @@ buildTypeTextTranslator()
     // Onion Layouts.
     const char *onion_layout_chars[] =
     {
-        "PLAIN_ONION_LAYOUT", "NUM_ONION_LAYOUT",
-        "BEST_EFFORT_NUM_ONION_LAYOUT", "STR_ONION_LAYOUT",
-        "BEST_EFFORT_STR_ONION_LAYOUT"
+        "PLAIN_ONION_LAYOUT", "NUM_ONION_LAYOUT", "STR_ONION_LAYOUT"
+        
     };
     onionlayout onion_layouts[] =
     {
-        PLAIN_ONION_LAYOUT, NUM_ONION_LAYOUT,
-        BEST_EFFORT_NUM_ONION_LAYOUT,
-        STR_ONION_LAYOUT, BEST_EFFORT_STR_ONION_LAYOUT
+        PLAIN_ONION_LAYOUT, NUM_ONION_LAYOUT, STR_ONION_LAYOUT 
     };
-    assert(arraysize(onion_layout_chars) == arraysize(onion_layouts));
+    static_assert(arraysize(onion_layout_chars) ==
+                    arraysize(onion_layouts),
+                  "onionlayout size mismatch!");
     count = arraysize(onion_layout_chars);
     translatorHelper((const char **)onion_layout_chars,
                      (onionlayout *)onion_layouts, count);
@@ -445,10 +447,29 @@ buildTypeTextTranslator()
         Field::GEOM_MULTILINESTRING, Field::GEOM_MULTIPOLYGON,
         Field::GEOM_GEOMETRYCOLLECTION
     };
-    assert(arraysize(geometry_type_chars) == arraysize(geometry_types));
+    static_assert(arraysize(geometry_type_chars) ==
+                    arraysize(geometry_types),
+                  "geometry type size mismatch!");
     count = arraysize(geometry_type_chars);
     translatorHelper((const char **)geometry_type_chars,
                     (Field::geometry_type *)geometry_types, count);
+
+    // Security Rating.
+    const char *security_rating_chars[] =
+    {
+        "SENSITIVE", "BEST_EFFORT", "PLAIN"
+    };
+    SECURITY_RATING security_rating_types[] =
+    {
+        SECURITY_RATING::SENSITIVE, SECURITY_RATING::BEST_EFFORT,
+        SECURITY_RATING::PLAIN
+    };
+    static_assert(arraysize(security_rating_chars) ==
+                    arraysize(security_rating_types),
+                  "security rating size mismatch!");
+    count = arraysize(security_rating_chars);
+    translatorHelper((const char **)security_rating_chars,
+                    (SECURITY_RATING *)security_rating_types, count);
 
     return;
 }

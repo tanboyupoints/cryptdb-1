@@ -123,21 +123,24 @@ public:
     const bool has_salt; //whether this field has its own salt
     const std::string salt_name;
     const onionlayout onion_layout;
+    const SECURITY_RATING sec_rating;
 
     // New.
     FieldMeta(std::string name, Create_field *field,
-              const AES_KEY * const mKey, unsigned long uniq_count,
-              bool best_effort);
+              const AES_KEY * const mKey, SECURITY_RATING sec_rating,
+              unsigned long uniq_count);
     // Restore (WARN: Creates an incomplete type as it will not have it's
     // OnionMetas until they are added by the caller).
     static FieldMeta *deserialize(unsigned int id,
                                   const std::string &serial);
     FieldMeta(unsigned int id, std::string fname, bool has_salt,
               std::string salt_name, onionlayout onion_layout,
+              SECURITY_RATING sec_rating,
               unsigned long uniq_count, unsigned long counter)
         : MappedDBMeta(id), fname(fname), has_salt(has_salt),
           salt_name(salt_name), onion_layout(onion_layout),
-          uniq_count(uniq_count) {}
+          sec_rating(sec_rating), uniq_count(uniq_count),
+          counter(counter) {}
     ~FieldMeta() {;}
 
     std::string serialize(const DBObject &parent) const;
@@ -164,7 +167,7 @@ private:
     SECLEVEL getOnionLevel(onion o) const;
     bool setOnionLevel(onion o, SECLEVEL maxl);
     static onionlayout getOnionLayout(const AES_KEY * const m_key,
-                                      Create_field *f, bool best_effort);
+                                      Create_field *f);
 } FieldMeta;
 
 typedef class TableMeta : public MappedDBMeta<FieldMeta, IdentityMetaKey> {
