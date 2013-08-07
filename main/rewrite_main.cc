@@ -363,8 +363,8 @@ buildTypeTextTranslator()
 {
     // Onions.
     const char *onion_chars[] =
-        {"oBESTEFFORT", "oPLAIN", "oDET", "oOPE", "oAGG", "oSWP"};
-    onion onions[] = {oBESTEFFORT, oPLAIN, oDET, oOPE, oAGG, oSWP};
+        {"oPLAIN", "oDET", "oOPE", "oAGG", "oSWP"};
+    onion onions[] = {oPLAIN, oDET, oOPE, oAGG, oSWP};
     static_assert(arraysize(onion_chars) == arraysize(onions),
                   "onion size mismatch!");
     int count = arraysize(onion_chars);

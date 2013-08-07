@@ -118,7 +118,6 @@ EncSet::chooseOne() const
         oOPE,
         oAGG,
         oSWP,
-        oBESTEFFORT,
         oPLAIN
     };
 
