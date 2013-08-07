@@ -242,12 +242,6 @@ Databases:
 <select name="db" onChange="frefresh()">
 <?php echo get_db_select($dbn)?>
 </select>
-
-<?php if($dbn){ $z=" &#183; <a href='$self?$xurl&db=$dbn"; ?>
-<?php if($_POST['cryptdb_describe_table'] && $dbn) { 
-    $z.'&q='.urlencode($var);
-} ?>
-
 Tables:
 <form action="'<?php echo $self?>'" method="post">
 <select name="cryptdb_describe_table">
@@ -273,6 +267,12 @@ Tables:
 </select>
 <input type="submit" value="Describe table">
 </form>
+
+<?php if($dbn){ $z=" &#183; <a href='$self?$xurl&db=$dbn"; ?>
+<?php if($_POST['cryptdb_describe_table'] && $dbn) { 
+    $z.'&q='.urlencode($var);
+} ?>
+
 <?php } ?>
 <?php } ?>
 
