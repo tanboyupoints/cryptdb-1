@@ -4,8 +4,7 @@
 
 #   Carlos Carvalho
 #
-# Deploy: 'sudo ./install.sh'
-# Devel: 'sudo ./install.sh' devel  (creates symbolic links for php files)
+# See INSTALL for instructions
 
 apache2="/etc/apache2/sites-enabled/000-default"
 declare -a files=(./index.php ./common.php ./select.php ./favicon.ico menu_assets)
@@ -32,7 +31,7 @@ function do_install() {
     if [ $? -ne 0 ] ; then
         echo "* warning: php disabled"
     else
-        echo "`basename $php` seems to be enabled"
+        echo "`basename $php` is enabled"
     fi
     
     # Installing...
@@ -76,7 +75,6 @@ function do_install() {
         a=$(expr $a + 1)
     done
     echo "Done."
-
 }
 
 function install
@@ -100,5 +98,5 @@ function install
 
 #do it
 install $1
-
+#EOF
 
