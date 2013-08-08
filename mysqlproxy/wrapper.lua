@@ -114,19 +114,22 @@ function read_query_result_real(inj)
         local resultset = inj.resultset
 
         if resultset.query_status == proxy.MYSQLD_PACKET_ERR then
+            -- FIXME: Handle error.
             local err = proto.from_err_packet(resultset.raw)
             proxy.response.type = proxy.MYSQLD_PACKET_ERR
             proxy.response.errmsg = err.errmsg
             proxy.response.errcode = err.errcode
             proxy.response.sqlstate = err.sqlstate
         else
+            -- Handle the backend of the query.
+            CryptDB.epilogue(proxy.connection.client.src.name)
             local query = inj.query:sub(2)
 
             -- for DEMO: printing results
             local f_names = ""
             local r = ""
 
-            -- mysqlproxy doesn't return real lua arrays, so re-package them..
+            -- mysqlproxy doesn't return real lua arrays, so re-package
             local resfields = resultset.fields
             local fields = {}
             for i = 1, #resfields do

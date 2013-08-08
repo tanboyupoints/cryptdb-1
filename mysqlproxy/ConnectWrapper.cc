@@ -257,7 +257,8 @@ preamble(lua_State *L)
             assert(ps);
 
             Rewriter r;
-            QueryRewrite *&qr = clients[client]->qr = new QueryRewrite(r.rewrite(*ps, query));
+            QueryRewrite *&qr = clients[client]->qr =
+                new QueryRewrite(r.rewrite(*ps, query));
             assert(qr->output->beforeQuery(ps->conn, ps->e_conn));
         }
     }
@@ -331,6 +332,40 @@ rewrite(lua_State *L)
 }
 
 static int
+epilogue(lua_State *L)
+{
+    ANON_REGION(__func__, &perf_cg);
+    scoped_lock l(&big_lock);
+    assert(0 == mysql_thread_init());
+
+    std::string client = xlua_tolstring(L, 1);
+    if (clients.find(client) == clients.end())
+        return 0;
+
+    if (EXECUTE_QUERIES) {
+        if (DO_CRYPT) {
+            assert(ps);
+            assert(clients[client] || clients[client]->qr);
+
+            QueryRewrite *qr = clients[client]->qr;
+            assert(qr->output->afterQuery(ps->e_conn));
+            if (qr->output->queryAgain()) {
+                // FIXME: Is this okay?
+                // > Needs some way to return the actual ResType.
+                // > Also need access to original query.
+                throw CryptDBError("implement onion lowering!");
+
+                const std::string original_query = "original query!";
+                executeQuery(*ps, original_query);
+                return 0;
+            }
+        }
+    }
+
+    return 0;
+}
+
+static int
 decrypt(lua_State *L)
 {
     ANON_REGION(__func__, &perf_cg);
@@ -364,7 +399,7 @@ decrypt(lua_State *L)
             if (k == "name")
                 res.names.push_back(xlua_tolstring(L, -1));
             else if (k == "type")
-                res.types.push_back((enum_field_types) luaL_checkint(L, -1));
+                res.types.push_back((enum_field_types)luaL_checkint(L, -1));
             else
                 LOG(warn) << "unknown key " << k;
             lua_pop(L, 1);
@@ -469,6 +504,7 @@ cryptdb_lib[] = {
     F(rewrite),
     F(decrypt),
     F(preamble),
+    F(epilogue),
     { 0, 0 },
 };
 
