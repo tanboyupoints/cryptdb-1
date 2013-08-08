@@ -18,9 +18,8 @@ class WrapperState {
 public:
     WrapperState() {;}
     std::string last_query;
-    bool considered;
     std::ofstream * PLAIN_LOG;
-    ReturnMeta * rmeta;
+    ReturnMeta rmeta;
     std::string cur_db;
     QueryRewrite * qr;
 };
@@ -30,8 +29,6 @@ static Timer t;
 //static EDBProxy * cl = NULL;
 static ProxyState * ps = NULL;
 static pthread_mutex_t big_lock;
-
-static bool DO_CRYPT = true;
 
 static bool EXECUTE_QUERIES = true;
 
@@ -107,6 +104,7 @@ connect(lua_State *L)
 
     clients[client] = new WrapperState();
 
+    // Is it the first connection?
     if (!ps) {
         std::cerr << "starting proxy\n";
         //cryptdb_logger::setConf(string(getenv("CRYPTDB_LOG")?:""));
@@ -116,61 +114,33 @@ connect(lua_State *L)
                      << "user = " << user << "; "
                      << "password = " << psswd;
 
-        // HACK: This code may require the support of databaseless 'Connect'
-        // objects.  If so, use a derived type to make it clear that the 
-        // Connect object supports this property.
         const std::string dbname = "cryptdbtest";
         const std::string mkey = "113341234";  // XXX do not change as
                                                // it's used for tpcc exps
-        // FIXME: Use env var.
         char * ev = getenv("ENC_BY_DEFAULT");
-        // if (ev) {
-            const std::string encbydefault = "true";
-            if (encbydefault == "false") {
-                std::cerr << "\n\n enc by default false " << "\n\n";
-                ps = new ProxyState(ci, embed_dir, dbname, mkey,
-                                    SECURITY_RATING::PLAIN);
-            } else {
-                std::cerr << "\n\nenc by default true" << "\n\n";
-                ps = new ProxyState(ci, embed_dir, dbname, mkey,
-                                    SECURITY_RATING::BEST_EFFORT);
-            }
-        // }
+        if (ev && "FALSE" == toUpperCase(ev)) {
+            std::cerr << "\n\n enc by default false " << "\n\n";
+            ps = new ProxyState(ci, embed_dir, dbname, mkey,
+                                SECURITY_RATING::PLAIN);
+        } else {
+            std::cerr << "\n\nenc by default true" << "\n\n";
+            ps = new ProxyState(ci, embed_dir, dbname, mkey,
+                                SECURITY_RATING::BEST_EFFORT);
+        }
 
         //may need to do training
         ev = getenv("TRAIN_QUERY");
         if (ev) {
-            std::string trainQuery = ev;
-            LOG(wrapper) << "proxy trains using " << trainQuery;
-            if (trainQuery != "") {
-                // FIXME.
-                throw CryptDBError("TRAIN_QUERY implementation broken!");
-            } else {
-                std::cerr << "empty training!\n";
-            }
+            std::cerr << "Deprecated query training!" << std::endl;
         }
-
-        ev = getenv("DO_CRYPT");
-        if (ev) {
-            std::string useCryptDB = std::string(ev);
-            if (useCryptDB == "false") {
-                LOG(wrapper) << "do not crypt queries/results";
-                DO_CRYPT = false;
-            } else {
-                LOG(wrapper) << "crypt queries/result";
-            }
-        }
-
 
         ev = getenv("EXECUTE_QUERIES");
-        if (ev) {
-            std::string execQueries = std::string(ev);
-            if (execQueries == "false") {
-                LOG(wrapper) << "do not execute queries";
-                EXECUTE_QUERIES = false;
-            } else {
-                LOG(wrapper) << "execute queries";
-            }
+        if (ev && "FALSE" == toUpperCase(ev)) {
+            LOG(wrapper) << "do not execute queries";
+            EXECUTE_QUERIES = false;
+        } else {
+            LOG(wrapper) << "execute queries";
+            EXECUTE_QUERIES = true;
         }
 
         ev = getenv("LOAD_ENC_TABLES");
@@ -199,9 +169,6 @@ connect(lua_State *L)
                 LOG_PLAIN_QUERIES = false;
             }
         }
-
-
-
     } else {
         if (LOG_PLAIN_QUERIES) {
             std::string logPlainQueries =
@@ -233,35 +200,11 @@ disconnect(lua_State *L)
         return 0;
 
     LOG(wrapper) << "disconnect " << client;
+    if (clients[client]->qr) {
+        delete clients[client]->qr;
+    }
     delete clients[client];
     clients.erase(client);
-
-    return 0;
-}
-
-static int
-preamble(lua_State *L)
-{
-    ANON_REGION(__func__, &perf_cg);
-    scoped_lock l(&big_lock);
-    assert(0 == mysql_thread_init());
-
-    std::string client = xlua_tolstring(L, 1);
-    if (clients.find(client) == clients.end())
-        return 0;
-
-    std::string query = xlua_tolstring(L, 2);
-
-    if (EXECUTE_QUERIES) {
-        if (DO_CRYPT) {
-            assert(ps);
-
-            Rewriter r;
-            QueryRewrite *&qr = clients[client]->qr =
-                new QueryRewrite(r.rewrite(*ps, query));
-            assert(qr->output->beforeQuery(ps->conn, ps->e_conn));
-        }
-    }
 
     return 0;
 }
@@ -275,48 +218,40 @@ rewrite(lua_State *L)
 
     std::string client = xlua_tolstring(L, 1);
     if (clients.find(client) == clients.end()) {
-        // FIXME: Is it actually safe to return 0 here?
-        // > Or should be double nil?
         return 0;
     }
 
     std::string query = xlua_tolstring(L, 2);
     std::string query_data = xlua_tolstring(L, 3);
 
-    //clients[client]->considered = true;
-
     std::list<std::string> new_queries;
 
     t.lap_ms();
     if (EXECUTE_QUERIES) {
-        if (!DO_CRYPT) {
-            new_queries.push_back(query);
-        } else {
-            try {
-                assert(ps);
+        try {
+            assert(ps);
 
-                QueryRewrite *&qr = clients[client]->qr;
-                if (!qr->output->getQuery(&new_queries)) {
-                    throw CryptDBError("Failed to retrieve query!");
-                }
-                
-                clients[client]->rmeta = new ReturnMeta(qr->rmeta);
-                clients[client]->considered = true;
-                // clients[client]->considered = qr.wasRew;
-            } catch (CryptDBError &e) {
-                LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
-                lua_pushnil(L);
-                lua_pushnil(L);
-                return 2;
+            Rewriter r;
+            QueryRewrite *&qr = clients[client]->qr =
+                new QueryRewrite(r.rewrite(*ps, query));
+            assert(qr->output->beforeQuery(ps->conn, ps->e_conn));
+
+            if (!qr->output->getQuery(&new_queries)) {
+                assert(qr->output->handleQueryFailure(ps->e_conn));
+                return 0;
             }
+            
+            clients[client]->rmeta = qr->rmeta;
+        } catch (CryptDBError &e) {
+            LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
+            lua_pushnil(L);
+            return 1;
         }
     }
 
     if (LOG_PLAIN_QUERIES) {
         *(clients[client]->PLAIN_LOG) << query << "\n";
     }
-
-    lua_pushboolean(L, clients[client]->considered);
 
     lua_createtable(L, (int) new_queries.size(), 0);
     int top = lua_gettop(L);
@@ -328,7 +263,7 @@ rewrite(lua_State *L)
     }
 
     clients[client]->last_query = query;
-    return 2;
+    return 1;
 }
 
 static int
@@ -342,24 +277,21 @@ epilogue(lua_State *L)
     if (clients.find(client) == clients.end())
         return 0;
 
-    if (EXECUTE_QUERIES) {
-        if (DO_CRYPT) {
-            assert(ps);
-            assert(clients[client] || clients[client]->qr);
+    assert(EXECUTE_QUERIES);
 
-            QueryRewrite *qr = clients[client]->qr;
-            assert(qr->output->afterQuery(ps->e_conn));
-            if (qr->output->queryAgain()) {
-                // FIXME: Is this okay?
-                // > Needs some way to return the actual ResType.
-                // > Also need access to original query.
-                throw CryptDBError("implement onion lowering!");
+    assert(ps);
+    assert(clients[client]->qr);
 
-                const std::string original_query = "original query!";
-                executeQuery(*ps, original_query);
-                return 0;
-            }
-        }
+    QueryRewrite *qr = clients[client]->qr;
+    assert(qr->output->afterQuery(ps->e_conn));
+    if (qr->output->queryAgain()) {
+        // FIXME: Is this okay?
+        // > Needs some way to return the actual ResType.
+        // > Also need access to original query.
+        throw CryptDBError("implement onion lowering!");
+
+        const std::string original_query = "original query!";
+        executeQuery(*ps, original_query);
     }
 
     return 0;
@@ -434,22 +366,16 @@ decrypt(lua_State *L)
     }
 
     ResType rd;
-    std::cerr << "do crypt is " << DO_CRYPT << " and considered is " << clients[client]->considered << "\n";
-    if (!DO_CRYPT || !clients[client]->considered) {
-        rd = res;
-    } else {
-        try {
-            Rewriter r;
-            assert(clients[client]->rmeta);
-            ResType *rt = r.decryptResults(res, *clients[client]->rmeta);
-            assert(rt);
-            rd = *rt;
-        }
-        catch(CryptDBError e) {
-            lua_pushnil(L);
-            lua_pushnil(L);
-            return 2;
-        }
+    try {
+        Rewriter r;
+        ResType *rt = r.decryptResults(res, clients[client]->rmeta);
+        assert(rt);
+        rd = *rt;
+    }
+    catch(CryptDBError e) {
+        lua_pushnil(L);
+        lua_pushnil(L);
+        return 2;
     }
 
     /* return decrypted result set */
@@ -503,7 +429,6 @@ cryptdb_lib[] = {
     F(disconnect),
     F(rewrite),
     F(decrypt),
-    F(preamble),
     F(epilogue),
     { 0, 0 },
 };
