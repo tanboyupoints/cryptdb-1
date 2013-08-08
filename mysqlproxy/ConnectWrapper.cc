@@ -241,6 +241,7 @@ rewrite(lua_State *L)
                 return 0;
             }
             
+            clients[client]->last_query = query;
             clients[client]->rmeta = qr->rmeta;
         } catch (CryptDBError &e) {
             LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
@@ -285,13 +286,8 @@ epilogue(lua_State *L)
     QueryRewrite *qr = clients[client]->qr;
     assert(qr->output->afterQuery(ps->e_conn));
     if (qr->output->queryAgain()) {
-        // FIXME: Is this okay?
-        // > Needs some way to return the actual ResType.
-        // > Also need access to original query.
-        throw CryptDBError("implement onion lowering!");
-
-        const std::string original_query = "original query!";
-        executeQuery(*ps, original_query);
+        // > FIXME: Needs some way to return the actual ResType.
+        executeQuery(*ps, clients[client]->last_query);
     }
 
     return 0;

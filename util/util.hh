@@ -437,3 +437,35 @@ class Timer {
 
     uint64_t start;
 };
+
+template <typename T>
+class AssignOnce {
+public:
+    AssignOnce() : frozen(false) {}
+    AssignOnce(T value) : value(value), frozen(true) {}
+    ~AssignOnce() {;}
+    const AssignOnce& operator=(T value) {
+        if (true == frozen) {
+            throw CryptDBError("Object has already been assigned to!");
+        } else {
+            this->value = value;
+            frozen = true;
+            return *this;
+        }
+    }
+
+    const T get() {
+        if (false == frozen) {
+            throw CryptDBError("First assign to AssignOnce template!");
+        }
+        frozen = true;
+        return value;
+    }
+
+private:
+    T value;
+    bool frozen;
+
+    AssignOnce(const AssignOnce &other);
+};
+

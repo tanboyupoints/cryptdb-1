@@ -419,8 +419,7 @@ private:
     const std::string where_clause;
     const ProxyState &ps;
 
-    // Use AssignOnce.
-    std::string output_values;
+    AssignOnce<std::string> output_values;
 };
 
 class DeltaOutput : public RewriteOutput {
@@ -456,8 +455,7 @@ public:
 
 private:
     const std::string new_query;
-    // FIXME: Use AssignOnce.
-    unsigned long delta_output_id;
+    AssignOnce<unsigned long> delta_output_id;
 
     const std::list<std::string> remote_qz() const;
     const std::list<std::string> local_qz() const;
@@ -480,8 +478,7 @@ public:
 
 private:
     const std::list<std::string> adjust_queries;
-    // FIXME: Use AssignOnce.
-    unsigned long delta_output_id;
+    AssignOnce<unsigned long> delta_output_id;
 
     const std::list<std::string> remote_qz() const;
     const std::list<std::string> local_qz() const;

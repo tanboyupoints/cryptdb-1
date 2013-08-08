@@ -594,7 +594,8 @@ bool SpecialUpdate::getQuery(std::list<std::string> *queryz)
     // > Add each row from the embedded database to the data database.
     std::ostringstream push_results_stream;
     push_results_stream << " INSERT INTO " << this->plain_table
-                        << " VALUES " << this->output_values << ";";
+                        << " VALUES " << this->output_values.get()
+                        << ";";
     queryz->push_back(push_results_stream.str());
     queryz->push_back("COMMIT; ");
 
@@ -857,7 +858,6 @@ handleDeltaAfterQuery(Connect *e_conn,
     return true;
 }
 
-// FIXME: Use AssignOnce.
 bool DDLOutput::beforeQuery(Connect *conn, Connect *e_conn)
 {
     unsigned long delta_id;
@@ -880,14 +880,14 @@ bool DDLOutput::getQuery(std::list<std::string> *queryz)
 
 bool DDLOutput::handleQueryFailure(Connect *e_conn)
 {
-    assert(revertAndCleanupEmbedded(e_conn, this->delta_output_id));
+    assert(revertAndCleanupEmbedded(e_conn, this->delta_output_id.get()));
     return true;
 }
 
 bool DDLOutput::afterQuery(Connect *e_conn)
 {
     return handleDeltaAfterQuery(e_conn, deltas, local_qz(),
-                                 this->delta_output_id);
+                                 this->delta_output_id.get());
 }
 
 const std::list<std::string> DDLOutput::remote_qz() const {
@@ -898,7 +898,6 @@ const std::list<std::string> DDLOutput::local_qz() const {
     return std::list<std::string>({original_query});
 }
 
-// FIXME: Use AssignOnce.
 bool AdjustOnionOutput::beforeQuery(Connect *conn, Connect *e_conn)
 {
     unsigned long delta_id;
@@ -918,7 +917,7 @@ bool AdjustOnionOutput::getQuery(std::list<std::string> *queryz)
         queryz->push_back(it);
     }
 
-    queryz->push_back(dmlCompletionQuery(this->delta_output_id));
+    queryz->push_back(dmlCompletionQuery(this->delta_output_id.get()));
     queryz->push_back("COMMIT; ");
 
     return true;
@@ -926,14 +925,14 @@ bool AdjustOnionOutput::getQuery(std::list<std::string> *queryz)
 
 bool AdjustOnionOutput::handleQueryFailure(Connect *e_conn)
 {
-    assert(revertAndCleanupEmbedded(e_conn, this->delta_output_id));
+    assert(revertAndCleanupEmbedded(e_conn, this->delta_output_id.get()));
     return true;
 }
 
 bool AdjustOnionOutput::afterQuery(Connect *e_conn)
 {
     return handleDeltaAfterQuery(e_conn, deltas, local_qz(),
-                                 this->delta_output_id);
+                                 this->delta_output_id.get());
 }
 
 const std::list<std::string> AdjustOnionOutput::remote_qz() const
