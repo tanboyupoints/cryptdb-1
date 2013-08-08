@@ -79,4 +79,4 @@ static onionlayout BEST_EFFORT_STR_ONION_LAYOUT = {
 
 typedef std::map<onion, SECLEVEL>  OnionLevelMap;
 
-enum class SECURITY_RATING {SENSITIVE, BEST_EFFORT, PLAIN};
+enum class SECURITY_RATING {PLAIN, BEST_EFFORT, SENSITIVE};

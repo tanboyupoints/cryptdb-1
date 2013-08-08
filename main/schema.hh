@@ -123,7 +123,6 @@ public:
     const bool has_salt; //whether this field has its own salt
     const std::string salt_name;
     const onionlayout onion_layout;
-    const SECURITY_RATING sec_rating;
 
     // New.
     FieldMeta(std::string name, Create_field *field,
@@ -155,12 +154,14 @@ public:
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
 
+    SECURITY_RATING getSecurityRating() {return sec_rating;}
     unsigned long leaseIncUniq() {return counter++;}
     // FIXME: Change name.
     unsigned long getCurrentUniqCounter() {return counter;}
 
 private:
     constexpr static const char *type_name = "fieldMeta";
+    const SECURITY_RATING sec_rating;
     unsigned long uniq_count;
     unsigned long counter;
 

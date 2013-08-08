@@ -889,6 +889,13 @@ struct DirectiveData {
     }
 };
 
+static
+std::string
+mysql_noop()
+{
+    return "do 0;";
+}
+
 // FIXME: Implement.
 // SYNTAX: DIRECTIVE [table name] [field name] [security rating]
 // > FIXME: Make the syntax more sql like.
@@ -897,7 +904,17 @@ Rewriter::handleDirective(Analysis &a, const ProxyState &ps,
                           const std::string &query)
 {
     DirectiveData data(query);
-    return NULL;
+    FieldMeta *fm = a.getFieldMeta(data.table_name, data.field_name);
+    const SECURITY_RATING current_rating = fm->getSecurityRating();
+    if (current_rating < data.sec_rating) {
+        throw CryptDBError("cryptdb does not support going to a more "
+                           "secure rating!");
+    } else if (current_rating == data.sec_rating) {
+        return new SimpleOutput(mysql_noop());
+    } else {
+        // Actually do things.
+        throw CryptDBError("implement handleDirective!");
+    }
 }
 
 static
@@ -935,7 +952,6 @@ Rewriter::rewrite(const ProxyState &ps, const std::string & q)
     if (cryptdbDirective(q)) {
         RewriteOutput *output = this->handleDirective(analysis, ps, q);
         return QueryRewrite(true, *analysis.rmeta, output);
-                            
     } else {
         // FIXME: Memleak return of 'dispatchOnLex()'
         RewriteOutput *output = this->dispatchOnLex(analysis, ps, q);
