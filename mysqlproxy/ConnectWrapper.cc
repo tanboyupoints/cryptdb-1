@@ -136,9 +136,8 @@ connect(lua_State *L)
             std::string trainQuery = ev;
             LOG(wrapper) << "proxy trains using " << trainQuery;
             if (trainQuery != "") {
-                Rewriter r;
-                // TODO: May need to set current database in ProxyState.
-                r.rewrite(*ps, trainQuery);
+                // FIXME.
+                throw CryptDBError("TRAIN_QUERY implementation broken!");
             } else {
                 std::cerr << "empty training!\n";
             }
@@ -234,6 +233,30 @@ disconnect(lua_State *L)
 }
 
 static int
+preamble(lua_State *L)
+{
+    ANON_REGION(__func__, &perf_cg);
+    scoped_lock l(&big_lock);
+    assert(0 == mysql_thread_init());
+
+    std::string client = xlua_tolstring(L, 1);
+    if (clients.find(client) == clients.end())
+        return 0;
+
+    std::string query = xlua_tolstring(L, 2);
+
+    if (EXECUTE_QUERIES) {
+        if (DO_CRYPT) {
+            throw CryptDBError("implement preamble!");
+        }
+    }
+
+    // FIXME: Is it actually safe to return 0 here?
+    // > Or should be double nil.
+    return 0;
+}
+
+static int
 rewrite(lua_State *L)
 {
     ANON_REGION(__func__, &perf_cg);
@@ -245,6 +268,7 @@ rewrite(lua_State *L)
         return 0;
 
     std::string query = xlua_tolstring(L, 2);
+    std::string query_data = xlua_tolstring(L, 3);
 
     //clients[client]->considered = true;
 
@@ -257,6 +281,11 @@ rewrite(lua_State *L)
             new_queries.push_back(query);
         } else {
             try {
+                /*
+                Rewriter r;
+                assert(ps);
+                QueryRewrite qr = r.rewrite(*ps, query);
+                */
                 throw CryptDBError("rewrite, not implemented!");
                 // TODO: May need to set current db in ProxyState.
                 /*
@@ -426,6 +455,7 @@ cryptdb_lib[] = {
     F(disconnect),
     F(rewrite),
     F(decrypt),
+    F(preamble),
     { 0, 0 },
 };
 

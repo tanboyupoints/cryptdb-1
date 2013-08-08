@@ -458,14 +458,12 @@ ResType *RewriteOutput::sendQuery(Connect *c, const std::string &q)
     return res;
 }
 
-bool SimpleOutput::beforeQuery(Connect *conn, Connect *e_conn,
-                               std::string *before_query_data)
+bool SimpleOutput::beforeQuery(Connect *conn, Connect *e_conn)
 {
     return true;
 }
 
-bool SimpleOutput::getQuery(const std::string before_query_data,
-                            std::list<std::string> *queryz)
+bool SimpleOutput::getQuery(std::list<std::string> *queryz)
 {
     queryz->clear();
     queryz->push_back(original_query);
@@ -483,14 +481,12 @@ bool SimpleOutput::afterQuery(Connect *e_conn)
     return true;
 }
 
-bool DMLOutput::beforeQuery(Connect *conn, Connect *e_conn,
-                            std::string *before_query_data)
+bool DMLOutput::beforeQuery(Connect *conn, Connect *e_conn)
 {
     return true;
 }
 
-bool DMLOutput::getQuery(const std::string before_query_data,
-                         std::list<std::string> *queryz)
+bool DMLOutput::getQuery(std::list<std::string> *queryz)
 {
     queryz->clear();
     queryz->push_back(new_query);
@@ -508,8 +504,7 @@ bool DMLOutput::afterQuery(Connect *e_conn)
     return true;
 }
 
-bool SpecialUpdate::beforeQuery(Connect *conn, Connect *e_conn,
-                                std::string *before_query_data)
+bool SpecialUpdate::beforeQuery(Connect *conn, Connect *e_conn)
 {
     // Retrieve rows from database.
     std::ostringstream select_stream;
@@ -575,7 +570,7 @@ bool SpecialUpdate::beforeQuery(Connect *conn, Connect *e_conn,
         }
         output_rows.append(" ) ,");
     }
-    *before_query_data = output_rows.substr(0, output_rows.length() - 1);
+    this->output_values = output_rows.substr(0, output_rows.length() - 1);
 
     // Cleanup the embedded database.
     std::ostringstream cleanup_stream;
@@ -585,8 +580,7 @@ bool SpecialUpdate::beforeQuery(Connect *conn, Connect *e_conn,
     return true;
 }
 
-bool SpecialUpdate::getQuery(const std::string before_query_data,
-                             std::list<std::string> *queryz)
+bool SpecialUpdate::getQuery(std::list<std::string> *queryz)
 {
     queryz->clear();
     queryz->push_back("START TRANSACTION; ");
@@ -600,7 +594,7 @@ bool SpecialUpdate::getQuery(const std::string before_query_data,
     // > Add each row from the embedded database to the data database.
     std::ostringstream push_results_stream;
     push_results_stream << " INSERT INTO " << this->plain_table
-                        << " VALUES " << before_query_data << ";";
+                        << " VALUES " << this->output_values << ";";
     queryz->push_back(push_results_stream.str());
     queryz->push_back("COMMIT; ");
 
@@ -864,8 +858,7 @@ handleDeltaAfterQuery(Connect *e_conn,
 }
 
 // FIXME: Use AssignOnce.
-bool DDLOutput::beforeQuery(Connect *conn, Connect *e_conn,
-                            std::string *before_query_data)
+bool DDLOutput::beforeQuery(Connect *conn, Connect *e_conn)
 {
     unsigned long delta_id;
     bool b = handleDeltaBeforeQuery(conn, e_conn, deltas, local_qz(),
@@ -875,8 +868,7 @@ bool DDLOutput::beforeQuery(Connect *conn, Connect *e_conn,
     return b;
 }
 
-bool DDLOutput::getQuery(const std::string before_query_data,
-                         std::list<std::string> *queryz)
+bool DDLOutput::getQuery(std::list<std::string> *queryz)
 {
     queryz->clear();
 
@@ -907,8 +899,7 @@ const std::list<std::string> DDLOutput::local_qz() const {
 }
 
 // FIXME: Use AssignOnce.
-bool AdjustOnionOutput::beforeQuery(Connect *conn, Connect *e_conn,
-                                    std::string *before_query_data)
+bool AdjustOnionOutput::beforeQuery(Connect *conn, Connect *e_conn)
 {
     unsigned long delta_id;
     bool b = handleDeltaBeforeQuery(conn, e_conn, deltas, local_qz(),
@@ -918,8 +909,7 @@ bool AdjustOnionOutput::beforeQuery(Connect *conn, Connect *e_conn,
     return b;
 }
 
-bool AdjustOnionOutput::getQuery(const std::string before_query_data,
-                                 std::list<std::string> *queryz)
+bool AdjustOnionOutput::getQuery(std::list<std::string> *queryz)
 {
     queryz->clear();
     queryz->push_back("START TRANSACTION; ");

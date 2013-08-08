@@ -354,10 +354,8 @@ public:
         : original_query(original_query) {}
     virtual ~RewriteOutput() = 0;
 
-    virtual bool beforeQuery(Connect *conn, Connect *e_conn,
-                             std::string *before_query_data) = 0;
-    virtual bool getQuery(const std::string before_query_data,
-                          std::list<std::string> *queryz) = 0;
+    virtual bool beforeQuery(Connect *conn, Connect *e_conn) = 0;
+    virtual bool getQuery(std::list<std::string> *queryz) = 0;
     virtual bool handleQueryFailure(Connect *e_conn) = 0;
     virtual bool afterQuery(Connect *e_conn) = 0;
     virtual bool queryAgain();
@@ -374,10 +372,8 @@ public:
         : RewriteOutput(original_query) {}
     ~SimpleOutput() {;}
 
-    bool beforeQuery(Connect *conn, Connect *e_conn,
-                     std::string *before_query_data);
-    bool getQuery(const std::string before_query_data,
-                  std::list<std::string> *queryz);
+    bool beforeQuery(Connect *conn, Connect *e_conn);
+    bool getQuery(std::list<std::string> *queryz);
     bool handleQueryFailure(Connect *e_conn);
     bool afterQuery(Connect *e_conn);
 };
@@ -388,10 +384,8 @@ public:
         : RewriteOutput(original_query), new_query(new_query) {}
     ~DMLOutput() {;}
 
-    bool beforeQuery(Connect *conn, Connect *e_conn,
-                     std::string *before_query_data);
-    bool getQuery(const std::string before_query_data,
-                  std::list<std::string> *queryz);
+    bool beforeQuery(Connect *conn, Connect *e_conn);
+    bool getQuery(std::list<std::string> *queryz);
     bool handleQueryFailure(Connect *e_conn);
     bool afterQuery(Connect *e_conn);
 
@@ -413,10 +407,8 @@ public:
       where_clause(where_clause), ps(ps) {}
     ~SpecialUpdate() {;}
 
-    bool beforeQuery(Connect *conn, Connect *e_conn,
-                     std::string *before_query_data);
-    bool getQuery(const std::string before_query_data,
-                  std::list<std::string> *queryz);
+    bool beforeQuery(Connect *conn, Connect *e_conn);
+    bool getQuery(std::list<std::string> *queryz);
     bool handleQueryFailure(Connect *e_conn);
     bool afterQuery(Connect *e_conn);
 
@@ -425,8 +417,10 @@ private:
     const std::string plain_table;
     const std::string crypted_table;
     const std::string where_clause;
-    // FIXME: Use const.
     const ProxyState &ps;
+
+    // Use AssignOnce.
+    std::string output_values;
 };
 
 class DeltaOutput : public RewriteOutput {
@@ -435,10 +429,8 @@ public:
         : RewriteOutput(original_query), deltas(deltas) {}
     virtual ~DeltaOutput() = 0;
 
-    bool beforeQuery(Connect *conn, Connect *e_conn,
-                     std::string *before_query_data) = 0;
-    virtual bool getQuery(const std::string before_query_data,
-                          std::list<std::string> *queryz) = 0;
+    bool beforeQuery(Connect *conn, Connect *e_conn) = 0;
+    virtual bool getQuery(std::list<std::string> *queryz) = 0;
     virtual bool handleQueryFailure(Connect *e_conn) = 0;
     bool afterQuery(Connect *e_conn) = 0;
 
@@ -457,10 +449,8 @@ public:
         : DeltaOutput(original_query, deltas), new_query(new_query) {}
     ~DDLOutput() {;}
 
-    bool beforeQuery(Connect *conn, Connect *e_conn,
-                     std::string *before_query_data);
-    bool getQuery(const std::string before_query_data,
-                  std::list<std::string> *queryz);
+    bool beforeQuery(Connect *conn, Connect *e_conn);
+    bool getQuery(std::list<std::string> *queryz);
     bool handleQueryFailure(Connect *e_conn);
     bool afterQuery(Connect *e_conn);
 
@@ -482,10 +472,8 @@ public:
     ~AdjustOnionOutput() {;}
     ResType *doQuery(Connect *conn, Connect *e_conn);
 
-    bool beforeQuery(Connect *conn, Connect *e_conn,
-                     std::string *before_query_data);
-    bool getQuery(const std::string before_query_data,
-                  std::list<std::string> *queryz);
+    bool beforeQuery(Connect *conn, Connect *e_conn);
+    bool getQuery(std::list<std::string> *queryz);
     bool handleQueryFailure(Connect *e_conn);
     bool afterQuery(Connect *e_conn);
     bool queryAgain();

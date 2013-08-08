@@ -1064,13 +1064,12 @@ executeQuery(const ProxyState &ps, const std::string &q)
         QueryRewrite qr = r.rewrite(ps, q);
         
         // Query preamble.
-        std::string before_data;
-        assert(qr.output->beforeQuery(ps.conn, ps.e_conn, &before_data));
+        assert(qr.output->beforeQuery(ps.conn, ps.e_conn));
 
         // Execute query.
         DBResult *dbres;
         std::list<std::string> out_queryz;
-        if (!qr.output->getQuery(before_data, &out_queryz)) {
+        if (!qr.output->getQuery(&out_queryz)) {
             throw CryptDBError("Failed to retrieve query!");
         }
     

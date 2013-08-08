@@ -64,8 +64,11 @@ function read_query_real(packet)
         local query = string.sub(packet, 2)
         dprint("read_query: " .. query)
 
+        query_data =
+            CryptDB.preamble(proxy.connection.client.src.name, query);
         consider, new_queries =
-            CryptDB.rewrite(proxy.connection.client.src.name, query)
+            CryptDB.rewrite(proxy.connection.client.src.name, query,
+                            query_data);
 
         if not new_queries then
             proxy.response.type = proxy.MYSQLD_PACKET_ERR
@@ -83,7 +86,7 @@ function read_query_real(packet)
             return proxy.PROXY_SEND_RESULT
         end
 
-	dprint(" ")
+        dprint(" ")
         for i, v in pairs(new_queries) do
             dprint("rewritten query[" .. i .. "]: " .. v)
             local result_key
