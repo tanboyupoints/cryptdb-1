@@ -64,7 +64,6 @@ operator<<(std::ostream &out, const EncSet & es);
 
 const EncSet EQ_EncSet = {
     {
-        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET,   LevelFieldPair(SECLEVEL::DET, NULL)},
         {oOPE,   LevelFieldPair(SECLEVEL::OPE, NULL)},
@@ -73,7 +72,6 @@ const EncSet EQ_EncSet = {
 
 const EncSet JOIN_EncSet = {
     {
-        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET,   LevelFieldPair(SECLEVEL::DETJOIN, NULL)},
     }
@@ -81,7 +79,6 @@ const EncSet JOIN_EncSet = {
 
 const EncSet ORD_EncSet = {
     {
-        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
     }
@@ -90,14 +87,12 @@ const EncSet ORD_EncSet = {
 const EncSet PLAIN_EncSet = {
     {
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)}
     }
 };
 
 //todo: there should be a map of FULL_EncSets depending on item type
 const EncSet FULL_EncSet = {
     {
-        {oBESTEFFORT, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
@@ -108,7 +103,6 @@ const EncSet FULL_EncSet = {
 
 const EncSet FULL_EncSet_Str = {
     {
-        {oBESTEFFORT, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
@@ -118,7 +112,6 @@ const EncSet FULL_EncSet_Str = {
 
 const EncSet FULL_EncSet_Int = {
     {
-        {oBESTEFFORT, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
@@ -128,7 +121,6 @@ const EncSet FULL_EncSet_Int = {
 
 const EncSet Search_EncSet = {
     {
-        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
     }
@@ -136,7 +128,6 @@ const EncSet Search_EncSet = {
 
 const EncSet ADD_EncSet = {
     {
-        {oBESTEFFORT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
     }
@@ -266,27 +257,29 @@ public:
 std::ostream&
 operator<<(std::ostream &out, const RewritePlan * rp);
 
-
 // state maintained at the proxy
 typedef struct ProxyState {
     ProxyState(ConnectionInfo ci, const std::string &embed_dir,
-               const std::string &dbname, bool encByDefault,
-               const std::string &master_key, bool best_effort=true);
+               const std::string &dbname, const std::string &master_key,
+               SECURITY_RATING default_sec_rating =
+                SECURITY_RATING::BEST_EFFORT);
     ~ProxyState();
     std::string dbName() const {return dbname;}
-    bool bestEffort() const {return best_effort;}
+    SECURITY_RATING defaultSecurityRating() const
+    {
+        return default_sec_rating;
+    }
 
     // connection to remote and embedded server
     Connect *conn;
     Connect *e_conn;
 
-    const bool encByDefault;
     const AES_KEY * const masterKey;
 
 private:
     // FIXME: Remove once cryptdb supports multiple databases.
     const std::string dbname;
-    const bool best_effort;
+    const SECURITY_RATING default_sec_rating;
 } ProxyState;
 
 

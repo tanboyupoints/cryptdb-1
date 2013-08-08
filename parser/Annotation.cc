@@ -305,13 +305,16 @@ Annotation::parse() {
             OPEenclevel = SECLEVEL::RND;
         }
         while (word != query_list.end()) {
-            SECLEVEL enclevel = string_to_sec_level(toUpperCase(*word));
+            throw CryptDBError("Need to get enclevel!");
+            /*
+            SECLEVEL enclevel =
+                TypeText<SECLEVEL>::toType(toUpperCase(*word));
             switch (enclevel) {
             case SECLEVEL::DETJOIN:
             case SECLEVEL::DET:
                 DETenclevel = enclevel;
                 break;
-            case SECLEVEL::OPEJOIN:
+            // case SECLEVEL::OPEJOIN:
             case SECLEVEL::OPE:
                 OPEenclevel = enclevel;
                 break;
@@ -325,6 +328,7 @@ Annotation::parse() {
                 assert_s(false, "unknown onion level annotation on ENC_FOR");
             }
             word++;
+            */
         }
         break;
     case SPEAKSFOR:

@@ -363,9 +363,10 @@ buildTypeTextTranslator()
 {
     // Onions.
     const char *onion_chars[] =
-        {"oBESTEFFORT", "oPLAIN", "oDET", "oOPE", "oAGG", "oSWP"};
-    onion onions[] = {oBESTEFFORT, oPLAIN, oDET, oOPE, oAGG, oSWP};
-    assert(arraysize(onion_chars) == arraysize(onions));
+        {"oPLAIN", "oDET", "oOPE", "oAGG", "oSWP"};
+    onion onions[] = {oPLAIN, oDET, oOPE, oAGG, oSWP};
+    static_assert(arraysize(onion_chars) == arraysize(onions),
+                  "onion size mismatch!");
     int count = arraysize(onion_chars);
     translatorHelper((const char **)onion_chars, (onion *)onions, count);
 
@@ -376,7 +377,8 @@ buildTypeTextTranslator()
                             SECLEVEL::DETJOIN, SECLEVEL::OPE,
                             SECLEVEL::HOM, SECLEVEL::SEARCH,
                             SECLEVEL::PLAINVAL};
-    assert(arraysize(seclevel_chars) == arraysize(seclevels));
+    static_assert(arraysize(seclevel_chars) == arraysize(seclevels),
+                  "SECLEVEL size mismatch!");
     count = arraysize(seclevel_chars);
     translatorHelper((const char **)seclevel_chars, (SECLEVEL *)seclevels,
                      count);
@@ -408,7 +410,8 @@ buildTypeTextTranslator()
         MYSQL_TYPE_TINY_BLOB, MYSQL_TYPE_VAR_STRING,
         MYSQL_TYPE_VARCHAR, MYSQL_TYPE_YEAR
     };
-    assert(arraysize(mysql_type_chars) == arraysize(mysql_types));
+    static_assert(arraysize(mysql_type_chars) == arraysize(mysql_types),
+                  "mysql type size mismatch!");
     count = arraysize(mysql_type_chars);
     translatorHelper((const char **)mysql_type_chars,
                      (enum enum_field_types *)mysql_types, count);
@@ -419,14 +422,17 @@ buildTypeTextTranslator()
         "PLAIN_ONION_LAYOUT", "NUM_ONION_LAYOUT",
         "BEST_EFFORT_NUM_ONION_LAYOUT", "STR_ONION_LAYOUT",
         "BEST_EFFORT_STR_ONION_LAYOUT"
+        
     };
     onionlayout onion_layouts[] =
     {
         PLAIN_ONION_LAYOUT, NUM_ONION_LAYOUT,
-        BEST_EFFORT_NUM_ONION_LAYOUT,
-        STR_ONION_LAYOUT, BEST_EFFORT_STR_ONION_LAYOUT
+        BEST_EFFORT_NUM_ONION_LAYOUT, STR_ONION_LAYOUT,
+        BEST_EFFORT_STR_ONION_LAYOUT
     };
-    assert(arraysize(onion_layout_chars) == arraysize(onion_layouts));
+    static_assert(arraysize(onion_layout_chars) ==
+                    arraysize(onion_layouts),
+                  "onionlayout size mismatch!");
     count = arraysize(onion_layout_chars);
     translatorHelper((const char **)onion_layout_chars,
                      (onionlayout *)onion_layouts, count);
@@ -445,10 +451,29 @@ buildTypeTextTranslator()
         Field::GEOM_MULTILINESTRING, Field::GEOM_MULTIPOLYGON,
         Field::GEOM_GEOMETRYCOLLECTION
     };
-    assert(arraysize(geometry_type_chars) == arraysize(geometry_types));
+    static_assert(arraysize(geometry_type_chars) ==
+                    arraysize(geometry_types),
+                  "geometry type size mismatch!");
     count = arraysize(geometry_type_chars);
     translatorHelper((const char **)geometry_type_chars,
                     (Field::geometry_type *)geometry_types, count);
+
+    // Security Rating.
+    const char *security_rating_chars[] =
+    {
+        "SENSITIVE", "BEST_EFFORT", "PLAIN"
+    };
+    SECURITY_RATING security_rating_types[] =
+    {
+        SECURITY_RATING::SENSITIVE, SECURITY_RATING::BEST_EFFORT,
+        SECURITY_RATING::PLAIN
+    };
+    static_assert(arraysize(security_rating_chars) ==
+                    arraysize(security_rating_types),
+                  "security rating size mismatch!");
+    count = arraysize(security_rating_chars);
+    translatorHelper((const char **)security_rating_chars,
+                    (SECURITY_RATING *)security_rating_types, count);
 
     return;
 }
@@ -842,6 +867,74 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
     }
 }
 
+struct DirectiveData {
+    std::string table_name;
+    std::string field_name;
+    SECURITY_RATING sec_rating;
+
+    DirectiveData(const std::string query)
+    {
+        std::list<std::string> tokens = split(query, " ");
+        assert(tokens.size() == 4);
+        tokens.pop_front();
+
+        table_name = tokens.front();
+        tokens.pop_front();
+
+        field_name = tokens.front();
+        tokens.pop_front();
+
+        sec_rating = TypeText<SECURITY_RATING>::toType(tokens.front());
+        tokens.pop_front();
+    }
+};
+
+static
+std::string
+mysql_noop()
+{
+    return "do 0;";
+}
+
+// FIXME: Implement.
+// SYNTAX: DIRECTIVE [table name] [field name] [security rating]
+// > FIXME: Make the syntax more sql like.
+RewriteOutput * 
+Rewriter::handleDirective(Analysis &a, const ProxyState &ps,
+                          const std::string &query)
+{
+    DirectiveData data(query);
+    FieldMeta *fm = a.getFieldMeta(data.table_name, data.field_name);
+    const SECURITY_RATING current_rating = fm->getSecurityRating();
+    if (current_rating < data.sec_rating) {
+        throw CryptDBError("cryptdb does not support going to a more "
+                           "secure rating!");
+    } else if (current_rating == data.sec_rating) {
+        return new SimpleOutput(mysql_noop());
+    } else {
+        // Actually do things.
+        throw CryptDBError("implement handleDirective!");
+    }
+}
+
+static
+bool
+cryptdbDirective(const std::string query)
+{
+    std::size_t found = query.find("DIRECTIVE");
+    if (std::string::npos == found) {
+        return false;
+    }
+    
+    for (std::size_t i = 0; i < found; ++i) {
+        if (!std::isspace(query[i])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 // TODO: we don't need to pass analysis, enough to pass returnmeta
 QueryRewrite
 Rewriter::rewrite(const ProxyState &ps, const std::string & q)
@@ -856,9 +949,14 @@ Rewriter::rewrite(const ProxyState &ps, const std::string & q)
     const SchemaInfo * const schema = loadSchemaInfo(ps.conn, ps.e_conn);
     Analysis analysis = Analysis(schema);
 
-    // FIXME: Memleak return of 'dispatchOnLex()'
-    return QueryRewrite(true, analysis.rmeta,
-                        this->dispatchOnLex(analysis, ps, q));
+    if (cryptdbDirective(q)) {
+        RewriteOutput *output = this->handleDirective(analysis, ps, q);
+        return QueryRewrite(true, *analysis.rmeta, output);
+    } else {
+        // FIXME: Memleak return of 'dispatchOnLex()'
+        RewriteOutput *output = this->dispatchOnLex(analysis, ps, q);
+        return QueryRewrite(true, *analysis.rmeta, output);
+    }
 }
 
 //TODO: replace stringify with <<
@@ -881,7 +979,7 @@ std::string ReturnMeta::stringify() {
 }
 
 ResType *
-Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
+Rewriter::decryptResults(ResType &dbres, const ReturnMeta &rmeta)
 {
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
@@ -893,7 +991,7 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
     unsigned int index = 0;
     for (auto it = dbres.names.begin();
         it != dbres.names.end(); it++) {
-        const ReturnField &rf = rmeta->rfmeta.at(index);
+        const ReturnField &rf = rmeta.rfmeta.at(index);
         if (!rf.getIsSalt()) {
             //need to return this field
             res->names.push_back(rf.fieldCalled());
@@ -914,7 +1012,7 @@ Rewriter::decryptResults(ResType & dbres, ReturnMeta * rmeta)
     // decrypt rows
     unsigned int col_index = 0;
     for (unsigned int c = 0; c < cols; c++) {
-        const ReturnField &rf = rmeta->rfmeta.at(c);
+        const ReturnField &rf = rmeta.rfmeta.at(c);
         FieldMeta * fm = rf.getOLK().key;
         if (!rf.getIsSalt()) {
             for (unsigned int r = 0; r < rows; r++) {

@@ -45,9 +45,9 @@ printRes(const ResType & r);
 // - data structure needed to decrypt results
 class QueryRewrite {
 public:
-    QueryRewrite(bool wasRes, ReturnMeta *rmeta, RewriteOutput *output)
+    QueryRewrite(bool wasRes, ReturnMeta rmeta, RewriteOutput *output)
         : rmeta(rmeta), output(output) {}
-    ReturnMeta * rmeta;
+    ReturnMeta rmeta;
     RewriteOutput *output;
 };
 
@@ -59,11 +59,14 @@ public:
     ~Rewriter() {;}
 
     QueryRewrite rewrite(const ProxyState &ps, const std::string &q);
-    ResType *decryptResults(ResType & dbres, ReturnMeta * rm);
+    ResType *decryptResults(ResType &dbres, const ReturnMeta &rm);
 
     RewriteOutput *
         dispatchOnLex(Analysis &a, const ProxyState &ps,
                       const std::string &query);
+    RewriteOutput *
+        handleDirective(Analysis &a, const ProxyState &ps,
+                        const std::string &query);
 
     SQLDispatcher *dml_dispatcher;
     SQLDispatcher *ddl_dispatcher;

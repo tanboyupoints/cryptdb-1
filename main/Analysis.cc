@@ -93,7 +93,7 @@ operator<<(std::ostream &out, const EncSet & es)
     }
     for (auto it : es.osl) {
         out << "(onion " << it.first
-            << ", level " << levelnames[(int)it.second.first]
+            << ", level " << TypeText<SECLEVEL>::toText(it.second.first)
             << ", field `" << (it.second.second == NULL ? "*" : it.second.second->fname) << "`"
             << ") ";
     }
@@ -118,7 +118,6 @@ EncSet::chooseOne() const
         oOPE,
         oAGG,
         oSWP,
-        oBESTEFFORT,
         oPLAIN
     };
 
@@ -132,7 +131,6 @@ EncSet::chooseOne() const
                 it->second.first != SECLEVEL::PLAINVAL) {
                 /*
                  * If no key, skip this OLK.
-                 * What are the semantics of chooseOne() anyway?
                  */
                 continue;
             }
@@ -265,11 +263,11 @@ loadUDFs(Connect * conn) {
 }
 
 ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
-                       const std::string &dbname, bool encByDefault,
+                       const std::string &dbname,
                        const std::string &master_key,
-                       bool best_effort)
-    : encByDefault(encByDefault), masterKey(getKey(master_key)),
-      dbname(dbname), best_effort(best_effort)
+                       SECURITY_RATING default_sec_rating)
+    : masterKey(getKey(master_key)), dbname(dbname),
+      default_sec_rating(default_sec_rating)
 {
     init_mysql(embed_dir);
 
@@ -856,7 +854,7 @@ FieldMeta *Analysis::getFieldMeta(const std::string &table,
 TableMeta *Analysis::getTableMeta(const std::string &table) const
 {
     IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
-                                 
+
     TableMeta *tm = this->schema->getChild(key);
     assert(tm);
     return tm;

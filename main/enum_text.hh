@@ -16,21 +16,21 @@ public:
 
     // Instance.
     std::string getText(_type e) {
-		auto it = std::find(theEnums.begin(), theEnums.end(), e);
-		if (theEnums.end() == it) {
-			throw "type does not exist!";
-		}
+        auto it = std::find(theEnums.begin(), theEnums.end(), e);
+        if (theEnums.end() == it) {
+            throw "type does not exist!";
+        }
 
-		return theTexts[it - theEnums.begin()];
+        return theTexts[it - theEnums.begin()];
     }
 
     _type getEnum(std::string t) {
-		auto it = std::find(theTexts.begin(), theTexts.end(), t);
-		if (theTexts.end() == it) {
-			throw "text does not exist!";
-		}
+        auto it = std::find(theTexts.begin(), theTexts.end(), t);
+        if (theTexts.end() == it) {
+            throw "text does not exist!";
+        }
 
-		return theEnums[it - theTexts.begin()];
+        return theEnums[it - theTexts.begin()];
     }
 
     // Static.

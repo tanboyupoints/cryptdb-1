@@ -371,9 +371,10 @@ unmarshallBinary(const std::string &s)
 
 static uint hexval(char c) {
     if (c >= '0' && c <= '9') {
-	return c - '0';
-    } else
-	return c - 'a'+10;
+        return c - '0';
+    } else {
+        return c - 'a'+10;
+    }
 }
 
 std::string
@@ -381,7 +382,7 @@ fromHex(const std::string & h) {
     std::string res(h.length()/2, '0');
 
     for (uint i = 0; i < h.length(); i = i +2) {
-	res[i/2] = (unsigned char)(hexval(h[i])*16+hexval(h[i+1]));
+        res[i/2] = (unsigned char)(hexval(h[i])*16+hexval(h[i+1]));
     }
 
     return res;
@@ -391,14 +392,13 @@ const std::string hextable = "0123456789abcdef";
 
 std::string
 toHex(const std::string  & x) {
-
     uint len = x.length();
     std::string result(len*2, '0');
     
     for (uint i = 0; i < len; i++) {
-	uint v = (uint)x[i];
-	result[2*i] = hextable[v / 16];
-	result[2*i+1] = hextable[v % 16];
+        uint v = (uint)x[i];
+        result[2*i] = hextable[v / 16];
+        result[2*i+1] = hextable[v % 16];
     }
 
     return result;

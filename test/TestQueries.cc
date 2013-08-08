@@ -918,7 +918,7 @@ Connection::start() {
                 ConnectionInfo ci(tc.host, tc.user, tc.pass);
                 const std::string master_key = "2392834";
                 ProxyState *ps =
-                    new ProxyState(ci, tc.shadowdb_dir, tc.db, true,
+                    new ProxyState(ci, tc.shadowdb_dir, tc.db,
                                    master_key);
                 re_set.insert(ps);
                 this->re_it = re_set.begin();

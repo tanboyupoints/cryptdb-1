@@ -21,40 +21,17 @@ typedef enum onion {
 // if a is less secure than b.
 // a appears before b
 // (note, this is not "iff")
-#define SECLEVELS(m)    \
-    m(INVALID)          \
-    m(PLAINVAL)         \
-    m(OPEJOIN)          \
-    m(OPE)              \
-    m(DETJOIN)          \
-    m(DET)              \
-    m(SEARCH)           \
-    m(HOM)              \
-    m(RND)              \
-    m(SECLEVEL_LAST)
 
-typedef enum class SECLEVEL {
-#define __temp_m(n) n,
-SECLEVELS(__temp_m)
-#undef __temp_m
-} SECLEVEL;
-
-//TODO: what is seclevel_last needed for?
-
-const std::string levelnames[] = {
-#define __temp_m(n) #n,
-SECLEVELS(__temp_m)
-#undef __temp_m
+enum class SECLEVEL {
+    INVALID,
+    PLAINVAL,
+    OPE,
+    DETJOIN,
+    DET,
+    SEARCH,
+    HOM,
+    RND
 };
-
-inline SECLEVEL string_to_sec_level(const std::string &s)
-{
-#define __temp_m(n) if (s == #n) return SECLEVEL::n;
-SECLEVELS(__temp_m)
-#undef __temp_m
-    // TODO: possibly raise an exception
-    return SECLEVEL::INVALID;
-}
 
 bool needsSalt(SECLEVEL l);
 
@@ -69,7 +46,7 @@ static onionlayout NUM_ONION_LAYOUT = {
     {oDET, std::vector<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET,
                                   SECLEVEL::RND})},
     {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
-    {oAGG, std::vector<SECLEVEL>({SECLEVEL::HOM})},
+    {oAGG, std::vector<SECLEVEL>({SECLEVEL::HOM})}
 };
 
 static onionlayout BEST_EFFORT_NUM_ONION_LAYOUT = {
@@ -77,7 +54,7 @@ static onionlayout BEST_EFFORT_NUM_ONION_LAYOUT = {
                                   SECLEVEL::RND})},
     {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
     {oAGG, std::vector<SECLEVEL>({SECLEVEL::HOM})},
-    {oBESTEFFORT, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL,
+    {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL,
                                          SECLEVEL::RND})}
 };
 
@@ -95,11 +72,11 @@ static onionlayout BEST_EFFORT_STR_ONION_LAYOUT = {
     {oSWP, std::vector<SECLEVEL>({SECLEVEL::SEARCH})},
     // HACK: RND_str expects the data to be a multiple of 16, so we use
     // DET (it supports decryption UDF) to handle the padding for us.
-    {oBESTEFFORT, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL,
-                                         SECLEVEL::DET,
-                                         SECLEVEL::RND})}
+    {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL,
+                                    SECLEVEL::DET,
+                                    SECLEVEL::RND})}
 };
-
 
 typedef std::map<onion, SECLEVEL>  OnionLevelMap;
 
+enum class SECURITY_RATING {PLAIN, BEST_EFFORT, SENSITIVE};

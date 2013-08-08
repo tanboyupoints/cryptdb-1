@@ -303,8 +303,8 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     // -----------------------------
     const std::string name = std::string(cf->field_name);
     FieldMeta * const fm =
-        new FieldMeta(name, cf, ps.masterKey, tm->leaseIncUniq(),
-                      ps.bestEffort());
+        new FieldMeta(name, cf, ps.masterKey, ps.defaultSecurityRating(),
+                      tm->leaseIncUniq());
     // Here we store the key name for the first time. It will be applied
     // after the Delta is read out of the database.
     if (true == new_table) {
@@ -336,7 +336,8 @@ encrypt_item_layers(Item * i, onion o, OnionMeta * const om,
     Item * enc = i;
     Item * prev_enc = NULL;
     for (auto layer : enc_layers) {
-        LOG(encl) << "encrypt layer " << levelnames[(int)layer->level()] << "\n";
+        LOG(encl) << "encrypt layer "
+                  << TypeText<SECLEVEL>::toText(layer->level()) << "\n";
         enc = layer->encrypt(enc, IV);
         //need to free space for all enc
         //except the last one
