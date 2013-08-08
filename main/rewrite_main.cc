@@ -1069,15 +1069,18 @@ executeQuery(const ProxyState &ps, const std::string &q)
 
         // Execute query.
         DBResult *dbres;
-        std::string out_query;
-        if (!qr.output->getQuery(before_data, &out_query)) {
+        std::list<std::string> out_queryz;
+        if (!qr.output->getQuery(before_data, &out_queryz)) {
             throw CryptDBError("Failed to retrieve query!");
         }
-        prettyPrintQuery(out_query);
-        
-        if (!ps.conn->execute(out_query, dbres)) {
-            qr.output->handleQueryFailure(ps.e_conn);
-            throw CryptDBError("Failed to execute query!");
+    
+        for (auto it : out_queryz) {
+            prettyPrintQuery(it);
+            
+            if (!ps.conn->execute(it, dbres)) {
+                qr.output->handleQueryFailure(ps.e_conn);
+                throw CryptDBError("Failed to execute query!");
+            }
         }
 
         // Query cleanup.

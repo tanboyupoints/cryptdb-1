@@ -1196,7 +1196,7 @@ RunTest(const TestConfig &tc) {
     // Pass 33/34
     scores.push_back(CheckQueryList(tc, Select));
 
-    // PAss 24/24
+    // Pass 24/24
     scores.push_back(CheckQueryList(tc, HOM));
 
     // Pass 19/19

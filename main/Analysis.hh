@@ -357,7 +357,7 @@ public:
     virtual bool beforeQuery(Connect *conn, Connect *e_conn,
                              std::string *before_query_data) = 0;
     virtual bool getQuery(const std::string before_query_data,
-                          std::string *query) = 0;
+                          std::list<std::string> *queryz) = 0;
     virtual bool handleQueryFailure(Connect *e_conn) = 0;
     virtual bool afterQuery(Connect *e_conn) = 0;
     virtual bool queryAgain();
@@ -377,7 +377,7 @@ public:
     bool beforeQuery(Connect *conn, Connect *e_conn,
                      std::string *before_query_data);
     bool getQuery(const std::string before_query_data,
-                  std::string *query);
+                  std::list<std::string> *queryz);
     bool handleQueryFailure(Connect *e_conn);
     bool afterQuery(Connect *e_conn);
 };
@@ -391,7 +391,7 @@ public:
     bool beforeQuery(Connect *conn, Connect *e_conn,
                      std::string *before_query_data);
     bool getQuery(const std::string before_query_data,
-                  std::string *query);
+                  std::list<std::string> *queryz);
     bool handleQueryFailure(Connect *e_conn);
     bool afterQuery(Connect *e_conn);
 
@@ -416,7 +416,7 @@ public:
     bool beforeQuery(Connect *conn, Connect *e_conn,
                      std::string *before_query_data);
     bool getQuery(const std::string before_query_data,
-                  std::string *query);
+                  std::list<std::string> *queryz);
     bool handleQueryFailure(Connect *e_conn);
     bool afterQuery(Connect *e_conn);
 
@@ -438,7 +438,7 @@ public:
     bool beforeQuery(Connect *conn, Connect *e_conn,
                      std::string *before_query_data) = 0;
     virtual bool getQuery(const std::string before_query_data,
-                          std::string *query) = 0;
+                          std::list<std::string> *queryz) = 0;
     virtual bool handleQueryFailure(Connect *e_conn) = 0;
     bool afterQuery(Connect *e_conn) = 0;
 
@@ -460,12 +460,14 @@ public:
     bool beforeQuery(Connect *conn, Connect *e_conn,
                      std::string *before_query_data);
     bool getQuery(const std::string before_query_data,
-                  std::string *query);
+                  std::list<std::string> *queryz);
     bool handleQueryFailure(Connect *e_conn);
     bool afterQuery(Connect *e_conn);
 
 private:
     const std::string new_query;
+    // FIXME: Use AssignOnce.
+    unsigned long delta_output_id;
 
     const std::list<std::string> remote_qz() const;
     const std::list<std::string> local_qz() const;
@@ -483,13 +485,15 @@ public:
     bool beforeQuery(Connect *conn, Connect *e_conn,
                      std::string *before_query_data);
     bool getQuery(const std::string before_query_data,
-                  std::string *query);
+                  std::list<std::string> *queryz);
     bool handleQueryFailure(Connect *e_conn);
     bool afterQuery(Connect *e_conn);
     bool queryAgain();
 
 private:
     const std::list<std::string> adjust_queries;
+    // FIXME: Use AssignOnce.
+    unsigned long delta_output_id;
 
     const std::list<std::string> remote_qz() const;
     const std::list<std::string> local_qz() const;
