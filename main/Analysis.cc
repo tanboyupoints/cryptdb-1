@@ -93,7 +93,7 @@ operator<<(std::ostream &out, const EncSet & es)
     }
     for (auto it : es.osl) {
         out << "(onion " << it.first
-            << ", level " << levelnames[(int)it.second.first]
+            << ", level " << TypeText<SECLEVEL>::toText(it.second.first)
             << ", field `" << (it.second.second == NULL ? "*" : it.second.second->fname) << "`"
             << ") ";
     }

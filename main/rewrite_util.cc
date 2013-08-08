@@ -336,7 +336,8 @@ encrypt_item_layers(Item * i, onion o, OnionMeta * const om,
     Item * enc = i;
     Item * prev_enc = NULL;
     for (auto layer : enc_layers) {
-        LOG(encl) << "encrypt layer " << levelnames[(int)layer->level()] << "\n";
+        LOG(encl) << "encrypt layer "
+                  << TypeText<SECLEVEL>::toText(layer->level()) << "\n";
         enc = layer->encrypt(enc, IV);
         //need to free space for all enc
         //except the last one

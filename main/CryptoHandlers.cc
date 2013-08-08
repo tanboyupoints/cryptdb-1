@@ -109,7 +109,7 @@ serial_unpack(std::string serial) {
     ss >> len;
     std::string levelname;
     ss >> levelname;
-    sl.l = string_to_sec_level(levelname);
+    sl.l = TypeText<SECLEVEL>::toType(levelname);
     ss >> sl.name;
     sl.layer_info = serial.substr(serial.size()-len, len);
 

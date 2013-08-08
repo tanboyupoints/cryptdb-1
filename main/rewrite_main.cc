@@ -867,11 +867,36 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
     }
 }
 
+struct DirectiveData {
+    std::string table_name;
+    std::string field_name;
+    SECURITY_RATING sec_rating;
+
+    DirectiveData(const std::string query)
+    {
+        std::list<std::string> tokens = split(query, " ");
+        assert(tokens.size() == 4);
+        tokens.pop_front();
+
+        table_name = tokens.front();
+        tokens.pop_front();
+
+        field_name = tokens.front();
+        tokens.pop_front();
+
+        sec_rating = TypeText<SECURITY_RATING>::toType(tokens.front());
+        tokens.pop_front();
+    }
+};
+
 // FIXME: Implement.
+// SYNTAX: DIRECTIVE [table name] [field name] [security rating]
+// > FIXME: Make the syntax more sql like.
 RewriteOutput * 
 Rewriter::handleDirective(Analysis &a, const ProxyState &ps,
                           const std::string &query)
 {
+    DirectiveData data(query);
     return NULL;
 }
 
