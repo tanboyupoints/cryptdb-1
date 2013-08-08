@@ -129,8 +129,6 @@ std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
             return layer;
         };
 
-    // FIXME: Add sanity check to make sure that onions match
-    // OnionMeta::onion_layout.
     return DBMeta::doFetchChildren(e_conn, deserialize);
 }
 
