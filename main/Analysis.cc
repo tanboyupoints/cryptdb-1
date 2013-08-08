@@ -471,7 +471,7 @@ bool SimpleOutput::getQuery(const std::string before_query_data,
     return true;
 }
 
-bool SimpleOutput::handleQueryFailure()
+bool SimpleOutput::handleQueryFailure(Connect *e_conn)
 {
     return true;
 }
@@ -494,7 +494,7 @@ bool DMLOutput::getQuery(const std::string before_query_data,
     return true;
 }
 
-bool DMLOutput::handleQueryFailure()
+bool DMLOutput::handleQueryFailure(Connect *e_conn)
 {
     return true;
 }
@@ -584,7 +584,9 @@ bool SpecialUpdate::beforeQuery(Connect *conn, Connect *e_conn,
 bool SpecialUpdate::getQuery(const std::string before_query_data,
                              std::string *query)
 {
+    query->clear();
     *query = "START TRANSACTION; ";
+
     // DELETE the rows matching the WHERE clause from the database.
     std::ostringstream delete_stream;
     delete_stream << " DELETE FROM " << this->plain_table
@@ -603,7 +605,7 @@ bool SpecialUpdate::getQuery(const std::string before_query_data,
 }
 
 // FIXME: Implement.
-bool SpecialUpdate::handleQueryFailure()
+bool SpecialUpdate::handleQueryFailure(Connect *e_conn)
 {
     return false;
 }
@@ -712,7 +714,6 @@ setRegularTableToBleedingTable(Connect *e_conn)
     return tableCopy(e_conn, src, dest);
 }
 
-/*
 static bool
 setBleedingTableToRegularTable(Connect *e_conn)
 {
@@ -739,7 +740,6 @@ revertAndCleanupEmbedded(Connect *e_conn, unsigned long delta_output_id)
 
     return true;
 }
-*/
 
 bool
 cleanupDeltaOutputAndQuery(Connect *e_conn,
@@ -856,47 +856,51 @@ handleDeltaAfterQuery(Connect *e_conn,
 bool DDLOutput::beforeQuery(Connect *conn, Connect *e_conn,
                             std::string *before_query_data)
 {
-    // FIXME: Duplicated.
-    std::list<std::string> local_qz, remote_qz;
-    local_qz.push_back(original_query);
-    remote_qz.push_back(new_query);
-
-    return handleDeltaBeforeQuery(conn, e_conn, deltas, local_qz,
-                                  remote_qz, true);
+    return handleDeltaBeforeQuery(conn, e_conn, deltas, local_qz(),
+                                  remote_qz(), true);
 }
 
-// FIXME: Implement.
 bool DDLOutput::getQuery(const std::string before_query_data,
                          std::string *query)
 {
-    return false;
+    query->clear();
+
+    assert(remote_qz().size() == 1);
+    *query = remote_qz().back();
+
+    return true;
 }
 
-// FIXME: Implement.
-bool DDLOutput::handleQueryFailure()
+bool DDLOutput::handleQueryFailure(Connect *e_conn)
 {
-    return false;
+    // FIXME: Get actual delta_output_id
+    const unsigned long delta_output_id = 0;
+
+    assert(revertAndCleanupEmbedded(e_conn, delta_output_id));
+    return true;
 }
 
 bool DDLOutput::afterQuery(Connect *e_conn)
 {
-    // FIXME: Duplicated.
-    std::list<std::string> local_qz;
-    local_qz.push_back(original_query);
-
     // FIXME: Get real value.
     const unsigned long delta_output_id = 0;
-    return handleDeltaAfterQuery(e_conn, deltas, local_qz,
+
+    return handleDeltaAfterQuery(e_conn, deltas, local_qz(),
                                  delta_output_id);
 }
 
+const std::list<std::string> DDLOutput::remote_qz() const {
+    return std::list<std::string>({new_query});
+}
+
+const std::list<std::string> DDLOutput::local_qz() const {
+    return std::list<std::string>({original_query});
+}
+    
 bool AdjustOnionOutput::beforeQuery(Connect *conn, Connect *e_conn,
                                     std::string *before_query_data)
 {
-    // FIXME: Duplicated.
-    std::list<std::string> local_qz;
-
-    return handleDeltaBeforeQuery(conn, e_conn, deltas, local_qz,
+    return handleDeltaBeforeQuery(conn, e_conn, deltas, local_qz(),
                                   adjust_queries, false);
 }
 
@@ -908,20 +912,28 @@ bool AdjustOnionOutput::getQuery(const std::string before_query_data,
 }
 
 // FIXME: Implement.
-bool AdjustOnionOutput::handleQueryFailure()
+bool AdjustOnionOutput::handleQueryFailure(Connect *e_conn)
 {
     return false;
 }
 
 bool AdjustOnionOutput::afterQuery(Connect *e_conn)
 {
-    // FIXME: Duplicated.
-    std::list<std::string> local_qz;
     // FIXME: Get actual value.
     const unsigned long delta_output_id = 0;
 
-    return handleDeltaAfterQuery(e_conn, deltas, local_qz,
+    return handleDeltaAfterQuery(e_conn, deltas, local_qz(),
                                  delta_output_id);
+}
+
+const std::list<std::string> AdjustOnionOutput::remote_qz() const
+{
+    return std::list<std::string>(adjust_queries);
+}
+
+const std::list<std::string> AdjustOnionOutput::local_qz() const
+{
+    return std::list<std::string>();
 }
 
 bool AdjustOnionOutput::queryAgain()

@@ -358,7 +358,7 @@ public:
                              std::string *before_query_data) = 0;
     virtual bool getQuery(const std::string before_query_data,
                           std::string *query) = 0;
-    virtual bool handleQueryFailure() = 0;
+    virtual bool handleQueryFailure(Connect *e_conn) = 0;
     virtual bool afterQuery(Connect *e_conn) = 0;
     virtual bool queryAgain();
 
@@ -378,7 +378,7 @@ public:
                      std::string *before_query_data);
     bool getQuery(const std::string before_query_data,
                   std::string *query);
-    bool handleQueryFailure();
+    bool handleQueryFailure(Connect *e_conn);
     bool afterQuery(Connect *e_conn);
 };
 
@@ -392,7 +392,7 @@ public:
                      std::string *before_query_data);
     bool getQuery(const std::string before_query_data,
                   std::string *query);
-    bool handleQueryFailure();
+    bool handleQueryFailure(Connect *e_conn);
     bool afterQuery(Connect *e_conn);
 
 private:
@@ -417,7 +417,7 @@ public:
                      std::string *before_query_data);
     bool getQuery(const std::string before_query_data,
                   std::string *query);
-    bool handleQueryFailure();
+    bool handleQueryFailure(Connect *e_conn);
     bool afterQuery(Connect *e_conn);
 
 private:
@@ -439,7 +439,7 @@ public:
                      std::string *before_query_data) = 0;
     virtual bool getQuery(const std::string before_query_data,
                           std::string *query) = 0;
-    virtual bool handleQueryFailure() = 0;
+    virtual bool handleQueryFailure(Connect *e_conn) = 0;
     bool afterQuery(Connect *e_conn) = 0;
 
     static bool save(Connect *e_conn, unsigned long *delta_output_id);
@@ -461,11 +461,14 @@ public:
                      std::string *before_query_data);
     bool getQuery(const std::string before_query_data,
                   std::string *query);
-    bool handleQueryFailure();
+    bool handleQueryFailure(Connect *e_conn);
     bool afterQuery(Connect *e_conn);
 
 private:
     const std::string new_query;
+
+    const std::list<std::string> remote_qz() const;
+    const std::list<std::string> local_qz() const;
 };
 
 class AdjustOnionOutput : public DeltaOutput {
@@ -481,12 +484,15 @@ public:
                      std::string *before_query_data);
     bool getQuery(const std::string before_query_data,
                   std::string *query);
-    bool handleQueryFailure();
+    bool handleQueryFailure(Connect *e_conn);
     bool afterQuery(Connect *e_conn);
     bool queryAgain();
 
 private:
     const std::list<std::string> adjust_queries;
+
+    const std::list<std::string> remote_qz() const;
+    const std::list<std::string> local_qz() const;
 };
 
 bool saveDMLCompletion(Connect *conn, unsigned long delta_output_id);

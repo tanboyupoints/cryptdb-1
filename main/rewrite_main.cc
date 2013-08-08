@@ -1076,7 +1076,7 @@ executeQuery(const ProxyState &ps, const std::string &q)
         prettyPrintQuery(out_query);
         
         if (!ps.conn->execute(out_query, dbres)) {
-            qr.output->handleQueryFailure();
+            qr.output->handleQueryFailure(ps.e_conn);
             throw CryptDBError("Failed to execute query!");
         }
 
