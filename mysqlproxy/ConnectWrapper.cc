@@ -10,13 +10,19 @@
 #include <main/rewrite_main.hh>
 #include <parser/sql_utils.hh>
 
+// FIXME: Ownership semantics.
 class WrapperState {
+    WrapperState(const WrapperState &other);
+    WrapperState &operator=(const WrapperState &rhs);
+
 public:
+    WrapperState() {;}
     std::string last_query;
     bool considered;
     std::ofstream * PLAIN_LOG;
     ReturnMeta * rmeta;
     std::string cur_db;
+    QueryRewrite * qr;
 };
 
 static Timer t;
@@ -116,19 +122,20 @@ connect(lua_State *L)
         const std::string dbname = "cryptdbtest";
         const std::string mkey = "113341234";  // XXX do not change as
                                                // it's used for tpcc exps
+        // FIXME: Use env var.
         char * ev = getenv("ENC_BY_DEFAULT");
-        if (ev) {
-            const std::string encbydefault = ev;
+        // if (ev) {
+            const std::string encbydefault = "true";
             if (encbydefault == "false") {
                 std::cerr << "\n\n enc by default false " << "\n\n";
                 ps = new ProxyState(ci, embed_dir, dbname, mkey,
-                                    SECURITY_RATING::BEST_EFFORT);
+                                    SECURITY_RATING::PLAIN);
             } else {
                 std::cerr << "\n\nenc by default true" << "\n\n";
                 ps = new ProxyState(ci, embed_dir, dbname, mkey,
-                                    SECURITY_RATING::PLAIN);
+                                    SECURITY_RATING::BEST_EFFORT);
             }
-        }
+        // }
 
         //may need to do training
         ev = getenv("TRAIN_QUERY");
@@ -247,12 +254,14 @@ preamble(lua_State *L)
 
     if (EXECUTE_QUERIES) {
         if (DO_CRYPT) {
-            throw CryptDBError("implement preamble!");
+            assert(ps);
+
+            Rewriter r;
+            QueryRewrite *&qr = clients[client]->qr = new QueryRewrite(r.rewrite(*ps, query));
+            assert(qr->output->beforeQuery(ps->conn, ps->e_conn));
         }
     }
 
-    // FIXME: Is it actually safe to return 0 here?
-    // > Or should be double nil.
     return 0;
 }
 
@@ -264,8 +273,11 @@ rewrite(lua_State *L)
     assert(0 == mysql_thread_init());
 
     std::string client = xlua_tolstring(L, 1);
-    if (clients.find(client) == clients.end())
+    if (clients.find(client) == clients.end()) {
+        // FIXME: Is it actually safe to return 0 here?
+        // > Or should be double nil?
         return 0;
+    }
 
     std::string query = xlua_tolstring(L, 2);
     std::string query_data = xlua_tolstring(L, 3);
@@ -274,26 +286,22 @@ rewrite(lua_State *L)
 
     std::list<std::string> new_queries;
 
-
     t.lap_ms();
     if (EXECUTE_QUERIES) {
         if (!DO_CRYPT) {
             new_queries.push_back(query);
         } else {
             try {
-                /*
-                Rewriter r;
                 assert(ps);
-                QueryRewrite qr = r.rewrite(*ps, query);
-                */
-                throw CryptDBError("rewrite, not implemented!");
-                // TODO: May need to set current db in ProxyState.
-                /*
-                new_queries = rew.queries;
-                clients[client]->rmeta = rew.rmeta;
-                clients[client]->considered = rew.wasRew;
-                */
-                //cerr << "query: " << *new_queries.begin() << " considered ? " << clients[client]->considered << "\n";
+
+                QueryRewrite *&qr = clients[client]->qr;
+                if (!qr->output->getQuery(&new_queries)) {
+                    throw CryptDBError("Failed to retrieve query!");
+                }
+                
+                clients[client]->rmeta = new ReturnMeta(qr->rmeta);
+                clients[client]->considered = true;
+                // clients[client]->considered = qr.wasRew;
             } catch (CryptDBError &e) {
                 LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
                 lua_pushnil(L);
@@ -397,7 +405,9 @@ decrypt(lua_State *L)
     } else {
         try {
             Rewriter r;
+            assert(clients[client]->rmeta);
             ResType *rt = r.decryptResults(res, *clients[client]->rmeta);
+            assert(rt);
             rd = *rt;
         }
         catch(CryptDBError e) {
@@ -411,16 +421,19 @@ decrypt(lua_State *L)
     lua_createtable(L, (int) rd.names.size(), 0);
     int t_fields = lua_gettop(L);
     for (uint i = 0; i < rd.names.size(); i++) {
-        lua_createtable(L, 0, 2);
+        lua_createtable(L, 0, 1);
         int t_field = lua_gettop(L);
 
         /* set name for field */
         xlua_pushlstring(L, rd.names[i]);
         lua_setfield(L, t_field, "name");
 
-        /* set type for field */
+/*
+        // FIXME.
+        // set type for field
         lua_pushinteger(L, rd.types[i]);
         lua_setfield(L, t_field, "type");
+*/
 
         /* insert field element into fields table at i+1 */
         lua_rawseti(L, t_fields, i+1);

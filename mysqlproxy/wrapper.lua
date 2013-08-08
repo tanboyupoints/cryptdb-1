@@ -64,11 +64,9 @@ function read_query_real(packet)
         local query = string.sub(packet, 2)
         dprint("read_query: " .. query)
 
-        query_data =
-            CryptDB.preamble(proxy.connection.client.src.name, query);
+        CryptDB.preamble(proxy.connection.client.src.name, query)
         consider, new_queries =
-            CryptDB.rewrite(proxy.connection.client.src.name, query,
-                            query_data);
+            CryptDB.rewrite(proxy.connection.client.src.name, query)
 
         if not new_queries then
             proxy.response.type = proxy.MYSQLD_PACKET_ERR
@@ -146,10 +144,10 @@ function read_query_result_real(inj)
             end
 
             -- DEMO
-	    if #rows > 0 then
-	       dprint(" ")
-	       dprint("Results from server:")
-	    end
+            if #rows > 0 then
+               dprint(" ")
+               dprint("Results from server:")
+            end
             dprint(f_names)
             for i = 1, #rows do
                 for j = 1, #rows[i] do
@@ -159,8 +157,9 @@ function read_query_result_real(inj)
                 r = ""
             end
 
-            dfields, drows = CryptDB.decrypt(proxy.connection.client.src.name,
-                                             fields, rows)
+            dfields, drows =
+                CryptDB.decrypt(proxy.connection.client.src.name,
+                                fields, rows)
 
             if dfields and drows then
                 f_names = ""
@@ -169,12 +168,12 @@ function read_query_result_real(inj)
                     f_names = f_names .. " | " .. dfields[i].name
                 end
 
-		if #drows > 0 then
-		   dprint(" ")
-		   dprint("Decrypted results:")
-		end
-		dprint(f_names)
-              
+                if #drows > 0 then
+                   dprint(" ")
+                   dprint("Decrypted results:")
+                end
+                dprint(f_names)
+
                 for i = 1, #drows do
                     for j = 1, #drows[i] do
                         r = r .. " | " .. drows[i][j]
