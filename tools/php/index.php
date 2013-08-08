@@ -1,7 +1,6 @@
 <?php
 
 require("common.php");
-//print_r($_POST);
 
  //get initial values
  $SQLq=trim($_REQUEST['q']);
@@ -109,39 +108,16 @@ function print_header(){
 <!DOCTYPE html>
 <html>
 <head><title>CryptDB</title>
-<meta charset="utf-8">
+<link href="/menu_assets/styles.css" rel="stylesheet" type="text/css">
 
-
-<!-- CSS STYLE DEFINITIONS -->
-<style type="text/css">
-body{font-family:Arial,sans-serif;font-size:80%;padding:2;margin:2}
-th,td{padding:0;margin:0}
-div{padding:3px}
-pre{font-size:50%}
-.nav{text-align:center}
-.ft{text-align:right;margin-top:10px;font-size:smaller}
-.inv{background-color:#069;color:#FFF}
-.inv a{color:#FFF}
-table.res{width:100%;border-collapse:collapse;}
-table.wa{width:auto}
-table.res th,table.res td{padding:2px;border:1px solid #fff}
-table.restr{vertical-align:top}
-tr.e{background-color:#CCC}
-tr.o{background-color:#EEE}
-tr.h{background-color:#99C}
-tr.s{background-color:#FF9}
-.err{color:#F33;font-weight:bold;text-align:center}
-.frm{width:400px;border:1px solid #999;background-color:#eee;text-align:left}
-.frm label.l{width:100px;float:left}
-.dot{border-bottom:1px dotted #000}
-.ajax{text-decoration: none;border-bottom: 1px dashed;}
-.qnav{width:30px}
-.boxsizingBorder {
-    -webkit-box-sizing: border-box;
-       -moz-box-sizing: border-box;
-            box-sizing: border-box;
+<style>
+body
+{
+background-color:#E0E0E0;
 }
 </style>
+<h1 align="center" style="color:#990000;">CryptDB</h1>
+<meta charset="utf-8">
 
 <script type="text/javascript">
 var LSK='pma_',LSKX=LSK+'max',LSKM=LSK+'min',qcur=0,LSMAX=32;
@@ -265,15 +241,9 @@ Databases:
 <select name="db" onChange="frefresh()">
 <?php echo get_db_select($dbn)?>
 </select>
-
-<?php if($dbn){ $z=" &#183; <a href='$self?$xurl&db=$dbn"; ?>
-<?php if($_POST['cryptdb_describe_table'] && $dbn) { 
-    $z.'&q='.urlencode($var);
-} ?>
-
 Tables:
-<form action="'<?php echo $self?>'" method="post">
-<select name="cryptdb_describe_table">
+<form action="'<?php echo $self?>'" method="post" >
+<select name="cryptdb_describe_table" onChange="this.form.submit()">
 <?php 
  $a=0;
  $array = get_db_tables($dbn) ; foreach($array as $key=>$value) 
@@ -286,16 +256,20 @@ Tables:
      {
 ?>
 <option selected value="<?php echo $value[$accesskey]; ?>"><?php echo $value[$accesskey]; ?></option>
-<?php } else { ?>
-
+<?php } else  { ?>
 <option value="<?php echo $value[$accesskey]; ?>"><?php echo $value[$accesskey]; ?></option>
 <?php } ?>
 
 
 <?php } ?>
 </select>
-<input type="submit" value="Describe table">
 </form>
+
+<?php if($dbn){ $z=" &#183; <a href='$self?$xurl&db=$dbn"; ?>
+<?php if($_POST['cryptdb_describe_table'] && $dbn) { 
+    $z.'&q='.urlencode($var);
+} ?>
+
 <?php } ?>
 <?php } ?>
 
@@ -319,11 +293,29 @@ function print_screen(){
 
     print_header();
 ?>
-<div class="boxsizingBorder">
-<textarea style="overflow:auto;" readonly id="query_output" name="q" cols="100" rows="10" style="width:50%;overflow:auto;"><?php echo curr_q("",FALSE)?><?php echo $SQLq; ?></textarea><br>
-<input type="button" value="Clear board" onclick="this.form.elements['query_output'].value=''">
+<table>
+<tr>
+<td>
+
+<textarea style="overflow:auto;" readonly id="query_output" name="q" cols="120" rows="10" 
+style="width:50%;overflow:auto;"><?php echo curr_q("",FALSE)?><?php echo $SQLq; ?></textarea><br>
+
+</td>
+<td>
+<div id='cssmenu'>
+<ul>
+   <li class='active'><a href='index.php'><span>Home</span></a></li>
+   <li><a href='http://css.csail.mit.edu/cryptdb/' target="_blank"><span>About CryptDB</span></a></li>
+   <li class=''><a href='#'><span>somelink</span></a></li>
+   <li class='last'><a href='#'><span>somelink</span></a></li>
+</ul>
 </div>
-Records: <b><?php echo $reccount?></b> in <b><?php echo $time_all?></b> sec<br>
+</td>
+</table>
+
+<input type="button" value="Clear board" onclick="this.form.elements['query_output'].value=''">
+<input type="button" value="Export Results" onclick=""> <!-- add .js here to export output to txt file -->
+Records: <b><?php echo $reccount?></b> in <b><?php echo $time_all?></b> sec<br><br>
 <b><?php echo $out_message?></b>
 <div class="sqldr">
 <?php echo $nav.$sqldr.$nav; ?>
@@ -338,15 +330,14 @@ function print_cfg(){
     print_header();
 ?>
 <center>
-<h3>CryptDB</h3>
 <div class="frm">
 
-<label class="l">MYSQL host/ip:</label><input type="text" name="v[host]" value="<?php echo $DB['host']?>"><br>
+<label class="l">MYSQL host:</label><input type="text" name="v[host]" value="<?php echo $DB['host']?>"><br>
 <label class="l">DB user:</label><input type="text" name="v[user]" value="<?php echo $DB['user']?>"><br>
 <label class="l">Password:</label><input type="password" name="v[pwd]" value=""><br>
 <br>
 
-<label class="l">CryptDB host/ip:</label><input type="text" readonly name="c[host]" value="localhost"><br>
+<label class="l">CryptDB host:</label><input type="text" readonly name="c[host]" value="localhost"><br>
 <label class="l">DB user:</label><input type="text" name="c[user]" value="<?php echo $CRYPTDB['user']?>"><br>
 <label class="l">Password:</label><input type="password" name="c[pwd]" value=""><br>
 <!--<label class="l">Port:</label><input type="text" readonly name="c[port]" value="<?php echo $CRYPTDB['port']?>" size="4"><br>-->

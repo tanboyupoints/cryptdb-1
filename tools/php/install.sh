@@ -8,7 +8,7 @@
 # Devel: 'sudo ./install.sh' devel  (creates symbolic links for php files)
 
 apache2="/etc/apache2/sites-enabled/000-default"
-declare -a files=(./index.php ./common.php ./select.php ./favicon.ico)
+declare -a files=(./index.php ./common.php ./select.php ./favicon.ico menu_assets)
 
 function do_install() {
 

@@ -53,8 +53,8 @@ function display_select($sth,$q){
     $sqldr='';
 
     $keys = array_keys($_POST);
-    $is_cryptdb = strstr($keys[0], "cryptdb");
-    if(isset($_POST['cryptdb_describe_table']) || $is_cryptdb != FALSE)
+    $is_enclevel = strstr($keys[0], "cryptdb");
+    if(isset($_POST['cryptdb_describe_table']) || $is_enclevel != FALSE)
     {
         $is_shd=(preg_match('/^show\s+databases/i',$q));
         $is_sht=(preg_match('/^show\s+tables|^SHOW\s+TABLE\s+STATUS/',$q));
@@ -88,7 +88,6 @@ function display_select($sth,$q){
             $sqldr.="<tr class='".$rc[$swp=!$swp]."' onmouseover='tmv(this)' onmouseout='tmo(this)' onclick='tc(this)' align=\"center\">";
             for($i=0;$i<$fields_num;$i++){
                 $v=$row[$i];
-                echo $row[$i] . " ";
 
                 $more='';
 
@@ -98,7 +97,7 @@ function display_select($sth,$q){
             }
             $sqldr.= "<td><form  action=\"$self\" value=$dbn$idpos  method=\"post\">";
     
-            if($is_cryptdb == FALSE)
+            if($is_enclevel == FALSE)
             {
                 session_add('s_PROXY', "CryptDBProxy");
                 session_add('s_QUERY', $q);

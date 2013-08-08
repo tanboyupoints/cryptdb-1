@@ -31,9 +31,6 @@
  */
 
 
-//TODO(burrows): need to implement cleanup & destructors
-
-
 /*
  * TODO:
  *  -- anon name should not be in EncLayers
@@ -45,7 +42,8 @@ serial_pack(SECLEVEL l, const std::string & name,
             const std::string & layer_info) {
     std::stringstream ss;
     ss.clear();
-    ss << layer_info.length() << " " << levelnames[(uint)l] << " " << name << " " << layer_info;
+    ss << layer_info.length() << " " << TypeText<SECLEVEL>::toText(l)
+       << " " << name << " " << layer_info;
     return ss.str();
 }
 

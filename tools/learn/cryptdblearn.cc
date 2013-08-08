@@ -54,6 +54,8 @@ Learn::trainFromFile(ProxyState &ps)
                 s += line;
                 Rewriter r;
                 QueryRewrite qr = r.rewrite(ps, s);
+                /*
+                // FIXME.
                 ResType *res =
                     qr.output->doQuery(ps.conn, ps.e_conn);
                 if(res){
@@ -61,6 +63,7 @@ Learn::trainFromFile(ProxyState &ps)
                         this->m_success_num++;
                     delete res;
                 }
+                */
                 if (true == qr.output->queryAgain()){ 
                     this->m_totalnum++;
                     assert(executeQuery(ps, s));
@@ -140,7 +143,7 @@ int main(int argc, char **argv)
     
     ConnectionInfo ci("localhost", username, password);
     const std::string master_key = "2392834";
-    ProxyState ps(ci, "/var/lib/shadow-mysql", dbname, true, master_key);
+    ProxyState ps(ci, "/var/lib/shadow-mysql", dbname, master_key);
 
     Learn *learn; 
     

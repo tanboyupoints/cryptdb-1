@@ -121,10 +121,12 @@ connect(lua_State *L)
             const std::string encbydefault = ev;
             if (encbydefault == "false") {
                 std::cerr << "\n\n enc by default false " << "\n\n";
-                ps = new ProxyState(ci, embed_dir, dbname, false, mkey);
+                ps = new ProxyState(ci, embed_dir, dbname, mkey,
+                                    SECURITY_RATING::BEST_EFFORT);
             } else {
                 std::cerr << "\n\nenc by default true" << "\n\n";
-                ps = new ProxyState(ci, embed_dir, dbname, true, mkey);
+                ps = new ProxyState(ci, embed_dir, dbname, mkey,
+                                    SECURITY_RATING::PLAIN);
             }
         }
 
@@ -366,7 +368,7 @@ decrypt(lua_State *L)
     } else {
         try {
             Rewriter r;
-            ResType *rt = r.decryptResults(res, clients[client]->rmeta);
+            ResType *rt = r.decryptResults(res, *clients[client]->rmeta);
             rd = *rt;
         }
         catch(CryptDBError e) {
