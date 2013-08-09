@@ -978,7 +978,7 @@ std::string ReturnMeta::stringify() {
 }
 
 ResType *
-Rewriter::decryptResults(ResType &dbres, const ReturnMeta &rmeta)
+Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
 {
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
@@ -987,9 +987,9 @@ Rewriter::decryptResults(ResType &dbres, const ReturnMeta &rmeta)
     ResType *res = new ResType();
 
     // un-anonymize the names
-    unsigned int index = 0;
     for (auto it = dbres.names.begin();
         it != dbres.names.end(); it++) {
+        unsigned int index = it - dbres.names.begin();
         const ReturnField &rf = rmeta.rfmeta.at(index);
         if (!rf.getIsSalt()) {
             //need to return this field
@@ -997,7 +997,6 @@ Rewriter::decryptResults(ResType &dbres, const ReturnMeta &rmeta)
             // switch types to original ones : TODO
 
         }
-        index++;
     }
 
     unsigned int real_cols = res->names.size();

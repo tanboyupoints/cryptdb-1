@@ -115,51 +115,56 @@ function read_query_result_real(inj)
             proxy.response.errcode = err.errcode
             proxy.response.sqlstate = err.sqlstate
         else
-            -- Handle the backend of the query.
-            CryptDB.epilogue(proxy.connection.client.src.name)
-
+            local fields = {}
+            local rows = {}
             local query = inj.query:sub(2)
 
-            -- for DEMO: printing results
-            local f_names = ""
-            local r = ""
+            -- Handle the backend of the query.
+            res_ptr =
+                CryptDB.epilogue(proxy.connection.client.src.name)
+            if res_ptr then
+                local client = proxy.connection.client.src.name
+                dfields, drows = CryptDB.passDecryptedPtr(client, res_ptr)
+            else
+                 -- for DEMO: printing results
+                local f_names = ""
+                local r = ""
 
-            -- mysqlproxy doesn't return real lua arrays, so re-package
-            local resfields = resultset.fields
-            local fields = {}
-            for i = 1, #resfields do
-                rfi = resfields[i]
-                fields[i] = { type = rfi.type, name = rfi.name }
-                f_names = f_names .. "|" .. rfi.name
-            end
-
-            local resrows = resultset.rows
-            local rows = {}
-            if resrows then
-                for row in resrows do
-                    table.insert(rows, row)
+                -- mysqlproxy doesn't return real lua arrays, so re-package
+                local resfields = resultset.fields
+                for i = 1, #resfields do
+                    rfi = resfields[i]
+                    fields[i] = { type = rfi.type, name = rfi.name }
+                    f_names = f_names .. "|" .. rfi.name
                 end
-            end
 
-            -- DEMO
-            if #rows > 0 then
-               dprint(" ")
-               dprint("Results from server:")
-            end
-            dprint(f_names)
-            for i = 1, #rows do
-                for j = 1, #rows[i] do
-                    r = r .. "|" .. rows[i][j]
+                local resrows = resultset.rows
+                if resrows then
+                    for row in resrows do
+                        table.insert(rows, row)
+                    end
                 end
-                dprint(r)
-                r = ""
-            end
 
-            dfields, drows =
-                CryptDB.decrypt(proxy.connection.client.src.name,
-                                fields, rows)
+                -- DEMO
+                if #rows > 0 then
+                   dprint(" ")
+                   dprint("Results from server:")
+                end
+                dprint(f_names)
+                for i = 1, #rows do
+                    for j = 1, #rows[i] do
+                        r = r .. "|" .. rows[i][j]
+                    end
+                    dprint(r)
+                    r = ""
+                end
+                dfields, drows =
+                    CryptDB.decrypt(proxy.connection.client.src.name,
+                                    fields, rows)
+            end
 
             if dfields and drows then
+                -- DEMO
                 f_names = ""
                 r = ""
                 for i = 1, #dfields do

@@ -42,6 +42,9 @@ static int counter = 0;
 
 static std::map<std::string, WrapperState*> clients;
 
+static int
+returnResultSet(lua_State *L, const ResType &res);
+
 static Item *
 make_item(std::string value, enum_field_types type)
 {
@@ -257,8 +260,8 @@ rewrite(lua_State *L)
     lua_createtable(L, (int) new_queries.size(), 0);
     int top = lua_gettop(L);
     int index = 1;
-    for (auto it = new_queries.begin(); it != new_queries.end(); it++) {
-        xlua_pushlstring(L, *it);
+    for (auto it : new_queries) {
+        xlua_pushlstring(L, it);
         lua_rawseti(L, top, index);
         index++;
     }
@@ -286,11 +289,41 @@ epilogue(lua_State *L)
     QueryRewrite *qr = clients[client]->qr;
     assert(qr->output->afterQuery(ps->e_conn));
     if (qr->output->queryAgain()) {
-        // > FIXME: Needs some way to return the actual ResType.
-        executeQuery(*ps, clients[client]->last_query);
+        ResType *res_type =
+            executeQuery(*ps, clients[client]->last_query);
+        assert(res_type);
+
+        lua_pushinteger(L, (lua_Integer)res_type);
+        return 1;
     }
 
-    return 0;
+    lua_pushnil(L);
+    return 1;
+}
+
+static int
+passDecryptedPtr(lua_State *L)
+{
+    ANON_REGION(__func__, &perf_cg);
+    scoped_lock l(&big_lock);
+    assert(0 == mysql_thread_init());
+    
+    THD *thd = (THD*) create_embedded_thd(0);
+    auto thd_cleanup = cleanup([&thd]
+        {
+            thd->clear_data_list();
+            thd->store_globals();
+            thd->unlink();
+            delete thd;
+        });
+
+    const std::string client = xlua_tolstring(L, 1);
+    if (clients.find(client) == clients.end())
+        return 0;
+
+    ResType *res_type = (ResType *)lua_tointeger(L, 2);
+
+    return returnResultSet(L, *res_type);
 }
 
 static int
@@ -374,8 +407,14 @@ decrypt(lua_State *L)
         return 2;
     }
 
+    return returnResultSet(L, rd);
+}
+
+static int
+returnResultSet(lua_State *L, const ResType &rd)
+{
     /* return decrypted result set */
-    lua_createtable(L, (int) rd.names.size(), 0);
+    lua_createtable(L, (int)rd.names.size(), 0);
     int t_fields = lua_gettop(L);
     for (uint i = 0; i < rd.names.size(); i++) {
         lua_createtable(L, 0, 1);
@@ -425,6 +464,7 @@ cryptdb_lib[] = {
     F(disconnect),
     F(rewrite),
     F(decrypt),
+    F(passDecryptedPtr),
     F(epilogue),
     { 0, 0 },
 };
