@@ -984,6 +984,11 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
     LOG(cdb_v) << "rows in result " << rows << "\n";
     unsigned int cols = dbres.names.size();
 
+    // HACK: Queries like 'SHOW DATABASES;'
+    if (dbres.names.size() != rmeta.rfmeta.size()) {
+        return new ResType(dbres);
+    }
+
     ResType *res = new ResType();
 
     // un-anonymize the names
@@ -1087,10 +1092,10 @@ executeQuery(const ProxyState &ps, const std::string &q)
             return executeQuery(ps, q);
         } 
 
-        ResType *enc_res = new ResType(dbres->unpack());
-        prettyPrintQueryResult(*enc_res);
+        ResType *res = new ResType(dbres->unpack());
+        prettyPrintQueryResult(*res);
 
-        ResType *dec_res = r.decryptResults(*enc_res, qr.rmeta);
+        ResType *dec_res = r.decryptResults(*res, qr.rmeta);
         prettyPrintQueryResult(*dec_res);
 
         printEmbeddedState(ps);

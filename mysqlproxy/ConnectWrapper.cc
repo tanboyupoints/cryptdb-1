@@ -84,7 +84,6 @@ xlua_pushlstring(lua_State *l, const std::string &s)
     lua_pushlstring(l, s.data(), s.length());
 }
 
-// FIXME: Specify database name.
 static int
 connect(lua_State *L)
 {
