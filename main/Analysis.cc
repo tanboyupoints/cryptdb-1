@@ -3,6 +3,14 @@
 #include <main/rewrite_main.hh>
 #include <main/metadata_tables.hh>
 
+#define ROLLBACK_AND_RETURN_ON_FAIL(status, c, ret)     \
+    {                                                   \
+        if (!status) {                                  \
+            assert(c->execute("ROLLBACK;"));            \
+            return ret;                                 \
+        }                                               \
+    }                                                   
+
 // FIXME: Memory leaks when we allocate MetaKey<...>, use smart pointer.
 
 static std::string
@@ -436,13 +444,6 @@ bool DeleteDelta::apply(Connect *e_conn, TableType table_type)
 RewriteOutput::~RewriteOutput()
 {;}
 
-static void
-prettyPrintQuery(const std::string &query)
-{
-    std::cout << std::endl << RED_BEGIN
-              << "QUERY: " << COLOR_END << query << std::endl;
-}
-
 bool RewriteOutput::queryAgain()
 {
     return false;
@@ -457,19 +458,53 @@ ResType *RewriteOutput::sendQuery(Connect *c, const std::string &q)
     return res;
 }
 
-ResType *SimpleOutput::doQuery(Connect *conn, Connect *e_conn)
+bool SimpleOutput::beforeQuery(Connect *conn, Connect *e_conn)
 {
-    prettyPrintQuery(original_query);
-    return sendQuery(conn, original_query);
+    return true;
 }
 
-ResType *DMLOutput::doQuery(Connect *conn, Connect *e_conn)
+bool SimpleOutput::getQuery(std::list<std::string> *queryz)
 {
-    prettyPrintQuery(new_query);
-    return sendQuery(conn, new_query);
+    queryz->clear();
+    queryz->push_back(original_query);
+
+    return true;
 }
 
-ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn)
+bool SimpleOutput::handleQueryFailure(Connect *e_conn)
+{
+    return true;
+}
+
+bool SimpleOutput::afterQuery(Connect *e_conn)
+{
+    return true;
+}
+
+bool DMLOutput::beforeQuery(Connect *conn, Connect *e_conn)
+{
+    return true;
+}
+
+bool DMLOutput::getQuery(std::list<std::string> *queryz)
+{
+    queryz->clear();
+    queryz->push_back(new_query);
+
+    return true;
+}
+
+bool DMLOutput::handleQueryFailure(Connect *e_conn)
+{
+    return true;
+}
+
+bool DMLOutput::afterQuery(Connect *e_conn)
+{
+    return true;
+}
+
+bool SpecialUpdate::beforeQuery(Connect *conn, Connect *e_conn)
 {
     // Retrieve rows from database.
     std::ostringstream select_stream;
@@ -535,28 +570,47 @@ ResType *SpecialUpdate::doQuery(Connect *conn, Connect *e_conn)
         }
         output_rows.append(" ) ,");
     }
-    output_rows = output_rows.substr(0, output_rows.length() - 1);
+    this->output_values = output_rows.substr(0, output_rows.length() - 1);
 
     // Cleanup the embedded database.
     std::ostringstream cleanup_stream;
     cleanup_stream << "DELETE FROM " << this->plain_table << ";";
     assert(e_conn->execute(cleanup_stream.str()));
 
+    return true;
+}
+
+bool SpecialUpdate::getQuery(std::list<std::string> *queryz)
+{
+    queryz->clear();
+    queryz->push_back("START TRANSACTION; ");
+
     // DELETE the rows matching the WHERE clause from the database.
     std::ostringstream delete_stream;
     delete_stream << " DELETE FROM " << this->plain_table
                   << " WHERE " << this->where_clause << ";";
-    assert(executeQuery(this->ps, delete_stream.str()));
+    queryz->push_back(delete_stream.str());
 
     // > Add each row from the embedded database to the data database.
     std::ostringstream push_results_stream;
     push_results_stream << " INSERT INTO " << this->plain_table
-                        << " VALUES " << output_rows << ";";
-    ResType * const ret_value =
-        executeQuery(this->ps, push_results_stream.str());
-    assert(ret_value);
+                        << " VALUES " << this->output_values.get()
+                        << ";";
+    queryz->push_back(push_results_stream.str());
+    queryz->push_back("COMMIT; ");
 
-    return ret_value;
+    return true;
+}
+
+// FIXME: Implement.
+bool SpecialUpdate::handleQueryFailure(Connect *e_conn)
+{
+    return false;
+}
+
+bool SpecialUpdate::afterQuery(Connect *e_conn)
+{
+    return true;
 }
 
 DeltaOutput::~DeltaOutput()
@@ -619,8 +673,9 @@ static bool destroyQueryRecord(Connect *e_conn,
     return true;
 }
 
-bool
-saveDMLCompletion(Connect *conn, unsigned long delta_output_id)
+static
+std::string
+dmlCompletionQuery(unsigned long delta_output_id)
 {
     const std::string dml_table =
         MetaDataTables::Name::dmlCompletion();
@@ -628,7 +683,14 @@ saveDMLCompletion(Connect *conn, unsigned long delta_output_id)
         " INSERT INTO " + dml_table +
         "   (delta_output_id) VALUES ("
         " " + std::to_string(delta_output_id) + ");";
-    assert(conn->execute(dml_insert_query));
+
+    return dml_insert_query;
+}
+
+bool
+saveDMLCompletion(Connect *conn, unsigned long delta_output_id)
+{
+    assert(conn->execute(dmlCompletionQuery(delta_output_id)));
 
     return true;
 }
@@ -695,51 +757,43 @@ cleanupDeltaOutputAndQuery(Connect *e_conn,
     return true;
 }
 
-// FIXME: Test DB by reading out of it for later ops.
 static
-ResType *
-handleDeltaQuery(Connect *conn, Connect *e_conn,
-                 std::vector<Delta *> deltas,
-                 std::list<std::string> local_qz,
-                 std::list<std::string> remote_qz, bool remote_ddl)
+bool
+handleDeltaBeforeQuery(Connect *conn, Connect *e_conn,
+                       std::vector<Delta *> deltas,
+                       std::list<std::string> local_qz,
+                       std::list<std::string> remote_qz,
+                       bool remote_ddl, unsigned long *delta_output_id)
 {
     if (remote_ddl) {
         assert(remote_qz.size() == 1);
     }
     assert(local_qz.size() == 0 || local_qz.size() == 1);
 
-    bool b;
-    #define ROLLBACK_AND_RETURN_ON_FAIL(status, c, ret)     \
-        {                                                   \
-            if (!status) {                                  \
-                assert(c->execute("ROLLBACK;"));            \
-                return ret;                                 \
-            }                                               \
-        }                                                   
-
     // Write to the bleeding table, store delta and store query.
-    // -----------------------------------------------------------
-    unsigned long delta_output_id;
-    {
-        assert(e_conn->execute("START TRANSACTION;"));
-        for (auto it : deltas) {
-            b = it->apply(e_conn, Delta::BLEEDING_TABLE);
-            ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, NULL);
-        }
+    bool b;
+    assert(e_conn->execute("START TRANSACTION;"));
+    for (auto it : deltas) {
+        b = it->apply(e_conn, Delta::BLEEDING_TABLE);
+        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
+    }
 
-        b = DeltaOutput::save(e_conn, &delta_output_id);
-        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, NULL);
+    b = DeltaOutput::save(e_conn, delta_output_id);
+    ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
 
-        for (auto it : local_qz) {
-            b = saveQuery(e_conn, it, delta_output_id, true, false);
-            ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, NULL);
-        }
-        for (auto it : remote_qz) {
-            b = saveQuery(e_conn, it, delta_output_id, false, remote_ddl);
-            ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, NULL);
-        }
+    for (auto it : local_qz) {
+        b = saveQuery(e_conn, it, *delta_output_id, true, false);
+        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
+    }
+    for (auto it : remote_qz) {
+        b = saveQuery(e_conn, it, *delta_output_id, false, remote_ddl);
+        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
     }
     assert(e_conn->execute("COMMIT;"));
+
+    return true;
+}
+/*
     // -----------------------------------------------------------
 
     // Execute rewritten query @ remote.
@@ -770,21 +824,29 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
             assert(conn->execute("COMMIT;"));
         }
     }
+*/
+
+static
+bool
+handleDeltaAfterQuery(Connect *e_conn,
+                      std::vector<Delta *> deltas,
+                      std::list<std::string> local_qz,
+                      unsigned long delta_output_id)
+{
+    bool b;
 
     // > Write to regular table and apply original query.
     // > Remove delta and original query from embedded db.
-    {
-        assert(e_conn->execute("START TRANSACTION;"));
-        for (auto it : deltas) {
-            b = it->apply(e_conn, Delta::REGULAR_TABLE);
-            ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, NULL);
-        }
-
-        b = cleanupDeltaOutputAndQuery(e_conn, delta_output_id);
-        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, NULL);
-
-        assert(e_conn->execute("COMMIT;"));
+    assert(e_conn->execute("START TRANSACTION;"));
+    for (auto it : deltas) {
+        b = it->apply(e_conn, Delta::REGULAR_TABLE);
+        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
     }
+
+    b = cleanupDeltaOutputAndQuery(e_conn, delta_output_id);
+    ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
+
+    assert(e_conn->execute("COMMIT;"));
 
     // FIXME: local_qz can have DDL.
     // > This can be fixed with a bleeding table.
@@ -793,31 +855,99 @@ handleDeltaQuery(Connect *conn, Connect *e_conn,
         assert(e_conn->execute(it));
     }
 
-    #undef ROLLBACK_AND_RETURN_ON_FAIL
-
-    return result;
+    return true;
 }
 
-ResType *DDLOutput::doQuery(Connect *conn, Connect *e_conn)
+bool DDLOutput::beforeQuery(Connect *conn, Connect *e_conn)
 {
-    std::list<std::string> local_qz, remote_qz;
-    local_qz.push_back(original_query);
-    remote_qz.push_back(new_query);
+    unsigned long delta_id;
+    bool b = handleDeltaBeforeQuery(conn, e_conn, deltas, local_qz(),
+                                    remote_qz(), true, &delta_id);
+    this->delta_output_id = delta_id;
 
-    return handleDeltaQuery(conn, e_conn, deltas, local_qz, remote_qz,
-                            true);
+    return b;
+}
+
+bool DDLOutput::getQuery(std::list<std::string> *queryz)
+{
+    queryz->clear();
+
+    assert(remote_qz().size() == 1);
+    queryz->push_back(remote_qz().back());
+
+    return true;
+}
+
+bool DDLOutput::handleQueryFailure(Connect *e_conn)
+{
+    assert(revertAndCleanupEmbedded(e_conn, this->delta_output_id.get()));
+    return true;
+}
+
+bool DDLOutput::afterQuery(Connect *e_conn)
+{
+    return handleDeltaAfterQuery(e_conn, deltas, local_qz(),
+                                 this->delta_output_id.get());
+}
+
+const std::list<std::string> DDLOutput::remote_qz() const {
+    return std::list<std::string>({new_query});
+}
+
+const std::list<std::string> DDLOutput::local_qz() const {
+    return std::list<std::string>({original_query});
+}
+
+bool AdjustOnionOutput::beforeQuery(Connect *conn, Connect *e_conn)
+{
+    unsigned long delta_id;
+    bool b = handleDeltaBeforeQuery(conn, e_conn, deltas, local_qz(),
+                                    remote_qz(), false, &delta_id);
+    this->delta_output_id = delta_id;
+
+    return b;
+}
+
+bool AdjustOnionOutput::getQuery(std::list<std::string> *queryz)
+{
+    queryz->clear();
+    queryz->push_back("START TRANSACTION; ");
+
+    for (auto it : remote_qz()) {
+        queryz->push_back(it);
+    }
+
+    queryz->push_back(dmlCompletionQuery(this->delta_output_id.get()));
+    queryz->push_back("COMMIT; ");
+
+    return true;
+}
+
+bool AdjustOnionOutput::handleQueryFailure(Connect *e_conn)
+{
+    assert(revertAndCleanupEmbedded(e_conn, this->delta_output_id.get()));
+    return true;
+}
+
+bool AdjustOnionOutput::afterQuery(Connect *e_conn)
+{
+    return handleDeltaAfterQuery(e_conn, deltas, local_qz(),
+                                 this->delta_output_id.get());
+}
+
+const std::list<std::string> AdjustOnionOutput::remote_qz() const
+{
+    return std::list<std::string>(adjust_queries);
+}
+
+const std::list<std::string> AdjustOnionOutput::local_qz() const
+{
+    return std::list<std::string>();
 }
 
 bool AdjustOnionOutput::queryAgain()
 {
     return true;
-}
-
-ResType *AdjustOnionOutput::doQuery(Connect *conn, Connect *e_conn)
-{
-    return handleDeltaQuery(conn, e_conn, deltas,
-                            std::list<std::string>(),
-                            adjust_queries, false);
 }
 
 bool Analysis::addAlias(const std::string &alias,
@@ -929,3 +1059,6 @@ std::vector<EncLayer *> Analysis::getEncLayers(OnionMeta * const om) const
         return it->second;
     }
 }
+
+#undef ROLLBACK_AND_RETURN_ON_FAIL
+

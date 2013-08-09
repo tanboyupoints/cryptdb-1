@@ -935,7 +935,6 @@ cryptdbDirective(const std::string query)
     return true;
 }
 
-// TODO: we don't need to pass analysis, enough to pass returnmeta
 QueryRewrite
 Rewriter::rewrite(const ProxyState &ps, const std::string & q)
 {
@@ -1042,6 +1041,13 @@ Rewriter::decryptResults(ResType &dbres, const ReturnMeta &rmeta)
 }
 
 static void
+prettyPrintQuery(const std::string &query)
+{
+    std::cout << std::endl << RED_BEGIN
+              << "QUERY: " << COLOR_END << query << std::endl;
+}
+
+static void
 prettyPrintQueryResult(ResType res)
 {
     std::cout << std::endl << RED_BEGIN
@@ -1056,18 +1062,40 @@ executeQuery(const ProxyState &ps, const std::string &q)
     try {
         Rewriter r;
         QueryRewrite qr = r.rewrite(ps, q);
-        std::unique_ptr<ResType> res(qr.output->doQuery(ps.conn,
-                                                        ps.e_conn));
-        assert(res);
-        if (true == qr.output->queryAgain()) { // Onion adjustment.
-            return executeQuery(ps, q);
-        }
-        prettyPrintQueryResult(*res);
+        
+        // Query preamble.
+        assert(qr.output->beforeQuery(ps.conn, ps.e_conn));
 
-        ResType *dec_res = r.decryptResults(*res, qr.rmeta);
+        // Execute query.
+        DBResult *dbres;
+        std::list<std::string> out_queryz;
+        if (!qr.output->getQuery(&out_queryz)) {
+            throw CryptDBError("Failed to retrieve query!");
+        }
+    
+        for (auto it : out_queryz) {
+            prettyPrintQuery(it);
+            
+            if (!ps.conn->execute(it, dbres)) {
+                qr.output->handleQueryFailure(ps.e_conn);
+                throw CryptDBError("Failed to execute query!");
+            }
+        }
+
+        // Query cleanup.
+        assert(qr.output->afterQuery(ps.e_conn));
+        if (qr.output->queryAgain()) {
+            return executeQuery(ps, q);
+        } 
+
+        ResType *enc_res = new ResType(dbres->unpack());
+        prettyPrintQueryResult(*enc_res);
+
+        ResType *dec_res = r.decryptResults(*enc_res, qr.rmeta);
         prettyPrintQueryResult(*dec_res);
 
         printEmbeddedState(ps);
+
         return dec_res;
     } catch (std::runtime_error &e) {
         std::cout << "Unexpected Error: " << e.what() << " in query "

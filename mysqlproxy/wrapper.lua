@@ -64,7 +64,7 @@ function read_query_real(packet)
         local query = string.sub(packet, 2)
         dprint("read_query: " .. query)
 
-        consider, new_queries =
+        new_queries =
             CryptDB.rewrite(proxy.connection.client.src.name, query)
 
         if not new_queries then
@@ -73,17 +73,12 @@ function read_query_real(packet)
             return proxy.PROXY_SEND_RESULT
         end
 
-        if not consider then
-            -- no need to decrypt results
-            return
-        end
-
         if table.maxn(new_queries) == 0 then
             proxy.response.type = proxy.MYSQLD_PACKET_OK
             return proxy.PROXY_SEND_RESULT
         end
 
-	dprint(" ")
+        dprint(" ")
         for i, v in pairs(new_queries) do
             dprint("rewritten query[" .. i .. "]: " .. v)
             local result_key
@@ -113,19 +108,23 @@ function read_query_result_real(inj)
         local resultset = inj.resultset
 
         if resultset.query_status == proxy.MYSQLD_PACKET_ERR then
+            -- FIXME: Handle error.
             local err = proto.from_err_packet(resultset.raw)
             proxy.response.type = proxy.MYSQLD_PACKET_ERR
             proxy.response.errmsg = err.errmsg
             proxy.response.errcode = err.errcode
             proxy.response.sqlstate = err.sqlstate
         else
+            -- Handle the backend of the query.
+            CryptDB.epilogue(proxy.connection.client.src.name)
+
             local query = inj.query:sub(2)
 
             -- for DEMO: printing results
             local f_names = ""
             local r = ""
 
-            -- mysqlproxy doesn't return real lua arrays, so re-package them..
+            -- mysqlproxy doesn't return real lua arrays, so re-package
             local resfields = resultset.fields
             local fields = {}
             for i = 1, #resfields do
@@ -143,10 +142,10 @@ function read_query_result_real(inj)
             end
 
             -- DEMO
-	    if #rows > 0 then
-	       dprint(" ")
-	       dprint("Results from server:")
-	    end
+            if #rows > 0 then
+               dprint(" ")
+               dprint("Results from server:")
+            end
             dprint(f_names)
             for i = 1, #rows do
                 for j = 1, #rows[i] do
@@ -156,8 +155,9 @@ function read_query_result_real(inj)
                 r = ""
             end
 
-            dfields, drows = CryptDB.decrypt(proxy.connection.client.src.name,
-                                             fields, rows)
+            dfields, drows =
+                CryptDB.decrypt(proxy.connection.client.src.name,
+                                fields, rows)
 
             if dfields and drows then
                 f_names = ""
@@ -166,12 +166,12 @@ function read_query_result_real(inj)
                     f_names = f_names .. " | " .. dfields[i].name
                 end
 
-		if #drows > 0 then
-		   dprint(" ")
-		   dprint("Decrypted results:")
-		end
-		dprint(f_names)
-              
+                if #drows > 0 then
+                   dprint(" ")
+                   dprint("Decrypted results:")
+                end
+                dprint(f_names)
+
                 for i = 1, #drows do
                     for j = 1, #drows[i] do
                         r = r .. " | " .. drows[i][j]

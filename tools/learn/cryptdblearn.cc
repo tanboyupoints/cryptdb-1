@@ -54,6 +54,8 @@ Learn::trainFromFile(ProxyState &ps)
                 s += line;
                 Rewriter r;
                 QueryRewrite qr = r.rewrite(ps, s);
+                /*
+                // FIXME.
                 ResType *res =
                     qr.output->doQuery(ps.conn, ps.e_conn);
                 if(res){
@@ -61,6 +63,7 @@ Learn::trainFromFile(ProxyState &ps)
                         this->m_success_num++;
                     delete res;
                 }
+                */
                 if (true == qr.output->queryAgain()){ 
                     this->m_totalnum++;
                     assert(executeQuery(ps, s));
