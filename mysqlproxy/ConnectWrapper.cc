@@ -240,8 +240,8 @@ rewrite(lua_State *L)
             assert(qr->output->beforeQuery(ps->conn, ps->e_conn));
 
             if (!qr->output->getQuery(&new_queries)) {
+                throw CryptDBError("Failed to get rewritten query!");
                 assert(qr->output->handleQueryFailure(ps->e_conn));
-                return 0;
             }
             
             clients[client]->last_query = query;
@@ -268,6 +268,29 @@ rewrite(lua_State *L)
 
     clients[client]->last_query = query;
     return 1;
+}
+
+static int
+queryFailure(lua_State *L)
+{
+    ANON_REGION(__func__, &perf_cg);
+    scoped_lock l(&big_lock);
+    assert(0 == mysql_thread_init());
+
+    std::string client = xlua_tolstring(L, 1);
+    if (clients.find(client) == clients.end()) {
+        throw CryptDBError("Failed to properly handle failed query!");
+    }
+
+    assert(EXECUTE_QUERIES);
+
+    assert(ps);
+    assert(clients[client]->qr);
+
+    QueryRewrite *qr = clients[client]->qr;
+    assert(qr->output->handleQueryFailure(ps->e_conn));
+
+    return 0;
 }
 
 static int
@@ -308,6 +331,7 @@ passDecryptedPtr(lua_State *L)
     scoped_lock l(&big_lock);
     assert(0 == mysql_thread_init());
     
+    // FIXME: Necessary?
     THD *thd = (THD*) create_embedded_thd(0);
     auto thd_cleanup = cleanup([&thd]
         {
@@ -466,6 +490,7 @@ cryptdb_lib[] = {
     F(decrypt),
     F(passDecryptedPtr),
     F(epilogue),
+    F(queryFailure),
     { 0, 0 },
 };
 

@@ -102,13 +102,16 @@ function read_query_real(packet)
 end
 
 function read_query_result_real(inj)
+    local client = proxy.connection.client.src.name
+
     if inj.id == RES_IGNORE then
         return proxy.PROXY_IGNORE_RESULT
     elseif inj.id == RES_DECRYPT then
         local resultset = inj.resultset
 
         if resultset.query_status == proxy.MYSQLD_PACKET_ERR then
-            -- FIXME: Handle error.
+            CryptDB.queryFailure(client)
+
             local err = proto.from_err_packet(resultset.raw)
             proxy.response.type = proxy.MYSQLD_PACKET_ERR
             proxy.response.errmsg = err.errmsg
@@ -121,9 +124,8 @@ function read_query_result_real(inj)
 
             -- Handle the backend of the query.
             res_ptr =
-                CryptDB.epilogue(proxy.connection.client.src.name)
+                CryptDB.epilogue(client)
             if res_ptr then
-                local client = proxy.connection.client.src.name
                 dfields, drows = CryptDB.passDecryptedPtr(client, res_ptr)
             else
                  -- for DEMO: printing results
@@ -159,8 +161,7 @@ function read_query_result_real(inj)
                     r = ""
                 end
                 dfields, drows =
-                    CryptDB.decrypt(proxy.connection.client.src.name,
-                                    fields, rows)
+                    CryptDB.decrypt(client, fields, rows)
             end
 
             if dfields and drows then
