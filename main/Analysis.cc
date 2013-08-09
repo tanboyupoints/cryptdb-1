@@ -444,9 +444,14 @@ bool DeleteDelta::apply(Connect *e_conn, TableType table_type)
 RewriteOutput::~RewriteOutput()
 {;}
 
-bool RewriteOutput::queryAgain()
+bool RewriteOutput::queryAgain() const
 {
     return false;
+}
+
+bool RewriteOutput::doDecryption() const
+{
+    return true;
 }
 
 ResType *RewriteOutput::sendQuery(Connect *c, const std::string &q)
@@ -463,7 +468,7 @@ bool SimpleOutput::beforeQuery(Connect *conn, Connect *e_conn)
     return true;
 }
 
-bool SimpleOutput::getQuery(std::list<std::string> *queryz)
+bool SimpleOutput::getQuery(std::list<std::string> *queryz) const
 {
     queryz->clear();
     queryz->push_back(original_query);
@@ -471,14 +476,19 @@ bool SimpleOutput::getQuery(std::list<std::string> *queryz)
     return true;
 }
 
-bool SimpleOutput::handleQueryFailure(Connect *e_conn)
+bool SimpleOutput::handleQueryFailure(Connect *e_conn) const
 {
     return true;
 }
 
-bool SimpleOutput::afterQuery(Connect *e_conn)
+bool SimpleOutput::afterQuery(Connect *e_conn) const
 {
     return true;
+}
+
+bool SimpleOutput::doDecryption() const
+{
+    return false;
 }
 
 bool DMLOutput::beforeQuery(Connect *conn, Connect *e_conn)
@@ -486,7 +496,7 @@ bool DMLOutput::beforeQuery(Connect *conn, Connect *e_conn)
     return true;
 }
 
-bool DMLOutput::getQuery(std::list<std::string> *queryz)
+bool DMLOutput::getQuery(std::list<std::string> *queryz) const
 {
     queryz->clear();
     queryz->push_back(new_query);
@@ -494,12 +504,12 @@ bool DMLOutput::getQuery(std::list<std::string> *queryz)
     return true;
 }
 
-bool DMLOutput::handleQueryFailure(Connect *e_conn)
+bool DMLOutput::handleQueryFailure(Connect *e_conn) const
 {
     return true;
 }
 
-bool DMLOutput::afterQuery(Connect *e_conn)
+bool DMLOutput::afterQuery(Connect *e_conn) const
 {
     return true;
 }
@@ -580,7 +590,7 @@ bool SpecialUpdate::beforeQuery(Connect *conn, Connect *e_conn)
     return true;
 }
 
-bool SpecialUpdate::getQuery(std::list<std::string> *queryz)
+bool SpecialUpdate::getQuery(std::list<std::string> *queryz) const
 {
     queryz->clear();
     queryz->push_back("START TRANSACTION; ");
@@ -603,12 +613,12 @@ bool SpecialUpdate::getQuery(std::list<std::string> *queryz)
 }
 
 // FIXME: Implement.
-bool SpecialUpdate::handleQueryFailure(Connect *e_conn)
+bool SpecialUpdate::handleQueryFailure(Connect *e_conn) const
 {
     return false;
 }
 
-bool SpecialUpdate::afterQuery(Connect *e_conn)
+bool SpecialUpdate::afterQuery(Connect *e_conn) const
 {
     return true;
 }
@@ -868,7 +878,7 @@ bool DDLOutput::beforeQuery(Connect *conn, Connect *e_conn)
     return b;
 }
 
-bool DDLOutput::getQuery(std::list<std::string> *queryz)
+bool DDLOutput::getQuery(std::list<std::string> *queryz) const
 {
     queryz->clear();
 
@@ -878,23 +888,25 @@ bool DDLOutput::getQuery(std::list<std::string> *queryz)
     return true;
 }
 
-bool DDLOutput::handleQueryFailure(Connect *e_conn)
+bool DDLOutput::handleQueryFailure(Connect *e_conn) const
 {
     assert(revertAndCleanupEmbedded(e_conn, this->delta_output_id.get()));
     return true;
 }
 
-bool DDLOutput::afterQuery(Connect *e_conn)
+bool DDLOutput::afterQuery(Connect *e_conn) const
 {
     return handleDeltaAfterQuery(e_conn, deltas, local_qz(),
                                  this->delta_output_id.get());
 }
 
-const std::list<std::string> DDLOutput::remote_qz() const {
+const std::list<std::string> DDLOutput::remote_qz() const
+{
     return std::list<std::string>({new_query});
 }
 
-const std::list<std::string> DDLOutput::local_qz() const {
+const std::list<std::string> DDLOutput::local_qz() const
+{
     return std::list<std::string>({original_query});
 }
 
@@ -908,7 +920,7 @@ bool AdjustOnionOutput::beforeQuery(Connect *conn, Connect *e_conn)
     return b;
 }
 
-bool AdjustOnionOutput::getQuery(std::list<std::string> *queryz)
+bool AdjustOnionOutput::getQuery(std::list<std::string> *queryz) const
 {
     queryz->clear();
     queryz->push_back("START TRANSACTION; ");
@@ -923,13 +935,13 @@ bool AdjustOnionOutput::getQuery(std::list<std::string> *queryz)
     return true;
 }
 
-bool AdjustOnionOutput::handleQueryFailure(Connect *e_conn)
+bool AdjustOnionOutput::handleQueryFailure(Connect *e_conn) const
 {
     assert(revertAndCleanupEmbedded(e_conn, this->delta_output_id.get()));
     return true;
 }
 
-bool AdjustOnionOutput::afterQuery(Connect *e_conn)
+bool AdjustOnionOutput::afterQuery(Connect *e_conn) const
 {
     return handleDeltaAfterQuery(e_conn, deltas, local_qz(),
                                  this->delta_output_id.get());
@@ -945,7 +957,7 @@ const std::list<std::string> AdjustOnionOutput::local_qz() const
     return std::list<std::string>();
 }
 
-bool AdjustOnionOutput::queryAgain()
+bool AdjustOnionOutput::queryAgain() const
 {
     return true;
 }

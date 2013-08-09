@@ -897,8 +897,12 @@ mysql_noop()
 }
 
 // FIXME: Implement.
-// SYNTAX: DIRECTIVE [table name] [field name] [security rating]
-// > FIXME: Make the syntax more sql like.
+// SYNTAX
+// > DIRECTIVE UPDATE cryptdb_metadata
+//                SET <table_name | field_name | rating> = [value]
+// > DIRECTIVE SELECT <table_name | field_name | rating>
+//               FROM cryptdb_metadata
+//              WHERE <table_name | field_name | rating> = [value]
 RewriteOutput * 
 Rewriter::handleDirective(Analysis &a, const ProxyState &ps,
                           const std::string &query)
@@ -983,11 +987,6 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
     unsigned int cols = dbres.names.size();
-
-    // HACK: Queries like 'SHOW DATABASES;'
-    if (dbres.names.size() != rmeta.rfmeta.size()) {
-        return new ResType(dbres);
-    }
 
     ResType *res = new ResType();
 
@@ -1095,8 +1094,11 @@ executeQuery(const ProxyState &ps, const std::string &q)
         ResType *res = new ResType(dbres->unpack());
         prettyPrintQueryResult(*res);
 
-        ResType *dec_res = r.decryptResults(*res, qr.rmeta);
-        prettyPrintQueryResult(*dec_res);
+        ResType *dec_res;
+        if (true == qr.output->doDecryption()) {
+            dec_res = r.decryptResults(*res, qr.rmeta);
+            prettyPrintQueryResult(*dec_res);
+        }
 
         printEmbeddedState(ps);
 
