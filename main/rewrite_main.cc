@@ -1015,29 +1015,31 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
     unsigned int col_index = 0;
     for (unsigned int c = 0; c < cols; c++) {
         const ReturnField &rf = rmeta.rfmeta.at(c);
-        FieldMeta * fm = rf.getOLK().key;
-        if (!rf.getIsSalt()) {
-            for (unsigned int r = 0; r < rows; r++) {
-                if (!fm || dbres.rows[r][c]->is_null()) {
-                    res->rows[r][col_index] = dbres.rows[r][c];
-                } else {
-                    uint64_t salt = 0;
-                    const int salt_pos = rf.getSaltPosition();
-                    if (salt_pos >= 0) {
-                        Item * salt_item = dbres.rows[r][salt_pos];
-                        assert_s(!salt_item->null_value, "salt item is null");
-                        salt =
-                            ((Item_int *)dbres.rows[r][salt_pos])->value;
-                    }
-
-                    res->rows[r][col_index] =
-                        decrypt_item_layers(dbres.rows[r][c], fm,
-                                            rf.getOLK().o, salt,
-                                            res->rows[r]);
-                }
-            }
-            col_index++;
+        if (rf.getIsSalt()) {
+            continue;
         }
+
+        FieldMeta * fm = rf.getOLK().key;
+        for (unsigned int r = 0; r < rows; r++) {
+            if (!fm || dbres.rows[r][c]->is_null()) {
+                res->rows[r][col_index] = dbres.rows[r][c];
+            } else {
+                uint64_t salt = 0;
+                const int salt_pos = rf.getSaltPosition();
+                if (salt_pos >= 0) {
+                    Item * salt_item = dbres.rows[r][salt_pos];
+                    assert_s(!salt_item->null_value, "salt item is null");
+                    salt =
+                        ((Item_int *)dbres.rows[r][salt_pos])->value;
+                }
+
+                res->rows[r][col_index] =
+                    decrypt_item_layers(dbres.rows[r][c], fm,
+                                        rf.getOLK().o, salt,
+                                        res->rows[r]);
+            }
+        }
+        col_index++;
     }
 
     return res;
