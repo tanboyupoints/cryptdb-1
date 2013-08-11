@@ -315,12 +315,16 @@ epilogue(lua_State *L)
             executeQuery(*ps, clients[client]->last_query);
         assert(res_type);
 
+        // HACK/FIXME: This should use the doDecryption from the second
+        // query rewriting.
+        lua_pushboolean(L, qr->output->doDecryption());
         lua_pushinteger(L, (lua_Integer)res_type);
-        return 1;
+        return 2;
     }
 
+    lua_pushboolean(L, qr->output->doDecryption());
     lua_pushnil(L);
-    return 1;
+    return 2;
 }
 
 static int
@@ -400,7 +404,8 @@ decrypt(lua_State *L)
         if (!lua_istable(L, -1))
             LOG(warn) << "mismatch";
 
-        /* initialize all items to NULL, since Lua skips nil array entries */
+        /* initialize all items to NULL, since Lua skips
+           nil array entries */
         std::vector<Item *> row(res.types.size());
 
         lua_pushnil(L);

@@ -123,7 +123,7 @@ function read_query_result_real(inj)
             local query = inj.query:sub(2)
 
             -- Handle the backend of the query.
-            res_ptr =
+            decryptp, res_ptr =
                 CryptDB.epilogue(client)
             if res_ptr then
                 dfields, drows = CryptDB.passDecryptedPtr(client, res_ptr)
@@ -160,8 +160,13 @@ function read_query_result_real(inj)
                     dprint(r)
                     r = ""
                 end
-                dfields, drows =
-                    CryptDB.decrypt(client, fields, rows)
+                if true == decryptp then
+                    dfields, drows =
+                        CryptDB.decrypt(client, fields, rows)
+                else
+                    dfields = fields
+                    drows = rows
+                end
             end
 
             if dfields and drows then
