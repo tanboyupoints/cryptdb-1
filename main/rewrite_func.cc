@@ -91,20 +91,25 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
         assert(false);
     }
 
-    const EncSet *out_es;
-    if (encset_from_intersection) {
-        assert_s(solution.single_crypted_and_or_plainvals(),
-                 "cannot use typical_gather with more outgoing encsets");
-        out_es = &solution;
-    } else {
-        out_es = &PLAIN_EncSet;
-    }
+    std::function<EncSet ()> getEncSet =
+        [encset_from_intersection, solution] ()
+    {
+        if (encset_from_intersection) {
+            assert_s(solution.single_crypted_and_or_plainvals(),
+                     "can't use typical_gather with more outgoing"
+                        " encsets");
+            return solution;
+        } else {
+            return PLAIN_EncSet;
+        }
+    };
+    const EncSet out_es = getEncSet();
 
-    my_r = reason(*out_es, why, i);
+    my_r = reason(out_es, why, i);
     my_r.add_child(r1);
     my_r.add_child(r2);
 
-    return new RewritePlanOneOLK(EncSet(out_es->chooseOne()),
+    return new RewritePlanOneOLK(EncSet(out_es.chooseOne()),
                                  solution.chooseOne(), childr_rp, my_r);
 }
 
@@ -156,30 +161,34 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
     {
         LOG(cdb_v) << "CItemCompare (L1139) do_gather func " << *i;
 
-        const EncSet *my_es;
         std::string why = "";
 
-        if (FT == Item_func::Functype::EQ_FUNC ||
-            FT == Item_func::Functype::EQUAL_FUNC ||
-            FT == Item_func::Functype::NE_FUNC) {
-            why = "compare equality";
+        std::function<EncSet ()> getEncSet =
+            [&why, &i] ()
+        {
+            if (FT == Item_func::Functype::EQ_FUNC ||
+                FT == Item_func::Functype::EQUAL_FUNC ||
+                FT == Item_func::Functype::NE_FUNC) {
+                why = "compare equality";
 
-            Item ** args = i->arguments();
-            if (!args[0]->const_item() && !args[1]->const_item()) {
-                why = why + "; join";
-                std::cerr << "join";
-                my_es = &JOIN_EncSet;
+                Item ** args = i->arguments();
+                if (!args[0]->const_item() && !args[1]->const_item()) {
+                    why = why + "; join";
+                    std::cerr << "join";
+                    return JOIN_EncSet;
+                } else {
+                    return EQ_EncSet;
+                }
             } else {
-                my_es = &EQ_EncSet;
+                why = "compare order";
+                return ORD_EncSet;
             }
-        } else {
-            my_es = &ORD_EncSet;
-            why = "compare order";
-        }
+        };
+        const EncSet my_es = getEncSet();
 
         assert_s(i->argument_count() == 2,
                  "expected two arguments for comparison");
-        return typical_gather(a, i, *my_es, why, tr, false, PLAIN_EncSet);
+        return typical_gather(a, i, my_es, why, tr, false, PLAIN_EncSet);
     }
 
     virtual Item * do_optimize_type(Item_func *i, Analysis & a) const
