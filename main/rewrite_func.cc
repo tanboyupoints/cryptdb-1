@@ -162,21 +162,23 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
         if (FT == Item_func::Functype::EQ_FUNC ||
             FT == Item_func::Functype::EQUAL_FUNC ||
             FT == Item_func::Functype::NE_FUNC) {
-            my_es = &EQ_EncSet;
             why = "compare equality";
+
+            Item ** args = i->arguments();
+            if (!args[0]->const_item() && !args[1]->const_item()) {
+                why = why + "; join";
+                std::cerr << "join";
+                my_es = &JOIN_EncSet;
+            } else {
+                my_es = &EQ_EncSet;
+            }
         } else {
             my_es = &ORD_EncSet;
             why = "compare order";
         }
 
-        Item ** args = i->arguments();
-        assert_s(i->argument_count() == 2, "expected two arguments for comparison");
-        if (!args[0]->const_item() && !args[1]->const_item()) {
-            why = why + "; join";
-            std::cerr << "join";
-            my_es = &JOIN_EncSet;
-        }
-
+        assert_s(i->argument_count() == 2,
+                 "expected two arguments for comparison");
         return typical_gather(a, i, *my_es, why, tr, false, PLAIN_EncSet);
     }
 

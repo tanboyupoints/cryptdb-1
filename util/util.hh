@@ -461,6 +461,10 @@ public:
         return value;
     }
 
+    bool assigned() const {
+        return frozen;
+    }
+
 private:
     T value;
     bool frozen;

@@ -175,6 +175,23 @@ EncLayer *OnionMeta::getLayerBack() const
     return layers.back();
 }
 
+EncLayer *OnionMeta::getLayer(const SECLEVEL &sl) const
+{
+    if (layers.size() == 0) {
+        throw CryptDBError("No EncLayerz!");
+    }
+
+    AssignOnce<EncLayer *> out;
+    for (auto it : layers) {
+        if (it->level() == sl) {
+            out = it;
+        }
+    }
+
+    assert(out.assigned());
+    return out.get();
+}
+
 void OnionMeta::removeLayerBack()
 {
     if (layers.size() == 0) {

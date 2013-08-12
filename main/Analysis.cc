@@ -81,10 +81,10 @@ EncSet::intersect(const EncSet & es2) const
                 // 2> Different fields, but SECLEVEL is PLAINVAL,
                 //    HOM or DETJOIN so same key.
                 OnionMeta *om = fm->getOnionMeta(o);
-                OnionMeta *om2 = fm->getOnionMeta(o);
+                OnionMeta *om2 = fm2->getOnionMeta(o);
                 // HACK: To determine if the keys are the same.
-                if (om->getLayerBack()->doSerialize() ==
-                    om2->getLayerBack()->doSerialize()) {
+                if (om->getLayer(sl)->doSerialize() ==
+                    om2->getLayer(sl)->doSerialize()) {
                     m[o] = LevelFieldPair(sl, fm);
                 }
             }
