@@ -10,7 +10,7 @@ void
 init_mysql(const string & embed_db)
 {
     if (lib_initialized) {
-	return;
+        return;
     }
     char dir_arg[1024];
     snprintf(dir_arg, sizeof(dir_arg), "--datadir=%s", embed_db.c_str());
@@ -26,7 +26,7 @@ init_mysql(const string & embed_db)
     };
 
     assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
-				   (char**) mysql_av, 0));
+                                   (char**) mysql_av, 0));
 
     assert(0 == mysql_thread_init());
 

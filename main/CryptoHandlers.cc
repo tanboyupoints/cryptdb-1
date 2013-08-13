@@ -204,8 +204,8 @@ type_len_for_AES_str(enum enum_field_types type, int len, bool pad) {
             res_len = rounded_len(len, AES_BLOCK_BYTES, pad);
             break;
         default: {
-                     assert_s(false, "unexpected sql_type");
-                 }
+             assert_s(false, "unexpected sql_type");
+         }
     }
 
     return std::make_pair(res_type, res_len);
@@ -856,10 +856,10 @@ DET_str::newCreateField(Create_field * cf, std::string anonname) {
 
 Item *
 DET_str::encrypt(Item * ptext, uint64_t IV) {
-    std::string plain =  ItemToString(ptext);
+    std::string plain = ItemToString(ptext);
     std::string enc = encrypt_AES_CMC(plain,enckey, true);
     LOG(encl) << " DET_str encrypt " << plain  << " IV " << IV << " ---> "
-	      << " enc len " << enc.length() << " enc " << enc;
+              << " enc len " << enc.length() << " enc " << enc;
 
     return new Item_string(make_thd_string(enc), enc.length(), &my_charset_bin);
 }
@@ -868,8 +868,9 @@ Item *
 DET_str::decrypt(Item * ctext, uint64_t IV) {
     std::string enc = ItemToString(ctext);
     std::string dec = decrypt_AES_CMC(enc, deckey, true);
-    LOG(encl) << " DET_str decrypt enc len " << enc.length() << " enc " << enc
-	      << " IV " << IV << " ---> " << " dec len " << dec.length() << " dec " << dec;
+    LOG(encl) << " DET_str decrypt enc len " << enc.length()
+              << " enc " << enc << " IV " << IV << " ---> "
+              << " dec len " << dec.length() << " dec " << dec;
 
     return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
 }

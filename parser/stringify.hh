@@ -78,7 +78,7 @@ operator<<(std::ostream &out, List_noparen<String> &l)
 
         if (!first) {
             out << ", ";
-	}
+        }
         out << "'" << *i << "'";
         first = false;
     }
