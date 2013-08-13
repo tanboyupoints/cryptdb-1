@@ -33,11 +33,10 @@ T * copy(T *x) {
 /* Makes a new item based on
  * information from an old item */
 Item_field *make_item(Item_field *t, std::string field_name = "");
-Item_string * make_item(Item_string * i);
-Item_int * make_item(Item_int * i);
-Item_int * make_item(Item_num * i);
+Item_string *make_item(Item_string *i);
+Item_int *make_item(Item_int *i);
 Item_null *make_item(Item_null *i);
-ORDER * make_order(ORDER * old_order, Item * i);
+ORDER *make_order(ORDER *old_order, Item *i);
 
 
 // sets the select_lex in a lex
