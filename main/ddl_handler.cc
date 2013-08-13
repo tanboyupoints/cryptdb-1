@@ -38,7 +38,8 @@ class CreateHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
                                   const ProxyState &ps) const
     {
-        char* table  = lex->select_lex.table_list.first->table_name;
+        const std::string table =
+            lex->select_lex.table_list.first->table_name;
         LEX *new_lex = copy(lex);
         
         //TODO: support for "create table like"
@@ -76,13 +77,30 @@ class CreateHandler : public DDLHandler {
 
             auto it =
                 List_iterator<Create_field>(lex->alter_info.create_list);
-            new_lex->alter_info.create_list = 
+            new_lex->alter_info.create_list =
                 reduceList<Create_field>(it, List<Create_field>(),
                     [&a, &ps, &tm] (List<Create_field> out_list,
                                     Create_field *cf) {
                         return createAndRewriteField(a, ps, cf, tm, 
                                                      true, out_list);
                 });
+
+            // Add each new index.
+            auto key_it =
+                List_iterator<Key>(lex->alter_info.key_list);
+            new_lex->alter_info.key_list =
+                reduceList<Key>(key_it, List<Key>(),
+                    [&tm, &a] (List<Key> out_list, Key *key) {
+                        // -----------------------------
+                        //         Rewrite INDEX
+                        // -----------------------------
+                        auto keys = rewrite_key(tm, key, a);
+                        out_list.concat(vectorToList(keys));
+
+                        return out_list;
+                });
+
+    
         } else { // Table already exists.
 
             // Make sure we aren't trying to create a table that
