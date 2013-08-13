@@ -71,7 +71,7 @@ ini_set("mysqli.default_user", "root");
      loadcfg();
  }
 
- if ($_REQUEST['login']){
+ if (isset($_REQUEST['login'])){
      if ($_REQUEST['pwd']!=$ACCESS_PWD){
          $err_msg="Invalid password. Try again";
      }else{
@@ -80,7 +80,7 @@ ini_set("mysqli.default_user", "root");
      }
  }
 
- if ($_REQUEST['logoff']){
+ if (isset($_REQUEST['logoff'])){
      check_xss();
      $_SESSION = array();
      savecfg();
@@ -91,19 +91,19 @@ ini_set("mysqli.default_user", "root");
      exit;
  }
 
- if (!$_SESSION['is_logged']){
+ if (!isset($_SESSION['is_logged'])){
      print_login();
      exit;
  }
 
- if ($_REQUEST['savecfg']){
+ if (isset($_REQUEST['savecfg'])){
      check_xss();
      savecfg();
  }
 
  loadsess();
 
- if ($_REQUEST['showcfg']){
+ if (isset($_REQUEST['showcfg'])){
      print_cfg();
      exit;
  }
@@ -322,7 +322,7 @@ function loadcfg(){
 function chset_select($sel=''){
     global $DBDEF;
     $result='';
-    if ($_SESSION['sql_chset']){
+    if (isset($_SESSION['sql_chset'])){
         $arr=$_SESSION['sql_chset'];
     }else{
         $arr=db_array("show character set",NULL,1);
