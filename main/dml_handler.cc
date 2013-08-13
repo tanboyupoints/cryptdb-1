@@ -46,7 +46,8 @@ class InsertHandler : public DMLHandler {
                 lex->select_lex.table_list.first->table_name;
 
         //rewrite table name
-        new_lex->select_lex.table_list.first = rewrite_table_list(lex->select_lex.table_list.first, a);
+        new_lex->select_lex.table_list.first =
+            rewrite_table_list(lex->select_lex.table_list.first, a);
 
         // fields
         std::vector<FieldMeta *> fmVec;
@@ -60,7 +61,8 @@ class InsertHandler : public DMLHandler {
                 assert(i->type() == Item::FIELD_ITEM);
                 Item_field *ifd = static_cast<Item_field*>(i);
                 //cerr << "field " << ifd->table_name << "." << ifd->field_name << endl;
-                fmVec.push_back(a.getFieldMeta(ifd->table_name, ifd->field_name));
+                fmVec.push_back(a.getFieldMeta(ifd->table_name,
+                                               ifd->field_name));
                 std::vector<Item *> l;
                 itemTypes.do_rewrite_insert(i, a, l, NULL);
                 for (auto it0 = l.begin(); it0 != l.end(); ++it0) {

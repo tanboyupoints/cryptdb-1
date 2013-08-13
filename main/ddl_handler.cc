@@ -85,15 +85,14 @@ class CreateHandler : public DDLHandler {
                                                      true, out_list);
                 });
 
-            // Add each new index.
+            // -----------------------------
+            //         Rewrite INDEX
+            // -----------------------------
             auto key_it =
                 List_iterator<Key>(lex->alter_info.key_list);
             new_lex->alter_info.key_list =
                 reduceList<Key>(key_it, List<Key>(),
                     [&tm, &a] (List<Key> out_list, Key *key) {
-                        // -----------------------------
-                        //         Rewrite INDEX
-                        // -----------------------------
                         auto keys = rewrite_key(tm, key, a);
                         out_list.concat(vectorToList(keys));
 

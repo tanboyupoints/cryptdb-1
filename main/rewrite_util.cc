@@ -185,6 +185,7 @@ get_create_field(const Analysis &a, Create_field * f, OnionMeta *om,
     Create_field * new_cf = f;
     
     auto enc_layers = a.getEncLayers(om);
+    assert(enc_layers.size() > 0);
     for (auto l : enc_layers) {
         Create_field * old_cf = new_cf;
         new_cf = l->newCreateField(old_cf, name);
@@ -211,17 +212,21 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
         return output_cfields;
     }
 
+    const bool has_default = f->def != NULL;
+    const uint64_t default_salt =
+        fm->has_salt && has_default ? randomValue() : 0;
+
     // create each onion column
     for (auto oit : fm->orderedOnionMetas()) {
+        onion o = oit.first->getValue();
         OnionMeta *om = oit.second;
         Create_field * new_cf =
-        get_create_field(a, f, om, om->getAnonOnionName());
-        /*
-        EncLayer * last_layer = oit->second->layers.back();
-        //create field with anonymous name
-        Create_field * new_cf =
-                last_layer->newCreateField(f, oit->second->getAnonOnionName().c_str());
-        */
+            get_create_field(a, f, om, om->getAnonOnionName());
+        assert(has_default == static_cast<bool>(new_cf->def));
+        if (has_default) {
+            new_cf->def =
+                encrypt_item_layers(new_cf->def, o, om, a, default_salt);
+        }
         output_cfields.push_back(new_cf);
     }
 
@@ -234,6 +239,11 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
         f0->flags = f0->flags | UNSIGNED_FLAG;//salt is unsigned
         f0->sql_type     = MYSQL_TYPE_LONGLONG;
         f0->length       = 8;
+
+        if (has_default) {
+            f0->def = new Item_int(static_cast<ulonglong>(default_salt));
+        }
+
         output_cfields.push_back(f0);
     }
 
@@ -356,7 +366,7 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
 //TODO: which encrypt/decrypt should handle null?
 Item *
 encrypt_item_layers(Item * i, onion o, OnionMeta * const om,
-                    Analysis &a, uint64_t IV) {
+                    const Analysis &a, uint64_t IV) {
     assert(!i->is_null());
 
     const auto enc_layers = a.getEncLayers(om);

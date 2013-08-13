@@ -63,7 +63,7 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
 
 Item *
 encrypt_item_layers(Item * i, onion o, OnionMeta * const om,
-                    Analysis &a, uint64_t IV = 0);
+                    const Analysis &a, uint64_t IV = 0);
 
 // FIXME(burrows): Generalize to support any container with next AND end
 // semantics.

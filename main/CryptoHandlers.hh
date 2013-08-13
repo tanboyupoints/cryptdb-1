@@ -122,7 +122,8 @@ public:
 
     SECLEVEL level() const {return SECLEVEL::SEARCH;}
     std::string name() const {return "SEARCH";}
-    Create_field * newCreateField(Create_field * cf, std::string anonname = "");
+    Create_field * newCreateField(Create_field * cf,
+                                  std::string anonname = "");
 
     Item * encrypt(Item * ptext, uint64_t IV = 0);
     Item * decrypt(Item * ctext, uint64_t IV = 0)__attribute__((noreturn));

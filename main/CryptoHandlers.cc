@@ -1485,7 +1485,8 @@ HOM::HOM(unsigned int id, const std::string & serial)
 
 Create_field *
 HOM::newCreateField(Create_field * cf, std::string anonname) {
-    return createFieldHelper(cf, 2*nbits/8, MYSQL_TYPE_BLOB, anonname, &my_charset_bin);
+    return createFieldHelper(cf, 2*nbits/8, MYSQL_TYPE_VARCHAR,
+                             anonname, &my_charset_bin);
 }
 
 
@@ -1568,7 +1569,8 @@ Search::Search(unsigned int id, const std::string & serial)
 
 Create_field *
 Search::newCreateField(Create_field * cf, std::string anonname) {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname, &my_charset_bin);
+    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname,
+                             &my_charset_bin);
 }
 
 
