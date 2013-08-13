@@ -138,11 +138,11 @@ class AddIndexSubHandler : public AlterSubHandler {
             List_iterator<Key>(lex->alter_info.key_list);
         new_lex->alter_info.key_list = 
             reduceList<Key>(key_it, List<Key>(),
-                [preamble, &tm, &a] (List<Key> out_list, Key *key) {
+                [tm, &a] (List<Key> out_list, Key *key) {
                     // -----------------------------
                     //         Rewrite INDEX
                     // -----------------------------
-                    auto new_keys = rewrite_key(preamble.table, key, a);
+                    auto new_keys = rewrite_key(tm, key, a);
                     out_list.concat(vectorToList(new_keys));
 
                     return out_list;

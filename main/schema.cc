@@ -54,28 +54,27 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels,
     : onionname(getpRandomName() + TypeText<onion>::toText(o)),
       uniq_count(uniq_count)
 {
-    if (m_key) {         // Don't encrypt if we don't have a key.
-        Create_field * newcf = cf;
-        //generate enclayers for encrypted field
-        const std::string uniqueFieldName = this->getAnonOnionName();
-        for (auto l: levels) {
-            std::string key;
-            key = getLayerKey(m_key, uniqueFieldName, l);
+    Create_field * newcf = cf;
+    //generate enclayers for encrypted field
+    const std::string uniqueFieldName = this->getAnonOnionName();
+    for (auto l: levels) {
+        const std::string key =
+            m_key ? getLayerKey(m_key, uniqueFieldName, l)
+                  : "plainkey";
+        EncLayer * const el =
+            EncLayerFactory::encLayer(o, l, newcf, key);
 
-            EncLayer * el = EncLayerFactory::encLayer(o, l, newcf, key);
+        Create_field * oldcf = newcf;
+        newcf = el->newCreateField(oldcf);
+        
+        this->layers.push_back(el);
 
-            Create_field * oldcf = newcf;
-            newcf = el->newCreateField(oldcf);
-            
-            this->layers.push_back(el);
-
-            if (oldcf != cf) {
-                delete oldcf;
-            }
+        if (oldcf != cf) {
+            delete oldcf;
         }
-        if (newcf != cf) {
-            delete newcf;
-        }
+    }
+    if (newcf != cf) {
+        delete newcf;
     }
 }
 
@@ -247,10 +246,13 @@ FieldMeta::FieldMeta(std::string name, Create_field *field,
 
 std::string FieldMeta::serialize(const DBObject &parent) const
 {
+    const std::string serialized_salt_name =
+        true == this->has_salt ? serialize_string(getSaltName())
+                               : serialize_string("");
     const std::string serial =
         serialize_string(fname) +
         serialize_string(bool_to_string(has_salt)) +
-        serialize_string(getSaltName()) +
+        serialized_salt_name +
         serialize_string(TypeText<onionlayout>::toText(onion_layout)) +
         serialize_string(TypeText<SECURITY_RATING>::toText(sec_rating)) +
         serialize_string(std::to_string(uniq_count)) +

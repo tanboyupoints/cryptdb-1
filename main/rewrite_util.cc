@@ -240,26 +240,43 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
     return output_cfields;
 }
 
+static
+const OnionMeta *
+getKeyOnionMeta(const FieldMeta *fm)
+{
+    std::vector<onion> onions({oOPE, oDET, oPLAIN});
+    for (auto it : onions) {
+        const OnionMeta * const om = fm->getOnionMeta(it);
+        if (NULL != om) {
+            return om;
+        }
+    }
+
+    assert(false);
+}
+
 // TODO: Add Key for oDET onion as well.
 std::vector<Key*>
-rewrite_key(const std::string &table, Key *key, Analysis &a)
+rewrite_key(const TableMeta *tm, Key *key, Analysis &a)
 {
     std::vector<Key*> output_keys;
-    Key * const new_key = key->clone(current_thd->mem_root);    
+    Key * const new_key = key->clone(current_thd->mem_root);
     auto col_it =
         List_iterator<Key_part_spec>(key->columns);
     // FIXME: Memleak.
-    new_key->name =
-        string_to_lex_str(a.getAnonIndexName(table, convert_lex_str(key->name)));
+    const std::string new_name =
+        a.getAnonIndexName(tm, convert_lex_str(key->name));
+    new_key->name = string_to_lex_str(new_name);
     new_key->columns = 
         reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
-            [table, a] (List<Key_part_spec> out_field_list,
+            [tm, a] (List<Key_part_spec> out_field_list,
                         Key_part_spec *key_part) {
                 const std::string field_name =
                     convert_lex_str(key_part->field_name);
                 const FieldMeta * const fm =
-                    a.getFieldMeta(table, field_name);
-                const OnionMeta * const om = fm->getOnionMeta(oOPE);
+                    a.getFieldMeta(tm, field_name);
+                // HACK: Should return multiple onions.
+                const OnionMeta * const om = getKeyOnionMeta(fm);
                 key_part->field_name =
                     string_to_lex_str(om->getAnonOnionName());
                 out_field_list.push_back(key_part);
@@ -302,9 +319,20 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     //         Update FIELD       
     // -----------------------------
     const std::string name = std::string(cf->field_name);
-    FieldMeta * const fm =
-        new FieldMeta(name, cf, ps.masterKey, ps.defaultSecurityRating(),
-                      tm->leaseIncUniq());
+    auto buildFieldMeta =
+        [] (const std::string name, Create_field *cf,
+            const ProxyState &ps, TableMeta *tm)
+    {
+        if (Field::NEXT_NUMBER == cf->unireg_check) {
+            return new FieldMeta(name, cf, NULL, SECURITY_RATING::PLAIN,
+                                 tm->leaseIncUniq());
+        } else {
+            return new FieldMeta(name, cf, ps.masterKey,
+                                 ps.defaultSecurityRating(),
+                                 tm->leaseIncUniq());
+        }
+    };
+    FieldMeta * const fm = buildFieldMeta(name, cf, ps, tm);
     // Here we store the key name for the first time. It will be applied
     // after the Delta is read out of the database.
     if (true == new_table) {

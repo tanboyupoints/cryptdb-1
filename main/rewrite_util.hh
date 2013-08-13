@@ -48,7 +48,7 @@ std::vector<Create_field*>
 rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a);
 
 std::vector<Key*>
-rewrite_key(const std::string &table, Key *key, Analysis &a);
+rewrite_key(const TableMeta *tm, Key *key, Analysis &a);
 
 std::string
 bool_to_string(bool b);

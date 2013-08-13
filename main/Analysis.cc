@@ -987,24 +987,36 @@ OnionMeta *Analysis::getOnionMeta(const std::string &table,
 FieldMeta *Analysis::getFieldMeta(const std::string &table,
                                   const std::string &field) const
 {
-    std::string real_table_name = unAliasTable(table);
-    FieldMeta *fm = this->schema->getFieldMeta(real_table_name, field);
+    const std::string real_table_name = unAliasTable(table);
+    FieldMeta * const fm =
+        this->schema->getFieldMeta(real_table_name, field);
+    assert(fm);
+    return fm;
+}
+
+FieldMeta *Analysis::getFieldMeta(const TableMeta *tm,
+                                  const std::string &field) const
+{
+    const IdentityMetaKey * const key = new IdentityMetaKey(field);
+    FieldMeta *fm = tm->getChild(key);
     assert(fm);
     return fm;
 }
 
 TableMeta *Analysis::getTableMeta(const std::string &table) const
 {
-    IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
+    const IdentityMetaKey * const key =
+        new IdentityMetaKey(unAliasTable(table));
 
-    TableMeta *tm = this->schema->getChild(key);
+    TableMeta * const tm = this->schema->getChild(key);
     assert(tm);
     return tm;
 }
 
 bool Analysis::tableMetaExists(const std::string &table) const
 {
-    IdentityMetaKey *key = new IdentityMetaKey(unAliasTable(table));
+    IdentityMetaKey * const key =
+        new IdentityMetaKey(unAliasTable(table));
     return this->schema->childExists(key);
 }
 
@@ -1017,6 +1029,12 @@ std::string Analysis::getAnonIndexName(const std::string &table,
                                        const std::string &index_name) const
 {
     return this->getTableMeta(table)->getAnonIndexName(index_name); 
+}
+
+std::string Analysis::getAnonIndexName(const TableMeta *tm,
+                                       const std::string &index_name) const
+{
+    return tm->getAnonIndexName(index_name); 
 }
 
 std::string Analysis::unAliasTable(const std::string &table) const

@@ -514,10 +514,14 @@ public:
                             const std::string &field, onion o) const;
     FieldMeta *getFieldMeta(const std::string &table,
                             const std::string &field) const;
+    FieldMeta *getFieldMeta(const TableMeta *tm,
+                            const std::string &field) const;
     TableMeta *getTableMeta(const std::string &table) const;
     bool tableMetaExists(const std::string &table) const;
     std::string getAnonTableName(const std::string &table) const;
     std::string getAnonIndexName(const std::string &table,
+                                 const std::string &index_name) const;
+    std::string getAnonIndexName(const TableMeta *tm,
                                  const std::string &index_name) const;
     EncLayer *getBackEncLayer(OnionMeta * const om) const;
     EncLayer *popBackEncLayer(OnionMeta * const om);
