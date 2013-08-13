@@ -12,90 +12,95 @@ require("common.php");
  /*
   * Commands handler
   */
-if (db_connect('nodie')){
 
-    global $proxy;
-    // Make sure mysql is available
-    // $dbh is global.
-    if(!$dbh)
-        die("Fatal: Backend DB not connected.");
+if(!isset($_SESSION['logoff']) || $_SESSION['logoff']==false)
+{
+    if (db_connect('nodie')){
 
-    $time_start=microtime_float();
+        global $proxy;
+        // Make sure mysql is available
+        // $dbh is global.
+        if(!$dbh)
+            die("Fatal: Backend DB not connected.");
 
-    if ($_REQUEST['phpinfo']){
-        ob_start();phpinfo();$sqldr='<div style="font-size:130%">'.ob_get_clean().'</div>';
-    }else{
-        if(isset($_SESSION['s_PROXY']) && !isset($DB['db']))
-        {
-            session_remove('s_PROXY');
-           
-            $s_db = session_remove('s_DB');
-            $s_query = session_remove('s_QUERY');
-            $s_id = session_remove('s_ID');
-            $s_table = session_remove('s_TABLE');
+        $time_start=microtime_float();
 
-            /*
-             * Execute query (proxy db)
-             */
-
-            $keys = array_keys($_POST);
-            if(strstr($keys[0], "cryptdb") == FALSE)
-                die("Parse error");
-    
-            $index =  $keys[0][0];
-
-            $fieldname = preg_split("/\&/", $s_id);
-
-            //Using hardocded default. If user inputs 'localhost' mysqli ignores port...
-            $host = ini_get("mysqli.default_host"); 
-            //$database = ini_get("mysqli.default_database"); 
-
-            $user = isset($CRYPTDB['user']) ?  $CRYPTDB['user'] : ini_get("mysqli.default_user"); 
-
-            // Force default
-            $port = ini_get("mysqli.default_port"); 
-            $pwd = $CRYPTDB['pwd'];
-
-            $query = "show columns from " . $s_db . "."  . $s_table . " where Field = " . "'" . $fieldname[$index] . "';";
-            //$SQLq = $query;
-
-            $proxy = proxy_connect($host, $user, $pwd, $s_db, $port);            
-            do_sql($query);
-            //do_cryptdb_sql($proxy, $query);
-            // TODO: Execute query and display results
-            // TODO: close is to be placed in session's destructor (logoff link?)
-            //$proxy->mysqli_close();
-
-        } else if (isset($DB['db']))
-        {
-
-            /*
-             * Describe_table
-             *
-             */
-            if($_POST['cryptdb_describe_table'])
-            {
-                $q = "describe " . $DB['db'] . "." . $_POST['cryptdb_describe_table'];
-                do_sql($q);
-
-            }
+        if ($_REQUEST['phpinfo']){
+            ob_start();phpinfo();$sqldr='<div style="font-size:130%">'.ob_get_clean().'</div>';
         }else{
-            if (isset($_REQUEST['refresh'])){
-                check_xss();do_sql('show databases');
-            }elseif ( preg_match('/^show\s+(?:databases|status|variables|process)/i',$SQLq) ){
-                check_xss();do_sql($SQLq);
+            if(isset($_SESSION['s_PROXY']) && !isset($DB['db']))
+            {
+                session_remove('s_PROXY');
+
+                $s_db = session_remove('s_DB');
+                $s_query = session_remove('s_QUERY');
+                $s_id = session_remove('s_ID');
+                $s_table = session_remove('s_TABLE');
+
+                /*
+                 * Execute query (proxy db)
+                 */
+
+                $keys = array_keys($_POST);
+                if(strstr($keys[0], "cryptdb") == FALSE)
+                    die("Parse error");
+
+                $index =  $keys[0][0];
+
+                $fieldname = preg_split("/\&/", $s_id);
+
+                //Using hardocded default. If user inputs 'localhost' mysqli ignores port...
+                $host = ini_get("mysqli.default_host"); 
+                //$database = ini_get("mysqli.default_database"); 
+
+                $user = isset($CRYPTDB['user']) ?  $CRYPTDB['user'] : ini_get("mysqli.default_user"); 
+
+                // Force default
+                $port = ini_get("mysqli.default_port"); 
+                $pwd = $CRYPTDB['pwd'];
+
+                $query = "show columns from " . $s_db . "."  . $s_table . " where Field = " . "'" . $fieldname[$index] . "';";
+                //$SQLq = $query;
+
+                $proxy = proxy_connect($host, $user, $pwd, $s_db, $port);            
+                do_sql($query);
+                //do_cryptdb_sql($proxy, $query);
+                // TODO: Execute query and display results
+                // TODO: close is to be placed in session's destructor (logoff link?)
+                //$proxy->mysqli_close();
+
+            } else if (isset($DB['db']))
+            {
+
+                /*
+                 * Describe_table
+                 *
+                 */
+                if($_POST['cryptdb_describe_table'])
+                {
+                    $q = "describe " . $DB['db'] . "." . $_POST['cryptdb_describe_table'];
+                    do_sql($q);
+
+                }
             }else{
-                $err_msg="Select Database first";
-                if (!$SQLq) do_sql("show databases");
+                if (isset($_REQUEST['refresh'])){
+                    check_xss();do_sql('show databases');
+                }elseif ( preg_match('/^show\s+(?:databases|status|variables|process)/i',$SQLq) ){
+                    check_xss();do_sql($SQLq);
+                }else{
+                    $err_msg="Select Database first";
+                    if (!$SQLq) do_sql("show databases");
+                }
             }
         }
-    }
-    $time_all=ceil((microtime_float()-$time_start)*10000)/10000;
+        $time_all=ceil((microtime_float()-$time_start)*10000)/10000;
 
-    print_screen();
+        print_screen();
+    }
 }else{
+    $_SESSION['logoff']=false;
     print_cfg();
- }
+}
 
 
 function print_header(){
@@ -225,8 +230,7 @@ function print_footer(){
 ?>
 </form>
 </body></html>
-<?php
-}?>
+<?php }?>
 
 <body onload="after_load()">
 <form method="post" name="DF" action="<?php echo $self?>" enctype="multipart/form-data">

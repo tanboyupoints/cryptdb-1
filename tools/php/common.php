@@ -84,9 +84,9 @@ ini_set("mysqli.default_user", "root");
      check_xss();
      $_SESSION = array();
      savecfg();
-     session_destroy();
      $url=$self;
-     if (!$ACCESS_PWD) $url='/';
+     //if (!$ACCESS_PWD) $url='/';
+     $_SESSION['logoff']=true;
      header("location: $url");
      exit;
  }
