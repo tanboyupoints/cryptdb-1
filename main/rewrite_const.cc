@@ -118,8 +118,8 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
     }
 } ANON;
 
-static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
-    virtual RewritePlan * do_gather_type(Item_num *i, reason &tr,
+static class ANON : public CItemSubtypeIT<Item_int, Item::Type::INT_ITEM> {
+    virtual RewritePlan * do_gather_type(Item_int *i, reason &tr,
                                          Analysis & a) const
     {
         LOG(cdb_v) << "CItemSubtypeIT (L966) num do_gather " << *i;
@@ -128,12 +128,12 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
         return new RewritePlan(FULL_EncSet_Int, tr);
     }
 
-    virtual Item * do_optimize_type(Item_num *i, Analysis & a) const
+    virtual Item * do_optimize_type(Item_int *i, Analysis & a) const
     {
         return i;
     }
 
-    virtual Item * do_rewrite_type(Item_num *i, const OLK & constr,
+    virtual Item * do_rewrite_type(Item_int *i, const OLK & constr,
                                    const RewritePlan * rp,
                                    Analysis & a) const
     {
@@ -143,7 +143,7 @@ static class ANON : public CItemSubtypeIT<Item_num, Item::Type::INT_ITEM> {
     }
 
     virtual void
-    do_rewrite_insert_type(Item_num *i, Analysis & a,
+    do_rewrite_insert_type(Item_int *i, Analysis & a,
                            std::vector<Item *> &l, FieldMeta *fm) const
     {
         typical_rewrite_insert_type(i, a, l, fm);
