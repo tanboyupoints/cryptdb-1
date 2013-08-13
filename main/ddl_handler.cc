@@ -99,8 +99,6 @@ class CreateHandler : public DDLHandler {
 
                         return out_list;
                 });
-
-    
         } else { // Table already exists.
 
             // Make sure we aren't trying to create a table that
