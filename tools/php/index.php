@@ -246,6 +246,13 @@ Tables:
 <select name="cryptdb_describe_table" onChange="this.form.submit()">
 <?php 
  $a=0;
+
+
+ if($_REQUEST['refresh'])
+ {?>
+    <option selected value="">---</option>
+<?php }
+
  $array = get_db_tables($dbn) ; foreach($array as $key=>$value) 
 { 
      $accesskey = "Tables_in_" . $dbn;
