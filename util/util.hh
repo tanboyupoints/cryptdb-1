@@ -454,12 +454,15 @@ public:
         }
     }
 
-    const T get() {
+    const T get() const {
         if (false == frozen) {
             throw CryptDBError("First assign to AssignOnce template!");
         }
-        frozen = true;
         return value;
+    }
+
+    bool assigned() const {
+        return frozen;
     }
 
 private:

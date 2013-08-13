@@ -355,10 +355,11 @@ public:
     virtual ~RewriteOutput() = 0;
 
     virtual bool beforeQuery(Connect *conn, Connect *e_conn) = 0;
-    virtual bool getQuery(std::list<std::string> *queryz) = 0;
-    virtual bool handleQueryFailure(Connect *e_conn) = 0;
-    virtual bool afterQuery(Connect *e_conn) = 0;
-    virtual bool queryAgain();
+    virtual bool getQuery(std::list<std::string> *queryz) const = 0;
+    virtual bool handleQueryFailure(Connect *e_conn) const = 0;
+    virtual bool afterQuery(Connect *e_conn) const = 0;
+    virtual bool queryAgain() const;
+    virtual bool doDecryption() const;
 
     static ResType *sendQuery(Connect *c, const std::string &q);
 
@@ -373,9 +374,10 @@ public:
     ~SimpleOutput() {;}
 
     bool beforeQuery(Connect *conn, Connect *e_conn);
-    bool getQuery(std::list<std::string> *queryz);
-    bool handleQueryFailure(Connect *e_conn);
-    bool afterQuery(Connect *e_conn);
+    bool getQuery(std::list<std::string> *queryz) const;
+    bool handleQueryFailure(Connect *e_conn) const;
+    bool afterQuery(Connect *e_conn) const;
+    bool doDecryption() const;
 };
 
 class DMLOutput : public RewriteOutput {
@@ -385,9 +387,9 @@ public:
     ~DMLOutput() {;}
 
     bool beforeQuery(Connect *conn, Connect *e_conn);
-    bool getQuery(std::list<std::string> *queryz);
-    bool handleQueryFailure(Connect *e_conn);
-    bool afterQuery(Connect *e_conn);
+    bool getQuery(std::list<std::string> *queryz) const;
+    bool handleQueryFailure(Connect *e_conn) const;
+    bool afterQuery(Connect *e_conn) const;
 
 private:
     const std::string new_query;
@@ -408,9 +410,9 @@ public:
     ~SpecialUpdate() {;}
 
     bool beforeQuery(Connect *conn, Connect *e_conn);
-    bool getQuery(std::list<std::string> *queryz);
-    bool handleQueryFailure(Connect *e_conn);
-    bool afterQuery(Connect *e_conn);
+    bool getQuery(std::list<std::string> *queryz) const;
+    bool handleQueryFailure(Connect *e_conn) const;
+    bool afterQuery(Connect *e_conn) const;
 
 private:
     const std::string new_query;
@@ -429,9 +431,9 @@ public:
     virtual ~DeltaOutput() = 0;
 
     bool beforeQuery(Connect *conn, Connect *e_conn) = 0;
-    virtual bool getQuery(std::list<std::string> *queryz) = 0;
-    virtual bool handleQueryFailure(Connect *e_conn) = 0;
-    bool afterQuery(Connect *e_conn) = 0;
+    virtual bool getQuery(std::list<std::string> *queryz) const = 0;
+    virtual bool handleQueryFailure(Connect *e_conn) const = 0;
+    bool afterQuery(Connect *e_conn) const = 0;
 
     static bool save(Connect *e_conn, unsigned long *delta_output_id);
     static bool destroyRecord(Connect *e_conn,
@@ -449,9 +451,9 @@ public:
     ~DDLOutput() {;}
 
     bool beforeQuery(Connect *conn, Connect *e_conn);
-    bool getQuery(std::list<std::string> *queryz);
-    bool handleQueryFailure(Connect *e_conn);
-    bool afterQuery(Connect *e_conn);
+    bool getQuery(std::list<std::string> *queryz) const;
+    bool handleQueryFailure(Connect *e_conn) const;
+    bool afterQuery(Connect *e_conn) const;
 
 private:
     const std::string new_query;
@@ -471,10 +473,10 @@ public:
     ResType *doQuery(Connect *conn, Connect *e_conn);
 
     bool beforeQuery(Connect *conn, Connect *e_conn);
-    bool getQuery(std::list<std::string> *queryz);
-    bool handleQueryFailure(Connect *e_conn);
-    bool afterQuery(Connect *e_conn);
-    bool queryAgain();
+    bool getQuery(std::list<std::string> *queryz) const;
+    bool handleQueryFailure(Connect *e_conn) const;
+    bool afterQuery(Connect *e_conn) const;
+    bool queryAgain() const;
 
 private:
     const std::list<std::string> adjust_queries;

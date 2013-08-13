@@ -897,8 +897,12 @@ mysql_noop()
 }
 
 // FIXME: Implement.
-// SYNTAX: DIRECTIVE [table name] [field name] [security rating]
-// > FIXME: Make the syntax more sql like.
+// SYNTAX
+// > DIRECTIVE UPDATE cryptdb_metadata
+//                SET <table_name | field_name | rating> = [value]
+// > DIRECTIVE SELECT <table_name | field_name | rating>
+//               FROM cryptdb_metadata
+//              WHERE <table_name | field_name | rating> = [value]
 RewriteOutput * 
 Rewriter::handleDirective(Analysis &a, const ProxyState &ps,
                           const std::string &query)
@@ -978,7 +982,7 @@ std::string ReturnMeta::stringify() {
 }
 
 ResType *
-Rewriter::decryptResults(ResType &dbres, const ReturnMeta &rmeta)
+Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
 {
     unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
@@ -987,9 +991,9 @@ Rewriter::decryptResults(ResType &dbres, const ReturnMeta &rmeta)
     ResType *res = new ResType();
 
     // un-anonymize the names
-    unsigned int index = 0;
     for (auto it = dbres.names.begin();
         it != dbres.names.end(); it++) {
+        unsigned int index = it - dbres.names.begin();
         const ReturnField &rf = rmeta.rfmeta.at(index);
         if (!rf.getIsSalt()) {
             //need to return this field
@@ -997,7 +1001,6 @@ Rewriter::decryptResults(ResType &dbres, const ReturnMeta &rmeta)
             // switch types to original ones : TODO
 
         }
-        index++;
     }
 
     unsigned int real_cols = res->names.size();
@@ -1012,29 +1015,31 @@ Rewriter::decryptResults(ResType &dbres, const ReturnMeta &rmeta)
     unsigned int col_index = 0;
     for (unsigned int c = 0; c < cols; c++) {
         const ReturnField &rf = rmeta.rfmeta.at(c);
-        FieldMeta * fm = rf.getOLK().key;
-        if (!rf.getIsSalt()) {
-            for (unsigned int r = 0; r < rows; r++) {
-                if (!fm || dbres.rows[r][c]->is_null()) {
-                    res->rows[r][col_index] = dbres.rows[r][c];
-                } else {
-                    uint64_t salt = 0;
-                    const int salt_pos = rf.getSaltPosition();
-                    if (salt_pos >= 0) {
-                        Item * salt_item = dbres.rows[r][salt_pos];
-                        assert_s(!salt_item->null_value, "salt item is null");
-                        salt =
-                            ((Item_int *)dbres.rows[r][salt_pos])->value;
-                    }
-
-                    res->rows[r][col_index] =
-                        decrypt_item_layers(dbres.rows[r][c], fm,
-                                            rf.getOLK().o, salt,
-                                            res->rows[r]);
-                }
-            }
-            col_index++;
+        if (rf.getIsSalt()) {
+            continue;
         }
+
+        FieldMeta * fm = rf.getOLK().key;
+        for (unsigned int r = 0; r < rows; r++) {
+            if (!fm || dbres.rows[r][c]->is_null()) {
+                res->rows[r][col_index] = dbres.rows[r][c];
+            } else {
+                uint64_t salt = 0;
+                const int salt_pos = rf.getSaltPosition();
+                if (salt_pos >= 0) {
+                    Item * salt_item = dbres.rows[r][salt_pos];
+                    assert_s(!salt_item->null_value, "salt item is null");
+                    salt =
+                        ((Item_int *)dbres.rows[r][salt_pos])->value;
+                }
+
+                res->rows[r][col_index] =
+                    decrypt_item_layers(dbres.rows[r][c], fm,
+                                        rf.getOLK().o, salt,
+                                        res->rows[r]);
+            }
+        }
+        col_index++;
     }
 
     return res;
@@ -1088,11 +1093,14 @@ executeQuery(const ProxyState &ps, const std::string &q)
             return executeQuery(ps, q);
         } 
 
-        ResType *enc_res = new ResType(dbres->unpack());
-        prettyPrintQueryResult(*enc_res);
+        ResType *res = new ResType(dbres->unpack());
+        prettyPrintQueryResult(*res);
 
-        ResType *dec_res = r.decryptResults(*enc_res, qr.rmeta);
-        prettyPrintQueryResult(*dec_res);
+        ResType *dec_res;
+        if (true == qr.output->doDecryption()) {
+            dec_res = r.decryptResults(*res, qr.rmeta);
+            prettyPrintQueryResult(*dec_res);
+        }
 
         printEmbeddedState(ps);
 

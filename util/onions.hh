@@ -55,7 +55,7 @@ static onionlayout BEST_EFFORT_NUM_ONION_LAYOUT = {
     {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
     {oAGG, std::vector<SECLEVEL>({SECLEVEL::HOM})},
     {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL,
-                                         SECLEVEL::RND})}
+                                    SECLEVEL::RND})}
 };
 
 static onionlayout STR_ONION_LAYOUT = {

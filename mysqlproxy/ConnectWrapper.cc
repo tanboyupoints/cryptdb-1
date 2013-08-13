@@ -42,6 +42,9 @@ static int counter = 0;
 
 static std::map<std::string, WrapperState*> clients;
 
+static int
+returnResultSet(lua_State *L, const ResType &res);
+
 static Item *
 make_item(std::string value, enum_field_types type)
 {
@@ -81,7 +84,6 @@ xlua_pushlstring(lua_State *l, const std::string &s)
     lua_pushlstring(l, s.data(), s.length());
 }
 
-// FIXME: Specify database name.
 static int
 connect(lua_State *L)
 {
@@ -237,8 +239,8 @@ rewrite(lua_State *L)
             assert(qr->output->beforeQuery(ps->conn, ps->e_conn));
 
             if (!qr->output->getQuery(&new_queries)) {
+                throw CryptDBError("Failed to get rewritten query!");
                 assert(qr->output->handleQueryFailure(ps->e_conn));
-                return 0;
             }
             
             clients[client]->last_query = query;
@@ -257,14 +259,37 @@ rewrite(lua_State *L)
     lua_createtable(L, (int) new_queries.size(), 0);
     int top = lua_gettop(L);
     int index = 1;
-    for (auto it = new_queries.begin(); it != new_queries.end(); it++) {
-        xlua_pushlstring(L, *it);
+    for (auto it : new_queries) {
+        xlua_pushlstring(L, it);
         lua_rawseti(L, top, index);
         index++;
     }
 
     clients[client]->last_query = query;
     return 1;
+}
+
+static int
+queryFailure(lua_State *L)
+{
+    ANON_REGION(__func__, &perf_cg);
+    scoped_lock l(&big_lock);
+    assert(0 == mysql_thread_init());
+
+    std::string client = xlua_tolstring(L, 1);
+    if (clients.find(client) == clients.end()) {
+        throw CryptDBError("Failed to properly handle failed query!");
+    }
+
+    assert(EXECUTE_QUERIES);
+
+    assert(ps);
+    assert(clients[client]->qr);
+
+    QueryRewrite *qr = clients[client]->qr;
+    assert(qr->output->handleQueryFailure(ps->e_conn));
+
+    return 0;
 }
 
 static int
@@ -286,11 +311,46 @@ epilogue(lua_State *L)
     QueryRewrite *qr = clients[client]->qr;
     assert(qr->output->afterQuery(ps->e_conn));
     if (qr->output->queryAgain()) {
-        // > FIXME: Needs some way to return the actual ResType.
-        executeQuery(*ps, clients[client]->last_query);
+        ResType *res_type =
+            executeQuery(*ps, clients[client]->last_query);
+        assert(res_type);
+
+        // HACK/FIXME: This should use the doDecryption from the second
+        // query rewriting.
+        lua_pushboolean(L, qr->output->doDecryption());
+        lua_pushinteger(L, (lua_Integer)res_type);
+        return 2;
     }
 
-    return 0;
+    lua_pushboolean(L, qr->output->doDecryption());
+    lua_pushnil(L);
+    return 2;
+}
+
+static int
+passDecryptedPtr(lua_State *L)
+{
+    ANON_REGION(__func__, &perf_cg);
+    scoped_lock l(&big_lock);
+    assert(0 == mysql_thread_init());
+    
+    // FIXME: Necessary?
+    THD *thd = (THD*) create_embedded_thd(0);
+    auto thd_cleanup = cleanup([&thd]
+        {
+            thd->clear_data_list();
+            thd->store_globals();
+            thd->unlink();
+            delete thd;
+        });
+
+    const std::string client = xlua_tolstring(L, 1);
+    if (clients.find(client) == clients.end())
+        return 0;
+
+    ResType *res_type = (ResType *)lua_tointeger(L, 2);
+
+    return returnResultSet(L, *res_type);
 }
 
 static int
@@ -344,7 +404,8 @@ decrypt(lua_State *L)
         if (!lua_istable(L, -1))
             LOG(warn) << "mismatch";
 
-        /* initialize all items to NULL, since Lua skips nil array entries */
+        /* initialize all items to NULL, since Lua skips
+           nil array entries */
         std::vector<Item *> row(res.types.size());
 
         lua_pushnil(L);
@@ -374,8 +435,14 @@ decrypt(lua_State *L)
         return 2;
     }
 
+    return returnResultSet(L, rd);
+}
+
+static int
+returnResultSet(lua_State *L, const ResType &rd)
+{
     /* return decrypted result set */
-    lua_createtable(L, (int) rd.names.size(), 0);
+    lua_createtable(L, (int)rd.names.size(), 0);
     int t_fields = lua_gettop(L);
     for (uint i = 0; i < rd.names.size(); i++) {
         lua_createtable(L, 0, 1);
@@ -425,7 +492,9 @@ cryptdb_lib[] = {
     F(disconnect),
     F(rewrite),
     F(decrypt),
+    F(passDecryptedPtr),
     F(epilogue),
+    F(queryFailure),
     { 0, 0 },
 };
 

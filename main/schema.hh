@@ -92,6 +92,7 @@ public:
                                const std::string &serial_child) const;
     UIntMetaKey *deserializeKey(const std::string &serial_key) const;
     EncLayer *getLayerBack() const;
+    EncLayer *getLayer(const SECLEVEL &sl) const;
     unsigned long getUniq() const {return uniq_count;}
 
     // Need access to layers.

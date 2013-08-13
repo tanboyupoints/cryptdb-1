@@ -332,7 +332,7 @@ encrypt_item_layers(Item * i, onion o, OnionMeta * const om,
     assert(!i->is_null());
 
     const auto enc_layers = a.getEncLayers(om);
-    assert_s(enc_layers.size() > 0, "field must have at least one layer");
+    assert_s(enc_layers.size() > 0, "onion must have at least one layer");
     Item * enc = i;
     Item * prev_enc = NULL;
     for (auto layer : enc_layers) {
