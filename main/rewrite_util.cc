@@ -302,9 +302,20 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     //         Update FIELD       
     // -----------------------------
     const std::string name = std::string(cf->field_name);
-    FieldMeta * const fm =
-        new FieldMeta(name, cf, ps.masterKey, ps.defaultSecurityRating(),
-                      tm->leaseIncUniq());
+    auto buildFieldMeta =
+        [] (const std::string name, Create_field *cf,
+            const ProxyState &ps, TableMeta *tm)
+    {
+        if (Field::NEXT_NUMBER == cf->unireg_check) {
+            return new FieldMeta(name, cf, NULL, SECURITY_RATING::PLAIN,
+                                 tm->leaseIncUniq());
+        } else {
+            return new FieldMeta(name, cf, ps.masterKey,
+                                 ps.defaultSecurityRating(),
+                                 tm->leaseIncUniq());
+        }
+    };
+    FieldMeta * const fm = buildFieldMeta(name, cf, ps, tm);
     // Here we store the key name for the first time. It will be applied
     // after the Delta is read out of the database.
     if (true == new_table) {
