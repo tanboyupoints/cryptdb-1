@@ -2,10 +2,11 @@
 
 require("common.php");
 
+//print_r($_POST);
  //get initial values
  $SQLq=trim($_REQUEST['q']);
  $page=$_REQUEST['p']+0;
- if ($_REQUEST['refresh'] && $DB['db'] && preg_match('/^show/',$SQLq) ) $SQLq=$SHOW_T;
+ if (isset($_REQUEST['refresh']) && $DB['db'] && preg_match('/^show/',$SQLq) ) $SQLq=$SHOW_T;
  
 
  /*
@@ -49,7 +50,7 @@ if (db_connect('nodie')){
             $host = ini_get("mysqli.default_host"); 
             //$database = ini_get("mysqli.default_database"); 
 
-            $user = $CRYPTDB['user'] ?  $CRYPTDB['user'] : ini_get("mysqli.default_user"); 
+            $user = isset($CRYPTDB['user']) ?  $CRYPTDB['user'] : ini_get("mysqli.default_user"); 
 
             // Force default
             $port = ini_get("mysqli.default_port"); 
@@ -79,7 +80,7 @@ if (db_connect('nodie')){
 
             }
         }else{
-            if ( $_REQUEST['refresh'] ){
+            if (isset($_REQUEST['refresh'])){
                 check_xss();do_sql('show databases');
             }elseif ( preg_match('/^show\s+(?:databases|status|variables|process)/i',$SQLq) ){
                 check_xss();do_sql($SQLq);
@@ -236,7 +237,7 @@ function print_footer(){
 
 <!-- HEADER MENU -->
 <div class="inv">
-<?php if ($_SESSION['is_logged'] && $dbh){ ?>
+<?php if (isset($_SESSION['is_logged']) && $dbh){ ?>
 Databases:
 <select name="db" onChange="frefresh()">
 <?php echo get_db_select($dbn)?>
@@ -248,7 +249,7 @@ Tables:
  $a=0;
 
 
- if($_REQUEST['refresh'])
+ if(isset($_REQUEST['refresh']))
  {?>
     <option selected value="">---</option>
 <?php }
@@ -273,7 +274,7 @@ Tables:
 </form>
 
 <?php if($dbn){ $z=" &#183; <a href='$self?$xurl&db=$dbn"; ?>
-<?php if($_POST['cryptdb_describe_table'] && $dbn) { 
+<?php if(isset($_POST['cryptdb_describe_table']) && $dbn) { 
     $z.'&q='.urlencode($var);
 } ?>
 
@@ -283,7 +284,7 @@ Tables:
 
 
 
-<?php if ($GLOBALS['ACCESS_PWD']){?> | <a href="?<?php echo $xurl?>&logoff=1" onclick="logoff()">Logoff</a> <?php }?>
+<?php if (isset($GLOBALS['ACCESS_PWD'])){?> | <a href="?<?php echo $xurl?>&logoff=1" onclick="logoff()">Logoff</a> <?php }?>
 </div>
 <div class="err"><?php echo $err_msg?></div>
 
@@ -412,7 +413,7 @@ function db_connect($nodie=0){
             $err_msg='Cannot select db because: '.mysql_error();
             if (!$nodie) die($err_msg);
         }else{
-            if ($DB['chset']) db_query("SET NAMES ".$DB['chset']);
+            if (isset($DB['chset'])) db_query("SET NAMES ".$DB['chset']);
         }
     }
 
