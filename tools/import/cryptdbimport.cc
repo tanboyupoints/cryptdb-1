@@ -77,7 +77,7 @@ Import::executeQueries(ProxyState& ps)
             if(lastChar == ';'){
                 s += line;
                 std::cout << s << std::endl;
-                executeQuery(ps, s);
+                assert(executeQuery(ps, s));
                 s.clear();
                 continue;
             }
