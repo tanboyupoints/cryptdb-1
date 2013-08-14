@@ -4,12 +4,13 @@
 
 TODO:
 
-- Use 'DIRECTIVE UPDATE' for reading from and writing to CryptDB onion security level adjustments, ex:
+- Use 'DIRECTIVE <SELECT|UPDATE>' for onion security level adjustments, ex:
 
-    DIRECTIVE UPDATE cryptdb_metadata SET rating = 'sensitive' WHERE field = 'x'
+To select:
+    DIRECTIVE SELECT rating FROM cryptdb_metadata WHERE field = 'x'
 
-    DIRECTIVE UPDATE cryptdb_metadata SET rating = 'SENSITIVE|PLAIN|BEST_EFFORT' WHERE field = 'x'
-
+To update:
+    DIRECTIVE UPDATE cryptdb_metadata SET rating = '<SENSITIVE|PLAIN|BEST_EFFORT>' WHERE field = 'x'
 
 - Make output to be displayed in textarea instead.
 - Implement dump results to file.
