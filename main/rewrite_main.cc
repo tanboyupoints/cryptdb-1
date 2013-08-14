@@ -1096,6 +1096,7 @@ executeQuery(const ProxyState &ps, const std::string &q)
         }
 
         assert(qr.output->afterQuery(ps.e_conn));
+
         if (qr.output->queryAgain()) {
             return executeQuery(ps, q);
         } 

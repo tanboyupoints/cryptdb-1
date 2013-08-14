@@ -126,8 +126,7 @@ iterate_gather(Item_func *i, const EncSet &out_es, EncSet child_es,
         reason r;
         childr_rp[index] = gather(args[index], r, a);
         tr.add_child(r);
-        child_es.intersect(childr_rp[index]->es_out);
-        ++index;
+        child_es = child_es.intersect(childr_rp[index]->es_out);
     }
 
     return new RewritePlanOneOLK(EncSet(out_es.chooseOne()),
