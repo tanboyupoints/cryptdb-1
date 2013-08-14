@@ -275,7 +275,8 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                        const std::string &master_key,
                        SECURITY_RATING default_sec_rating)
     : masterKey(getKey(master_key)), dbname(dbname),
-      default_sec_rating(default_sec_rating)
+      default_sec_rating(default_sec_rating), previous_schema(NULL),
+      schema_staleness(true)
 {
     init_mysql(embed_dir);
 
@@ -454,6 +455,11 @@ bool RewriteOutput::doDecryption() const
     return true;
 }
 
+bool RewriteOutput::stalesSchema() const
+{
+    return false;
+}
+
 ResType *RewriteOutput::sendQuery(Connect *c, const std::string &q)
 {
     DBResult *dbres;
@@ -520,8 +526,10 @@ bool SpecialUpdate::beforeQuery(Connect *conn, Connect *e_conn)
     std::ostringstream select_stream;
     select_stream << " SELECT * FROM " << this->plain_table
                   << " WHERE " << this->where_clause << ";";
+    // FIXME: const_cast
     const ResType * const select_res_type =
-        executeQuery(this->ps, select_stream.str());
+        executeQuery(const_cast<ProxyState &>(this->ps),
+                     select_stream.str());
     assert(select_res_type);
     if (select_res_type->rows.size() == 0) { // No work to be done.
         return sendQuery(conn, new_query);
@@ -625,6 +633,11 @@ bool SpecialUpdate::afterQuery(Connect *e_conn) const
 
 DeltaOutput::~DeltaOutput()
 {;}
+
+bool DeltaOutput::stalesSchema() const
+{
+    return true;
+}
 
 bool DeltaOutput::save(Connect *e_conn, unsigned long *delta_output_id)
 {

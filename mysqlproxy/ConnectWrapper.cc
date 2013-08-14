@@ -59,6 +59,10 @@ make_item(std::string value, enum_field_types type)
         i = new Item_int((long long) valFromStr(value));
         break;
 
+    case MYSQL_TYPE_BLOB:
+    case MYSQL_TYPE_TINY_BLOB:
+    case MYSQL_TYPE_MEDIUM_BLOB:
+    case MYSQL_TYPE_LONG_BLOB:
     case MYSQL_TYPE_VARCHAR:
     case MYSQL_TYPE_VAR_STRING:
         i = new Item_string(make_thd_string(value), value.length(), &my_charset_bin);
@@ -234,8 +238,12 @@ rewrite(lua_State *L)
             assert(ps);
 
             Rewriter r;
+            SchemaInfo *out_schema;
             QueryRewrite *&qr = clients[client]->qr =
-                new QueryRewrite(r.rewrite(*ps, query));
+                new QueryRewrite(r.rewrite(*ps, query, &out_schema));
+            ps->setPreviousSchema(out_schema);
+            ps->setSchemaStaleness(qr->output->stalesSchema());
+
             assert(qr->output->beforeQuery(ps->conn, ps->e_conn));
 
             if (!qr->output->getQuery(&new_queries)) {
