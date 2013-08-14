@@ -698,7 +698,7 @@ static class ANON : public CItemSubtypeFT<Item_func_in, Item_func::Functype::IN_
                                          Analysis & a) const
     {
         const EncSet out_es = PLAIN_EncSet;
-        EncSet child_es = EQ_EncSet; 
+        const EncSet child_es = EQ_EncSet; 
         const std::string why = "in";
         
         return iterate_gather(i, out_es, child_es, why, tr, a);
@@ -716,7 +716,6 @@ static class ANON : public CItemSubtypeFT<Item_func_in, Item_func::Functype::IN_
         rewrite_args_FN(i, constr, (const RewritePlanOneOLK *)rp, a);
         return i;
     }
-
 } ANON;
 
 static class ANON : public CItemSubtypeFT<Item_func_in, Item_func::Functype::BETWEEN> {
@@ -724,7 +723,7 @@ static class ANON : public CItemSubtypeFT<Item_func_in, Item_func::Functype::BET
                                          Analysis & a) const
     {
         const EncSet out_es = PLAIN_EncSet;
-        EncSet child_es = ORD_EncSet; 
+        const EncSet child_es = ORD_EncSet; 
         const std::string why = "between";
 
         return iterate_gather(i, out_es, child_es, why, tr, a);
@@ -983,18 +982,27 @@ static class ANON : public CItemSubtypeFN<Item_in_optimizer, str_in_optimizer> {
 
 template<const char *NAME>
 class CItemStrconv : public CItemSubtypeFN<Item_str_conv, NAME> {
-    virtual RewritePlan * do_gather_type(Item_str_conv *i, reason & tr, Analysis & a) const
+    virtual RewritePlan * do_gather_type(Item_str_conv *i, reason & tr,
+                                         Analysis & a) const
     {
-	/* Item **args = i->arguments();
-        for (uint x = 0; x < i->argument_count(); x++)
-            analyze(args[x], reason(EMPTY_EncSet, "strconv", i, &tr), a);
-        return tr.encset;
-	*/
-        UNIMPLEMENTED;
+        const EncSet out_es = PLAIN_EncSet;
+        const EncSet child_es = PLAIN_EncSet;
+        const std::string why = "strconv";
+
+        return iterate_gather(i, out_es, child_es, why, tr, a);
     }
+
     virtual Item * do_optimize_type(Item_str_conv *i, Analysis & a) const
     {
         return do_optimize_type_self_and_args(i, a);
+    }
+
+    virtual Item * do_rewrite_type(Item_str_conv *i, const OLK & constr,
+                                   const RewritePlan * rp, Analysis & a)
+        const
+    {
+        rewrite_args_FN(i, constr, (const RewritePlanOneOLK *)rp, a);
+        return i;
     }
 };
 

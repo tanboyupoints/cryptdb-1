@@ -59,6 +59,10 @@ make_item(std::string value, enum_field_types type)
         i = new Item_int((long long) valFromStr(value));
         break;
 
+    case MYSQL_TYPE_BLOB:
+    case MYSQL_TYPE_TINY_BLOB:
+    case MYSQL_TYPE_MEDIUM_BLOB:
+    case MYSQL_TYPE_LONG_BLOB:
     case MYSQL_TYPE_VARCHAR:
     case MYSQL_TYPE_VAR_STRING:
         i = new Item_string(make_thd_string(value), value.length(), &my_charset_bin);
