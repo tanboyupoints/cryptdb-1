@@ -493,7 +493,6 @@ public:
     Item * decrypt(Item * ctext, uint64_t IV = 0);
     Item * decryptUDF(Item * col, Item * ivcol = NULL);
 
-
 protected:
     std::string key;
     blowfish bf;
@@ -501,6 +500,9 @@ protected:
     static const int bf_key_size = 16;
     static const int ciph_size = 8;
 
+private:
+    std::string getKeyFromSerial(const std::string &serial);
+    int64_t getShiftFromSerial(const std::string &serial);
 };
 
 class DET_mediumint : public DET_int {
@@ -683,20 +685,29 @@ DET_int::DET_int(Create_field * f, const std::string & seed_key)
     : key(prng_expand(seed_key, bf_key_size)),
       bf(key)
 {
-    if(f->flags & UNSIGNED_FLAG)
+    if (f->flags & UNSIGNED_FLAG) {
         shift = 0;
-    else
+    } else {
         shift = INT_MAX;
+    }
+}
+
+std::string
+DET_int::getKeyFromSerial(const std::string &serial)
+{
+    return serial.substr(serial.find(' ')+1, std::string::npos);
+}
+
+int64_t
+DET_int::getShiftFromSerial(const std::string &serial)
+{
+    return atol(serial.substr(0, serial.find(' ')).c_str());
 }
 
 DET_int::DET_int(unsigned int id, const std::string & serial)
-    : EncLayer(id), key(serial), bf(key)
+    : EncLayer(id), key(getKeyFromSerial(serial)), bf(key),
+      shift(getShiftFromSerial(serial))
 {
-    shift = atol(serial.substr(0, serial.find(' ')).c_str());
-    std::stringstream layerinfo(serial);
-    layerinfo >> shift;
-    uint pos = layerinfo.tellg();
-    serial.substr(pos+1, serial.length()-pos);
 }
 
 Create_field *
@@ -706,8 +717,8 @@ DET_int::newCreateField(Create_field * cf, std::string anonname) {
 
 
 Item *
-DET_int::encrypt(Item * ptext, uint64_t IV) {
-
+DET_int::encrypt(Item * ptext, uint64_t IV)
+{
     ulonglong value = static_cast<Item_int*>(ptext)->value;
 
     longlong ival = static_cast<Item_int*>(ptext)->val_int();
@@ -726,8 +737,9 @@ DET_int::encrypt(Item * ptext, uint64_t IV) {
 }
 
 Item *
-DET_int::decrypt(Item * ctext, uint64_t IV) {
-
+DET_int::decrypt(Item * ctext, uint64_t IV)
+{
+    std::cout << "DECSALT: " << IV << std::endl;
     ulonglong value = static_cast<Item_int*>(ctext)->value;
 
     if(shift)
@@ -1009,9 +1021,9 @@ DETJOINFactory::deserialize(unsigned int id, const SerialLayer & sl) {
     } else if (sl.name == "DETJOIN_tinyint") {
         return new DETJOIN_tinyint(id, sl.layer_info);
     } else if (sl.name == "DETJOIN_str") {
-	return new DETJOIN_str(id, sl.layer_info);
+        return new DETJOIN_str(id, sl.layer_info);
     } else {
-	return new DETJOIN_dec(id, sl.layer_info);
+        return new DETJOIN_dec(id, sl.layer_info);
     }
 }
 

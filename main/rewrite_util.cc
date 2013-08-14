@@ -1,3 +1,5 @@
+#include <memory>
+
 #include <main/rewrite_util.hh>
 #include <main/enum_text.hh>
 #include <main/rewrite_main.hh>
@@ -198,6 +200,38 @@ get_create_field(const Analysis &a, Create_field * f, OnionMeta *om,
     return new_cf;
 }
 
+static Item *
+makeNiceDefault(Create_field *cf)
+{
+    assert(cf->def);
+
+    switch (cf->sql_type) {
+        case MYSQL_TYPE_DECIMAL:
+            throw CryptDBError("implement default decimal type!");
+
+        case MYSQL_TYPE_TINY:
+        case MYSQL_TYPE_SHORT:
+        case MYSQL_TYPE_INT24:
+        case MYSQL_TYPE_LONG:
+        case MYSQL_TYPE_LONGLONG: {
+            const std::string val = ItemToString(cf->def);
+            return new Item_int(atoi(val.c_str()));
+        }
+        case MYSQL_TYPE_VARCHAR:
+        case MYSQL_TYPE_VAR_STRING:
+        case MYSQL_TYPE_STRING:
+        case MYSQL_TYPE_TINY_BLOB:
+        case MYSQL_TYPE_LONG_BLOB:
+        case MYSQL_TYPE_MEDIUM_BLOB:
+            return make_item(static_cast<Item_string *>(cf->def));
+
+        case MYSQL_TYPE_NULL:
+            return make_item(static_cast<Item_null *>(cf->def));
+        default:
+            throw CryptDBError("unrecognized default type!");
+    }
+}
+
 std::vector<Create_field *>
 rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
 {
@@ -224,8 +258,9 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
             get_create_field(a, f, om, om->getAnonOnionName());
         assert(has_default == static_cast<bool>(new_cf->def));
         if (has_default) {
+            const std::unique_ptr<Item> def(makeNiceDefault(new_cf));
             new_cf->def =
-                encrypt_item_layers(new_cf->def, o, om, a, default_salt);
+                encrypt_item_layers(def.get(), o, om, a, default_salt);
         }
         output_cfields.push_back(new_cf);
     }
