@@ -1,0 +1,22 @@
+-= CryptDB web tool
+
+ Web interface for onion security level adjustments.
+
+TODO:
+
+- Use 'DIRECTIVE UPDATE' for reading from and writing to CryptDB onion security level adjustments, ex:
+
+    DIRECTIVE UPDATE cryptdb_metadata SET rating = 'sensitive' WHERE field = 'x'
+
+    DIRECTIVE UPDATE cryptdb_metadata SET rating = 'SENSITIVE|PLAIN|BEST_EFFORT' WHERE field = 'x'
+
+
+- Make output to be displayed in textarea instead.
+- Implement dump results to file.
+- Fix proxy connection (currently connecting into backend mysql, see if php has any special statement for proxy connections).
+- Do not reload results when clicking submit, keep page static and preserve user's choice selected (sensitive, best effort or unencrypted).
+- Use mysqli instead of deprecated mysql API.
+- Check integration with cryptdblearn tool (@see tools/learn/cryptdblearn.cc).
+- Fix possible session's persistence, login/logoff issues  
+- Improve layout.
+
