@@ -816,12 +816,26 @@ lex_to_query(LEX *lex)
     return o.str();
 }
 
+static
+std::string
+mysql_noop()
+{
+    return "do 0;";
+}
+
 RewriteOutput * 
 Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
                         const std::string &query)
 {
-    query_parse p(ps.dbName(), query);
-    LEX *lex = p.lex();
+    std::unique_ptr<query_parse> p;
+    try {
+        p = std::unique_ptr<query_parse>(new query_parse(ps.dbName(), query));
+    } catch (std::runtime_error &e) {
+        std::cout << "Error: " << query << std::endl;
+        return new SimpleOutput(mysql_noop());
+    }
+    LEX *lex = p.get()->lex();
+
     LOG(cdb_v) << "pre-analyze " << *lex;
 
     // optimization: do not process queries that we will not rewrite
@@ -888,13 +902,6 @@ struct DirectiveData {
         tokens.pop_front();
     }
 };
-
-static
-std::string
-mysql_noop()
-{
-    return "do 0;";
-}
 
 // FIXME: Implement.
 // SYNTAX
