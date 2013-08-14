@@ -739,7 +739,6 @@ DET_int::encrypt(Item * ptext, uint64_t IV)
 Item *
 DET_int::decrypt(Item * ctext, uint64_t IV)
 {
-    std::cout << "DECSALT: " << IV << std::endl;
     ulonglong value = static_cast<Item_int*>(ctext)->value;
 
     if(shift)
