@@ -350,7 +350,7 @@ class Rewriter;
 
 class RewriteOutput { 
 public:
-    RewriteOutput(std::string original_query)
+    RewriteOutput(const std::string &original_query)
         : original_query(original_query) {}
     virtual ~RewriteOutput() = 0;
 
@@ -382,7 +382,8 @@ public:
 
 class DMLOutput : public RewriteOutput {
 public:
-    DMLOutput(std::string original_query, std::string new_query)
+    DMLOutput(const std::string &original_query,
+              const std::string &new_query)
         : RewriteOutput(original_query), new_query(new_query) {}
     ~DMLOutput() {;}
 
@@ -398,11 +399,11 @@ private:
 // Special case of DML query.
 class SpecialUpdate : public RewriteOutput {
 public:
-    SpecialUpdate(std::string original_query,
-                  std::string new_query,
-                  std::string plain_table,
-                  std::string crypted_table,
-                  std::string where_clause,
+    SpecialUpdate(const std::string &original_query,
+                  const std::string &new_query,
+                  const std::string &plain_table,
+                  const std::string &crypted_table,
+                  const std::string &where_clause,
                   const ProxyState &ps)
     : RewriteOutput(original_query), new_query(new_query),
       plain_table(plain_table), crypted_table(crypted_table),
@@ -426,7 +427,8 @@ private:
 
 class DeltaOutput : public RewriteOutput {
 public:
-    DeltaOutput(std::string original_query, std::vector<Delta *> deltas)
+    DeltaOutput(const std::string &original_query,
+                std::vector<Delta *> deltas)
         : RewriteOutput(original_query), deltas(deltas) {}
     virtual ~DeltaOutput() = 0;
 
@@ -445,7 +447,8 @@ protected:
 
 class DDLOutput : public DeltaOutput {
 public:
-    DDLOutput(std::string original_query, std::string new_query,
+    DDLOutput(const std::string &original_query,
+              const std::string &new_query,
               std::vector<Delta *> deltas)
         : DeltaOutput(original_query, deltas), new_query(new_query) {}
     ~DDLOutput() {;}

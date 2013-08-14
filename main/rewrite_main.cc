@@ -1079,7 +1079,7 @@ executeQuery(const ProxyState &ps, const std::string &q)
         assert(qr.output->beforeQuery(ps.conn, ps.e_conn));
 
         // Execute query.
-        DBResult *dbres;
+        DBResult *dbres = NULL;
         std::list<std::string> out_queryz;
         if (!qr.output->getQuery(&out_queryz)) {
             throw CryptDBError("Failed to retrieve query!");
@@ -1092,26 +1092,29 @@ executeQuery(const ProxyState &ps, const std::string &q)
                 qr.output->handleQueryFailure(ps.e_conn);
                 throw CryptDBError("Failed to execute query!");
             }
+            assert(dbres);
         }
 
-        // Query cleanup.
         assert(qr.output->afterQuery(ps.e_conn));
         if (qr.output->queryAgain()) {
             return executeQuery(ps, q);
         } 
 
-        ResType *res = new ResType(dbres->unpack());
-        prettyPrintQueryResult(*res);
+        if (dbres) {
+            ResType *res = new ResType(dbres->unpack());
+            prettyPrintQueryResult(*res);
 
-        ResType *dec_res;
-        if (true == qr.output->doDecryption()) {
-            dec_res = r.decryptResults(*res, qr.rmeta);
-            prettyPrintQueryResult(*dec_res);
+            ResType *dec_res;
+            if (true == qr.output->doDecryption()) {
+                dec_res = r.decryptResults(*res, qr.rmeta);
+                prettyPrintQueryResult(*dec_res);
+            }
+
+            printEmbeddedState(ps);
+            return dec_res;
+        } else {
+            return NULL;
         }
-
-        printEmbeddedState(ps);
-
-        return dec_res;
     } catch (std::runtime_error &e) {
         std::cout << "Unexpected Error: " << e.what() << " in query "
                   << q << std::endl;
