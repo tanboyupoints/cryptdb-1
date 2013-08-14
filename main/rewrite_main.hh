@@ -58,7 +58,8 @@ public:
     // FIXME: Cleanup resources.
     ~Rewriter() {;}
 
-    QueryRewrite rewrite(const ProxyState &ps, const std::string &q);
+    QueryRewrite rewrite(const ProxyState &ps, const std::string &q,
+                         SchemaInfo **out_schema);
     ResType *decryptResults(const ResType &dbres, const ReturnMeta &rm);
 
     RewriteOutput *
@@ -87,7 +88,7 @@ private:
 };
 
 ResType *
-executeQuery(const ProxyState &ps, const std::string &q);
+executeQuery(ProxyState &ps, const std::string &q);
 
 #define UNIMPLEMENTED \
         throw std::runtime_error(std::string("Unimplemented: ") + \

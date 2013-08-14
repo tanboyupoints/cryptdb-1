@@ -50,11 +50,14 @@ Learn::trainFromFile(ProxyState &ps)
         if (!line.empty()){
             char lastChar = *line.rbegin();
             if(lastChar == ';'){
+                throw CryptDBError("fix Learn::trainFromFile!");
+                /*
+                // FIXME: Use executeQuery.
                 this->m_totalnum++;
                 s += line;
                 Rewriter r;
-                QueryRewrite qr = r.rewrite(ps, s);
-                /*
+                SchemaInfo *out_schema;
+                QueryRewrite qr = r.rewrite(ps, s, &out_schema);
                 // FIXME.
                 ResType *res =
                     qr.output->doQuery(ps.conn, ps.e_conn);
@@ -63,12 +66,12 @@ Learn::trainFromFile(ProxyState &ps)
                         this->m_success_num++;
                     delete res;
                 }
-                */
                 if (true == qr.output->queryAgain()){ 
                     this->m_totalnum++;
                     assert(executeQuery(ps, s));
                     this->m_success_num++;
                 } 
+                */
                 s.clear();
                 continue;
             }

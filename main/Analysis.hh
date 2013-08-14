@@ -269,6 +269,22 @@ typedef struct ProxyState {
     {
         return default_sec_rating;
     }
+    SchemaInfo *getPreviousSchema() const
+    {
+        return previous_schema;
+    }
+    void setPreviousSchema(SchemaInfo *schema)
+    {
+        previous_schema = schema;
+    }
+    bool schemaIsStale() const
+    {
+        return schema_staleness;
+    }
+    void setSchemaStaleness(bool staleness)
+    {
+        schema_staleness = staleness;
+    }
 
     // connection to remote and embedded server
     Connect *conn;
@@ -280,6 +296,8 @@ private:
     // FIXME: Remove once cryptdb supports multiple databases.
     const std::string dbname;
     const SECURITY_RATING default_sec_rating;
+    SchemaInfo *previous_schema;
+    bool schema_staleness;
 } ProxyState;
 
 
@@ -360,6 +378,7 @@ public:
     virtual bool afterQuery(Connect *e_conn) const = 0;
     virtual bool queryAgain() const;
     virtual bool doDecryption() const;
+    virtual bool stalesSchema() const;
 
     static ResType *sendQuery(Connect *c, const std::string &q);
 
@@ -436,6 +455,7 @@ public:
     virtual bool getQuery(std::list<std::string> *queryz) const = 0;
     virtual bool handleQueryFailure(Connect *e_conn) const = 0;
     bool afterQuery(Connect *e_conn) const = 0;
+    bool stalesSchema() const;
 
     static bool save(Connect *e_conn, unsigned long *delta_output_id);
     static bool destroyRecord(Connect *e_conn,

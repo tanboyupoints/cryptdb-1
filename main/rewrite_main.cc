@@ -947,7 +947,8 @@ cryptdbDirective(const std::string query)
 }
 
 QueryRewrite
-Rewriter::rewrite(const ProxyState &ps, const std::string & q)
+Rewriter::rewrite(const ProxyState &ps, const std::string & q,
+                  SchemaInfo **out_schema)
 {
     LOG(cdb_v) << "q " << q;
     assert(0 == mysql_thread_init());
@@ -956,17 +957,25 @@ Rewriter::rewrite(const ProxyState &ps, const std::string & q)
     // printEmbeddedState(ps);
 
     // FIXME: Memleak 'schema'.
-    const SchemaInfo * const schema = loadSchemaInfo(ps.conn, ps.e_conn);
-    Analysis analysis = Analysis(schema);
-
+    AssignOnce<SchemaInfo *> schema;
+    if (ps.schemaIsStale()) {
+        schema = loadSchemaInfo(ps.conn, ps.e_conn);
+    } else {
+        schema = ps.getPreviousSchema();
+    }
+    assert(schema.get());
+    Analysis analysis = Analysis(schema.get());
+    
+    RewriteOutput *output;
     if (cryptdbDirective(q)) {
-        RewriteOutput *output = this->handleDirective(analysis, ps, q);
-        return QueryRewrite(true, *analysis.rmeta, output);
+        output = this->handleDirective(analysis, ps, q);
     } else {
         // FIXME: Memleak return of 'dispatchOnLex()'
-        RewriteOutput *output = this->dispatchOnLex(analysis, ps, q);
-        return QueryRewrite(true, *analysis.rmeta, output);
+        output = this->dispatchOnLex(analysis, ps, q);
     }
+
+    *out_schema = schema.get();
+    return QueryRewrite(true, *analysis.rmeta, output);
 }
 
 //TODO: replace stringify with <<
@@ -1069,12 +1078,15 @@ prettyPrintQueryResult(ResType res)
 }
 
 ResType *
-executeQuery(const ProxyState &ps, const std::string &q)
+executeQuery(ProxyState &ps, const std::string &q)
 {
     try {
         Rewriter r;
-        QueryRewrite qr = r.rewrite(ps, q);
-        
+        SchemaInfo *out_schema;
+        QueryRewrite qr = r.rewrite(ps, q, &out_schema);
+        ps.setPreviousSchema(out_schema);
+        ps.setSchemaStaleness(qr.output->stalesSchema());
+
         // Query preamble.
         assert(qr.output->beforeQuery(ps.conn, ps.e_conn));
 
