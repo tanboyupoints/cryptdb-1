@@ -14,10 +14,14 @@ static void
 process_select_lex(st_select_lex *select_lex, Analysis & a);
 
 static void
+process_field_value_pairs(List_iterator<Item> fd_it,
+                          List_iterator<Item> val_it, Analysis &a);
+
+static void
 process_filters_lex(st_select_lex * select_lex, Analysis & a);
 
 static inline void
-analyze_update(Item_field * field, Item * val, Analysis & a);
+analyze_field_value_pair(Item_field * field, Item * val, Analysis & a);
 
 static st_select_lex *
 rewrite_filters_lex(st_select_lex * select_lex, Analysis & a);
@@ -36,16 +40,14 @@ class InsertHandler : public DMLHandler {
     {
         process_select_lex(lex, a);
 
+        // -----------------------
         // ON DUPLICATE KEY UPDATE
-        auto item_it = List_iterator<Item>(lex->update_list);
-        for (;;) {
-            Item *item = item_it++;
-            if (!item) {
-                break;
-            }
+        // -----------------------
+        auto fd_it = List_iterator<Item>(lex->update_list);
+        auto val_it = List_iterator<Item>(lex->value_list);
+        process_field_value_pairs(fd_it, val_it, a);
 
-            analyze(item, a);
-        }
+        return;
     }
 
     virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
@@ -134,54 +136,46 @@ class InsertHandler : public DMLHandler {
         // -----------------------
         // ON DUPLICATE KEY UPDATE
         // -----------------------
-        // fields
-        std::vector<FieldMeta *> update_fms;
         {
-            auto it = List_iterator<Item>(lex->update_list);
-            List<Item> new_list;
+            List<Item> res_items, res_values;
+            auto fd_it = List_iterator<Item>(lex->update_list);
+            auto val_it = List_iterator<Item>(lex->value_list);
             for (;;) {
-                Item *item = it++;
-                if (!item) {
+                Item *field_item = fd_it++;
+                Item *value_item = val_it++;
+                if (!field_item) {
+                    assert(NULL == value_item);
                     break;
                 }
-                assert(item->type() == Item::FIELD_ITEM);
-                Item_field *ifd = static_cast<Item_field *>(item);
-                update_fms.push_back(a.getFieldMeta(ifd->table_name,
-                                                    ifd->field_name));
-                std::vector<Item *> l;
-                itemTypes.do_rewrite_insert(item, a, l, NULL);
-                for (auto it = l.begin(); it != l.end(); ++it) {
-                    new_list.push_back(*it);
-                }
-            }
-            new_lex->update_list = new_list;
-        }
+                assert(NULL != value_item);
 
-        // values
-        {
-            auto it = List_iterator<Item>(lex->value_list);
-            List<Item> new_list;
-            auto update_fm_it = update_fms.begin();
-            for (;;) {
-                Item *item = it++;
-                if (!item) {
-                    assert(update_fms.end() == update_fm_it);
-                    break;
+                assert(field_item->type() == Item::FIELD_ITEM);
+                Item_field *ifd = static_cast<Item_field *>(field_item);
+                FieldMeta *fm =
+                    a.getFieldMeta(ifd->table_name, ifd->field_name);
+
+                RewritePlan *rp = getAssert(a.rewritePlans, value_item);
+                EncSet r_es = rp->es_out.intersect(EncSet(a, fm));
+                assert(!r_es.empty());
+
+                for (auto pair : r_es.osl) {
+                    OLK olk = {pair.first, pair.second.first, fm};
+                    RewritePlan *rp_field =
+                        getAssert(a.rewritePlans, field_item);
+                    Item *re_field =
+                        itemTypes.do_rewrite(field_item, olk, rp_field, a);
+                    res_items.push_back(re_field);
+
+                    RewritePlan *rp_value =
+                        getAssert(a.rewritePlans, value_item);
+                    Item *re_value =
+                        itemTypes.do_rewrite(value_item, olk, rp_value, a);
+                    res_values.push_back(re_value);
                 }
-                assert(update_fms.end() != update_fm_it);
-                std::vector<Item *> l;
-                // if (item->type() == Item::FIELD_ITEM) {
-                    // itemTypes.do_rewrite_insert(item, a, l, NULL);
-                // } else {
-                    itemTypes.do_rewrite_insert(item, a, l,
-                                                *update_fm_it);
-                // }
-                for (auto it = l.begin(); it != l.end(); ++it) {
-                    new_list.push_back(*it);
-                }
-                ++update_fm_it;
             }
-            new_lex->value_list = new_list;
+
+            new_lex->update_list = res_items;
+            new_lex->value_list = res_values;
         }
 
         return new_lex;
@@ -199,21 +193,12 @@ class UpdateHandler : public DMLHandler {
 
             auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
             auto val_it = List_iterator<Item>(lex->value_list);
-
-            for (;;) {
-                Item *i = fd_it++;
-                Item * val = val_it++;
-                if (!i)
-                    break;
-                assert(val != NULL);
-                assert(i->type() == Item::FIELD_ITEM);
-                Item_field *ifd = static_cast<Item_field*>(i);
-                analyze_update(ifd, val, a);
-            }
+            process_field_value_pairs(fd_it, val_it, a);
         }
 
         process_filters_lex(&lex->select_lex, a);
     }
+
     virtual  LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
@@ -228,7 +213,8 @@ class UpdateHandler : public DMLHandler {
             rewrite_table_list(lex->select_lex.top_join_list, a);
 
         // Rewrite filters
-        set_select_lex(new_lex, rewrite_filters_lex(&new_lex->select_lex, a));
+        set_select_lex(new_lex,
+                       rewrite_filters_lex(&new_lex->select_lex, a));
 
         // Rewrite SET values
         bool invalids = false;
@@ -286,10 +272,12 @@ class UpdateHandler : public DMLHandler {
             for (auto pair : r_es.osl) {
                 OLK olk = {pair.first, pair.second.first, fm};
                 RewritePlan *rp_i = getAssert(a.rewritePlans, i);
-                res_items.push_back(rew_fd = itemTypes.do_rewrite(i, olk, rp_i,
-                                                                  a));
+                rew_fd = itemTypes.do_rewrite(i, olk, rp_i, a);
+                res_items.push_back(rew_fd);
+
                 RewritePlan *rp_val = getAssert(a.rewritePlans, val);
-                res_vals.push_back(itemTypes.do_rewrite(val, olk, rp_val, a));
+                res_vals.push_back(itemTypes.do_rewrite(val, olk, rp_val,
+                                                        a));
             }
 
             // Determine if the query invalidates onions.
@@ -410,7 +398,7 @@ process_select_lex(LEX *lex, Analysis & a)
 }
 
 static void
-process_select_lex(st_select_lex *select_lex, Analysis & a)
+process_select_lex(st_select_lex *select_lex, Analysis &a)
 {
     //select clause
     auto item_it = List_iterator<Item>(select_lex->item_list);
@@ -425,6 +413,26 @@ process_select_lex(st_select_lex *select_lex, Analysis & a)
     process_filters_lex(select_lex, a);
 }
 
+static void
+process_field_value_pairs(List_iterator<Item> fd_it,
+                          List_iterator<Item> val_it, Analysis &a)
+{
+    for (;;) {
+        Item *field_item = fd_it++;
+        Item *value_item = val_it++;
+        if (!field_item) {
+            assert(!value_item);
+            break;
+        }
+        assert(value_item != NULL);
+        assert(field_item->type() == Item::FIELD_ITEM);
+        Item_field *ifd = static_cast<Item_field *>(field_item);
+
+        // FIXME: Change function name.
+        analyze_field_value_pair(ifd, value_item, a);
+    }
+}
+
 // TODO:
 // should be able to support general updates such as
 // UPDATE table SET x = 2, y = y + 1, z = y+2, z =z +1, w = y, l = x
@@ -434,7 +442,7 @@ process_select_lex(st_select_lex *select_lex, Analysis & a)
 //analyzes an expression of the form field = val expression from
 // an UPDATE
 static inline void
-analyze_update(Item_field * field, Item * val, Analysis & a) {
+analyze_field_value_pair(Item_field * field, Item * val, Analysis & a) {
 
     reason r;
     a.rewritePlans[val] = gather(val, r, a);
