@@ -177,13 +177,14 @@ typedef struct ReturnMeta {
 
 class OnionAdjustExcept {
 public:
-    OnionAdjustExcept(onion o, FieldMeta *fm, SECLEVEL l, Item_field *itf)
+    OnionAdjustExcept(onion o, const FieldMeta * const fm,
+                      SECLEVEL l, Item_field * const itf)
         : o(o), fm(fm), tolevel(l), itf(itf) {}
 
-    onion o;
-    FieldMeta * fm;
-    SECLEVEL tolevel;
-    Item_field * itf;
+    const onion o;
+    const FieldMeta * const fm;
+    const SECLEVEL tolevel;
+    Item_field * const itf;
 };
 
 

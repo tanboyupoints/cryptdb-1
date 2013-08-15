@@ -44,11 +44,12 @@ extern CItemFuncNameDir funcNames;
 // it just does gather, choos and then rewrite
 
 static Item_field *
-stringToItemField(std::string field, std::string table, Item_field * itf) {
+stringToItemField(const std::string &field,
+                  const std::string &table, Item_field * const itf) {
 
-    THD * thd = current_thd;
+    THD * const thd = current_thd;
     assert(thd);
-    Item_field * res = new Item_field(thd, itf);
+    Item_field * const res = new Item_field(thd, itf);
     res->name = NULL; //no alias
     res->field_name = make_thd_string(field);
     res->table_name = make_thd_string(table);
@@ -480,13 +481,15 @@ buildTypeTextTranslator()
 
 //l gets updated to the new level
 static std::string
-removeOnionLayer(Analysis &a, const ProxyState &ps, FieldMeta * fm,
-                 Item_field *itf, onion o, SECLEVEL *new_level,
+removeOnionLayer(Analysis &a, const ProxyState &ps,
+                 const FieldMeta * const fm,
+                 Item_field * const itf, onion o,
+                 SECLEVEL * const new_level,
                  const std::string &cur_db) {
-    OnionMeta *om = fm->getOnionMeta(o);
+    OnionMeta * const om = fm->getOnionMeta(o);
     assert(om);
-    std::string fieldanon  = om->getAnonOnionName();
-    std::string tableanon  =
+    const std::string fieldanon = om->getAnonOnionName();
+    const std::string tableanon =
         a.getTableMeta(itf->table_name)->getAnonTableName();
 
     //removes onion layer at the DB
@@ -494,11 +497,13 @@ removeOnionLayer(Analysis &a, const ProxyState &ps, FieldMeta * fm,
     query << " UPDATE " << cur_db << "." << tableanon
           << "    SET " << fieldanon  << " = ";
 
-    Item_field *field = stringToItemField(fieldanon, tableanon, itf);
-    Item_field *salt =
+    Item_field * const field =
+        stringToItemField(fieldanon, tableanon, itf);
+    Item_field * const salt =
         stringToItemField(fm->getSaltName(), tableanon, itf);
     std::cout << TypeText<onion>::toText(o) << std::endl;
-    Item * decUDF = a.getBackEncLayer(om)->decryptUDF(field, salt);
+    Item * const decUDF =
+        a.getBackEncLayer(om)->decryptUDF(field, salt);
 
     query << *decUDF << ";";
 
@@ -524,10 +529,11 @@ removeOnionLayer(Analysis &a, const ProxyState &ps, FieldMeta * fm,
  *
  */
 static std::list<std::string>
-adjustOnion(Analysis &a, const ProxyState &ps, onion o, FieldMeta * fm,
-            SECLEVEL tolevel, Item_field *itf, const std::string &cur_db)
+adjustOnion(Analysis &a, const ProxyState &ps, onion o,
+            const FieldMeta * const fm, SECLEVEL tolevel,
+            Item_field * const itf, const std::string &cur_db)
 {
-    OnionMeta *om = fm->getOnionMeta(o);
+    OnionMeta * const om = fm->getOnionMeta(o);
     SECLEVEL newlevel = a.getOnionLevel(om);
     assert(newlevel != SECLEVEL::INVALID);
 

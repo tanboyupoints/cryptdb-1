@@ -37,10 +37,10 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     virtual RewritePlan * do_gather_type(Item_field *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << "FIELD_ITEM do_gather " << *i;
 
-        std::string fieldname = i->field_name;
-        std::string table = i->table_name;
+        const std::string fieldname = i->field_name;
+        const std::string table = i->table_name;
 
-        FieldMeta * fm = a.getFieldMeta(table, fieldname);
+        FieldMeta * const fm = a.getFieldMeta(table, fieldname);
 
         EncSet es = EncSet(a, fm);
 
@@ -55,7 +55,7 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     {
         LOG(cdb_v) << "do_rewrite_type FIELD_ITEM " << *i;
 
-        FieldMeta * const fm =
+        const FieldMeta * const fm =
             a.getFieldMeta(i->table_name, i->field_name);
         //assert(constr.key == fm);
 
