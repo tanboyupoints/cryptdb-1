@@ -33,7 +33,16 @@ static st_select_lex *
 rewrite_select_lex(st_select_lex *select_lex, Analysis & a);
 
 static void
+rewrite_field_value_pairs(List_iterator<Item> fd_it,
+                          List_iterator<Item> val_it, Analysis &a,
+                          bool *invalids, List<Item> *res_items,
+                          List<Item> *res_values);
+
+static void
 process_table_list(List<TABLE_LIST> *tll, Analysis & a);
+
+static bool
+invalidates(FieldMeta * fm, const EncSet & es);
 
 class InsertHandler : public DMLHandler {
     virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps) const
@@ -137,43 +146,13 @@ class InsertHandler : public DMLHandler {
         // ON DUPLICATE KEY UPDATE
         // -----------------------
         {
-            List<Item> res_items, res_values;
             auto fd_it = List_iterator<Item>(lex->update_list);
             auto val_it = List_iterator<Item>(lex->value_list);
-            for (;;) {
-                Item *field_item = fd_it++;
-                Item *value_item = val_it++;
-                if (!field_item) {
-                    assert(NULL == value_item);
-                    break;
-                }
-                assert(NULL != value_item);
-
-                assert(field_item->type() == Item::FIELD_ITEM);
-                Item_field *ifd = static_cast<Item_field *>(field_item);
-                FieldMeta *fm =
-                    a.getFieldMeta(ifd->table_name, ifd->field_name);
-
-                RewritePlan *rp = getAssert(a.rewritePlans, value_item);
-                EncSet r_es = rp->es_out.intersect(EncSet(a, fm));
-                assert(!r_es.empty());
-
-                for (auto pair : r_es.osl) {
-                    OLK olk = {pair.first, pair.second.first, fm};
-                    RewritePlan *rp_field =
-                        getAssert(a.rewritePlans, field_item);
-                    Item *re_field =
-                        itemTypes.do_rewrite(field_item, olk, rp_field, a);
-                    res_items.push_back(re_field);
-
-                    RewritePlan *rp_value =
-                        getAssert(a.rewritePlans, value_item);
-                    Item *re_value =
-                        itemTypes.do_rewrite(value_item, olk, rp_value, a);
-                    res_values.push_back(re_value);
-                }
-            }
-
+            bool invalids;
+            List<Item> res_items, res_values;
+            rewrite_field_value_pairs(fd_it, val_it, a, &invalids,
+                                      &res_items, &res_values);
+            //TODO: cleanup old item and value list
             new_lex->update_list = res_items;
             new_lex->value_list = res_values;
         }
@@ -206,7 +185,8 @@ class UpdateHandler : public DMLHandler {
 
         LOG(cdb_v) << "rewriting update \n";
 
-        assert_s(lex->select_lex.item_list.head(), "update needs to have item_list");
+        assert_s(lex->select_lex.item_list.head(),
+                 "update needs to have item_list");
 
         // Rewrite table name
         new_lex->select_lex.top_join_list =
@@ -217,102 +197,20 @@ class UpdateHandler : public DMLHandler {
                        rewrite_filters_lex(&new_lex->select_lex, a));
 
         // Rewrite SET values
-        bool invalids = false;
-
         assert(lex->select_lex.item_list.head());
         assert(lex->value_list.head());
 
-        List<Item> res_items, res_vals;
-
         auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
         auto val_it = List_iterator<Item>(lex->value_list);
-
-        // Look through all pairs in set: fd = val
-        for (;;) {
-            Item * i = fd_it++;
-            if (!i) {
-                // Ensure that we were not dealing with an invalid query where
-                // we had more values than fields.
-                Item *v = val_it++;
-                assert(NULL == v);
-                break;
-            }
-            assert(i->type() == Item::FIELD_ITEM);
-            Item_field * fd = static_cast<Item_field*>(i);
-
-            FieldMeta * fm = a.getFieldMeta(fd->table_name, fd->field_name);
-            Item * val = val_it++;
-            assert(val != NULL);
-
-            RewritePlan * rp = getAssert(a.rewritePlans, val);
-            EncSet r_es = rp->es_out.intersect(EncSet(a, fm));
-            if (r_es.empty()) {
-                /*
-                 * FIXME(burrows): Change error message.
-                cerr << "update cannot be performed BECAUSE " << i << " supports " << fm->encdesc << "\n BUT " \
-                     << val << " can only provide " << rp->es_out << " BECAUSE " << rp->r << "\n";
-                */
-                assert(false);
-            }
-
-            // Determine salt for field
-            bool add_salt = false;
-            if (fm->has_salt) {
-                auto it_salt = a.salts.find(fm);
-                if ((it_salt == a.salts.end()) && needsSalt(r_es)) {
-                    add_salt = true;
-                    salt_type salt = randomValue();
-                    a.salts[fm] = salt;
-                }
-            }
-
-            Item * rew_fd = NULL;
-
-            // Rewrite field-value pair for every onion possible
-            for (auto pair : r_es.osl) {
-                OLK olk = {pair.first, pair.second.first, fm};
-                RewritePlan *rp_i = getAssert(a.rewritePlans, i);
-                rew_fd = itemTypes.do_rewrite(i, olk, rp_i, a);
-                res_items.push_back(rew_fd);
-
-                RewritePlan *rp_val = getAssert(a.rewritePlans, val);
-                res_vals.push_back(itemTypes.do_rewrite(val, olk, rp_val,
-                                                        a));
-            }
-
-            // Determine if the query invalidates onions.
-            invalids = invalids || invalidates(fm, r_es);
-
-            // Add the salt field
-            if (add_salt) {
-                salt_type salt = a.salts[fm];
-                assert(rew_fd);
-                res_items.push_back(make_item((Item_field *)rew_fd,
-                                              fm->getSaltName()));
-                res_vals.push_back(new Item_int((ulonglong) salt));
-            }
-
-        }
-
-        //TODO: cleanup old item and value list
-
-        new_lex->select_lex.item_list = res_items;
-        new_lex->value_list = res_vals;
-
+        bool invalids;
+        List<Item> res_items, res_values;
+        rewrite_field_value_pairs(fd_it, val_it, a, &invalids,
+                                  &res_items, &res_values);
         a.special_update = invalids;
+        //TODO: cleanup old item and value list
+        new_lex->select_lex.item_list = res_items;
+        new_lex->value_list = res_values;
         return new_lex;
-    }
-
-private:
-    bool invalidates(FieldMeta * fm, const EncSet & es) const {
-        for (auto o_l : fm->children) {
-            onion o = o_l.first->getValue();
-            if (es.osl.find(o) == es.osl.end()) {
-                return true;
-            }
-        }
-
-        return false;
     }
 };
 
@@ -327,7 +225,8 @@ class DeleteHandler : public DMLHandler {
     {
         LEX * new_lex = copy(lex);
         new_lex->query_tables = rewrite_table_list(lex->query_tables, a);
-        set_select_lex(new_lex, rewrite_select_lex(&new_lex->select_lex, a));
+        set_select_lex(new_lex,
+                       rewrite_select_lex(&new_lex->select_lex, a));
 
         return new_lex;
     }
@@ -510,6 +409,76 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
 }
 
 static void
+rewrite_field_value_pairs(List_iterator<Item> fd_it,
+                          List_iterator<Item> val_it, Analysis &a,
+                          bool *invalids, List<Item> *res_items,
+                          List<Item> *res_values)
+{
+    *invalids = false;
+    for (;;) {
+        Item * const field_item = fd_it++;
+        Item * const value_item = val_it++;
+        if (!field_item) {
+            assert(NULL == value_item);
+            break;
+        }
+        assert(NULL != value_item);
+
+        assert(field_item->type() == Item::FIELD_ITEM);
+        const Item_field * const ifd =
+            static_cast<Item_field *>(field_item);
+        FieldMeta * const fm =
+            a.getFieldMeta(ifd->table_name, ifd->field_name);
+
+        const RewritePlan * const rp =
+            getAssert(a.rewritePlans, value_item);
+        const EncSet r_es = rp->es_out.intersect(EncSet(a, fm));
+        assert(!r_es.empty());
+
+        // Determine salt for field
+        bool add_salt = false;
+        if (fm->has_salt) {
+            auto it_salt = a.salts.find(fm);
+            if ((it_salt == a.salts.end()) && needsSalt(r_es)) {
+                add_salt = true;
+                const salt_type salt = randomValue();
+                a.salts[fm] = salt;
+            }
+        }
+
+        for (auto pair : r_es.osl) {
+            OLK olk = {pair.first, pair.second.first, fm};
+            RewritePlan *rp_field =
+                getAssert(a.rewritePlans, field_item);
+            Item *re_field =
+                itemTypes.do_rewrite(field_item, olk, rp_field, a);
+            res_items->push_back(re_field);
+
+            RewritePlan *rp_value =
+                getAssert(a.rewritePlans, value_item);
+            Item *re_value =
+                itemTypes.do_rewrite(value_item, olk, rp_value, a);
+            res_values->push_back(re_value);
+        }
+
+        // Add the salt field
+        if (add_salt) {
+            const salt_type salt = a.salts[fm];
+            assert(res_items->elements != 0);
+            Item_field * const rew_fd =
+                static_cast<Item_field *>(res_items->head());
+            assert(rew_fd);
+            res_items->push_back(make_item(rew_fd,
+                                          fm->getSaltName()));
+            res_values->push_back(new Item_int((ulonglong) salt));
+        }
+
+        // Determine if the query invalidates onions.
+        *invalids = *invalids || invalidates(fm, r_es);
+    }
+}
+
+static void
 addToReturn(ReturnMeta * rm, int pos, const OLK & constr, bool has_salt,
             std::string name) {
     if ((unsigned int)pos != rm->rfmeta.size()) {
@@ -617,6 +586,18 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
             process_select_lex(u->first_select(), a);
         }
     }
+}
+
+bool invalidates(FieldMeta * fm, const EncSet & es)
+{
+    for (auto o_l : fm->children) {
+        onion o = o_l.first->getValue();
+        if (es.osl.find(o) == es.osl.end()) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // FIXME: Add test to make sure handlers added successfully.

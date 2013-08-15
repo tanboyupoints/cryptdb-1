@@ -55,20 +55,21 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     {
         LOG(cdb_v) << "do_rewrite_type FIELD_ITEM " << *i;
 
-        FieldMeta *fm = a.getFieldMeta(i->table_name, i->field_name);
+        FieldMeta * const fm =
+            a.getFieldMeta(i->table_name, i->field_name);
         //assert(constr.key == fm);
 
         //check if we need onion adjustment
-        OnionMeta *om =
+        OnionMeta * const om =
             a.getOnionMeta(i->table_name, i->field_name, constr.o);
-        SECLEVEL onion_level = a.getOnionLevel(om);
+        const SECLEVEL onion_level = a.getOnionLevel(om);
         assert(onion_level != SECLEVEL::INVALID);
         if (constr.l < onion_level) {
             //need adjustment, throw exception
             throw OnionAdjustExcept(constr.o, fm, constr.l, i);
         }
 
-        Item_field * res = make_item(i);
+        Item_field * const res = make_item(i);
         res->table_name =
             make_thd_string(a.getAnonTableName(i->table_name));
         res->field_name = make_thd_string(om->getAnonOnionName());

@@ -576,8 +576,8 @@ bool SpecialUpdate::beforeQuery(Connect *conn, Connect *e_conn)
              ++field_index) {
             std::string field_data;
             if (row[field_index]) {
-                field_data = std::string(row[field_index],
-                                         l[field_index]);
+                field_data =
+                    std::string(row[field_index], l[field_index]);
             } else {    // Handle NULL values.
                 field_data = std::string("NULL");
             }
@@ -602,6 +602,8 @@ bool SpecialUpdate::getQuery(std::list<std::string> *queryz) const
 {
     queryz->clear();
     queryz->push_back("START TRANSACTION; ");
+
+    // FIXME: Broken, these queries must be rewritten.
 
     // DELETE the rows matching the WHERE clause from the database.
     std::ostringstream delete_stream;
