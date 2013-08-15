@@ -73,6 +73,11 @@ static QueryList Select = QueryList("SingleSelect",
       Query("INSERT INTO test_select VALUES (5, 30, 100000, '221B Baker Street', 'Sherlock Holmes')", false),
       Query("SELECT * FROM test_select WHERE id IN (1, 2, 10, 20, 30)", false),
       Query("SELECT * FROM test_select WHERE id BETWEEN 3 AND 5", false),
+      Query("SELECT NULLIF(1, id) FROM test_select", false),
+      Query("SELECT NULLIF(id, 1) FROM test_select", false),
+      Query("SELECT NULLIF(id, id) FROM test_select", false),
+      Query("SELECT NULLIF(1, 2) FROM test_select", false),
+      Query("SELECT NULLIF(1, 1) FROM test_select", false),
       Query("SELECT * FROM test_select", false),
       Query("SELECT max(id) FROM test_select", false),
       Query("SELECT max(salary) FROM test_select", false),
@@ -1143,12 +1148,12 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 303/319
+    //      TOTAL RESULT: 308/324
     // ###############################
 
     std::vector<Score> scores;
 
-    // Pass 42/44
+    // Pass 47/49
     scores.push_back(CheckQueryList(tc, Select));
 
     // Pass 24/24
