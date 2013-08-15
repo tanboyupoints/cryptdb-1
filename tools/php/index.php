@@ -62,7 +62,7 @@ if(!isset($_SESSION['logoff']) || $_SESSION['logoff']==false)
                 $query = "show columns from " . $s_db . "."  . $s_table . " where Field = " . "'" . $fieldname[$index] . "';";
                 //$SQLq = $query;
 
-                $proxy = proxy_connect($host, $user, $pwd, $s_db, $port);            
+                //$proxy = proxy_connect($host, $user, $pwd, $s_db, $port);            
                 do_sql($query);
                 //do_cryptdb_sql($proxy, $query);
                 // TODO: Execute query and display results
@@ -344,14 +344,15 @@ function print_cfg(){
 <center>
 <div class="frm">
 
-<label class="l">MYSQL host:</label><input type="text" name="v[host]" value="<?php echo $DB['host']?>"><br>
+<label class="l">Host:</label><input type="text" name="v[host]" value="<?php echo $DB['host']?>"><br>
 <label class="l">DB user:</label><input type="text" name="v[user]" value="<?php echo $DB['user']?>"><br>
 <label class="l">Password:</label><input type="password" name="v[pwd]" value=""><br>
 <br>
-
+<!--
 <label class="l">CryptDB host:</label><input type="text" readonly name="c[host]" value="localhost"><br>
 <label class="l">DB user:</label><input type="text" name="c[user]" value="<?php echo $CRYPTDB['user']?>"><br>
 <label class="l">Password:</label><input type="password" name="c[pwd]" value=""><br>
+-->
 <!--<label class="l">Port:</label><input type="text" readonly name="c[port]" value="<?php echo $CRYPTDB['port']?>" size="4"><br>-->
 
 <div id="cfg-adv" style="display:none;">
