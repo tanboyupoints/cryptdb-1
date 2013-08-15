@@ -135,8 +135,10 @@ EncSet::chooseOne() const
         onion o = onion_order[i];
         auto it = osl.find(o);
         if (it != osl.end()) {
+            // HACK.
             if (it->second.second == 0 &&
-                it->second.first != SECLEVEL::PLAINVAL) {
+                (it->second.first != SECLEVEL::PLAINVAL &&
+                 o != oPLAIN)) {
                 /*
                  * If no key, skip this OLK.
                  */

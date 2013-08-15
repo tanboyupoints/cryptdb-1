@@ -533,7 +533,8 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
         Item *item = item_it++;
         if (!item)
             break;
-        LOG(cdb_v) << "rewrite_select_lex " << *item << " with name " << item->name;
+        LOG(cdb_v) << "rewrite_select_lex " << *item << " with name "
+                   << item->name;
         rewrite_proj(item, getAssert(a.rewritePlans, item), a, newList);
     }
 

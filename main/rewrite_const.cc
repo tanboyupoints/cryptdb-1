@@ -31,17 +31,17 @@ encrypt_item(Item * i, const OLK & olk, Analysis & a)
     assert(!i->is_null());
 
 /*
+    // HACK
     // Necessary because gathering PLAINVAL is not going to have
     // a FieldMeta associated with it when we are doing an operation
     // on a constant without a field.
     // > SELECT 2 FROM t
     // > SELECT 8*9 FROM t
 */
-    if (SECLEVEL::PLAINVAL == olk.l) {
+    FieldMeta * const fm = olk.key;
+    if (!fm && oPLAIN == olk.o) {
         return i;
     }
-
-    FieldMeta * const fm = olk.key;
     assert(fm);
 
     const onion o = olk.o;
