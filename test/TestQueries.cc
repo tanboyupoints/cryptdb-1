@@ -638,55 +638,21 @@ static QueryList UserGroupForum = QueryList("UserGroupForum",
 
 static QueryList Auto = QueryList("AutoInc",
     { "CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext text)",
-      "CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)",
-      "CREATE TABLE u_auto (userid integer, username text)",
-      "CREATE TABLE "+PWD_TABLE_PREFIX+"u_auto (username text, psswd text)",
       "", "", "", "", "", ""},
     { "CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext text)",
-      "CRYPTDB msgs.msgtext ENC",
-      "CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)",
-      "CRYPTDB privmsg.recid ENC",
-      "CRYPTDB privmsg.senderid ENC",
-      "CREATE TABLE u_auto (userid integer, username text)",
-      "CRYPTDB u_auto.userid ENC",
-      "CRYPTDB u_auto.username ENC",
-      "CREATE TABLE "+PWD_TABLE_PREFIX+"u_auto (username text, psswd text)", "" },
-    { "CRYPTDB PRINCTYPE mid",
-      "CRYPTDB PRINCTYPE uid",
-      "CRYPTDB PRINCTYPE username EXTERNAL",
-      "CREATE TABLE msgs (msgid integer AUTO_INCREMENT PRIMARY KEY , msgtext text)",
-      "CRYPTDB msgs.msgtext ENCFOR msgs.msgid",
-      "CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)",
-      "CRYPTDB privmsg.recid uid SPEAKSFOR privmsg.msgid mid",
-      "CRYPTDB privmsg.sender uid SPEAKSFOR privmsg.msgid mid",
-      "CREATE TABLE u_auto (userid equals privmsg.senderid integer, username givespsswd userid text)",
-      "CRYPTDB u_auto.username username SPEAKSFOR u_auto.userid uid" },
-    { Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_auto (username, psswd) VALUES ('alice','secretA')",false),
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_auto (username, psswd) VALUES ('bob','secretB')",false),
-      Query("INSERT INTO u_auto VALUES (1, 'alice')",false),
-      Query("INSERT INTO u_auto VALUES (2, 'bob')",false),
-      Query("INSERT INTO privmsg (msgid, recid, senderid) VALUES (9, 1, 2)", false),
-      Query("INSERT INTO msgs (msgtext) VALUES ('hello world')", false),
+      "", "", "", "", "", ""},
+    { "CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext text)",
+      "", "", "", "", "", ""},
+    { Query("INSERT INTO msgs (msgtext) VALUES ('hello world')", false),
       Query("INSERT INTO msgs (msgtext) VALUES ('hello world2')", false),
       Query("INSERT INTO msgs (msgtext) VALUES ('hello world3')", false),
       Query("SELECT msgtext FROM msgs WHERE msgid=1", false),
       Query("SELECT msgtext FROM msgs WHERE msgid=2", false),
       Query("SELECT msgtext FROM msgs WHERE msgid=3", false),
-      Query("SELECT msgtext FROM msgs, privmsg, u_auto WHERE username = 'alice' AND userid = recid AND msgs.msgid = privmsg.msgid", false),
-      Query("INSERT INTO msgs VALUES (9, 'message for alice from bob')", false),
-      Query("SELECT msgtext FROM msgs, privmsg, u_auto WHERE username = 'alice' AND userid = recid AND msgs.msgid = privmsg.msgid", false) },
-    { "DROP TABLE msgs",
-      "DROP TABLE privmsg",
-      "DROP TABLE u_auto",
-      "DROP TABLE "+PWD_TABLE_PREFIX+"u_auto" },
-    { "DROP TABLE msgs",
-      "DROP TABLE privmsg",
-      "DROP TABLE u_auto",
-      "DROP TABLE "+PWD_TABLE_PREFIX+"u_auto" },
-    { "DROP TABLE msgs",
-      "DROP TABLE privmsg",
-      "DROP TABLE u_auto",
-      ""} );
+      Query("INSERT INTO msgs VALUES (9, 'message for alice from bob')", false)},
+    { "DROP TABLE msgs"},
+    { "DROP TABLE msgs"},
+    { "DROP TABLE msgs"});
 
 static QueryList Null = QueryList("Null",
     { "CREATE TABLE test_null (uid integer, age integer, address text)",
@@ -1229,18 +1195,21 @@ RunTest(const TestConfig &tc) {
     // Pass 22/22
     scores.push_back(CheckQueryList(tc, BestEffort));
 
+    /*
+    // Pass x/x
+    CheckQueryList(tc, Auto);
+    */
+
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;
     }
 
     /*
-    // Auto increment doesn't run
-    CheckQueryList(tc, Auto);
-
     //everything has to restart so that last_insert_id() are lined up
     test->restart();
     control->restart();
-    CheckQueryList(tc, ManyConnections);*/
+    CheckQueryList(tc, ManyConnections);
+    */
 }
 
 
