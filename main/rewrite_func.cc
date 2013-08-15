@@ -884,22 +884,55 @@ static class ANON : public CItemSubtypeFN<Item_func_if, str_if> {
     }
 } ANON;
 
+// FIXME: This query must be rewritten into a proper IF().
+// > Otherwise the value it produces must be rewritten in the same way
+// > that the value it compares was rewritten.
 extern const char str_nullif[] = "nullif";
 static class ANON : public CItemSubtypeFN<Item_func_nullif, str_nullif> {
-    virtual RewritePlan * do_gather_type(Item_func_nullif *i, reason &tr, Analysis & a) const
+    virtual RewritePlan * do_gather_type(Item_func_nullif *i,
+                                         reason &tr, Analysis & a)
+        const
     {
-        /*
-	    Item **args = i->arguments();
-        for (uint x = 0; x < i->argument_count(); x++)
-            analyze(args[x], a);
-        return a.rewritePlans.find(i)->second;
-        */
-        UNIMPLEMENTED;
+        assert(i->argument_count() == 2);
+        RewritePlan **childr_rp = new RewritePlan*[2];
+        Item ** const args = i->arguments();
+
+        const std::string why = "nullif";
+        reason r0;
+        childr_rp[0] = gather(args[0], r0, a);
+
+        reason r1;
+        childr_rp[1] = gather(args[1], r1, a);
+
+        const EncSet child_es =
+            EQ_EncSet.intersect(childr_rp[0]->es_out)
+                     .intersect(childr_rp[1]->es_out);
+
+        // HACK.
+        const EncSet out_es = EncSet(child_es.chooseOne());
+
+        tr = reason(out_es, why, i);
+        tr.add_child(r0);
+        tr.add_child(r1);
+
+        return new RewritePlanOneOLK(out_es, child_es.chooseOne(),
+                                     childr_rp, tr);
     }
-    virtual Item * do_optimize_type(Item_func_nullif *i, Analysis & a) const
+
+    virtual Item * do_optimize_type(Item_func_nullif *i, Analysis & a)
+        const
     {
         return do_optimize_type_self_and_args(i, a);
     }
+    virtual Item * do_rewrite_type(Item_func_nullif *i,
+                                   const OLK & constr,
+                                   const RewritePlan * rp, Analysis & a)
+        const
+    {
+        rewrite_args_FN(i, constr, (const RewritePlanOneOLK *)rp, a);
+        return i;
+    }
+
 } ANON;
 
 
