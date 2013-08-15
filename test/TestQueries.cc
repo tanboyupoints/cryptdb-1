@@ -40,17 +40,12 @@ static QueryList Insert = QueryList("SingleInsert",
       Query("SELECT * FROM test_insert", false),
       Query("INSERT INTO test_insert (age, address, salary, name) VALUES (26, 'test address', 30, 'test name')", false),
       Query("SELECT * FROM test_insert", false),
-
-      // Query Fail
-      //Query("INSERT INTO test_insert (age, address, salary, name) VALUES (27, 'test address2', 31, 'test name')", false),
-
+      Query("INSERT INTO test_insert (age, address, salary, name) VALUES (27, 'test address2', 31, 'test name')", false),
       // Query Fail
       //Query("select last_insert_id()", false),
 
       // This one crashes DBMS! DBMS recovery: ./mysql_upgrade -u root -pletmein 
       //Query("INSERT INTO test_insert (id) VALUES (7)", false),
-      
-      // Query Fail
       //Query("select sum(id) from test_insert", false),
       Query("INSERT INTO test_insert (age) VALUES (40)", false),
       Query("SELECT age FROM test_insert", false),
@@ -76,6 +71,8 @@ static QueryList Select = QueryList("SingleSelect",
       Query("INSERT INTO test_select VALUES (3, 8, 0, 'London', 'Lucy')", false),
       Query("INSERT INTO test_select VALUES (4, 10, 0, 'London', 'Edmund')", false),
       Query("INSERT INTO test_select VALUES (5, 30, 100000, '221B Baker Street', 'Sherlock Holmes')", false),
+      Query("SELECT * FROM test_select WHERE id IN (1, 2, 10, 20, 30)", false),
+      Query("SELECT * FROM test_select WHERE id BETWEEN 3 AND 5", false),
       Query("SELECT * FROM test_select", false),
       Query("SELECT max(id) FROM test_select", false),
       Query("SELECT max(salary) FROM test_select", false),
@@ -149,22 +146,20 @@ static QueryList Join = QueryList("SingleJoin",
       Query("SELECT test_join1.id, test_join2.id, age, books, test_join2.name FROM test_join1, test_join2 WHERE test_join1.id = test_join2.id", false),
       Query("SELECT test_join1.name, age, salary, test_join2.name, books FROM test_join1, test_join2 WHERE test_join1.age=test_join2.books", false),
       //we don't support things that join unecrypted columns to encrypted columns
-      //Query("SELECT * FROM test_join1, test_join2 WHERE test_join1.name=test_join2.name", false),
+      // Query("SELECT * FROM test_join1, test_join2 WHERE test_join1.name=test_join2.name", false),
       Query("SELECT * FROM test_join1, test_join2 WHERE test_join1.address=test_join2.name", false),
             //TODO: new parser still has issues with AS type things
-      //Query("SELECT address FROM test_join1 AS a, test_join2 WHERE a.id=test_join2.id", false),
+      // Query("SELECT address FROM test_join1 AS a, test_join2 WHERE a.id=test_join2.id", false),
             //TODO: new parser throws an error for the implicit AS
-      //Query("SELECT a.id, b.id, age, books, b.name FROM test_join1 a, test_join2 AS b WHERE a.id=b.id", false),
-      //Query("SELECT test_join1.name, age, salary, b.name, books FROM test_join1, test_join2 b WHERE test_join1.age = b.books", false),
+      // Query("SELECT a.id, b.id, age, books, b.name FROM test_join1 a, test_join2 AS b WHERE a.id=b.id", false),
+      // Query("SELECT test_join1.name, age, salary, b.name, books FROM test_join1, test_join2 b WHERE test_join1.age = b.books", false),
             },
-
-    // Added "IF NOT EXISTS" otherwise breaks
-    { "DROP TABLE IF EXISTS test_join1",
-     "DROP TABLE  IF EXISTS test_join2" },
-    { "DROP TABLE  IF EXISTS test_join1",
-     "DROP TABLE  IF EXISTS test_join2" },
-    { "DROP TABLE  IF EXISTS test_join1",
-     "DROP TABLE  IF EXISTS test_join2" } );
+    { "DROP TABLE test_join1",
+      "DROP TABLE test_join2" },
+    { "DROP TABLE test_join1",
+      "DROP TABLE test_join2" },
+    { "DROP TABLE test_join1",
+      "DROP TABLE test_join2" } );
 
 //migrated from TestSinglePrinc TestUpdate
 static QueryList Update = QueryList("SingleUpdate",
@@ -204,15 +199,13 @@ static QueryList Update = QueryList("SingleUpdate",
       Query("SELECT * FROM test_update", false),
       Query("SELECT age FROM test_update WHERE age > 20", false),
       Query("SELECT id FROM test_update", false),
-            //TODO: new parser can't deal with aggrgegates
-      //Query("SELECT sum(age) FROM test_update", false),
+      Query("SELECT sum(age) FROM test_update", false),
       Query("UPDATE test_update SET age=20 WHERE name='Elizabeth Darcy'", false),
       Query("SELECT * FROM test_update WHERE age > 20", false),
-            //TODO: new parser can't deal with aggrgegates
-      //Query("SELECT sum(age) FROM test_update", false),
-      //Query("UPDATE test_update SET age = age + 2", false),
+      Query("SELECT sum(age) FROM test_update", false),
+      // Query("UPDATE test_update SET age = age + 2", false),
       Query("SELECT age FROM test_update", false),
-      //Query("UPDATE test_update SET id = id + 10, salary = salary + 19, name = 'xxx', address = 'foo' WHERE address = 'London'", false),
+      // Query("UPDATE test_update SET id = id + 10, salary = salary + 19, name = 'xxx', address = 'foo' WHERE address = 'London'", false),
       Query("SELECT * FROM test_update", false),
       Query("SELECT * FROM test_update WHERE address < 'fml'", false),
       Query("UPDATE test_update SET address = 'Neverland' WHERE id=1", false),
@@ -1150,18 +1143,18 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 298/314
+    //      TOTAL RESULT: 303/319
     // ###############################
 
     std::vector<Score> scores;
 
-    // Pass 40/42
+    // Pass 42/44
     scores.push_back(CheckQueryList(tc, Select));
 
     // Pass 24/24
     scores.push_back(CheckQueryList(tc, HOM));
 
-    // Pass 19/19
+    // Pass 20/20
     scores.push_back(CheckQueryList(tc, Insert));
 
     // Pass 23/23
@@ -1170,7 +1163,7 @@ RunTest(const TestConfig &tc) {
     // Pass 21/21
     scores.push_back(CheckQueryList(tc, Basic));
 
-    // Pass 30/31
+    // Pass 32/33
     scores.push_back(CheckQueryList(tc, Update));
 
     // Pass 28/28
