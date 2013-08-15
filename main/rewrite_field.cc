@@ -99,8 +99,14 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     do_rewrite_insert_type(Item_field *i, Analysis & a,
                            std::vector<Item *> &l, FieldMeta *fm) const
     {
-        assert(NULL == fm);
-        fm = a.getFieldMeta(i->table_name, i->field_name);
+        FieldMeta * const local_fm =
+            a.getFieldMeta(i->table_name, i->field_name);
+        if (fm) {
+            // FIXME: Compares pointers.
+            assert(fm == local_fm);
+        } else {
+            fm = local_fm;
+        }
 
         Item_field * new_field = NULL;
         for (auto it : fm->orderedOnionMetas()) {

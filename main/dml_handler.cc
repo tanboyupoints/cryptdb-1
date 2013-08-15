@@ -35,6 +35,17 @@ class InsertHandler : public DMLHandler {
     virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps) const
     {
         process_select_lex(lex, a);
+
+        // ON DUPLICATE KEY UPDATE
+        auto item_it = List_iterator<Item>(lex->update_list);
+        for (;;) {
+            Item *item = item_it++;
+            if (!item) {
+                break;
+            }
+
+            analyze(item, a);
+        }
     }
 
     virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
@@ -93,8 +104,11 @@ class InsertHandler : public DMLHandler {
                 auto fmVecIt = fmVec.begin();
                 for (;;) {
                     Item *i = it0++;
-                    if (!i)
+                    if (!i) {
+                        assert(fmVec.end() == fmVecIt);
                         break;
+                    }
+                    assert(fmVec.end() != fmVecIt);
                     std::vector<Item *> l;
                     // Prevent the dereferencing of a bad iterator if
                     // the user supplies more values than fields and the
@@ -115,6 +129,59 @@ class InsertHandler : public DMLHandler {
                 newList.push_back(newList0);
             }
             new_lex->many_values = newList;
+        }
+
+        // -----------------------
+        // ON DUPLICATE KEY UPDATE
+        // -----------------------
+        // fields
+        std::vector<FieldMeta *> update_fms;
+        {
+            auto it = List_iterator<Item>(lex->update_list);
+            List<Item> new_list;
+            for (;;) {
+                Item *item = it++;
+                if (!item) {
+                    break;
+                }
+                assert(item->type() == Item::FIELD_ITEM);
+                Item_field *ifd = static_cast<Item_field *>(item);
+                update_fms.push_back(a.getFieldMeta(ifd->table_name,
+                                                    ifd->field_name));
+                std::vector<Item *> l;
+                itemTypes.do_rewrite_insert(item, a, l, NULL);
+                for (auto it = l.begin(); it != l.end(); ++it) {
+                    new_list.push_back(*it);
+                }
+            }
+            new_lex->update_list = new_list;
+        }
+
+        // values
+        {
+            auto it = List_iterator<Item>(lex->value_list);
+            List<Item> new_list;
+            auto update_fm_it = update_fms.begin();
+            for (;;) {
+                Item *item = it++;
+                if (!item) {
+                    assert(update_fms.end() == update_fm_it);
+                    break;
+                }
+                assert(update_fms.end() != update_fm_it);
+                std::vector<Item *> l;
+                // if (item->type() == Item::FIELD_ITEM) {
+                    // itemTypes.do_rewrite_insert(item, a, l, NULL);
+                // } else {
+                    itemTypes.do_rewrite_insert(item, a, l,
+                                                *update_fm_it);
+                // }
+                for (auto it = l.begin(); it != l.end(); ++it) {
+                    new_list.push_back(*it);
+                }
+                ++update_fm_it;
+            }
+            new_lex->value_list = new_list;
         }
 
         return new_lex;
