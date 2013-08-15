@@ -77,9 +77,8 @@ static QueryList Select = QueryList("SingleSelect",
       Query("INSERT INTO test_select VALUES (4, 10, 0, 'London', 'Edmund')", false),
       Query("INSERT INTO test_select VALUES (5, 30, 100000, '221B Baker Street', 'Sherlock Holmes')", false),
       Query("SELECT * FROM test_select", false),
-            //TODO: aborts on new parser
-      //Query("SELECT max(id) FROM test_select", false),
-      //Query("SELECT max(salary) FROM test_select", false),
+      Query("SELECT max(id) FROM test_select", false),
+      Query("SELECT max(salary) FROM test_select", false),
       Query("SELECT COUNT(*) FROM test_select", false),
       Query("SELECT COUNT(DISTINCT age) FROM test_select", false),
       Query("SELECT COUNT(DISTINCT(address)) FROM test_select", false),
@@ -100,18 +99,15 @@ static QueryList Select = QueryList("SingleSelect",
       Query("SELECT * FROM test_select ORDER BY salary", false),
       Query("SELECT * FROM test_select ORDER BY name", false),
       Query("SELECT * FROM test_select ORDER BY address", false),
-            //TODO: problems on new parser
-      //Query("SELECT sum(age) FROM test_select GROUP BY address ORDER BY address", false),
-      //Query("SELECT salary, max(id) FROM test_select GROUP BY salary ORDER BY salary", false),
+      Query("SELECT sum(age) FROM test_select GROUP BY address ORDER BY address", false),
+      Query("SELECT salary, max(id) FROM test_select GROUP BY salary ORDER BY salary", false),
       Query("SELECT * FROM test_select GROUP BY age ORDER BY age", false),
       Query("SELECT * FROM test_select ORDER BY age ASC", false),
       Query("SELECT * FROM test_select ORDER BY address DESC", false),
-            //TODO: aborts on new parser
-      //Query("SELECT sum(age) as z FROM test_select", false),
-      //Query("SELECT sum(age) z FROM test_select", false),
-      //Query("SELECT min(t.id) a FROM test_select AS t", false),
-            //TODO: aborts on new parser for non-AS aliasing
-      //Query("SELECT t.address AS b FROM test_select t", false)
+      Query("SELECT sum(age) as z FROM test_select", false),
+      Query("SELECT sum(age) z FROM test_select", false),
+      Query("SELECT min(t.id) a FROM test_select AS t", false),
+      Query("SELECT t.address AS b FROM test_select t", false)
       },
     { "DROP TABLE test_select" },
     { "DROP TABLE test_select" },
@@ -1154,12 +1150,12 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 291/306
+    //      TOTAL RESULT: 298/314
     // ###############################
 
     std::vector<Score> scores;
 
-    // Pass 33/34
+    // Pass 40/42
     scores.push_back(CheckQueryList(tc, Select));
 
     // Pass 24/24
