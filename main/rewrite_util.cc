@@ -423,3 +423,20 @@ encrypt_item_layers(Item * i, onion o, OnionMeta * const om,
     return enc;
 }
 
+std::string
+rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q)
+{
+    Rewriter r;
+    SchemaInfo *out_schema;
+    QueryRewrite qr = r.rewrite(ps, q, &out_schema);
+    assert(false == qr.output->stalesSchema());
+    assert(false == qr.output->queryAgain());
+    
+    std::list<std::string> out_queryz;
+    if (!qr.output->getQuery(&out_queryz)) {
+        throw CryptDBError("Failed to retrieve query!");
+    }
+    assert(out_queryz.size() == 1);
+
+    return out_queryz.back();
+}

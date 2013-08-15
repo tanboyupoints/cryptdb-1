@@ -72,12 +72,32 @@ ItemToString(Item * i) {
     assert(i);
     String s;
     String *s0 = i->val_str(&s);
-    std::string ret;
+    AssignOnce<std::string> ret;
     if (NULL == s0) {
         assert(i->is_null());
         ret = std::string("NULL");
     } else {
         ret = string(s0->ptr(), s0->length());
     }
-    return ret;
+    return ret.get();
+}
+
+string
+ItemToStringWithQuotes(Item * i) {
+    assert(i);
+    String s;
+    String *s0 = i->val_str(&s);
+    AssignOnce<std::string> ret;
+    if (NULL == s0) {
+        assert(i->is_null());
+        ret = std::string("NULL");
+    } else {
+        const std::string out = std::string(s0->ptr(), s0->length());
+        if (i->type() == Item::Type::STRING_ITEM) {
+            ret = "\"" + out + "\"";
+        } else {
+            ret = out;
+        }
+    }
+    return ret.get();
 }

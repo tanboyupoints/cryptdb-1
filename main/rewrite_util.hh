@@ -65,6 +65,9 @@ Item *
 encrypt_item_layers(Item * i, onion o, OnionMeta * const om,
                     const Analysis &a, uint64_t IV = 0);
 
+std::string
+rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q);
+
 // FIXME(burrows): Generalize to support any container with next AND end
 // semantics.
 template <typename T>

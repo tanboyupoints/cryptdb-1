@@ -60,7 +60,6 @@ encrypt_item_all_onions(Item * i, FieldMeta * fm,
                         uint64_t IV, std::vector<Item*> & l,
                         Analysis &a)
 {
-
     for (auto it : fm->orderedOnionMetas()) {
         const onion o = it.first->getValue();
         OnionMeta * const om = it.second;

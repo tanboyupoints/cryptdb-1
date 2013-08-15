@@ -1097,12 +1097,12 @@ executeQuery(ProxyState &ps, const std::string &q)
         assert(qr.output->beforeQuery(ps.conn, ps.e_conn));
 
         // Execute query.
-        DBResult *dbres = NULL;
         std::list<std::string> out_queryz;
         if (!qr.output->getQuery(&out_queryz)) {
             throw CryptDBError("Failed to retrieve query!");
         }
     
+        DBResult *dbres = NULL;
         for (auto it : out_queryz) {
             prettyPrintQuery(it);
             

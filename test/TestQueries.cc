@@ -208,9 +208,9 @@ static QueryList Update = QueryList("SingleUpdate",
       Query("UPDATE test_update SET age=20 WHERE name='Elizabeth Darcy'", false),
       Query("SELECT * FROM test_update WHERE age > 20", false),
       Query("SELECT sum(age) FROM test_update", false),
-      // Query("UPDATE test_update SET age = age + 2", false),
+      Query("UPDATE test_update SET age = age + 2", false),
       Query("SELECT age FROM test_update", false),
-      // Query("UPDATE test_update SET id = id + 10, salary = salary + 19, name = 'xxx', address = 'foo' WHERE address = 'London'", false),
+      Query("UPDATE test_update SET id = id + 10, salary = salary + 19, name = 'xxx', address = 'foo' WHERE address = 'London'", false),
       Query("SELECT * FROM test_update", false),
       Query("SELECT * FROM test_update WHERE address < 'fml'", false),
       Query("UPDATE test_update SET address = 'Neverland' WHERE id=1", false),
@@ -236,13 +236,9 @@ static QueryList HOM = QueryList("HOMAdd",
       Query("INSERT INTO test_HOM VALUES (8, 25, 100, 'The Heath', 'Eustacia Vye')", false),
       
       Query("SELECT * FROM test_HOM", false),
-      
-      // Query Fail
-      //Query("UPDATE test_HOM SET age = age + 1", false),
+      Query("UPDATE test_HOM SET age = age + 1", false),
       Query("SELECT * FROM test_HOM", false),
-
-      // Query Fail
-      //Query("UPDATE test_HOM SET age = age + 3 WHERE id=1", false),
+      Query("UPDATE test_HOM SET age = age + 3 WHERE id=1", false),
       Query("SELECT * FROM test_HOM", false),
 
       Query("UPDATE test_HOM SET age = 100 WHERE id = 1", false),
@@ -1148,7 +1144,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 308/324
+    //      TOTAL RESULT: 312/328
     // ###############################
 
     std::vector<Score> scores;
@@ -1156,7 +1152,7 @@ RunTest(const TestConfig &tc) {
     // Pass 47/49
     scores.push_back(CheckQueryList(tc, Select));
 
-    // Pass 24/24
+    // Pass 26/26
     scores.push_back(CheckQueryList(tc, HOM));
 
     // Pass 20/20
@@ -1168,7 +1164,7 @@ RunTest(const TestConfig &tc) {
     // Pass 21/21
     scores.push_back(CheckQueryList(tc, Basic));
 
-    // Pass 32/33
+    // Pass 34/35
     scores.push_back(CheckQueryList(tc, Update));
 
     // Pass 28/28

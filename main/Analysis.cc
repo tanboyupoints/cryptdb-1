@@ -538,7 +538,9 @@ bool SpecialUpdate::beforeQuery(Connect *conn, Connect *e_conn)
     }
 
     const auto itemJoin = [](std::vector<Item*> row) {
-        return "(" + vector_join<Item*>(row, ",", ItemToString) + ")";
+        return "(" +
+               vector_join<Item*>(row, ",", ItemToStringWithQuotes) +
+               ")";
     };
     const std::string values_string =
         vector_join<std::vector<Item*>>(select_res_type->rows, ",",
@@ -563,35 +565,10 @@ bool SpecialUpdate::beforeQuery(Connect *conn, Connect *e_conn)
     std::ostringstream select_results_stream;
     select_results_stream << " SELECT * FROM " << this->plain_table << ";";
     assert(e_conn->execute(select_results_stream.str(), dbres));
-
-    // FIXME(burrows): Use general join.
-    ScopedMySQLRes r(dbres->n);
-    MYSQL_ROW row;
-    std::string output_rows = " ";
-    const unsigned long field_count = r.res()->field_count;
-    while ((row = mysql_fetch_row(r.res()))) {
-        unsigned long *l = mysql_fetch_lengths(r.res());
-        assert(l != NULL);
-
-        output_rows.append(" ( ");
-        for (unsigned long field_index = 0; field_index < field_count;
-             ++field_index) {
-            std::string field_data;
-            if (row[field_index]) {
-                field_data =
-                    std::string(row[field_index], l[field_index]);
-            } else {    // Handle NULL values.
-                field_data = std::string("NULL");
-            }
-            output_rows.append(field_data);
-            if (field_index + 1 < field_count) {
-                output_rows.append(", ");
-            }
-        }
-        output_rows.append(" ) ,");
-    }
-    this->output_values = output_rows.substr(0, output_rows.length() - 1);
-
+    ResType * const interim_res = new ResType(dbres->unpack());
+    this->output_values = 
+        vector_join<std::vector<Item*>>(interim_res->rows, ",",
+                                        itemJoin);
     // Cleanup the embedded database.
     std::ostringstream cleanup_stream;
     cleanup_stream << "DELETE FROM " << this->plain_table << ";";
@@ -611,14 +588,19 @@ bool SpecialUpdate::getQuery(std::list<std::string> *queryz) const
     std::ostringstream delete_stream;
     delete_stream << " DELETE FROM " << this->plain_table
                   << " WHERE " << this->where_clause << ";";
-    queryz->push_back(delete_stream.str());
+    const std::string re_delete =
+        rewriteAndGetSingleQuery(ps, delete_stream.str());
+    queryz->push_back(re_delete);
 
     // > Add each row from the embedded database to the data database.
     std::ostringstream push_results_stream;
     push_results_stream << " INSERT INTO " << this->plain_table
                         << " VALUES " << this->output_values.get()
                         << ";";
-    queryz->push_back(push_results_stream.str());
+    const std::string re_push =
+        rewriteAndGetSingleQuery(ps, push_results_stream.str());
+    queryz->push_back(re_push);
+
     queryz->push_back("COMMIT; ");
 
     return true;
