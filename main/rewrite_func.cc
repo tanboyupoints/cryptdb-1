@@ -189,7 +189,8 @@ static class ANON : public CItemSubtypeFT<Item_func_not, Item_func::Functype::NO
 
 template<Item_func::Functype FT, class IT>
 class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
-    virtual RewritePlan * do_gather_type(Item_func *i, reason &tr, Analysis & a) const
+    virtual RewritePlan * do_gather_type(Item_func *i, reason &tr,
+                                         Analysis & a) const
     {
         LOG(cdb_v) << "CItemCompare (L1139) do_gather func " << *i;
 
@@ -1177,10 +1178,23 @@ static CItemDateNow<str_utc_timestamp> ANON;
 extern const char str_sysdate[] = "sysdate";
 static CItemDateNow<str_sysdate> ANON;
 
+// FIXME: What does Item_char_typecast do?
+// FIXME: Use encryption/rewriting.
 static class ANON: public CItemSubtypeFT<Item_char_typecast, Item_func::Functype::CHAR_TYPECAST_FUNC> {
-    virtual RewritePlan * do_gather_type(Item_char_typecast *i, reason &tr, Analysis & a) const {
-        thrower() << "what does Item_char_typecast do?";
-        UNIMPLEMENTED;
+    virtual RewritePlan * do_gather_type(Item_char_typecast *i,
+                                         reason &tr, Analysis & a) const
+    {
+        const std::string why = "char_typecast";
+        return allPlainIterateGather(i, why, tr, a);
+    }
+
+    virtual Item * do_rewrite_type(Item_char_typecast *i,
+                                   const OLK & constr,
+                                   const RewritePlan * rp, Analysis & a)
+        const
+    {
+        rewrite_args_FN(i, constr, (const RewritePlanOneOLK *)rp, a);
+        return i;
     }
 } ANON;
 
