@@ -114,8 +114,8 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
 }
 
 static RewritePlan *
-iterate_gather(Item_func *i, const EncSet &out_es, EncSet child_es,
-               const std::string &why, reason &tr, Analysis &a)
+iterateGather(Item_func *i, const EncSet &out_es, EncSet child_es,
+              const std::string &why, reason &tr, Analysis &a)
 {
     tr = reason(out_es, why, i);
     
@@ -133,6 +133,16 @@ iterate_gather(Item_func *i, const EncSet &out_es, EncSet child_es,
                                  child_es.chooseOne(),
                                  childr_rp, tr);
 
+}
+
+static RewritePlan *
+allPlainIterateGather(Item_func *i,  const std::string &why,
+                      reason &tr, Analysis &a)
+{
+    const EncSet out_es = PLAIN_EncSet;
+    const EncSet child_es = PLAIN_EncSet;
+
+    return iterateGather(i, out_es, child_es, why, tr, a);
 }
 
 static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NEG_FUNC> {
@@ -529,19 +539,28 @@ static class ANON : public CItemSubtypeFT<Item_extract, Item_func::Functype::EXT
     }
 } ANON;
 
+// FIXME: Use encryption/rewriting.
 template<const char *NAME>
 class CItemDateExtractFunc : public CItemSubtypeFN<Item_int_func, NAME> {
-    virtual RewritePlan * do_gather_type(Item_int_func *i, reason &tr, Analysis & a) const {
-        /*Item **args = i->arguments();
-        for (uint x = 0; x < i->argument_count(); x++) {
-            // assuming we separately store different date components
-            analyze(args[x], tr, a);
-        }
-        return tr.encset;*/
-        UNIMPLEMENTED;
+    virtual RewritePlan * do_gather_type(Item_int_func *i, reason &tr,
+                                         Analysis & a) const
+    {
+        const std::string why = "date extract";
+
+        return allPlainIterateGather(i, why, tr, a);
     }
-    virtual Item * do_optimize_type(Item_int_func *i, Analysis & a) const {
+
+    virtual Item * do_optimize_type(Item_int_func *i, Analysis & a) const
+    {
         return do_optimize_type_self_and_args(i, a);
+    }
+
+    virtual Item * do_rewrite_type(Item_int_func *i, const OLK & constr,
+                                   const RewritePlan * rp, Analysis & a)
+        const
+    {
+        rewrite_args_FN(i, constr, (const RewritePlanOneOLK *)rp, a);
+        return i;
     }
 };
 
@@ -701,7 +720,7 @@ static class ANON : public CItemSubtypeFT<Item_func_in, Item_func::Functype::IN_
         const EncSet child_es = EQ_EncSet; 
         const std::string why = "in";
         
-        return iterate_gather(i, out_es, child_es, why, tr, a);
+        return iterateGather(i, out_es, child_es, why, tr, a);
     }
 
     virtual Item * do_optimize_type(Item_func_in *i, Analysis & a) const
@@ -726,7 +745,7 @@ static class ANON : public CItemSubtypeFT<Item_func_in, Item_func::Functype::BET
         const EncSet child_es = ORD_EncSet; 
         const std::string why = "between";
 
-        return iterate_gather(i, out_es, child_es, why, tr, a);
+        return iterateGather(i, out_es, child_es, why, tr, a);
     }
     virtual Item * do_optimize_type(Item_func_in *i, Analysis & a) const
     {
@@ -1018,11 +1037,8 @@ class CItemStrconv : public CItemSubtypeFN<Item_str_conv, NAME> {
     virtual RewritePlan * do_gather_type(Item_str_conv *i, reason & tr,
                                          Analysis & a) const
     {
-        const EncSet out_es = PLAIN_EncSet;
-        const EncSet child_es = PLAIN_EncSet;
         const std::string why = "strconv";
-
-        return iterate_gather(i, out_es, child_es, why, tr, a);
+        return allPlainIterateGather(i, why, tr, a);
     }
 
     virtual Item * do_optimize_type(Item_str_conv *i, Analysis & a) const
@@ -1094,29 +1110,50 @@ extern const char str_unix_timestamp[] = "unix_timestamp";
 static CItemDateExtractFunc<str_unix_timestamp> ANON;
 
 extern const char str_date_add_interval[] = "date_add_interval";
+// Use encryption/rewriting.
 static class ANON : public CItemSubtypeFN<Item_date_add_interval, str_date_add_interval> {
     virtual RewritePlan * do_gather_type(Item_date_add_interval *i,
                                          reason &tr, Analysis & a) const
     {
-	/* Item **args = i->arguments();
-        for (uint x = 0; x < i->argument_count(); x++) {
-            // XXX perhaps too conservative
-            analyze(args[x], reason(EMPTY_EncSet, "date_add", i, &tr), a);
-        }
-        return tr.encset;
-        */
-        UNIMPLEMENTED;
+        const EncSet out_es = PLAIN_EncSet;
+        const EncSet child_es = PLAIN_EncSet;
+        const std::string why = "date extract";
+
+        return allPlainIterateGather(i, why, tr, a);
     }
-    virtual Item * do_optimize_type(Item_date_add_interval *i, Analysis & a) const
+
+    virtual Item * do_optimize_type(Item_date_add_interval *i,
+                                    Analysis & a) const
     {
         return do_optimize_type_self_and_args(i, a);
     }
+
+    virtual Item * do_rewrite_type(Item_date_add_interval *i,
+                                   const OLK & constr,
+                                   const RewritePlan * rp, Analysis & a)
+        const
+    {
+        rewrite_args_FN(i, constr, (const RewritePlanOneOLK *)rp, a);
+        return i;
+    }
 } ANON;
 
+// FIXME: Use encryption/rewriting.
 template<const char *NAME>
 class CItemDateNow : public CItemSubtypeFN<Item_func_now, NAME> {
-    virtual RewritePlan * do_gather_type(Item_func_now *i, reason &tr, Analysis & a) const {
-        UNIMPLEMENTED;
+    virtual RewritePlan * do_gather_type(Item_func_now *i, reason &tr,
+                                         Analysis & a) const
+    {
+        const std::string why = "now";
+        return allPlainIterateGather(i, why, tr, a);
+    }
+
+    virtual Item * do_rewrite_type(Item_func_now *i, const OLK & constr,
+                                   const RewritePlan * rp, Analysis & a)
+        const
+    {
+        rewrite_args_FN(i, constr, (const RewritePlanOneOLK *)rp, a);
+        return i;
     }
 };
 
