@@ -303,10 +303,7 @@ static QueryList Delete = QueryList("SingleDelete",
 //migrated from TestSearch
 static QueryList Search = QueryList("SingleSearch",
     { "CREATE TABLE test_search (id integer, searchable text)", "" },
-    { "CREATE TABLE test_search (id integer, searchable text)",
-
-
-      "" },
+    { "CREATE TABLE test_search (id integer, searchable text)", "" },
 
       // Query Fail
       //"CRYPTDB test_search.seachable ENC" },
@@ -402,10 +399,10 @@ static QueryList PrivMessages = QueryList("MultiPrivMessages",
     { 
     
     // Query Fail
-    //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_mess (username, psswd) VALUES ('alice', 'secretalice')", false),
+    // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_mess (username, psswd) VALUES ('alice', 'secretalice')", false),
 
-        // Query Fail
-    //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_mess (username, psswd) VALUES ('bob', 'secretbob')", false),
+    // Query Fail
+    // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_mess (username, psswd) VALUES ('bob', 'secretbob')", false),
       Query("INSERT INTO u_mess VALUES (1, 'alice')", false),
       Query("INSERT INTO u_mess VALUES (2, 'bob')", false),
       Query("INSERT INTO privmsg (msgid, recid, senderid) VALUES (9, 1, 2)", false),
@@ -454,12 +451,12 @@ static QueryList UserGroupForum = QueryList("UserGroupForum",
       "CREATE TABLE forum (forumid integer, forumtext text)",
       "CRYPTDB forum.forumtext ENCFOR forum.forumid fid det" },
     { 
-        // Query Fail
-        //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice', 'secretalice')", false),
-        //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')", false),
-      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('chris', 'secretchris')", false),
+      // Query Fail
+      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice', 'secretalice')", false),
+      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')", false),
+      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('chris', 'secretchris')", false),
 
-      //Alice, Bob, Chris all logged on
+      // Alice, Bob, Chris all logged on
 
       Query("INSERT INTO u VALUES (1, 'alice')", false),
       Query("INSERT INTO u VALUES (2, 'bob')", false),
@@ -482,134 +479,134 @@ static QueryList UserGroupForum = QueryList("UserGroupForum",
       Query("INSERT INTO forum VALUES (1, 'success-- you can see forum text')", false),
       
       // Query Fail
-      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'", false),
-      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'", false),
-      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='chris'", false),
+      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'", false),
+      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'", false),
+      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='chris'", false),
 
-      //All users logged off at this point
+      // All users logged off at this point
 
-      //alice
+      // alice
       
       // Query Fail
-      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice', 'secretalice')", false),
-      //only Alice logged in and she should see forum 1
+      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice', 'secretalice')", false),
+      // only Alice logged in and she should see forum 1
       Query("SELECT forumtext FROM forum WHERE forumid=1", false),
       
       // Query Fail
-      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'", false),
+      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'", false),
 
 
-      //bob
+      // bob
 
       // Query Fail
-      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')", false),
-      //only Bob logged in and he should not see forum 1
+      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')", false),
+      // only Bob logged in and he should not see forum 1
       Query("SELECT forumtext FROM forum WHERE forumid=1",true),
       
       // Query Fail
-      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'", false),
+      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'", false),
 
 
-      //chris
+      // chris
       
       // Query Fail
-      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('chris', 'secretchris')",false),
+      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('chris', 'secretchris')",false),
 
-      //only Chris logged in and he should see forum 1
+      // only Chris logged in and he should see forum 1
       Query("SELECT forumtext FROM forum WHERE forumid=1",false),
-      //change forum text while Chris logged in
+      // change forum text while Chris logged in
       Query("UPDATE forum SET forumtext='you win!' WHERE forumid=1",false),
       Query("SELECT forumtext FROM forum WHERE forumid=1",false),
       
       // Query Fail
-      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='chris'",false),
+      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='chris'",false),
 
 
-      //alice
+      // alice
 
       // Query Fail
-      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice','secretalice')",false),
+      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice','secretalice')",false),
 
-      //only Alice logged in and she should see new text in forum 1
+      // only Alice logged in and she should see new text in forum 1
       Query("SELECT forumtext FROM forum WHERE forumid=1",false),
-      //create an orphaned forum
+      // create an orphaned forum
       Query("INSERT INTO forum VALUES (2, 'orphaned text! everyone should be able to see me')",false),
-      //only Alice logged in and she should see text in orphaned forum 2
+      // only Alice logged in and she should see text in orphaned forum 2
       Query("SELECT forumtext FROM forum WHERE forumid=2",false),
       
       // Query Fail
-      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'",false),
+      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'",false),
 
 
-      //bob
+      // bob
 
       // Query Fail
-      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')",false),
-      //only Bob logged in and he should see text in orphaned forum 2
+      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')",false),
+      // only Bob logged in and he should see text in orphaned forum 2
       Query("SELECT forumtext FROM forum WHERE forumid=2",false),
       
       // Query Fail
-      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'",false),
+      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'",false),
 
 
-      //chris
+      // chris
       
       // Query Fail
-      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('chris','secretchris')",false),
+      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('chris','secretchris')",false),
       
-      //only Chris logged in and he should see text in orphaned forum 2
+      // only Chris logged in and he should see text in orphaned forum 2
       Query("SELECT forumtext FROM forum WHERE forumid=2",false),
-      //de-orphanize forum 2 -- now only accessible by group 2
+      // de-orphanize forum 2 -- now only accessible by group 2
       Query("INSERT INTO groupforum VALUES (2,2,20)",false),
-      //only Chris logged in and he should see text in both forum 1 and forum 2
+      // only Chris logged in and he should see text in both forum 1 and forum 2
       Query("SELECT forumtext FROM forum AS f, groupforum AS g, usergroup AS ug, u WHERE f.forumid=g.forumid AND g.groupid=ug.groupid AND ug.userid=u.userid AND u.username='chris' AND g.optionid=20",false),
       
       // Query Fail
-      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='chris'",false),
+      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='chris'",false),
 
 
-      //bob
+      // bob
 
       // Query Fail
-      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob','secretbob')",false),
+      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob','secretbob')",false),
 
-      //only Bob logged in and he should see text in forum 2
+      // only Bob logged in and he should see text in forum 2
       Query("SELECT forumtext FROM forum AS f, groupforum AS g, usergroup AS ug, u WHERE f.forumid=g.forumid AND g.groupid=ug.groupid AND ug.userid=u.userid AND u.username='bob' AND g.optionid=20",false),
       
       // Query Fail
-      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'",false),
+      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'",false),
 
 
-      //alice
+      // alice
 
       // Query Fail
-      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice','secretalice')",false),
+      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice','secretalice')",false),
 
-      //only Alice logged in and she should see text in forum 1
+      // only Alice logged in and she should see text in forum 1
       Query("SELECT forumtext FROM forum AS f, groupforum AS g, usergroup AS ug, u WHERE f.forumid=g.forumid AND g.groupid=ug.groupid AND ug.userid=u.userid AND u.username='alice' AND g.optionid=20",false),
       
       // Query Fail
-      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'",false),
+      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'",false),
 
-      //all logged out at this point
+      // all logged out at this point
 
-      //give group 2 access to forum 1 with the wrong access IDs -- since the forum will be inaccessible to group 2, doesn't matter that no one is logged in
+      // give group 2 access to forum 1 with the wrong access IDs -- since the forum will be inaccessible to group 2, doesn't matter that no one is logged in
       Query("INSERT INTO groupforum VALUES (1,2,2)", false),
       Query("INSERT INTO groupforum VALUES (1,2,0)", false),
-      //attempt to gice group 2 actual access to the forum -- should fail, because no one is logged in
+      // attempt to gice group 2 actual access to the forum -- should fail, because no one is logged in
       Query("INSERT INTO groupforum VALUES (1,2,20)", true),
 
 
-      //bob
+      // bob
 
       // Query Fail
-      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')",false),
-      //only Bob logged in and he should still not have access to forum 1
+      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')",false),
+      // only Bob logged in and he should still not have access to forum 1
       Query("SELECT forumtext FROM forum WHERE forumid=1",true)
       
     },
       // Query Fail
-      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'",false)},
+      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'",false)},
     { "DROP TABLE u",
       "DROP TABLE usergroup",
       "DROP TABLE groupforum",
