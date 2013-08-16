@@ -299,7 +299,7 @@ operator<<(std::ostream &out, Create_field &f)
     case MYSQL_TYPE_BLOB:
     case MYSQL_TYPE_MEDIUM_BLOB:
     case MYSQL_TYPE_LONG_BLOB:
-	break;
+        break;
     case MYSQL_TYPE_ENUM:
     case MYSQL_TYPE_SET:
         if (f.charset) {
@@ -333,6 +333,7 @@ operator<<(std::ostream &out, Create_field &f)
     }
 
     // primary key
+    /*
     if (f.flags & PRI_KEY_FLAG) {
         out << " primary key";
     } else if (f.flags & UNIQUE_FLAG) { // unique
@@ -340,6 +341,7 @@ operator<<(std::ostream &out, Create_field &f)
     } else if (f.flags & UNIQUE_KEY_FLAG) { // unique key
         out << " unique key";
     }
+    */
 
     // ignore comments
 
