@@ -549,14 +549,8 @@ needsSalt(OLK olk) {
 }
 
 static void
-process_table_list(List<TABLE_LIST> *tll, Analysis & a)
+process_table_aliases(List<TABLE_LIST> *tll, Analysis & a)
 {
-    /*
-     * later, need to rewrite different joins, e.g.
-     * SELECT g2_ChildEntity.g_id, IF(ai0.g_id IS NULL, 1, 0) AS albumsFirst, g2_Item.g_originationTimestamp FROM g2_ChildEntity LEFT JOIN g2_AlbumItem AS ai0 ON g2_ChildEntity.g_id = ai0.g_id INNER JOIN g2_Item ON g2_ChildEntity.g_id = g2_Item.g_id INNER JOIN g2_AccessSubscriberMap ON g2_ChildEntity.g_id = g2_AccessSubscriberMap.g_itemId ...
-     */
-
-    // Gather aliases first.
     List_iterator<TABLE_LIST> join_it(*tll);
     for (;;) {
         TABLE_LIST *t = join_it++;
@@ -566,10 +560,18 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
         if (t->is_alias) {
             assert(a.addAlias(t->alias, t->table_name));
         }
-    }
 
-    // Now gather on table.
-    join_it = *tll;
+        if (t->nested_join) {
+            process_table_aliases(&t->nested_join->join_list, a);
+            return;
+        }
+    }
+}
+
+static void
+process_table_joins_and_derived(List<TABLE_LIST> *tll, Analysis & a)
+{
+    List_iterator<TABLE_LIST> join_it(*tll);
     for (;;) {
         TABLE_LIST *t = join_it++;
         if (!t) {
@@ -577,7 +579,7 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
         }
 
         if (t->nested_join) {
-            process_table_list(&t->nested_join->join_list, a);
+            process_table_joins_and_derived(&t->nested_join->join_list, a);
             return;
         }
 
@@ -598,6 +600,18 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
             process_select_lex(u->first_select(), a);
         }
     }
+}
+
+static void
+process_table_list(List<TABLE_LIST> *tll, Analysis & a)
+{
+    /*
+     * later, need to rewrite different joins, e.g.
+     * SELECT g2_ChildEntity.g_id, IF(ai0.g_id IS NULL, 1, 0) AS albumsFirst, g2_Item.g_originationTimestamp FROM g2_ChildEntity LEFT JOIN g2_AlbumItem AS ai0 ON g2_ChildEntity.g_id = ai0.g_id INNER JOIN g2_Item ON g2_ChildEntity.g_id = g2_Item.g_id INNER JOIN g2_AccessSubscriberMap ON g2_ChildEntity.g_id = g2_AccessSubscriberMap.g_itemId ...
+     */
+
+    process_table_aliases(tll, a);
+    process_table_joins_and_derived(tll, a);
 }
 
 bool invalidates(FieldMeta * fm, const EncSet & es)
