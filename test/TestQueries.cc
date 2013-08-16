@@ -1144,12 +1144,12 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 312/328
+    //      TOTAL RESULT: 315/328
     // ###############################
 
     std::vector<Score> scores;
 
-    // Pass 47/49
+    // Pass 48/49
     scores.push_back(CheckQueryList(tc, Select));
 
     // Pass 26/26
@@ -1170,7 +1170,7 @@ RunTest(const TestConfig &tc) {
     // Pass 28/28
     scores.push_back(CheckQueryList(tc, Delete));
 
-    // Pass 8/16
+    // Pass 10/16
     scores.push_back(CheckQueryList(tc, Search));
 
     // Pass 20/22

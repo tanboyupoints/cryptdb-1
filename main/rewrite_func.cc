@@ -607,9 +607,12 @@ static CItemBitfunc<str_bit_and> ANON;
 
 static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::LIKE_FUNC> {
     virtual RewritePlan * do_gather_type(Item_func_like *i, reason &tr,
-                                         Analysis & a) const {
+                                         Analysis & a) const
+    {
+        assert(i->argument_count() == 2);
+        const std::string why = "char_typecast";
+        return allPlainIterateGather(i, why, tr, a);
 
-        assert_s(false, "LIKE needs to be adapted to new RewritePlans");
 	/*
 	LOG(cdb_v) << "Item_func do_gather_type " << *i;
 
@@ -654,8 +657,8 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
 
 
 	*/
-	return NULL;
     }
+
     virtual Item * do_optimize_type(Item_func_like *i, Analysis & a) const {
         return do_optimize_type_self_and_args(i, a);
     }
@@ -663,6 +666,8 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
                                    const RewritePlan *rp,
                                    Analysis & a) const
     {
+        rewrite_args_FN(i, constr, (const RewritePlanOneOLK *)rp, a);
+        return i;
 /*	LOG(cdb_v) << "Item_func_like do_rewrite_type " << *i;
 
 	assert_s(i->argument_count() == 2, "expecting LIKE to have two arguements");
@@ -710,8 +715,6 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
 	// we cannot support non-constant search patterns
 	assert_s(false, "we cannot support search patterns not of the form (field like constant string)");
 */
-        assert_s(false, "LIKE needs to be updated to new RewritePlan interface");
-        return NULL;
     }
 } ANON;
 

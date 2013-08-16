@@ -416,7 +416,7 @@ RND_str::newCreateField(Create_field * cf, std::string anonname) {
 
 Item *
 RND_str::encrypt(Item * ptext, uint64_t IV) {
-    std::string enc =
+    const std::string enc =
         encrypt_AES_CBC(ItemToString(ptext), enckey,
                         BytesFromInt(IV, SALT_LEN_BYTES), false);
     
@@ -430,7 +430,7 @@ RND_str::encrypt(Item * ptext, uint64_t IV) {
 
 Item *
 RND_str::decrypt(Item * ctext, uint64_t IV) {
-    std::string dec =
+    const std::string dec =
         decrypt_AES_CBC(ItemToString(ctext), deckey,
                         BytesFromInt(IV, SALT_LEN_BYTES), false);
     LOG(encl) << "RND_str decrypt " << ItemToString(ctext) << " IV "
@@ -867,23 +867,25 @@ DET_str::newCreateField(Create_field * cf, std::string anonname) {
 
 Item *
 DET_str::encrypt(Item * ptext, uint64_t IV) {
-    std::string plain = ItemToString(ptext);
-    std::string enc = encrypt_AES_CMC(plain,enckey, true);
+    const std::string plain = ItemToString(ptext);
+    const std::string enc = encrypt_AES_CMC(plain, enckey, true);
     LOG(encl) << " DET_str encrypt " << plain  << " IV " << IV << " ---> "
               << " enc len " << enc.length() << " enc " << enc;
 
-    return new Item_string(make_thd_string(enc), enc.length(), &my_charset_bin);
+    return new Item_string(make_thd_string(enc), enc.length(),
+                           &my_charset_bin);
 }
 
 Item *
 DET_str::decrypt(Item * ctext, uint64_t IV) {
-    std::string enc = ItemToString(ctext);
-    std::string dec = decrypt_AES_CMC(enc, deckey, true);
+    const std::string enc = ItemToString(ctext);
+    const std::string dec = decrypt_AES_CMC(enc, deckey, true);
     LOG(encl) << " DET_str decrypt enc len " << enc.length()
               << " enc " << enc << " IV " << IV << " ---> "
               << " dec len " << dec.length() << " dec " << dec;
 
-    return new Item_string(make_thd_string(dec), dec.length(), &my_charset_bin);
+    return new Item_string(make_thd_string(dec), dec.length(),
+                           &my_charset_bin);
 }
 
 static udf_func u_decDETStr = {
@@ -1244,9 +1246,11 @@ OPE_dec::encrypt(Item * ptext, uint64_t IV) {
 
 Item *
 OPE_dec::decrypt(Item *ctext, uint64_t IV) {
-    Item_int * res_int = static_cast<Item_int*>(OPE_int::decrypt(ctext, IV));
+    Item_int * res_int =
+        static_cast<Item_int*>(OPE_int::decrypt(ctext, IV));
 
-    Item_decimal * res = new Item_decimal(res_int->value*1.0/shift, decimals, decimals);
+    Item_decimal * res =
+        new Item_decimal(res_int->value*1.0/shift, decimals, decimals);
 
     delete res_int;
 
@@ -1387,8 +1391,10 @@ ZZToItemInt(const ZZ & val) {
 
 static Item *
 ZZToItemStr(const ZZ & val) {
-    std::string str = StringFromZZ(val);
-    Item * newit = new Item_string(make_thd_string(str), str.length(), &my_charset_bin);
+    const std::string str = StringFromZZ(val);
+    Item * newit =
+        new Item_string(make_thd_string(str), str.length(),
+                        &my_charset_bin);
     newit->name = NULL; //no alias
 
     return newit;
@@ -1396,7 +1402,7 @@ ZZToItemStr(const ZZ & val) {
 
 static ZZ
 ItemStrToZZ(Item* i) {
-    std::string res = ItemToString(i);
+    const std::string res = ItemToString(i);
     return ZZFromString(res);
 }
 
@@ -1428,7 +1434,8 @@ ItemDecToZZ(Item * ptext, const ZZ & shift, uint decimals) {
     String s;
     static_cast<Item_decimal*>(ptext)->val_str(&s);
 
-    std::string ss(s.ptr(), s.length()); // ss is a number : - xxxx.yyyy
+    const std::string ss(s.ptr(), s.length()); // ss is a number
+                                               // : - xxxx.yyyy
 
     std::string ss_int = ss.substr(0, ss.find('.')); // integer part
     if (ss_int == "") ss_int = "0";
@@ -1455,7 +1462,7 @@ ZZToItemDec(const ZZ & val, const ZZ & shift) {
     ZZ val_int = val / shift;
     ZZ val_dec = val % shift;
 
-    std::string num =
+    const std::string num =
         DecStringFromZZ(val_int) + "." + DecStringFromZZ(val_dec);
     
     return new Item_decimal(num.data(), num.length(), &my_charset_numeric);
@@ -1605,7 +1612,7 @@ static std::string
 encryptSWP(const std::string & key, const std::list<std::string> & words)
 {
     auto l = SWP::encrypt(key, words);
-    std::string r = assembleWords(l);
+    const std::string r = assembleWords(l);
     delete l;
     return r;
 }
@@ -1635,7 +1642,7 @@ tokenize(std::string text)
             it++) {
         if ((it->length() >= 3) &&
                 (search_tokens.find(*it) == search_tokens.end())) {
-            std::string token = toLowerCase(*it);
+            const std::string token = toLowerCase(*it);
             search_tokens.insert(token);
             res->push_back(token);
         }
@@ -1656,10 +1663,10 @@ newmem(const std::string & a) {
 
 Item *
 Search::encrypt(Item * ptext, uint64_t IV) {
-    std::string plainstr = ItemToString(ptext);
+    const std::string plainstr = ItemToString(ptext);
     //TODO: remove string, string serves this purpose now..
     std::list<std::string> * tokens = tokenize(plainstr);
-    std::string ciph = encryptSWP(key, *tokens);
+    const std::string ciph = encryptSWP(key, *tokens);
 
     LOG(encl) << "SEARCH encrypt " << plainstr << " --> " << ciph;
 
