@@ -9,9 +9,9 @@
 template<class T>
 std::string stringify_ptr(T * x) {
     if (x == NULL ) {
-	return "NULL";
+        return "NULL";
     } else {
-	return x->stringify();
+        return x->stringify();
     }
 }
 
@@ -163,29 +163,29 @@ sql_type_to_string(enum_field_types tpe, CHARSET_INFO *charset)
     case MYSQL_TYPE_YEAR        : return "YEAR";
     case MYSQL_TYPE_NEWDATE     : ASSERT_NOT_REACHED();
     case MYSQL_TYPE_VARCHAR     :
-	if (charset == &my_charset_bin) {
-	    return "VARBINARY";
-	} else {
-	    return "VARCHAR";
-	}
+        if (charset == &my_charset_bin) {
+            return "VARBINARY";
+        } else {
+            return "VARCHAR";
+        }
     case MYSQL_TYPE_BIT         : return "BIT";
     case MYSQL_TYPE_NEWDECIMAL  : return "DECIMAL";
     case MYSQL_TYPE_ENUM        : return "ENUM";
     case MYSQL_TYPE_SET         : return "SET";
     case MYSQL_TYPE_TINY_BLOB   :
-	if (charset == &my_charset_bin) {
+        if (charset == &my_charset_bin) {
             return "TINYBLOB";
         } else {
             return "TINYTEXT";
         }
     case MYSQL_TYPE_MEDIUM_BLOB :
-	if (charset == &my_charset_bin) {
+        if (charset == &my_charset_bin) {
             return "MEDIUMBLOB";
         } else {
             return "MEDIUMTEXT";
         }
     case MYSQL_TYPE_LONG_BLOB   :
-	if (charset == &my_charset_bin) {
+        if (charset == &my_charset_bin) {
             return "LONGBLOB";
         } else {
             return "LONGTEXT";
@@ -332,17 +332,6 @@ operator<<(std::ostream &out, Create_field &f)
         out << " auto_increment";
     }
 
-    // primary key
-    /*
-    if (f.flags & PRI_KEY_FLAG) {
-        out << " primary key";
-    } else if (f.flags & UNIQUE_FLAG) { // unique
-        out << " unique";
-    } else if (f.flags & UNIQUE_KEY_FLAG) { // unique key
-        out << " unique key";
-    }
-    */
-
     // ignore comments
 
     // TODO(stephentu): column_format?
@@ -392,9 +381,8 @@ operator<<(std::ostream &out, enum legacy_db_type db_type) {
     case DB_TYPE_MYISAM: {out << "MYISAM"; break;}
     case DB_TYPE_CSV_DB: {out << "CSV"; break;}
     default:
-	assert_s(false,
-		 "stringify does not know how to print db_type "
-		 + strFromVal((uint) db_type));
+        assert_s(false, "stringify does not know how to print db_type "
+                        + strFromVal((uint)db_type));
     }
 
     return out;
@@ -506,16 +494,16 @@ do_create_table(std::ostream &out, LEX &lex)
             out << " " << lex.select_lex;
         }
 
-	if (lex.create_info.db_type) {
-	    out << " ENGINE=" << lex.create_info.db_type->db_type;
-	}
-	if (lex.create_info.table_charset) {
-	    out << " CHARSET=" << *lex.create_info.table_charset;
-	}
-	if (lex.create_info.default_table_charset) {
-	    out << " DEFAULT CHARSET=" << *lex.create_info.default_table_charset;
-	}
-
+        if (lex.create_info.db_type) {
+            out << " ENGINE=" << lex.create_info.db_type->db_type;
+        }
+        if (lex.create_info.table_charset) {
+            out << " CHARSET=" << *lex.create_info.table_charset;
+        }
+        if (lex.create_info.default_table_charset) {
+            out << " DEFAULT CHARSET="
+                << *lex.create_info.default_table_charset;
+        }
     }
 }
 

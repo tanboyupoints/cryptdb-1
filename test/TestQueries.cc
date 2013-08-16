@@ -636,7 +636,8 @@ static QueryList Auto = QueryList("AutoInc",
       Query("SELECT msgtext FROM msgs WHERE msgid=1", false),
       Query("SELECT msgtext FROM msgs WHERE msgid=2", false),
       Query("SELECT msgtext FROM msgs WHERE msgid=3", false),
-      Query("INSERT INTO msgs VALUES (9, 'message for alice from bob')", false)},
+      Query("INSERT INTO msgs VALUES (9, 'message for alice from bob')", false),
+      Query("INSERT INTO msgs VALUES (9, 'whatever') ON DUPLICATE KEY UPDATE msgid = msgid + 10", false)},
     { "DROP TABLE msgs"},
     { "DROP TABLE msgs"},
     { "DROP TABLE msgs"});
@@ -1141,7 +1142,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 315/328
+    //      TOTAL RESULT: 331/344
     // ###############################
 
     std::vector<Score> scores;
@@ -1182,10 +1183,8 @@ RunTest(const TestConfig &tc) {
     // Pass 22/22
     scores.push_back(CheckQueryList(tc, BestEffort));
 
-    /*
-    // Pass x/x
-    CheckQueryList(tc, Auto);
-    */
+    // Pass 16/16
+    scores.push_back(CheckQueryList(tc, Auto));
 
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;
