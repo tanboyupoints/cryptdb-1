@@ -304,8 +304,9 @@ template<typename A, typename B>
 B getAssert(const std::map<A, B> & m, const A & x, const std::string & str = "" ) {
     auto it = m.find(x);
     if (it == m.end()) {
-	std::cerr << "item not present in map " << x << ". " << str << std::endl;
-	assert_s(false, "");
+        std::cerr << "item not present in map " << x << ". " << str
+                  << std::endl;
+        assert_s(false, "");
     }
     return it->second;
 }
@@ -315,10 +316,10 @@ template<typename A, typename B>
 bool contains_get(const std::map<A, B> & m, const A & x, B & y) {
     auto it = m.find(x);
     if (it == m.end()) {
-	return false;
+        return false;
     } else {
-	y = it->second;
-	return true;
+        y = it->second;
+        return true;
     }
 }
 

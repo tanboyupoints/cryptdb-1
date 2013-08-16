@@ -263,8 +263,7 @@ static void
 process_order(Analysis & a, SQL_I_List<ORDER> & lst) {
 
     for (ORDER *o = lst.first; o; o = o->next) {
-        reason r;
-        gather(*o->item, r, a);
+        analyze(*o->item, a);
     }
 }
 
@@ -357,7 +356,7 @@ rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
               const EncSet & constr, const std::string & name) {
     ORDER * prev = NULL;
     for (ORDER *o = lst.first; o; o = o->next) {
-        Item * i = *o->item;
+        Item *i = *o->item;
         RewritePlan * rp = getAssert(a.rewritePlans, i);
         assert(rp);
         EncSet es = constr.intersect(rp->es_out);
@@ -557,26 +556,38 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
      * SELECT g2_ChildEntity.g_id, IF(ai0.g_id IS NULL, 1, 0) AS albumsFirst, g2_Item.g_originationTimestamp FROM g2_ChildEntity LEFT JOIN g2_AlbumItem AS ai0 ON g2_ChildEntity.g_id = ai0.g_id INNER JOIN g2_Item ON g2_ChildEntity.g_id = g2_Item.g_id INNER JOIN g2_AccessSubscriberMap ON g2_ChildEntity.g_id = g2_AccessSubscriberMap.g_itemId ...
      */
 
+    // Gather aliases first.
     List_iterator<TABLE_LIST> join_it(*tll);
     for (;;) {
         TABLE_LIST *t = join_it++;
         if (!t)
             break;
 
+        if (t->is_alias) {
+            assert(a.addAlias(t->alias, t->table_name));
+        }
+    }
+
+    // Now gather on table.
+    join_it = *tll;
+    for (;;) {
+        TABLE_LIST *t = join_it++;
+        if (!t) {
+            break;
+        }
+
         if (t->nested_join) {
             process_table_list(&t->nested_join->join_list, a);
             return;
         }
 
-        if (t->on_expr)
+        if (t->on_expr) {
             analyze(t->on_expr, a);
+        }
 
         //std::string db(t->db, t->db_length);
         //std::string table_name(t->table_name, t->table_name_length);
         //std::string alias(t->alias);
-
-        if (t->is_alias)
-            assert(a.addAlias(t->alias, t->table_name));
 
         // Handles SUBSELECTs in table clause.
         if (t->derived) {

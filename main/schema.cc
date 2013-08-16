@@ -419,7 +419,7 @@ SchemaInfo::getFieldMeta(const std::string &table,
                          const std::string & field) const
 {
     IdentityMetaKey *table_key = new IdentityMetaKey(table);
-    TableMeta * tm = getChild(table_key);
+    TableMeta *tm = getChild(table_key);
     if (NULL == tm) {
         return NULL;
     }
