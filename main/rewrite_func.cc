@@ -504,11 +504,23 @@ static CItemMath<Item_func_log, str_log> ANON;
 // static CItemMath<str_radians> ANON;
 
 
+// FIXME: Use encryption/rewriting.
+// FIXME: Determine if we are dealing with arguments correctly.
 template<const char *NAME>
 class CItemLeafFunc : public CItemSubtypeFN<Item_func, NAME> {
-    virtual RewritePlan * do_gather_type(Item_func *i, reason &tr, Analysis & a) const
+    virtual RewritePlan * do_gather_type(Item_func *i, reason &tr,
+                                         Analysis & a) const
     {
-        UNIMPLEMENTED;
+        const std::string why = "leaf func (" + std::string(NAME) + ")";
+        return allPlainIterateGather(i, why, tr, a);
+    }
+
+    virtual Item * do_rewrite_type(Item_func *i, const OLK & constr,
+                                   const RewritePlan * rp, Analysis & a)
+        const
+    {
+        rewrite_args_FN(i, constr, (const RewritePlanOneOLK *)rp, a);
+        return i;
     }
 };
 
@@ -546,7 +558,6 @@ class CItemDateExtractFunc : public CItemSubtypeFN<Item_int_func, NAME> {
                                          Analysis & a) const
     {
         const std::string why = "date extract";
-
         return allPlainIterateGather(i, why, tr, a);
     }
 
