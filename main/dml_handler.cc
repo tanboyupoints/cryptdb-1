@@ -242,8 +242,10 @@ class SelectHandler : public DMLHandler {
         const
     {
         LEX * new_lex = copy(lex);
-        new_lex->select_lex.top_join_list = rewrite_table_list(lex->select_lex.top_join_list, a);
-        set_select_lex(new_lex, rewrite_select_lex(&new_lex->select_lex, a));
+        new_lex->select_lex.top_join_list =
+            rewrite_table_list(lex->select_lex.top_join_list, a);
+        set_select_lex(new_lex,
+            rewrite_select_lex(&new_lex->select_lex, a));
 
         return new_lex;
     }
@@ -280,8 +282,9 @@ process_filters_lex(st_select_lex * select_lex, Analysis & a) {
         select_lex->where != select_lex->join->conds)
         analyze(select_lex->join->conds, reason(FULL_EncSet, "join->conds", select_lex->join->conds, 0), a);*/
 
-    if (select_lex->having)
+    if (select_lex->having) {
         analyze(select_lex->having, a);
+    }
 
     process_order(a, select_lex->group_list);
     process_order(a, select_lex->order_list);
@@ -351,12 +354,18 @@ analyze_field_value_pair(Item_field * field, Item * val, Analysis & a) {
     // onions because first SET does not matter
 }
 
-static void
+static SQL_I_List<ORDER> *
 rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
               const EncSet & constr, const std::string & name) {
+    SQL_I_List<ORDER> *new_lst = copy(&lst);
     ORDER * prev = NULL;
-    for (ORDER *o = lst.first; o; o = o->next) {
+    for (ORDER *o = lst.first, *out_o = new_lst->first; o;
+         o = o->next, out_o = out_o->next) {
+        assert(out_o);
+
         Item *i = *o->item;
+        int type = (int)i->type();
+        std::cout << type << std::endl;
         RewritePlan * rp = getAssert(a.rewritePlans, i);
         assert(rp);
         EncSet es = constr.intersect(rp->es_out);
@@ -373,12 +382,14 @@ rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
         Item * new_item = itemTypes.do_rewrite(*o->item, olk, rp, a);
         ORDER * neworder = make_order(o, new_item);
         if (prev == NULL) {
-            lst = *oneElemList(neworder);
+            *new_lst = *oneElemList(neworder);
         } else {
             prev->next = neworder;
         }
         prev = neworder;
     }
+
+    return new_lst;
 }
 
 static st_select_lex *
@@ -397,13 +408,15 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
     //rewrite(&select_lex->join->conds, a);
     //}
 
-    if (select_lex->having)
-        new_select_lex->having = rewrite(select_lex->having,
-                                         PLAIN_EncSet, a);
+    if (select_lex->having) {
+        new_select_lex->having =
+            rewrite(select_lex->having, PLAIN_EncSet, a);
+    }
 
-    rewrite_order(a, new_select_lex->group_list, EQ_EncSet, "group by");
-    rewrite_order(a, new_select_lex->order_list, ORD_EncSet, "order by");
-
+    new_select_lex->group_list =
+        *rewrite_order(a, new_select_lex->group_list, EQ_EncSet, "group by");
+    new_select_lex->order_list =
+        *rewrite_order(a, select_lex->order_list, ORD_EncSet, "order by");
     return new_select_lex;
 }
 

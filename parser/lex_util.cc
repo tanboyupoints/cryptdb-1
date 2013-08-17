@@ -6,7 +6,8 @@ using namespace std;
 /* Functions for constructing/copying MySQL structures  */
 
 Item_field *
-make_item(Item_field *t, string field_name)
+make_item(Item_field *t, const std::string &table_name,
+                         const std::string &field_name)
 {
     THD *thd = current_thd;
     assert(thd);
@@ -14,6 +15,31 @@ make_item(Item_field *t, string field_name)
     Item_field *i0 = new Item_field(thd, t);
     // clear out alias
     i0->name = NULL;
+    if (table_name.size() > 0) {
+        i0->table_name = make_thd_string(table_name);
+    }
+    if (field_name.size() > 0) {
+        i0->field_name = make_thd_string(field_name);
+    }
+
+    return i0;
+}
+
+Item_ref *
+make_item(Item_ref *t, const std::string &table_name,
+                       const std::string &field_name)
+{
+    assert(field_name.size() > 0 && table_name.size() > 0);
+
+    THD *thd = current_thd;
+    assert(thd);
+    // bootstrap i0 from t
+    Item_ref *i0 = new Item_ref(thd, t);
+    // clear out alias
+    i0->name = NULL;
+    if (table_name.size() > 0) {
+        i0->table_name = make_thd_string(table_name);
+    }
     if (field_name.size() > 0) {
         i0->field_name = make_thd_string(field_name);
     }
@@ -22,14 +48,16 @@ make_item(Item_field *t, string field_name)
 }
 
 Item_string *
-make_item(Item_string *i) {
-    string s = ItemToString(i);
+make_item(Item_string *i)
+{
+    std::string s = ItemToString(i);
     return new Item_string(make_thd_string(s), s.length(),
                            i->default_charset());
 }
 
 Item_int *
-make_item(Item_int *i) {
+make_item(Item_int *i)
+{
     return new Item_int(i->value);
 }
 
@@ -40,7 +68,8 @@ make_item(Item_null *i)
 }
 
 ORDER *
-make_order(ORDER *old_order, Item *i) {
+make_order(ORDER *old_order, Item *i)
+{
     ORDER * new_order = (ORDER *)malloc(sizeof(ORDER));
     memcpy(new_order, old_order, sizeof(ORDER));
     new_order->next = NULL;
@@ -53,7 +82,8 @@ make_order(ORDER *old_order, Item *i) {
 
 
 void
-set_select_lex(LEX * lex, SELECT_LEX * select_lex) {
+set_select_lex(LEX * lex, SELECT_LEX * select_lex)
+{
     lex->select_lex = *select_lex;
     lex->unit.*rob<st_select_lex_node, st_select_lex_node *,
                    &st_select_lex_node::slave>::ptr() =
@@ -63,7 +93,8 @@ set_select_lex(LEX * lex, SELECT_LEX * select_lex) {
 }
 
 void
-set_where(st_select_lex * sl, Item * where) {
+set_where(st_select_lex * sl, Item * where)
+{
     sl->where = where;
     if (sl->join) {
         sl->join->conds = where;

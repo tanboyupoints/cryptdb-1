@@ -53,6 +53,9 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     do_rewrite_type(Item_field *i, const OLK & constr,
                     const RewritePlan * rp, Analysis & a) const
     {
+        return rewrite_field<Item_field>(i, constr, rp, a);
+
+/*
         LOG(cdb_v) << "do_rewrite_type FIELD_ITEM " << *i;
 
         const FieldMeta * const fm =
@@ -75,6 +78,7 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         res->field_name = make_thd_string(om->getAnonOnionName());
 
         return res;
+*/
     }
 /*
     static OLK
@@ -102,13 +106,14 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     {
         assert(NULL == fm);
         fm = a.getFieldMeta(i->table_name, i->field_name);
+        const std::string anon_table_name =
+            a.getAnonTableName(i->table_name);
 
         Item_field * new_field = NULL;
         for (auto it : fm->orderedOnionMetas()) {
-            std::string name = it.second->getAnonOnionName();
-            new_field = make_item(i, name);
-            new_field->table_name =
-                make_thd_string(a.getAnonTableName(i->table_name));
+            const std::string anon_field_name =
+                it.second->getAnonOnionName();
+            new_field = make_item(i, anon_table_name, anon_field_name);
             l.push_back(new_field);
         }
         if (fm->has_salt) {

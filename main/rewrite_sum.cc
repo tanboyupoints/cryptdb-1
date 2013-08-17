@@ -235,6 +235,21 @@ static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
     virtual RewritePlan * do_gather_type(Item_ref *i, reason &tr,
                                          Analysis & a) const
     {
+        const std::string why = "ref_item";
+        
+        RewritePlan **childr_rp = new RewritePlan*[1];
+        reason r;
+        childr_rp[0] = gather(*i->ref, r, a);
+        
+        const EncSet out_es = EncSet(childr_rp[0]->es_out);
+        const EncSet child_es = childr_rp[0]->es_out;
+ 
+        tr = reason(out_es, why, i);
+        tr.add_child(r);
+
+        return new RewritePlanOneOLK(out_es, child_es.chooseOne(),
+                                     childr_rp, tr);
+
         LOG(cdb_v) << "do_a_t Item_ref reason " << tr;
         /* if (i->ref) {
                 analyze(*i->ref, tr, a);
@@ -245,6 +260,32 @@ static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
             }*/
         UNIMPLEMENTED;
     }
+
+    virtual Item * do_rewrite_type(Item_ref *i, const OLK & constr,
+                                   const RewritePlan * rp,
+                                   Analysis & a) const
+    {
+        // HACK.
+        const std::string plain_table =
+            static_cast<Item_field *>(*i->ref)->table_name;
+        const std::string anon_table =
+            a.getAnonTableName(plain_table);
+
+        const std::string plain_field = i->field_name;
+        OnionMeta * const om =
+            a.getOnionMeta(plain_table, plain_field, constr.o);
+        const std::string anon_field =
+            om->getAnonOnionName();
+
+        Item_ref *out_i = make_item(i, anon_table, anon_field);
+        // out_i->ref = new Item *;
+        // *out_i->ref =
+            // itemTypes.do_rewrite(*i->ref, constr, rp, a);
+
+        return out_i;
+
+        // return rewrite_field<Item_ref>(i, constr, rp, a);
+    }
 } ANON;
 
 static class ANON : public CItemSubtypeIT<Item_null, Item::Type::NULL_ITEM> {
@@ -254,6 +295,7 @@ static class ANON : public CItemSubtypeIT<Item_null, Item::Type::NULL_ITEM> {
         tr = reason(FULL_EncSet, "is a constant", i);
         return new RewritePlan(FULL_EncSet, tr);
     }
+
     virtual Item * do_rewrite_type(Item_null *i,
                                    const OLK & constr,
                                    const RewritePlan * rp,

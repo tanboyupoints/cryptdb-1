@@ -440,3 +440,4 @@ rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q)
 
     return out_queryz.back();
 }
+

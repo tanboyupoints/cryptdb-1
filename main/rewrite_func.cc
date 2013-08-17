@@ -178,11 +178,28 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
 }ANON;
 
 static class ANON : public CItemSubtypeFT<Item_func_not, Item_func::Functype::NOT_FUNC> {
-    virtual RewritePlan * do_gather_type(Item_func_not *i, reason &tr, Analysis & a) const {
-        return gather(i->arguments()[0], tr, a);
+    virtual RewritePlan * do_gather_type(Item_func_not *i, reason &tr,
+                                         Analysis & a) const
+    {
+        // return gather(i->arguments()[0], tr, a);
+        const EncSet out_es = PLAIN_EncSet;
+        const EncSet child_es = EQ_EncSet;
+        const std::string why = "not";
+
+        return iterateGather(i, out_es, child_es, why, tr, a);
     }
-    virtual Item * do_optimize_type(Item_func_not *i, Analysis & a) const {
+
+    virtual Item * do_optimize_type(Item_func_not *i, Analysis & a) const
+    {
         return do_optimize_type_self_and_args(i, a);
+    }
+
+    virtual Item * do_rewrite_type(Item_func_not *i, const OLK & constr,
+                                   const RewritePlan * rp, Analysis & a)
+        const
+    {
+        rewrite_args_FN(i, constr, (const RewritePlanOneOLK *)rp, a);
+        return i;
     }
 } ANON;
 
@@ -610,7 +627,7 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
                                          Analysis & a) const
     {
         assert(i->argument_count() == 2);
-        const std::string why = "char_typecast";
+        const std::string why = "like";
         return allPlainIterateGather(i, why, tr, a);
 
 	/*
@@ -666,7 +683,8 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
                                    const RewritePlan *rp,
                                    Analysis & a) const
     {
-        rewrite_args_FN(i, constr, (const RewritePlanOneOLK *)rp, a);
+        rewrite_args_FN(i, constr,
+                        static_cast<const RewritePlanOneOLK *>(rp), a);
         return i;
 /*	LOG(cdb_v) << "Item_func_like do_rewrite_type " << *i;
 

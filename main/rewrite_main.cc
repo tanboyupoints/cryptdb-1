@@ -373,11 +373,11 @@ buildTypeTextTranslator()
 
     // SecLevels.
     const char *seclevel_chars[] = {"RND", "DET", "DETJOIN", "OPE", "HOM",
-                                    "SEARCH", "PLAINVAL"};
+                                    "SEARCH", "PLAINVAL", "INVALID"};
     SECLEVEL seclevels[] = {SECLEVEL::RND, SECLEVEL::DET,
                             SECLEVEL::DETJOIN, SECLEVEL::OPE,
                             SECLEVEL::HOM, SECLEVEL::SEARCH,
-                            SECLEVEL::PLAINVAL};
+                            SECLEVEL::PLAINVAL, SECLEVEL::INVALID};
     static_assert(arraysize(seclevel_chars) == arraysize(seclevels),
                   "SECLEVEL size mismatch!");
     count = arraysize(seclevel_chars);
