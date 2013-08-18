@@ -50,12 +50,10 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     }
 
     virtual Item *
-    do_rewrite_type(Item_field *i, const OLK & constr,
-                    const RewritePlan * rp, Analysis & a) const
+    do_rewrite_type(Item_field *i, const OLK &constr,
+                    const RewritePlan *rp, Analysis &a)
+        const
     {
-        return rewrite_field<Item_field>(i, constr, rp, a);
-
-/*
         LOG(cdb_v) << "do_rewrite_type FIELD_ITEM " << *i;
 
         const FieldMeta * const fm =
@@ -71,14 +69,16 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
             //need adjustment, throw exception
             throw OnionAdjustExcept(constr.o, fm, constr.l, i);
         }
+    
+        const std::string anon_table_name =
+            a.getAnonTableName(i->table_name);
+        const std::string anon_field_name = om->getAnonOnionName();
 
-        Item_field * const res = make_item(i);
-        res->table_name =
-            make_thd_string(a.getAnonTableName(i->table_name));
-        res->field_name = make_thd_string(om->getAnonOnionName());
+        Item_field * const res =
+            make_item(i, anon_table_name, anon_field_name);
+        a.item_cache[i] = res;
 
         return res;
-*/
     }
 /*
     static OLK

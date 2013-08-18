@@ -91,30 +91,3 @@ std::string vector_join(std::vector<T> v, std::string delim,
     return output;
 }
 
-template <typename Type>
-Item *
-rewrite_field(Type *i, const OLK &constr, const RewritePlan *rp,
-              Analysis &a)
-{
-    const FieldMeta * const fm =
-        a.getFieldMeta(i->table_name, i->field_name);
-    //assert(constr.key == fm);
-
-    //check if we need onion adjustment
-    OnionMeta * const om =
-        a.getOnionMeta(i->table_name, i->field_name, constr.o);
-    const SECLEVEL onion_level = a.getOnionLevel(om);
-    assert(onion_level != SECLEVEL::INVALID);
-    if (constr.l < onion_level) {
-        //need adjustment, throw exception
-        throw OnionAdjustExcept(constr.o, fm, constr.l, i);
-    }
-
-    const std::string anon_table_name = a.getAnonTableName(i->table_name);
-    const std::string anon_field_name = om->getAnonOnionName();
-    Type * const res =
-        make_item(i, anon_table_name, anon_field_name);
-
-    return res;
-}
-

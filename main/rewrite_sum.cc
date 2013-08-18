@@ -277,10 +277,8 @@ static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
         const std::string anon_field =
             om->getAnonOnionName();
 
-        Item_ref *out_i = make_item(i, anon_table, anon_field);
-        // out_i->ref = new Item *;
-        // *out_i->ref =
-            // itemTypes.do_rewrite(*i->ref, constr, rp, a);
+        Item *new_ref = itemTypes.do_rewrite(*i->ref, constr, rp, a);
+        Item_ref *out_i = make_item(i, new_ref, anon_table, anon_field);
 
         return out_i;
 

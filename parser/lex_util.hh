@@ -32,9 +32,11 @@ T * copy(T *x) {
 
 /* Makes a new item based on
  * information from an old item */
-Item_field *make_item(Item_field *t, const std::string &table_name = "",
+Item_field *make_item(Item_field * const t,
+                      const std::string &table_name = "",
                       const std::string &field_name = "");
-Item_ref *make_item(Item_ref *t, const std::string &table_name = "",
+Item_ref *make_item(Item_ref * const t, Item * const new_ref,
+                    const std::string &table_name = "",
                     const std::string &field_name = "");
 Item_string *make_item(Item_string *i);
 Item_int *make_item(Item_int *i);

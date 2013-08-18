@@ -27,7 +27,7 @@ optimize(Item **i, Analysis &a) {
 
 // this function should be called at the root of a tree of items
 // that should be rewritten
-// @context defaults to empty string.
+// @item_cache defaults to NULL
 Item *
 rewrite(Item *i, const EncSet &req_enc, Analysis &a)
 {

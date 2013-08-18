@@ -5,44 +5,52 @@ using namespace std;
 
 /* Functions for constructing/copying MySQL structures  */
 
+static void
+init_new_ident(Item_ident *i, const std::string &table_name = "",
+               const std::string &field_name = "")
+{
+    // clear out alias
+    i->name = NULL;
+
+    if (!table_name.empty()) {
+        i->table_name = make_thd_string(table_name);
+    }
+    if (!field_name.empty()) {
+        i->field_name = make_thd_string(field_name);
+    }
+}
+
 Item_field *
-make_item(Item_field *t, const std::string &table_name,
-                         const std::string &field_name)
+make_item(Item_field * const t, const std::string &table_name,
+          const std::string &field_name)
 {
     THD *thd = current_thd;
     assert(thd);
+
     // bootstrap i0 from t
     Item_field *i0 = new Item_field(thd, t);
-    // clear out alias
-    i0->name = NULL;
-    if (table_name.size() > 0) {
-        i0->table_name = make_thd_string(table_name);
-    }
-    if (field_name.size() > 0) {
-        i0->field_name = make_thd_string(field_name);
-    }
+    init_new_ident(i0, table_name, field_name); 
 
     return i0;
 }
 
 Item_ref *
-make_item(Item_ref *t, const std::string &table_name,
-                       const std::string &field_name)
+make_item(Item_ref * const t, Item * const new_ref,
+          const std::string &table_name,
+          const std::string &field_name)
 {
     assert(field_name.size() > 0 && table_name.size() > 0);
 
     THD *thd = current_thd;
     assert(thd);
+
     // bootstrap i0 from t
     Item_ref *i0 = new Item_ref(thd, t);
-    // clear out alias
-    i0->name = NULL;
-    if (table_name.size() > 0) {
-        i0->table_name = make_thd_string(table_name);
-    }
-    if (field_name.size() > 0) {
-        i0->field_name = make_thd_string(field_name);
-    }
+
+    i0->ref = new Item *;
+    *i0->ref = new_ref;
+
+    init_new_ident(i0, table_name, field_name); 
 
     return i0;
 }
