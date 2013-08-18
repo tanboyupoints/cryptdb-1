@@ -29,11 +29,8 @@ optimize(Item **i, Analysis &a) {
 // that should be rewritten
 // @context defaults to empty string.
 Item *
-rewrite(Item *i, const EncSet &req_enc, Analysis &a, std::string context)
+rewrite(Item *i, const EncSet &req_enc, Analysis &a)
 {
-    if (context.size()) {
-        context = " for " + context;
-    }
     RewritePlan * const rp = getAssert(a.rewritePlans, i);
     assert(rp);
     EncSet solution = rp->es_out.intersect(req_enc);

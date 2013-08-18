@@ -13,8 +13,7 @@ const std::string GREEN_BEGIN = "\033[1;92m";
 const std::string COLOR_END = "\033[0m";
 
 Item *
-rewrite(Item *i, const EncSet &req_enc, Analysis &a,
-        std::string context = "");
+rewrite(Item *i, const EncSet &req_enc, Analysis &a);
 
 TABLE_LIST *
 rewrite_table_list(TABLE_LIST *t, Analysis &a);

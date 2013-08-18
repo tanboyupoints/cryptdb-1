@@ -24,7 +24,8 @@ static inline void
 analyze_field_value_pair(Item_field * field, Item * val, Analysis & a);
 
 static st_select_lex *
-rewrite_filters_lex(st_select_lex * select_lex, Analysis & a);
+rewrite_filters_lex(st_select_lex *select_lex, Analysis &a,
+                    std::map<Item *, Item *> *item_cache);
 
 static bool
 needsSalt(OLK olk);
@@ -193,8 +194,10 @@ class UpdateHandler : public DMLHandler {
             rewrite_table_list(lex->select_lex.top_join_list, a);
 
         // Rewrite filters
+        std::map<Item *, Item *> item_cache; // Unused.
         set_select_lex(new_lex,
-                       rewrite_filters_lex(&new_lex->select_lex, a));
+                       rewrite_filters_lex(&new_lex->select_lex, a,
+                                           &item_cache));
 
         // Rewrite SET values
         assert(lex->select_lex.item_list.head());
@@ -356,7 +359,9 @@ analyze_field_value_pair(Item_field * field, Item * val, Analysis & a) {
 
 static SQL_I_List<ORDER> *
 rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
-              const EncSet & constr, const std::string & name) {
+              const EncSet & constr, const std::string & name,
+              std::map<Item *, Item *> *item_cache)
+{
     SQL_I_List<ORDER> *new_lst = copy(&lst);
     ORDER * prev = NULL;
     for (ORDER *o = lst.first, *out_o = new_lst->first; o;
@@ -380,6 +385,7 @@ rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
         OLK olk = es.chooseOne();
 
         Item * new_item = itemTypes.do_rewrite(*o->item, olk, rp, a);
+        (*item_cache)[*o->item] = new_item;
         ORDER * neworder = make_order(o, new_item);
         if (prev == NULL) {
             *new_lst = *oneElemList(neworder);
@@ -392,10 +398,19 @@ rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
     return new_lst;
 }
 
+// @item_cache is empty by default.
 static st_select_lex *
-rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
-
+rewrite_filters_lex(st_select_lex * select_lex, Analysis & a,
+                    std::map<Item *, Item *> *item_cache)
+{
     st_select_lex * new_select_lex = copy(select_lex);
+
+    new_select_lex->group_list =
+        *rewrite_order(a, select_lex->group_list, EQ_EncSet, "group by",
+                       item_cache);
+    new_select_lex->order_list =
+        *rewrite_order(a, select_lex->order_list, ORD_EncSet, "order by",
+                       item_cache);
 
     if (select_lex->where) {
         set_where(new_select_lex, rewrite(select_lex->where,
@@ -413,10 +428,6 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a) {
             rewrite(select_lex->having, PLAIN_EncSet, a);
     }
 
-    new_select_lex->group_list =
-        *rewrite_order(a, new_select_lex->group_list, EQ_EncSet, "group by");
-    new_select_lex->order_list =
-        *rewrite_order(a, select_lex->order_list, ORD_EncSet, "order by");
     return new_select_lex;
 }
 
@@ -514,11 +525,17 @@ addSaltToReturn(ReturnMeta * rm, int pos) {
 
 static void
 rewrite_proj(Item * i, const RewritePlan * rp, Analysis & a,
-             List<Item> & newList)
+             List<Item> & newList, std::map<Item *, Item *> item_cache)
 {
     OLK olk = rp->es_out.chooseOne();
-    Item *ir = rewrite(i, rp->es_out, a);
-    newList.push_back(ir);
+    const auto cached_rewritten_i = item_cache.find(i);
+    AssignOnce<Item *> ir;
+    if (cached_rewritten_i != item_cache.end()) {
+        ir = cached_rewritten_i->second;
+    } else {
+        ir = rewrite(i, rp->es_out, a);
+    }
+    newList.push_back(ir.get());
     bool use_salt = needsSalt(olk);
 
     // This line implicity handles field aliasing for at least some cases.
@@ -526,16 +543,18 @@ rewrite_proj(Item * i, const RewritePlan * rp, Analysis & a,
     addToReturn(a.rmeta, a.pos++, olk, use_salt, i->name);
 
     if (use_salt) {
-        newList.push_back(make_item((Item_field*) ir,
+        newList.push_back(make_item((Item_field*)ir.get(),
                                     olk.key->getSaltName()));
         addSaltToReturn(a.rmeta, a.pos++);
     }
 }
 
 static st_select_lex *
-rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
+rewrite_select_lex(st_select_lex *select_lex, Analysis &a)
 {
-    st_select_lex * new_select_lex = copy(select_lex);
+    std::map<Item *, Item *> item_cache;
+    st_select_lex *new_select_lex =
+        rewrite_filters_lex(copy(select_lex), a, &item_cache);
 
     LOG(cdb_v) << "rewrite select lex input is " << *select_lex;
     auto item_it = List_iterator<Item>(select_lex->item_list);
@@ -547,13 +566,14 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis & a)
             break;
         LOG(cdb_v) << "rewrite_select_lex " << *item << " with name "
                    << item->name;
-        rewrite_proj(item, getAssert(a.rewritePlans, item), a, newList);
+        rewrite_proj(item, getAssert(a.rewritePlans, item), a, newList,
+                     item_cache);
     }
 
     // TODO(stephentu): investigate whether or not this is a memory leak
     new_select_lex->item_list = newList;
 
-    return rewrite_filters_lex(new_select_lex, a);
+    return new_select_lex;
 }
 
 static bool
