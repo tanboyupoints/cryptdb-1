@@ -124,7 +124,7 @@ class InsertHandler : public DMLHandler {
                     // Prevent the dereferencing of a bad iterator if
                     // the user supplies more values than fields and the
                     // parser fails to throw an error.
-                    // TODO(burrows): It seems like the expected behavior
+                    // TODO: It seems like the expected behavior
                     // is for the parser to catch this bad state, so we
                     // will fail until further notice.
                     assert(fmVecIt != fmVec.end());
@@ -483,9 +483,11 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
             Item_field * const rew_fd =
                 static_cast<Item_field *>(res_items->head());
             assert(rew_fd);
-            res_items->push_back(make_item(rew_fd,
-                                          fm->getSaltName()));
-            res_values->push_back(new Item_int((ulonglong) salt));
+            const std::string anon_table_name = rew_fd->table_name;
+            const std::string anon_field_name = fm->getSaltName();
+            res_items->push_back(make_item(rew_fd, anon_table_name,
+                                           anon_field_name));
+            res_values->push_back(new Item_int((ulonglong)salt));
         }
 
         // Determine if the query invalidates onions.
@@ -541,8 +543,14 @@ rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
     addToReturn(a.rmeta, a.pos++, olk, use_salt, i->name);
 
     if (use_salt) {
-        newList->push_back(make_item((Item_field*)ir.get(),
-                                    olk.key->getSaltName()));
+        const std::string anon_table_name =
+            ((Item_field *)ir.get())->table_name;
+        const std::string anon_field_name = olk.key->getSaltName();
+        Item_field *ir_field =
+            make_item(static_cast<Item_field *>(ir.get()),
+                                                anon_table_name,
+                                                anon_field_name);
+        newList->push_back(ir_field);
         addSaltToReturn(a.rmeta, a.pos++);
     }
 }
