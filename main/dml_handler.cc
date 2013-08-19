@@ -362,8 +362,6 @@ rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
     ORDER * prev = NULL;
     for (ORDER *o = lst.first; o; o = o->next) {
         Item *i = *o->item;
-        int type = (int)i->type();
-        std::cout << type << std::endl;
         RewritePlan * rp = getAssert(a.rewritePlans, i);
         assert(rp);
         EncSet es = constr.intersect(rp->es_out);

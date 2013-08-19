@@ -63,3 +63,15 @@ oneElemList(T * elem) {
 
     return res;
 }
+
+template <typename T>
+List<T> *
+dptrToList(T **es, unsigned int count)
+{
+    List<T> * const out = new List<T>();
+    for (unsigned int i = 0; i < count; ++i) {
+        out->push_back(es[i]);
+    }
+
+    return out;
+}

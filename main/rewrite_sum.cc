@@ -249,16 +249,6 @@ static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
 
         return new RewritePlanOneOLK(out_es, child_es.chooseOne(),
                                      childr_rp, tr);
-
-        LOG(cdb_v) << "do_a_t Item_ref reason " << tr;
-        /* if (i->ref) {
-                analyze(*i->ref, tr, a);
-                return tr.encset;
-            } else {
-                thrower() << "how to resolve Item_ref::ref?";
-                UNIMPLEMENTED;
-            }*/
-        UNIMPLEMENTED;
     }
 
     virtual Item * do_rewrite_type(Item_ref *i, const OLK & constr,
@@ -281,8 +271,6 @@ static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
         Item_ref *out_i = make_item(i, new_ref, anon_table, anon_field);
 
         return out_i;
-
-        // return rewrite_field<Item_ref>(i, constr, rp, a);
     }
 } ANON;
 
