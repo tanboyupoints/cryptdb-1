@@ -37,6 +37,8 @@ typedef std::map<onion, LevelFieldPair> OnionLevelFieldMap;
 class OLK {
 public:
     OLK(onion o, SECLEVEL l, FieldMeta * key) : o(o), l(l), key(key) {}
+    // FIXME: Default constructor required so we can use make_pair.
+    OLK() {;}
     onion o;
     SECLEVEL l;
     FieldMeta * key; // a field meta is a key because each encryption key

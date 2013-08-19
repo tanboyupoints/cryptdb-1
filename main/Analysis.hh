@@ -526,7 +526,7 @@ public:
     std::map<FieldMeta *, salt_type>    salts;
     std::map<Item *, RewritePlan *>     rewritePlans;
     std::map<std::string, std::string>  table_aliases;
-    std::map<Item_field *, Item_field *> item_cache;
+    std::map<Item_field *, std::pair<Item_field *, OLK>> item_cache;
 
     // information for decrypting results
     ReturnMeta * rmeta;

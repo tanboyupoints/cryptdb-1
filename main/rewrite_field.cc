@@ -76,7 +76,7 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
         Item_field * const res =
             make_item(i, anon_table_name, anon_field_name);
-        a.item_cache[i] = res;
+        a.item_cache[i] = std::make_pair(res, constr);
 
         return res;
     }

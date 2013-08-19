@@ -195,7 +195,6 @@ class UpdateHandler : public DMLHandler {
         // Rewrite filters
         set_select_lex(new_lex,
                        rewrite_filters_lex(&new_lex->select_lex, a));
-        
 
         // Rewrite SET values
         assert(lex->select_lex.item_list.head());
@@ -518,35 +517,37 @@ static void
 rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
              List<Item> *newList)
 {
-    OLK olk = rp->es_out.chooseOne();
+    AssignOnce<OLK> olk;
     AssignOnce<Item *> ir;
     if (i->type() == Item::Type::FIELD_ITEM) {
         Item_field *field_i = static_cast<Item_field *>(i);
         const auto cached_rewritten_i = a.item_cache.find(field_i);
         if (cached_rewritten_i != a.item_cache.end()) {
-            ir = cached_rewritten_i->second;
+            ir = cached_rewritten_i->second.first;
+            olk = cached_rewritten_i->second.second;
         } else {
             ir = rewrite(i, rp->es_out, a);
+            olk = rp->es_out.chooseOne();
         }
     } else {
         ir = rewrite(i, rp->es_out, a);
+        olk = rp->es_out.chooseOne();
     }
     assert(ir.assigned() && ir.get());
     newList->push_back(ir.get());
-    bool use_salt = needsSalt(olk);
+    bool use_salt = needsSalt(olk.get());
 
     // This line implicity handles field aliasing for at least some cases.
     // As i->name can/will be the alias.
-    addToReturn(a.rmeta, a.pos++, olk, use_salt, i->name);
+    addToReturn(a.rmeta, a.pos++, olk.get(), use_salt, i->name);
 
     if (use_salt) {
         const std::string anon_table_name =
             ((Item_field *)ir.get())->table_name;
-        const std::string anon_field_name = olk.key->getSaltName();
+        const std::string anon_field_name = olk.get().key->getSaltName();
         Item_field *ir_field =
             make_item(static_cast<Item_field *>(ir.get()),
-                                                anon_table_name,
-                                                anon_field_name);
+                      anon_table_name, anon_field_name);
         newList->push_back(ir_field);
         addSaltToReturn(a.rmeta, a.pos++);
     }
@@ -566,7 +567,7 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis &a)
 
     List<Item> newList;
     for (;;) {
-        Item *item = item_it++;
+        Item * const item = item_it++;
         if (!item)
             break;
         LOG(cdb_v) << "rewrite_select_lex " << *item << " with name "
