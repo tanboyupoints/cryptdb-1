@@ -361,10 +361,7 @@ rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
 {
     SQL_I_List<ORDER> *new_lst = copy(&lst);
     ORDER * prev = NULL;
-    for (ORDER *o = lst.first, *out_o = new_lst->first; o;
-         o = o->next, out_o = out_o->next) {
-        assert(out_o);
-
+    for (ORDER *o = lst.first; o; o = o->next) {
         Item *i = *o->item;
         int type = (int)i->type();
         std::cout << type << std::endl;
@@ -562,7 +559,7 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis &a)
     // it is responsible for filling Analysis::item_cache which
     // rewrite_proj uses.
     st_select_lex *new_select_lex =
-        rewrite_filters_lex(copy(select_lex), a);
+        rewrite_filters_lex(select_lex, a);
 
     LOG(cdb_v) << "rewrite select lex input is " << *select_lex;
     auto item_it = List_iterator<Item>(select_lex->item_list);
