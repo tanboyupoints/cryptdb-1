@@ -437,7 +437,6 @@ decrypt(lua_State *L)
                 throw CryptDBError("Bad key in decrypt!");
             }
 
-            std::cout << res.rows.size() << "\t" << key << std::endl;
             assert(key >= 0 && (uint) key < res.types.size());
             std::string data = xlua_tolstring(L, -1);
             Item * value = make_item_by_type(data, res.types[key]);
