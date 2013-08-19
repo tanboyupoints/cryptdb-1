@@ -1006,16 +1006,16 @@ std::string ReturnMeta::stringify() {
 ResType *
 Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
 {
-    unsigned int rows = dbres.rows.size();
+    const unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
-    unsigned int cols = dbres.names.size();
+    const unsigned int cols = dbres.names.size();
 
-    ResType *res = new ResType();
+    ResType * const res = new ResType();
 
     // un-anonymize the names
     for (auto it = dbres.names.begin();
         it != dbres.names.end(); it++) {
-        unsigned int index = it - dbres.names.begin();
+        const unsigned int index = it - dbres.names.begin();
         const ReturnField &rf = rmeta.rfmeta.at(index);
         if (!rf.getIsSalt()) {
             //need to return this field
@@ -1025,7 +1025,7 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
         }
     }
 
-    unsigned int real_cols = res->names.size();
+    const unsigned int real_cols = res->names.size();
 
     //allocate space in results for decrypted rows
     res->rows = std::vector<std::vector<Item*> >(rows);

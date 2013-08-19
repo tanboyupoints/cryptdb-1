@@ -46,7 +46,7 @@ static int
 returnResultSet(lua_State *L, const ResType &res);
 
 static Item *
-make_item(std::string value, enum_field_types type)
+make_item_by_type(std::string value, enum_field_types type)
 {
     Item * i;
 
@@ -72,6 +72,14 @@ make_item(std::string value, enum_field_types type)
         thrower() << "unknown data type " << type;
     }
     return i;
+}
+
+static Item_null *
+make_null(const std::string &name = "")
+{
+    // FIXME: Memleak.
+    char *n = strdup(name.c_str());
+    return new Item_null(n);
 }
 
 static std::string
@@ -377,7 +385,7 @@ decrypt(lua_State *L)
             delete thd;
         });
 
-    std::string client = xlua_tolstring(L, 1);
+    const std::string client = xlua_tolstring(L, 1);
     if (clients.find(client) == clients.end())
         return 0;
 
@@ -417,14 +425,28 @@ decrypt(lua_State *L)
         std::vector<Item *> row(res.types.size());
 
         lua_pushnil(L);
+        int key, last_key = -1;
         while (lua_next(L, -2)) {
-            int key = luaL_checkint(L, -2) - 1;
+            key = luaL_checkint(L, -2) - 1;
+            const int key_diff = key - last_key;
+            if (key_diff > 1) {
+                for (int k_i = key - 1; k_i > last_key; --k_i) {
+                    row[k_i] = make_null();
+                }
+            } else if (key_diff < 0) {
+                throw CryptDBError("Bad key in decrypt!");
+            }
+
+            std::cout << res.rows.size() << "\t" << key << std::endl;
             assert(key >= 0 && (uint) key < res.types.size());
             std::string data = xlua_tolstring(L, -1);
-            Item * value = make_item(data, res.types[key]);
+            Item * value = make_item_by_type(data, res.types[key]);
             row[key] = value;
+
             lua_pop(L, 1);
+            last_key = key;
         }
+        assert((unsigned int)key == res.names.size() - 1);
 
         res.rows.push_back(row);
         lua_pop(L, 1);
