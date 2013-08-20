@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <stdexcept>
 #include <assert.h>
+#include <memory>
 
 #include <gmp.h>
 
@@ -48,15 +49,6 @@ IsMySQLTypeNumeric(enum_field_types t) {
         case MYSQL_TYPE_LONGLONG:
         case MYSQL_TYPE_INT24:
         case MYSQL_TYPE_NEWDECIMAL:
-
-        // numeric also includes dates for now,
-        // since it makes sense to do +/- on date types
-        case MYSQL_TYPE_TIMESTAMP:
-        case MYSQL_TYPE_DATE:
-        case MYSQL_TYPE_TIME:
-        case MYSQL_TYPE_DATETIME:
-        case MYSQL_TYPE_YEAR:
-        case MYSQL_TYPE_NEWDATE:
             return true;
         default: return false;
     }
@@ -407,8 +399,13 @@ toHex(const std::string  & x) {
 
 
 std::list<std::string>
-split(std::string s, const char * separators) {
-    char* tok = strtok((char *)s.c_str(), separators);
+split(const std::string &s, const char * const separators) {
+    std::unique_ptr<char, void (*)(void *)>
+        cp_s(strdup(s.c_str()), &std::free);
+    if (!cp_s) {
+        throw CryptDBError("insufficient memory!");
+    }
+    char* tok = strtok(cp_s.get(), separators);
     std::list<std::string> parts = std::list<std::string>();
     while (tok != NULL) {
         parts.push_back(std::string(tok));

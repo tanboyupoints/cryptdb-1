@@ -240,6 +240,7 @@ rewrite(lua_State *L)
 
     std::list<std::string> new_queries;
 
+    clients[client]->last_query = query;
     t.lap_ms();
     if (EXECUTE_QUERIES) {
         try {
@@ -259,7 +260,6 @@ rewrite(lua_State *L)
                 assert(qr->output->handleQueryFailure(ps->e_conn));
             }
             
-            clients[client]->last_query = query;
             clients[client]->rmeta = qr->rmeta;
         } catch (CryptDBError &e) {
             LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
@@ -281,7 +281,6 @@ rewrite(lua_State *L)
         index++;
     }
 
-    clients[client]->last_query = query;
     return 1;
 }
 

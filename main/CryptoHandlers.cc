@@ -178,6 +178,11 @@ EncLayerFactory::serializeLayer(EncLayer * el, DBMeta *parent) {
 */
 
 /* ========================= other helpers ==============================*/
+static bool
+stringItem(Item *i)
+{
+    return i->type() == Item::Type::STRING_ITEM;
+}
 
 static
 std::string prng_expand(std::string seed_key, uint key_bytes) {
@@ -201,10 +206,18 @@ type_len_for_AES_str(enum enum_field_types type, int len, bool pad) {
         case MYSQL_TYPE_BLOB:
             break;
         case MYSQL_TYPE_VARCHAR:
+        case MYSQL_TYPE_TIMESTAMP:
+        case MYSQL_TYPE_DATE:
+        case MYSQL_TYPE_NEWDATE:
+        case MYSQL_TYPE_TIME:
+        case MYSQL_TYPE_DATETIME:
+            res_type = MYSQL_TYPE_VARCHAR;
             res_len = rounded_len(len, AES_BLOCK_BYTES, pad);
             break;
         default: {
-             assert_s(false, "unexpected sql_type");
+            const std::string t =
+                TypeText<enum enum_field_types>::toText(type);
+            assert_s(false, "unexpected sql_type" + t);
          }
     }
 
@@ -340,6 +353,7 @@ RND_int::newCreateField(Create_field * cf, std::string anonname) {
 //TODO: may want to do more specialized crypto for lengths
 Item *
 RND_int::encrypt(Item * ptext, uint64_t IV) {
+    assert(!stringItem(ptext));
     //TODO: should have encrypt_SEM work for any length
     uint64_t p = static_cast<Item_int *>(ptext)->value;
     uint64_t c = bf.encrypt(p ^ IV);
@@ -719,6 +733,7 @@ DET_int::newCreateField(Create_field * cf, std::string anonname) {
 Item *
 DET_int::encrypt(Item * ptext, uint64_t IV)
 {
+    assert(!stringItem(ptext));
     ulonglong value = static_cast<Item_int*>(ptext)->value;
 
     longlong ival = static_cast<Item_int*>(ptext)->val_int();
@@ -1274,7 +1289,9 @@ OPE_int::newCreateField(Create_field * cf, std::string anonname) {
 }
 
 Item *
-OPE_int::encrypt(Item * ptext, uint64_t IV) {
+OPE_int::encrypt(Item * ptext, uint64_t IV)
+{
+    assert(!stringItem(ptext));
     ulong pval =  (ulong)static_cast<Item_int *>(ptext)->value;
     ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ(pval)));
     LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV << "--->" << enc;

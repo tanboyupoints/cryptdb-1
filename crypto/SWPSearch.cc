@@ -95,7 +95,7 @@ SWP::encryptSym(const string & key, const string & val, const string & iv)
     unsigned char * newiv = new unsigned char[iv.length()];
     memcpy(newiv, iv.c_str(), iv.length());
 
-    AES_cbc_encrypt((unsigned char *)val2.c_str(), &result[0], newlen, &aes_key,
+    AES_cbc_encrypt((const unsigned char *)val2.c_str(), &result[0], newlen, &aes_key,
                     newiv, AES_ENCRYPT);
 
     return string((char*)&result[0], newlen);

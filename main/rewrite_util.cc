@@ -214,6 +214,11 @@ makeNiceDefault(Create_field *cf)
             const std::string val = ItemToString(cf->def);
             return new Item_int(atoi(val.c_str()));
         }
+        case MYSQL_TYPE_DATE:
+            throw CryptDBError("handle MYSQL_TYPE_DATE");
+        case MYSQL_TYPE_TIME:
+            throw CryptDBError("handle MYSQL_TYPE_TIME");
+        case MYSQL_TYPE_DATETIME:
         case MYSQL_TYPE_VARCHAR:
         case MYSQL_TYPE_VAR_STRING:
         case MYSQL_TYPE_STRING:
@@ -249,9 +254,9 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
 
     // create each onion column
     for (auto oit : fm->orderedOnionMetas()) {
-        onion o = oit.first->getValue();
-        OnionMeta *om = oit.second;
-        Create_field * new_cf =
+        const onion o = oit.first->getValue();
+        OnionMeta * const om = oit.second;
+        Create_field * const new_cf =
             get_create_field(a, f, om, om->getAnonOnionName());
         assert(has_default == static_cast<bool>(new_cf->def));
         if (has_default) {

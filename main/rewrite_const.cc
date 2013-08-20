@@ -66,7 +66,7 @@ encrypt_item_all_onions(Item * i, FieldMeta * fm,
         l.push_back(encrypt_item_layers(i, o, om, a, IV));
     }
 }
- 
+
 template <typename ItemType>
 static void
 typical_rewrite_insert_type(ItemType *i, Analysis &a,
@@ -80,6 +80,9 @@ typical_rewrite_insert_type(ItemType *i, Analysis &a,
         //TODO: need to use table salt in this case
     }
 
+    if (i->type() == Item::Type::INT_ITEM && i->is_datetime()) {
+        ((Item_int *)i)->value = 0;
+    }
     encrypt_item_all_onions(i, fm, salt, l, a);
 
     if (fm->has_salt) {

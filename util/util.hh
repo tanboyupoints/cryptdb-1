@@ -360,7 +360,7 @@ void consolidate(std::list<std::string> & words);
 
 
 std::list<std::string>
-split(std::string s, const char * separators);
+split(const std::string &s, const char * const separators);
 
 
 //returns a std::string representing a value pointed to by it and advances it
