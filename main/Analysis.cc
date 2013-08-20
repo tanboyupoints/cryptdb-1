@@ -149,7 +149,7 @@ EncSet::chooseOne() const
         }
     }
 
-    return OLK::invalidOLK();
+    throw CryptDBError("No OLK to choose!");
 }
 
 bool

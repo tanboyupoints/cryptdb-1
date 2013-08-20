@@ -69,7 +69,7 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
             //need adjustment, throw exception
             throw OnionAdjustExcept(constr.o, fm, constr.l, i);
         }
-    
+
         const std::string anon_table_name =
             a.getAnonTableName(i->table_name);
         const std::string anon_field_name = om->getAnonOnionName();

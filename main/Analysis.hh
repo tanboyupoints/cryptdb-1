@@ -217,8 +217,8 @@ operator<<(std::ostream &out, const reason &r);
 // Other more specific RewritePlan-s inherit from this class
 class RewritePlan {
 public:
-    reason r;
-    EncSet es_out; // encset that this item can output
+    const reason r;
+    const EncSet es_out; // encset that this item can output
 
     RewritePlan(const EncSet &es, reason r) : r(r), es_out(es) {};
 
@@ -231,13 +231,24 @@ public:
 // to know how to rewrite
 class RewritePlanOneOLK: public RewritePlan {
 public:
-    OLK olk;
+    const OLK olk;
     // the following store how to rewrite children
-    RewritePlan ** childr_rp;
+    RewritePlan ** const childr_rp;
 
     RewritePlanOneOLK(const EncSet & es_out, const OLK & olk,
-                      RewritePlan ** childr_rp, reason r)
+                      RewritePlan ** const childr_rp, reason r)
         : RewritePlan(es_out, r), olk(olk), childr_rp(childr_rp) {}
+};
+
+class RewritePlanPerChildOLK : public RewritePlan {
+public:
+    const std::vector<std::pair<RewritePlan *, OLK>> child_olks;
+
+    RewritePlanPerChildOLK(const EncSet &es_out,
+                           std::vector<std::pair<RewritePlan *, OLK>>
+                            child_olks,
+                           reason r)
+        : RewritePlan(es_out, r), child_olks(child_olks) {}
 };
 
 // TODO: Maybe we want a database name argument/member.

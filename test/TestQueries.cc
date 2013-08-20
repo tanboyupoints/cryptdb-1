@@ -109,7 +109,9 @@ static QueryList Select = QueryList("SingleSelect",
       Query("SELECT sum(age) as z FROM test_select", false),
       Query("SELECT sum(age) z FROM test_select", false),
       Query("SELECT min(t.id) a FROM test_select AS t", false),
-      Query("SELECT t.address AS b FROM test_select t", false)
+      Query("SELECT t.address AS b FROM test_select t", false),
+      Query("SELECT * FROM test_select HAVING age", false),
+      Query("SELECT * FROM test_select HAVING age && id", false)
       },
     { "DROP TABLE test_select" },
     { "DROP TABLE test_select" },
@@ -1142,12 +1144,12 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 331/344
+    //      TOTAL RESULT: 333/346
     // ###############################
 
     std::vector<Score> scores;
 
-    // Pass 48/49
+    // Pass 50/51
     scores.push_back(CheckQueryList(tc, Select));
 
     // Pass 26/26
