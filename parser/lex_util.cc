@@ -108,3 +108,12 @@ set_where(st_select_lex * sl, Item * where)
         sl->join->conds = where;
     }
 }
+
+void
+set_having(st_select_lex *sl, Item *having)
+{
+    sl->having = having;
+    if (sl->join) {
+        sl->join->having = having;
+    }
+}

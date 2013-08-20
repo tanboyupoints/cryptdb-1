@@ -412,8 +412,8 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a)
     // HACK: We only care about Analysis::item_cache from HAVING.
     a.item_cache.clear();
     if (select_lex->having) {
-        new_select_lex->having =
-            rewrite(select_lex->having, PLAIN_EncSet, a);
+        set_having(new_select_lex, rewrite(select_lex->having,
+                                   PLAIN_EncSet, a));
     }
 
     return new_select_lex;

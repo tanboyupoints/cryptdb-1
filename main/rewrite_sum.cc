@@ -264,8 +264,7 @@ static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
         const std::string plain_field = i->field_name;
         OnionMeta * const om =
             a.getOnionMeta(plain_table, plain_field, constr.o);
-        const std::string anon_field =
-            om->getAnonOnionName();
+        const std::string anon_field = om->getAnonOnionName();
 
         Item *new_ref = itemTypes.do_rewrite(*i->ref, constr, rp, a);
         Item_ref *out_i = make_item(i, new_ref, anon_table, anon_field);

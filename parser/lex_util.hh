@@ -51,6 +51,9 @@ set_select_lex(LEX * lex, SELECT_LEX * select_lex);
 void
 set_where(st_select_lex * sl, Item * where);
 
+void
+set_having(st_select_lex *sl, Item *having);
+
 
 // Creates a SQL_I_List that contains one element
 template <typename T>
