@@ -49,35 +49,38 @@ serial_pack(SECLEVEL l, const std::string & name,
 
 class EncLayer : public LeafDBMeta {
 public:
-     virtual ~EncLayer() {}
-     EncLayer() : LeafDBMeta() {}
-     EncLayer(unsigned int id) : LeafDBMeta(id) {}
+    virtual ~EncLayer() {}
+    EncLayer() : LeafDBMeta() {}
+    EncLayer(unsigned int id) : LeafDBMeta(id) {}
 
-     std::string typeName() const {return type_name;}
-     static std::string instanceTypeName() {return type_name;}
+    std::string typeName() const {return type_name;}
+    static std::string instanceTypeName() {return type_name;}
 
-     virtual SECLEVEL level() const = 0;
-     virtual std::string name() const = 0;
+    virtual SECLEVEL level() const = 0;
+    virtual std::string name() const = 0;
 
-     // returns a rewritten create field to include in rewritten query
-     virtual Create_field * newCreateField(Create_field * cf,
-                                           std::string anonname = "") = 0;
+    // returns a rewritten create field to include in rewritten query
+    virtual Create_field *
+        newCreateField(Create_field * const cf,
+                       const std::string &anonname = "") = 0;
 
-     virtual Item * encrypt(Item * const ptext, uint64_t IV,
-                            std::function<std::string(const std::string &)>
-                                doEscape) = 0;
-     virtual Item * decrypt(Item * ctext, uint64_t IV) = 0;
+    virtual Item * encrypt(Item * const ptext, uint64_t IV,
+                           std::function<std::string(const std::string &)>
+                            doEscape) = 0;
+    virtual Item * decrypt(Item * const ctext, uint64_t IV) = 0;
 
-     // returns the decryptUDF to remove the onion layer
-     virtual Item * decryptUDF(Item * col, Item * ivcol = NULL) {
-         thrower() << "decryptUDF not supported";
-     }
+    // returns the decryptUDF to remove the onion layer
+    virtual Item * decryptUDF(Item * const col, Item * const ivcol = NULL)
+    {
+        thrower() << "decryptUDF not supported";
+    }
 
-     virtual std::string doSerialize() const = 0;
-     std::string serialize(const DBObject &parent) const {
-         return serial_pack(this->level(), this->name(),
-                            this->doSerialize());
-     }
+    virtual std::string doSerialize() const = 0;
+    std::string serialize(const DBObject &parent) const
+    {
+        return serial_pack(this->level(), this->name(),
+                           this->doSerialize());
+    }
 
 protected:
      friend class EncLayerFactory;
@@ -88,25 +91,26 @@ private:
 
 class HOM : public EncLayer {
 public:
-    HOM(Create_field * cf, std::string seed_key);
+    HOM(Create_field * const cf, const std::string &seed_key);
 
     // serialize and deserialize
     std::string doSerialize() const {return seed_key;}
-    HOM(unsigned int id, const std::string & serial);
+    HOM(unsigned int id, const std::string &serial);
 
     SECLEVEL level() const {return SECLEVEL::HOM;}
     std::string name() const {return "HOM";}
-    Create_field * newCreateField(Create_field * cf, std::string anonname = "");
+    Create_field * newCreateField(Create_field *cf,
+                                  const std::string &anonname = "");
 
     //TODO needs multi encrypt and decrypt
     Item * encrypt(Item * const p, uint64_t IV,
                    std::function<std::string(const std::string &)>
                     doEscape);
-    Item * decrypt(Item * c, uint64_t IV);
+    Item * decrypt(Item * const c, uint64_t IV);
 
     //expr is the expression (e.g. a field) over which to sum
-    Item * sumUDA(Item * expr);
-    Item * sumUDF(Item * i1, Item * i2);
+    Item * sumUDA(Item * const expr);
+    Item * sumUDF(Item * const i1, Item * const i2);
 
 protected:
     std::string seed_key;
@@ -118,24 +122,25 @@ protected:
 
 class Search : public EncLayer {
 public:
-    Search(Create_field * cf, std::string seed_key);
+    Search(Create_field * const cf, const std::string &seed_key);
 
     // serialize and deserialize
     std::string doSerialize() const {return key;}
-    Search(unsigned int id, const std::string & serial);
+    Search(unsigned int id, const std::string &serial);
 
     SECLEVEL level() const {return SECLEVEL::SEARCH;}
     std::string name() const {return "SEARCH";}
-    Create_field * newCreateField(Create_field * cf,
-                                  std::string anonname = "");
+    Create_field * newCreateField(Create_field *cf,
+                                  const std::string &anonname = "");
 
     Item * encrypt(Item * const ptext, uint64_t IV,
                    std::function<std::string(const std::string &)>
                     doEscape);
-    Item * decrypt(Item * ctext, uint64_t IV)__attribute__((noreturn));
+    Item * decrypt(Item * const ctext,
+                   uint64_t IV) __attribute__((noreturn));
 
     //expr is the expression (e.g. a field) over which to sum
-    Item * searchUDF(Item * field, Item * expr);
+    Item * searchUDF(Item * const field, Item * const expr);
 
 private:
     static const uint key_bytes = 16;
@@ -147,12 +152,13 @@ extern const std::vector<udf_func*> udf_list;
 
 class EncLayerFactory {
 public:
-    static EncLayer * encLayer(onion o, SECLEVEL sl, Create_field *cf,
-                               std::string key);
+    static EncLayer * encLayer(onion o, SECLEVEL sl,
+                               Create_field * const cf,
+                               const std::string &key);
 
     // creates EncLayer from its serialization
     static EncLayer * deserializeLayer(unsigned int id,
-                                       const std::string & serial);
+                                       const std::string &serial);
 
     // static std::string serializeLayer(EncLayer * el, DBMeta *parent);
 };
@@ -165,11 +171,11 @@ public:
     SECLEVEL level() const {return SECLEVEL::PLAINVAL;}
     std::string name() const {return "PLAINTEXT";}
 
-    Create_field *newCreateField(Create_field *cf,
-                                 std::string anonname = "")
+    Create_field *newCreateField(Create_field * const cf,
+                                 const std::string &anonname = "")
     {
-        THD *thd = current_thd;
-        Create_field *f0 = cf->clone(thd->mem_root);
+        const THD * const thd = current_thd;
+        Create_field * const f0 = cf->clone(thd->mem_root);
         if (anonname.size() > 0) {
             f0->field_name = make_thd_string(anonname);
         }
@@ -184,9 +190,9 @@ public:
         return ptext;
     }
 
-    Item *decrypt(Item *ctext, uint64_t IV) {return ctext;}
+    Item *decrypt(Item * const ctext, uint64_t IV) {return ctext;}
 
-    Item *decryptUDF(Item *col, Item *ivcol = NULL) {
+    Item *decryptUDF(Item * const col, Item * const ivcol = NULL) {
         return col;
     }
 

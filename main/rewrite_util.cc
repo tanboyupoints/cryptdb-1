@@ -448,7 +448,8 @@ std::string
 escapeString(Connect * const e_conn, const std::string &escape_me)
 {
     const unsigned int escaped_length = escape_me.size() * 2 + 1;
-    std::unique_ptr<char> escaped(new char[escaped_length]);
+    std::unique_ptr<char, void (*)(void *)>
+        escaped(new char[escaped_length], &operator delete []);
     e_conn->real_escape_string(escaped.get(), escape_me.c_str(),
                                escape_me.size());
 
