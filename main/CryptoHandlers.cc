@@ -520,10 +520,9 @@ class DET_int : public EncLayer {
 public:
     DET_int(Create_field * const cf,  const std::string &seed_key);
     
-    std::string doSerialize() const {
-        std::stringstream layerinfo;
-        layerinfo << shift << " " << key;
-        return layerinfo.str();
+    std::string doSerialize() const
+    {
+        return std::to_string(shift) + " " + key;
     }
     // create object from serialized contents
     DET_int(unsigned int id, const std::string &serial);
@@ -858,10 +857,7 @@ DET_dec::DET_dec(Create_field * const cf, const std::string &seed_key)
 std::string
 DET_dec::doSerialize() const
 {
-    std::stringstream layerinfo;
-
-    layerinfo << decimals << " " << DET_int::doSerialize(); 
-    return layerinfo.str();
+    return std::to_string(decimals) + " " + DET_int::doSerialize();
 }
 
 
@@ -1338,11 +1334,7 @@ OPE_dec::OPE_dec(Create_field * const cf, const std::string &seed_key)
 std::string
 OPE_dec::doSerialize() const
 {
-    std::stringstream layerinfo;
-
-    layerinfo << decimals << " " << OPE_int::doSerialize();
-
-    return layerinfo.str();
+    return std::to_string(decimals) + " " + OPE_int::doSerialize();
 }
 
 OPE_dec::OPE_dec(unsigned int id, const std::string &serial)
@@ -1562,11 +1554,7 @@ HOM_dec::HOM_dec(Create_field * const cf, const std::string &seed_key)
 std::string
 HOM_dec::doSerialize() const
 {
-    std::stringstream layerinfo;
-
-    layerinfo << decimals << " " << HOM::doSerialize();
-
-    return layerinfo.str();
+    return std::to_string(decimals) + " " + HOM::doSerialize();
 }
 
 HOM_dec::HOM_dec(unsigned int id, const std::string &serial)
