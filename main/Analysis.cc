@@ -13,20 +13,6 @@
 
 // FIXME: Memory leaks when we allocate MetaKey<...>, use smart pointer.
 
-static std::string
-escapeString(Connect *e_conn, const std::string &escape_me)
-{
-    unsigned int escaped_length = escape_me.size() * 2 + 1;
-    char *escaped = new char[escaped_length];
-    e_conn->real_escape_string(escaped, escape_me.c_str(),
-                               escape_me.size());
-
-    std::string out = std::string(escaped);
-    delete[] escaped;
-
-    return out;
-}
-
 // FIXME: Wrong interfaces.
 EncSet::EncSet(Analysis &a, FieldMeta * fm) {
     // FIXME: Safe to throw exception in constructor?

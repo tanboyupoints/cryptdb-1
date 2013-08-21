@@ -410,10 +410,11 @@ encrypt_item_layers(Item * i, onion o, OnionMeta * const om,
     assert_s(enc_layers.size() > 0, "onion must have at least one layer");
     Item * enc = i;
     Item * prev_enc = NULL;
+    auto stringEscaper = a.getStringEscaper();
     for (auto layer : enc_layers) {
         LOG(encl) << "encrypt layer "
                   << TypeText<SECLEVEL>::toText(layer->level()) << "\n";
-        enc = layer->encrypt(enc, IV);
+        enc = layer->encrypt(enc, IV, stringEscaper);
         //need to free space for all enc
         //except the last one
         if (prev_enc) {
@@ -441,5 +442,18 @@ rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q)
     assert(out_queryz.size() == 1);
 
     return out_queryz.back();
+}
+
+std::string
+escapeString(Connect * const e_conn, const std::string &escape_me)
+{
+    const unsigned int escaped_length = escape_me.size() * 2 + 1;
+    std::unique_ptr<char> escaped(new char[escaped_length]);
+    e_conn->real_escape_string(escaped.get(), escape_me.c_str(),
+                               escape_me.size());
+
+    const std::string out = std::string(escaped.get());
+
+    return out;
 }
 

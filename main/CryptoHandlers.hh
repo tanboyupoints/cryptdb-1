@@ -63,8 +63,10 @@ public:
      virtual Create_field * newCreateField(Create_field * cf,
                                            std::string anonname = "") = 0;
 
-     virtual Item * encrypt(Item * ptext, uint64_t IV = 0) = 0;
-     virtual Item * decrypt(Item * ctext, uint64_t IV = 0) = 0;
+     virtual Item * encrypt(Item * const ptext, uint64_t IV,
+                            std::function<std::string(const std::string &)>
+                                doEscape) = 0;
+     virtual Item * decrypt(Item * ctext, uint64_t IV) = 0;
 
      // returns the decryptUDF to remove the onion layer
      virtual Item * decryptUDF(Item * col, Item * ivcol = NULL) {
@@ -97,8 +99,10 @@ public:
     Create_field * newCreateField(Create_field * cf, std::string anonname = "");
 
     //TODO needs multi encrypt and decrypt
-    Item * encrypt(Item * p, uint64_t IV = 0);
-    Item * decrypt(Item * c, uint64_t IV = 0);
+    Item * encrypt(Item * const p, uint64_t IV,
+                   std::function<std::string(const std::string &)>
+                    doEscape);
+    Item * decrypt(Item * c, uint64_t IV);
 
     //expr is the expression (e.g. a field) over which to sum
     Item * sumUDA(Item * expr);
@@ -125,8 +129,10 @@ public:
     Create_field * newCreateField(Create_field * cf,
                                   std::string anonname = "");
 
-    Item * encrypt(Item * ptext, uint64_t IV = 0);
-    Item * decrypt(Item * ctext, uint64_t IV = 0)__attribute__((noreturn));
+    Item * encrypt(Item * const ptext, uint64_t IV,
+                   std::function<std::string(const std::string &)>
+                    doEscape);
+    Item * decrypt(Item * ctext, uint64_t IV)__attribute__((noreturn));
 
     //expr is the expression (e.g. a field) over which to sum
     Item * searchUDF(Item * field, Item * expr);
@@ -171,8 +177,14 @@ public:
         return f0;
     }
 
-    Item *encrypt(Item *ptext, uint64_t = 0) {return ptext;}
-    Item *decrypt(Item *ctext, uint64_t = 0) {return ctext;}
+    Item *encrypt(Item * const ptext, uint64_t IV,
+                  std::function<std::string(const std::string &)>
+                    doEscape)
+    {
+        return ptext;
+    }
+
+    Item *decrypt(Item *ctext, uint64_t IV) {return ctext;}
 
     Item *decryptUDF(Item *col, Item *ivcol = NULL) {
         return col;

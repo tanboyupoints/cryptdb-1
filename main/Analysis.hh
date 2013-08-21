@@ -528,9 +528,11 @@ bool cleanupDeltaOutputAndQuery(Connect *e_conn,
 
 class Analysis {
 public:
-    Analysis(const SchemaInfo * const schema)
+    Analysis(const SchemaInfo * const schema,
+             std::function<std::string(const std::string &)>
+                doStringEscape)
         : pos(0), rmeta(new ReturnMeta()), special_update(false),
-          schema(schema) {}
+          schema(schema), doStringEscape(doStringEscape) {}
 
     unsigned int pos; // > a counter indicating how many projection
                       // fields have been analyzed so far
@@ -564,6 +566,12 @@ public:
     SECLEVEL getOnionLevel(OnionMeta * const om) const;
     std::vector<EncLayer *> getEncLayers(OnionMeta * const om) const;
     // HACK.
+    std::function<std::string(const std::string &)> getStringEscaper()
+        const
+    {
+        return doStringEscape;
+    }
+    // HACK.
     const SchemaInfo *getSchema() {return schema;}
 
     // TODO: Make private.
@@ -573,6 +581,7 @@ public:
 
 private:
     const SchemaInfo * const schema;
+    const std::function<std::string(const std::string )> doStringEscape;
     std::string unAliasTable(const std::string &table) const;
 };
 
