@@ -38,13 +38,11 @@
  */
 
 static std::string
-serial_pack(SECLEVEL l, const std::string & name,
-            const std::string & layer_info) {
-    std::stringstream ss;
-    ss.clear();
-    ss << layer_info.length() << " " << TypeText<SECLEVEL>::toText(l)
-       << " " << name << " " << layer_info;
-    return ss.str();
+serial_pack(SECLEVEL l, const std::string &name,
+            const std::string &layer_info)
+{
+    return std::to_string(layer_info.length()) + " " + 
+           TypeText<SECLEVEL>::toText(l) + " " + name + " " + layer_info;
 }
 
 class EncLayer : public LeafDBMeta {
@@ -86,7 +84,7 @@ protected:
      friend class EncLayerFactory;
 
 private:
-     constexpr static const char* type_name = "encLayer";
+     constexpr static const char * type_name = "encLayer";
 };
 
 class HOM : public EncLayer {
@@ -99,7 +97,7 @@ public:
 
     SECLEVEL level() const {return SECLEVEL::HOM;}
     std::string name() const {return "HOM";}
-    Create_field * newCreateField(Create_field *cf,
+    Create_field * newCreateField(Create_field * const cf,
                                   const std::string &anonname = "");
 
     //TODO needs multi encrypt and decrypt
@@ -130,7 +128,7 @@ public:
 
     SECLEVEL level() const {return SECLEVEL::SEARCH;}
     std::string name() const {return "SEARCH";}
-    Create_field * newCreateField(Create_field *cf,
+    Create_field * newCreateField(Create_field * const cf,
                                   const std::string &anonname = "");
 
     Item * encrypt(Item * const ptext, uint64_t IV,
@@ -192,11 +190,13 @@ public:
 
     Item *decrypt(Item * const ctext, uint64_t IV) {return ctext;}
 
-    Item *decryptUDF(Item * const col, Item * const ivcol = NULL) {
+    Item *decryptUDF(Item * const col, Item * const ivcol = NULL)
+    {
         return col;
     }
 
-    std::string doSerialize() const {
+    std::string doSerialize() const
+    {
         return std::string("");
     }
 };
