@@ -14,7 +14,7 @@
 class EncSet {
 public:
     EncSet(OnionLevelFieldMap input) : osl(input) {}
-    EncSet(Analysis &a, FieldMeta * fm);
+    EncSet(Analysis &a, FieldMeta * const fm);
     explicit EncSet(const OLK & olk);
 
     /**
@@ -191,7 +191,7 @@ public:
 class reason {
 public:
     reason(const EncSet & es, const std::string &why_t_arg,
-                Item *why_t_item_arg)
+                Item * const why_t_item_arg)
         :  encset(es), why_t(why_t_arg), why_t_item(why_t_item_arg)
     { childr = new std::list<reason>();}
     reason()
@@ -235,7 +235,7 @@ public:
     // the following store how to rewrite children
     RewritePlan ** const childr_rp;
 
-    RewritePlanOneOLK(const EncSet & es_out, const OLK & olk,
+    RewritePlanOneOLK(const EncSet &es_out, const OLK &olk,
                       RewritePlan ** const childr_rp, reason r)
         : RewritePlan(es_out, r), olk(olk), childr_rp(childr_rp) {}
 };
@@ -259,15 +259,15 @@ public:
     std::string user;
     std::string passwd;
 
-    ConnectionInfo(std::string s, std::string u, std::string p,
-                   uint port = 0)
+    ConnectionInfo(const std::string &s, const std::string &u,
+                   const std::string &p, uint port = 0)
         : server(s), port(port), user(u), passwd(p) {};
     ConnectionInfo() : server(""), port(0), user(""), passwd("") {};
 
 } ConnectionInfo;
 
 std::ostream&
-operator<<(std::ostream &out, const RewritePlan * rp);
+operator<<(std::ostream &out, const RewritePlan * const rp);
 
 // state maintained at the proxy
 typedef struct ProxyState {
@@ -285,7 +285,7 @@ typedef struct ProxyState {
     {
         return previous_schema;
     }
-    void setPreviousSchema(SchemaInfo *schema)
+    void setPreviousSchema(SchemaInfo * const schema)
     {
         previous_schema = schema;
     }
@@ -347,9 +347,10 @@ public:
                 const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
-    bool save(Connect *e_conn, unsigned long *delta_output_id);
-    bool apply(Connect *e_conn, TableType table_type);
-    bool destroyRecord(Connect *e_conn);
+    bool save(Connect * const e_conn,
+              unsigned long * const delta_output_id);
+    bool apply(Connect * const e_conn, TableType table_type);
+    bool destroyRecord(Connect * const e_conn);
 };
 
 class ReplaceDelta : public Delta {
@@ -359,9 +360,10 @@ public:
                  const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
-    bool save(Connect *e_conn, unsigned long *delta_output_id);
-    bool apply(Connect *e_conn, TableType table_type);
-    bool destroyRecord(Connect *e_conn);
+    bool save(Connect * const e_conn,
+              unsigned long * const delta_output_id);
+    bool apply(Connect * const e_conn, TableType table_type);
+    bool destroyRecord(Connect * const e_conn);
 };
 
 class DeleteDelta : public Delta {
@@ -371,9 +373,10 @@ public:
                 const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
-    bool save(Connect *e_conn, unsigned long *delta_output_id);
-    bool apply(Connect *e_conn, TableType table_type);
-    bool destroyRecord(Connect *e_conn);
+    bool save(Connect * const e_conn,
+              unsigned long * const delta_output_id);
+    bool apply(Connect * const e_conn, TableType table_type);
+    bool destroyRecord(Connect * const e_conn);
 };
 
 class Rewriter;
@@ -384,15 +387,16 @@ public:
         : original_query(original_query) {}
     virtual ~RewriteOutput() = 0;
 
-    virtual bool beforeQuery(Connect *conn, Connect *e_conn) = 0;
-    virtual bool getQuery(std::list<std::string> *queryz) const = 0;
-    virtual bool handleQueryFailure(Connect *e_conn) const = 0;
-    virtual bool afterQuery(Connect *e_conn) const = 0;
+    virtual bool beforeQuery(Connect * const conn,
+                             Connect * const e_conn) = 0;
+    virtual bool getQuery(std::list<std::string> * const queryz) const = 0;
+    virtual bool handleQueryFailure(Connect * const e_conn) const = 0;
+    virtual bool afterQuery(Connect * const e_conn) const = 0;
     virtual bool queryAgain() const;
     virtual bool doDecryption() const;
     virtual bool stalesSchema() const;
 
-    static ResType *sendQuery(Connect *c, const std::string &q);
+    static ResType *sendQuery(Connect * const c, const std::string &q);
 
 protected:
     const std::string original_query;
@@ -404,10 +408,10 @@ public:
         : RewriteOutput(original_query) {}
     ~SimpleOutput() {;}
 
-    bool beforeQuery(Connect *conn, Connect *e_conn);
-    bool getQuery(std::list<std::string> *queryz) const;
-    bool handleQueryFailure(Connect *e_conn) const;
-    bool afterQuery(Connect *e_conn) const;
+    bool beforeQuery(Connect * const conn, Connect * const e_conn);
+    bool getQuery(std::list<std::string> * const queryz) const;
+    bool handleQueryFailure(Connect * const e_conn) const;
+    bool afterQuery(Connect * const e_conn) const;
     bool doDecryption() const;
 };
 
@@ -418,10 +422,10 @@ public:
         : RewriteOutput(original_query), new_query(new_query) {}
     ~DMLOutput() {;}
 
-    bool beforeQuery(Connect *conn, Connect *e_conn);
-    bool getQuery(std::list<std::string> *queryz) const;
-    bool handleQueryFailure(Connect *e_conn) const;
-    bool afterQuery(Connect *e_conn) const;
+    bool beforeQuery(Connect * const conn, Connect * const e_conn);
+    bool getQuery(std::list<std::string> * const queryz) const;
+    bool handleQueryFailure(Connect * const e_conn) const;
+    bool afterQuery(Connect * const e_conn) const;
 
 private:
     const std::string new_query;
@@ -441,10 +445,10 @@ public:
       where_clause(where_clause), ps(ps) {}
     ~SpecialUpdate() {;}
 
-    bool beforeQuery(Connect *conn, Connect *e_conn);
-    bool getQuery(std::list<std::string> *queryz) const;
-    bool handleQueryFailure(Connect *e_conn) const;
-    bool afterQuery(Connect *e_conn) const;
+    bool beforeQuery(Connect * const conn, Connect * const e_conn);
+    bool getQuery(std::list<std::string> * const queryz) const;
+    bool handleQueryFailure(Connect * const e_conn) const;
+    bool afterQuery(Connect * const e_conn) const;
 
 private:
     const std::string new_query;
@@ -463,14 +467,15 @@ public:
         : RewriteOutput(original_query), deltas(deltas) {}
     virtual ~DeltaOutput() = 0;
 
-    bool beforeQuery(Connect *conn, Connect *e_conn) = 0;
-    virtual bool getQuery(std::list<std::string> *queryz) const = 0;
-    virtual bool handleQueryFailure(Connect *e_conn) const = 0;
-    bool afterQuery(Connect *e_conn) const = 0;
+    bool beforeQuery(Connect * const conn, Connect * const e_conn) = 0;
+    virtual bool getQuery(std::list<std::string> * const queryz) const = 0;
+    virtual bool handleQueryFailure(Connect * const e_conn) const = 0;
+    bool afterQuery(Connect * const e_conn) const = 0;
     bool stalesSchema() const;
 
-    static bool save(Connect *e_conn, unsigned long *delta_output_id);
-    static bool destroyRecord(Connect *e_conn,
+    static bool save(Connect * const e_conn,
+                     unsigned long * const delta_output_id);
+    static bool destroyRecord(Connect * const e_conn,
                               unsigned long delta_output_id);
 
 protected:
@@ -485,10 +490,10 @@ public:
         : DeltaOutput(original_query, deltas), new_query(new_query) {}
     ~DDLOutput() {;}
 
-    bool beforeQuery(Connect *conn, Connect *e_conn);
-    bool getQuery(std::list<std::string> *queryz) const;
-    bool handleQueryFailure(Connect *e_conn) const;
-    bool afterQuery(Connect *e_conn) const;
+    bool beforeQuery(Connect * const conn, Connect * const e_conn);
+    bool getQuery(std::list<std::string> * const queryz) const;
+    bool handleQueryFailure(Connect * const e_conn) const;
+    bool afterQuery(Connect * const e_conn) const;
 
 private:
     const std::string new_query;
@@ -505,12 +510,12 @@ public:
         : DeltaOutput("", deltas),
           adjust_queries(adjust_queries) {}
     ~AdjustOnionOutput() {;}
-    ResType *doQuery(Connect *conn, Connect *e_conn);
+    ResType *doQuery(Connect * const conn, Connect * const e_conn);
 
-    bool beforeQuery(Connect *conn, Connect *e_conn);
-    bool getQuery(std::list<std::string> *queryz) const;
-    bool handleQueryFailure(Connect *e_conn) const;
-    bool afterQuery(Connect *e_conn) const;
+    bool beforeQuery(Connect * const conn, Connect * const e_conn);
+    bool getQuery(std::list<std::string> * const queryz) const;
+    bool handleQueryFailure(Connect * const e_conn) const;
+    bool afterQuery(Connect * const e_conn) const;
     bool queryAgain() const;
 
 private:
@@ -521,9 +526,10 @@ private:
     const std::list<std::string> local_qz() const;
 };
 
-bool saveDMLCompletion(Connect *conn, unsigned long delta_output_id);
-bool setRegularTableToBleedingTable(Connect *e_conn);
-bool cleanupDeltaOutputAndQuery(Connect *e_conn,
+bool saveDMLCompletion(Connect * const conn,
+                       unsigned long delta_output_id);
+bool setRegularTableToBleedingTable(Connect * const e_conn);
+bool cleanupDeltaOutputAndQuery(Connect * const e_conn,
                                 unsigned long delta_output_id);
 
 class Analysis {
@@ -550,14 +556,14 @@ public:
                             const std::string &field, onion o) const;
     FieldMeta *getFieldMeta(const std::string &table,
                             const std::string &field) const;
-    FieldMeta *getFieldMeta(const TableMeta *tm,
+    FieldMeta *getFieldMeta(const TableMeta * const tm,
                             const std::string &field) const;
     TableMeta *getTableMeta(const std::string &table) const;
     bool tableMetaExists(const std::string &table) const;
     std::string getAnonTableName(const std::string &table) const;
     std::string getAnonIndexName(const std::string &table,
                                  const std::string &index_name) const;
-    std::string getAnonIndexName(const TableMeta *tm,
+    std::string getAnonIndexName(const TableMeta * const tm,
                                  const std::string &index_name) const;
     EncLayer *getBackEncLayer(OnionMeta * const om) const;
     EncLayer *popBackEncLayer(OnionMeta * const om);
