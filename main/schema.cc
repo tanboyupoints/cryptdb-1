@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <functional>
+#include <memory>
 
 #include <parser/lex_util.hh>
 #include <parser/stringify.hh>
@@ -10,16 +11,16 @@
 #include <main/dbobject.hh>
 #include <main/metadata_tables.hh>
 
-std::vector<DBMeta *>
+std::vector<std::shared_ptr<DBMeta>>
 DBMeta::doFetchChildren(Connect *e_conn,
-                        std::function<DBMeta *(std::string, std::string,
-                                               std::string)>
+                        std::function<std::shared_ptr<DBMeta>
+                            (std::string, std::string, std::string)>
                             deserialHandler)
 {
     const std::string table_name = MetaDataTables::Name::metaObject();
 
     // Now that we know the table exists, SELECT the data we want.
-    std::vector<DBMeta *> out_vec;
+    std::vector<std::shared_ptr<DBMeta>> out_vec;
     DBResult *db_res;
     const std::string parent_id = std::to_string(this->getDatabaseID());
     const std::string serials_query = 
@@ -40,7 +41,7 @@ DBMeta::doFetchChildren(Connect *e_conn,
         const std::string child_key(row[1], l[1]);
         const std::string child_id(row[2], l[2]);
 
-        DBMeta *new_old_meta =
+        std::shared_ptr<DBMeta> new_old_meta =
             deserialHandler(child_key, child_serial_object, child_id);
         out_vec.push_back(new_old_meta);
     }
@@ -50,7 +51,7 @@ DBMeta::doFetchChildren(Connect *e_conn,
 
 OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels,
                      const AES_KEY * const m_key,
-                     Create_field *cf, unsigned long uniq_count)
+                     Create_field * const cf, unsigned long uniq_count)
     : onionname(getpRandomName() + TypeText<onion>::toText(o)),
       uniq_count(uniq_count)
 {
@@ -61,10 +62,10 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels,
         const std::string key =
             m_key ? getLayerKey(m_key, uniqueFieldName, l)
                   : "plainkey";
-        EncLayer * const el =
-            EncLayerFactory::encLayer(o, l, newcf, key);
+        const std::shared_ptr<EncLayer>
+            el(EncLayerFactory::encLayer(o, l, newcf, key));
 
-        Create_field * oldcf = newcf;
+        Create_field * const oldcf = newcf;
         newcf = el->newCreateField(oldcf);
         
         this->layers.push_back(el);
@@ -78,15 +79,16 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels,
     }
 }
 
-OnionMeta *OnionMeta::deserialize(unsigned int id,
-                                  const std::string &serial)
+std::unique_ptr<OnionMeta>
+OnionMeta::deserialize(unsigned int id, const std::string &serial)
 {
     const auto vec = unserialize_string(serial); 
 
     const std::string onionname = vec[0];
     const unsigned int uniq_count = atoi(vec[1].c_str());
 
-    return new OnionMeta(id, onionname, uniq_count);
+    return std::unique_ptr<OnionMeta>(new OnionMeta(id, onionname,
+                                                    uniq_count));
 }
 
 std::string OnionMeta::serialize(const DBObject &parent) const
@@ -103,35 +105,39 @@ std::string OnionMeta::getAnonOnionName() const
     return onionname;
 }
 
-std::vector<DBMeta *> OnionMeta::fetchChildren(Connect *e_conn)
+std::vector<std::shared_ptr<DBMeta>>
+OnionMeta::fetchChildren(Connect *e_conn)
 {
-    std::function<DBMeta *(std::string, std::string, std::string)> deserialize =
-        [this] (std::string key, std::string serial, std::string id)
-            -> DBMeta*
-        {
-            std::function<unsigned int(std::string)> strToInt =
-                [](std::string s) {return atoi(s.c_str());};
-            // > Probably going to want to use indexes in AbstractMetaKey
-            // for now, otherwise you will need to abstract and rederive
-            // a keyed and nonkeyed version of Delta.
-            UIntMetaKey *meta_key =
-                AbstractMetaKey::factory<UIntMetaKey>(key);
-            const unsigned int index = meta_key->getValue();
-            if (index >= this->layers.size()) {
-                this->layers.resize(index + 1);
-            }
-            EncLayer *layer =
-                EncLayerFactory::deserializeLayer(atoi(id.c_str()),
-                                                  serial);
-            this->layers[index] = layer;
+    std::function<std::shared_ptr<DBMeta>(std::string, std::string,
+                                          std::string)>
+        deserialHelper =
+    [this] (std::string key, std::string serial, std::string id)
+        -> std::shared_ptr<EncLayer>
+    {
+        std::function<unsigned int(std::string)> strToInt =
+            [](std::string s) {return atoi(s.c_str());};
+        // > Probably going to want to use indexes in AbstractMetaKey
+        // for now, otherwise you will need to abstract and rederive
+        // a keyed and nonkeyed version of Delta.
+        const std::unique_ptr<UIntMetaKey>
+            meta_key(AbstractMetaKey::factory<UIntMetaKey>(key));
+        const unsigned int index = meta_key->getValue();
+        if (index >= this->layers.size()) {
+            this->layers.resize(index + 1);
+        }
+        std::shared_ptr<EncLayer>
+            layer(EncLayerFactory::deserializeLayer(atoi(id.c_str()),
+                                                    serial));
+        this->layers[index] = layer;
 
-            return layer;
-        };
+        return layer;
+    };
 
-    return DBMeta::doFetchChildren(e_conn, deserialize);
+    return DBMeta::doFetchChildren(e_conn, deserialHelper);
 }
 
-void OnionMeta::applyToChildren(std::function<void(const DBMeta * const)> fn) const
+void OnionMeta::applyToChildren(std::function<void(std::shared_ptr<DBMeta>)>
+    fn) const
 {
     for (auto it : layers) {
         fn(it);
@@ -141,7 +147,8 @@ void OnionMeta::applyToChildren(std::function<void(const DBMeta * const)> fn) co
 AbstractMetaKey *OnionMeta::getKey(const DBMeta *const child) const
 {
     for (std::vector<EncLayer *>::size_type i = 0; i< layers.size(); ++i) {
-        if (child == layers[i]) {
+        // FIXME: PTR.
+        if (child == layers[i].get()) {
             return new UIntMetaKey(i);
         }
     }
@@ -149,29 +156,13 @@ AbstractMetaKey *OnionMeta::getKey(const DBMeta *const child) const
     return NULL;
 }
 
-EncLayer *OnionMeta::deserializeChild(unsigned int id,
-                                      const std::string &serial_child)
-    const
-{
-    return EncLayerFactory::deserializeLayer(id, serial_child);
-}
-
-UIntMetaKey *OnionMeta::deserializeKey(const std::string &serial_key)
-    const
-{
-    return AbstractMetaKey::factory<UIntMetaKey>(serial_key);
-}
-
-void OnionMeta::addLayerBack(EncLayer *layer) {
-    layers.push_back(layer);
-}
-
 EncLayer *OnionMeta::getLayerBack() const
 {
     if (layers.size() == 0) {
         throw CryptDBError("Tried getting EncLayer when there are none!");
     }
-    return layers.back();
+    // FIXME: PTR.
+    return layers.back().get();
 }
 
 EncLayer *OnionMeta::getLayer(const SECLEVEL &sl) const
@@ -183,7 +174,8 @@ EncLayer *OnionMeta::getLayer(const SECLEVEL &sl) const
     AssignOnce<EncLayer *> out;
     for (auto it : layers) {
         if (it->level() == sl) {
-            out = it;
+            // FIXME: PTR.
+            out = it.get();
         }
     }
 
@@ -199,23 +191,14 @@ void OnionMeta::removeLayerBack()
     layers.pop_back();
 }
 
-void OnionMeta::replaceLayerBack(EncLayer *layer)
-{
-    if (layers.size() == 0) {
-        throw CryptDBError("Tried to remove EncLayer when there are none!");
-    }
-    layers.pop_back();
-    layers.push_back(layer);
-}
-
 SECLEVEL OnionMeta::getSecLevel()
 {
     assert(layers.size() > 0);
     return layers.back()->level();
 }
 
-FieldMeta *FieldMeta::deserialize(unsigned int id,
-                                  const std::string &serial)
+std::unique_ptr<FieldMeta>
+FieldMeta::deserialize(unsigned int id, const std::string &serial)
 {
     const auto vec = unserialize_string(serial);
 
@@ -228,11 +211,12 @@ FieldMeta *FieldMeta::deserialize(unsigned int id,
     const unsigned int uniq_count = atoi(vec[5].c_str());
     const unsigned int counter = atoi(vec[6].c_str());
 
-    return new FieldMeta(id, fname, has_salt, salt_name, onion_layout,
-                         sec_rating, uniq_count, counter);
+    return std::unique_ptr<FieldMeta>
+        (new FieldMeta(id, fname, has_salt, salt_name, onion_layout,
+                       sec_rating, uniq_count, counter));
 }
 
-FieldMeta::FieldMeta(std::string name, Create_field *field,
+FieldMeta::FieldMeta(const std::string &name, Create_field * const field,
                      const AES_KEY * const m_key,
                      SECURITY_RATING sec_rating,
                      unsigned long uniq_count)
@@ -272,7 +256,8 @@ FieldMeta::orderedOnionMetas() const
 {
     std::vector<std::pair<OnionMetaKey *, OnionMeta *>> v;
     for (auto it : children) {
-        v.push_back(it);
+        // FIXME: PTR.
+        v.push_back(std::make_pair(it.first, it.second.get()));
     }
 
     std::sort(v.begin(), v.end(),
@@ -318,10 +303,10 @@ bool FieldMeta::setOnionLevel(onion o, SECLEVEL maxl) {
 
 OnionMeta *FieldMeta::getOnionMeta(onion o) const
 {
-    const OnionMetaKey * const key = new OnionMetaKey(o);
-    OnionMeta * const om = getChild(key);
-    delete key;
-    return om;
+    const std::unique_ptr<OnionMetaKey> key(new OnionMetaKey(o));
+    const std::shared_ptr<OnionMeta> om = getChild(key.get());
+    // FIXME: PTR.
+    return om.get();
 }
 
 onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
@@ -355,8 +340,8 @@ onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
     }
 }
 
-TableMeta *TableMeta::deserialize(unsigned int id,
-                                  const std::string &serial)
+std::unique_ptr<TableMeta>
+TableMeta::deserialize(unsigned int id, const std::string &serial)
 {
     const auto vec = unserialize_string(serial);
     
@@ -366,8 +351,9 @@ TableMeta *TableMeta::deserialize(unsigned int id,
     const std::string salt_name = vec[3];
     const unsigned int counter = atoi(vec[4].c_str());
 
-    return new TableMeta(id, anon_table_name, hasSensitive, has_salt,
-                         salt_name, counter);
+    return std::unique_ptr<TableMeta>
+        (new TableMeta(id, anon_table_name, hasSensitive, has_salt,
+                       salt_name, counter));
 }
 
 std::string TableMeta::serialize(const DBObject &parent) const
@@ -394,7 +380,8 @@ std::vector<FieldMeta *> TableMeta::orderedFieldMetas() const
 {
     std::vector<FieldMeta *> v;
     for (auto it : children) {
-        v.push_back(it.second);
+        // FIXME: PTR.
+        v.push_back(it.second.get());
     }
 
     std::sort(v.begin(), v.end(),
@@ -416,20 +403,21 @@ std::string TableMeta::getAnonIndexName(const std::string &index_name) const
 
 FieldMeta *
 SchemaInfo::getFieldMeta(const std::string &table,
-                         const std::string & field) const
+                         const std::string &field) const
 {
-    IdentityMetaKey *table_key = new IdentityMetaKey(table);
-    TableMeta *tm = getChild(table_key);
+    std::unique_ptr<IdentityMetaKey>
+        table_key(new IdentityMetaKey(table));
+    std::shared_ptr<TableMeta> tm = getChild(table_key.get());
     if (NULL == tm) {
         return NULL;
     }
-    delete table_key;
 
-    IdentityMetaKey *field_key = new IdentityMetaKey(field);
-    FieldMeta *fm = tm->getChild(field_key);
-    delete field_key;
+    std::unique_ptr<IdentityMetaKey>
+        field_key(new IdentityMetaKey(field));
+    std::shared_ptr<FieldMeta> fm = tm->getChild(field_key.get());
 
-    return fm;
+    // FIXME: PTR.
+    return fm.get();
 }
 
 // FIXME: Slow.

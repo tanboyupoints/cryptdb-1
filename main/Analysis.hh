@@ -562,12 +562,14 @@ public:
     EncLayer *getBackEncLayer(OnionMeta * const om) const;
     EncLayer *popBackEncLayer(OnionMeta * const om);
     SECLEVEL getOnionLevel(OnionMeta * const om) const;
-    std::vector<EncLayer *> getEncLayers(OnionMeta * const om) const;
+    std::vector<std::shared_ptr<EncLayer>>
+        getEncLayers(OnionMeta * const om) const;
     // HACK.
     const SchemaInfo *getSchema() {return schema;}
 
     // TODO: Make private.
-    std::map<OnionMeta *, std::vector<EncLayer *>> to_adjust_enc_layers;
+    std::map<OnionMeta *, std::vector<std::shared_ptr<EncLayer>>>
+        to_adjust_enc_layers;
     
     std::vector<Delta *> deltas;
 

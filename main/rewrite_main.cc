@@ -84,26 +84,29 @@ mysql_query_wrapper(MYSQL *m, const std::string &q)
 }
 
 bool
-sanityCheck(FieldMeta *fm)
+sanityCheck(FieldMeta * const fm)
 {
     for (auto it : fm->children) {
-        OnionMeta *om = it.second;
-        onion o = it.first->getValue();
+        // FIXME: PTR.
+        std::shared_ptr<OnionMeta> om = it.second;
+        const onion o = it.first->getValue();
         const std::vector<SECLEVEL> &secs = fm->onion_layout.at(o);
-        for (unsigned int i = 0; i < om->layers.size(); ++i) {
-            EncLayer *layer = om->layers[i];
-            assert(layer->level() == secs[i]);
+        for (unsigned int i = 0; i < om.get()->layers.size(); ++i) {
+            std::shared_ptr<EncLayer> layer = om.get()->layers[i];
+            // FIXME: PTR.
+            assert(layer.get()->level() == secs[i]);
         }
     }
     return true;
 }
 
 static bool
-sanityCheck(TableMeta *tm)
+sanityCheck(TableMeta * const tm)
 {
     for (auto it : tm->children) {
-        FieldMeta *fm = it.second;
-        assert(sanityCheck(fm));
+        std::shared_ptr<FieldMeta> fm = it.second;
+        // FIXME: PTR.
+        assert(sanityCheck(fm.get()));
     }
     return true;
 }
@@ -112,8 +115,9 @@ static bool
 sanityCheck(SchemaInfo *schema)
 {
     for (auto it : schema->children) {
-        TableMeta *tm = it.second;
-        assert(sanityCheck(tm));
+        std::shared_ptr<TableMeta> tm = it.second;
+        // FIXME: PTR.
+        assert(sanityCheck(tm.get()));
     }
     return true;
 }
@@ -305,7 +309,8 @@ loadSchemaInfo(Connect *conn, Connect *e_conn)
         [&loadChildren, &e_conn](DBMeta *parent) {
             auto kids = parent->fetchChildren(e_conn);
             for (auto it : kids) {
-                loadChildren(it);
+                // FIXME: PTR.
+                loadChildren(it.get());
             }
 
             return parent;  /* lambda */

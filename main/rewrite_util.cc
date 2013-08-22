@@ -379,13 +379,15 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
                                  tm->leaseIncUniq());
         }
     };
-    FieldMeta * const fm = buildFieldMeta(name, cf, ps, tm);
+    std::shared_ptr<FieldMeta> fm =
+        std::shared_ptr<FieldMeta>(buildFieldMeta(name, cf, ps, tm));
     // Here we store the key name for the first time. It will be applied
     // after the Delta is read out of the database.
     if (true == new_table) {
         tm->addChild(new IdentityMetaKey(name), fm);
     } else {
-        a.deltas.push_back(new CreateDelta(fm, tm,
+        // FIXME: PTR.
+        a.deltas.push_back(new CreateDelta(fm.get(), tm,
                                            new IdentityMetaKey(name)));
         a.deltas.push_back(new ReplaceDelta(tm, a.getSchema(),
                                             a.getSchema()->getKey(tm)));
@@ -394,7 +396,8 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     // -----------------------------
     //         Rewrite FIELD       
     // -----------------------------
-    auto new_fields = rewrite_create_field(fm, cf, a);
+    // FIXME: PTR.
+    auto new_fields = rewrite_create_field(fm.get(), cf, a);
     rewritten_cfield_list.concat(vectorToList(new_fields));
 
     return rewritten_cfield_list;

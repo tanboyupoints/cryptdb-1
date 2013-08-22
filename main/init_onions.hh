@@ -11,15 +11,16 @@ init_onions_layout(const AES_KEY * const m_key,
     assert(0 == fm->children.size());
 
     for (auto it: fm->onion_layout) {
-        onion o = it.first;
-        std::vector<SECLEVEL> levels = it.second;
+        const onion o = it.first;
+        const std::vector<SECLEVEL> levels = it.second;
         // A new OnionMeta will only occur with a new FieldMeta so
         // we never have to build Deltaz for our OnionMetaz.
-        OnionMeta * om =
-            new OnionMeta(o, levels, m_key, cf, fm->leaseIncUniq());
-        fm->addChild(new OnionMetaKey(o), om);
+        std::unique_ptr<OnionMeta>
+            om(new OnionMeta(o, levels, m_key, cf, fm->leaseIncUniq()));
+        const std::string onion_name = om->getAnonOnionName();
+        fm->addChild(new OnionMetaKey(o), std::move(om));
 
-        LOG(cdb_v) << "adding onion layer " << om->getAnonOnionName()
+        LOG(cdb_v) << "adding onion layer " << onion_name
                    << " for " << fm->fname;
 
         //set outer layer

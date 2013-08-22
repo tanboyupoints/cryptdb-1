@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
 #include <main/enum_text.hh>
 #include <main/serializers.hh>
@@ -143,22 +144,18 @@ public:
     virtual ~DBMeta() {;}
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;
-    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn) = 0;
-    virtual void applyToChildren(std::function<void(const DBMeta * const)>)
+    virtual std::vector<std::shared_ptr<DBMeta>>
+        fetchChildren(Connect *e_conn) = 0;
+    virtual void applyToChildren(std::function<void(const std::shared_ptr<DBMeta>)>)
         const = 0;
     virtual AbstractMetaKey *getKey(const DBMeta *const child) const = 0;
-    virtual DBMeta *deserializeChild(unsigned int id,
-                                     const std::string &serial_child)
-        const = 0;
-    virtual AbstractMetaKey *deserializeKey(const std::string &serial_key)
-        const = 0;
 
 protected:
-    std::vector<DBMeta *>
+    std::vector<std::shared_ptr<DBMeta>>
         doFetchChildren(Connect *e_conn,
-                        std::function<DBMeta *(std::string, std::string,
-                                               std::string)>
-                          deserialHandler);
+                        std::function<std::shared_ptr<DBMeta>
+                            (std::string, std::string, std::string)>
+                            deserialHandler);
 };
 
 class LeafDBMeta : public DBMeta {
@@ -166,12 +163,13 @@ public:
     LeafDBMeta() {}
     LeafDBMeta(unsigned int id) : DBMeta(id) {}
 
-    std::vector<DBMeta *> fetchChildren(Connect *e_conn)
+    std::vector<std::shared_ptr<DBMeta>> fetchChildren(Connect *e_conn)
     {
-        return std::vector<DBMeta *>();
+        return std::vector<std::shared_ptr<DBMeta>>();
     }
 
-    void applyToChildren(std::function<void(const DBMeta * const)> func) const
+    void applyToChildren(std::function<void(const std::shared_ptr<DBMeta>)>
+        fn) const
     {
         return;
     }
@@ -179,17 +177,6 @@ public:
     AbstractMetaKey *getKey(const DBMeta *const child) const
     {
         return NULL;
-    }
-
-    DBMeta *deserializeChild(unsigned int id,
-                             const std::string &serial_child) const
-    {
-        throw CryptDBError("I don't have children!");
-    }
-    
-    AbstractMetaKey *deserializeKey(const std::string &serial_key) const
-    {
-        throw CryptDBError("I don't have keys!");
     }
 };
 
@@ -206,22 +193,23 @@ public:
     MappedDBMeta() {}
     MappedDBMeta(unsigned int id) : DBMeta(id) {}
     virtual ~MappedDBMeta();
-    virtual bool addChild(KeyType *key, ChildType *meta);
+    virtual bool addChild(KeyType *key, std::shared_ptr<ChildType> meta);
     virtual bool childExists(KeyType * key) const;
-    virtual ChildType *getChild(const KeyType * const key) const;
+    virtual std::shared_ptr<ChildType>
+        getChild(const KeyType * const key) const;
     AbstractMetaKey *getKey(const DBMeta *const child) const;
-    ChildType *deserializeChild(unsigned int id,
-                                const std::string &serial_child) const;
-    KeyType *deserializeKey(const std::string &serial_key) const;
-    virtual std::vector<DBMeta *> fetchChildren(Connect *e_conn);
-    void applyToChildren(std::function<void(const DBMeta * const)> fn) const;
+    virtual std::vector<std::shared_ptr<DBMeta>>
+        fetchChildren(Connect *e_conn);
+    void applyToChildren(std::function<void(const std::shared_ptr<DBMeta>)>
+        fn) const;
 
     // FIXME: Make protected.
-    std::map<KeyType *, ChildType *> children;
+    std::map<KeyType *, std::shared_ptr<ChildType>> children;
 
 private:
     // Helpers.
-    typename std::map<KeyType *, ChildType *>::const_iterator
+    typename
+        std::map<KeyType *, std::shared_ptr<ChildType>>::const_iterator
         findChild(KeyType *key) const;
 };
 

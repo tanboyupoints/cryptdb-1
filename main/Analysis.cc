@@ -22,8 +22,9 @@ EncSet::EncSet(Analysis &a, FieldMeta * fm) {
 
     osl.clear();
     for (auto pair : fm->children) {
-        OnionMeta *om = pair.second;
-        OnionMetaKey *key = pair.first;
+        // FIXME: PTR.
+        OnionMeta * const om = pair.second.get();
+        const OnionMetaKey * const key = pair.first;
         osl[key->getValue()] = LevelFieldPair(a.getOnionLevel(om), fm);
     }
 }
@@ -361,11 +362,12 @@ bool CreateDelta::apply(Connect *e_conn, TableType table_type)
 
         const unsigned int object_id = e_conn->last_insert_id();
 
-        std::function<void(const DBMeta * const)> localCreateHandler =
+        std::function<void(std::shared_ptr<DBMeta>)> localCreateHandler =
             [&e_conn, &object, object_id, &helper]
-                (const DBMeta * const child)
+                (std::shared_ptr<DBMeta> child)
             {
-                helper(e_conn, child, object, NULL, &object_id);
+                // FIXME: PTR.
+                helper(e_conn, child.get(), object, NULL, &object_id);
             };
         object->applyToChildren(localCreateHandler);
     };
@@ -419,9 +421,10 @@ bool DeleteDelta::apply(Connect *e_conn, TableType table_type)
 
         assert(e_conn->execute(query));
 
-        std::function<void(const DBMeta * const)> localDestroyHandler =
-            [&e_conn, &object, &helper] (const DBMeta * const child) {
-                helper(e_conn, child, object);
+        std::function<void(std::shared_ptr<DBMeta>)> localDestroyHandler =
+            [&e_conn, &object, &helper] (std::shared_ptr<DBMeta> child) {
+                // FIXME: PTR.
+                helper(e_conn, child.get(), object);
             };
         object->applyToChildren(localDestroyHandler);
     };
@@ -982,27 +985,30 @@ FieldMeta *Analysis::getFieldMeta(const std::string &table,
 FieldMeta *Analysis::getFieldMeta(const TableMeta *tm,
                                   const std::string &field) const
 {
-    const IdentityMetaKey * const key = new IdentityMetaKey(field);
-    FieldMeta *fm = tm->getChild(key);
+    // FIXME: PTR.
+    const std::unique_ptr<IdentityMetaKey>
+        key(new IdentityMetaKey(field));
+    std::shared_ptr<FieldMeta> fm = tm->getChild(key.get());
     assert(fm);
-    return fm;
+    return fm.get();
 }
 
 TableMeta *Analysis::getTableMeta(const std::string &table) const
 {
-    const IdentityMetaKey * const key =
-        new IdentityMetaKey(unAliasTable(table));
+    // FIXME: PTR.
+    const std::unique_ptr<IdentityMetaKey>
+        key(new IdentityMetaKey(unAliasTable(table)));
 
-    TableMeta * const tm = this->schema->getChild(key);
+    std::shared_ptr<TableMeta> tm = this->schema->getChild(key.get());
     assert(tm);
-    return tm;
+    return tm.get();
 }
 
 bool Analysis::tableMetaExists(const std::string &table) const
 {
-    IdentityMetaKey * const key =
-        new IdentityMetaKey(unAliasTable(table));
-    return this->schema->childExists(key);
+    const std::unique_ptr<IdentityMetaKey>
+        key(new IdentityMetaKey(unAliasTable(table)));
+    return this->schema->childExists(key.get());
 }
 
 std::string Analysis::getAnonTableName(const std::string &table) const
@@ -1034,11 +1040,12 @@ std::string Analysis::unAliasTable(const std::string &table) const
 
 EncLayer *Analysis::getBackEncLayer(OnionMeta * const om) const
 {
+    // FIXME: PTR.
     auto it = to_adjust_enc_layers.find(om);
     if (to_adjust_enc_layers.end() == it) {
-        return om->layers.back();
+        return om->layers.back().get();
     } else { 
-        return it->second.back();
+        return it->second.back().get();
     }
 }
 
@@ -1049,7 +1056,8 @@ EncLayer *Analysis::popBackEncLayer(OnionMeta * const om)
         to_adjust_enc_layers[om] = om->layers;
     }
 
-    EncLayer *out_layer = to_adjust_enc_layers[om].back();
+    // FIXME: PTR.
+    EncLayer * const out_layer = to_adjust_enc_layers[om].back().get();
     to_adjust_enc_layers[om].pop_back();
 
     return out_layer;
@@ -1065,7 +1073,8 @@ SECLEVEL Analysis::getOnionLevel(OnionMeta * const om) const
     }
 }
 
-std::vector<EncLayer *> Analysis::getEncLayers(OnionMeta * const om) const
+std::vector<std::shared_ptr<EncLayer>>
+Analysis::getEncLayers(OnionMeta * const om) const
 {
     auto it = to_adjust_enc_layers.find(om);
     if (to_adjust_enc_layers.end() == it) {

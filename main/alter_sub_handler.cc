@@ -82,15 +82,16 @@ class DropColumnSubHandler : public AlterSubHandler {
 
         // Rewrite each onion column.
         for (auto onion_pair : fm->children) {
-            Alter_drop *new_adrop = adrop->clone(thd->mem_root);
-            OnionMeta *om = onion_pair.second;
-            new_adrop->name = thd->strdup(om->getAnonOnionName().c_str());
+            Alter_drop * const new_adrop = adrop->clone(thd->mem_root);
+            std::shared_ptr<OnionMeta> om = onion_pair.second;
+            new_adrop->name =
+                thd->strdup(om.get()->getAnonOnionName().c_str());
             out_list.push_back(new_adrop);
         }
 
         // Rewrite the salt column.
         if (fm->has_salt) {
-            Alter_drop *new_adrop = adrop->clone(thd->mem_root);
+            Alter_drop * const new_adrop = adrop->clone(thd->mem_root);
             new_adrop->name =
                 thd->strdup(fm->getSaltName().c_str());
             out_list.push_back(new_adrop);

@@ -73,12 +73,12 @@ typedef class OnionMeta : public DBMeta {
 public:
     // New.
     OnionMeta(onion o, std::vector<SECLEVEL> levels,
-              const AES_KEY * const m_key, Create_field *cf,
+              const AES_KEY * const m_key, Create_field * const cf,
               unsigned long uniq_count);
     // Restore.
-    static OnionMeta *deserialize(unsigned int id,
-                                  const std::string &serial);
-    OnionMeta(unsigned int id, std::string onionname,
+    static std::unique_ptr<OnionMeta>
+        deserialize(unsigned int id, const std::string &serial);
+    OnionMeta(unsigned int id, const std::string &onionname,
               unsigned long uniq_count)
         : DBMeta(id), onionname(onionname), uniq_count(uniq_count) {}
 
@@ -87,12 +87,9 @@ public:
     // FIXME: Use rtti.
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
-    std::vector<DBMeta *> fetchChildren(Connect *e_conn);
-    void applyToChildren(std::function<void(const DBMeta * const)>) const;
+    std::vector<std::shared_ptr<DBMeta>> fetchChildren(Connect *e_conn);
+    void applyToChildren(std::function<void(std::shared_ptr<DBMeta>)>) const;
     AbstractMetaKey *getKey(const DBMeta *const child) const;
-    EncLayer *deserializeChild(unsigned int id,
-                               const std::string &serial_child) const;
-    UIntMetaKey *deserializeKey(const std::string &serial_key) const;
     EncLayer *getLayerBack() const;
     EncLayer *getLayer(const SECLEVEL &sl) const;
     unsigned long getUniq() const {return uniq_count;}
@@ -100,20 +97,18 @@ public:
     // Need access to layers.
     friend class Analysis;
     friend class FieldMeta;
-    friend bool sanityCheck(FieldMeta *);
+    friend bool sanityCheck(FieldMeta * const);
     friend Item *decrypt_item_layers(Item *, FieldMeta *, onion, uint64_t,
                                      const std::vector<Item *> &);
 
 private:
-    std::vector<EncLayer *> layers; //first in list is lowest layer
+    std::vector<std::shared_ptr<EncLayer>> layers; //first in list is lowest layer
     constexpr static const char *type_name = "onionMeta";
     const std::string onionname;
     unsigned long uniq_count;
 
     SECLEVEL getSecLevel();
-    void addLayerBack(EncLayer *layer);
     void removeLayerBack();
-    void replaceLayerBack(EncLayer *layer);
 } OnionMeta;
 
 struct TableMeta;
@@ -128,15 +123,15 @@ public:
     const onionlayout onion_layout;
 
     // New.
-    FieldMeta(std::string name, Create_field *field,
+    FieldMeta(const std::string &name, Create_field * const field,
               const AES_KEY * const mKey, SECURITY_RATING sec_rating,
               unsigned long uniq_count);
     // Restore (WARN: Creates an incomplete type as it will not have it's
     // OnionMetas until they are added by the caller).
-    static FieldMeta *deserialize(unsigned int id,
-                                  const std::string &serial);
-    FieldMeta(unsigned int id, std::string fname, bool has_salt,
-              std::string salt_name, onionlayout onion_layout,
+    static std::unique_ptr<FieldMeta>
+        deserialize(unsigned int id, const std::string &serial);
+    FieldMeta(unsigned int id, const std::string &fname, bool has_salt,
+              const std::string &salt_name, onionlayout onion_layout,
               SECURITY_RATING sec_rating,
               unsigned long uniq_count, unsigned long counter)
         : MappedDBMeta(id), fname(fname), has_salt(has_salt),
@@ -189,11 +184,11 @@ public:
           anon_table_name("table_" + getpRandomName()),
           counter(0) {}
     // Restore.
-    static TableMeta *deserialize(unsigned int id,
-                                  const std::string &serial);
-    TableMeta(unsigned int id, std::string anon_table_name,
-              bool has_sensitive, bool has_salt, std::string salt_name,
-              unsigned int counter)
+    static std::unique_ptr<TableMeta>
+        deserialize(unsigned int id, const std::string &serial);
+    TableMeta(unsigned int id, const std::string &anon_table_name,
+              bool has_sensitive, bool has_salt,
+              const std::string &salt_name, unsigned int counter)
         : MappedDBMeta(id), hasSensitive(has_sensitive),
           has_salt(has_salt), salt_name(salt_name),
           anon_table_name(anon_table_name), counter(counter) {}
@@ -237,8 +232,8 @@ private:
 
     // These functions do not support Aliasing, use Analysis::getTableMeta
     // and Analysis::getFieldMeta.
-    FieldMeta * getFieldMeta(const std::string & table,
-                             const std::string & field) const;
+    FieldMeta * getFieldMeta(const std::string &table,
+                             const std::string &field) const;
     std::string serialize(const DBObject &parent) const {
         throw CryptDBError("SchemaInfo can not be serialized!");
     }
