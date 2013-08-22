@@ -16,11 +16,13 @@
 std::string
 getpRandomName()
 {
+    // FIXME: Not using numbers because.
+    //  'CREATE TABLE a (2e integer); <---- succeeds
+    //  'CREATE TABLE b (2e5 integer); <--- fails
     static const char valids[] =
-        "0123456789"
-        "abcdefghijklmnopqrstuvwxyz"
+        // "0123456789"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    static int out_length = 8;
+    static int out_length = 10;
     char output[out_length + 1];
 
     std::function<bool()> wrap_srand =[](){srand(time(NULL)); return true;};
