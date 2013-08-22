@@ -253,11 +253,12 @@ rewrite(lua_State *L)
             ps->setPreviousSchema(out_schema);
             ps->setSchemaStaleness(qr->output->stalesSchema());
 
-            assert(qr->output->beforeQuery(ps->conn, ps->e_conn));
+            assert(qr->output->beforeQuery(ps->getConn(),
+                                           ps->getEConn()));
 
             if (!qr->output->getQuery(&new_queries)) {
                 throw CryptDBError("Failed to get rewritten query!");
-                assert(qr->output->handleQueryFailure(ps->e_conn));
+                assert(qr->output->handleQueryFailure(ps->getEConn()));
             }
             
             clients[client]->rmeta = qr->rmeta;
@@ -302,7 +303,7 @@ queryFailure(lua_State *L)
     assert(clients[client]->qr);
 
     QueryRewrite *qr = clients[client]->qr;
-    assert(qr->output->handleQueryFailure(ps->e_conn));
+    assert(qr->output->handleQueryFailure(ps->getEConn()));
 
     return 0;
 }
@@ -324,7 +325,7 @@ epilogue(lua_State *L)
     assert(clients[client]->qr);
 
     QueryRewrite *qr = clients[client]->qr;
-    assert(qr->output->afterQuery(ps->e_conn));
+    assert(qr->output->afterQuery(ps->getEConn()));
     if (qr->output->queryAgain()) {
         ResType *res_type =
             executeQuery(*ps, clients[client]->last_query);

@@ -92,4 +92,5 @@ std::string vector_join(std::vector<T> v, std::string delim,
 }
 
 std::string
-escapeString(Connect * const e_conn, const std::string &escape_me);
+escapeString(const std::unique_ptr<Connect> &c,
+             const std::string &escape_me);

@@ -87,7 +87,8 @@ public:
     // FIXME: Use rtti.
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
-    std::vector<std::shared_ptr<DBMeta>> fetchChildren(Connect *e_conn);
+    std::vector<std::shared_ptr<DBMeta>>
+        fetchChildren(const std::unique_ptr<Connect> &e_conn);
     void applyToChildren(std::function<void(std::shared_ptr<DBMeta>)>) const;
     AbstractMetaKey *getKey(const DBMeta *const child) const;
     EncLayer *getLayerBack() const;
@@ -102,7 +103,8 @@ public:
                                      const std::vector<Item *> &);
 
 private:
-    std::vector<std::shared_ptr<EncLayer>> layers; //first in list is lowest layer
+    std::vector<std::shared_ptr<EncLayer>> layers; // first in list is
+                                                   // lowest layer
     constexpr static const char *type_name = "onionMeta";
     const std::string onionname;
     unsigned long uniq_count;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <memory>
 
 #include <main/Connect.hh>
 
@@ -13,6 +14,7 @@ namespace MetaDataTables {
         std::string bleedingMetaObject();
     };
 
-    void initialize(Connect *conn, Connect *e_conn);
+    void initialize(const std::unique_ptr<Connect> &conn,
+                    const std::unique_ptr<Connect> &e_conn);
 };
 

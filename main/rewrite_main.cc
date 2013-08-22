@@ -141,7 +141,9 @@ recoverableDeltaError(unsigned int err)
 }
 
 static bool
-fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
+fixDelta(const std::unique_ptr<Connect> &conn,
+         const std::unique_ptr<Connect> &e_conn,
+         unsigned long delta_output_id)
 {
     std::list<std::string> local_queries;
     bool expect_ddl;
@@ -263,7 +265,8 @@ fixDelta(Connect *conn, Connect *e_conn, unsigned long delta_output_id)
 }
 
 static bool
-deltaSanityCheck(Connect *conn, Connect *e_conn)
+deltaSanityCheck(const std::unique_ptr<Connect> &conn,
+                 const std::unique_ptr<Connect> &e_conn)
 {
     const std::string table_name = MetaDataTables::Name::delta();
 
@@ -298,7 +301,8 @@ deltaSanityCheck(Connect *conn, Connect *e_conn)
 //  2> INSERTing
 //  3> SELECTing
 static SchemaInfo *
-loadSchemaInfo(Connect *conn, Connect *e_conn)
+loadSchemaInfo(const std::unique_ptr<Connect> &conn,
+               const std::unique_ptr<Connect> &e_conn)
 {
     // Must be done before loading the children.
     assert(deltaSanityCheck(conn, e_conn));
@@ -326,7 +330,7 @@ loadSchemaInfo(Connect *conn, Connect *e_conn)
 
 /*
 static void
-printEC(Connect * e_conn, const std::string & command) {
+printEC(std::unique_ptr<Connect> e_conn, const std::string & command) {
     DBResult * dbres;
     assert_s(e_conn->execute(command, dbres), "command failed");
     ResType res = dbres->unpack();
@@ -386,8 +390,8 @@ buildTypeTextTranslator()
     static_assert(arraysize(seclevel_chars) == arraysize(seclevels),
                   "SECLEVEL size mismatch!");
     count = arraysize(seclevel_chars);
-    translatorHelper((const char **)seclevel_chars, (SECLEVEL *)seclevels,
-                     count);
+    translatorHelper((const char **)seclevel_chars,
+                     (SECLEVEL *)seclevels, count);
 
     // MYSQL types.
     const char *mysql_type_chars[] =
@@ -970,7 +974,7 @@ Rewriter::rewrite(const ProxyState &ps, const std::string & q,
     // FIXME: Memleak 'schema'.
     AssignOnce<SchemaInfo *> schema;
     if (ps.schemaIsStale()) {
-        schema = loadSchemaInfo(ps.conn, ps.e_conn);
+        schema = loadSchemaInfo(ps.getConn(), ps.getEConn());
     } else {
         schema = ps.getPreviousSchema();
     }
@@ -1099,7 +1103,7 @@ executeQuery(ProxyState &ps, const std::string &q)
         ps.setSchemaStaleness(qr.output->stalesSchema());
 
         // Query preamble.
-        assert(qr.output->beforeQuery(ps.conn, ps.e_conn));
+        assert(qr.output->beforeQuery(ps.getConn(), ps.getEConn()));
 
         // Execute query.
         std::list<std::string> out_queryz;
@@ -1111,14 +1115,14 @@ executeQuery(ProxyState &ps, const std::string &q)
         for (auto it : out_queryz) {
             prettyPrintQuery(it);
             
-            if (!ps.conn->execute(it, dbres)) {
-                qr.output->handleQueryFailure(ps.e_conn);
+            if (!ps.getConn()->execute(it, dbres)) {
+                qr.output->handleQueryFailure(ps.getEConn());
                 throw CryptDBError("Failed to execute query!");
             }
             assert(dbres);
         }
 
-        assert(qr.output->afterQuery(ps.e_conn));
+        assert(qr.output->afterQuery(ps.getEConn()));
 
         if (qr.output->queryAgain()) {
             return executeQuery(ps, q);
@@ -1151,7 +1155,7 @@ executeQuery(ProxyState &ps, const std::string &q)
 }
 
 void
-printRes(const ResType & r) {
+printRes(const ResType &r) {
 
     //if (!cryptdb_logger::enabled(log_group::log_edb_v))
     //return;

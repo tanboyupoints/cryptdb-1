@@ -12,7 +12,7 @@
 #include <main/metadata_tables.hh>
 
 std::vector<std::shared_ptr<DBMeta>>
-DBMeta::doFetchChildren(Connect *e_conn,
+DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
                         std::function<std::shared_ptr<DBMeta>
                             (std::string, std::string, std::string)>
                             deserialHandler)
@@ -30,7 +30,7 @@ DBMeta::doFetchChildren(Connect *e_conn,
         " FROM pdb." + table_name + 
         " WHERE pdb." + table_name + ".parent_id"
         "   = " + parent_id + ";";
-    assert(e_conn->execute(serials_query, db_res));
+    assert(e_conn.get()->execute(serials_query, db_res));
     ScopedMySQLRes r(db_res->n);
     MYSQL_ROW row;
     while ((row = mysql_fetch_row(r.res()))) {
@@ -106,7 +106,7 @@ std::string OnionMeta::getAnonOnionName() const
 }
 
 std::vector<std::shared_ptr<DBMeta>>
-OnionMeta::fetchChildren(Connect *e_conn)
+OnionMeta::fetchChildren(const std::unique_ptr<Connect> &e_conn)
 {
     std::function<std::shared_ptr<DBMeta>(std::string, std::string,
                                           std::string)>

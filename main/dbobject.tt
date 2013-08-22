@@ -95,7 +95,7 @@ MappedDBMeta<ChildType, KeyType>::getKey(const DBMeta * const child) const
 
 template <typename ChildType, typename KeyType>
 std::vector<std::shared_ptr<DBMeta>>
-MappedDBMeta<ChildType, KeyType>::fetchChildren(Connect *e_conn)
+MappedDBMeta<ChildType, KeyType>::fetchChildren(const std::unique_ptr<Connect> &e_conn)
 {
     // Perhaps it's conceptually cleaner to have this lambda return
     // pairs of keys and children and then add the children from local

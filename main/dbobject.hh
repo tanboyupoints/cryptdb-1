@@ -145,14 +145,14 @@ public:
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;
     virtual std::vector<std::shared_ptr<DBMeta>>
-        fetchChildren(Connect *e_conn) = 0;
+        fetchChildren(const std::unique_ptr<Connect> &e_conn) = 0;
     virtual void applyToChildren(std::function<void(const std::shared_ptr<DBMeta>)>)
         const = 0;
     virtual AbstractMetaKey *getKey(const DBMeta *const child) const = 0;
 
 protected:
     std::vector<std::shared_ptr<DBMeta>>
-        doFetchChildren(Connect *e_conn,
+        doFetchChildren(const std::unique_ptr<Connect> &e_conn,
                         std::function<std::shared_ptr<DBMeta>
                             (std::string, std::string, std::string)>
                             deserialHandler);
@@ -163,7 +163,8 @@ public:
     LeafDBMeta() {}
     LeafDBMeta(unsigned int id) : DBMeta(id) {}
 
-    std::vector<std::shared_ptr<DBMeta>> fetchChildren(Connect *e_conn)
+    std::vector<std::shared_ptr<DBMeta>>
+        fetchChildren(const std::unique_ptr<Connect> &e_conn)
     {
         return std::vector<std::shared_ptr<DBMeta>>();
     }
@@ -199,7 +200,7 @@ public:
         getChild(const KeyType * const key) const;
     AbstractMetaKey *getKey(const DBMeta *const child) const;
     virtual std::vector<std::shared_ptr<DBMeta>>
-        fetchChildren(Connect *e_conn);
+        fetchChildren(const std::unique_ptr<Connect> &e_conn);
     void applyToChildren(std::function<void(const std::shared_ptr<DBMeta>)>
         fn) const;
 

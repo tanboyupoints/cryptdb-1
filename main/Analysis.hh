@@ -298,13 +298,17 @@ typedef struct ProxyState {
         schema_staleness = staleness;
     }
 
-    // connection to remote and embedded server
-    Connect *conn;
-    Connect *e_conn;
-
     const AES_KEY * const masterKey;
+    const std::unique_ptr<Connect> &getConn() const {return conn;}
+    const std::unique_ptr<Connect> &getEConn() const {return e_conn;}
+
+    static int db_init(const std::string &embed_dir);
 
 private:
+    const int mysql_dummy;
+    // connection to remote and embedded server
+    const std::unique_ptr<Connect> conn;
+    const std::unique_ptr<Connect> e_conn;
     // FIXME: Remove once cryptdb supports multiple databases.
     const std::string dbname;
     const SECURITY_RATING default_sec_rating;
@@ -327,7 +331,8 @@ public:
      * Take the update action against the database. Contains high level
      * serialization semantics.
      */
-    virtual bool apply(Connect *e_conn, TableType table_type) = 0;
+    virtual bool apply(const std::unique_ptr<Connect> &e_conn,
+                       TableType table_type) = 0;
 
 protected:
     const DBMeta * const meta;
@@ -347,10 +352,11 @@ public:
                 const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
-    bool save(Connect * const e_conn,
+    bool save(const std::unique_ptr<Connect> &e_conn,
               unsigned long * const delta_output_id);
-    bool apply(Connect * const e_conn, TableType table_type);
-    bool destroyRecord(Connect * const e_conn);
+    bool apply(const std::unique_ptr<Connect> &e_conn,
+               TableType table_type);
+    bool destroyRecord(const std::unique_ptr<Connect> &e_conn);
 };
 
 class ReplaceDelta : public Delta {
@@ -360,10 +366,11 @@ public:
                  const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
-    bool save(Connect * const e_conn,
+    bool save(const std::unique_ptr<Connect> &e_conn,
               unsigned long * const delta_output_id);
-    bool apply(Connect * const e_conn, TableType table_type);
-    bool destroyRecord(Connect * const e_conn);
+    bool apply(const std::unique_ptr<Connect> &e_conn,
+               TableType table_type);
+    bool destroyRecord(const std::unique_ptr<Connect> &e_conn);
 };
 
 class DeleteDelta : public Delta {
@@ -373,10 +380,11 @@ public:
                 const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
 
-    bool save(Connect * const e_conn,
+    bool save(const std::unique_ptr<Connect> &e_conn,
               unsigned long * const delta_output_id);
-    bool apply(Connect * const e_conn, TableType table_type);
-    bool destroyRecord(Connect * const e_conn);
+    bool apply(const std::unique_ptr<Connect> &e_conn,
+               TableType table_type);
+    bool destroyRecord(const std::unique_ptr<Connect> &e_conn);
 };
 
 class Rewriter;
@@ -387,16 +395,19 @@ public:
         : original_query(original_query) {}
     virtual ~RewriteOutput() = 0;
 
-    virtual bool beforeQuery(Connect * const conn,
-                             Connect * const e_conn) = 0;
+    virtual bool beforeQuery(const std::unique_ptr<Connect> &conn,
+                             const std::unique_ptr<Connect> &e_conn) = 0;
     virtual bool getQuery(std::list<std::string> * const queryz) const = 0;
-    virtual bool handleQueryFailure(Connect * const e_conn) const = 0;
-    virtual bool afterQuery(Connect * const e_conn) const = 0;
+    virtual bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
+        const = 0;
+    virtual bool afterQuery(const std::unique_ptr<Connect> &e_conn)
+        const = 0;
     virtual bool queryAgain() const;
     virtual bool doDecryption() const;
     virtual bool stalesSchema() const;
 
-    static ResType *sendQuery(Connect * const c, const std::string &q);
+    static ResType *sendQuery(const std::unique_ptr<Connect> &c,
+                              const std::string &q);
 
 protected:
     const std::string original_query;
@@ -408,10 +419,11 @@ public:
         : RewriteOutput(original_query) {}
     ~SimpleOutput() {;}
 
-    bool beforeQuery(Connect * const conn, Connect * const e_conn);
+    bool beforeQuery(const std::unique_ptr<Connect> &conn,
+                     const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz) const;
-    bool handleQueryFailure(Connect * const e_conn) const;
-    bool afterQuery(Connect * const e_conn) const;
+    bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
+    bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     bool doDecryption() const;
 };
 
@@ -422,10 +434,11 @@ public:
         : RewriteOutput(original_query), new_query(new_query) {}
     ~DMLOutput() {;}
 
-    bool beforeQuery(Connect * const conn, Connect * const e_conn);
+    bool beforeQuery(const std::unique_ptr<Connect> &conn,
+                     const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz) const;
-    bool handleQueryFailure(Connect * const e_conn) const;
-    bool afterQuery(Connect * const e_conn) const;
+    bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
+    bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
 
 private:
     const std::string new_query;
@@ -445,10 +458,11 @@ public:
       where_clause(where_clause), ps(ps) {}
     ~SpecialUpdate() {;}
 
-    bool beforeQuery(Connect * const conn, Connect * const e_conn);
+    bool beforeQuery(const std::unique_ptr<Connect> &conn,
+                     const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz) const;
-    bool handleQueryFailure(Connect * const e_conn) const;
-    bool afterQuery(Connect * const e_conn) const;
+    bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
+    bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
 
 private:
     const std::string new_query;
@@ -467,15 +481,17 @@ public:
         : RewriteOutput(original_query), deltas(deltas) {}
     virtual ~DeltaOutput() = 0;
 
-    bool beforeQuery(Connect * const conn, Connect * const e_conn) = 0;
+    bool beforeQuery(const std::unique_ptr<Connect> &conn,
+                     const std::unique_ptr<Connect> &e_conn) = 0;
     virtual bool getQuery(std::list<std::string> * const queryz) const = 0;
-    virtual bool handleQueryFailure(Connect * const e_conn) const = 0;
-    bool afterQuery(Connect * const e_conn) const = 0;
+    virtual bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
+        const = 0;
+    bool afterQuery(const std::unique_ptr<Connect> &e_conn) const = 0;
     bool stalesSchema() const;
 
-    static bool save(Connect * const e_conn,
+    static bool save(const std::unique_ptr<Connect> &e_conn,
                      unsigned long * const delta_output_id);
-    static bool destroyRecord(Connect * const e_conn,
+    static bool destroyRecord(const std::unique_ptr<Connect> &e_conn,
                               unsigned long delta_output_id);
 
 protected:
@@ -490,10 +506,11 @@ public:
         : DeltaOutput(original_query, deltas), new_query(new_query) {}
     ~DDLOutput() {;}
 
-    bool beforeQuery(Connect * const conn, Connect * const e_conn);
+    bool beforeQuery(const std::unique_ptr<Connect> &conn,
+                     const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz) const;
-    bool handleQueryFailure(Connect * const e_conn) const;
-    bool afterQuery(Connect * const e_conn) const;
+    bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
+    bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
 
 private:
     const std::string new_query;
@@ -510,12 +527,14 @@ public:
         : DeltaOutput("", deltas),
           adjust_queries(adjust_queries) {}
     ~AdjustOnionOutput() {;}
-    ResType *doQuery(Connect * const conn, Connect * const e_conn);
+    ResType *doQuery(const std::unique_ptr<Connect> &conn,
+                     const std::unique_ptr<Connect> &e_conn);
 
-    bool beforeQuery(Connect * const conn, Connect * const e_conn);
+    bool beforeQuery(const std::unique_ptr<Connect> &conn,
+                     const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz) const;
-    bool handleQueryFailure(Connect * const e_conn) const;
-    bool afterQuery(Connect * const e_conn) const;
+    bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
+    bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     bool queryAgain() const;
 
 private:
@@ -526,10 +545,10 @@ private:
     const std::list<std::string> local_qz() const;
 };
 
-bool saveDMLCompletion(Connect * const conn,
+bool saveDMLCompletion(const std::unique_ptr<Connect> &conn,
                        unsigned long delta_output_id);
-bool setRegularTableToBleedingTable(Connect * const e_conn);
-bool cleanupDeltaOutputAndQuery(Connect * const e_conn,
+bool setRegularTableToBleedingTable(const std::unique_ptr<Connect> &e_conn);
+bool cleanupDeltaOutputAndQuery(const std::unique_ptr<Connect> &e_conn,
                                 unsigned long delta_output_id);
 
 class Analysis {
