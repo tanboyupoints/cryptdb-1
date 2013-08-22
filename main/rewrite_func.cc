@@ -419,10 +419,12 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
                    << " with constr " << EncSet(constr);
 
         //rewrite children
-        assert_s(i->argument_count() == 2, " expecting two arguments for additive operator ");
+        assert_s(i->argument_count() == 2,
+                 " expecting two arguments for additive operator ");
         Item ** const args = i->arguments();
 
-        RewritePlanOneOLK * const rp = (RewritePlanOneOLK *) _rp;
+        const RewritePlanOneOLK * const rp =
+            static_cast<const RewritePlanOneOLK *>(_rp);
 
         std::cerr << "Rewrite plan is " << rp << "\n";
 
@@ -435,7 +437,8 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
             OnionMeta * const om = constr.key->getOnionMeta(oAGG);
             assert(om);
             EncLayer * const el = a.getBackEncLayer(om);
-            assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
+            assert_s(el->level() == SECLEVEL::HOM,
+                     "incorrect onion level on onion oHOM");
             return ((HOM*)el)->sumUDF(arg0, arg1);
         } else {
             IT * const out_i = new IT(arg0, arg1);

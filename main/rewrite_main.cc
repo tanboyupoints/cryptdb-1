@@ -970,12 +970,7 @@ Rewriter::rewrite(const ProxyState &ps, const std::string & q,
         schema = ps.getPreviousSchema();
     }
     assert(schema.get());
-    // HACK.
-    std::function<std::string(const std::string &)> doEscape =
-        [&ps] (const std::string &raw_string) {
-            return escapeString(ps.e_conn, raw_string);
-        };
-    Analysis analysis = Analysis(schema.get(), doEscape);
+    Analysis analysis = Analysis(schema.get());
     
     RewriteOutput *output;
     if (cryptdbDirective(q)) {

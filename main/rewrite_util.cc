@@ -410,11 +410,10 @@ encrypt_item_layers(Item * i, onion o, OnionMeta * const om,
     assert_s(enc_layers.size() > 0, "onion must have at least one layer");
     Item * enc = i;
     Item * prev_enc = NULL;
-    auto stringEscaper = a.getStringEscaper();
     for (auto layer : enc_layers) {
         LOG(encl) << "encrypt layer "
                   << TypeText<SECLEVEL>::toText(layer->level()) << "\n";
-        enc = layer->encrypt(enc, IV, stringEscaper);
+        enc = layer->encrypt(enc, IV);
         //need to free space for all enc
         //except the last one
         if (prev_enc) {

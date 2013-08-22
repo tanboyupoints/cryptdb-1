@@ -291,9 +291,7 @@ public:
     Create_field * newCreateField(Create_field * const cf,
                                   const std::string &anonname = "");
 
-    Item * encrypt(Item * const ptext, uint64_t IV,
-                   std::function<std::string(const std::string &)>
-                    doEscape);
+    Item * encrypt(Item * const ptext, uint64_t IV);
     Item * decrypt(Item * const ctext, uint64_t IV);
     Item * decryptUDF(Item * const col, Item * const ivcol);
 
@@ -319,9 +317,7 @@ public:
     Create_field * newCreateField(Create_field * const cf,
                                   const std::string &anonname = "");
 
-    Item * encrypt(Item * const ptext, uint64_t IV,
-                   std::function<std::string(const std::string &)>
-                    doEscape);
+    Item * encrypt(Item * const ptext, uint64_t IV);
     Item * decrypt(Item * const ctext, uint64_t IV);
     Item * decryptUDF(Item * const col, Item * const ivcol);
 
@@ -372,8 +368,7 @@ RND_int::newCreateField(Create_field * const cf,
 
 //TODO: may want to do more specialized crypto for lengths
 Item *
-RND_int::encrypt(Item * const ptext, uint64_t IV,
-                 std::function<std::string(const std::string &)>)
+RND_int::encrypt(Item * const ptext, uint64_t IV)
 {
     assert(!stringItem(ptext));
     //TODO: should have encrypt_SEM work for any length
@@ -455,8 +450,7 @@ RND_str::newCreateField(Create_field * const cf,
 }
 
 Item *
-RND_str::encrypt(Item * const ptext, uint64_t IV,
-                 std::function<std::string(const std::string &)> doEscape)
+RND_str::encrypt(Item * const ptext, uint64_t IV)
 {
     const std::string enc =
         encrypt_AES_CBC(ItemToString(ptext), enckey,
@@ -533,9 +527,7 @@ public:
     Create_field * newCreateField(Create_field * const cf,
                                   const std::string &anonname = "");
 
-    Item * encrypt(Item * const ptext, uint64_t IV,
-                   std::function<std::string(const std::string &)>
-                    doEscape);
+    Item * encrypt(Item * const ptext, uint64_t IV);
     Item * decrypt(Item * const ctext, uint64_t IV);
     Item * decryptUDF(Item * const col, Item * const ivcol = NULL);
 
@@ -560,9 +552,7 @@ class DET_mediumint : public DET_int {
 
     std::string name() const {return "DET_mediumint";}
 
-    Item * encrypt(Item * const ptext, uint64_t IV,
-                   std::function<std::string(const std::string &)>
-                    doEscape);
+    Item * encrypt(Item * const ptext, uint64_t IV);
     Item * decrypt(Item * const ctext, uint64_t IV);
 };
 
@@ -578,9 +568,7 @@ DET_mediumint::DET_mediumint(unsigned int id, const std::string &serial)
 
 
 Item *
-DET_mediumint::encrypt(Item * const ptext, uint64_t IV,
-                       std::function<std::string(const std::string &)>
-                        doEscape)
+DET_mediumint::encrypt(Item * const ptext, uint64_t IV)
 {
     const ulonglong val = static_cast<Item_int *>(ptext)->value;
 
@@ -589,7 +577,7 @@ DET_mediumint::encrypt(Item * const ptext, uint64_t IV,
         throw CryptDBError("Backend storage unit it not MEDIUMINT, won't floor. ");
     
     LOG(encl) << "DET_tinyint encrypt " << val << " IV " << IV << "--->";
-    return DET_int::encrypt(ptext, static_cast<ulong>(val), doEscape);
+    return DET_int::encrypt(ptext, static_cast<ulong>(val));
 }
 
 Item *
@@ -607,9 +595,7 @@ class DET_tinyint : public DET_int {
 
     std::string name() const {return "DET_tinyint";}
 
-    Item * encrypt(Item * const ptext, uint64_t IV,
-                   std::function<std::string(const std::string &)>
-                    doEscape);
+    Item * encrypt(Item * const ptext, uint64_t IV);
     Item * decrypt(Item * const ctext, uint64_t IV);
 };
 
@@ -625,9 +611,7 @@ DET_tinyint::DET_tinyint(unsigned int id, const std::string &serial)
 
 
 Item *
-DET_tinyint::encrypt(Item * const ptext, uint64_t IV,
-                     std::function<std::string(const std::string &)>
-                        doEscape)
+DET_tinyint::encrypt(Item * const ptext, uint64_t IV)
 {
     const ulonglong val = static_cast<Item_int *>(ptext)->value;
     
@@ -637,7 +621,7 @@ DET_tinyint::encrypt(Item * const ptext, uint64_t IV,
         
     LOG(encl) << "DET_tinyint encrypt " << val << " IV " << IV << "--->";
     // delegates
-    return DET_int::encrypt(ptext, static_cast<ulong>(val), doEscape);
+    return DET_int::encrypt(ptext, static_cast<ulong>(val));
 }
 
 Item *
@@ -670,9 +654,7 @@ public:
 
     std::string name() const {return "DET_dec";}
 
-    Item * encrypt(Item * const ptext, uint64_t IV,
-                   std::function<std::string(const std::string &)>
-                    doEscape);
+    Item * encrypt(Item * const ptext, uint64_t IV);
     Item * decrypt(Item * const ctext, uint64_t IV);
  
 protected:
@@ -695,9 +677,7 @@ public:
     Create_field * newCreateField(Create_field * const cf,
                                   const std::string &anonname = "");
 
-    Item * encrypt(Item * const ptext, uint64_t IV,
-                   std::function<std::string(const std::string &)>
-                    doEscape);
+    Item * encrypt(Item * const ptext, uint64_t IV);
     Item * decrypt(Item * const ctext, uint64_t IV);
     Item * decryptUDF(Item * const col, Item * const ivcol = NULL);
 
@@ -782,8 +762,7 @@ DET_int::newCreateField(Create_field * const cf,
 }
 
 Item *
-DET_int::encrypt(Item * const ptext, uint64_t IV,
-                 std::function<std::string(const std::string &)> doEscape)
+DET_int::encrypt(Item * const ptext, uint64_t IV)
 {
     assert(!stringItem(ptext));
     const ulonglong value = static_cast<Item_int*>(ptext)->value;
@@ -888,13 +867,12 @@ decimal_to_int(Item_decimal * const v, uint decimals,
     return new Item_int(res);
 }
 Item *
-DET_dec::encrypt(Item * const ptext, uint64_t IV,
-                 std::function<std::string(const std::string &)> doEscape)
+DET_dec::encrypt(Item * const ptext, uint64_t IV)
 {
     Item_decimal * const ptext_dec = static_cast<Item_decimal *>(ptext);
-    std::unique_ptr<Item_int>
+    const std::unique_ptr<Item_int>
         ptext_int(decimal_to_int(ptext_dec, decimals, shift));
-    Item * const result = DET_int::encrypt(ptext_int.get(), IV, doEscape);
+    Item * const result = DET_int::encrypt(ptext_int.get(), IV);
     
     return result;
 }
@@ -902,7 +880,7 @@ DET_dec::encrypt(Item * const ptext, uint64_t IV,
 Item *
 DET_dec::decrypt(Item * const ctext, uint64_t IV)
 {
-    std::unique_ptr<Item_int>
+    const std::unique_ptr<Item_int>
         res_int(static_cast<Item_int*>(DET_int::decrypt(ctext, IV)));
 
     Item_decimal * const res =
@@ -942,8 +920,7 @@ DET_str::newCreateField(Create_field * const cf,
 }
 
 Item *
-DET_str::encrypt(Item * const ptext, uint64_t IV,
-                 std::function<std::string(const std::string &)> doEscape)
+DET_str::encrypt(Item * const ptext, uint64_t IV)
 {
     const std::string plain = ItemToString(ptext);
     const std::string enc = encrypt_AES_CMC(plain, enckey, true);
@@ -1133,9 +1110,7 @@ public:
     Create_field * newCreateField(Create_field * const cf,
                                   const std::string &anonname = "");
 
-    Item * encrypt(Item * const p, uint64_t IV,
-                   std::function<std::string(const std::string &)>
-                    doEscape);
+    Item * encrypt(Item * const p, uint64_t IV);
     Item * decrypt(Item * const c, uint64_t IV);
 
 
@@ -1156,9 +1131,7 @@ public:
 
     std::string name() const {return "OPE_tinyint";}
 
-    Item * encrypt(Item * const p, uint64_t IV,
-                   std::function<std::string(const std::string &)>
-                    doEscape);
+    Item * encrypt(Item * const p, uint64_t IV);
     Item * decrypt(Item * const c, uint64_t IV);
 };
 
@@ -1172,9 +1145,7 @@ OPE_tinyint::OPE_tinyint(Create_field * const cf,
 {}
 
 Item *
-OPE_tinyint::encrypt(Item * const ptext, uint64_t IV,
-                     std::function<std::string(const std::string &)>
-                        doEscape)
+OPE_tinyint::encrypt(Item * const ptext, uint64_t IV)
 {
     const ulonglong val = static_cast<Item_int *>(ptext)->value;
 
@@ -1183,8 +1154,7 @@ OPE_tinyint::encrypt(Item * const ptext, uint64_t IV,
         throw CryptDBError("Backend storage unit it not TINYINT, won't floor. ");
 
     LOG(encl) << "OPE_tinyint encrypt " << val << " IV " << IV << "--->";
-    return OPE_int::encrypt(ptext, static_cast<const ulong>(val),
-                            doEscape);
+    return OPE_int::encrypt(ptext, static_cast<const ulong>(val));
 }
 
 Item *
@@ -1202,9 +1172,7 @@ public:
 
     std::string name() const {return "OPE_mediumint";}
 
-    Item * encrypt(Item * const p, uint64_t IV,
-                   std::function<std::string(const std::string &)>
-                    doEscape);
+    Item * encrypt(Item * const p, uint64_t IV);
     Item * decrypt(Item * const c, uint64_t IV);
 };
 
@@ -1218,9 +1186,7 @@ OPE_mediumint::OPE_mediumint(unsigned int id, const std::string &serial)
 {}
 
 Item *
-OPE_mediumint::encrypt(Item * const ptext, uint64_t IV,
-                       std::function<std::string(const std::string &)>
-                        doEscape)
+OPE_mediumint::encrypt(Item * const ptext, uint64_t IV)
 {
     const ulonglong val = static_cast<Item_int *>(ptext)->value;
 
@@ -1229,8 +1195,7 @@ OPE_mediumint::encrypt(Item * const ptext, uint64_t IV,
         throw CryptDBError("Backend storage unit it not MEDIUMINT, won't floor. ");
 
     LOG(encl) << "OPE_mediumint encrypt " << val << " IV " << IV << "--->";
-    return OPE_int::encrypt(ptext, static_cast<const ulong>(val),
-                            doEscape);
+    return OPE_int::encrypt(ptext, static_cast<const ulong>(val));
 }
 
 Item *
@@ -1253,9 +1218,7 @@ public:
     Create_field * newCreateField(Create_field * const cf,
                                   const std::string &anonname = "");
 
-    Item * encrypt(Item * const p, uint64_t IV,
-                   std::function<std::string(const std::string &)>
-                    doEscape);
+    Item * encrypt(Item * const p, uint64_t IV);
     Item * decrypt(Item * const c, uint64_t IV)__attribute__((noreturn));
 
 private:
@@ -1277,9 +1240,7 @@ public:
 
     std::string name() const {return "OPE_dec";}
 
-    Item * encrypt(Item * const p, uint64_t IV,
-                   std::function<std::string(const std::string &)>
-                    doEscape);
+    Item * encrypt(Item * const p, uint64_t IV);
     Item * decrypt(Item * const c, uint64_t IV);
 
 private:
@@ -1344,14 +1305,12 @@ OPE_dec::OPE_dec(unsigned int id, const std::string &serial)
 }
 
 Item *
-OPE_dec::encrypt(Item * const ptext, uint64_t IV,
-                 std::function<std::string(const std::string &)> doEscape)
+OPE_dec::encrypt(Item * const ptext, uint64_t IV)
 {
     Item_decimal * const ptext_dec = static_cast<Item_decimal *>(ptext);
-    Item_int * const ptext_int =
-        decimal_to_int(ptext_dec, decimals, shift);
-    Item * const result = OPE_int::encrypt(ptext_int, IV, doEscape);
-    delete ptext_int;
+    const std::unique_ptr<Item_int>
+        ptext_int(decimal_to_int(ptext_dec, decimals, shift));
+    Item * const result = OPE_int::encrypt(ptext_int.get(), IV);
     
     return result;
 }
@@ -1360,7 +1319,7 @@ OPE_dec::encrypt(Item * const ptext, uint64_t IV,
 Item *
 OPE_dec::decrypt(Item * const ctext, uint64_t IV)
 {
-    std::unique_ptr<Item_int>
+    const std::unique_ptr<Item_int>
         res_int(static_cast<Item_int *>(OPE_int::decrypt(ctext, IV)));
 
     Item_decimal * const res =
@@ -1389,8 +1348,7 @@ OPE_int::newCreateField(Create_field * const cf,
 }
 
 Item *
-OPE_int::encrypt(Item * const ptext, uint64_t IV,
-                 std::function<std::string(const std::string &)> doEscape)
+OPE_int::encrypt(Item * const ptext, uint64_t IV)
 {
     assert(!stringItem(ptext));
     const ulong pval =  (ulong)static_cast<Item_int *>(ptext)->value;
@@ -1433,8 +1391,7 @@ OPE_str::newCreateField(Create_field * const cf,
 }
 
 Item *
-OPE_str::encrypt(Item * const ptext, uint64_t IV,
-                 std::function<std::string(const std::string &)> doEscape)
+OPE_str::encrypt(Item * const ptext, uint64_t IV)
 {
     std::string ps = ItemToString(ptext);
     if (ps.size() < plain_size)
@@ -1471,9 +1428,7 @@ public:
   
 
     //TODO needs multi encrypt and decrypt
-    Item * encrypt(Item * const p, uint64_t IV,
-                   std::function<std::string(const std::string &)>
-                    doEscape);
+    Item * encrypt(Item * const p, uint64_t IV);
     Item * decrypt(Item * const c, uint64_t IV);
 
     //expr is the expression (e.g. a field) over which to sum
@@ -1605,8 +1560,7 @@ ZZToItemDec(const ZZ &val, const ZZ &shift)
 
 
 Item *
-HOM_dec::encrypt(Item * const ptext, uint64_t IV,
-                 std::function<std::string(const std::string &)> doEscape)
+HOM_dec::encrypt(Item * const ptext, uint64_t IV)
 {
     const ZZ enc = sk->encrypt(ItemDecToZZ(ptext, shift, decimals));
 
@@ -1616,8 +1570,8 @@ HOM_dec::encrypt(Item * const ptext, uint64_t IV,
 Item *
 HOM_dec::decrypt(Item * const ctext, uint64_t IV)
 {
-    ZZ enc = ItemStrToZZ(ctext);
-    ZZ dec = sk->decrypt(enc);
+    const ZZ enc = ItemStrToZZ(ctext);
+    const ZZ dec = sk->decrypt(enc);
 
     return ZZToItemDec(dec, shift);
 }
@@ -1627,7 +1581,8 @@ HOM_dec::decrypt(Item * const ctext, uint64_t IV)
 HOM::HOM(Create_field * const f, const std::string &seed_key)
     : seed_key(seed_key)
 {
-    std::unique_ptr<streamrng<arc4>> prng(new streamrng<arc4>(seed_key));
+    const std::unique_ptr<streamrng<arc4>>
+        prng(new streamrng<arc4>(seed_key));
     sk = new Paillier_priv(Paillier_priv::keygen(prng.get(), nbits));
 }
 
@@ -1648,8 +1603,7 @@ HOM::newCreateField(Create_field * const cf, const std::string &anonname)
 
 
 Item *
-HOM::encrypt(Item * const ptext, uint64_t IV,
-             std::function<std::string(const std::string &)>)
+HOM::encrypt(Item * const ptext, uint64_t IV)
 {
     const ZZ enc = sk->encrypt(ItemIntToZZ(ptext));
     return ZZToItemStr(enc);
@@ -1756,7 +1710,8 @@ assembleWords(std::list<std::string> * const words)
 static std::string
 encryptSWP(const std::string &key, const std::list<std::string> &words)
 {
-    std::unique_ptr<std::list<std::string>> l(SWP::encrypt(key, words));
+    const std::unique_ptr<std::list<std::string>>
+        l(SWP::encrypt(key, words));
     const std::string r = assembleWords(l.get());
     return r;
 }
@@ -1806,8 +1761,7 @@ newmem(const std::string &a)
 }
 
 Item *
-Search::encrypt(Item * const ptext, uint64_t IV,
-                std::function<std::string(const std::string &)> doEscape)
+Search::encrypt(Item * const ptext, uint64_t IV)
 {
     const std::string plainstr = ItemToString(ptext);
     //TODO: remove string, string serves this purpose now..

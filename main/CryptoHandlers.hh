@@ -62,9 +62,7 @@ public:
         newCreateField(Create_field * const cf,
                        const std::string &anonname = "") = 0;
 
-    virtual Item * encrypt(Item * const ptext, uint64_t IV,
-                           std::function<std::string(const std::string &)>
-                            doEscape) = 0;
+    virtual Item * encrypt(Item * const ptext, uint64_t IV) = 0;
     virtual Item * decrypt(Item * const ctext, uint64_t IV) = 0;
 
     // returns the decryptUDF to remove the onion layer
@@ -101,9 +99,7 @@ public:
                                   const std::string &anonname = "");
 
     //TODO needs multi encrypt and decrypt
-    Item * encrypt(Item * const p, uint64_t IV,
-                   std::function<std::string(const std::string &)>
-                    doEscape);
+    Item * encrypt(Item * const p, uint64_t IV);
     Item * decrypt(Item * const c, uint64_t IV);
 
     //expr is the expression (e.g. a field) over which to sum
@@ -131,9 +127,7 @@ public:
     Create_field * newCreateField(Create_field * const cf,
                                   const std::string &anonname = "");
 
-    Item * encrypt(Item * const ptext, uint64_t IV,
-                   std::function<std::string(const std::string &)>
-                    doEscape);
+    Item * encrypt(Item * const ptext, uint64_t IV);
     Item * decrypt(Item * const ctext,
                    uint64_t IV) __attribute__((noreturn));
 
@@ -181,9 +175,7 @@ public:
         return f0;
     }
 
-    Item *encrypt(Item * const ptext, uint64_t IV,
-                  std::function<std::string(const std::string &)>
-                    doEscape)
+    Item *encrypt(Item * const ptext, uint64_t IV)
     {
         return ptext;
     }
