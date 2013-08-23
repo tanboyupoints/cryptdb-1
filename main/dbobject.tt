@@ -100,11 +100,13 @@ MappedDBMeta<ChildType, KeyType>::fetchChildren(const std::unique_ptr<Connect> &
     // Perhaps it's conceptually cleaner to have this lambda return
     // pairs of keys and children and then add the children from local
     // scope.
-    std::function<std::shared_ptr<DBMeta>(std::string,
-                                          std::string,
-                                          std::string)>
+    std::function<std::shared_ptr<DBMeta>(const std::string &,
+                                          const std::string &,
+                                          const std::string &)>
         deserialize =
-        [this] (std::string key, std::string serial, std::string id) {
+        [this] (const std::string &key, const std::string &serial,
+                const std::string &id)
+        {
             KeyType *meta_key = AbstractMetaKey::factory<KeyType>(key);
             auto dChild = ChildType::deserialize;
             std::shared_ptr<ChildType>

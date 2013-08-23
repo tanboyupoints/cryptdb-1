@@ -146,7 +146,8 @@ public:
     virtual std::string typeName() const = 0;
     virtual std::vector<std::shared_ptr<DBMeta>>
         fetchChildren(const std::unique_ptr<Connect> &e_conn) = 0;
-    virtual void applyToChildren(std::function<void(const std::shared_ptr<DBMeta>)>)
+    virtual void
+        applyToChildren(std::function<void(const std::shared_ptr<DBMeta>)>)
         const = 0;
     virtual AbstractMetaKey *getKey(const DBMeta *const child) const = 0;
 
@@ -154,7 +155,8 @@ protected:
     std::vector<std::shared_ptr<DBMeta>>
         doFetchChildren(const std::unique_ptr<Connect> &e_conn,
                         std::function<std::shared_ptr<DBMeta>
-                            (std::string, std::string, std::string)>
+                            (const std::string &, const std::string &,
+                             const std::string &)>
                             deserialHandler);
 };
 

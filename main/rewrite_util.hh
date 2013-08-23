@@ -44,11 +44,11 @@ begin_transaction_lex(const std::string &dbname);
 LEX *
 commit_transaction_lex(const std::string &dbname);
 
-std::vector<Create_field*>
+std::vector<Create_field *>
 rewrite_create_field(const FieldMeta * const fm, Create_field * const f,
                      const Analysis &a);
 
-std::vector<Key*>
+std::vector<Key *>
 rewrite_key(const TableMeta * const tm, Key * const key,
             const Analysis &a);
 

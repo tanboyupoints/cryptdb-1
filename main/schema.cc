@@ -14,7 +14,8 @@
 std::vector<std::shared_ptr<DBMeta>>
 DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
                         std::function<std::shared_ptr<DBMeta>
-                            (std::string, std::string, std::string)>
+                            (const std::string &, const std::string &,
+                             const std::string &)>
                             deserialHandler)
 {
     const std::string table_name = MetaDataTables::Name::metaObject();
@@ -108,11 +109,12 @@ std::string OnionMeta::getAnonOnionName() const
 std::vector<std::shared_ptr<DBMeta>>
 OnionMeta::fetchChildren(const std::unique_ptr<Connect> &e_conn)
 {
-    std::function<std::shared_ptr<DBMeta>(std::string, std::string,
-                                          std::string)>
+    std::function<std::shared_ptr<DBMeta>(const std::string &,
+                                          const std::string &,
+                                          const std::string &)>
         deserialHelper =
-    [this] (std::string key, std::string serial, std::string id)
-        -> std::shared_ptr<EncLayer>
+    [this] (const std::string &key, const std::string &serial,
+            const std::string &id) -> std::shared_ptr<EncLayer>
     {
         std::function<unsigned int(std::string)> strToInt =
             [](std::string s) {return atoi(s.c_str());};
@@ -270,15 +272,16 @@ FieldMeta::orderedOnionMetas() const
     return v;
 }
 
-std::string FieldMeta::getSaltName() const {
+std::string FieldMeta::getSaltName() const
+{
     assert(has_salt);
     return salt_name;
 }
 
-SECLEVEL FieldMeta::getOnionLevel(onion o) const {
-    OnionMetaKey *key = new OnionMetaKey(o);
-    const auto om = getChild(key);
-    delete key;
+SECLEVEL FieldMeta::getOnionLevel(onion o) const
+{
+    std::unique_ptr<OnionMetaKey> key(new OnionMetaKey(o));
+    const auto om = getChild(key.get());
     if (om == NULL) {
         return SECLEVEL::INVALID;
     }
@@ -286,8 +289,9 @@ SECLEVEL FieldMeta::getOnionLevel(onion o) const {
     return om->getSecLevel();
 }
 
-bool FieldMeta::setOnionLevel(onion o, SECLEVEL maxl) {
-    OnionMeta *om = getOnionMeta(o);
+bool FieldMeta::setOnionLevel(onion o, SECLEVEL maxl)
+{
+    OnionMeta * const om = getOnionMeta(o);
     if (NULL == om) {
         return false;
     }
@@ -310,7 +314,7 @@ OnionMeta *FieldMeta::getOnionMeta(onion o) const
 }
 
 onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
-                                      Create_field *f,
+                                      const Create_field * const f,
                                       SECURITY_RATING sec_rating)
 {
     if (sec_rating == SECURITY_RATING::PLAIN) {
@@ -370,7 +374,8 @@ std::string TableMeta::serialize(const DBObject &parent) const
 
 // FIXME: May run into problems where a plaintext table expects the regular
 // name, but it shouldn't get that name from 'getAnonTableName' anyways.
-std::string TableMeta::getAnonTableName() const {
+std::string TableMeta::getAnonTableName() const
+{
     return anon_table_name;
 }
 
@@ -422,10 +427,10 @@ SchemaInfo::getFieldMeta(const std::string &table,
 
 // FIXME: Slow.
 std::string
-SchemaInfo::getTableNameFromFieldMeta(FieldMeta *fm) const
+SchemaInfo::getTableNameFromFieldMeta(const FieldMeta * const fm) const
 {
     for (auto it : children) {
-        AbstractMetaKey *key = it.second->getKey(fm);
+        const AbstractMetaKey * const key = it.second->getKey(fm);
         if (key) {
             return it.first->getValue();
         }

@@ -168,7 +168,7 @@ private:
     SECLEVEL getOnionLevel(onion o) const;
     bool setOnionLevel(onion o, SECLEVEL maxl);
     static onionlayout getOnionLayout(const AES_KEY * const m_key,
-                                      Create_field *f,
+                                      const Create_field * const f,
                                       SECURITY_RATING sec_rating);
 } FieldMeta;
 
@@ -219,24 +219,25 @@ private:
 // this level or below. Use Analysis::* if you need aliasing.
 typedef class SchemaInfo : public MappedDBMeta<TableMeta, IdentityMetaKey> {
 public:
-    SchemaInfo() : MappedDBMeta(0), db_name("cryptdbtest") {}
+    SchemaInfo() : MappedDBMeta(0) {}
     ~SchemaInfo() {}
 
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
-    std::string getTableNameFromFieldMeta(FieldMeta *fm) const;
+    std::string getTableNameFromFieldMeta(const FieldMeta * const fm)
+        const;
 
     friend class Analysis;
 
 private:
     constexpr static const char *type_name = "schemaInfo";
-    const char *db_name;
 
     // These functions do not support Aliasing, use Analysis::getTableMeta
     // and Analysis::getFieldMeta.
     FieldMeta * getFieldMeta(const std::string &table,
                              const std::string &field) const;
-    std::string serialize(const DBObject &parent) const {
+    std::string serialize(const DBObject &parent) const
+    {
         throw CryptDBError("SchemaInfo can not be serialized!");
     }
 } SchemaInfo;

@@ -58,7 +58,7 @@ stringToItemField(const std::string &field,
 }
 
 static inline std::string
-extract_fieldname(Item_field *i)
+extract_fieldname(Item_field * const i)
 {
     std::stringstream fieldtemp;
     fieldtemp << *i;
@@ -68,7 +68,7 @@ extract_fieldname(Item_field *i)
 
 //TODO: remove this at some point
 static inline void
-mysql_query_wrapper(MYSQL *m, const std::string &q)
+mysql_query_wrapper(MYSQL * const m, const std::string &q)
 {
     if (mysql_query(m, q.c_str())) {
         cryptdb_err() << "query failed: " << q
@@ -1050,7 +1050,7 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
             continue;
         }
 
-        FieldMeta * fm = rf.getOLK().key;
+        FieldMeta * const fm = rf.getOLK().key;
         for (unsigned int r = 0; r < rows; r++) {
             if (!fm || dbres.rows[r][c]->is_null()) {
                 res->rows[r][col_index] = dbres.rows[r][c];
@@ -1058,10 +1058,10 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
                 uint64_t salt = 0;
                 const int salt_pos = rf.getSaltPosition();
                 if (salt_pos >= 0) {
-                    Item * salt_item = dbres.rows[r][salt_pos];
+                    Item_int * const salt_item =
+                        static_cast<Item_int *>(dbres.rows[r][salt_pos]);
                     assert_s(!salt_item->null_value, "salt item is null");
-                    salt =
-                        ((Item_int *)dbres.rows[r][salt_pos])->value;
+                    salt = salt_item->value;
                 }
 
                 res->rows[r][col_index] =
