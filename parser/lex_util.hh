@@ -24,8 +24,8 @@
 
 //copies any data structure shallowly
 template <typename T>
-T * copy(T *x) {
-    T * res = (T *) malloc(sizeof(T));
+T *copy(const T * const x) {
+    T * const res = static_cast<T *>(malloc(sizeof(T)));
     memcpy(res, x, sizeof(T));
     return res;
 }

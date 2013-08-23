@@ -288,7 +288,7 @@ public:
     SECLEVEL level() const {return SECLEVEL::RND;}
     std::string name() const {return "RND_int";}
     
-    Create_field * newCreateField(Create_field * const cf,
+    Create_field * newCreateField(const Create_field * const cf,
                                   const std::string &anonname = "");
 
     Item * encrypt(Item * const ptext, uint64_t IV);
@@ -314,7 +314,7 @@ public:
 
     SECLEVEL level() const {return SECLEVEL::RND;}
     std::string name() const {return "RND_str";}
-    Create_field * newCreateField(Create_field * const cf,
+    Create_field * newCreateField(const Create_field * const cf,
                                   const std::string &anonname = "");
 
     Item * encrypt(Item * const ptext, uint64_t IV);
@@ -360,7 +360,7 @@ RND_int::RND_int(unsigned int id, const std::string &serial)
 {}
 
 Create_field *
-RND_int::newCreateField(Create_field * const cf,
+RND_int::newCreateField(const Create_field * const cf,
                         const std::string &anonname)
 {
     return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
@@ -440,7 +440,7 @@ RND_str::RND_str(unsigned int id, const std::string &serial)
 
 
 Create_field *
-RND_str::newCreateField(Create_field * const cf,
+RND_str::newCreateField(const Create_field * const cf,
                         const std::string &anonname)
 {
     auto typelen = type_len_for_AES_str(cf->sql_type, cf->length, false);
@@ -524,7 +524,7 @@ public:
 
     virtual SECLEVEL level() const {return SECLEVEL::DET;}
     std::string name() const {return "DET_int";}
-    Create_field * newCreateField(Create_field * const cf,
+    Create_field * newCreateField(const Create_field * const cf,
                                   const std::string &anonname = "");
 
     Item * encrypt(Item * const ptext, uint64_t IV);
@@ -674,7 +674,7 @@ public:
 
     virtual SECLEVEL level() const {return SECLEVEL::DET;}
     std::string name() const {return "DET_str";}
-    Create_field * newCreateField(Create_field * const cf,
+    Create_field * newCreateField(const Create_field * const cf,
                                   const std::string &anonname = "");
 
     Item * encrypt(Item * const ptext, uint64_t IV);
@@ -755,7 +755,7 @@ DET_int::DET_int(unsigned int id, const std::string &serial)
 {}
 
 Create_field *
-DET_int::newCreateField(Create_field * const cf,
+DET_int::newCreateField(const Create_field * const cf,
                         const std::string &anonname)
 {
     return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
@@ -910,7 +910,7 @@ DET_str::DET_str(unsigned int id, const std::string &serial)
 
 
 Create_field *
-DET_str::newCreateField(Create_field * const cf,
+DET_str::newCreateField(const Create_field * const cf,
                         const std::string &anonname)
 {
     auto typelen = type_len_for_AES_str(cf->sql_type, cf->length, true);
@@ -1107,7 +1107,7 @@ public:
   
     SECLEVEL level() const {return SECLEVEL::OPE;}
     std::string name() const {return "OPE_int";}
-    Create_field * newCreateField(Create_field * const cf,
+    Create_field * newCreateField(const Create_field * const cf,
                                   const std::string &anonname = "");
 
     Item * encrypt(Item * const p, uint64_t IV);
@@ -1215,7 +1215,7 @@ public:
 
     SECLEVEL level() const {return SECLEVEL::OPE;}
     std::string name() const {return "OPE_str";}
-    Create_field * newCreateField(Create_field * const cf,
+    Create_field * newCreateField(const Create_field * const cf,
                                   const std::string &anonname = "");
 
     Item * encrypt(Item * const p, uint64_t IV);
@@ -1341,7 +1341,7 @@ OPE_int::OPE_int(unsigned int id, const std::string &serial)
 {}
 
 Create_field *
-OPE_int::newCreateField(Create_field * const cf,
+OPE_int::newCreateField(const Create_field * const cf,
                         const std::string &anonname)
 {
     return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname);
@@ -1383,7 +1383,7 @@ OPE_str::OPE_str(unsigned int id, const std::string &serial)
 {}
 
 Create_field *
-OPE_str::newCreateField(Create_field * const cf,
+OPE_str::newCreateField(const Create_field * const cf,
                         const std::string &anonname)
 {
     return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname,
@@ -1595,7 +1595,8 @@ HOM::HOM(unsigned int id, const std::string &serial)
 }
 
 Create_field *
-HOM::newCreateField(Create_field * const cf, const std::string &anonname)
+HOM::newCreateField(const Create_field * const cf,
+                    const std::string &anonname)
 {
     return createFieldHelper(cf, 2*nbits/8, MYSQL_TYPE_VARCHAR,
                              anonname, &my_charset_bin);
@@ -1684,7 +1685,7 @@ Search::Search(unsigned int id, const std::string &serial)
 }
 
 Create_field *
-Search::newCreateField(Create_field * const cf,
+Search::newCreateField(const Create_field * const cf,
                        const std::string &anonname)
 {
     return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname,

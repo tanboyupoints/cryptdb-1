@@ -5,7 +5,7 @@
 // If mkey == NULL, the field is not encrypted
 inline void
 init_onions_layout(const AES_KEY * const m_key,
-                   FieldMeta * fm, Create_field * cf)
+                   FieldMeta * const fm, Create_field * const cf)
 {
     assert(fm->has_salt == static_cast<bool>(m_key));
     assert(0 == fm->children.size());

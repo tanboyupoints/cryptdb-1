@@ -11,7 +11,7 @@
 extern CItemTypesDir itemTypes;
 
 void
-optimize(Item **i, Analysis &a) {
+optimize(Item ** const i, Analysis &a) {
    //TODO
 /*Item *i0 = itemTypes.do_optimize(*i, a);
     if (i0 != *i) {
@@ -29,11 +29,11 @@ optimize(Item **i, Analysis &a) {
 // that should be rewritten
 // @item_cache defaults to NULL
 Item *
-rewrite(Item *i, const EncSet &req_enc, Analysis &a)
+rewrite(Item * const i, const EncSet &req_enc, Analysis &a)
 {
     RewritePlan * const rp = getAssert(a.rewritePlans, i);
     assert(rp);
-    EncSet solution = rp->es_out.intersect(req_enc);
+    const EncSet solution = rp->es_out.intersect(req_enc);
     if (solution.empty()) {
         // FIXME: Error message;
         assert(false);
@@ -43,12 +43,12 @@ rewrite(Item *i, const EncSet &req_enc, Analysis &a)
 }
 
 TABLE_LIST *
-rewrite_table_list(TABLE_LIST *t, Analysis &a)
+rewrite_table_list(const TABLE_LIST * const t, const Analysis &a)
 {
     // Table name can only be empty when grouping a nested join.
     assert(t->table_name || t->nested_join);
     if (t->table_name) {
-        std::string anon_name =
+        const std::string anon_name =
             a.getAnonTableName(std::string(t->table_name,
                                t->table_name_length));
         return rewrite_table_list(t, anon_name);
@@ -58,7 +58,8 @@ rewrite_table_list(TABLE_LIST *t, Analysis &a)
 }
 
 TABLE_LIST *
-rewrite_table_list(TABLE_LIST *t, std::string anon_name)
+rewrite_table_list(const TABLE_LIST * const t,
+                   const std::string &anon_name)
 {
     TABLE_LIST * const new_t = copy(t);
     new_t->table_name =
@@ -85,7 +86,8 @@ rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
        tl = rewrite_table_list(tlist.first, a);
     }
 
-    SQL_I_List<TABLE_LIST> * new_tlist = oneElemList<TABLE_LIST>(tl);
+    const SQL_I_List<TABLE_LIST> * const new_tlist =
+        oneElemList<TABLE_LIST>(tl);
 
     TABLE_LIST * prev = tl;
     for (TABLE_LIST *tbl = tlist.first->next_local; tbl;
@@ -106,14 +108,14 @@ rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
 }
 
 List<TABLE_LIST>
-rewrite_table_list(List<TABLE_LIST> tll, Analysis & a)
+rewrite_table_list(List<TABLE_LIST> tll, Analysis &a)
 {
     List<TABLE_LIST> * const new_tll = new List<TABLE_LIST>();
 
     List_iterator<TABLE_LIST> join_it(tll);
 
     for (;;) {
-        TABLE_LIST *t = join_it++;
+        const TABLE_LIST * const t = join_it++;
         if (!t) {
             break;
         }
@@ -122,7 +124,8 @@ rewrite_table_list(List<TABLE_LIST> tll, Analysis & a)
         new_tll->push_back(new_t);
 
         if (t->nested_join) {
-            new_t->nested_join->join_list = rewrite_table_list(t->nested_join->join_list, a);
+            new_t->nested_join->join_list =
+                rewrite_table_list(t->nested_join->join_list, a);
             return *new_tll;
         }
 
@@ -145,7 +148,7 @@ rewrite_table_list(List<TABLE_LIST> tll, Analysis & a)
  * Helper functions to look up via directory & invoke method.
  */
 RewritePlan *
-gather(Item *i, reason &tr, Analysis & a)
+gather(Item * const i, reason &tr, Analysis &a)
 {
     return itemTypes.do_gather(i, tr, a);
 }
@@ -153,7 +156,7 @@ gather(Item *i, reason &tr, Analysis & a)
 //TODO: need to check somewhere that plain is returned
 //TODO: Put in gather helpers file.
 void
-analyze(Item *i, Analysis & a)
+analyze(Item * const i, Analysis &a)
 {
     assert(i != NULL);
     LOG(cdb_v) << "calling gather for item " << *i;
@@ -178,15 +181,15 @@ commit_transaction_lex(const std::string &dbname) {
 //TODO(raluca) : figure out how to create Create_field from scratch
 // and avoid this chaining and passing f as an argument
 static Create_field *
-get_create_field(const Analysis &a, Create_field * f, OnionMeta *om,
-                 const std::string & name)
+get_create_field(const Analysis &a, Create_field * const f,
+                 OnionMeta * const om, const std::string &name)
 {
-    Create_field * new_cf = f;
+    Create_field *new_cf = f;
     
     auto enc_layers = a.getEncLayers(om);
     assert(enc_layers.size() > 0);
     for (auto l : enc_layers) {
-        Create_field * old_cf = new_cf;
+        const Create_field * const old_cf = new_cf;
         new_cf = l->newCreateField(old_cf, name);
 
         if (old_cf != f) {
@@ -198,7 +201,7 @@ get_create_field(const Analysis &a, Create_field * f, OnionMeta *om,
 }
 
 static Item *
-makeNiceDefault(Create_field *cf)
+makeNiceDefault(const Create_field * const cf)
 {
     assert(cf->def);
 
@@ -235,7 +238,8 @@ makeNiceDefault(Create_field *cf)
 }
 
 std::vector<Create_field *>
-rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
+rewrite_create_field(const FieldMeta * const fm,
+                     Create_field * const f, const Analysis &a)
 {
     LOG(cdb_v) << "in rewrite create field for " << *f;
 
@@ -270,12 +274,13 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
     // create salt column
     if (fm->has_salt) {
         //cerr << fm->salt_name << endl;
-        THD *thd         = current_thd;
-        Create_field *f0 = f->clone(thd->mem_root);
-        f0->field_name   = thd->strdup(fm->getSaltName().c_str());
-        f0->flags = f0->flags | UNSIGNED_FLAG;//salt is unsigned
-        f0->sql_type     = MYSQL_TYPE_LONGLONG;
-        f0->length       = 8;
+        THD * const thd   = current_thd;
+        Create_field * const f0 = f->clone(thd->mem_root);
+        f0->field_name          = thd->strdup(fm->getSaltName().c_str());
+        f0->flags               = f0->flags | UNSIGNED_FLAG; // salt is
+                                                             // unsigned
+        f0->sql_type            = MYSQL_TYPE_LONGLONG;
+        f0->length              = 8;
 
         if (has_default) {
             f0->def = new Item_int(static_cast<ulonglong>(default_salt));
@@ -289,7 +294,7 @@ rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a)
 
 static
 const OnionMeta *
-getKeyOnionMeta(const FieldMeta *fm)
+getKeyOnionMeta(const FieldMeta * const fm)
 {
     std::vector<onion> onions({oOPE, oDET, oPLAIN});
     for (auto it : onions) {
@@ -304,11 +309,12 @@ getKeyOnionMeta(const FieldMeta *fm)
 
 // TODO: Add Key for oDET onion as well.
 std::vector<Key*>
-rewrite_key(const TableMeta *tm, Key *key, Analysis &a)
+rewrite_key(const TableMeta * const tm, Key * const key,
+            const Analysis &a)
 {
     std::vector<Key*> output_keys;
     Key * const new_key = key->clone(current_thd->mem_root);
-    auto col_it =
+    const auto col_it =
         List_iterator<Key_part_spec>(key->columns);
     // FIXME: Memleak.
     const std::string new_name =
@@ -345,7 +351,7 @@ bool_to_string(bool b)
 }
 
 bool
-string_to_bool(std::string s)
+string_to_bool(const std::string &s)
 {
     if (s == std::string("TRUE") || s == std::string("1")) {
         return true;
@@ -358,7 +364,7 @@ string_to_bool(std::string s)
 
 List<Create_field>
 createAndRewriteField(Analysis &a, const ProxyState &ps,
-                      Create_field *cf, TableMeta *tm,
+                      Create_field * const cf, TableMeta * const tm,
                       bool new_table,
                       List<Create_field> &rewritten_cfield_list)
 {
@@ -367,8 +373,8 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     // -----------------------------
     const std::string name = std::string(cf->field_name);
     auto buildFieldMeta =
-        [] (const std::string name, Create_field *cf,
-            const ProxyState &ps, TableMeta *tm)
+        [] (const std::string name, Create_field * const cf,
+            const ProxyState &ps, TableMeta * const tm)
     {
         if (Field::NEXT_NUMBER == cf->unireg_check) {
             return new FieldMeta(name, cf, NULL, SECURITY_RATING::PLAIN,
@@ -397,7 +403,7 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     //         Rewrite FIELD       
     // -----------------------------
     // FIXME: PTR.
-    auto new_fields = rewrite_create_field(fm.get(), cf, a);
+    const auto new_fields = rewrite_create_field(fm.get(), cf, a);
     rewritten_cfield_list.concat(vectorToList(new_fields));
 
     return rewritten_cfield_list;
@@ -405,7 +411,7 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
 
 //TODO: which encrypt/decrypt should handle null?
 Item *
-encrypt_item_layers(Item * i, onion o, OnionMeta * const om,
+encrypt_item_layers(Item * const i, onion o, OnionMeta * const om,
                     const Analysis &a, uint64_t IV) {
     assert(!i->is_null());
 

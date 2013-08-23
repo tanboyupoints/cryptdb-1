@@ -59,7 +59,7 @@ public:
 
     // returns a rewritten create field to include in rewritten query
     virtual Create_field *
-        newCreateField(Create_field * const cf,
+        newCreateField(const Create_field * const cf,
                        const std::string &anonname = "") = 0;
 
     virtual Item * encrypt(Item * const ptext, uint64_t IV) = 0;
@@ -95,7 +95,7 @@ public:
 
     SECLEVEL level() const {return SECLEVEL::HOM;}
     std::string name() const {return "HOM";}
-    Create_field * newCreateField(Create_field * const cf,
+    Create_field * newCreateField(const Create_field * const cf,
                                   const std::string &anonname = "");
 
     //TODO needs multi encrypt and decrypt
@@ -124,7 +124,7 @@ public:
 
     SECLEVEL level() const {return SECLEVEL::SEARCH;}
     std::string name() const {return "SEARCH";}
-    Create_field * newCreateField(Create_field * const cf,
+    Create_field * newCreateField(const Create_field * const cf,
                                   const std::string &anonname = "");
 
     Item * encrypt(Item * const ptext, uint64_t IV);
@@ -163,7 +163,7 @@ public:
     SECLEVEL level() const {return SECLEVEL::PLAINVAL;}
     std::string name() const {return "PLAINTEXT";}
 
-    Create_field *newCreateField(Create_field * const cf,
+    Create_field *newCreateField(const Create_field * const cf,
                                  const std::string &anonname = "")
     {
         const THD * const thd = current_thd;

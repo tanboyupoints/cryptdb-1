@@ -13,29 +13,30 @@ const std::string GREEN_BEGIN = "\033[1;92m";
 const std::string COLOR_END = "\033[0m";
 
 Item *
-rewrite(Item *i, const EncSet &req_enc, Analysis &a);
+rewrite(Item * const i, const EncSet &req_enc, Analysis &a);
 
 TABLE_LIST *
-rewrite_table_list(TABLE_LIST *t, Analysis &a);
+rewrite_table_list(const TABLE_LIST * const t, const Analysis &a);
 
 TABLE_LIST *
-rewrite_table_list(TABLE_LIST *t, std::string anon_name);
+rewrite_table_list(const TABLE_LIST * const t,
+                   const std::string &anon_name);
 
 SQL_I_List<TABLE_LIST>
 rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
                    bool if_exists=false);
 
 List<TABLE_LIST>
-rewrite_table_list(List<TABLE_LIST> tll, Analysis & a);
+rewrite_table_list(List<TABLE_LIST> tll, Analysis &a);
 
 RewritePlan *
-gather(Item *i, reason &tr, Analysis & a);
+gather(Item * const i, reason &tr, Analysis &a);
 
 void
-analyze(Item *i, Analysis & a);
+analyze(Item * const i, Analysis &a);
 
 void
-optimize(Item **i, Analysis &a);
+optimize(Item ** const i, Analysis &a);
 
 LEX *
 begin_transaction_lex(const std::string &dbname);
@@ -44,24 +45,26 @@ LEX *
 commit_transaction_lex(const std::string &dbname);
 
 std::vector<Create_field*>
-rewrite_create_field(FieldMeta *fm, Create_field *f, const Analysis &a);
+rewrite_create_field(const FieldMeta * const fm, Create_field * const f,
+                     const Analysis &a);
 
 std::vector<Key*>
-rewrite_key(const TableMeta *tm, Key *key, Analysis &a);
+rewrite_key(const TableMeta * const tm, Key * const key,
+            const Analysis &a);
 
 std::string
 bool_to_string(bool b);
 
-bool string_to_bool(std::string s);
+bool string_to_bool(const std::string &s);
 
 List<Create_field>
 createAndRewriteField(Analysis &a, const ProxyState &ps,
-                      Create_field *cf, TableMeta *tm,
+                      Create_field * const cf, TableMeta * const tm,
                       bool new_table,
                       List<Create_field> &rewritten_cfield_list);
 
 Item *
-encrypt_item_layers(Item * i, onion o, OnionMeta * const om,
+encrypt_item_layers(Item * const i, onion o, OnionMeta * const om,
                     const Analysis &a, uint64_t IV = 0);
 
 std::string
@@ -70,7 +73,7 @@ rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q);
 // FIXME(burrows): Generalize to support any container with next AND end
 // semantics.
 template <typename T>
-std::string vector_join(std::vector<T> v, std::string delim,
+std::string vector_join(std::vector<T> v, const std::string &delim,
                         std::string (*finalize)(T))
 {
     std::string accum;
@@ -81,14 +84,14 @@ std::string vector_join(std::vector<T> v, std::string delim,
         accum.append(delim);
     }
 
-    std::string output;
+    AssignOnce<std::string> output;
     if (accum.length() > 0) {
         output = accum.substr(0, accum.length() - delim.length());
     } else {
         output = accum;
     }
 
-    return output;
+    return output.get();
 }
 
 std::string
