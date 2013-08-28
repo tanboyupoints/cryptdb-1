@@ -264,17 +264,20 @@ rewrite_create_field(const FieldMeta * const fm,
             get_create_field(a, f, om, om->getAnonOnionName());
         assert(has_default == static_cast<bool>(new_cf->def));
         if (has_default) {
-            const std::unique_ptr<Item> def(makeNiceDefault(new_cf));
+            // AWARE: Could be pulled out, but would require an additional
+            // if statement for has_default.
+            const std::unique_ptr<Item> def(makeNiceDefault(f));
             new_cf->def =
                 encrypt_item_layers(def.get(), o, om, a, default_salt);
         }
+
         output_cfields.push_back(new_cf);
     }
 
     // create salt column
     if (fm->has_salt) {
         //cerr << fm->salt_name << endl;
-        THD * const thd   = current_thd;
+        THD * const thd         = current_thd;
         Create_field * const f0 = f->clone(thd->mem_root);
         f0->field_name          = thd->strdup(fm->getSaltName().c_str());
         f0->flags               = f0->flags | UNSIGNED_FLAG; // salt is

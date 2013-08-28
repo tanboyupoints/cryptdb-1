@@ -171,7 +171,7 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
         
         for (auto it : fm->children) {
             const onion o = it.first->getValue();
-            std::shared_ptr<OnionMeta> om = it.second;
+            const std::shared_ptr<OnionMeta> om = it.second;
             // FIXME: PTR.
             l.push_back(encrypt_item_layers(i, o, om.get(), a, salt));
         }

@@ -35,7 +35,7 @@ DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
     ScopedMySQLRes r(db_res->n);
     MYSQL_ROW row;
     while ((row = mysql_fetch_row(r.res()))) {
-        unsigned long *l = mysql_fetch_lengths(r.res());
+        unsigned long * const l = mysql_fetch_lengths(r.res());
         assert(l != NULL);
 
         const std::string child_serial_object(row[0], l[0]);

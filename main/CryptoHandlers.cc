@@ -241,8 +241,8 @@ createFieldHelper(const Create_field * const f, int field_length,
                   const std::string &anonname = "",
                   CHARSET_INFO * const charset = NULL)
 {
-    THD *thd = current_thd;
-    Create_field *f0 = f->clone(thd->mem_root);
+    const THD * const thd = current_thd;
+    Create_field * const f0 = f->clone(thd->mem_root);
     if (field_length != -1) {
         f0->length = field_length;
     }
