@@ -48,7 +48,7 @@ do_optimize_type_self_and_args(T *i, Analysis &a) {
 
 template <class T>
 static T *
-rewrite_args_FN(T * i, const RewritePlanOneOLK * rp, Analysis &a) {
+rewrite_args_FN(T *i, const RewritePlanOneOLK *rp, Analysis &a) {
     const uint count = i->argument_count();
     T * const out_i = copy(i);
     List<Item> * const arg_list = dptrToList(i->arguments(), count);
@@ -150,37 +150,56 @@ allPlainIterateGather(Item_func *i,  const std::string &why,
 }
 
 static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NEG_FUNC> {
-    virtual RewritePlan * do_gather_type(Item_func_neg *i, reason &tr, Analysis & a) const {
-        return gather(i->arguments()[0], tr, a);
+    virtual RewritePlan * do_gather_type(Item_func_neg *i, reason &tr,
+                                         Analysis & a) const
+    {
+        // Can only support constants.
+        const EncSet out_es = FULL_EncSet_Int;
+        const EncSet child_es = FULL_EncSet_Int;
+        const std::string why = "neg";
+
+        return iterateGather(i, out_es, child_es, why, tr, a);
+        // return gather(i->arguments()[0], tr, a);
     }
-    virtual Item * do_optimize_type(Item_func_neg *i, Analysis & a) const {
+
+    virtual Item * do_optimize_type(Item_func_neg *i, Analysis & a) const
+    {
         return do_optimize_type_self_and_args(i, a);
     }
 
-    virtual void do_rewrite_insert_type(Item_func_neg *i, Analysis & a,
+    virtual void do_rewrite_insert_type(Item_func_neg *i, Analysis &a,
                                         std::vector<Item *> &l,
                                         FieldMeta *fm) const
     {
         uint64_t salt = randomValue();
-    
+
         if (fm->has_salt) {
             salt = randomValue();
         } else {
-        //TODO: need to use table salt in this case
+            //TODO: need to use table salt in this case
         }
-        
+
         for (auto it : fm->children) {
             const onion o = it.first->getValue();
             const std::shared_ptr<OnionMeta> om = it.second;
             // FIXME: PTR.
             l.push_back(encrypt_item_layers(i, o, om.get(), a, salt));
         }
-    
+
         if (fm->has_salt) {
             l.push_back(new Item_int((ulonglong) salt));
         }
     }
-}ANON;
+
+    virtual Item * do_rewrite_type(Item_func_neg *i, const OLK &constr,
+                                   const RewritePlan *rp, Analysis &a)
+        const
+    {
+        return rewrite_args_FN(i,
+                               static_cast<const RewritePlanOneOLK *>(rp),
+                               a);
+    }
+} ANON;
 
 static class ANON : public CItemSubtypeFT<Item_func_not, Item_func::Functype::NOT_FUNC> {
     virtual RewritePlan * do_gather_type(Item_func_not *i, reason &tr,
@@ -203,7 +222,9 @@ static class ANON : public CItemSubtypeFT<Item_func_not, Item_func::Functype::NO
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i, (const RewritePlanOneOLK *)rp, a);
+        return rewrite_args_FN(i,
+                               static_cast<const RewritePlanOneOLK *>(rp),
+                               a);
     }
 } ANON;
 
@@ -257,7 +278,9 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
         LOG(cdb_v) << "do_rewrite_type Item_func " << *i << " constr "
                    << EncSet(constr);
         assert_s(i->argument_count() == 2, "compare function does not have two arguments as expected");
-        return rewrite_args_FN(i, (const RewritePlanOneOLK *)rp, a);
+        return rewrite_args_FN(i,
+                               static_cast<const RewritePlanOneOLK *>(rp),
+                               a);
     }
 };
 
@@ -367,11 +390,13 @@ class CItemNullcheck : public CItemSubtypeFT<Item_bool_func, FT> {
                                      child_rp, tr);
     }
 
-    virtual Item * do_rewrite_type(Item_bool_func * i, const OLK & constr,
-                                   const RewritePlan * _rp, Analysis & a)
+    virtual Item * do_rewrite_type(Item_bool_func *i, const OLK &constr,
+                                   const RewritePlan *rp, Analysis &a)
         const
     {
-        return rewrite_args_FN(i, (const RewritePlanOneOLK *)_rp, a);
+        return rewrite_args_FN(i,
+                               static_cast<const RewritePlanOneOLK *>(rp),
+                               a);
     }
 
     virtual Item * do_optimize_type(Item_bool_func *i, Analysis & a) const
@@ -440,7 +465,7 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
             EncLayer * const el = a.getBackEncLayer(om);
             assert_s(el->level() == SECLEVEL::HOM,
                      "incorrect onion level on onion oHOM");
-            return ((HOM*)el)->sumUDF(arg0, arg1);
+            return static_cast<HOM *>(el)->sumUDF(arg0, arg1);
         } else {
             IT * const out_i = new IT(arg0, arg1);
             return out_i;
@@ -539,7 +564,9 @@ class CItemLeafFunc : public CItemSubtypeFN<Item_func, NAME> {
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i, (const RewritePlanOneOLK *)rp, a);
+        return rewrite_args_FN(i,
+                               static_cast<const RewritePlanOneOLK *>(rp),
+                               a);
     }
 };
 
@@ -589,7 +616,9 @@ class CItemDateExtractFunc : public CItemSubtypeFN<Item_int_func, NAME> {
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i, (const RewritePlanOneOLK *)rp, a);
+        return rewrite_args_FN(i,
+                               static_cast<const RewritePlanOneOLK *>(rp),
+                               a);
     }
 };
 
@@ -765,7 +794,9 @@ static class ANON : public CItemSubtypeFT<Item_func_in, Item_func::Functype::IN_
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i, (const RewritePlanOneOLK *)rp, a);
+        return rewrite_args_FN(i,
+                               static_cast<const RewritePlanOneOLK *>(rp),
+                               a);
     }
 } ANON;
 
@@ -788,7 +819,9 @@ static class ANON : public CItemSubtypeFT<Item_func_in, Item_func::Functype::BET
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i, (const RewritePlanOneOLK *)rp, a);
+        return rewrite_args_FN(i,
+                               static_cast<const RewritePlanOneOLK *>(rp),
+                               a);
     }
 } ANON;
 
@@ -979,7 +1012,9 @@ static class ANON : public CItemSubtypeFN<Item_func_nullif, str_nullif> {
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i, (const RewritePlanOneOLK *)rp, a);
+        return rewrite_args_FN(i,
+                               static_cast<const RewritePlanOneOLK *>(rp),
+                               a);
     }
 
 } ANON;
@@ -1080,7 +1115,9 @@ class CItemStrconv : public CItemSubtypeFN<Item_str_conv, NAME> {
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i, (const RewritePlanOneOLK *)rp, a);
+        return rewrite_args_FN(i,
+                               static_cast<const RewritePlanOneOLK *>(rp),
+                               a);
     }
 };
 
@@ -1162,7 +1199,9 @@ static class ANON : public CItemSubtypeFN<Item_date_add_interval, str_date_add_i
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i, (const RewritePlanOneOLK *)rp, a);
+        return rewrite_args_FN(i,
+                               static_cast<const RewritePlanOneOLK *>(rp),
+                               a);
     }
 } ANON;
 
@@ -1180,7 +1219,9 @@ class CItemDateNow : public CItemSubtypeFN<Item_func_now, NAME> {
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i, (const RewritePlanOneOLK *)rp, a);
+        return rewrite_args_FN(i,
+                               static_cast<const RewritePlanOneOLK *>(rp),
+                               a);
     }
 };
 
@@ -1208,7 +1249,9 @@ static class ANON: public CItemSubtypeFT<Item_char_typecast, Item_func::Functype
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i, (const RewritePlanOneOLK *)rp, a);
+        return rewrite_args_FN(i,
+                               static_cast<const RewritePlanOneOLK *>(rp),
+                               a);
     }
 } ANON;
 

@@ -185,12 +185,15 @@ EncLayerFactory::serializeLayer(EncLayer * el, DBMeta *parent) {
 }
 */
 
-/* ========================= other helpers ==============================*/
+/* ========================= other helpers ============================*/
+
+/*
 static bool
 stringItem(Item * const i)
 {
     return i->type() == Item::Type::STRING_ITEM;
 }
+*/
 
 static
 std::string prng_expand(const std::string &seed_key, uint key_bytes)
@@ -370,7 +373,7 @@ RND_int::newCreateField(const Create_field * const cf,
 Item *
 RND_int::encrypt(Item * const ptext, uint64_t IV)
 {
-    assert(!stringItem(ptext));
+    // assert(!stringItem(ptext));
     //TODO: should have encrypt_SEM work for any length
     const uint64_t p = static_cast<const Item_int *>(ptext)->value;
     const uint64_t c = bf.encrypt(p ^ IV);
@@ -521,7 +524,6 @@ public:
     // create object from serialized contents
     DET_int(unsigned int id, const std::string &serial);
 
-
     virtual SECLEVEL level() const {return SECLEVEL::DET;}
     std::string name() const {return "DET_int";}
     Create_field * newCreateField(const Create_field * const cf,
@@ -542,49 +544,6 @@ private:
     std::string getKeyFromSerial(const std::string &serial);
     int64_t getShiftFromSerial(const std::string &serial);
 };
-
-class DET_mediumint : public DET_int {
-    public:
-    DET_mediumint(Create_field * const cf, const std::string &seed_key);
-
-    // create object from serialized contents
-    DET_mediumint(unsigned int id, const std::string &serial);
-
-    std::string name() const {return "DET_mediumint";}
-
-    Item * encrypt(Item * const ptext, uint64_t IV);
-    Item * decrypt(Item * const ctext, uint64_t IV);
-};
-
-
-DET_mediumint::DET_mediumint(Create_field * const cf,
-                             const std::string &seed_key)
-    : DET_int(cf, seed_key)
-{}
-
-DET_mediumint::DET_mediumint(unsigned int id, const std::string &serial)
-    : DET_int(id, serial)
-{}
-
-
-Item *
-DET_mediumint::encrypt(Item * const ptext, uint64_t IV)
-{
-    const ulonglong val = static_cast<Item_int *>(ptext)->value;
-
-    static const longlong medium_max = 0xffffff;
-    if(medium_max < static_cast<Item_int *>(ptext)->val_int())
-        throw CryptDBError("Backend storage unit it not MEDIUMINT, won't floor. ");
-    
-    LOG(encl) << "DET_tinyint encrypt " << val << " IV " << IV << "--->";
-    return DET_int::encrypt(ptext, static_cast<ulong>(val));
-}
-
-Item *
-DET_mediumint::decrypt(Item * const ctext, uint64_t IV)
-{
-    return DET_int::decrypt(ctext, IV);
-}
 
 class DET_tinyint : public DET_int {
     public:
@@ -609,7 +568,6 @@ DET_tinyint::DET_tinyint(unsigned int id, const std::string &serial)
     : DET_int(id, serial)
 {}
 
-
 Item *
 DET_tinyint::encrypt(Item * const ptext, uint64_t IV)
 {
@@ -629,6 +587,49 @@ DET_tinyint::decrypt(Item * const ctext, uint64_t IV) {
     // delegates
     return DET_int::decrypt(ctext, IV);
 }
+
+class DET_mediumint : public DET_int {
+    public:
+    DET_mediumint(Create_field * const cf, const std::string &seed_key);
+
+    // create object from serialized contents
+    DET_mediumint(unsigned int id, const std::string &serial);
+
+    std::string name() const {return "DET_mediumint";}
+
+    Item * encrypt(Item * const ptext, uint64_t IV);
+    Item * decrypt(Item * const ctext, uint64_t IV);
+};
+
+
+DET_mediumint::DET_mediumint(Create_field * const cf,
+                             const std::string &seed_key)
+    : DET_int(cf, seed_key)
+{}
+
+DET_mediumint::DET_mediumint(unsigned int id, const std::string &serial)
+    : DET_int(id, serial)
+{}
+
+Item *
+DET_mediumint::encrypt(Item * const ptext, uint64_t IV)
+{
+    const ulonglong val = static_cast<Item_int *>(ptext)->value;
+
+    static const longlong medium_max = 0xffffff;
+    if(medium_max < static_cast<Item_int *>(ptext)->val_int())
+        throw CryptDBError("Backend storage unit it not MEDIUMINT, won't floor. ");
+    
+    LOG(encl) << "DET_tinyint encrypt " << val << " IV " << IV << "--->";
+    return DET_int::encrypt(ptext, static_cast<ulong>(val));
+}
+
+Item *
+DET_mediumint::decrypt(Item * const ctext, uint64_t IV)
+{
+    return DET_int::decrypt(ctext, IV);
+}
+
 
 static udf_func u_decDETInt = {
     LEXSTRING("decrypt_int_det"),
@@ -727,8 +728,7 @@ DETFactory::deserialize(unsigned int id, const SerialLayer &sl)
 
 
 DET_int::DET_int(Create_field * const f, const std::string &seed_key)
-    : key(prng_expand(seed_key, bf_key_size)),
-      bf(key)
+    : key(prng_expand(seed_key, bf_key_size)), bf(key)
 {
     if (f->flags & UNSIGNED_FLAG) {
         shift = 0;
@@ -764,7 +764,7 @@ DET_int::newCreateField(const Create_field * const cf,
 Item *
 DET_int::encrypt(Item * const ptext, uint64_t IV)
 {
-    assert(!stringItem(ptext));
+    // assert(!stringItem(ptext));
     const ulonglong value = static_cast<Item_int*>(ptext)->value;
 
     const longlong ival = static_cast<Item_int*>(ptext)->val_int();
@@ -1212,7 +1212,6 @@ public:
     std::string doSerialize() const {return key;}
     OPE_str(unsigned int id, const std::string &serial);
 
-
     SECLEVEL level() const {return SECLEVEL::OPE;}
     std::string name() const {return "OPE_str";}
     Create_field * newCreateField(const Create_field * const cf,
@@ -1257,9 +1256,9 @@ OPEFactory::create(Create_field * const cf, const std::string &key)
         if (cf->sql_type == MYSQL_TYPE_DECIMAL
             || cf->sql_type ==  MYSQL_TYPE_NEWDECIMAL) {
             return new OPE_dec(cf, key);
-        } else if( cf->sql_type == MYSQL_TYPE_TINY) { 
+        } else if (cf->sql_type == MYSQL_TYPE_TINY) { 
             return new OPE_tinyint(cf, key);
-        } else if( cf->sql_type == MYSQL_TYPE_INT24) { 
+        } else if (cf->sql_type == MYSQL_TYPE_INT24) { 
             return new OPE_mediumint(cf, key);
         }
         return new OPE_int(cf, key);
@@ -1286,7 +1285,8 @@ OPEFactory::deserialize(unsigned int id, const SerialLayer &sl)
 OPE_dec::OPE_dec(Create_field * const cf, const std::string &seed_key)
     : OPE_int(cf, seed_key)
 {
-    assert_s(cf->length - cf->decimals <= 8, "this type of decimal not supported ");
+    assert_s(cf->length - cf->decimals <= 8,
+             "this type of decimal not supported ");
 
     decimals = cf->decimals;
     shift = pow(10, decimals);
@@ -1350,8 +1350,8 @@ OPE_int::newCreateField(const Create_field * const cf,
 Item *
 OPE_int::encrypt(Item * const ptext, uint64_t IV)
 {
-    assert(!stringItem(ptext));
-    const ulong pval =  (ulong)static_cast<Item_int *>(ptext)->value;
+    // assert(!stringItem(ptext));
+    const ulong pval = (ulong)static_cast<Item_int *>(ptext)->value;
     const ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ(pval)));
     LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV
               << "--->" << enc;
