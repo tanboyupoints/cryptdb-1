@@ -366,7 +366,9 @@ Create_field *
 RND_int::newCreateField(const Create_field * const cf,
                         const std::string &anonname)
 {
-    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
+    // MYSQL_TYPE_LONGLONG because blowfish works on 64 bit blocks.
+    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG,
+                             anonname);
 }
 
 //TODO: may want to do more specialized crypto for lengths
@@ -536,15 +538,17 @@ public:
 protected:
     std::string key;
     blowfish bf;
-    int64_t shift;
+    const int64_t shift;
     static const int bf_key_size = 16;
     static const int ciph_size = 8;
 
 private:
     std::string getKeyFromSerial(const std::string &serial);
-    int64_t getShiftFromSerial(const std::string &serial);
+    static int64_t getShift(const std::string &serial);
+    static int64_t getShift(const Create_field * const f);
 };
 
+/*
 class DET_tinyint : public DET_int {
     public:
     DET_tinyint(Create_field * const cf, const std::string &seed_key);
@@ -629,6 +633,7 @@ DET_mediumint::decrypt(Item * const ctext, uint64_t IV)
 {
     return DET_int::decrypt(ctext, IV);
 }
+*/
 
 
 static udf_func u_decDETInt = {
@@ -698,10 +703,6 @@ DETFactory::create(Create_field * const cf, const std::string &key)
         if (cf->sql_type == MYSQL_TYPE_DECIMAL
             || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
             return new DET_dec(cf, key);
-        } else if(cf->sql_type == MYSQL_TYPE_INT24) {
-            return new DET_mediumint(cf, key);
-        } else if(cf->sql_type == MYSQL_TYPE_TINY) {
-            return new DET_tinyint(cf, key);
         } else {
             return new DET_int(cf, key);
         }
@@ -713,29 +714,25 @@ DETFactory::create(Create_field * const cf, const std::string &key)
 EncLayer *
 DETFactory::deserialize(unsigned int id, const SerialLayer &sl)
 {
-    if  (sl.name == "DET_int") {
+    if ("DET_int" == sl.name) {
         return new DET_int(id, sl.layer_info);
-    } else if(sl.name == "DET_mediumint") {
-        return new DET_mediumint(id, sl.layer_info);
-    } else if(sl.name == "DET_tinyint") {
-        return new DET_tinyint(id, sl.layer_info);
-    } else if (sl.name == "DET_str") {
-        return new DET_str(id, sl.layer_info);
-    } else {
+    } else if ("DET_dec" == sl.name) {
         return new DET_dec(id, sl.layer_info);
+    } else {
+        throw CryptDBError("Unknown type for DET deserialization!");
     }
 }
 
 
 DET_int::DET_int(Create_field * const f, const std::string &seed_key)
-    : key(prng_expand(seed_key, bf_key_size)), bf(key)
-{
-    if (f->flags & UNSIGNED_FLAG) {
-        shift = 0;
-    } else {
-        shift = INT_MAX;
-    }
-}
+    : key(prng_expand(seed_key, bf_key_size)), bf(key),
+      shift(getShift(f))
+{}
+
+DET_int::DET_int(unsigned int id, const std::string &serial)
+    : EncLayer(id), key(getKeyFromSerial(serial)), bf(key),
+      shift(getShift(serial))
+{}
 
 std::string
 DET_int::getKeyFromSerial(const std::string &serial)
@@ -744,38 +741,48 @@ DET_int::getKeyFromSerial(const std::string &serial)
 }
 
 int64_t
-DET_int::getShiftFromSerial(const std::string &serial)
+DET_int::getShift(const std::string &serial)
 {
     return atol(serial.substr(0, serial.find(' ')).c_str());
 }
 
-DET_int::DET_int(unsigned int id, const std::string &serial)
-    : EncLayer(id), key(getKeyFromSerial(serial)), bf(key),
-      shift(getShiftFromSerial(serial))
-{}
+int64_t
+DET_int::getShift(const Create_field * const cf)
+{
+    if (cf->flags & UNSIGNED_FLAG) {
+        return 0x00;
+    } else {
+        switch (cf->sql_type) {
+            case MYSQL_TYPE_TINY:
+                return 0x80;
+            case MYSQL_TYPE_SHORT:
+                return 0x8000;
+            case MYSQL_TYPE_INT24:
+                return 0x800000;
+            case MYSQL_TYPE_LONG:
+                return 0x80000000;
+            case MYSQL_TYPE_LONGLONG:
+                return 0x8000000000000000;
+            default:
+                throw CryptDBError("unknown int type!");
+        }
+    }
+}
 
 Create_field *
 DET_int::newCreateField(const Create_field * const cf,
                         const std::string &anonname)
 {
-    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG, anonname);
+    // MYSQL_TYPE_LONGLONG because blowfish works on 64 bit blocks.
+    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG,
+                             anonname);
 }
 
 Item *
 DET_int::encrypt(Item * const ptext, uint64_t IV)
 {
     // assert(!stringItem(ptext));
-    const ulonglong value = static_cast<Item_int*>(ptext)->value;
-
-    const longlong ival = static_cast<Item_int*>(ptext)->val_int();
-    if(shift && ival < 0)
-    {
-        longlong tmp = ival+shift;
-        //std::cout << "ival: " << ival << " tmp: " << tmp << " shift: " << shift << "\n";
-        const ulonglong res = static_cast<ulonglong>(bf.encrypt(tmp));
-        LOG(encl) << "DET_int enc " << value << "--->" << res;
-        return new Item_int(res);
-    }
+    const longlong value = static_cast<Item_int*>(ptext)->val_int();
 
     const ulonglong res = static_cast<ulonglong>(bf.encrypt(value+shift));
     LOG(encl) << "DET_int enc " << value << "--->" << res;
@@ -810,6 +817,7 @@ DET_int::decryptUDF(Item * const col, Item * const ivcol)
     l.push_back(col);
 
     l.push_back(get_key_item(key));
+    l.push_back(new Item_int(static_cast<ulonglong>(shift)));
 
     Item * const udfdec = new Item_func_udf_int(&u_decDETInt, l);
     udfdec->name = NULL;
@@ -989,6 +997,7 @@ public:
 private:
 };
 
+/*
 class DETJOIN_tinyint : public DET_tinyint {
     //TODO
 public:
@@ -1022,6 +1031,7 @@ public:
 private:
    
 };
+*/
 
 
 
@@ -1065,10 +1075,12 @@ DETJOINFactory::create(Create_field * const cf,
         if (cf->sql_type == MYSQL_TYPE_DECIMAL
             || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
             return new DETJOIN_dec(cf, key);
+/*
         } else if (cf->sql_type == MYSQL_TYPE_INT24) {
             return new DETJOIN_mediumint(cf, key);
         } else if (cf->sql_type == MYSQL_TYPE_TINY) {
             return new DETJOIN_tinyint(cf, key);
+*/
         } else {
             return new DETJOIN_int(cf, key);
         }
@@ -1078,17 +1090,14 @@ DETJOINFactory::create(Create_field * const cf,
 }
 
 EncLayer *
-DETJOINFactory::deserialize(unsigned int id, const SerialLayer &sl) {
-    if  (sl.name == "DETJOIN_int") {
+DETJOINFactory::deserialize(unsigned int id, const SerialLayer &sl)
+{
+    if  ("DETJOIN_int" == sl.name) {
         return new DETJOIN_int(id, sl.layer_info);
-    } else if (sl.name == "DETJOIN_mediumint") {
-        return new DETJOIN_mediumint(id, sl.layer_info);
-    } else if (sl.name == "DETJOIN_tinyint") {
-        return new DETJOIN_tinyint(id, sl.layer_info);
-    } else if (sl.name == "DETJOIN_str") {
-        return new DETJOIN_str(id, sl.layer_info);
-    } else {
+    } else if ("DETJOIN_dec" == sl.name) {
         return new DETJOIN_dec(id, sl.layer_info);
+    } else {
+        throw CryptDBError("DETJOINFactory does not recognize type!");
     }
 }
 
@@ -1140,7 +1149,7 @@ OPE_tinyint::OPE_tinyint(Create_field * const cf,
     : OPE_int(cf, seed_key)
 {}
 
-    OPE_tinyint::OPE_tinyint(unsigned int id, const std::string &serial)
+OPE_tinyint::OPE_tinyint(unsigned int id, const std::string &serial)
     : OPE_int(id, serial)
 {}
 
@@ -1832,6 +1841,43 @@ Search::searchUDF(Item * const field, Item * const expr)
     l.push_back(t2);
 
     return new Item_func_udf_int(&u_search, l);
+}
+
+Create_field *
+PlainText::newCreateField(const Create_field * const cf,
+                          const std::string &anonname)
+{
+    const THD * const thd = current_thd;
+    Create_field * const f0 = cf->clone(thd->mem_root);
+    if (anonname.size() > 0) {
+        f0->field_name = make_thd_string(anonname);
+    }
+
+    return f0;
+}
+
+Item *
+PlainText::encrypt(Item * const ptext, uint64_t IV)
+{
+    return ptext;
+}
+
+Item *
+PlainText::decrypt(Item * const ctext, uint64_t IV)
+{
+    return ctext;
+}
+
+Item *
+PlainText::decryptUDF(Item * const col, Item * const ivcol)
+{
+    throw CryptDBError("Can't decrypt from PLAIN");
+}
+
+std::string
+PlainText::doSerialize() const
+{
+    return std::string("");
 }
 
 const std::vector<udf_func*> udf_list = {

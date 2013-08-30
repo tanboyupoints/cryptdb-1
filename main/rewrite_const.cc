@@ -55,42 +55,6 @@ encrypt_item(Item * i, const OLK & olk, Analysis & a)
     return ret_i;
 }
 
-static void
-encrypt_item_all_onions(Item * i, FieldMeta * fm,
-                        uint64_t IV, std::vector<Item*> & l,
-                        Analysis &a)
-{
-    for (auto it : fm->orderedOnionMetas()) {
-        const onion o = it.first->getValue();
-        OnionMeta * const om = it.second;
-        l.push_back(encrypt_item_layers(i, o, om, a, IV));
-    }
-}
-
-template <typename ItemType>
-static void
-typical_rewrite_insert_type(ItemType *i, Analysis &a,
-                            std::vector<Item *> &l, FieldMeta *fm)
-{
-    uint64_t salt = 0;
-
-    if (fm->has_salt) {
-        salt = randomValue();
-    } else {
-        //TODO: need to use table salt in this case
-    }
-
-    if (i->type() == Item::Type::INT_ITEM && i->is_datetime()) {
-        ((Item_int *)i)->value = 0;
-    }
-    encrypt_item_all_onions(i, fm, salt, l, a);
-
-    if (fm->has_salt) {
-        l.push_back(new Item_int((ulonglong) salt));
-    }
-}
-
-
 static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> {
     virtual RewritePlan * do_gather_type(Item_string *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << " String item do_gather " << *i;

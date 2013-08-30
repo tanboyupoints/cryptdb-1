@@ -256,8 +256,10 @@ decrypt_int_det(PG_FUNCTION_ARGS)
         char * keyBytes = getba(args, 1, keyLen);
         std::string key = std::string(keyBytes, keyLen);
 
+        uint64_t shift = getui(ARGS, 2);
+
         blowfish bf(key);
-        value = bf.decrypt(eValue);
+        value = bf.decrypt(eValue) - shift;
     }
 
 

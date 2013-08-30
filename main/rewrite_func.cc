@@ -151,14 +151,22 @@ allPlainIterateGather(Item_func *i,  const std::string &why,
 
 static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NEG_FUNC> {
     virtual RewritePlan * do_gather_type(Item_func_neg *i, reason &tr,
-                                         Analysis & a) const
+                                         Analysis &a) const
     {
-        // Can only support constants.
-        const EncSet out_es = FULL_EncSet_Int;
-        const EncSet child_es = FULL_EncSet_Int;
-        const std::string why = "neg";
+        assert(i->argument_count() == 1);
 
-        return iterateGather(i, out_es, child_es, why, tr, a);
+        auto arg = i->arguments()[0];
+        if (arg->type() == Item::Type::INT_ITEM) {
+            // Can only support constants.
+            const EncSet out_es = FULL_EncSet_Int;
+            const EncSet child_es = FULL_EncSet_Int;
+            const std::string why = "neg";
+
+            return iterateGather(i, out_es, child_es, why, tr, a);
+        }
+
+        // FIXME: Go to PLAIN.
+        throw CryptDBError("goto PLAIN!");
         // return gather(i->arguments()[0], tr, a);
     }
 
@@ -171,24 +179,7 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
                                         std::vector<Item *> &l,
                                         FieldMeta *fm) const
     {
-        uint64_t salt = randomValue();
-
-        if (fm->has_salt) {
-            salt = randomValue();
-        } else {
-            //TODO: need to use table salt in this case
-        }
-
-        for (auto it : fm->children) {
-            const onion o = it.first->getValue();
-            const std::shared_ptr<OnionMeta> om = it.second;
-            // FIXME: PTR.
-            l.push_back(encrypt_item_layers(i, o, om.get(), a, salt));
-        }
-
-        if (fm->has_salt) {
-            l.push_back(new Item_int((ulonglong) salt));
-        }
+        return typical_rewrite_insert_type(i, a, l, fm);
     }
 
     virtual Item * do_rewrite_type(Item_func_neg *i, const OLK &constr,

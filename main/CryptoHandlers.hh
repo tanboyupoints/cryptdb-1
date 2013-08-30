@@ -164,32 +164,11 @@ public:
     std::string name() const {return "PLAINTEXT";}
 
     Create_field *newCreateField(const Create_field * const cf,
-                                 const std::string &anonname = "")
-    {
-        const THD * const thd = current_thd;
-        Create_field * const f0 = cf->clone(thd->mem_root);
-        if (anonname.size() > 0) {
-            f0->field_name = make_thd_string(anonname);
-        }
-
-        return f0;
-    }
-
-    Item *encrypt(Item * const ptext, uint64_t IV)
-    {
-        return ptext;
-    }
-
-    Item *decrypt(Item * const ctext, uint64_t IV) {return ctext;}
-
+                                 const std::string &anonname = "");
+    Item *encrypt(Item * const ptext, uint64_t IV);
+    Item *decrypt(Item * const ctext, uint64_t IV);
     Item *decryptUDF(Item * const col, Item * const ivcol = NULL)
-    {
-        return col;
-    }
-
-    std::string doSerialize() const
-    {
-        return std::string("");
-    }
+        __attribute__((noreturn));
+    std::string doSerialize() const;
 };
 
