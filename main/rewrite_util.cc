@@ -292,6 +292,15 @@ rewrite_create_field(const FieldMeta * const fm,
         output_cfields.push_back(f0);
     }
 
+    // HACK: Create the extra plain column.
+    if (fm->needExtraPlainColumn()) {
+        Create_field * const extra_plain_cf =
+            f->clone(current_thd->mem_root);
+        extra_plain_cf->field_name =
+            current_thd->strdup(fm->getToPlainName().c_str());
+        output_cfields.push_back(extra_plain_cf);
+    }
+
     return output_cfields;
 }
 

@@ -315,7 +315,8 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
                         TableType table_type)
 {
     const std::string table_name = tableNameFromType(table_type);
-    std::function<void(const std::unique_ptr<Connect> &e_conn, const DBMeta * const,
+    std::function<void(const std::unique_ptr<Connect> &e_conn,
+                       const DBMeta * const,
                        const DBMeta * const,
                        const AbstractMetaKey * const,
                        const unsigned int * const)> helper =

@@ -75,6 +75,11 @@ public:
     OnionMeta(onion o, std::vector<SECLEVEL> levels,
               const AES_KEY * const m_key, Create_field * const cf,
               unsigned long uniq_count);
+
+    static std::unique_ptr<OnionMeta>
+        copyWithNewName(const OnionMeta * const om,
+                        const std::string &name);
+
     // Restore.
     static std::unique_ptr<OnionMeta>
         deserialize(unsigned int id, const std::string &serial);
@@ -122,6 +127,8 @@ public:
     const std::string fname;
     const bool has_salt; //whether this field has its own salt
     const std::string salt_name;
+    // FIXME: AssignOnce.
+    bool plain_number;
     const onionlayout onion_layout;
 
     // New.
@@ -133,13 +140,13 @@ public:
     static std::unique_ptr<FieldMeta>
         deserialize(unsigned int id, const std::string &serial);
     FieldMeta(unsigned int id, const std::string &fname, bool has_salt,
-              const std::string &salt_name, onionlayout onion_layout,
-              SECURITY_RATING sec_rating,
+              const std::string &salt_name, bool plain_number,
+              onionlayout onion_layout, SECURITY_RATING sec_rating,
               unsigned long uniq_count, unsigned long counter)
         : MappedDBMeta(id), fname(fname), has_salt(has_salt),
-          salt_name(salt_name), onion_layout(onion_layout),
-          sec_rating(sec_rating), uniq_count(uniq_count),
-          counter(counter) {}
+          salt_name(salt_name), plain_number(plain_number),
+          onion_layout(onion_layout), sec_rating(sec_rating),
+          uniq_count(uniq_count), counter(counter) {}
     ~FieldMeta() {;}
 
     std::string serialize(const DBObject &parent) const;
@@ -158,6 +165,8 @@ public:
     unsigned long leaseIncUniq() {return counter++;}
     // FIXME: Change name.
     unsigned long getCurrentUniqCounter() {return counter;}
+    bool needExtraPlainColumn() const;
+    std::string getToPlainName() const;
 
 private:
     constexpr static const char *type_name = "fieldMeta";
@@ -169,7 +178,8 @@ private:
     bool setOnionLevel(onion o, SECLEVEL maxl);
     static onionlayout getOnionLayout(const AES_KEY * const m_key,
                                       const Create_field * const f,
-                                      SECURITY_RATING sec_rating);
+                                      SECURITY_RATING sec_rating,
+                                      bool * const plain_number);
 } FieldMeta;
 
 typedef class TableMeta : public MappedDBMeta<FieldMeta, IdentityMetaKey> {

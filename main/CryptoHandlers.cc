@@ -819,16 +819,24 @@ DET_int::decryptUDF(Item * const col, Item * const ivcol)
     l.push_back(col);
 
     l.push_back(get_key_item(key));
+    // Only used for signed columns, otherwise zero.
     l.push_back(new Item_int(static_cast<ulonglong>(shift)));
 
     Item * const udfdec = new Item_func_udf_int(&u_decDETInt, l);
     udfdec->name = NULL;
 
-    //add encompassing CAST for unsigned
-    Item * const udf = new Item_func_unsigned(udfdec);
-    udf->name = NULL;
+    AssignOnce<Item *> udf;
+    if (0 == shift) {
+        // CAST for unsigned
+        udf = new Item_func_unsigned(udfdec);
+        udf.get()->name = NULL;
+    } else {
+        // CAST for signed.
+        udf = new Item_func_signed(udfdec);
+        udf.get()->name = NULL;
+    }
 
-    return udf;
+    return udf.get();
 }
 
 DET_dec::DET_dec(Create_field * const cf, const std::string &seed_key)

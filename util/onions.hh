@@ -54,7 +54,9 @@ static onionlayout BEST_EFFORT_NUM_ONION_LAYOUT = {
                                   SECLEVEL::RND})},
     {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
     {oAGG, std::vector<SECLEVEL>({SECLEVEL::HOM})},
-    {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL,
+    // Requires SECLEVEL::DET, otherwise you will have to implement
+    // encoding for negative numbers in SECLEVEL::RND.
+    {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL, SECLEVEL::DET,
                                     SECLEVEL::RND})}
 };
 
