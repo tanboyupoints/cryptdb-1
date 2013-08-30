@@ -718,6 +718,8 @@ DETFactory::deserialize(unsigned int id, const SerialLayer &sl)
         return new DET_int(id, sl.layer_info);
     } else if ("DET_dec" == sl.name) {
         return new DET_dec(id, sl.layer_info);
+    } else if ("DET_str" == sl.name) {
+        return new DET_str(id, sl.layer_info);
     } else {
         throw CryptDBError("Unknown type for DET deserialization!");
     }
@@ -1096,6 +1098,8 @@ DETJOINFactory::deserialize(unsigned int id, const SerialLayer &sl)
         return new DETJOIN_int(id, sl.layer_info);
     } else if ("DETJOIN_dec" == sl.name) {
         return new DETJOIN_dec(id, sl.layer_info);
+    } else if ("DETJOIN_str" == sl.name) {
+        return new DETJOIN_str(id, sl.layer_info);
     } else {
         throw CryptDBError("DETJOINFactory does not recognize type!");
     }
