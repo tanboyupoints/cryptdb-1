@@ -135,6 +135,7 @@ class InsertHandler : public DMLHandler {
                         (*it1)->print(&s, QT_ORDINARY);
                         cerr << s << endl;*/
                     }
+                    /*
                     // HACK: Extra plain column.
                     if ((*fmVecIt)->needExtraPlainColumn()) {
                         std::string name = "nullvalue";
@@ -142,6 +143,7 @@ class InsertHandler : public DMLHandler {
                             current_thd->strdup(name.c_str());
                         newList0->push_back(new Item_null(nullname));
                     }
+                    */
                     ++fmVecIt;
                 }
                 newList.push_back(newList0);

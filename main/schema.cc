@@ -91,6 +91,7 @@ OnionMeta::copyWithNewName(const OnionMeta * const om,
 std::unique_ptr<OnionMeta>
 OnionMeta::deserialize(unsigned int id, const std::string &serial)
 {
+    assert(id);
     const auto vec = unserialize_string(serial); 
 
     const std::string onionname = vec[0];

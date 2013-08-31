@@ -157,11 +157,12 @@ public:
 
 class PlainText : public EncLayer {
 public:
-    PlainText() {;}
+    PlainText() {}
+    PlainText(unsigned int id) : EncLayer(id) {}
     virtual ~PlainText() {;}
 
-    SECLEVEL level() const {return SECLEVEL::PLAINVAL;}
-    std::string name() const {return "PLAINTEXT";}
+    virtual SECLEVEL level() const {return SECLEVEL::PLAINVAL;}
+    virtual std::string name() const {return "PLAINTEXT";}
 
     Create_field *newCreateField(const Create_field * const cf,
                                  const std::string &anonname = "");
@@ -172,3 +173,14 @@ public:
     std::string doSerialize() const;
 };
 
+class DoNothing : public PlainText {
+public:
+    DoNothing() {;}
+    DoNothing(unsigned int id) : PlainText(id) {}
+    virtual ~DoNothing() {;}
+
+    SECLEVEL level() const {return SECLEVEL::WAITING;}
+    std::string name() const {return "DONOTHING";}
+
+    Item *encrypt(Item * const ptext, uint64_t IV);
+};

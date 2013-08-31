@@ -139,6 +139,7 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * const cf,
         case SECLEVEL::HOM: {return HOMFactory::create(cf, key);}
         case SECLEVEL::SEARCH: {return new Search(cf, key);}
         case SECLEVEL::PLAINVAL: {return new PlainText();}
+        case SECLEVEL::WAITING: {return new DoNothing();}
         default:{}
     }
     throw CryptDBError("unknown or unimplemented security level \n");
@@ -148,7 +149,7 @@ EncLayer *
 EncLayerFactory::deserializeLayer(unsigned int id,
                                   const std::string &serial)
 {
-
+    assert(id);
     const SerialLayer li = serial_unpack(serial);
 
     switch (li.l) {
@@ -171,7 +172,10 @@ EncLayerFactory::deserializeLayer(unsigned int id,
             return new Search(id, serial);
         
         case SECLEVEL::PLAINVAL:
-            return new PlainText();
+            return new PlainText(id);
+
+        case SECLEVEL::WAITING:
+            return new DoNothing(id);
 
         default:{}
     }
@@ -1890,6 +1894,15 @@ std::string
 PlainText::doSerialize() const
 {
     return std::string("");
+}
+
+Item *
+DoNothing::encrypt(Item * const, uint64_t)
+{
+    std::string name = "nullvalue";
+    char *nullname =
+        current_thd->strdup(name.c_str());
+    return new Item_null(nullname);
 }
 
 const std::vector<udf_func*> udf_list = {
