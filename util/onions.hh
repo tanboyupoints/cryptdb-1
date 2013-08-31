@@ -25,14 +25,14 @@ typedef enum onion {
 
 enum class SECLEVEL {
     INVALID,
-    WAITING,
     PLAINVAL,
     OPE,
     DETJOIN,
     DET,
     SEARCH,
     HOM,
-    RND
+    RND,
+    WAITING,
 };
 
 bool needsSalt(SECLEVEL l);

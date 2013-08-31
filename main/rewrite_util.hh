@@ -127,3 +127,5 @@ typical_rewrite_insert_type(ItemType *i, Analysis &a,
     }
 }
 
+bool
+mergeCompleteOLK(OLK olk1, OLK olk2, OLK *out_olk);

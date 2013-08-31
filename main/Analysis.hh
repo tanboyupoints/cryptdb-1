@@ -20,13 +20,11 @@ public:
     /**
      * decides which encryption scheme to use out of multiple in a set
      */
-    OLK chooseOne() const;
-
+    OLK chooseOne(bool require_key=true) const;
     bool contains(const OLK & olk) const;
-    
     bool hasSecLevel(SECLEVEL level) const;
-
     EncSet intersect(const EncSet & es2) const;
+    SECLEVEL onionLevel(onion o) const;
 
     bool empty() const { return osl.empty(); }
 
@@ -53,8 +51,6 @@ public:
         return OLK(it->first, it->second.first, it->second.second);
     }
 
-    void setFieldForOnion(onion o, FieldMeta * fm);
-
     OnionLevelFieldMap osl; //max level on each onion
 };
 
@@ -64,6 +60,7 @@ operator<<(std::ostream &out, const EncSet & es);
 
 const EncSet EQ_EncSet = {
     {
+        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET,   LevelFieldPair(SECLEVEL::DET, NULL)},
         {oOPE,   LevelFieldPair(SECLEVEL::OPE, NULL)},
@@ -72,6 +69,7 @@ const EncSet EQ_EncSet = {
 
 const EncSet JOIN_EncSet = {
     {
+        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oDET,   LevelFieldPair(SECLEVEL::DETJOIN, NULL)},
     }
@@ -79,6 +77,7 @@ const EncSet JOIN_EncSet = {
 
 const EncSet ORD_EncSet = {
     {
+        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
     }
@@ -86,6 +85,7 @@ const EncSet ORD_EncSet = {
 
 const EncSet PLAIN_EncSet = {
     {
+        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
     }
 };
@@ -93,6 +93,10 @@ const EncSet PLAIN_EncSet = {
 //todo: there should be a map of FULL_EncSets depending on item type
 const EncSet FULL_EncSet = {
     {
+        // HACK: SECLEVEL must be PLAINVAL so that intersect/chooseOne
+        // will consider it usable.
+        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+
         {oPLAIN, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
@@ -112,6 +116,10 @@ const EncSet FULL_EncSet_Str = {
 
 const EncSet FULL_EncSet_Int = {
     {
+        // HACK: SECLEVEL must be PLAINVAL so that intersect/chooseOne
+        // will consider it usable.
+        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
+
         {oPLAIN, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
         {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
@@ -128,8 +136,15 @@ const EncSet Search_EncSet = {
 
 const EncSet ADD_EncSet = {
     {
+        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
         {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
+    }
+};
+
+const EncSet PLAINWAIT_EncSet {
+    {
+        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)}
     }
 };
 

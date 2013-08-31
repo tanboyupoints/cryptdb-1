@@ -520,7 +520,9 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
 
     AssignOnce<std::string> fieldanon;
     AssignOnce<Item *> decUDF;
-    if (SECLEVEL::PLAINVAL == new_level->get()) {
+    if (fm->needExtraPlainColumn()
+        && SECLEVEL::PLAINVAL == new_level->get()) {
+
         OnionMeta * const wait_om = fm->getOnionMeta(oWAIT);
         fieldanon = wait_om->getAnonOnionName();
         Item_field * const field =

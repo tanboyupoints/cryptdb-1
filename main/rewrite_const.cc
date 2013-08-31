@@ -86,7 +86,7 @@ static class ANON : public CItemSubtypeIT<Item_string, Item::Type::STRING_ITEM> 
 
 static class ANON : public CItemSubtypeIT<Item_int, Item::Type::INT_ITEM> {
     virtual RewritePlan * do_gather_type(Item_int *i, reason &tr,
-                                         Analysis & a) const
+                                         Analysis &a) const
     {
         LOG(cdb_v) << "CItemSubtypeIT (L966) num do_gather " << *i;
         /* constant ints are always ok */

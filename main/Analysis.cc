@@ -48,10 +48,13 @@ EncSet::intersect(const EncSet & es2) const
             const onion o = it->first;
             const onion o2 = it2->first;
             
-            // AWARE: While there isn't a reason why we can't share
-            // keys across onions, as of now it seems like unintentional
-            // behavior.
-            if (o != o2) {
+            assert(o == o2);
+
+            // HACK: Will not work correctly if WAITING is not the
+            // current seclevel (ie, don't embeded WAITING)
+            if (SECLEVEL::WAITING == it->second.first ||
+                SECLEVEL::WAITING == it2->second.first) {
+
                 continue;
             }
 
@@ -97,15 +100,8 @@ operator<<(std::ostream &out, const EncSet &es)
 }
 
 
-void
-EncSet::setFieldForOnion(onion o, FieldMeta * const fm) {
-    const LevelFieldPair lfp = getAssert(osl, o);
-
-    osl[o] = LevelFieldPair(lfp.first, fm);
-}
-
 OLK
-EncSet::chooseOne() const
+EncSet::chooseOne(bool require_key) const
 {
     // Order of selection is encoded in this array.
     // The onions appearing earlier are the more preferred ones.
@@ -125,9 +121,13 @@ EncSet::chooseOne() const
         const auto it = osl.find(o);
         if (it != osl.end()) {
             // HACK.
-            if (it->second.second == 0 &&
+            if (SECLEVEL::WAITING == it->second.first) {
+                continue;
+            }
+            // HACK.
+            if (require_key && (it->second.second == 0 &&
                 (it->second.first != SECLEVEL::PLAINVAL &&
-                 o != oPLAIN)) {
+                 o != oPLAIN))) {
                 /*
                  * If no key, skip this OLK.
                  */
@@ -157,12 +157,24 @@ bool
 EncSet::hasSecLevel(SECLEVEL level) const
 {
     for (auto it : osl) {
-        if (level == it.second.first) {
+        if (it.second.first == level) {
             return true;
         }
     }
 
     return false;
+}
+
+SECLEVEL
+EncSet::onionLevel(onion o) const
+{
+    for (auto it : osl) {
+        if (it.first == o) {
+            return it.second.first;
+        }
+    }
+
+    assert(false);
 }
 
 bool

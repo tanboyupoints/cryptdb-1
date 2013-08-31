@@ -64,6 +64,26 @@ rewrite_args_FN(T *i, const RewritePlanOneOLK *rp, Analysis &a) {
     return out_i;
 }
 
+static bool
+isWaitingField(RewritePlan *const rp, Item *const arg)
+{
+    if (arg->type() == Item::Type::FIELD_ITEM
+        && rp->es_out.onionLevel(oWAIT) == SECLEVEL::WAITING
+        && rp->es_out.onionLevel(oPLAIN) != SECLEVEL::WAITING) {
+        return true;
+    }
+
+    return false;
+}
+
+static bool
+isUsingExtraField(RewritePlan *const rp, Item *const arg)
+{
+    return arg->type() == Item::Type::FIELD_ITEM
+    && rp->es_out.onionLevel(oWAIT) == SECLEVEL::PLAINVAL
+    && rp->es_out.onionLevel(oPLAIN) == SECLEVEL::WAITING;
+}
+
 // An implementation of gather for the common case operation
 // Works for Item_func with two arguments, solution encset is intersect of
 // children and my_es
@@ -88,6 +108,23 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
               intersect(childr_rp[1]->es_out);
 
     if (solution.empty()) {
+        if (isWaitingField(childr_rp[0], args[0])
+            && isUsingExtraField(childr_rp[1], args[1])) {
+            Item_field * const f = static_cast<Item_field *>(args[0]);
+            FieldMeta * const fm =
+                a.getFieldMeta(f->table_name, f->field_name);
+            throw OnionAdjustExcept(oPLAIN, fm, SECLEVEL::PLAINVAL,
+                                    f);
+        } else if (isWaitingField(childr_rp[1], args[1])
+                   && isUsingExtraField(childr_rp[0], args[0])) {
+
+            Item_field * const f = static_cast<Item_field *>(args[1]);
+            FieldMeta * const fm =
+                a.getFieldMeta(f->table_name, f->field_name);
+            throw OnionAdjustExcept(oPLAIN, fm, SECLEVEL::PLAINVAL,
+                                    f);
+        }
+
         std::cerr << "crypto schemes does not support this query BECAUSE "
                   << i << " NEEDS " << my_es << "\n"
                   << " BECAUSE " << why << "\n" \
@@ -113,8 +150,9 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
     my_r.add_child(r1);
     my_r.add_child(r2);
 
-    return new RewritePlanOneOLK(EncSet(out_es.chooseOne()),
-                                 solution.chooseOne(), childr_rp, my_r);
+    return new RewritePlanOneOLK(out_es,
+                                 solution.chooseOne(false), childr_rp,
+                                 my_r);
 }
 
 static RewritePlan *
@@ -122,7 +160,7 @@ iterateGather(Item_func *i, const EncSet &out_es, EncSet child_es,
               const std::string &why, reason &tr, Analysis &a)
 {
     tr = reason(out_es, why, i);
-    
+
     const unsigned int arg_count = i->argument_count();
     RewritePlan ** const childr_rp = new RewritePlan*[arg_count];
     Item ** const args = i->arguments();
@@ -133,10 +171,8 @@ iterateGather(Item_func *i, const EncSet &out_es, EncSet child_es,
         child_es = child_es.intersect(childr_rp[index]->es_out);
     }
 
-    return new RewritePlanOneOLK(EncSet(out_es.chooseOne()),
-                                 child_es.chooseOne(),
+    return new RewritePlanOneOLK(out_es, child_es.chooseOne(),
                                  childr_rp, tr);
-
 }
 
 static RewritePlan *
@@ -158,7 +194,8 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
         auto arg = i->arguments()[0];
         if (arg->type() == Item::Type::INT_ITEM) {
             // Can only support constants.
-            const EncSet out_es = FULL_EncSet_Int;
+            // const EncSet out_es = FULL_EncSet_Int;
+            const EncSet out_es = PLAIN_EncSet;
             const EncSet child_es = FULL_EncSet_Int;
             const std::string why = "neg";
 
@@ -241,13 +278,13 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
                 if (!args[0]->const_item() && !args[1]->const_item()) {
                     why = why + "; join";
                     std::cerr << "join";
-                    return JOIN_EncSet;
+                    return JOIN_EncSet;     /* lambda */
                 } else {
-                    return EQ_EncSet;
+                    return EQ_EncSet;       /* lambda */
                 }
             } else {
                 why = "compare order";
-                return ORD_EncSet;
+                return ORD_EncSet;          /* lambda */
             }
         };
         const EncSet my_es = getEncSet();
@@ -318,8 +355,7 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
         }
 
         // Must be an OLK for each argument.
-        return new RewritePlanPerChildOLK(EncSet(out_es.chooseOne()),
-                                          out_child_olks, tr);
+        return new RewritePlanPerChildOLK(out_es, out_child_olks, tr);
     }
 
     virtual Item * do_optimize_type(Item_cond *i, Analysis & a) const {
@@ -376,8 +412,7 @@ class CItemNullcheck : public CItemSubtypeFT<Item_bool_func, FT> {
         tr = reason(out_es, "nullcheck", i);
         tr.add_child(r);
 
-        return new RewritePlanOneOLK(EncSet(out_es.chooseOne()),
-                                     solution.chooseOne(),
+        return new RewritePlanOneOLK(out_es, solution.chooseOne(),
                                      child_rp, tr);
     }
 
@@ -415,6 +450,29 @@ static class ANON : public CItemSubtypeFT<Item_func_get_system_var, Item_func::F
     }
 } ANON;
 
+/*
+ * When a higher level Rewrite node has a key to support an operation
+ * that a lower level node needs.
+ */
+static bool
+typicalGetCurrentAndChildOLK(OLK in_curr_olk, OLK in_child_olk,
+                             OLK *const out_curr_olk,
+                             OLK *const out_child_olk)
+{
+    OLK merged_olk;
+    const bool merge_res =
+        mergeCompleteOLK(in_child_olk, in_curr_olk, &merged_olk);
+    if (true == merge_res) {
+        *out_curr_olk  = merged_olk;
+        *out_child_olk = merged_olk;
+    } else {
+        *out_curr_olk  = in_curr_olk;
+        *out_child_olk = in_child_olk;
+    }
+
+    return true;
+}
+
 template<class IT, const char *NAME>
 class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
     virtual RewritePlan * do_gather_type(IT *i, reason &tr,
@@ -444,14 +502,17 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
             static_cast<const RewritePlanOneOLK *>(_rp);
 
         std::cerr << "Rewrite plan is " << rp << "\n";
-
+        
+        OLK curr_olk, child_olk;
+        assert(typicalGetCurrentAndChildOLK(rp->olk, constr, &curr_olk,
+                                            &child_olk));
         Item * const arg0 =
-            itemTypes.do_rewrite(args[0], rp->olk, rp->childr_rp[0], a);
+            itemTypes.do_rewrite(args[0], child_olk, rp->childr_rp[0], a);
         Item * const arg1 =
-            itemTypes.do_rewrite(args[1], rp->olk, rp->childr_rp[1], a);
+            itemTypes.do_rewrite(args[1], child_olk, rp->childr_rp[1], a);
 
         if (oAGG == constr.o) {
-            OnionMeta * const om = constr.key->getOnionMeta(oAGG);
+            OnionMeta * const om = curr_olk.key->getOnionMeta(oAGG);
             assert(om);
             EncLayer * const el = a.getBackEncLayer(om);
             assert_s(el->level() == SECLEVEL::HOM,
@@ -865,9 +926,8 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
         tr.add_child(r2);
 
         //prepare rewrite plans
-        return new RewritePlanOneOLK(out_es,
-                         supported_es.chooseOne(),
-                         childr_rp, tr);
+        return new RewritePlanOneOLK(out_es, supported_es.chooseOne(),
+                                     childr_rp, tr);
     }
     virtual Item * do_optimize_type(Item_func_min_max *i, Analysis & a) const
     {

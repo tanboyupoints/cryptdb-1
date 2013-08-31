@@ -493,3 +493,23 @@ encrypt_item_all_onions(Item *i, FieldMeta *fm,
     }
 }
 
+bool
+mergeCompleteOLK(OLK olk1, OLK olk2, OLK *out_olk)
+{
+    if (olk1.o != olk2.o && olk1.l != olk2.l) {
+        return false;
+    } else if (olk1.key && olk2.key) {
+        *out_olk = olk1;
+        return olk1.key == olk2.key;
+    } else if (olk1.key) {
+        *out_olk = olk1;
+        return true;
+    } else if (olk2.key) {
+        *out_olk = olk2;
+        return true;
+    } else {
+        *out_olk = olk1;
+        return olk1.l == SECLEVEL::PLAINVAL;
+    }
+}
+
