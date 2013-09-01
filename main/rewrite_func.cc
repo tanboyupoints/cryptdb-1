@@ -25,6 +25,11 @@
 // gives names to classes and objects we don't care to know the name of 
 #define ANON                ANON_NAME(__anon_id_func_)
 
+static bool
+typicalGetCurrentAndChildOLK(OLK in_curr_olk, OLK in_child_olk,
+                             OLK *const out_curr_olk,
+                             OLK *const out_child_olk);
+
 template <class T>
 static Item *
 do_optimize_type_self_and_args(T *i, Analysis &a) {
@@ -48,7 +53,33 @@ do_optimize_type_self_and_args(T *i, Analysis &a) {
 
 template <class T>
 static T *
-rewrite_args_FN(T *i, const RewritePlanOneOLK *rp, Analysis &a) {
+rewrite_args_FN(T *i, const OLK &constr, const RewritePlanOneOLK *rp,
+                Analysis &a)
+{
+    // FIXME: Should probably use the commented out code so that we can
+    // pass keys down the tree, but needs testing.
+    /*
+    const uint count = i->argument_count();
+    T * const out_i = copy(i);
+    List<Item> * const arg_list = dptrToList(i->arguments(), count);
+    out_i->set_arguments(*arg_list);
+
+    OLK curr_olk, child_olk;
+    assert(typicalGetCurrentAndChildOLK(constr, rp->olk, &curr_olk,
+                                        &child_olk));
+
+    Item ** const args = out_i->arguments();
+    for (uint x = 0; x < count; x++) {
+        args[x] =
+            itemTypes.do_rewrite(args[x], child_olk,
+                                 rp->childr_rp[x], a);
+        args[x]->name = NULL; // args should never have aliases...
+
+    }
+
+    return out_i;
+    */
+
     const uint count = i->argument_count();
     T * const out_i = copy(i);
     List<Item> * const arg_list = dptrToList(i->arguments(), count);
@@ -171,7 +202,7 @@ iterateGather(Item_func *i, const EncSet &out_es, EncSet child_es,
         child_es = child_es.intersect(childr_rp[index]->es_out);
     }
 
-    return new RewritePlanOneOLK(out_es, child_es.chooseOne(),
+    return new RewritePlanOneOLK(out_es, child_es.chooseOne(false),
                                  childr_rp, tr);
 }
 
@@ -194,8 +225,7 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
         auto arg = i->arguments()[0];
         if (arg->type() == Item::Type::INT_ITEM) {
             // Can only support constants.
-            // const EncSet out_es = FULL_EncSet_Int;
-            const EncSet out_es = PLAIN_EncSet;
+            const EncSet out_es = FULL_EncSet_Int;
             const EncSet child_es = FULL_EncSet_Int;
             const std::string why = "neg";
 
@@ -223,9 +253,27 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
                                    const RewritePlan *rp, Analysis &a)
         const
     {
-        return rewrite_args_FN(i,
-                               static_cast<const RewritePlanOneOLK *>(rp),
-                               a);
+        const RewritePlanOneOLK *const rp_one =
+            static_cast<const RewritePlanOneOLK *>(rp);
+
+        if (oDET == constr.o) {
+            Item *const arg = i->arguments()[0];
+            if (arg->type() != Item::Type::INT_ITEM) {
+                throw CryptDBError("Must use Integer type with NEG!");
+            }
+            const Item_int *const int_arg =
+                static_cast<Item_int *>(i->arguments()[0]);
+
+            // Negate the old value, so that it can be encrypted.
+            Item *const neg_i = new Item_int(-int_arg->value);
+
+            return itemTypes.do_rewrite(neg_i, constr,
+                            rp_one->childr_rp[0], a);
+        } else if (oWAIT == constr.o) {
+            return rewrite_args_FN(i, constr, rp_one, a);
+        } else {
+            throw CryptDBError("Bad onion for NEG!");
+        }
     }
 } ANON;
 
@@ -246,11 +294,11 @@ static class ANON : public CItemSubtypeFT<Item_func_not, Item_func::Functype::NO
         return do_optimize_type_self_and_args(i, a);
     }
 
-    virtual Item * do_rewrite_type(Item_func_not *i, const OLK & constr,
-                                   const RewritePlan * rp, Analysis & a)
+    virtual Item * do_rewrite_type(Item_func_not *i, const OLK &constr,
+                                   const RewritePlan *rp, Analysis &a)
         const
     {
-        return rewrite_args_FN(i,
+        return rewrite_args_FN(i, constr,
                                static_cast<const RewritePlanOneOLK *>(rp),
                                a);
     }
@@ -306,7 +354,7 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
         LOG(cdb_v) << "do_rewrite_type Item_func " << *i << " constr "
                    << EncSet(constr);
         assert_s(i->argument_count() == 2, "compare function does not have two arguments as expected");
-        return rewrite_args_FN(i,
+        return rewrite_args_FN(i, constr,
                                static_cast<const RewritePlanOneOLK *>(rp),
                                a);
     }
@@ -420,7 +468,7 @@ class CItemNullcheck : public CItemSubtypeFT<Item_bool_func, FT> {
                                    const RewritePlan *rp, Analysis &a)
         const
     {
-        return rewrite_args_FN(i,
+        return rewrite_args_FN(i, constr,
                                static_cast<const RewritePlanOneOLK *>(rp),
                                a);
     }
@@ -454,7 +502,7 @@ static class ANON : public CItemSubtypeFT<Item_func_get_system_var, Item_func::F
  * When a higher level Rewrite node has a key to support an operation
  * that a lower level node needs.
  */
-static bool
+bool
 typicalGetCurrentAndChildOLK(OLK in_curr_olk, OLK in_child_olk,
                              OLK *const out_curr_olk,
                              OLK *const out_child_olk)
@@ -502,7 +550,7 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
             static_cast<const RewritePlanOneOLK *>(_rp);
 
         std::cerr << "Rewrite plan is " << rp << "\n";
-        
+
         OLK curr_olk, child_olk;
         assert(typicalGetCurrentAndChildOLK(rp->olk, constr, &curr_olk,
                                             &child_olk));
@@ -616,7 +664,7 @@ class CItemLeafFunc : public CItemSubtypeFN<Item_func, NAME> {
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i,
+        return rewrite_args_FN(i, constr,
                                static_cast<const RewritePlanOneOLK *>(rp),
                                a);
     }
@@ -668,7 +716,7 @@ class CItemDateExtractFunc : public CItemSubtypeFN<Item_int_func, NAME> {
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i,
+        return rewrite_args_FN(i, constr,
                                static_cast<const RewritePlanOneOLK *>(rp),
                                a);
     }
@@ -766,7 +814,7 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
     {
         const RewritePlanOneOLK *one_rp =
             static_cast<const RewritePlanOneOLK *>(rp);
-        return rewrite_args_FN(i, one_rp, a);
+        return rewrite_args_FN(i, constr, one_rp, a);
 /*	LOG(cdb_v) << "Item_func_like do_rewrite_type " << *i;
 
 	assert_s(i->argument_count() == 2, "expecting LIKE to have two arguements");
@@ -846,7 +894,7 @@ static class ANON : public CItemSubtypeFT<Item_func_in, Item_func::Functype::IN_
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i,
+        return rewrite_args_FN(i, constr,
                                static_cast<const RewritePlanOneOLK *>(rp),
                                a);
     }
@@ -871,7 +919,7 @@ static class ANON : public CItemSubtypeFT<Item_func_in, Item_func::Functype::BET
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i,
+        return rewrite_args_FN(i, constr,
                                static_cast<const RewritePlanOneOLK *>(rp),
                                a);
     }
@@ -1063,7 +1111,7 @@ static class ANON : public CItemSubtypeFN<Item_func_nullif, str_nullif> {
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i,
+        return rewrite_args_FN(i, constr,
                                static_cast<const RewritePlanOneOLK *>(rp),
                                a);
     }
@@ -1166,7 +1214,7 @@ class CItemStrconv : public CItemSubtypeFN<Item_str_conv, NAME> {
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i,
+        return rewrite_args_FN(i, constr,
                                static_cast<const RewritePlanOneOLK *>(rp),
                                a);
     }
@@ -1250,7 +1298,7 @@ static class ANON : public CItemSubtypeFN<Item_date_add_interval, str_date_add_i
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i,
+        return rewrite_args_FN(i, constr,
                                static_cast<const RewritePlanOneOLK *>(rp),
                                a);
     }
@@ -1270,7 +1318,7 @@ class CItemDateNow : public CItemSubtypeFN<Item_func_now, NAME> {
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i,
+        return rewrite_args_FN(i, constr,
                                static_cast<const RewritePlanOneOLK *>(rp),
                                a);
     }
@@ -1300,7 +1348,7 @@ static class ANON: public CItemSubtypeFT<Item_char_typecast, Item_func::Functype
                                    const RewritePlan * rp, Analysis & a)
         const
     {
-        return rewrite_args_FN(i,
+        return rewrite_args_FN(i, constr,
                                static_cast<const RewritePlanOneOLK *>(rp),
                                a);
     }
