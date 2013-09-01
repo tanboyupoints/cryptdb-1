@@ -372,6 +372,12 @@ std::string FieldMeta::getToPlainName() const
     return "plainname";
 }
 
+bool FieldMeta::hasOnion(onion o) const
+{
+    const std::unique_ptr<OnionMetaKey> key(new OnionMetaKey(o));
+    return childExists(key.get());
+}
+
 std::unique_ptr<TableMeta>
 TableMeta::deserialize(unsigned int id, const std::string &serial)
 {

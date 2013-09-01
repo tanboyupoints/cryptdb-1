@@ -73,11 +73,13 @@ isWaitingField(Item *const arg, Analysis &a)
         Item_field * const f = static_cast<Item_field *>(arg);
         FieldMeta * const fm =
             a.getFieldMeta(f->table_name, f->field_name);
-        OnionMeta * const om_wait = fm->getOnionMeta(oWAIT);
-        OnionMeta * const om_plain = fm->getOnionMeta(oPLAIN);
-        if (a.getOnionLevel(om_wait) == SECLEVEL::WAITING
-            && a.getOnionLevel(om_plain) != SECLEVEL::WAITING) {
-            return true;
+        if (fm->hasOnion(oWAIT) && fm->hasOnion(oPLAIN)) {
+            OnionMeta * const om_wait = fm->getOnionMeta(oWAIT);
+            OnionMeta * const om_plain = fm->getOnionMeta(oPLAIN);
+            if (a.getOnionLevel(om_wait) == SECLEVEL::WAITING
+                && a.getOnionLevel(om_plain) != SECLEVEL::WAITING) {
+                return true;
+            }
         }
     }
 
@@ -91,11 +93,13 @@ isUsingExtraField(Item *const arg, Analysis &a)
         Item_field * const f = static_cast<Item_field *>(arg);
         FieldMeta * const fm =
             a.getFieldMeta(f->table_name, f->field_name);
-        OnionMeta * const om_wait = fm->getOnionMeta(oWAIT);
-        OnionMeta * const om_plain = fm->getOnionMeta(oPLAIN);
-        if (a.getOnionLevel(om_wait) == SECLEVEL::PLAINVAL
-            && a.getOnionLevel(om_plain) == SECLEVEL::WAITING) {
-            return true;
+        if (fm->hasOnion(oWAIT) && fm->hasOnion(oPLAIN)) {
+            OnionMeta * const om_wait = fm->getOnionMeta(oWAIT);
+            OnionMeta * const om_plain = fm->getOnionMeta(oPLAIN);
+            if (a.getOnionLevel(om_wait) == SECLEVEL::PLAINVAL
+                && a.getOnionLevel(om_plain) == SECLEVEL::WAITING) {
+                return true;
+            }
         }
     }
 
