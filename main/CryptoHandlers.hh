@@ -179,10 +179,21 @@ public:
     DoNothing(unsigned int id) : PlainText(id) {}
     virtual ~DoNothing() {;}
 
-    SECLEVEL level() const {return SECLEVEL::WAITING;}
-    std::string name() const {return "DONOTHING";}
+    virtual SECLEVEL level() const = 0;
+    virtual std::string name() const = 0;
 
     virtual Create_field *newCreateField(const Create_field * const cf,
                                          const std::string &anonname = "");
     Item *encrypt(Item * const ptext, uint64_t IV);
 };
+
+class Blocking : public DoNothing {
+public:
+    Blocking() {;}
+    Blocking(unsigned int id) : DoNothing(id) {}
+    virtual ~Blocking() {;}
+
+    SECLEVEL level() const {return SECLEVEL::BLOCKING;}
+    std::string name() const {return "BLOCKING";}
+};
+

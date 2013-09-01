@@ -12,7 +12,7 @@ class AddColumnSubHandler : public AlterSubHandler {
     {
         LEX *new_lex = copy(lex);
 
-        TableMeta *tm = a.getTableMeta(preamble.table);
+        const std::shared_ptr<TableMeta> tm(a.getTableMeta(preamble.table));
         // -----------------------------
         //         Rewrite TABLE
         // -----------------------------
@@ -51,9 +51,9 @@ class DropColumnSubHandler : public AlterSubHandler {
         List<Alter_drop> col_drop_list =
             filterList(drop_it,
                 [](Alter_drop *adrop)
-                {
-                    return Alter_drop::COLUMN == adrop->type;
-                });
+        {
+            return Alter_drop::COLUMN == adrop->type;
+        });
 
         // Rewrite and Remove.
         drop_it = List_iterator<Alter_drop>(col_drop_list);
@@ -61,16 +61,16 @@ class DropColumnSubHandler : public AlterSubHandler {
             reduceList<Alter_drop>(drop_it, List<Alter_drop>(),
                 [preamble, &a, this] (List<Alter_drop> out_list,
                                             Alter_drop *adrop)
-                {
-                    FieldMeta *fm =
-                        a.getFieldMeta(preamble.table, adrop->name);
-                    TableMeta *tm = a.getTableMeta(preamble.table);
-                    List<Alter_drop> lst = this->rewrite(fm, adrop);
-                    out_list.concat(&lst);
-                    a.deltas.push_back(new DeleteDelta(fm, tm,
-                                                       tm->getKey(fm)));
-                    return out_list; /* lambda */
-                });
+        {
+            std::shared_ptr<FieldMeta>
+                fm(a.getFieldMeta(preamble.table, adrop->name));
+            TableMeta *tm = a.getTableMeta(preamble.table);
+            List<Alter_drop> lst = this->rewrite(fm.get(), adrop);
+            out_list.concat(&lst);
+            a.deltas.push_back(new DeleteDelta(fm, tm,
+                                               tm->getKey(fm.get())));
+            return out_list; /* lambda */
+        });
 
         return new_lex;
     }
@@ -126,7 +126,7 @@ class AddIndexSubHandler : public AlterSubHandler {
     {
         LEX *new_lex = copy(lex);
 
-        TableMeta *tm = a.getTableMeta(preamble.table);
+        std::shared_ptr<TableMeta> tm(a.getTableMeta(preamble.table));
 
         // -----------------------------
         //         Rewrite TABLE

@@ -140,7 +140,7 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * const cf,
         case SECLEVEL::HOM: {return HOMFactory::create(cf, key);}
         case SECLEVEL::SEARCH: {return new Search(cf, key);}
         case SECLEVEL::PLAINVAL: {return new PlainText();}
-        case SECLEVEL::WAITING: {return new DoNothing();}
+        case SECLEVEL::BLOCKING: {return new Blocking();}
         default:{}
     }
     throw CryptDBError("unknown or unimplemented security level \n");
@@ -175,8 +175,8 @@ EncLayerFactory::deserializeLayer(unsigned int id,
         case SECLEVEL::PLAINVAL:
             return new PlainText(id);
 
-        case SECLEVEL::WAITING:
-            return new DoNothing(id);
+        case SECLEVEL::BLOCKING:
+            return new Blocking(id);
 
         default:{}
     }

@@ -374,7 +374,7 @@ rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
         RewritePlan * rp = getAssert(a.rewritePlans, i);
         assert(rp);
         EncSet es = constr.intersect(rp->es_out);
-        if (es.empty()) {
+        if (false == es.available()) {
                 std::cerr << " cannot support query because " << name
                           << " item " << i << " needs to output any of "
                           << constr << "\n"
@@ -453,7 +453,7 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
         const RewritePlan * const rp =
             getAssert(a.rewritePlans, value_item);
         const EncSet r_es = rp->es_out.intersect(EncSet(a, fm));
-        assert(!r_es.empty());
+        assert(r_es.available());
 
         // Determine salt for field
         bool add_salt = false;

@@ -50,18 +50,15 @@ EncSet::intersect(const EncSet & es2) const
             
             assert(o == o2);
 
-            // HACK: Will not work correctly if WAITING is not the
-            // current seclevel (ie, don't embeded WAITING)
-            if (SECLEVEL::WAITING == it->second.first ||
-                SECLEVEL::WAITING == it2->second.first) {
-
-                continue;
-            }
-
             const SECLEVEL sl =
-                (SECLEVEL)min(static_cast<int>(it->second.first),
-                              static_cast<int>(it2->second.first));
+                static_cast<SECLEVEL>(
+                        min(static_cast<int>(it->second.first),
+                            static_cast<int>(it2->second.first)));
 
+            /*
+             * FIXME: Each clause of this if statement should make sure
+             * that it's OnionMeta actually has the SecLevel.
+             */
             if (fm == NULL) {
                 m[o] = LevelFieldPair(sl, fm2);
             } else if (fm2 == NULL) {
@@ -74,8 +71,9 @@ EncSet::intersect(const EncSet & es2) const
                 const OnionMeta * const om = fm->getOnionMeta(o);
                 const OnionMeta * const om2 = fm2->getOnionMeta(o);
                 // HACK: To determine if the keys are the same.
-                if (om->getLayer(sl)->doSerialize() ==
-                    om2->getLayer(sl)->doSerialize()) {
+                if (om->hasEncLayer(sl) && om2->hasEncLayer(sl)
+                    && om->getLayer(sl)->doSerialize() ==
+                       om2->getLayer(sl)->doSerialize()) {
                     m[o] = LevelFieldPair(sl, fm);
                 }
             }
@@ -120,8 +118,7 @@ EncSet::chooseOne(bool require_key) const
         const onion o = onion_order[i];
         const auto it = osl.find(o);
         if (it != osl.end()) {
-            // HACK.
-            if (SECLEVEL::WAITING == it->second.first) {
+            if (SECLEVEL::BLOCKING == it->second.first) {
                 continue;
             }
             // HACK.
@@ -175,6 +172,18 @@ EncSet::onionLevel(onion o) const
     }
 
     assert(false);
+}
+
+bool
+EncSet::available() const
+{
+    for (auto it : osl) {
+        if (SECLEVEL::BLOCKING != it.second.first) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 bool
@@ -387,7 +396,7 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
         object->applyToChildren(localCreateHandler);
     };
 
-    helper(e_conn, meta, parent_meta, key, NULL);
+    helper(e_conn, meta.get(), parent_meta, key, NULL);
     return true;
 }
 
@@ -396,9 +405,9 @@ bool ReplaceDelta::apply(const std::unique_ptr<Connect> &e_conn,
 {
     const std::string table_name = tableNameFromType(table_type);
 
-    const unsigned int child_id = meta->getDatabaseID();
+    const unsigned int child_id = meta.get()->getDatabaseID();
     
-    const std::string child_serial = meta->serialize(*parent_meta);
+    const std::string child_serial = meta.get()->serialize(*parent_meta);
     const std::string esc_child_serial =
         escapeString(e_conn, child_serial);
     const std::string serial_key = key->getSerial();
@@ -446,7 +455,7 @@ bool DeleteDelta::apply(const std::unique_ptr<Connect> &e_conn,
         object->applyToChildren(localDestroyHandler);
     };
 
-    helper(meta, parent_meta); 
+    helper(meta.get(), parent_meta); 
     return true;
 }
 
@@ -1048,50 +1057,30 @@ std::string Analysis::unAliasTable(const std::string &table) const
     }
 }
 
+// FIXME.
 EncLayer *Analysis::getBackEncLayer(OnionMeta * const om) const
 {
-    // FIXME: PTR.
-    auto it = to_adjust_enc_layers.find(om);
-    if (to_adjust_enc_layers.end() == it) {
-        return om->layers.back().get();
-    } else { 
-        return it->second.back().get();
-    }
+    return om->layers.back().get();
 }
 
-EncLayer *Analysis::popBackEncLayer(OnionMeta * const om)
+std::shared_ptr<EncLayer> Analysis::popBackEncLayer(OnionMeta * const om)
 {
-    auto it = to_adjust_enc_layers.find(om);
-    if (to_adjust_enc_layers.end() == it) { // First onion adjustment
-        to_adjust_enc_layers[om] = om->layers;
-    }
-
     // FIXME: PTR.
-    EncLayer * const out_layer = to_adjust_enc_layers[om].back().get();
-    to_adjust_enc_layers[om].pop_back();
+    std::shared_ptr<EncLayer> out_layer(om->layers.back());
+    om->layers.pop_back();
 
     return out_layer;
 }
 
 SECLEVEL Analysis::getOnionLevel(OnionMeta * const om) const
 {
-    auto it = to_adjust_enc_layers.find(om);
-    if (to_adjust_enc_layers.end() == it) {
-        return om->getSecLevel();
-    } else {
-        return it->second.back()->level();
-    }
+    return om->getSecLevel();
 }
 
 std::vector<std::shared_ptr<EncLayer>>
 Analysis::getEncLayers(OnionMeta * const om) const
 {
-    auto it = to_adjust_enc_layers.find(om);
-    if (to_adjust_enc_layers.end() == it) {
-        return om->layers;
-    } else {
-        return it->second;
-    }
+    return om->layers;
 }
 
 #undef ROLLBACK_AND_RETURN_ON_FAIL

@@ -385,12 +385,12 @@ buildTypeTextTranslator()
 
     // SecLevels.
     const char *seclevel_chars[] = {"RND", "DET", "DETJOIN", "OPE", "HOM",
-                                    "SEARCH", "PLAINVAL", "WAITING",
+                                    "SEARCH", "PLAINVAL", "BLOCKING",
                                     "INVALID"};
     SECLEVEL seclevels[] = {SECLEVEL::RND, SECLEVEL::DET,
                             SECLEVEL::DETJOIN, SECLEVEL::OPE,
                             SECLEVEL::HOM, SECLEVEL::SEARCH,
-                            SECLEVEL::PLAINVAL, SECLEVEL::WAITING,
+                            SECLEVEL::PLAINVAL, SECLEVEL::BLOCKING,
                             SECLEVEL::INVALID};
     static_assert(arraysize(seclevel_chars) == arraysize(seclevels),
                   "SECLEVEL size mismatch!");
@@ -507,7 +507,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
 
     // Remove the EncLayer.
     auto meta_key = om->getKey(a.getBackEncLayer(om));
-    EncLayer * const back_el = a.popBackEncLayer(om);
+    std::shared_ptr<EncLayer> back_el(a.popBackEncLayer(om));
 
     // Update the Meta.
     a.deltas.push_back(new DeleteDelta(back_el, om, NULL));
@@ -527,30 +527,23 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
         fieldanon = wait_om->getAnonOnionName();
         Item_field * const field =
             stringToItemField(om->getAnonOnionName(), tableanon, itf);
-        decUDF = back_el->decryptUDF(field, salt);
+        decUDF = back_el.get()->decryptUDF(field, salt);
         assert(a.getBackEncLayer(om)->level() == SECLEVEL::PLAINVAL);
-        /*
-        std::unique_ptr<OnionMeta>
-            new_om(OnionMeta::copyWithNewName(om,
-                                            wait_om->getAnonOnionName()));
-        // HACK: PTR.
-        OnionMeta * const ptr = new_om.release();
-        a.deltas.push_back(new ReplaceDelta(ptr, fm, fm->getKey(om)));
-        */
 
         // HACK.
-        EncLayer * const do_nothing_el = new DoNothing();
+        const std::shared_ptr<EncLayer> do_nothing_el(new Blocking());
         a.deltas.push_back(new CreateDelta(do_nothing_el, om, meta_key));
 
-        EncLayer * const waiting_el = a.popBackEncLayer(wait_om);
-        assert(waiting_el->level() == SECLEVEL::WAITING);
+        const std::shared_ptr<EncLayer>
+            waiting_el(a.getBackEncLayer(wait_om));
+        assert(waiting_el->level() == SECLEVEL::BLOCKING);
         a.deltas.push_back(new DeleteDelta(waiting_el, wait_om, NULL));
     } else {
         fieldanon = om->getAnonOnionName();
         Item_field * const field =
             stringToItemField(fieldanon.get(), tableanon, itf);
 
-        decUDF = back_el->decryptUDF(field, salt);
+        decUDF = back_el.get()->decryptUDF(field, salt);
     }
 
     std::stringstream query;
