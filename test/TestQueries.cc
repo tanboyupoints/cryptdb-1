@@ -110,8 +110,9 @@ static QueryList Select = QueryList("SingleSelect",
       Query("SELECT sum(age) z FROM test_select", false),
       Query("SELECT min(t.id) a FROM test_select AS t", false),
       Query("SELECT t.address AS b FROM test_select t", false),
-      Query("SELECT * FROM test_select HAVING age", false),
-      Query("SELECT * FROM test_select HAVING age && id", false)
+      // BestEffort.
+      // Query("SELECT * FROM test_select HAVING age", false),
+      // Query("SELECT * FROM test_select HAVING age && id", false)
       },
     { "DROP TABLE test_select" },
     { "DROP TABLE test_select" },
@@ -667,7 +668,9 @@ static QueryList Negative = QueryList("Negative",
       Query("INSERT INTO negs (a, b, c) VALUES (-8, -50, -18)", false),
       Query("SELECT a FROM negs WHERE b = -50 OR b = 50", false),
       Query("SELECT a FROM negs WHERE c = -100 OR b = -20", false),
-      Query("SELECT a FROM negs WHERE -c = 100", false)},
+      // BestEffort.
+      // Query("SELECT a FROM negs WHERE -c = 100", false)
+    },
     { "DROP TABLE negs"},
     { "DROP TABLE negs"},
     { "DROP TABLE negs"});
@@ -1178,6 +1181,7 @@ static void
 RunTest(const TestConfig &tc) {
     // ###############################
     //      TOTAL RESULT: 336/336.
+    //    (No Best Effort: 311/311)
     // ###############################
 
     std::vector<Score> scores;
@@ -1216,7 +1220,10 @@ RunTest(const TestConfig &tc) {
     scores.push_back(CheckQueryList(tc, Null));
 
     // Pass 22/22
-    scores.push_back(CheckQueryList(tc, BestEffort));
+    ProxyState *ps = test->getProxyState();
+    if (ps->defaultSecurityRating() == SECURITY_RATING::BEST_EFFORT) {
+        scores.push_back(CheckQueryList(tc, BestEffort));
+    }
 
     // Pass 16/16
     scores.push_back(CheckQueryList(tc, Auto));
