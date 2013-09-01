@@ -653,7 +653,6 @@ static QueryList Auto = QueryList("AutoInc",
  * Add additional tests once functional.
  * > HOM
  * > OPE
- * > Inserting after onion adjustment.
  */
 static QueryList Negative = QueryList("Negative",
     { "CREATE TABLE negs (a integer, b integer, c integer)",
@@ -667,7 +666,10 @@ static QueryList Negative = QueryList("Negative",
       Query("INSERT INTO negs (a, b, c) VALUES (-8, -50, -18)", false),
       Query("SELECT a FROM negs WHERE b = -50 OR b = 50", false),
       Query("SELECT a FROM negs WHERE c = -100 OR b = -20", false),
-      Query("SELECT a FROM negs WHERE -c = 100", false)},
+      Query("SELECT a FROM negs WHERE -c = 100", false),
+      Query("INSERT INTO negs (c) VALUES (-1009)", false),
+      Query("INSERT INTO negs (c) VALUES (1009)", false),
+      Query("SELECT * FROM negs WHERE c = -1009", false)},
     { "DROP TABLE negs"},
     { "DROP TABLE negs"},
     { "DROP TABLE negs"});
@@ -1177,7 +1179,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 336/336.
+    //      TOTAL RESULT: 339/339.
     // ###############################
 
     std::vector<Score> scores;
@@ -1221,7 +1223,7 @@ RunTest(const TestConfig &tc) {
     // Pass 16/16
     scores.push_back(CheckQueryList(tc, Auto));
 
-    // Pass 14/14
+    // Pass 17/17
     scores.push_back(CheckQueryList(tc, Negative));
 
     for (auto it : scores) {

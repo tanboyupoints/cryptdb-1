@@ -1,4 +1,5 @@
 #include <main/CryptoHandlers.hh>
+#include <parser/lex_util.hh>
 #include <crypto/ope.hh>
 #include <crypto/BasicCrypto.hh>
 #include <crypto/SWPSearch.hh>
@@ -1875,13 +1876,13 @@ PlainText::newCreateField(const Create_field * const cf,
 Item *
 PlainText::encrypt(Item * const ptext, uint64_t IV)
 {
-    return ptext;
+    return clone_item(ptext);
 }
 
 Item *
 PlainText::decrypt(Item * const ctext, uint64_t IV)
 {
-    return ctext;
+    return clone_item(ctext);
 }
 
 Item *
