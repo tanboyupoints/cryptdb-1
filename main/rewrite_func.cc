@@ -25,11 +25,6 @@
 // gives names to classes and objects we don't care to know the name of 
 #define ANON                ANON_NAME(__anon_id_func_)
 
-static bool
-typicalGetCurrentAndChildOLK(OLK in_curr_olk, OLK in_child_olk,
-                             OLK *const out_curr_olk,
-                             OLK *const out_child_olk);
-
 template <class T>
 static Item *
 do_optimize_type_self_and_args(T *i, Analysis &a) {
@@ -56,30 +51,6 @@ static T *
 rewrite_args_FN(T *i, const OLK &constr, const RewritePlanOneOLK *rp,
                 Analysis &a)
 {
-    // FIXME: Should probably use the commented out code so that we can
-    // pass keys down the tree, but needs testing.
-    /*
-    const uint count = i->argument_count();
-    T * const out_i = copy(i);
-    List<Item> * const arg_list = dptrToList(i->arguments(), count);
-    out_i->set_arguments(*arg_list);
-
-    OLK curr_olk, child_olk;
-    assert(typicalGetCurrentAndChildOLK(constr, rp->olk, &curr_olk,
-                                        &child_olk));
-
-    Item ** const args = out_i->arguments();
-    for (uint x = 0; x < count; x++) {
-        args[x] =
-            itemTypes.do_rewrite(args[x], child_olk,
-                                 rp->childr_rp[x], a);
-        args[x]->name = NULL; // args should never have aliases...
-
-    }
-
-    return out_i;
-    */
-
     const uint count = i->argument_count();
     T * const out_i = copy(i);
     List<Item> * const arg_list = dptrToList(i->arguments(), count);
@@ -96,23 +67,54 @@ rewrite_args_FN(T *i, const OLK &constr, const RewritePlanOneOLK *rp,
 }
 
 static bool
-isWaitingField(RewritePlan *const rp, Item *const arg)
+isWaitingField(Item *const arg, Analysis &a)
 {
-    if (arg->type() == Item::Type::FIELD_ITEM
-        && rp->es_out.onionLevel(oWAIT) == SECLEVEL::WAITING
-        && rp->es_out.onionLevel(oPLAIN) != SECLEVEL::WAITING) {
-        return true;
+    if (arg->type() == Item::Type::FIELD_ITEM) {
+        Item_field * const f = static_cast<Item_field *>(arg);
+        FieldMeta * const fm =
+            a.getFieldMeta(f->table_name, f->field_name);
+        OnionMeta * const om_wait = fm->getOnionMeta(oWAIT);
+        OnionMeta * const om_plain = fm->getOnionMeta(oPLAIN);
+        if (a.getOnionLevel(om_wait) == SECLEVEL::WAITING
+            && a.getOnionLevel(om_plain) != SECLEVEL::WAITING) {
+            return true;
+        }
     }
 
     return false;
 }
 
 static bool
-isUsingExtraField(RewritePlan *const rp, Item *const arg)
+isUsingExtraField(Item *const arg, Analysis &a)
 {
-    return arg->type() == Item::Type::FIELD_ITEM
-    && rp->es_out.onionLevel(oWAIT) == SECLEVEL::PLAINVAL
-    && rp->es_out.onionLevel(oPLAIN) == SECLEVEL::WAITING;
+    if (arg->type() == Item::Type::FIELD_ITEM) {
+        Item_field * const f = static_cast<Item_field *>(arg);
+        FieldMeta * const fm =
+            a.getFieldMeta(f->table_name, f->field_name);
+        OnionMeta * const om_wait = fm->getOnionMeta(oWAIT);
+        OnionMeta * const om_plain = fm->getOnionMeta(oPLAIN);
+        if (a.getOnionLevel(om_wait) == SECLEVEL::PLAINVAL
+            && a.getOnionLevel(om_plain) == SECLEVEL::WAITING) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static void
+throwFieldToPlainIfBlocked(Item *const waiting_arg,
+                           Item *const using_arg, Analysis &a)
+{
+    if (isWaitingField(waiting_arg, a)
+        && isUsingExtraField(using_arg, a)) {
+
+        Item_field * const f = static_cast<Item_field *>(waiting_arg);
+        FieldMeta * const fm =
+            a.getFieldMeta(f->table_name, f->field_name);
+        throw OnionAdjustExcept(oPLAIN, fm, SECLEVEL::PLAINVAL,
+                                f);
+    }
 }
 
 // An implementation of gather for the common case operation
@@ -139,22 +141,14 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
               intersect(childr_rp[1]->es_out);
 
     if (solution.empty()) {
-        if (isWaitingField(childr_rp[0], args[0])
-            && isUsingExtraField(childr_rp[1], args[1])) {
-            Item_field * const f = static_cast<Item_field *>(args[0]);
-            FieldMeta * const fm =
-                a.getFieldMeta(f->table_name, f->field_name);
-            throw OnionAdjustExcept(oPLAIN, fm, SECLEVEL::PLAINVAL,
-                                    f);
-        } else if (isWaitingField(childr_rp[1], args[1])
-                   && isUsingExtraField(childr_rp[0], args[0])) {
-
-            Item_field * const f = static_cast<Item_field *>(args[1]);
-            FieldMeta * const fm =
-                a.getFieldMeta(f->table_name, f->field_name);
-            throw OnionAdjustExcept(oPLAIN, fm, SECLEVEL::PLAINVAL,
-                                    f);
-        }
+        // Throwing an exception here supports cases where we have an
+        // operation that needs to go to PLAIN and one of the fields is
+        // already at plain (using the extra field). The above intersect
+        // will fail to see that taking the other plain down to PLAINVAL
+        // is an option because this first field has SECLEVEL::WAITING
+        // on oPLAIN.
+        throwFieldToPlainIfBlocked(args[0], args[1], a);
+        throwFieldToPlainIfBlocked(args[1], args[0], a);
 
         std::cerr << "crypto schemes does not support this query BECAUSE "
                   << i << " NEEDS " << my_es << "\n"
@@ -223,18 +217,31 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
         assert(i->argument_count() == 1);
 
         auto arg = i->arguments()[0];
-        if (arg->type() == Item::Type::INT_ITEM) {
-            // Can only support constants.
+        if (arg->type() == Item::Type::FIELD_ITEM) {
+            if (isWaitingField(arg, a)) {
+                Item_field * const f = static_cast<Item_field *>(arg);
+                FieldMeta * const fm =
+                    a.getFieldMeta(f->table_name, f->field_name);
+
+                throw OnionAdjustExcept(oPLAIN, fm, SECLEVEL::PLAINVAL,
+                                        f);
+            } else {
+                const EncSet out_es = PLAIN_EncSet;
+                const EncSet child_es = PLAIN_EncSet;
+                const std::string why = "neg";
+
+                return iterateGather(i, out_es, child_es, why, tr, a);
+            }
+        } else if (arg->type() == Item::Type::INT_ITEM
+                   || arg->type() == Item::Type::FIELD_ITEM) {
             const EncSet out_es = FULL_EncSet_Int;
             const EncSet child_es = FULL_EncSet_Int;
             const std::string why = "neg";
 
             return iterateGather(i, out_es, child_es, why, tr, a);
+        } else {
+            throw CryptDBError("Unsupported NEG!");
         }
-
-        // FIXME: Go to PLAIN.
-        throw CryptDBError("goto PLAIN!");
-        // return gather(i->arguments()[0], tr, a);
     }
 
     virtual Item * do_optimize_type(Item_func_neg *i, Analysis & a) const
@@ -269,7 +276,7 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
 
             return itemTypes.do_rewrite(neg_i, constr,
                             rp_one->childr_rp[0], a);
-        } else if (oWAIT == constr.o) {
+        } else if (oWAIT == constr.o || oPLAIN == constr.o) {
             return rewrite_args_FN(i, constr, rp_one, a);
         } else {
             throw CryptDBError("Bad onion for NEG!");
@@ -502,10 +509,10 @@ static class ANON : public CItemSubtypeFT<Item_func_get_system_var, Item_func::F
  * When a higher level Rewrite node has a key to support an operation
  * that a lower level node needs.
  */
-bool
-typicalGetCurrentAndChildOLK(OLK in_curr_olk, OLK in_child_olk,
-                             OLK *const out_curr_olk,
-                             OLK *const out_child_olk)
+static bool
+addingGetCurrentAndChildOLK(OLK in_curr_olk, OLK in_child_olk,
+                            OLK *const out_curr_olk,
+                            OLK *const out_child_olk)
 {
     OLK merged_olk;
     const bool merge_res =
@@ -552,8 +559,8 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
         std::cerr << "Rewrite plan is " << rp << "\n";
 
         OLK curr_olk, child_olk;
-        assert(typicalGetCurrentAndChildOLK(rp->olk, constr, &curr_olk,
-                                            &child_olk));
+        assert(addingGetCurrentAndChildOLK(rp->olk, constr, &curr_olk,
+                                           &child_olk));
         Item * const arg0 =
             itemTypes.do_rewrite(args[0], child_olk, rp->childr_rp[0], a);
         Item * const arg1 =

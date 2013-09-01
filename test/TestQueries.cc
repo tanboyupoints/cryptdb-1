@@ -644,6 +644,29 @@ static QueryList Auto = QueryList("AutoInc",
     { "DROP TABLE msgs"},
     { "DROP TABLE msgs"});
 
+/*
+ * Add additional tests once functional.
+ * > HOM
+ * > OPE
+ * > Inserting after onion adjustment.
+ */
+static QueryList Negative = QueryList("Negative",
+    { "CREATE TABLE negs (a integer, b integer, c integer)",
+      "", "", "", "", "", ""},
+    { "CREATE TABLE negs (a integer, b integer, c integer)",
+      "", "", "", "", "", ""},
+    { "CREATE TABLE negs (a integer, b integer, c integer)",
+      "", "", "", "", "", ""},
+    { Query("INSERT INTO negs (a, b, c) VALUES (10, -20, -100)", false),
+      Query("INSERT INTO negs (a, b, c) VALUES (-100, 50, -12)", false),
+      Query("INSERT INTO negs (a, b, c) VALUES (-8, -50, -18)", false),
+      Query("SELECT a FROM negs WHERE b = -50 OR b = 50", false),
+      Query("SELECT a FROM negs WHERE c = -100 OR b = -20", false),
+      Query("SELECT a FROM negs WHERE -c = 100", false)},
+    { "DROP TABLE negs"},
+    { "DROP TABLE negs"},
+    { "DROP TABLE negs"});
+
 static QueryList Null = QueryList("Null",
     { "CREATE TABLE test_null (uid integer, age integer, address text)",
       "CREATE TABLE u_null (uid integer, username text)",
@@ -1144,7 +1167,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 333/346
+    //      TOTAL RESULT: 347/360.
     // ###############################
 
     std::vector<Score> scores;
@@ -1187,6 +1210,9 @@ RunTest(const TestConfig &tc) {
 
     // Pass 16/16
     scores.push_back(CheckQueryList(tc, Auto));
+
+    // Pass 14/14
+    scores.push_back(CheckQueryList(tc, Negative));
 
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;
