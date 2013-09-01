@@ -262,8 +262,10 @@ rewrite_create_field(const FieldMeta * const fm,
         OnionMeta * const om = oit.second;
         Create_field * const new_cf =
             get_create_field(a, f, om, om->getAnonOnionName());
-        assert(has_default == static_cast<bool>(new_cf->def));
-        if (has_default) {
+        // Don't add a default for the oWAIT onion.
+        assert(has_default == static_cast<bool>(new_cf->def)
+               || o == oWAIT);
+        if (new_cf->def) {
             // AWARE: Could be pulled out, but would require an additional
             // if statement for has_default.
             const std::unique_ptr<Item> def(makeNiceDefault(f));

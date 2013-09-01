@@ -164,8 +164,8 @@ public:
     virtual SECLEVEL level() const {return SECLEVEL::PLAINVAL;}
     virtual std::string name() const {return "PLAINTEXT";}
 
-    Create_field *newCreateField(const Create_field * const cf,
-                                 const std::string &anonname = "");
+    virtual Create_field *newCreateField(const Create_field * const cf,
+                                         const std::string &anonname = "");
     Item *encrypt(Item * const ptext, uint64_t IV);
     Item *decrypt(Item * const ctext, uint64_t IV);
     Item *decryptUDF(Item * const col, Item * const ivcol = NULL)
@@ -182,5 +182,7 @@ public:
     SECLEVEL level() const {return SECLEVEL::WAITING;}
     std::string name() const {return "DONOTHING";}
 
+    virtual Create_field *newCreateField(const Create_field * const cf,
+                                         const std::string &anonname = "");
     Item *encrypt(Item * const ptext, uint64_t IV);
 };

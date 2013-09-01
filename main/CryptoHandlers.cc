@@ -1896,6 +1896,18 @@ PlainText::doSerialize() const
     return std::string("");
 }
 
+Create_field *
+DoNothing::newCreateField(const Create_field * const cf,
+                          const std::string &anonname)
+{
+    Create_field *const f0 = PlainText::newCreateField(cf, anonname);
+
+    f0->def   = NULL;
+    f0->flags = f0->flags & ~NOT_NULL_FLAG;
+
+    return f0;
+}
+
 Item *
 DoNothing::encrypt(Item * const, uint64_t)
 {
