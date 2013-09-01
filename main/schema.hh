@@ -167,6 +167,7 @@ public:
     unsigned long getCurrentUniqCounter() {return counter;}
     bool needExtraPlainColumn() const;
     std::string getToPlainName() const;
+    bool hasOnion(onion o) const;
 
 private:
     constexpr static const char *type_name = "fieldMeta";
