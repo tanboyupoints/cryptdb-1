@@ -851,6 +851,31 @@ static QueryList BestEffort = QueryList("BestEffort",
     { "DROP TABLE t"},
     { "DROP TABLE t"});
 
+static QueryList DefaultValue = QueryList("DefaultValue",
+    { "CREATE TABLE t (x integer, y integer NOT NULL DEFAULT 12)",
+      "CREATE TABLE u (z integer NOT NULL DEFAULT 100)",
+      "", ""},
+    { "CREATE TABLE t (x integer, y integer NOT NULL DEFAULT 12)",
+      "CREATE TABLE u (z integer NOT NULL DEFAULT 100)",
+      "", ""},
+    { "CREATE TABLE t (x integer, y integer NOT NULL DEFAULT 12)",
+      "CREATE TABLE u (z integer NOT NULL DEFAULT 100)",
+      "", ""},
+    { Query("INSERT INTO t (x) VALUES (5)", false),
+      Query("INSERT INTO t (x, y) VALUES (18, -53)", false),
+      // Query("INSERT INTO u () VALUES ()", false),
+      Query("INSERT INTO u VALUES (DEFAULT)", false),
+      Query("INSERT INTO u VALUES (DEFAULT(z))", false),
+      Query("SELECT * FROM t WHERE x = 12", false),
+      Query("INSERT INTO t (x) VALUES (19)", false),
+      Query("SELECT * FROM t WHERE x = 19", false),
+      Query("SELECT * FROM t", false)},
+    { "DROP TABLE t",
+      "DROP TABLE u"},
+    { "DROP TABLE t",
+      "DROP TABLE u"},
+    { "DROP TABLE t",
+      "DROP TABLE u"});
 
 //-----------------------------------------------------------------------
 
@@ -1072,8 +1097,6 @@ CheckAnnotatedQuery(const TestConfig &tc, std::string control_query,
     }
 
     if (control_res.ok != test_res.ok) {
-        std::cout << "QUERY: " << test_query << std::endl;
-        std::cin >> r;
         LOG(warn) << "control " << control_res.ok
             << ", test " << test_res.ok
             << ", and true is " << true
@@ -1083,8 +1106,6 @@ CheckAnnotatedQuery(const TestConfig &tc, std::string control_query,
             thrower() << "stop on failure";
         return false;
     } else if (!match(test_res, control_res)) {
-        std::cout << "QUERY: " << test_query << std::endl;
-        std::cin >> r;
         LOG(warn) << "result mismatch for query: " << test_query;
         LOG(warn) << "control is:";
         printRes(control_res);
@@ -1179,7 +1200,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 339/339.
+    //      TOTAL RESULT: 351/353.
     // ###############################
 
     std::vector<Score> scores;
@@ -1225,6 +1246,9 @@ RunTest(const TestConfig &tc) {
 
     // Pass 17/17
     scores.push_back(CheckQueryList(tc, Negative));
+
+    // Pass 12/14
+    scores.push_back(CheckQueryList(tc, DefaultValue));
 
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;
