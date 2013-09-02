@@ -8,6 +8,7 @@
 #define LOG_GROUPS(m)       \
     m(warn)                 \
     m(debug)                \
+    m(cdb_v)                \
     m(crypto)               \
     m(crypto_v)             \
     m(crypto_data)          \
@@ -16,6 +17,7 @@
     m(edb_query)            \
     m(edb_query_plain)      \
     m(edb_perf)             \
+    m(encl)                 \
     m(test)                 \
     m(am)                   \
     m(am_v)                 \

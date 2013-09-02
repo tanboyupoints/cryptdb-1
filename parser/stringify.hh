@@ -1,11 +1,19 @@
 #pragma once
 
-#include <iostream>
 #include <string>
 #include <sstream>
 #include <stdexcept>
 #include <iostream>
+#include <functional>
 
+template<class T>
+std::string stringify_ptr(T * x) {
+    if (x == NULL ) {
+        return "NULL";
+    } else {
+        return x->stringify();
+    }
+}
 
 static inline std::ostream&
 operator<<(std::ostream &out, String &s)
@@ -18,7 +26,15 @@ operator<<(std::ostream &out, Item &i)
 {
     String s;
     i.print(&s, QT_ORDINARY);
+
     return out << s;
+}
+
+static inline std::ostream&
+operator<<(std::ostream &out, Alter_drop &adrop)
+{
+    // FIXME: Needs to support escapes.
+    return out << adrop.name;
 }
 
 template<class T>
@@ -44,6 +60,26 @@ operator<<(std::ostream &out, List_noparen<T> &l)
         if (!first)
             out << ", ";
         out << *i;
+        first = false;
+    }
+    return out;
+}
+
+//Strings needs apostrophes
+//template<>
+static inline std::ostream&
+operator<<(std::ostream &out, List_noparen<String> &l)
+{
+    bool first = true;
+    for (auto it = List_iterator<String>(l);;) {
+        String *i = it++;
+        if (!i)
+            break;
+
+        if (!first) {
+            out << ", ";
+        }
+        out << "'" << *i << "'";
         first = false;
     }
     return out;
@@ -76,8 +112,33 @@ operator<<(std::ostream &out, SELECT_LEX_UNIT &select_lex_unit)
     return out << s;
 }
 
+// FIXME: Combine with vector_join.
+template <typename T>
+std::string ListJoin(List<T> lst, std::string delim,
+                     std::function<std::string(T)> finalize)
+{
+    std::ostringstream accum;
+
+    auto it = List_iterator<T>(lst);
+    T *element = it++;
+    for (;element; element = it++) {
+        std::string finalized_element = finalize(*element);
+        accum << finalized_element;
+        accum << delim;
+    }
+
+    std::string output, str_accum = accum.str();
+    if (str_accum.length() > 0) {
+        output = str_accum.substr(0, str_accum.length() - delim.length());
+    } else {
+        output = str_accum;
+    }
+
+    return output;
+}
+
 static const char *
-sql_type_to_string(enum_field_types tpe)
+sql_type_to_string(enum_field_types tpe, CHARSET_INFO *charset)
 {
 #define ASSERT_NOT_REACHED() \
     do { \
@@ -101,15 +162,40 @@ sql_type_to_string(enum_field_types tpe)
     case MYSQL_TYPE_DATETIME    : return "DATETIME";
     case MYSQL_TYPE_YEAR        : return "YEAR";
     case MYSQL_TYPE_NEWDATE     : ASSERT_NOT_REACHED();
-    case MYSQL_TYPE_VARCHAR     : return "VARCHAR";
+    case MYSQL_TYPE_VARCHAR     :
+        if (charset == &my_charset_bin) {
+            return "VARBINARY";
+        } else {
+            return "VARCHAR";
+        }
     case MYSQL_TYPE_BIT         : return "BIT";
     case MYSQL_TYPE_NEWDECIMAL  : return "DECIMAL";
     case MYSQL_TYPE_ENUM        : return "ENUM";
     case MYSQL_TYPE_SET         : return "SET";
-    case MYSQL_TYPE_TINY_BLOB   : return "TINYBLOB";
-    case MYSQL_TYPE_MEDIUM_BLOB : return "MEDIUMBLOB";
-    case MYSQL_TYPE_LONG_BLOB   : return "LONGBLOB";
-    case MYSQL_TYPE_BLOB        : return "BLOB";
+    case MYSQL_TYPE_TINY_BLOB   :
+        if (charset == &my_charset_bin) {
+            return "TINYBLOB";
+        } else {
+            return "TINYTEXT";
+        }
+    case MYSQL_TYPE_MEDIUM_BLOB :
+        if (charset == &my_charset_bin) {
+            return "MEDIUMBLOB";
+        } else {
+            return "MEDIUMTEXT";
+        }
+    case MYSQL_TYPE_LONG_BLOB   :
+        if (charset == &my_charset_bin) {
+            return "LONGBLOB";
+        } else {
+            return "LONGTEXT";
+        }
+    case MYSQL_TYPE_BLOB        :
+        if (charset == &my_charset_bin) {
+            return "BLOB";
+        } else {
+            return "TEXT";
+        }
     case MYSQL_TYPE_VAR_STRING  : ASSERT_NOT_REACHED();
     case MYSQL_TYPE_STRING      : return "CHAR";
 
@@ -121,10 +207,17 @@ sql_type_to_string(enum_field_types tpe)
 }
 
 static std::ostream&
+operator<<(std::ostream &out, CHARSET_INFO & ci) {
+    out << ci.csname;
+    return out;
+}
+
+static std::ostream&
 operator<<(std::ostream &out, Create_field &f)
 {
+
     // emit field name + type definition
-    out << f.field_name << " " << sql_type_to_string(f.sql_type);
+    out << f.field_name << " " << sql_type_to_string(f.sql_type, f.charset);
 
     // emit extra length info if necessary
     switch (f.sql_type) {
@@ -206,6 +299,7 @@ operator<<(std::ostream &out, Create_field &f)
     case MYSQL_TYPE_BLOB:
     case MYSQL_TYPE_MEDIUM_BLOB:
     case MYSQL_TYPE_LONG_BLOB:
+        break;
     case MYSQL_TYPE_ENUM:
     case MYSQL_TYPE_SET:
         if (f.charset) {
@@ -238,15 +332,6 @@ operator<<(std::ostream &out, Create_field &f)
         out << " auto_increment";
     }
 
-    // primary key
-    if (f.flags & PRI_KEY_FLAG) {
-        out << " primary key";
-    } else if (f.flags & UNIQUE_FLAG) { // unique
-        out << " unique";
-    } else if (f.flags & UNIQUE_KEY_FLAG) { // unique key
-        out << " unique key";
-    }
-
     // ignore comments
 
     // TODO(stephentu): column_format?
@@ -274,12 +359,34 @@ operator<<(std::ostream &out, Key_part_spec &k)
     return out;
 }
 
-static inline std::string
+inline std::string
 convert_lex_str(const LEX_STRING &l)
 {
     return std::string(l.str, l.length);
 }
 
+inline LEX_STRING
+string_to_lex_str(const std::string &s)
+{
+    char *cstr = new char[s.length() + 1];
+    strncpy(cstr, s.c_str(), s.length());
+    return (LEX_STRING){cstr, s.length()};
+}
+
+static std::ostream&
+operator<<(std::ostream &out, enum legacy_db_type db_type) {
+    switch (db_type) {
+    case DB_TYPE_INNODB: {out << "InnoDB"; break;}
+    case DB_TYPE_ISAM: {out << "ISAM"; break;}
+    case DB_TYPE_MYISAM: {out << "MYISAM"; break;}
+    case DB_TYPE_CSV_DB: {out << "CSV"; break;}
+    default:
+        assert_s(false, "stringify does not know how to print db_type "
+                        + strFromVal((uint)db_type));
+    }
+
+    return out;
+}
 static std::ostream&
 operator<<(std::ostream &out, Key &k)
 {
@@ -289,7 +396,7 @@ operator<<(std::ostream &out, Key &k)
     const char *kname = NULL;
     switch (k.type) {
     case Key::PRIMARY     : kname = "PRIMARY KEY"; break;
-    case Key::UNIQUE      : kname = "UNIQUE";      break;
+    case Key::UNIQUE      : kname = "UNIQUE KEY";      break;
     case Key::MULTIPLE    : kname = "INDEX";       break;
     case Key::FULLTEXT    : kname = "FULLTEXT";    break;
     case Key::SPATIAL     : kname = "SPATIAL";     break;
@@ -355,7 +462,6 @@ do_create_table(std::ostream &out, LEX &lex)
         }
 
         out << tl->table_name << " ";
-	std::cerr << "in stringiffy, table name is " << tl->table_name << "\n";
     }
 
     if (lex.create_info.options & HA_LEX_CREATE_TABLE_LIKE) {
@@ -377,9 +483,9 @@ do_create_table(std::ostream &out, LEX &lex)
         out << noparen(kl) << ")";
 
         // TODO(stephentu): table options
-        if (lex.create_info.used_fields) {
-            mysql_thrower() << "WARNING: table options currently unsupported";
-        }
+        //if (lex.create_info.used_fields) {
+        //    mysql_thrower() << "WARNING: table options currently unsupported";
+        //}
 
         // create table ... select ...
         // this strange test for this condition comes from:
@@ -387,9 +493,58 @@ do_create_table(std::ostream &out, LEX &lex)
         if (lex.select_lex.item_list.elements) {
             out << " " << lex.select_lex;
         }
+
+        if (lex.create_info.db_type) {
+            out << " ENGINE=" << lex.create_info.db_type->db_type;
+        }
+        if (lex.create_info.table_charset) {
+            out << " CHARSET=" << *lex.create_info.table_charset;
+        }
+        if (lex.create_info.default_table_charset) {
+            out << " DEFAULT CHARSET="
+                << *lex.create_info.default_table_charset;
+        }
     }
 }
 
+static std::string prefix_drop_column(Alter_drop adrop) {
+    std::ostringstream ss;
+    ss << "DROP COLUMN " << adrop;
+    return ss.str();
+}
+
+static std::string prefix_drop_index(Alter_drop adrop) {
+    std::ostringstream ss;
+    ss << "DROP INDEX " << adrop;
+    return ss.str();
+}
+
+static std::string prefix_add_column(Create_field cf) {
+    std::ostringstream ss;
+    ss << "ADD COLUMN " << cf;
+    return ss.str();
+}
+
+static std::function<std::string(Key_part_spec)>
+do_prefix_add_index(std::string index_name) {
+    std::function<std::string(Key_part_spec key_part)> fn =
+        [index_name](Key_part_spec key_part) {
+            std::ostringstream ss;
+            ss << " ADD INDEX " << index_name << " (" << key_part << ")";
+            return ss.str();
+        };
+
+    return fn;
+}
+
+static std::string
+prefix_add_index(Key key) {
+    std::string index_name = convert_lex_str(key.name);
+    std::ostringstream key_output;
+    key_output << ListJoin<Key_part_spec>(key.columns, ",",
+                                          do_prefix_add_index(index_name));
+    return key_output.str();
+}
 static inline std::ostream&
 operator<<(std::ostream &out, LEX &lex)
 {
@@ -398,7 +553,6 @@ operator<<(std::ostream &out, LEX &lex)
 
     switch (lex.sql_command) {
     case SQLCOM_SELECT:
-        // out << lex.select_lex;
         out << lex.unit;
         break;
 
@@ -489,7 +643,7 @@ operator<<(std::ostream &out, LEX &lex)
                 out << "ignore ";
             }
 
-            lex.query_tables->print(t, &s, QT_ORDINARY);
+            lex.select_lex.table_list.first->print(t, &s, QT_ORDINARY);
             out << "into " << s;
             if (lex.field_list.head())
                 out << " " << lex.field_list;
@@ -575,6 +729,7 @@ operator<<(std::ostream &out, LEX &lex)
     case SQLCOM_CREATE_TABLE:
         do_create_table(out, lex);
         break;
+
     case SQLCOM_DROP_TABLE:
         out << "drop ";
         if (lex.drop_temporary) {
@@ -599,9 +754,70 @@ operator<<(std::ostream &out, LEX &lex)
           out << " cascade";
         }
         break;
+
+    case SQLCOM_CHANGE_DB:
+        out << "USE " << lex.select_lex.db;
+        break;
+
     case SQLCOM_BEGIN:
+        out << "START TRANSACTION";
+        if (lex.start_transaction_opt & MYSQL_START_TRANS_OPT_WITH_CONS_SNAPSHOT)
+            out << " WITH CONSISTENT SNAPSHOT";
+        break;
+
     case SQLCOM_COMMIT:
+        out << "COMMIT";
+        if (lex.tx_chain != TVL_UNKNOWN)
+            out << " AND" << (lex.tx_chain == TVL_NO ? " NO" : "") << " CHAIN";
+        if (lex.tx_release != TVL_UNKNOWN)
+            out << (lex.tx_release == TVL_NO ? " NO" : "") << " RELEASE";
+        break;
+
     case SQLCOM_ROLLBACK:
+        out << "ROLLBACK";
+        if (lex.tx_chain != TVL_UNKNOWN)
+            out << " AND" << (lex.tx_chain == TVL_NO ? " NO" : "") << " CHAIN";
+        if (lex.tx_release != TVL_UNKNOWN)
+            out << (lex.tx_release == TVL_NO ? " NO" : "") << " RELEASE";
+        break;
+
+    /*
+     * TODO: Support mixed operations.
+     * > Will likely require a filter.
+     *
+     * You can issue multiple ADD, ALTER, DROP, and CHANGE clauses in a
+     * single ALTER TABLE statement seperated by columns.  This is a MySQL
+     * extension to standard SQL, which permits only one of each clause
+     * per ALTER TABLE statement.
+     *
+     * ALTER TABLE t DROP COLUMN c, DROP COLUMN d;
+     */
+    case SQLCOM_ALTER_TABLE:
+        out << "ALTER TABLE";
+        lex.select_lex.table_list.first->print(t, &s, QT_ORDINARY);
+        out << " " << s;
+
+        // TODO: Support other flags.
+        // ALTER_ADD_COLUMN, ALTER_CHANGE_COLUMN, ALTER_ADD_INDEX,
+        // ALTER_DROP_INDEX, ALTER_FOREIGN_KEY
+        if (lex.alter_info.flags & ALTER_DROP_COLUMN) {
+            out << " " << ListJoin<Alter_drop>(lex.alter_info.drop_list,
+                                               ",", prefix_drop_column);
+        } else if (lex.alter_info.flags & ALTER_ADD_COLUMN) {
+            out << " " << ListJoin<Create_field>(lex.alter_info.create_list,
+                                                 ",", prefix_add_column);
+        } else if (lex.alter_info.flags & ALTER_ADD_INDEX) {
+            out << " " << ListJoin<Key>(lex.alter_info.key_list, ",",
+                                        prefix_add_index);
+        } else if (lex.alter_info.flags & ALTER_DROP_INDEX) {
+            out << " " << ListJoin<Alter_drop>(lex.alter_info.drop_list,
+                                               ",", prefix_drop_index);
+        } else {
+            throw CryptDBError("Unsupported ALTER in stringify");
+        }
+
+        break;
+
     case SQLCOM_SET_OPTION:
     case SQLCOM_SHOW_DATABASES:
     case SQLCOM_SHOW_TABLES:
@@ -610,7 +826,6 @@ operator<<(std::ostream &out, LEX &lex)
     case SQLCOM_SHOW_VARIABLES:
     case SQLCOM_SHOW_STATUS:
     case SQLCOM_SHOW_COLLATIONS:
-    case SQLCOM_CHANGE_DB:  /* for analysis, assume we never change DB? */
         /* placeholders to make analysis work.. */
         out << ".. type " << lex.sql_command << " query ..";
         break;
@@ -624,3 +839,4 @@ operator<<(std::ostream &out, LEX &lex)
 
     return out;
 }
+

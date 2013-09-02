@@ -7,11 +7,15 @@
 
 typedef struct CryptDBError {
  public:
-    CryptDBError(const std::string &m) : msg(m)
-    {
-    }
-    std::string msg;
+    CryptDBError(const std::string &m) : msg(m) {}
+    const std::string msg;
 } CryptDBError;
+
+struct ContinueError  {
+public:
+    ContinueError() {}
+    ~ContinueError() {}
+};
 
 class fatal : public std::stringstream {
  public:
@@ -23,7 +27,7 @@ class fatal : public std::stringstream {
 
 class cryptdb_err : public std::stringstream {
  public:
-    ~cryptdb_err() throw (CryptDBError) {
+    ~cryptdb_err() /*throw (CryptDBError)*/ {
         std::cerr << str() << std::endl;
         throw CryptDBError(str());
     }

@@ -3,18 +3,19 @@
 #include <iomanip>
 #include <stdexcept>
 #include <assert.h>
+#include <memory>
+
+#include <gmp.h>
 
 #include <openssl/rand.h>
 
 #include <util/util.hh>
 #include <util/cryptdb_log.hh>
 
-
-using namespace std;
 using namespace NTL;
 
 void
-myassert(bool value, const string &mess)
+myassert(bool value, const std::string &mess)
 {
     if (ASSERTS_ON) {
         if (!value) {
@@ -25,7 +26,7 @@ myassert(bool value, const string &mess)
 }
 
 void
-assert_s (bool value, const string &msg)
+assert_s(bool value, const std::string &msg)
 throw (CryptDBError)
 {
     if (ASSERTS_ON) {
@@ -36,78 +37,23 @@ throw (CryptDBError)
     }
 }
 
-ParserMeta::ParserMeta() : clauseKeywords_p(), querySeparators_p()
-{
-
-    const unsigned int noKeywords = 33;
-    const string clauseKeywords[] =
-    {"select", "from",  "where",  "order", "group",  "update", "set", "for",
-     "insert",
-     "into", "and",  "or",  "distinct",
-     "in", "*", "max", "min", "count", "sum", "by", "asc",
-     "desc", "limit",
-     "null",
-     "ilike", "like",
-     "integer", "bigint", "text",
-     "left", "join", "on", "is"};
-
-    const unsigned int noSeparators = 14;
-    const string querySeparators[] = {"from", "where", "left", "on", "group",
-                                      "order", "limit", "for", "values", ";", "set",
-                                      "group",  "asc", "desc"};
-
-    for (unsigned int i = 0; i < noKeywords; i++)
-        clauseKeywords_p.insert(clauseKeywords[i]);
-    for (unsigned int i = 0; i < noSeparators; i++)
-        querySeparators_p.insert(querySeparators[i]);
+bool
+IsMySQLTypeNumeric(enum_field_types t) {
+    switch (t) {
+        case MYSQL_TYPE_DECIMAL:
+        case MYSQL_TYPE_TINY:
+        case MYSQL_TYPE_SHORT:
+        case MYSQL_TYPE_LONG:
+        case MYSQL_TYPE_FLOAT:
+        case MYSQL_TYPE_DOUBLE:
+        case MYSQL_TYPE_LONGLONG:
+        case MYSQL_TYPE_INT24:
+        case MYSQL_TYPE_NEWDECIMAL:
+            return true;
+        default: return false;
+    }
 }
 
-FieldMetadata::FieldMetadata()
-{
-    isEncrypted = false;
-
-    can_be_null = true;
-
-
-    type = TYPE_TEXT;
-
-
-    //by default, all onions are at maximum security
-    secLevelDET = SECLEVEL::SEMANTIC_DET;
-    secLevelOPE = SECLEVEL::SEMANTIC_OPE;
-
-
-    INCREMENT_HAPPENED = false;
-
-    //onions used by default
-    has_ope = true;
-    has_agg = true;
-    has_search = true;
-    has_salt = true;
-
-    salt_name = "";
-
-    //none of the onions used yet
-    ope_used = false;
-    agg_used = false;
-    search_used = false;
-    update_set_performed = false;
-}
-
-TableMetadata::TableMetadata() {
-    anonTableName = "";
-    tableNo = 0;
-    hasEncrypted = false;
-    hasSensitive = false;
-}
-
-TableMetadata::~TableMetadata()
-{
-    for (auto i = fieldMetaMap.begin(); i != fieldMetaMap.end(); i++)
-        delete i->second;
-    for (auto i = indexes.begin(); i != indexes.end(); i++)
-        delete *i;
-}
 
 double
 timeInSec(struct timeval tvstart, struct timeval tvend)
@@ -117,10 +63,10 @@ timeInSec(struct timeval tvstart, struct timeval tvend)
          ((double) (tvend.tv_usec - tvstart.tv_usec)) / 1000000.0);
 }
 
-string
+std::string
 randomBytes(unsigned int len)
 {
-    string s;
+    std::string s;
     s.resize(len);
     RAND_bytes((uint8_t*) &s[0], len);
     return s;
@@ -132,10 +78,10 @@ randomValue()
     return IntFromBytes((const uint8_t*) randomBytes(8).c_str(), 8);
 }
 
-string
-stringToByteInts(const string &s)
+std::string
+stringToByteInts(const std::string &s)
 {
-    stringstream ss;
+    std::stringstream ss;
     bool first = true;
     for (size_t i = 0; i < s.length(); i++) {
         if (!first)
@@ -146,39 +92,16 @@ stringToByteInts(const string &s)
     return ss.str();
 }
 
-string
-angleBrackets(const string &s)
+std::string
+angleBrackets(const std::string &s)
 {
     return "<" + s + ">";
 }
 
-string
-checkStr(list<string>::iterator & it, list<string> & words, const string &s1,
-         const string &s2)
-{
-
-    if (it == words.end()) {
-        return "";
-    }
-    if (it->compare(s1) == 0) {
-        it++;
-        return s1;
-    }
-    if (it->compare(s2) == 0) {
-        return "";
-    }
-    if (isQuerySeparator(*it)) {
-        return "";
-    }
-
-    assert_s(false, string("expected ") + s1 + " or " + s2 + " given " + *it );
-    return "";
-}
-
-string
+std::string
 BytesFromInt(uint64_t value, unsigned int noBytes)
 {
-    string result;
+    std::string result;
     result.resize(noBytes);
 
     for (uint i = 0; i < noBytes; i++) {
@@ -202,25 +125,123 @@ IntFromBytes(const unsigned char * bytes, unsigned int noBytes)
     return value;
 }
 
-string
+uint64_t
+uint64FromZZ(ZZ val)
+{
+    uint64_t res = 0;
+    uint64_t mul = 1;
+    while (val > 0) {
+        res = res + mul*(to_int(val % 10));
+        mul = mul * 10;
+        val = val / 10;
+    }
+    return res;
+}
+
+
+
+std::string
 StringFromZZ(const ZZ &x)
 {
-    string s;
+    std::string s;
     s.resize(NumBytes(x), 0);
     BytesFromZZ((uint8_t*) &s[0], x, s.length());
     return s;
 }
 
 ZZ
-ZZFromString(const string &s)
+ZZFromString(const std::string &s)
 {
     return ZZFromBytes((const uint8_t *) s.data(), s.length());
 }
 
+// based on _ntl_gcopy from g_lip_impl.h
+// we duplicate this so we can avoid having to do a copy
+#define ALLOC(p) (((long *) (p))[0])
+#define SIZE(p) (((long *) (p))[1])
+#define DATA(p) ((mp_limb_t *) (((long *) (p)) + 2))
+#define STORAGE(len) ((long)(2*sizeof(long) + (len)*sizeof(mp_limb_t)))
+#define MustAlloc(c, len)  (!(c) || (ALLOC(c) >> 2) < (len))
 
+static void _ntl_gcopy_mp(mp_limb_t* a, long sa, _ntl_gbigint *bb)
+{
+   _ntl_gbigint b;
+   long abs_sa, i;
+   mp_limb_t *adata, *bdata;
+
+   b = *bb;
+
+   if (!a || sa == 0) {
+      if (b) SIZE(b) = 0;
+   }
+   else {
+      if (a != b) {
+         if (sa >= 0)
+            abs_sa = sa;
+         else
+            abs_sa = -sa;
+
+         if (MustAlloc(b, abs_sa)) {
+            _ntl_gsetlength(&b, abs_sa);
+            *bb = b;
+         }
+
+         adata = a;
+         bdata = DATA(b);
+
+         for (i = 0; i < abs_sa; i++)
+            bdata[i] = adata[i];
+
+         SIZE(b) = sa;
+      }
+   }
+}
+
+#ifndef NTL_GMP_LIP
+#error "NTL is not compiled with GMP"
+#endif
+
+std::string padForZZ(std::string s) {
+    if (s.size() % sizeof(mp_limb_t) == 0) {return s;}
+    int n = ((s.size()/sizeof(mp_limb_t)) + 1)*sizeof(mp_limb_t);
+    s.resize(n);
+    return s;
+}
+
+std::string StringFromZZFast(const ZZ& x) {
+    long sa = SIZE(x.rep);
+    long abs_sa;
+    if (sa >= 0)
+      abs_sa = sa;
+    else
+      abs_sa = -sa;
+    mp_limb_t* data = DATA(x.rep);
+    return std::string((char *)data, abs_sa * sizeof(mp_limb_t));
+}
+
+void ZZFromStringFast(ZZ& x, const std::string& s) {
+    assert(s.size() % sizeof(mp_limb_t) == 0);
+    _ntl_gcopy_mp(
+        (mp_limb_t*) s.data(),
+        s.size() / sizeof(mp_limb_t),
+        &x.rep);
+}
+
+//Faster function, if p is 8-byte aligned; if not go for the slower one
+// TODO: figure out how to pad non-8-byte aligned p
+void ZZFromBytesFast(ZZ& x, const unsigned char *p, long n) {
+    if (n % sizeof(mp_limb_t) != 0) {
+        x = ZZFromBytes((const uint8_t *) p, n);
+        return;
+    }
+    _ntl_gcopy_mp(
+        (mp_limb_t*) p,
+        n / sizeof(mp_limb_t),
+        &x.rep);
+}
 
 ZZ
-UInt64_tToZZ (uint64_t value)
+ZZFromUint64 (uint64_t value)
 {
     unsigned int unit = 256;
     ZZ power;
@@ -237,63 +258,54 @@ UInt64_tToZZ (uint64_t value)
 
 };
 
-//returns a string representing a value pointed to by it and advances it
-//skips apostrophes if there are nay
-string
-getVal(list<string>::iterator & it)
-{
-    string res;
-
-    if (hasApostrophe(*it)) {
-        res = removeApostrophe(*it);
-    } else {
-        res = *it;
-    }
-    it++;
-
+char *
+getCStr(const std::string & x) {
+    char *  res = (char *)malloc(x.size());
+    memcpy(res, x.c_str(), x.size());
     return res;
-
 }
 
-string
+std::string
 strFromVal(uint64_t x)
 {
-    stringstream ss;
+    std::stringstream ss;
     ss <<  x;
     return ss.str();
 }
 
-string
+std::string
 strFromVal(uint32_t x)
 {
-    stringstream ss;
+    std::stringstream ss;
     ss << (int32_t) x;
     return ss.str();
 }
 
-string
+std::string
 StringFromVal(uint64_t value, uint padLen)
 {
-    stringstream ss;
-    ss << setfill('0') << setw(padLen) << value;
+    std::stringstream ss;
+    ss << std::setfill('0') << std::setw(padLen) << value;
     return ss.str();
 }
 
+//Transforms a string that contains an integer (in decimal form) into the
+//integer
+// Does not work as wanted if str codifies a number in binary.
 uint64_t
-valFromStr(const string &str)
+valFromStr(const std::string &str)
 {
-    stringstream ss(str);
+    std::stringstream ss(str);
     uint64_t val;
     ss >> val;
+
     return  val;
 }
 
-#if MYSQL_S
-
-string
-marshallBinary(const string &s)
+std::string
+marshallBinary(const std::string &s)
 {
-    string r;
+    std::string r;
     r += "X\'";
 
     const char *sp = &s[0];
@@ -308,95 +320,17 @@ marshallBinary(const string &s)
     return r;
 }
 
-void
-printRes(const ResType & r) {
-
-    if (!cryptdb_logger::enabled(log_group::log_edb_v))
-        return;
-
-    stringstream ssn;
-    for (unsigned int i = 0; i < r.names.size(); i++) {
-        char buf[400];
-        snprintf(buf, sizeof(buf), "%-20s", r.names[i].c_str());
-        ssn << buf;
-    }
-    LOG(edb_v) << ssn.str();
-
-    /* next, print out the rows */
-    for (unsigned int i = 0; i < r.rows.size(); i++) {
-        stringstream ss;
-        for (unsigned int j = 0; j < r.rows[i].size(); j++) {
-            char buf[400];
-            snprintf(buf, sizeof(buf), "%-20s", r.rows[i][j].to_string().c_str());
-            ss << buf;
-        }
-        LOG(edb_v) << ss.str();
-    }
-}
-
-
-/*
-string
-marshallSalt(const string &s) {
-    assert_s(s.length() == SALT_LEN_BYTES, "salt for marshall does not have right len");
-
-    return strFromVal(IntFromBytes((const unsigned  char *)s.data(), s.length()));
-}
-
-string
-unmarshallSalt(const string & s) {
-    uint64_t val = valFromStr(s);
-
-    return string(BytesFromInt(val, SALT_LEN_BYTES), SALT_LEN_BYTES);
-
-}
-
-*/
-
-#else
-
-string
-marshallBinary(unsigned char * v, unsigned int len)
-{
-
-    cerr << "\n \n WRONG BINARY \n \n";
-    cout << "\n \n WRONG BINARY \n \n"; fflush(stdout);
-
-    string res = "E'";
-    cerr << "calling wrong marshall \n";
-    for (unsigned int i = 0; i < len; i++) {
-        int c = (int) v[i];
-        if (c == 39) {
-            res = res + "\\\\" + "047";             //StringFromInt((int)v[i],
-                                                    // 3)
-            continue;
-        }
-        if (c == 92) {
-            res = res + "\\\\" + "134";
-            continue;
-        }
-        if ((c >=0 && c <= 31) || (c >= 127 && c<=255)) {
-            res = res + "\\\\" + octalRepr(c);
-            continue;
-        }
-        res = res + (char)v[i];
-    }
-    res = res + "'";
-    return res;
-}
-
-#endif
 
 static unsigned char
-getFromHex(const string &hexValues)
+getFromHex(const std::string &hexValues)
 {
     unsigned int v;
     sscanf(hexValues.c_str(), "%2x", &v);
     return (unsigned char) v;
 }
 
-string
-unmarshallBinary(const string &s)
+std::string
+unmarshallBinary(const std::string &s)
 {
     uint offset;
     size_t len = s.length();
@@ -418,353 +352,76 @@ unmarshallBinary(const string &s)
              "unmarshallBinary: newlen is odd! newlen is " +
              strFromVal(len-offset));
 
-    string r;
+    std::string r;
     for (uint i = 0; i < (len-offset)/2; i++)
         r += getFromHex(&s[offset+i*2]);
     return r;
 }
 
-static bool
-matches(const char * query,
-        const std::set<char> &delims,
-        bool ignoreOnEscape = false,
-        int index = 0)
-{
-    bool res = (delims.find(query[0]) != delims.end());
 
-    if (res && (index > 0)) {
-        char c = *(query-1);
-        if (c =='\\') {
-            return false;
-        }
+
+
+static uint hexval(char c) {
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    } else {
+        return c - 'a'+10;
+    }
+}
+
+std::string
+fromHex(const std::string & h) {
+    std::string res(h.length()/2, '0');
+
+    for (uint i = 0; i < h.length(); i = i +2) {
+        res[i/2] = (unsigned char)(hexval(h[i])*16+hexval(h[i+1]));
     }
 
     return res;
 }
 
-list<string>
-parse(const string &query,
-      const std::set<char> &delimsStayArg,
-      const std::set<char> &delimsGoArg,
-      const std::set<char> &keepIntactArg)
-{
-    list<string> res;
-    size_t len = query.length();
+const std::string hextable = "0123456789abcdef";
 
-    unsigned int index = 0;
-
-    string word = "";
-
-    while (index < len) {
-        while ((index < len) &&
-               matches(&query[index], delimsGoArg)) {
-            index = index + 1;
-        }
-
-        while ((index < len) &&
-               matches(&query[index], delimsStayArg)) {
-            string sep = "";
-            sep = sep + query[index];
-            res.push_back(sep);
-            index = index + 1;
-        }
-
-        if (index >= len) {break; }
-
-        if (matches(&query[index], keepIntactArg, true, index)) {
-
-            word = query[index];
-
-            index++;
-
-            while (index < len)  {
-
-                if (matches(&query[index], keepIntactArg, true,
-                            index)) {
-                    break;
-                }
-
-                word += query[index];
-                index++;
-            }
-
-            /*
-             * check whether keepIntact was closed at index
-             */
-            assert((index < len)  &&
-                   matches(&query[index], keepIntactArg, index));
-
-            word += query[index];
-            res.push_back(word);
-
-            index++;
-
-        }
-
-        if (index >= len) {break; }
-
-        word = "";
-        while ((index < len) &&
-               (!matches(&query[index], delimsStayArg)) &&
-               (!matches(&query[index], delimsGoArg)) &&
-               (!matches(&query[index], keepIntactArg))) {
-            word += query[index];
-            index++;
-        }
-
-        if (word.length() > 0) {res.push_back(word); }
+std::string
+toHex(const std::string  & x) {
+    uint len = x.length();
+    std::string result(len*2, '0');
+    
+    for (uint i = 0; i < len; i++) {
+        uint v = (uint)x[i];
+        result[2*i] = hextable[v / 16];
+        result[2*i+1] = hextable[v % 16];
     }
 
-    return res;
-
+    return result;
 }
 
-static void
-consolidateComparisons(list<string> & words)
-{
-    list<string>::iterator it = words.begin();
-    list<string>::iterator oldit;
 
-    while (it!=words.end()) {
-        //consolidates comparisons
-        if (contains(*it, comparisons)) {
-            string res = "";
-            //consolidates comparisons
-            while ((it != words.end()) &&
-                   (contains(*it, comparisons))) {
-                res += *it;
-                oldit = it;
-                it++;
-                words.erase(oldit);
-            }
-            words.insert(it, res);
-            it++;
-            continue;
-        }
 
-        /*
-                //consolidates negative numbers
-                if (it->compare("-") == 0) {
-                        it++;
-                        if (isNumber(*it)) {
-                                string res = "-" + *it;
-                                it--;
-                                list<string>::iterator newit = it;
-                                newit--;
-                                words.insert(res, *it);
-                                words.erase(*it);
-                                it = ++newit;
-                                newit--;
-                                words.erase(it);
-                                newit++;
-                                it = newit;
-                        }
-                        continue;
-                }
-         */
-        it++;
+std::list<std::string>
+split(const std::string &s, const char * const separators) {
+    std::unique_ptr<char, void (*)(void *)>
+        cp_s(strdup(s.c_str()), &std::free);
+    if (!cp_s) {
+        throw CryptDBError("insufficient memory!");
     }
-
-}
-
-/*void evaluateMath(list<string> & words, list<string>::iterator start,
-   list<string>::iterator end) {
-   list<string>::iterator it = start;
-   string res;
-   //reduce the equations chosen
-   while ((it != words.end()) && it != end) {
-    assert_s(isOnly(*it, math, noMath), "input to evaluateMath is not math");
-    res += *it;
-    oldit = it;
-    it++;
-    words.erase(oldit);
-   }
-   Equation eq;
-   eq.set(res);
-   res = eq.rpn();
-   if (res.compare("") != 0) {
-    words.insert(it, res);
-   }
-   }
-
-   void consolidateMathSelect(list<string> & words) {
-
-   }
-
-   void consolidateMathInsert(list<string> & words) {
-
-   }
-
-   void consolidateMathUpdate(list<string> & words) {
-
-   }*/
-
-static void __attribute__((unused))
-consolidateMath(list<string> & words)
-{
-    command com = getCommand(*words.begin());
-    switch (com) {
-    case cmd::CREATE:
-        cerr << "consolidateMath doesn't deal with CREATE" << endl;
-        return;
-    case cmd::UPDATE:
-        //consolidateMathUpdate(words);
-        return;
-    case cmd::SELECT:
-        //consolidateMathSelect(words);
-        return;
-    case cmd::INSERT:
-        //consolidateMathInsert(words);
-        return;
-    case cmd::DROP:
-        cerr << "consolidateMath doesn't deal with DROP" << endl;
-        return;
-    case cmd::DELETE:
-        cerr << "consolidateMath doesn't deal with DELETE" << endl;
-        return;
-    case cmd::BEGIN:
-        cerr << "consolidateMath doesn't deal with BEGIN" << endl;
-        return;
-    case cmd::COMMIT:
-        cerr << "consolidateMath doesn't deal with COMMIT" << endl;
-        return;
-    case cmd::ALTER:
-        cerr << "consolidateMath doesn't deal with ALTER" << endl;
-        return;
-    default:
-    case cmd::OTHER:
-        cerr << "consolidateMath doesn't deal with OTHER (what is this?)" <<
-        endl;
-        return;
+    char* tok = strtok(cp_s.get(), separators);
+    std::list<std::string> parts = std::list<std::string>();
+    while (tok != NULL) {
+        parts.push_back(std::string(tok));
+        tok = strtok(NULL, separators);
     }
+    return parts;
 }
 
-/*
-        list<string>::iterator it = words.begin();
-        list<string>::iterator oldit = it;
-
-        // This will only perform mathematical operations on equations where
-           there are no variables in the words of the equations
-        //   That is, it will simplify {"x=", "2+3"}, but not {"x=2","+3"}
-        while (it != words.end()) {
-          //getCommand(first word)
-          list<string> select;
-          select.push_back("select");
-          list<string> insertinto;
-          insertinto.push_back("insert");
-          list<string> update;
-          update.push_back("update");
-          list<string> values;
-          values.push_back("values");
-          list<string> set;
-          set.push_back("set");
-          list<string> comma;
-          set.push_back(",");
-          set.push_back(")");
-          //for statements of the form SELECT ... WHERE ... = math
-          //use processWhere because UPDATE and DELETE are the same --- need
-             to process things after WHERE
-          //Raluca will email function that sends it afer WHERE
-          if (it != words.end() && contains(*it, select)) {
-            it++;
-            cerr << "select" << endl;
-            while (it != words.end() && !contains(*it, commands, noCommands))
-               {
-
-
-            }
-          }
-          //for statements of the form INSERT INTO ... VALUES (math or text,
-             math or text, ...)
-          //getExpressions(math or text)
-          if (it != words.end() && contains(*it, insertinto)) {
-            it++;
-            cerr << "insert" << endl;
-            while (it != words.end() && !contains(*it, commands, noCommands))
-               {
-              if (it != words.end() && contains(*it, values)) {
-                        it++;
-                        assert_s(it->compare("(") == 0, "VALUES is not
-                           followed by (");
-                        it++;
-                        string res = "";
-                        //consolidates comma-separated links
-                        while ((it != words.end()) && !isKeyword(*it)) {
-                          while ((it != words.end()) && !contains(*it, comma))
-                             {
-                            cerr << *it << endl;
-                                if (isOnly(*it, math, noMath)) {
-                                        res += *it;
-                                        oldit = it;
-                                        it++;
-
-                                        words.erase(oldit);
-                                } else {
-                                        break;
-                                }
-                          }
-                          Equation eq;
-                          eq.set(res);
-                          res = eq.rpn();
-                          if (res.compare("") != 0) {
-                            words.insert(it, res);
-                          }
-                          if (it != words.end()) {
-                            it++;
-                          }
-                        }
-                        if (it != words.end()) {
-                                it++;
-                        }
-                        continue;
-              }
-              it++;
-            }
-          }
-          //for statements of the form UPDATE ... SET ... = math
-          //WHERE clause as with SELECT
-          //SET ignore for now; maybe do this later
-          if (it != words.end() && contains(*it, update)) {
-            cerr << "update" << endl;
-          }
-          //if (it != words.end()) {
-          //  it++;
-          //}
-
-        }
-
-        }*/
-
-void
-consolidate(list<string> & words)
-{
-    consolidateComparisons(words);
-}
-
-//query to parse
-//delimsStay, delimsGo, keepIntact for parsing
-//tables
-//returns sql tokens and places in tables the tables to which this query
-// refers
-// if tables have aliases, each alias is replaced with the real name
-list<string>
-getSQLWords(const string &query)
-{
-    list<string> words = parse(query, delimsStay, delimsGo, keepIntact);
-
-    consolidate(words);
-
-    return words;
-}
-
-string
-getQuery(ifstream & qFile)
+std::string
+getQuery(std::ifstream & qFile)
 {
 
-    string query = "";
-    string line = "";
+    std::string query = "";
+    std::string line = "";
 
-    while ((!qFile.eof()) && (line.find(';') == string::npos)) {
+    while ((!qFile.eof()) && (line.find(';') == std::string::npos)) {
         getline(qFile, line);
         query = query + line;
     }
@@ -774,243 +431,42 @@ getQuery(ifstream & qFile)
 
 }
 
-
-
-command
-getCommand(const string &query)
-throw (CryptDBError)
-{
-    static struct { const char *s; command c; } s2c[] =
-    { { "select", cmd::SELECT },
-      { "insert", cmd::INSERT },
-      { "update", cmd::UPDATE },
-      { "delete", cmd::DELETE },
-      { "commit", cmd::COMMIT },
-      { "begin",  cmd::BEGIN  },
-      { "create", cmd::CREATE },
-      { "drop",   cmd::DROP   },
-      { "alter",  cmd::ALTER  },
-      { "train",  cmd::TRAIN  },
-      { 0,        cmd::OTHER  } };
-
-    string cmds = query.substr(0, query.find_first_of(" ,;()"));
-    transform(cmds.begin(), cmds.end(), cmds.begin(), ::tolower);
-    for (uint i = 0; s2c[i].s != 0; i++)
-        if (cmds == s2c[i].s)
-            return s2c[i].c;
-    return cmd::OTHER;
-}
-
-string
-getAlias(list<string>::iterator & it, list<string> & words)
-{
-
-    if (it == words.end()) {
-        return "";
-    }
-
-    if (equalsIgnoreCase(*it, "as" )) {
-        it++;
-        return *it;
-    }
-
-    if ((it->compare(",") == 0) || (isQuerySeparator(*it))) {
-        return "";
-    }
-
-    return *it;
-}
-
-string
-processAlias(list<string>::iterator & it, list<string> & words)
-{
-    string res = "";
-    const vector<string> terms = {",",")"};
-
-    if (it == words.end()) {
-        return res;
-    }
-    if (equalsIgnoreCase(*it, "as")) {
-        res = res + " as ";
-        it++;
-        assert_s(it != words.end(), "there should be field after as");
-        res = res + *it + " ";
-        it++;
-
-        if (it == words.end()) {
-            return res;
-        }
-
-        if (contains(*it, terms)) {
-            while ((it!=words.end()) && contains(*it, terms)) {
-                res = res + *it;
-                it++;
-            }
-            return res;
-        }
-        if (isQuerySeparator(*it)) {
-            return res;
-        }
-        assert_s(false, "incorrect syntax after as expression ");
-        return res;
-    }
-    if (contains(*it, terms)) {
-        while ((it!=words.end()) && contains(*it, terms)) {
-            res = res + *it;
-            it++;
-        }
-        return res;
-    }
-    if (isQuerySeparator(*it)) {
-        return res;
-    }
-
-    //you have an alias without as
-    res = res + " " + *it + " ";
-    it++;
-
-    if (it == words.end()) {
-        return res;
-    }
-    if (contains(*it, terms)) {
-        while ((it!=words.end()) && contains(*it, terms)) {
-            res = res + *it;
-            it++;
-        }
-        return res;
-    }
-    if (isQuerySeparator(*it)) {
-        return res;
-    }
-
-    assert_s(false, "syntax error around alias or comma");
-
-    return res;
-
-}
-
-string
-processParen(list<string>::iterator & it, const list<string> & words)
-{
-    if (!it->compare("(") == 0) {
-        return "";
-    }
-    // field token is "("
-    int nesting = 1;
-    it++;
-    string res = "(";
-    while ((nesting > 0) && (it!=words.end())) {
-        if (it->compare("(") == 0) {
-            nesting++;
-        }
-        if (it->compare(")") == 0) {
-            nesting--;
-        }
-        res = res + " " + *it;
-        it++;
-    }
-    assert_s(nesting == 0, "tokens ended before parenthesis were matched \n");
-    return res + " ";
-}
-
-string
-mirrorUntilTerm(list<string>::iterator & it, const list<string> & words,
-                const std::set<string> & terms, bool stopAfterTerm,
-                bool skipParenBlock)
-{
-    string res = "";
-    while ((it!=words.end()) && !contains(*it, terms)) {
-        if (skipParenBlock) {
-            string paren = processParen(it, words);
-            if (paren.length() > 0) {
-                res = res + paren;
-                continue;
-            }
-        }
-
-        res = res + *it + " ";
-        it++;
-    }
-
-    if (it!=words.end()) {
-        if (stopAfterTerm) {
-            res = res + *it + " ";
-            it++;
-        }
-    }
-
-    return res;
-}
-
-list<string>::iterator
-itAtKeyword(list<string> & lst, const string &keyword)
-{
-    list<string>::iterator it = lst.begin();
-    while (it != lst.end()) {
-        if (equalsIgnoreCase(*it, keyword)) {
-            return it;
-        } else {
-            it++;
-        }
-    }
-    return it;
-}
-
-string
-getBeforeChar(const string &str, char c)
+std::string
+getBeforeChar(const std::string &str, char c)
 {
     size_t pos = str.find(c);
-    if (pos != string::npos) {
+    if (pos != std::string::npos) {
         return str.substr(0, pos);
     } else {
         return "";
     }
 }
 
-bool
-isQuerySeparator(const string &st)
-{
-    return (parserMeta.querySeparators_p.find(toLowerCase(st)) !=
-            parserMeta.querySeparators_p.end());
-}
 
 bool
-isAgg(const string &value)
-{
-    return contains(value, aggregates);
-}
-
-bool
-isOnly(const string &token, const string * values, unsigned int noValues)
+isOnly(const std::string &token, const std::string * values,
+       unsigned int noValues)
 {
     for (unsigned int j = 0; j < token.size(); j++) {
         bool is_value = false;
         for (unsigned int i = 0; i < noValues; i++) {
-            string test = "";
+            std::string test = "";
             test += token[j];
             if (equalsIgnoreCase(test, values[i])) {
                 is_value = true;
             }
         }
         if (!is_value) {
-            cerr << token[j] << endl;
+            std::cerr << token[j] << std::endl;
             return false;
         }
     }
     return true;
 }
 
-bool
-isKeyword(const string &token)
-{
-    return (parserMeta.clauseKeywords_p.find(toLowerCase(token)) !=
-            parserMeta.clauseKeywords_p.end());
-}
-
 static bool
-contains(const string &token1, const string &token2, list<pair<string,
-                                                               string> > &
-         lst)
+contains(const std::string &token1, const std::string &token2,
+         std::list<std::pair<std::string, std::string> > &lst)
 {
     for (auto it = lst.begin(); it != lst.end(); it++)
         if ((it->first.compare(token1) == 0) &&
@@ -1021,7 +477,7 @@ contains(const string &token1, const string &token2, list<pair<string,
 }
 
 void
-addIfNotContained(const string &token, list<string> & lst)
+addIfNotContained(const std::string &token, std::list<std::string> & lst)
 {
     if (!contains(token, lst)) {
         lst.push_back(token);
@@ -1029,19 +485,17 @@ addIfNotContained(const string &token, list<string> & lst)
 }
 
 void
-addIfNotContained(const string &token1, const string &token2,
-                  list<pair<string,
-                            string> >
-                  & lst)
+addIfNotContained(const std::string &token1, const std::string &token2,
+                  std::list<std::pair<std::string, std::string> > &lst)
 {
 
     if (!contains(token1, token2, lst)) {
-        lst.push_back(pair<string, string>(token1, token2));
+        lst.push_back(std::pair<std::string, std::string>(token1, token2));
     }
 }
 
-string
-removeApostrophe(const string &data)
+std::string
+removeApostrophe(const std::string &data)
 {
     if (data[0] == '\'') {
         assert_s(data[data.length()-1] == '\'', "not matching ' ' \n");
@@ -1052,83 +506,41 @@ removeApostrophe(const string &data)
 }
 
 bool
-hasApostrophe(const string &data)
+hasApostrophe(const std::string &data)
 {
     return ((data[0] == '\'') && (data[data.length()-1] == '\''));
 }
 
-string
-homomorphicAdd(const string &val1, const string &val2, const string &valn2)
+std::string
+homomorphicAdd(const std::string &val1, const std::string &val2,
+               const std::string &valn2)
 {
-    ZZ z1 = ZZFromString(val1);
-    ZZ z2 = ZZFromString(val2);
-    ZZ n2 = ZZFromString(valn2);
+    ZZ z1 = ZZFromStringFast(padForZZ(val1));
+    ZZ z2 = ZZFromStringFast(padForZZ(val2));
+    ZZ n2 = ZZFromStringFast(padForZZ(valn2));
     ZZ res = MulMod(z1, z2, n2);
     return StringFromZZ(res);
 }
 
-string
-toLowerCase(const string &token)
+std::string
+toLowerCase(const std::string &token)
 {
-    string s = token;
+    std::string s = token;
     transform(s.begin(), s.end(), s.begin(), ::tolower);
     return s;
 }
 
+std::string
+toUpperCase(const std::string &token)
+{
+    std::string s = token;
+    transform(s.begin(), s.end(), s.begin(), ::toupper);
+    return s;
+}
+
 bool
-equalsIgnoreCase(const string &s1, const string &s2)
+equalsIgnoreCase(const std::string &s1, const std::string &s2)
 {
     return toLowerCase(s1) == toLowerCase(s2);
 }
 
-/***************************
- *           Operations
- ****************************/
-
-bool
-Operation::isDET(const string &op)
-{
-    vector<string> dets = {"=", "<>", "in", "!="};
-    return contains(op, dets);
-}
-
-bool
-Operation::isIN(const string &op)
-{
-    return equalsIgnoreCase(op,"in");
-}
-
-bool
-Operation::isOPE(const string &op)
-{
-    vector<string> opes = {"<", ">", "<=", ">="};
-    return contains(op, opes);
-}
-
-bool
-Operation::isILIKE(const string &op)
-{
-    vector<string> ilikes = {"ilike", "like"};
-    return contains(op, ilikes);
-}
-
-bool
-Operation::isOp(const string &op)
-{
-    return (isDET(op) || isOPE(op) || isILIKE(op));
-}
-
-/*
-   bool addAgg(string currentField, string & aggregateFields) {
-         currentField = "." + currentField + " ";
-     if (aggregateFields.length() == 0) {
-         return true;
-     }
-
-     if (aggregateFields.find(currentField) != string::npos) {
-         return true;
-     }
-
-     return false;
-   }
- */

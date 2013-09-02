@@ -1,31 +1,23 @@
 #include "util/onions.hh"
 #include "util/util.hh"
 
-SECLEVEL
-getMin(onion o) {
-    switch (o) {
-    case oDET: {return SECLEVEL::PLAIN_DET;}
-    case oOPE: {return SECLEVEL::PLAIN_OPE;}
-    case oAGG: {return SECLEVEL::PLAIN_AGG;}
-    case oSWP: {return SECLEVEL::PLAIN_SWP;}
-    default: {}
-    }
-    assert_s(false, "invalid onion");
-    return SECLEVEL::INVALID;
-    
+bool needsSalt(SECLEVEL l) {
+    return l == SECLEVEL::RND;
 }
 
-
-SECLEVEL
-getMax(onion o) {
-    switch (o) {
-    case oDET: {return SECLEVEL::SEMANTIC_DET;}
-    case oOPE: {return SECLEVEL::SEMANTIC_OPE;}
-    case oAGG: {return SECLEVEL::SEMANTIC_AGG;}
-    case oSWP: {return SECLEVEL::SWP;}
-    default: {}
+/*
+std::ostream&
+operator<<(std::ostream &out, const EncDesc & ed)
+{
+    if (ed.olm.size() == 0) {
+        out << "empty encdesc";
     }
-
-    assert_s(false, "invalid onion");
-    return SECLEVEL::INVALID;
+    for (auto it : ed.olm) {
+        out << "(onion " << it.first
+            << ", level " << levelnames[(int)it.second]
+            << ") ";
+    }
+    return out;
 }
+*/
+

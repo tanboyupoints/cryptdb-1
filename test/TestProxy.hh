@@ -9,7 +9,7 @@
 
 #include <signal.h>
 
-#include <edb/Connect.hh>
+#include <main/Connect.hh>
 #include <test/test_utils.hh>
 
 
@@ -18,6 +18,6 @@ class TestProxy {
     TestProxy();
     virtual
     ~TestProxy();
-    
+
     static void run(const TestConfig &tc, int argc, char ** argv);
 };

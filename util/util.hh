@@ -22,9 +22,7 @@
 #include <NTL/ZZ.h>
 
 #include <util/errstream.hh>
-#include <util/onions.hh>
 #include <util/params.hh>
-
 
 // ==== CONSTANTS ============== //
 
@@ -38,12 +36,6 @@
 #define TN_HOM "varbinary(" SVAL(PAILLIER_LEN_BYTES) ")"
 #define TN_PTEXT "text"
 #define TN_SALT "bigint unsigned"
-#else
-#define TN_I32 "integer"
-#define TN_I64 "bigint"
-#define TN_TEXT "BYTEA"
-#define TN_HOM "BYTEA(" SVAL(PAILLIER_LEN_BYTES) ")"
-#define TN_PTEXT "text"
 #endif
 
 #define TN_SYM_KEY "varbinary(32)"
@@ -75,11 +67,7 @@ const unsigned int bytesOfTextForOPE = 20; //texts may be ordered
                                            // indicates how many of the first
                                            // bytes should be used for sorting
 
-// text supports search only on words separated by these separators
-const std::string wordSeparators = "; .,'-{}()";
 
-const std::string dec_first_key =
-    "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x01\x02\x03\x04\x05\x06";
 const std::string PWD_TABLE_PREFIX = "pwdcryptdb__";
 
 //maps the name of an annotation we want to process to the number of fields
@@ -97,7 +85,7 @@ typedef MYSQL_RES DBResult_native;
 typedef PGresult DBResult_native;
 #endif
 
-class SqlItem;
+
 
 typedef struct AutoInc {
     AutoInc(std::string fieldval=""):incvalue(0), field(fieldval) {}
@@ -105,125 +93,8 @@ typedef struct AutoInc {
     std::string field;
 } AutoInc;
 
-class ResType {
- public:
-    explicit ResType(bool okflag = true) : ok(okflag) {}
-
-    bool ok;  // query executed successfully
-    std::vector<std::string> names;
-    std::vector<enum_field_types> types;
-    std::vector<std::vector<SqlItem> > rows;
-    AutoInc ai;
-};
-
-
-void
-printRes(const ResType &r);
-
-typedef struct ParserMeta {
-    std::set<std::string> clauseKeywords_p;
-    std::set<std::string> querySeparators_p;
-    ParserMeta();
-} ParserMeta;
-
-typedef enum class cmd {
-    CREATE, UPDATE, INSERT, SELECT, DROP, DELETE, BEGIN,
-    COMMIT, ALTER, TRAIN, OTHER
-} command;
-
 const std::string BASE_SALT_NAME = "cdb_salt";
-
-typedef struct FieldMetadata {
-
-    bool isEncrypted;     //indicates if this field is encrypted or not
-
-    fieldType type;
-    std::string fieldName;
-
-    bool can_be_null;
-    enum_field_types mysql_type;
-
-    std::string anonFieldNameDET;
-    std::string anonFieldNameOPE;
-    std::string anonFieldNameAGG;
-    std::string anonFieldNameSWP;
-
-    //true if the onions are used
-    bool has_ope;
-    bool has_agg;
-    bool has_search;
-    bool has_salt; //whether this field has its own salt
-
-    std::string salt_name;
-
-    FieldMetadata();
-
-    enum SECLEVEL secLevelOPE, secLevelDET;
-
-    bool INCREMENT_HAPPENED;
-
-    //records if some onion was used for training
-    bool ope_used;
-    bool agg_used;
-    bool search_used;
-    bool update_set_performed;
-
-    //returns true if the given field exists in the database
-    static bool exists(const std::string &field);
-
-} FieldMetadata;
-
-typedef struct IndexMetadata {
-    std::string anonIndexName;
-    std::list<std::string> fields;
-    bool isUnique;
-} IndexMetadata;
-
-typedef struct TableMetadata { //each anonymized field
-    std::list<std::string> fieldNames;     //in order field names
-    unsigned int tableNo;
-    std::string anonTableName;
-    std::map<std::string, std::string> fieldNameMap;
-        // map of anonymized field name to true field name
-    std::map<std::string, FieldMetadata *> fieldMetaMap;
-        // map of true field name to field metadata
-    std::string salt_name;
-
-    AutoInc ai;     //autoincrement
-
-    std::list<std::string> primaryKey;
-    std::list<IndexMetadata *> indexes;
-    bool hasEncrypted;     //true if the table contains an encrypted field
-    bool hasSensitive;    //true if any field is involved in access control of mp
-
-    TableMetadata();
-    ~TableMetadata();
-} TableMetadata;
-
-typedef struct FieldsToDecrypt {
-    std::list<std::string> OPEJoinFields;
-    std::list<std::string> OPEFields;
-    std::list<std::string> DETFields;
-    std::list<std::string> DETJoinFields;
-} FieldsToDecrypt;
-
-class Operation {
- public:
-    static bool isOp(const std::string &op);
-    static bool isDET(const std::string &op);
-    static bool isOPE(const std::string &op);
-    static bool isILIKE(const std::string &op);
-    static bool isIN(const std::string &op);
-
- private:
-};
-
-typedef struct OPESpec {
-   std::string fieldname;
-   unsigned int minv;
-   unsigned int maxv;
-} OPESpec;
-
+typedef uint64_t salt_type;
 
 typedef struct QueryMeta {
     std::map<std::string, std::string> tabToAlias, aliasToTab;
@@ -232,57 +103,6 @@ typedef struct QueryMeta {
 
     void cleanup();
 } QueryMeta;
-
-typedef struct ResMeta {
-
-    size_t nFields, nTuples, nTrueFields;
-
-    /* Indexes in the following std::vectors correspond to entries in the raw
-       response from the DBMS */
-
-    bool * isSalt;     //isSalt[i] = true if i-th entry is salt
-
-    //maps not anonymized full field name or anonymized table name to salt index in the results
-    std::map<std::string, int> SaltIndexes;
-
-    std::string * table;     //real table of each field
-    std::string * field;     //real name of each field
-    onion * o;     //onion of each field
-
-    std::string * namesForRes;     //this is the name of the field to be included
-                              // in result -- considering aliases -- for
-                              // aggregates, use field inside
-
-    void cleanup() {
-        if (isSalt)
-            delete[] isSalt;
-        if (table)
-            delete[] table;
-        if (field)
-            delete[] field;
-        if (o)
-            delete[] o;
-        if (namesForRes)
-            delete[] namesForRes;
-    }
-
-    ResMeta() {
-        isSalt = 0;
-        table = 0;
-        field = 0;
-        o = 0;
-        namesForRes = 0;
-    }
-
-} ResMeta;
-
-typedef struct ParseContext {
-
-} ParseContext;
-
-typedef struct Result {
-    std::vector<std::vector<std::string> > a;
-} Result;
 
 typedef struct Predicate {
     std::string name;
@@ -368,6 +188,9 @@ typedef struct TempMKM {
 
 //=============  Useful functions =========================//
 
+bool
+IsMySQLTypeNumeric(enum_field_types t);
+
 // extracts (nobytes) bytes from int by placing the most significant bits at
 // the end
 std::string BytesFromInt(uint64_t value, unsigned int noBytes);
@@ -384,9 +207,6 @@ const std::set<char> delimsStay = {'(', ')', '=', ',', '>', '<'};
 const std::set<char> delimsGo   = {';', ' ', '\t', '\n'};
 const std::set<char> keepIntact = {'\''};
 
-bool isKeyword(const std::string &token);
-bool isAgg(const std::string &token);
-
 #define NELEM(array) (sizeof((array)) / sizeof((array)[0]))
 const std::set<std::string> commands =
     { "select", "create", "insert", "update", "delete", "drop", "alter" };
@@ -398,14 +218,15 @@ const std::string math[]=
 {"+","-","(",")","*","/",".","0","1","2","3","4","5","6","7","8","9"};
 const unsigned int noMath = NELEM(math);
 
-const ParserMeta parserMeta = ParserMeta();
-
 std::string randomBytes(unsigned int len);
 uint64_t randomValue();
 
 std::string stringToByteInts(const std::string &s);
 std::string angleBrackets(const std::string &s);
 static inline std::string id_op(const std::string &x) { return x; }
+
+char *
+getCStr(const std::string & x);
 
 /*
  * Turn a std::list (of type C) into a std::string, applying op to each element.
@@ -429,13 +250,39 @@ toString(const C &l, T op)
     return ss.str();
 }
 
+// given binary string h, returns a hex readable string
+std::string
+fromHex(const std::string & h);
+
+// returns a binary string from a hex readable string
+std::string
+toHex(const std::string & b);
+
 // tries to represent value in minimum no of bytes, avoiding the \0 character
 std::string StringFromVal(uint64_t value, unsigned int padLen = 0);
 
-NTL::ZZ UInt64_tToZZ (uint64_t value);
+
+uint64_t uint64FromZZ(NTL::ZZ val);
+//to_ZZ func may not work for 64 bits
+NTL::ZZ ZZFromUint64(uint64_t val);
+
 
 std::string StringFromZZ(const NTL::ZZ &x);
 NTL::ZZ ZZFromString(const std::string &s);
+
+std::string padForZZ(std::string s);
+
+std::string StringFromZZFast(const NTL::ZZ& x);
+
+void ZZFromStringFast(NTL::ZZ& x, const std::string& s);
+void ZZFromBytesFast(NTL::ZZ& x, const unsigned char *p, long n);
+
+inline NTL::ZZ ZZFromStringFast(const std::string& s) {
+  NTL::ZZ z; ZZFromStringFast(z, s); return z;
+}
+inline NTL::ZZ ZZFromBytesFast(const unsigned char *p, long n) {
+  NTL::ZZ z; ZZFromBytesFast(z, p, n); return z;
+}
 
 //rolls an interator forward
 template<typename T> void
@@ -452,6 +299,30 @@ roll(typename std::list<T>::iterator & it,  int count)
         }
     }
 }
+
+template<typename A, typename B>
+B getAssert(const std::map<A, B> & m, const A & x, const std::string & str = "" ) {
+    auto it = m.find(x);
+    if (it == m.end()) {
+        std::cerr << "item not present in map " << x << ". " << str
+                  << std::endl;
+        assert_s(false, "");
+    }
+    return it->second;
+}
+
+//returns true if x is in m and sets y=m[x] in that case
+template<typename A, typename B>
+bool contains_get(const std::map<A, B> & m, const A & x, B & y) {
+    auto it = m.find(x);
+    if (it == m.end()) {
+        return false;
+    } else {
+        y = it->second;
+        return true;
+    }
+}
+
 
 template <typename T>
 bool
@@ -470,6 +341,7 @@ std::string strFromVal(uint32_t x);
 
 uint64_t valFromStr(const std::string & str);
 
+
 //marshalls a binary value into characters readable by Postgres
 std::string marshallBinary(const std::string &s);
 /*
@@ -486,70 +358,19 @@ std::string unmarshallBinary(const std::string &s);
 
 void consolidate(std::list<std::string> & words);
 
-/********* SQL QUERY PARSING ******/
 
-// splits query in a std::list of std::string tokens; the tokens are obtained by
-// splitting query at every character contained in delimsStay or delimsGo; the
-// tokens will include the characters
-// from delimsStay encountered
-std::list<std::string> getSQLWords(const std::string &query);
+std::list<std::string>
+split(const std::string &s, const char * const separators);
 
-//parses a given std::string str, by splitting it according to the delimiters in
-// delimsStay, delimsGo ; if a piece of std::string
-// is included in two keepIntact delimiters, it is not broken into pieces even
-// if this std::string
-//contains delimiters; delimsStay are kept in the result, delimsGo are
-// discarded
-std::list<std::string> parse(const std::string &str,
-                   const std::set<char> &delimsStay,
-                   const std::set<char> &delimsGo,
-                   const std::set<char> &keepIntact);
-
-command getCommand(const std::string &query)
-    throw (CryptDBError);
 
 //returns a std::string representing a value pointed to by it and advances it
 std::string getVal(std::list<std::string>::iterator & it);
 
-//checks that the value of the current iterator is s1 or s2;  if it is s1,
-// increment iterator and return s1, if it is s2, return ""; else throws
-// exception
-std::string checkStr(std::list<std::string>::iterator & it, std::list<std::string> & lst,
-                const std::string &s1, const std::string &s2);
 
 //acts only if the first field is "(";
 //returns position after matching ")" mirroring all contents
 std::string processParen(std::list<std::string>::iterator & it, const std::list<std::string> & words);
 
-bool isQuerySeparator(const std::string &st);
-
-//returns the alias that should be pointed by it or "" if there is no such
-// alias
-std::string getAlias(std::list<std::string>::iterator & it, std::list<std::string> & words);
-
-// "it" should point to item after a field
-//echos any aliases, commas or )  in the result,
-//advances it after any set of  comma or ),  stops on query separator, or end
-// of query, whichever comes first
-//also enforces that there is at most one alias
-std::string processAlias(std::list<std::string>::iterator & it, std::list<std::string> & words);
-
-//echoes in output all tokens pointed to by it up to when any of the
-// terminators are encountered or it reached end of words
-//it mirrors the terminator as well if encountered
-//ignores query separators
-//if stopAfterTerm, it leaves "it" pointing to first element after terminator,
-// else it points to terminator
-//if skipParentBlock, it looks for terminators only outside of any nested
-// parenthesis block
-std::string mirrorUntilTerm(std::list<std::string>::iterator & it, const std::list<std::string> & words,
-                       const std::set<std::string> &terms,
-                       bool stopAfterTerm = 1,
-                       bool skipParenBlock = 0);
-
-//returns the iterator that points at the first keyword in lst, or the end of
-// the lst if such keyword was not found
-std::list<std::string>::iterator itAtKeyword(std::list<std::string> & lst, const std::string &keyword);
 
 //returns the contents of str before the first encounter with c
 std::string getBeforeChar(const std::string &str, char c);
@@ -568,6 +389,7 @@ std::string homomorphicAdd(const std::string &val1, const std::string &val2,
                       const std::string &valN2);
 
 std::string toLowerCase(const std::string &token);
+std::string toUpperCase(const std::string &token);
 
 bool equalsIgnoreCase(const std::string &s1, const std::string &s2);
 
@@ -581,30 +403,6 @@ bool contains(const std::string &token, const T &values)
     return false;
 }
 
-class SqlItem {
- public:
-    SqlItem() : null(true) {}
-
-    bool null;
-    enum_field_types type;
-    std::string data;
-
-    std::string to_string() const {
-        if (null)
-            return "NULL";
-        if (type == MYSQL_TYPE_BLOB)
-            return marshallBinary(data);
-        return data;
-    }
-
-    bool operator==(const SqlItem &other) const {
-        if (null && other.null)
-            return true;
-        return null == other.null &&
-               /* type == other.type && */  /* XXX re-enable once we get types right */
-               data == other.data;
-    }
-};
 
 /**** HELPERS FOR EVAL **************/
 
@@ -640,3 +438,38 @@ class Timer {
 
     uint64_t start;
 };
+
+template <typename T>
+class AssignOnce {
+public:
+    AssignOnce() : frozen(false) {}
+    AssignOnce(T value) : value(value), frozen(true) {}
+    ~AssignOnce() {;}
+    const AssignOnce& operator=(T value) {
+        if (true == frozen) {
+            throw CryptDBError("Object has already been assigned to!");
+        } else {
+            this->value = value;
+            frozen = true;
+            return *this;
+        }
+    }
+
+    const T get() const {
+        if (false == frozen) {
+            throw CryptDBError("First assign to AssignOnce template!");
+        }
+        return value;
+    }
+
+    bool assigned() const {
+        return frozen;
+    }
+
+private:
+    T value;
+    bool frozen;
+
+    AssignOnce(const AssignOnce &other);
+};
+

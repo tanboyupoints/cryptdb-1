@@ -1,20 +1,22 @@
 OBJDIRS	+= parser
 
+PARSERSRC	:= sql_utils.cc Annotation.cc lex_util.cc embedmysql.cc 
+ 
+PARSERPROGS	:= analyze load-schema print-back
 
-PARSERSRC	:= embedmysql.cc mysqld-filler.cc cdb_rewrite.cc
-PARSERPROGS	:= analyze load-schema print-back cdb_test
+PARSERPROGOBJS	:= $(pathsubst %, $(OBJDIR)/parser/%,$(PARSERPROGS))
 
-PARSERPROGOBJS	:= $(patsubst %,$(OBJDIR)/parser/%,$(PARSERPROGS))
-
-all:	$(PARSERPROGOBJS) $(OBJDIR)/libedbparser.so
+all:	$(OBJDIR)/libedbparser.so
 
 $(PARSERPROGOBJS): %: %.o $(OBJDIR)/libedbparser.so  $(OBJDIR)/libedbutil.so
 	$(CXX) $< -o $@ -ledbparser  $(LDFLAGS) -ledbutil -lcryptdb
 
 EDBPARSER_OBJS	:= $(patsubst %.cc,$(OBJDIR)/parser/%.o,$(PARSERSRC))
-$(OBJDIR)/libedbparser.so: $(EDBPARSER_OBJS) $(OBJDIR)/libedbutil.so $(OBJDIR)/libedbcrypto.so
-	$(CXX) -shared -o $@ $(EDBPARSER_OBJS) \
+
+$(OBJDIR)/libedbparser.so: $(EDBPARSER_OBJS) $(OBJDIR)/libedbutil.so \
+			   $(OBJDIR)/libedbcrypto.so 
+	$(CXX) -shared -o $@ $(EDBPARSER_OBJS) $(LDFLAGS) -ledbutil -ledbcrypto \
 	       -Wl,--whole-archive -L$(MYBUILD)/libmysqld -lmysqld \
-	       -Wl,--no-whole-archive $(LDFLAGS) -ledbutil -ledbcrypto 
+	       -Wl,--no-whole-archive -laio $(LDFLAGS)
 
 # vim: set noexpandtab:

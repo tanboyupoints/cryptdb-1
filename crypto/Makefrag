@@ -1,13 +1,21 @@
 OBJDIRS     += crypto
-CRYPTO2SRC  := paillier.cc urandom.cc arc4.cc hgd.cc ope.cc pbkdf2.cc \
-	       ecjoin.cc search.cc
+CRYPTOSRC   := BasicCrypto.cc paillier.cc urandom.cc arc4.cc hgd.cc pbkdf2.cc \
+	       ecjoin.cc ECJoin.cc search.cc skip32.cc ffx.cc online_ope.cc mont.cc \
+	       prng.cc ope.cc SWPSearch.cc
+CRYPTOOBJ   := $(patsubst %.cc,$(OBJDIR)/crypto/%.o,$(CRYPTOSRC))
 
-all:    $(OBJDIR)/libedbcrypto2.so
-$(OBJDIR)/libedbcrypto2.so: $(patsubst %.cc,$(OBJDIR)/crypto/%.o,$(CRYPTO2SRC))
-	$(CXX) -shared -o $@ $^ $(LDFLAGS)
+all:    $(OBJDIR)/libedbcrypto.so
+$(OBJDIR)/libedbcrypto.so: $(CRYPTOOBJ) $(OBJDIR)/libedbutil.so
+	$(CXX) -shared -o $@ $(CRYPTOOBJ) $(LDFLAGS) -ledbutil
 
-all:	$(OBJDIR)/crypto/x
-$(OBJDIR)/crypto/x: $(OBJDIR)/crypto/x.o $(OBJDIR)/libedbcrypto2.so
-	$(CXX) $< -o $@ $(LDFLAGS) -ledbcrypto2
+#all:	$(OBJDIR)/crypto/x
+#$(OBJDIR)/crypto/x: $(OBJDIR)/crypto/x.o $(OBJDIR)/libedbcrypto.so
+#	$(CXX) $< -o $@ $(LDFLAGS) -ledbcrypto
+
+install: install_crypto
+
+.PHONY: install_crypto
+install_crypto: $(OBJDIR)/libedbcrypto.so
+	install -m 644 $(OBJDIR)/libedbcrypto.so /usr/lib
 
 # vim: set noexpandtab:

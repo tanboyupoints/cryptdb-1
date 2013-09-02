@@ -1,0 +1,91 @@
+Aaron:
+wiki -- host it on git?
+TRANSACT on stale onions after UPDATE
+ - Support multiple tables.
+ALTER TABLE
+ - FOREIGN KEY
+ - ADD INDEX
+ - DROP INDEX
+ - RENAME
+ - CHANGE COLUMN
+Subqueries
+DECIMAL
+VARCHAR
+Misc Bugs
+    * Connect can get into an inconsistent state because it claims to know
+    the current database (getCurDBName), but a rogue USE statement will
+    make it a liar.
+    * Crash while displaying encrypted query (executeQuery)
+      > CREATE TABLE t (x integer, y varchar(100), z integer);
+      > INSERT INTO t values (1, 'alice', NULL);
+      # Crash doesn't happen if we build another table first.
+    * ALTER TABLE ... occasionally locks in
+      mysql_execute_query => pthread_cond_timedwait
+    * ALTER TABLE <table> ADD COLUMN.. will occasionally segfault if we are
+      adding 3 columns. Discover why.
+Finish removing MultiPrincipal code.
+ - Test stuff.
+ - Rewriter constructor.
+
+
+Carlos:
+Import tool notes:
+
+    1 - Some queries are failing, at least in my environment, they are:
+        - CREATE DATABASE
+        - LOCK
+        - UNLOCK
+        - maybe others..
+
+        MySQL dump file usually include these queries, one or another may be included or excluded manually by mysqldump, somehow,
+        but in general CryptDB should support the whole set otherwise importing databases wouldn't be much feasible in real scenarios. 
+ 
+    2 - New import tool version.
+        - Took the wrong path and much some time trying to use XML database dump format, not feasible, complex and error prone,
+        switched to plain (default) dump file format and parser took less than 20 lines of code, very simple. 
+
+
+    3. Testing:
+      -- make old tests work again
+      -- test aliases
+      -- join
+      -- update + increment
+      -- test persistency
+      (by Wed)
+      Data types
+        -- varchar: test various lengths
+        -- tinytext, mediumtext, text, longtext
+      	-- decimal: test various length of decimals, including zero decimal
+	-- for each data type above, exercise each onion to see if it still works
+      
+
+Raluca:
+by monday: finish reorganizing crypto handlers to allow different data types like varchar DONE
++ bug in loading tool DONE
+by tue: decimal
+
+Aaron:
+tue: put proxy back, rewriter not execute onion lowering any more, but just return as list of queries
+
+
+
+
+All: Thur - Sun:
+work on proxy, concurrency, connections 
+testing
+wed: timestamp and date
+
+All:
+Monday 15 start on sql.mit.edu
+proxy back up and setup for sql.mit.edu
+
+
+
+
+
+* Make sure that constant expressions in queries (e.g., SELECT "mysecret";)
+  are encrypted with RND, even if it's some temporary key that does not
+  correspond to any column.
+
+* Get database name through lex instead of parsing it again in Rewriter::rewrite. 
+  

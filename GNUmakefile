@@ -1,10 +1,12 @@
 OBJDIR	 := obj
 TOP	 := $(shell echo $${PWD-`pwd`})
 CXX	 := g++
-CXXFLAGS := -O2 -fno-strict-aliasing -fno-rtti -fwrapv -fPIC \
+## -g -O0 -> -O2
+CXXFLAGS := -g -O0 -fno-strict-aliasing -fno-rtti -fwrapv -fPIC \
 	    -Wall -Werror -Wpointer-arith -Wendif-labels -Wformat=2  \
 	    -Wextra -Wmissing-noreturn -Wwrite-strings -Wno-unused-parameter \
-	    -Wmissing-declarations -Woverloaded-virtual \
+	    -Wno-deprecated \
+	    -Wmissing-declarations -Woverloaded-virtual  \
 	    -Wunreachable-code -D_GNU_SOURCE -std=c++0x -I$(TOP)
 LDFLAGS	 := -lz -llua5.1 -lcrypto -lntl \
 	    -L$(TOP)/$(OBJDIR) -Wl,-rpath=$(TOP)/$(OBJDIR) -Wl,-rpath=$(TOP)
@@ -22,6 +24,7 @@ CXXFLAGS += -I$(MYBUILD)/include \
 LDFLAGS	 += -lpthread -lrt -ldl -lcrypt -lreadline
 
 ## To be populated by Makefrag files
+
 OBJDIRS	:=
 
 .PHONY: all
@@ -33,6 +36,14 @@ install:
 .PHONY: clean
 clean:
 	rm -rf $(OBJDIR)
+
+.PHONY: doc
+doc:
+	doxygen CryptDBdoxgen
+
+.PHONY: whitespace
+whitespace:
+	find . -name '*.cc' -o -name '*.hh' -type f -exec sed -i 's/ *$//' '{}' ';'
 
 # Eliminate default suffix rules
 .SUFFIXES:
@@ -48,13 +59,14 @@ $(OBJDIR)/%.o: %.cc
 	$(CXX) -MD $(CXXFLAGS) -c $< -o $@
 
 include crypto/Makefrag
-include crypto-old/Makefrag
-include edb/Makefrag
 include parser/Makefrag
+include main/Makefrag
 include test/Makefrag
 include util/Makefrag
 include udf/Makefrag
 include mysqlproxy/Makefrag
+include tools/import/Makefrag
+include tools/learn/Makefrag
 
 $(OBJDIR)/.deps: $(foreach dir, $(OBJDIRS), $(wildcard $(OBJDIR)/$(dir)/*.d))
 	@mkdir -p $(@D)

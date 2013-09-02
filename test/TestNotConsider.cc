@@ -8,9 +8,6 @@
 #include <test/TestNotConsider.hh>
 #include <util/cryptdb_log.hh>
 
-
-using namespace std;
-
 static int ntest = 0;
 static int npass = 0;
 
@@ -20,7 +17,7 @@ TestNotConsider::TestNotConsider() {
 TestNotConsider::~TestNotConsider() {
 }
 
-vector<Query> CreateSingle = {
+std::vector<Query> CreateSingle = {
     Query("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext enc text)",true),
     Query("CREATE TABLE privmsg (msgid enc integer, recid enc integer, senderid enc integer)",true),
     Query("CREATE TABLE uncrypt (id integer, t text)",true),
@@ -30,7 +27,7 @@ vector<Query> CreateSingle = {
     Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u (username enc text, psswd enc text)",true)
 };
 
-vector<Query> CreateMulti = {
+std::vector<Query> CreateMulti = {
     Query("CREATE TABLE msgs (msgid equals privmsg.msgid integer AUTO_INCREMENT PRIMARY KEY , msgtext encfor msgid text)",true),
     Query("CREATE TABLE privmsg (msgid integer, recid equals u.userid speaks_for msgid integer, senderid speaks_for msgid integer)",true),
     Query("CREATE TABLE uncrypt (id integer, t text)",true),
@@ -40,7 +37,7 @@ vector<Query> CreateMulti = {
     Query("COMMIT ANNOTATIONS",true)
 };
 
-vector<Query> QueryList = {
+std::vector<Query> QueryList = {
     Query("INSERT INTO uncrypt VALUES (1, 'first')", false),
     Query("INSERT INTO uncrypt (title) VALUES ('second')", false),
     Query("INSERT INTO msgs VALUES (1, 'texty text text')", true),
@@ -58,7 +55,7 @@ vector<Query> QueryList = {
 
     Query("SELECT * FROM uncrypt, post", true),
     Query("SELECT postid FROM forum, post WHERE forum.formid = post.forumid",true),
-    
+
     Query("UPDATE uncrypt SET t = 'weeeeeee' WHERE id = 3",false),
     Query("UPDATE privmsg SET msgid = 4",true),
 
@@ -67,7 +64,7 @@ vector<Query> QueryList = {
     Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'", true)
 };
 
-vector<Query> Drop = {
+std::vector<Query> Drop = {
     Query("DROP TABLE msgs", true),
     Query("DROP TABLE privmsg", true),
     Query("DROP TABLE uncrypt", true),
@@ -77,7 +74,8 @@ vector<Query> Drop = {
 };
 
 static void
-Check(const TestConfig &tc, const vector<Query> &queries, EDBProxy * cl, bool createdrop) {
+Check(const TestConfig &tc, const std::vector<Query> &queries,
+      EDBProxy * cl, bool createdrop) {
     //all create queries should go be considered...
     for (auto q = queries.begin(); q != queries.end(); q++) {
         ntest++;
@@ -103,7 +101,7 @@ Check(const TestConfig &tc, const vector<Query> &queries, EDBProxy * cl, bool cr
 static void
 Consider(const TestConfig &tc, bool multi) {
     uint64_t mkey = 1144220039;
-    string masterKey = BytesFromInt(mkey, AES_KEY_BYTES);
+    std::string masterKey = BytesFromInt(mkey, AES_KEY_BYTES);
     EDBProxy * cl;
     cl = new EDBProxy(tc.host, tc.user, tc.pass, tc.db, tc.port, multi);
     cl->setMasterKey(masterKey);

@@ -54,7 +54,8 @@ ecjoin_priv::hash(const std::string &ptext, const std::string &k)
     assert(hash.size() >= base.blocksize);
     hash.resize(base.blocksize);
 
-    std::vector<uint8_t> enc(base.blocksize);
+    std::string enc;
+    enc.resize(base.blocksize);
     base.block_encrypt(&hash[0], &enc[0]);
 
     bignum kn(sha256::hash(k));

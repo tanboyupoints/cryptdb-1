@@ -37,6 +37,9 @@ class PRNG {
         return NTL::ZZFromBytes(buf, sizeof(buf)) % max;
     }
 
+    NTL::ZZ rand_zz_nbits(size_t nbits);
+    NTL::ZZ rand_zz_prime(size_t nbits);
+
     bignum rand_bn_mod(const bignum &max) {
         uint8_t buf[BN_num_bytes(max.bn())];
         rand_bytes(sizeof(buf), buf);
@@ -95,16 +98,37 @@ class blockrng : public PRNG {
             uint8_t ct[bc.blocksize];
             bc.block_encrypt(ctr, ct);
 
-            memcpy(&buf[i], ct, min(bc.blocksize, nbytes - i));
+            memcpy(&buf[i], ct, bc.blocksize < (nbytes - i) ? bc.blocksize : (nbytes - i));
         }
     }
 
-    void set_ctr(const std::vector<uint8_t> &v) {
+    void set_ctr(const std::string &v) {
         assert(v.size() == BlockCipher::blocksize);
-        memcpy(ctr, &v[0], BlockCipher::blocksize);
+        memcpy(ctr, v.data(), BlockCipher::blocksize);
     }
 
  private:
     BlockCipher bc;
     uint8_t ctr[BlockCipher::blocksize];
 };
+
+template<>
+inline bool
+PRNG::rand<bool>()
+{
+    uint8_t v;
+    rand_bytes(1, &v);
+    return v & 1;
+}
+
+template<>
+inline std::vector<bool>
+PRNG::rand_vec<bool>(size_t nelem)
+{
+    uint8_t buf[nelem];
+    rand_bytes(nelem, &buf[0]);
+    for (size_t i = 0; i < nelem; i++)
+        buf[i] &= 1;
+
+    return std::vector<bool>(&buf[0], &buf[nelem]);
+}

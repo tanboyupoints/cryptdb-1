@@ -1,0 +1,132 @@
+#pragma once
+
+#include <algorithm>
+
+template <typename KeyType>
+bool MetaKey<KeyType>::operator <(const MetaKey<KeyType> &rhs) const
+{
+    return key_data < rhs.key_data;
+}
+
+template <typename KeyType>
+bool MetaKey<KeyType>::operator ==(const MetaKey<KeyType> &rhs) const
+{
+    return key_data == rhs.key_data;
+}
+
+template <typename ChildType, typename KeyType>
+MappedDBMeta<ChildType, KeyType>::~MappedDBMeta()
+{
+    auto cp = children;
+    children.clear();
+
+    // FIXME: Handle keys.
+    /*
+    for (auto it : cp) {
+        delete it.second;
+    }
+    */
+}
+
+template <typename ChildType, typename KeyType>
+bool
+MappedDBMeta<ChildType, KeyType>::addChild(KeyType *key,
+                                           std::shared_ptr<ChildType> meta)
+{
+    if (childExists(key)) {
+        return false;
+    }
+
+    children[key] = meta;
+    return true;
+}
+
+// FIXME: Slow.
+// > std::reference_wrapper should fix.
+template <typename ChildType, typename KeyType>
+typename std::map<KeyType *, std::shared_ptr<ChildType>>::const_iterator
+MappedDBMeta<ChildType, KeyType>::findChild(KeyType *key) const
+{
+    auto it = 
+        std::find_if(children.begin(), children.end(),
+            [&key](const std::pair<KeyType *,
+                                   std::shared_ptr<ChildType>> child) {
+                return *child.first == *key;
+            });
+
+    return it;
+}
+
+template <typename ChildType, typename KeyType>
+bool
+MappedDBMeta<ChildType, KeyType>::childExists(KeyType *key) const
+{
+    return children.end() != this->findChild(key);
+}
+
+// Slow.
+// FIXME: Use findChild.
+template <typename ChildType, typename KeyType>
+std::shared_ptr<ChildType>
+MappedDBMeta<ChildType, KeyType>::getChild(const KeyType * const key) const
+{
+    for (auto it : children) {
+        if (*it.first == *key) {
+            return it.second;
+        }
+    }
+
+    return NULL;
+}
+
+// FIXME: Slow.
+template <typename ChildType, typename KeyType>
+AbstractMetaKey *
+MappedDBMeta<ChildType, KeyType>::getKey(const DBMeta * const child) const
+{
+    for (auto it : children) {
+        if (it.second.get() == child) {
+            return it.first;
+        }
+    }
+
+    return NULL;
+}
+
+template <typename ChildType, typename KeyType>
+std::vector<std::shared_ptr<DBMeta>>
+MappedDBMeta<ChildType, KeyType>::fetchChildren(const std::unique_ptr<Connect> &e_conn)
+{
+    // Perhaps it's conceptually cleaner to have this lambda return
+    // pairs of keys and children and then add the children from local
+    // scope.
+    std::function<std::shared_ptr<DBMeta>(const std::string &,
+                                          const std::string &,
+                                          const std::string &)>
+        deserialize =
+        [this] (const std::string &key, const std::string &serial,
+                const std::string &id)
+        {
+            KeyType *meta_key = AbstractMetaKey::factory<KeyType>(key);
+            auto dChild = ChildType::deserialize;
+            std::shared_ptr<ChildType>
+                new_old_meta(dChild(atoi(id.c_str()), serial));
+
+            // Gobble the child.
+            this->addChild(meta_key, new_old_meta);
+
+            return new_old_meta;
+        };
+
+    return DBMeta::doFetchChildren(e_conn, deserialize);
+}
+
+template <typename ChildType, typename KeyType>
+void
+MappedDBMeta<ChildType, KeyType>::applyToChildren(std::function<void(const std::shared_ptr<DBMeta>)> fn) const
+{
+    for (auto it : children) {
+        fn(it.second);
+    }
+}
+

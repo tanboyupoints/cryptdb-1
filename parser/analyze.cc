@@ -9,13 +9,14 @@
 #include <algorithm>
 #include <stdio.h>
 
+#include <parser/embedmysql.hh>
 #include <sql_select.h>
 #include <sql_delete.h>
 #include <sql_insert.h>
 #include <sql_update.h>
 #include <handler.h>
 
-#include <parser/embedmysql.hh>
+
 #include <parser/stringify.hh>
 
 #include <util/errstream.hh>
@@ -783,9 +784,10 @@ process_select_lex(st_select_lex *select_lex, const cipher_type_reason &tr)
         analyze(item, tr);
     }
 
-    if (select_lex->where)
+    if (select_lex->where) {
+	cerr << "going in where! \n";
         analyze(select_lex->where, cipher_type_reason(cipher_type::plain, "where", select_lex->where, 0));
-
+    }
     if (select_lex->having)
         analyze(select_lex->having, cipher_type_reason(cipher_type::plain, "having", select_lex->having, 0));
 
@@ -856,7 +858,6 @@ query_analyze(const std::string &db, const std::string &q)
             Item *item = item_it++;
             if (!item)
                 break;
-
             analyze(item, cipher_type_reason(cipher_type::any, "update", item, 0, false));
         }
     }

@@ -12,9 +12,6 @@
 #include <test/TestSinglePrinc.hh>
 #include <util/cryptdb_log.hh>
 
-
-using namespace std;
-
 static int ntest = 0;
 static int npass = 0;
 
@@ -30,13 +27,13 @@ TestSinglePrinc::~TestSinglePrinc()
 
 template <int N>
 static ResType
-convert(string rows[][N], int num_rows)
+convert(std::string rows[][N], int num_rows)
 {
     ResType res;
     for (int j = 0; j < N; j++)
         res.names.push_back(rows[0][j]);
     for (int i = 1; i < num_rows; i++) {
-        vector<SqlItem> temp;
+        std::vector<SqlItem> temp;
         for (int j = 0; j < N; j++) {
             /*
              * XXX temporarily fudge this..  Catherine is planning to redo
@@ -54,14 +51,15 @@ convert(string rows[][N], int num_rows)
 }
 
 static void
-CheckSelectResults(const TestConfig &tc, EDBProxy * cl, vector<string> in, vector<ResType> out)
+CheckSelectResults(const TestConfig &tc, EDBProxy * cl,
+                   std::vector<std::string> in, std::vector<ResType> out)
 {
     assert_s(
             in.size() == out.size(),
             "different numbers of test queries and expected results");
 
-    vector<string>::iterator query_it = in.begin();
-    vector<ResType>::iterator res_it = out.begin();
+    std::vector<std::string>::iterator query_it = in.begin();
+    std::vector<ResType>::iterator res_it = out.begin();
 
     LOG(test) << in.size() << "  " << out.size();
 
@@ -100,9 +98,10 @@ CheckSelectResults(const TestConfig &tc, EDBProxy * cl, vector<string> in, vecto
 }
 
 static void
-qUpdateSelect(const TestConfig &tc, EDBProxy *cl, const string &update,
-              const string &select, const vector<string> &exp_names,
-              const vector<vector<string> > &exp_rows)
+qUpdateSelect(const TestConfig &tc, EDBProxy *cl,
+              const std::string &update, const std::string &select,
+              const std::vector<std::string> &exp_names,
+              const std::vector<std::vector<std::string> > &exp_rows)
 {
     assert_res(myExecute(cl, update), "Query failed, Update or Delete test failed\n");
     ResType expect;
@@ -113,7 +112,7 @@ qUpdateSelect(const TestConfig &tc, EDBProxy *cl, const string &update,
      * so that we don't have to supply expected answers anyway.
      */
     for (auto i = exp_rows.begin(); i != exp_rows.end(); i++) {
-        vector<SqlItem> row;
+        std::vector<SqlItem> row;
         for (auto j = i->begin(); j != i->end(); j++) {
             SqlItem item;
             item.type = MYSQL_TYPE_BLOB;
@@ -153,7 +152,7 @@ testCreateDrop(const TestConfig &tc, EDBProxy * cl)
 {
     cl->plain_execute("DROP TABLE IF EXISTS table0, table1, table2, table3, table4");
 
-    string sql = "CREATE TABLE t1 (id integer, words text)";
+    std::string sql = "CREATE TABLE t1 (id integer, words text)";
     assert_res(cl->execute(sql), "Problem creating table t1 (first time)");
     assert_res(cl->plain_execute(
                  "SELECT * FROM table0"),
@@ -303,11 +302,11 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
                        "INSERT INTO t1 VALUES (5, 30, 100000, '221B Baker Street', 'Sherlock Holmes')"),
              "testSelect couldn't insert (5)");
 
-    vector<string> query;
-    vector<ResType> reply;
+    std::vector<std::string> query;
+    std::vector<ResType> reply;
 
     query.push_back("SELECT * FROM t1");
-    string rows1[6][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows1[6][5] = { {"id", "age", "salary", "address", "name"},
                            {"1", "10", "0",
                             "first star to the right and straight on till morning",
                             "Peter Pan"},
@@ -319,32 +318,32 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows1,6));
 
     query.push_back("SELECT max(id) FROM t1");
-    string rows2[2][1] = { {"max(id)"},
+    std::string rows2[2][1] = { {"max(id)"},
                            {"5"} };
     reply.push_back(convert(rows2,2));
 
     query.push_back("SELECT max(salary) FROM t1");
-    string rows3[2][1] = { {"max(salary)"},
+    std::string rows3[2][1] = { {"max(salary)"},
                            {"100000"} };
     reply.push_back(convert(rows3,2));
 
     query.push_back("SELECT COUNT(*) FROM t1");
-    string rows4[2][1] = { {"COUNT(*)"},
+    std::string rows4[2][1] = { {"COUNT(*)"},
                            {"5"} };
     reply.push_back(convert(rows4,2));
 
     query.push_back("SELECT COUNT(DISTINCT age) FROM t1");
-    string rows5[2][1] = { {"COUNT(DISTINCT age)"},
+    std::string rows5[2][1] = { {"COUNT(DISTINCT age)"},
                            {"4"} };
     reply.push_back(convert(rows5,2));
 
     query.push_back("SELECT COUNT(DISTINCT(address)) FROM t1");
-    string rows100[2][1] = { {"COUNT(DISTINCT(address))"},
+    std::string rows100[2][1] = { {"COUNT(DISTINCT(address))"},
                              {"4"} };
     reply.push_back(convert(rows100,2));
 
     query.push_back("SELECT name FROM t1");
-    string rows6[6][1] = { {"name"},
+    std::string rows6[6][1] = { {"name"},
                            {"Peter Pan"},
                            {"Anne Shirley"},
                            {"Lucy"},
@@ -353,7 +352,7 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows6,6));
 
     query.push_back("SELECT address FROM t1");
-    string rows7[6][1] = { { "address"},
+    std::string rows7[6][1] = { { "address"},
                            {
                                "first star to the right and straight on till morning"
                            },
@@ -365,28 +364,28 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
 
     query.push_back(
         "SELECT sum(age), max(salary), min(salary), COUNT(name), address FROM t1");
-    string rows8[2][5] =
+    std::string rows8[2][5] =
     { {"sum(age)", "max(salary)", "min(salary)", "COUNT(name)", "address"},
       {"74",        "100000",     "0",           "5",
        "first star to the right and straight on till morning"} };
     reply.push_back(convert(rows8,2));
 
     query.push_back("SELECT * FROM t1 WHERE id = 1");
-    string rows9[2][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows9[2][5] = { {"id", "age", "salary", "address", "name"},
                            {"1", "10", "0",
                             "first star to the right and straight on till morning",
                             "Peter Pan"} };
     reply.push_back(convert(rows9,2));
 
     query.push_back("SELECT * FROM t1 WHERE id>3");
-    string rows10[3][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows10[3][5] = { {"id", "age", "salary", "address", "name"},
                             {"4", "10", "0", "London", "Edmund"},
                             {"5", "30", "100000", "221B Baker Street",
                              "Sherlock Holmes"} };
     reply.push_back(convert(rows10,3));
 
     query.push_back("SELECT * FROM t1 WHERE age = 8");
-    string rows11[2][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows11[2][5] = { {"id", "age", "salary", "address", "name"},
                             {"3", "8", "0", "London", "Lucy"} };
     reply.push_back(convert(rows11,2));
 
@@ -394,7 +393,7 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(ResType());
 
     query.push_back("SELECT * FROM t1 WHERE age > 10");
-    string rows12[3][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows12[3][5] = { {"id", "age", "salary", "address", "name"},
                             {"2", "16", "1000", "Green Gables",
                              "Anne Shirley"},
                             {"5", "30", "100000", "221B Baker Street",
@@ -402,7 +401,7 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows12,3));
 
     query.push_back("SELECT * FROM t1 WHERE age = 10 AND salary = 0");
-    string rows13[3][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows13[3][5] = { {"id", "age", "salary", "address", "name"},
                             {"1", "10", "0",
                              "first star to the right and straight on till morning",
                              "Peter Pan"},
@@ -410,7 +409,7 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows13,3));
 
     query.push_back("SELECT * FROM t1 WHERE age = 10 OR salary = 0");
-    string rows14[4][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows14[4][5] = { {"id", "age", "salary", "address", "name"},
                             {"1", "10", "0",
                              "first star to the right and straight on till morning",
                              "Peter Pan"},
@@ -419,7 +418,7 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows14,4));
 
     query.push_back("SELECT * FROM t1 WHERE name = 'Peter Pan'");
-    string rows15[2][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows15[2][5] = { {"id", "age", "salary", "address", "name"},
                             {"1", "10", "0",
                              "first star to the right and straight on till morning",
                              "Peter Pan"} };
@@ -429,20 +428,20 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     //afer the WHERE statement
 
     query.push_back("SELECT * FROM t1 WHERE address= 'Green Gables'");
-    string rows16[2][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows16[2][5] = { {"id", "age", "salary", "address", "name"},
                             {"2", "16", "1000", "Green Gables",
                              "Anne Shirley"} };
     reply.push_back(convert(rows16,2));
 
     query.push_back("SELECT * FROM t1 WHERE address <= '221C'");
-    string rows17[2][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows17[2][5] = { {"id", "age", "salary", "address", "name"},
                             {"5", "30", "100000", "221B Baker Street",
                              "Sherlock Holmes"} };
     reply.push_back(convert(rows17,2));
 
     query.push_back(
         "SELECT * FROM t1 WHERE address >= 'Green Gables' AND age > 9");
-    string rows18[3][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows18[3][5] = { {"id", "age", "salary", "address", "name"},
                             {"2", "16", "1000", "Green Gables",
                              "Anne Shirley"},
                             {"4", "10", "0", "London", "Edmund"} };
@@ -450,7 +449,7 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
 
     query.push_back(
         "SELECT * FROM t1 WHERE address >= 'Green Gables' OR age > 9");
-    string rows19[6][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows19[6][5] = { {"id", "age", "salary", "address", "name"},
                             {"1", "10", "0",
                              "first star to the right and straight on till morning",
                              "Peter Pan"},
@@ -463,7 +462,7 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows19,6));
 
     query.push_back("SELECT * FROM t1 ORDER BY id");
-    string rows20[6][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows20[6][5] = { {"id", "age", "salary", "address", "name"},
                             {"1", "10", "0",
                              "first star to the right and straight on till morning",
                              "Peter Pan"},
@@ -476,7 +475,7 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows20,6));
 
     query.push_back("SELECT * FROM t1 ORDER BY salary");
-    string rows21[6][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows21[6][5] = { {"id", "age", "salary", "address", "name"},
                             {"1", "10", "0",
                              "first star to the right and straight on till morning",
                              "Peter Pan"},
@@ -489,7 +488,7 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows21,6));
 
     query.push_back("SELECT * FROM t1 ORDER BY name");
-    string rows22[6][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows22[6][5] = { {"id", "age", "salary", "address", "name"},
                             {"2", "16", "1000", "Green Gables",
                              "Anne Shirley"},
                             {"4", "10", "0", "London", "Edmund"},
@@ -502,7 +501,7 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows22,6));
 
     query.push_back("SELECT * FROM t1 ORDER BY address");
-    string rows23[6][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows23[6][5] = { {"id", "age", "salary", "address", "name"},
                             {"5", "30", "100000", "221B Baker Street",
                              "Sherlock Holmes"},
                             {"1", "10", "0",
@@ -515,7 +514,7 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows23,6));
 
     query.push_back("SELECT sum(age) FROM t1 GROUP BY address");
-    string rows24[5][1] = { {"sum(age)"},
+    std::string rows24[5][1] = { {"sum(age)"},
                             {"30"},
                             {"10"},
                             {"16"},
@@ -523,14 +522,14 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows24,5));
 
     query.push_back("SELECT salary, max(id) FROM t1 GROUP BY salary");
-    string rows24a[4][2] = { {"salary", "max(id)"},
+    std::string rows24a[4][2] = { {"salary", "max(id)"},
                             {"0", "4"},
                             {"1000", "2"},
                             {"100000", "5"} };
     reply.push_back(convert(rows24a,4));
 
     query.push_back("SELECT * FROM t1 GROUP BY age ORDER BY age");
-    string rows25[5][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows25[5][5] = { {"id", "age", "salary", "address", "name"},
                             {"3", "8", "0", "London", "Lucy"},
                             {"1", "10", "0",
                              "first star to the right and straight on till morning",
@@ -542,7 +541,7 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows25,5));
 
     query.push_back("SELECT * FROM t1 ORDER BY age ASC");
-    string rows26[6][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows26[6][5] = { {"id", "age", "salary", "address", "name"},
                             {"3", "8", "0", "London", "Lucy"},
                             {"1", "10", "0",
                              "first star to the right and straight on till morning",
@@ -555,7 +554,7 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows26,6));
 
     query.push_back("SELECT * FROM t1 ORDER BY age DESC");
-    string rows27[6][5] = { {"id", "age", "salary", "address", "name"},
+    std::string rows27[6][5] = { {"id", "age", "salary", "address", "name"},
                             {"5", "30", "100000", "221B Baker Street",
                              "Sherlock Holmes"},
                             {"2", "16", "1000", "Green Gables",
@@ -571,22 +570,22 @@ testSelect(const TestConfig &tc, EDBProxy * cl)
     // aliases
 
     query.push_back("SELECT sum(age) as z FROM t1");
-    string rows28[2][1] = { {"z"},
+    std::string rows28[2][1] = { {"z"},
                             {"74"} };
     reply.push_back(convert(rows28,2));
 
     query.push_back("SELECT sum(age) z FROM t1");
-    string rows29[2][1] = { {"z"},
+    std::string rows29[2][1] = { {"z"},
                             {"74"} };
     reply.push_back(convert(rows29,2));
 
     query.push_back("SELECT min(t.id) a FROM t1 AS t");
-    string rows30[2][1] = { {"a"},
+    std::string rows30[2][1] = { {"a"},
                             {"1"} };
     reply.push_back(convert(rows30,2));
 
     query.push_back("SELECT t.address AS b FROM t1 t");
-    string rows31[6][1] = { {"b"},
+    std::string rows31[6][1] = { {"b"},
                             {
                                 "first star to the right and straight on till morning"
                             },
@@ -648,12 +647,12 @@ testJoin(const TestConfig &tc, EDBProxy * cl)
                        "INSERT INTO t2 VALUES (10, 4, '221B Baker Street')"),
              "testJoin couldn't insert (5)");
 
-    vector<string> query;
-    vector<ResType> reply;
+    std::vector<std::string> query;
+    std::vector<ResType> reply;
 
     //int comparison
     query.push_back("SELECT address FROM t1, t2 WHERE t1.id=t2.id");
-    string rows1[5][1] = { {"address"},
+    std::string rows1[5][1] = { {"address"},
                            {
                                "first star to the right and straight on till morning"
                            },
@@ -663,7 +662,7 @@ testJoin(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows1,5));
     query.push_back(
         "SELECT t1.id, t2.id, age, books, t2.name FROM t1, t2 WHERE t1.id=t2.id");
-    string rows2[5][5] = { {"id", "id", "age", "books", "name"},
+    std::string rows2[5][5] = { {"id", "id", "age", "books", "name"},
                            {"1", "1", "10", "6", "Peter Pan"},
                            {"2", "2", "16", "8", "Anne Shirley"},
                            {"3", "3", "8", "7", "Lucy"},
@@ -671,14 +670,14 @@ testJoin(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows2,5));
     query.push_back(
         "SELECT t1.name, age, salary, t2.name, books FROM t1, t2 WHERE t1.age=t2.books");
-    string rows3[2][5] = { {"name", "age", "salary", "name", "books"},
+    std::string rows3[2][5] = { {"name", "age", "salary", "name", "books"},
                            {"Lucy", "8", "0", "Anne Shirley", "8"} };
     reply.push_back(convert(rows3,2));
 
     //string comparison
     query.push_back(
         "SELECT t1.id, t2.id, age, books, t2.name FROM t1, t2 WHERE t1.name=t2.name");
-    string rows4[5][5] = { {"id", "id", "age", "books", "name"},
+    std::string rows4[5][5] = { {"id", "id", "age", "books", "name"},
                            {"1", "1", "10", "6", "Peter Pan"},
                            {"2", "2", "16", "8", "Anne Shirley"},
                            {"3", "3", "8", "7", "Lucy"},
@@ -686,13 +685,13 @@ testJoin(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows4,5));
     query.push_back(
         "SELECT t1.id, age, address, t2.id, books FROM t1, t2 WHERE t1.address=t2.name");
-    string rows5[2][5] = { {"id", "age", "address", "id", "books"},
+    std::string rows5[2][5] = { {"id", "age", "address", "id", "books"},
                            {"5", "30", "221B Baker Street", "10", "4"} };
     reply.push_back(convert(rows5,2));
 
     //with aliases
     query.push_back("SELECT address FROM t1 AS a, t2 WHERE a.id=t2.id");
-    string rows11[5][1] = { {"address"},
+    std::string rows11[5][1] = { {"address"},
                             {
                                 "first star to the right and straight on till morning"
                             },
@@ -702,7 +701,7 @@ testJoin(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows11,5));
     query.push_back(
         "SELECT a.id, b.id, age, books, b.name FROM t1 a, t2 AS b WHERE a.id=b.id");
-    string rows12[5][5] = { {"id", "id", "age", "books", "name"},
+    std::string rows12[5][5] = { {"id", "id", "age", "books", "name"},
                             {"1", "1", "10", "6", "Peter Pan"},
                             {"2", "2", "16", "8", "Anne Shirley"},
                             {"3", "3", "8", "7", "Lucy"},
@@ -710,7 +709,7 @@ testJoin(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(convert(rows12,5));
     query.push_back(
         "SELECT t1.name, age, salary, b.name, books FROM t1, t2 b WHERE t1.age=b.books");
-    string rows13[2][5] = { {"name", "age", "salary", "name", "books"},
+    std::string rows13[2][5] = { {"name", "age", "salary", "name", "books"},
                             {"Lucy", "8", "0", "Anne Shirley", "8"} };
     reply.push_back(convert(rows13,2));
 
@@ -883,7 +882,7 @@ testUpdate(const TestConfig &tc, EDBProxy * cl)
     qUpdateSelect(tc, cl, "UPDATE t1 SET address = 'Neverland' WHERE id = 1", "SELECT * FROM t1 WHERE address < 'fml'",
           {"id", "age", "salary", "address", "name"},
           { {"5", "32", "55000", "221B Baker Street", "Sherlock Holmes"} });
-    
+
     if (!PLAIN) {
         assert_res(cl->execute("DROP TABLE t1"), "testUpdate can't drop t1");
     } else {
@@ -1013,27 +1012,27 @@ testSearch(const TestConfig &tc, EDBProxy * cl)
                        "INSERT INTO t3 VALUES (4, 'When I have fears that I may cease to be, before my pen has gleaned my teaming brain; before high-piled books in charactery hold like rich garners the full-ripened grain.  When I behold upon the nights starred face Huge cloudy symbols of high romance And think that I may never live to trace Their shadows with the magic hand of chance.  And when I feel, fair creature of the hour That I shall never look upon thee more, Never have relish of the faerie power Of unreflecting love, I stand alone of the edge of the wide world and think, to love and fame to nothingness do sink')"),
              "testSearch couldn't insert (4)");
 
-    vector<string> query;
-    vector<ResType> reply;
+    std::vector<std::string> query;
+    std::vector<ResType> reply;
 
     query.push_back("SELECT * FROM t3 WHERE searchable LIKE '%text%'");
-    string rows1[3][2] = { {"id", "searchable"},
+    std::string rows1[3][2] = { {"id", "searchable"},
                            {"1", "short text"},
                            {"2", "Text with CAPITALIZATION"} };
     reply.push_back(convert(rows1,3));
 
     query.push_back("SELECT * FROM t3 WHERE searchable LIKE 'short%'");
-    string rows2[2][2] = { {"id", "searchable"},
+    std::string rows2[2][2] = { {"id", "searchable"},
                              {"1", "short text"}};
     reply.push_back(convert(rows2,2));
 
     query.push_back("SELECT * FROM t3 WHERE searchable LIKE ''");
-    string rows3[2][2] = { {"id", "searchable"},
+    std::string rows3[2][2] = { {"id", "searchable"},
                            {"3", ""} };
     reply.push_back(convert(rows3,2));
 
     query.push_back("SELECT * FROM t3 WHERE searchable LIKE '%capitalization'");
-    string rows4[2][2] = { {"id", "searchable"},
+    std::string rows4[2][2] = { {"id", "searchable"},
                            {"2", "Text with CAPITALIZATION"} };
     reply.push_back(convert(rows4,2));
 
@@ -1041,7 +1040,7 @@ testSearch(const TestConfig &tc, EDBProxy * cl)
     reply.push_back(ResType());
 
     query.push_back("SELECT * FROM t3 WHERE searchable LIKE 'when%'");
-    string rows5[2][2] = { {"id", "searchable"},
+    std::string rows5[2][2] = { {"id", "searchable"},
                            {"4",
                             "When I have fears that I may cease to be, before my pen has gleaned my teaming brain; before high-piled books in charactery hold like rich garners the full-ripened grain.  When I behold upon the nights starred face Huge cloudy symbols of high romance And think that I may never live to trace Their shadows with the magic hand of chance.  And when I feel, fair creature of the hour That I shall never look upon thee more, Never have relish of the faerie power Of unreflecting love, I stand alone of the edge of the wide world and think, to love and fame to nothingness do sink"} };
     reply.push_back(convert(rows5,2));

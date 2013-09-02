@@ -4,7 +4,7 @@
  * TestNotConsider.h
  */
 
-#include <edb/EDBProxy.hh>
+#include <main/EDBProxy.hh>
 #include <test/test_utils.hh>
 
 

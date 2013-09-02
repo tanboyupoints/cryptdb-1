@@ -9,6 +9,9 @@ using namespace NTL;
  * Public-key operations
  */
 
+Paillier::Paillier() : nbits(0) {
+}
+
 Paillier::Paillier(const vector<ZZ> &pk)
     : n(pk[0]), g(pk[1]),
       nbits(NumBits(n)), n2(n*n)
@@ -52,6 +55,12 @@ Paillier::add(const ZZ &c0, const ZZ &c1) const
     return MulMod(c0, c1, n2);
 }
 
+ZZ
+Paillier::mul(const ZZ &ciphertext, const ZZ &constval) const
+{
+    return PowerMod(ciphertext, constval, n2);
+}
+
 
 /*
  * Private-key operations
@@ -92,16 +101,16 @@ Paillier_priv::Paillier_priv(const vector<ZZ> &sk)
 }
 
 std::vector<NTL::ZZ>
-Paillier_priv::keygen(uint nbits, uint abits)
+Paillier_priv::keygen(PRNG *rng, uint nbits, uint abits)
 {
     ZZ p, q, n, g, a;
 
     do {
         if (abits) {
-            a = RandomPrime_ZZ(abits);
+            a = rng->rand_zz_prime(abits);
 
-            ZZ cp = RandomLen_ZZ(nbits/2-abits);
-            ZZ cq = RandomLen_ZZ(nbits/2-abits);
+            ZZ cp = rng->rand_zz_nbits(nbits/2-abits);
+            ZZ cq = rng->rand_zz_nbits(nbits/2-abits);
 
             p = a * cp + 1;
             while (!ProbPrime(p))
@@ -112,8 +121,8 @@ Paillier_priv::keygen(uint nbits, uint abits)
                 q += a;
         } else {
             a = 0;
-            p = RandomPrime_ZZ(nbits/2);
-            q = RandomPrime_ZZ(nbits/2);
+            p = rng->rand_zz_prime(nbits/2);
+            q = rng->rand_zz_prime(nbits/2);
         }
         n = p * q;
     } while ((nbits != (uint) NumBits(n)) || p == q);

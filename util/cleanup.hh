@@ -4,9 +4,12 @@
  * ANON generates a unique identifier, useful in cases when the
  * name of some object or class doesn't matter.
  */
+
+#include "string.h"
+
 #define ANON_CONCAT2(a, b)  a ## b
 #define ANON_CONCAT(a, b)   ANON_CONCAT2(a, b)
-#define ANON                ANON_CONCAT(__anon_id_, __COUNTER__)
+#define ANON_NAME(name) ANON_CONCAT(name, __COUNTER__)
 
 /*
  * Cleanup handler object: invokes the supplied function in its
@@ -28,17 +31,3 @@ cleanup(T a)
 {
     return cleanup_caller<T>(a);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

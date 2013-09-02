@@ -8,8 +8,6 @@
 #include <test/TestAccessManager.hh>
 
 
-using namespace std;
-
 static int ntest = 0;
 static int npass = 0;
 
@@ -70,28 +68,37 @@ testMeta_native(const TestConfig &tc, Connect * conn) {
     string test = "(native meta) ";
     MetaAccess * meta;
     meta = new MetaAccess(conn, false);
-    
-    meta->addEquals("u.uid","g.uid");
-    meta->addAccess("u.uid","g.gid");
-    
+
+    meta->startEquals("uname");
+    meta->startEquals("uid");
+    meta->startEquals("gid");
+    meta->addEquals("u.uid", "uid");
+    meta->addEquals("g.uid","uid");
+    meta->addEquals("g.gid","gid");
+    meta->addAccess("uid","gid");
+
     record(tc, !meta->CheckAccess(), test + "CheckAccess--no gives");
-    
-    meta->addGives("u.uname");
-    
+
+    meta->addEquals("u.uname","uname");
+    meta->addGives("uname");
+
     record(tc, !meta->CheckAccess(), test + "CheckAccess--bad tree");
-    
-    meta->addAccess("u.uname","u.uid");
-    
-    record(tc, meta->CheckAccess(), test + "CheckAccess--good tree");  
+
+    meta->addAccess("uname","uid");
+
+    record(tc, meta->CheckAccess(), test + "CheckAccess--good tree");
     meta->CreateTables();
 
-    record(tc, meta->addAccessCheck("g.acc","g.gid") < 0, test + "succeeded in adding illegal access link");
+    //XXX need to properly test Check functions
+    /*meta->startEquals("acc");
+
     record(tc, meta->addEqualsCheck("u.acc","g.acc") < 0, test + "succeeded in adding illegal equality");
+    record(tc, meta->addAccessCheck("g.acc","g.gid") < 0, test + "succeeded in adding illegal access link");
 
     record(tc, meta->addAccessCheck("u.uname", "u.acc") == 0, test + "failed to add legal access link");
     record(tc, meta->addEqualsCheck("u.acc","g.acc") == 0, test + "failed to add legal equality (case 2)");
     record(tc, meta->addGivesCheck("u.captcha") == 0, test + "failed to add legal givesPsswd");
-    record(tc, meta->addEqualsCheck("u.uname", "u.captcha") == 0, test + "failed to add legal equality (case 4)");
+    record(tc, meta->addEqualsCheck("u.uname", "u.captcha") == 0, test + "failed to add legal equality (case 4)");*/
 
     delete meta;
 }
@@ -100,33 +107,66 @@ static KeyAccess *
 buildTest(Connect * conn) {
     KeyAccess * am;
     am = new KeyAccess(conn);
-  
-    am->addEquals("u.uid","g.uid");
-    am->addAccess("u.uname","u.uid");
-    am->addEquals("m.uid","u.uid");
-    am->addAccess("m.uid","m.mess");
-    am->addAccess("u.uid","u.acc");
-    am->addAccess("g.uid","g.gid");
-    am->addEquals("g.gid","x.gid");
-    am->addAccess("f.gid","f.fid");
-    am->addAccess("x.gid","x.mailing_list");
-    am->addEquals("g.gid","f.gid");
-    am->addAccess("m.mess","m.sub");
-    am->addAccess("f.gid","u.acc");
-    am->addGives("u.uname");
-    am->addAccess("msgs.msgid", "msgs.msgtext");
-    am->addEquals("msgs.msgid","privmsgs.msgid");
-    am->addEquals("privmsgs.recid", "users.userid");
-    am->addAccess("privmsgs.recid", "privmsgs.msgid");
-    am->addAccess("privmsgs.senderid", "privmsgs.msgid");
-    am->addEquals("users.userid", "privmsgs.senderid");
-    am->addGives("users.username");
-    am->addAccess("users.username", "users.userid");
+
+    am->startPrinc("uname");
+    am->startPrinc("uid");
+    am->startPrinc("gid");
+    am->startPrinc("fid");
+    am->startPrinc("ml");
+    am->startPrinc("acc");
+    am->startPrinc("mid");
+    am->startPrinc("sub");
+
+    am->addToPrinc("u.uid","uid");
+    am->addToPrinc("g.uid","uid");
+    am->addToPrinc("u.uname","uname");
+
+    am->addSpeaksFor("uname","uid");
+
+    am->addToPrinc("m.uid","uid");
+    am->addToPrinc("m.mess","mid");
+    am->addToPrinc("u.acc","acc");
+    am->addToPrinc("g.gid","gid");
+
+    am->addSpeaksFor("uid","mid");
+    am->addSpeaksFor("uid","acc");
+    am->addSpeaksFor("uid","gid");
+
+    am->addToPrinc("x.gid","gid");
+    am->addToPrinc("f.gid","gid");
+    am->addToPrinc("f.fid","fid");
+    am->addToPrinc("x.mailing_list","ml");
+
+    am->addSpeaksFor("gid","fid");
+    am->addSpeaksFor("gid","ml");
+
+    am->addToPrinc("m.sub","sub");
+
+    am->addSpeaksFor("mid","sub");
+    am->addSpeaksFor("gid","acc");
+    am->addGives("uname");
+
+    am->startPrinc("msgid");
+    am->startPrinc("text");
+    am->startPrinc("user");
+    am->startPrinc("username");
+    am->addToPrinc("msgs.msgid","msgid");
+    am->addToPrinc("msgs.msgtext","text");
+    am->addSpeaksFor("msgid","text");
+    am->addToPrinc("privmsgs.msgid","msgid");
+    am->addToPrinc("privmsgs.recid","user");
+    am->addToPrinc("users.userid","user");
+    am->addSpeaksFor("user","msgid");
+    am->addToPrinc("privmsgs.senderid","user");
+    am->addSpeaksFor("user","msgid");
+    am->addToPrinc("users.username","username");
+    am->addGives("username");
+    am->addSpeaksFor("username", "user");
 
     secretA.resize(AES_KEY_BYTES);
     secretB.resize(AES_KEY_BYTES);
     secretC.resize(AES_KEY_BYTES);
-    
+
     assert_s(am->CreateTables() == 0, "could not create tables");
 
     return am;
@@ -179,12 +219,12 @@ testMeta(const TestConfig &tc, KeyAccess * am) {
     std::set<string> generic_gid = am->getEquals("g.gid");
     record(tc, generic_gid.find("f.gid") != generic_gid.end(), test+"f.gid not in getEquals(g.gid)");
     record(tc, generic_gid.find("x.gid") != generic_gid.end(), test+"x.gid not in getEquals(g.gid)");
-    
+
     std::set<string> generic_uid = am->getEquals("m.uid");
     record(tc, generic_uid.find("u.uid") != generic_uid.end(), test+"u.uid not in getEquals(m.uid)");
     record(tc, generic_uid.find("g.uid") != generic_uid.end(), test+"g.uid not in getEquals(m.uid)");
     record(tc, generic_uid.find("f.gid") == generic_uid.end(), test+"m.uid in getEquals(f.gid)");
-    
+
     std::set<string> gid_hasAccessTo = am->getTypesHasAccessTo("g.gid");
     record(tc, gid_hasAccessTo.find("f.fid") != gid_hasAccessTo.end(), test+"g.gid does not have access to f.fid");
     record(tc, gid_hasAccessTo.find("x.mailing_list") != gid_hasAccessTo.end(),test+"g.gid does not have access to x.mailing_list");
@@ -195,7 +235,7 @@ testMeta(const TestConfig &tc, KeyAccess * am) {
     record(tc, gid_hasAccessTo.find(
                 "g.gid") == gid_hasAccessTo.end(),
      test+"getTypesHasAccessTo(g.gid) includes g.gid");
-    
+
     std::set<string> mess_accessibleFrom = am->getTypesAccessibleFrom("m.mess");
     record(tc, mess_accessibleFrom.find(
                     "m.uid") != mess_accessibleFrom.end(),
@@ -212,24 +252,21 @@ testMeta(const TestConfig &tc, KeyAccess * am) {
     record(tc, mess_accessibleFrom.find(
                     "u.uname") == mess_accessibleFrom.end(),
        test+"m.mess is accessible from u.uname in one link");
-    
+
     std::set<string> acc_accessibleFrom = am->getGenAccessibleFrom(
-                                   am->getGeneric("u.acc"));
-    record(tc, acc_accessibleFrom.find(am->getGeneric(
+                                   am->getPrincType("u.acc"));
+    record(tc, acc_accessibleFrom.find(am->getPrincType(
                           "u.uid")) != acc_accessibleFrom.end(),
        test+"gen acc is not accessible from gen uid");
-    record(tc, acc_accessibleFrom.find(am->getGeneric(
+    record(tc, acc_accessibleFrom.find(am->getPrincType(
                           "g.gid")) != acc_accessibleFrom.end(),
        test+"gen acc is not accessible from gen gid");
-    record(tc, acc_accessibleFrom.find(am->getGeneric(
+    record(tc, acc_accessibleFrom.find(am->getPrincType(
                           "f.fid")) == acc_accessibleFrom.end(),
        test+"gen acc is accessible from gen fid");
-    
-    list<string> bfs = am->BFS_hasAccess(alice);
+
+    list<Prin> bfs = am->BFS_hasAccess(alice);
     list<string> dfs = am->DFS_hasAccess(alice);
-    
-    record(tc, bfs.size() == dfs.size(), test + "bfs and dfs have different sizes");
-    
 }
 
 static void
@@ -316,7 +353,7 @@ testMultiBasic(const TestConfig &tc, KeyAccess * am) {
        test+"mailing list work key is not the same for bob as it was for alice");
 }
 
-static void
+/*static void
 testMetaAlterations(const TestConfig &tc, KeyAccess *am) {
     string test = "(meta changes) ";
     buildAll(am);
@@ -327,13 +364,13 @@ testMetaAlterations(const TestConfig &tc, KeyAccess *am) {
     record(tc, am->getKey(m5).length() == 0, test + "ml5 key accessible with no one online!");
 
     record(tc, am->addEquals("g.gid","m.mess") < 0, test + "illegal equality (gave access to previously inaccesible keys) was added");
-    
+
     record(tc, am->addGives("u.c") == 0, test + "add gives failed");
     record(tc, am->addEquals("u.uid", "u.c") == 0, test + "add equality failed (case 4)");
-    
+
     record(tc, am->addAccess("u.uid", "f.fid") == 0, test + "add access failed");
     record(tc, am->addAccess("new.thing","m.mess") < 0, test + "illegal access (new principal would break the access tree) was added");
-    
+
     //check that meta is still correctly structured
     record(tc, am->getGeneric("u.user") == am->getGeneric("u.uid"), test + "u.user and u.uid should have the same generic");
     record(tc, am->getGeneric("x.mailing_list") == am->getGeneric("m.mess"), test + "mailing_list and m.mess should have the same generic");
@@ -352,7 +389,7 @@ testMetaAlterations(const TestConfig &tc, KeyAccess *am) {
     record(tc, am->getKey(mlwork).length() > 0, test+"alice can't access mlwork");
     record(tc, am->getKey(u2).length() == 0, test+"alice can access u2");
     record(tc, am->getKey(m3).length() == 0, test+"alice can access m3");
-    record(tc, am->getKey(s16).length() == 0, test+"alice can access s16");   
+    record(tc, am->getKey(s16).length() == 0, test+"alice can access s16");
     record(tc, am->getKey(s6).length() > 0, test+"alice can't access s6 (orphan)");
     am->removePsswd(alice);
 
@@ -380,9 +417,9 @@ testMetaAlterations(const TestConfig &tc, KeyAccess *am) {
     record(tc, am->getKey(s5).length() == 0, test+"chris can access s5");
     record(tc, am->getKey(mlwork).length() == 0, test+"chris can access mlwork");
     am->removePsswd(chris);
-}
+    }*/
 
-    
+
 
 
 static void
@@ -428,7 +465,7 @@ testOrphans(const TestConfig &tc, KeyAccess * am) {
        test+"m2 key is available when bob is logged off");
     record(tc, (am->getKey(s6)).length() == 0,
        test+"s6 key is available when bob is logged off");
-    
+
     am->insertPsswd(bob,secretB);
     record(tc, (am->getKey(s6)).length() > 0,
        test+"s6 key is not available when bob is logged on");
@@ -458,8 +495,8 @@ testOrphans(const TestConfig &tc, KeyAccess * am) {
     string s4_key3 = marshallBinary(am->getKey(s4));
     string m3_key3 = marshallBinary(am->getKey(m3));
     record(tc, s4_key1.compare(s4_key3) == 0, test+"s4 key does not match 1v3");
-    record(tc, m3_key1.compare(m3_key3) == 0, test+"m3 key does not match 1v3"); 
-    
+    record(tc, m3_key1.compare(m3_key3) == 0, test+"m3 key does not match 1v3");
+
     am->insert(m4,s6);
     record(tc, (am->getKey(m4)).length() > 0, test+"m4 key does not exist as orphan");
     record(tc, (am->getKey(s6)).length() > 0, test+"s6 key does not exist as orphan AND as accessible by bob");
@@ -590,6 +627,8 @@ testRemove(const TestConfig &tc, KeyAccess * am) {
     buildAll(am);
     string m4_key = am->getKey(m4);
     record(tc, m4_key.length() > 0, test+"message 4 key (orphan) not available first");
+
+    //bob
     am->insertPsswd(bob,secretB);
     string s4_key = am->getKey(s4);
     record(tc, s4_key.length() > 0, test+"cannot access subject 4 key with bob logged on");
@@ -623,6 +662,7 @@ testRemove(const TestConfig &tc, KeyAccess * am) {
     string a5_key1 = marshallBinary(a5_key);
     string u1_key = am->getKey(u1);
     record(tc, u1_key.length() == 0, test+"user 1 key available when Alice not logged on");
+    //alice, bob
     am->insertPsswd(alice,secretA);
     m4_key = am->getKey(m4);
     record(tc, m4_key.length() > 0, test+"message 4 key (orphan) not available 2");
@@ -663,6 +703,7 @@ testRemove(const TestConfig &tc, KeyAccess * am) {
     m4_key = am->getKey(m4);
     record(tc, m4_key.length() > 0, test+"message 4 key (orphan) not available 3");
 
+    //bob
     am->removePsswd(alice);
     g5_key = am->getKey(g5);
     record(tc, g5_key.length() == 0, test+"group 5 key available when alice is logged off");
@@ -675,6 +716,7 @@ testRemove(const TestConfig &tc, KeyAccess * am) {
     m4_key = am->getKey(m4);
     record(tc, m4_key.length() > 0, test+"message 4 key (orphan) not available 4");
 
+    //bob, chris
     am->insertPsswd(chris, secretC);
     string s24_key = am->getKey(s24);
     record(tc, s24_key.length() > 0, test+"subject 24 key is not accessible with chris logged on");
@@ -702,6 +744,7 @@ testRemove(const TestConfig &tc, KeyAccess * am) {
 
 
     am->remove(g5,f3);
+    //alice, bob, chris
     am->insertPsswd(alice, secretA);
     g5_key = am->getKey(g5);
     record(tc, g5_key.length() > 0, test+"cannot access group 5 key with alice logged on");
@@ -719,6 +762,7 @@ testRemove(const TestConfig &tc, KeyAccess * am) {
     f3_key = am->getKey(f3);
     record(tc, f3_key.length() == 0, test+"forum 3 key available when alice is logged off");
 
+    //alice, chris
     am->removePsswd(bob);
     s6_key = am->getKey(s6);
     record(tc, s6_key.length() > 0, test+"subject 6 key, attached to orphan m4 not accessible");
@@ -794,7 +838,7 @@ TestAccessManager::run(const TestConfig &tc, int argc, char ** argv)
 
     KeyAccess * ka;
     ka = buildTest(new Connect(tc.host, tc.user, tc.pass, tc.db));
-    
+
     cerr << "testing meta section of KeyAccess..." << endl;
     testMeta(tc, ka);
 
@@ -805,12 +849,12 @@ TestAccessManager::run(const TestConfig &tc, int argc, char ** argv)
     ka = buildTest(new Connect(tc.host, tc.user, tc.pass, tc.db));
     cerr << "multi user tests..." << endl;
     testMultiBasic(tc, ka);
-  
+
     delete ka;
     ka = buildTest(new Connect(tc.host, tc.user, tc.pass, tc.db));
     cerr << "acyclic graphs (not a tree) tests..." << endl;
     testNonTree(tc, ka);
-    
+
     ka->~KeyAccess();
     ka = buildTest(new Connect(tc.host, tc.user, tc.pass, tc.db));
     cerr << "orphan tests..." << endl;
@@ -826,13 +870,13 @@ TestAccessManager::run(const TestConfig &tc, int argc, char ** argv)
     cerr << "threshold tests... (this may take a while)" << endl;
     testThreshold(tc, ka);
 
-    ka->~KeyAccess();
+    /*ka->~KeyAccess();
     ka = buildTest(new Connect(tc.host, tc.user, tc.pass, tc.db));
     cerr << "altering meta post data intertion tests..." << endl;
-    testMetaAlterations(tc, ka);
+    testMetaAlterations(tc, ka);*/
 
     cerr << "RESULT: " << npass << "/" << ntest << " passed" << endl;
 
     delete ka;
 }
-  
+

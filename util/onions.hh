@@ -1,64 +1,91 @@
 #pragma once
 
 #include <string>
+#include <map>
+#include <list>
+#include <iostream>
+#include <vector>
 
-typedef enum fieldType {
-    TYPE_TEXT,
-    TYPE_INTEGER,
-    TYPE_AGG_RESULT_COUNT,
-    TYPE_AGG_RESULT_SUM,
-    TYPE_AGG_RESULT_SET,
-    TYPE_OPE,
-} fieldType;
 
 typedef enum onion {
     oDET,
     oOPE,
     oAGG,
-    oNONE,
     oSWP,
+    oPLAIN,
+    oBESTEFFORT,
+    oWAIT,
     oINVALID,
 } onion;
 
-#define SECLEVELS(m)    \
-    m(INVALID)          \
-    m(PLAIN)            \
-    m(PLAIN_DET)        \
-    m(DETJOIN)          \
-    m(DET)              \
-    m(SEMANTIC_DET)     \
-    m(PLAIN_OPE)        \
-    m(OPEJOIN)          \
-    m(OPE)              \
-    m(SEMANTIC_OPE)     \
-    m(PLAIN_AGG)        \
-    m(SEMANTIC_AGG)     \
-    m(PLAIN_SWP)        \
-    m(SWP)              \
-    m(SEMANTIC_VAL)     \
-    m(SECLEVEL_LAST)
+//Sec levels ordered such that
+// if a is less secure than b.
+// a appears before b
+// (note, this is not "iff")
 
-typedef enum class SECLEVEL {
-#define __temp_m(n) n,
-SECLEVELS(__temp_m)
-#undef __temp_m
-} SECLEVEL;
-
-const std::string levelnames[] = {
-#define __temp_m(n) #n,
-SECLEVELS(__temp_m)
-#undef __temp_m
+enum class SECLEVEL {
+    INVALID,
+    BLOCKING,
+    PLAINVAL,
+    OPE,
+    DETJOIN,
+    DET,
+    SEARCH,
+    HOM,
+    RND,
 };
 
-inline SECLEVEL string_to_sec_level(const std::string &s)
-{
-#define __temp_m(n) if (s == #n) return SECLEVEL::n;
-SECLEVELS(__temp_m)
-#undef __temp_m
-    // TODO: possibly raise an exception
-    return SECLEVEL::INVALID;
-}
+bool needsSalt(SECLEVEL l);
 
-//returns max and min levels on onion o
-SECLEVEL getMax(onion o);
-SECLEVEL getMin(onion o);
+//Onion layouts - initial structure of onions
+typedef std::map<onion, std::vector<SECLEVEL> > onionlayout;
+
+static onionlayout PLAIN_ONION_LAYOUT = {
+    {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL})}
+};
+
+static onionlayout NUM_ONION_LAYOUT = {
+    {oDET, std::vector<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET,
+                                  SECLEVEL::RND})},
+    {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
+    {oAGG, std::vector<SECLEVEL>({SECLEVEL::HOM})}
+};
+
+static onionlayout BEST_EFFORT_NUM_ONION_LAYOUT = {
+    {oDET, std::vector<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET,
+                                  SECLEVEL::RND})},
+    {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
+    {oAGG, std::vector<SECLEVEL>({SECLEVEL::HOM})},
+    // Requires SECLEVEL::DET, otherwise you will have to implement
+    // encoding for negative numbers in SECLEVEL::RND.
+    {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL, SECLEVEL::DET,
+                                    SECLEVEL::RND})},
+    {oWAIT, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL,
+                                   SECLEVEL::BLOCKING})}
+};
+
+static onionlayout STR_ONION_LAYOUT = {
+    {oDET, std::vector<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET,
+                                  SECLEVEL::RND})},
+    {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
+    // {oSWP, std::vector<SECLEVEL>({SECLEVEL::SEARCH})}
+    // {oSWP, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL, SECLEVEL::DET,
+                                  // SECLEVEL::RND})}
+};
+
+static onionlayout BEST_EFFORT_STR_ONION_LAYOUT = {
+    {oDET, std::vector<SECLEVEL>({SECLEVEL::DETJOIN, SECLEVEL::DET,
+                                  SECLEVEL::RND})},
+    {oOPE, std::vector<SECLEVEL>({SECLEVEL::OPE, SECLEVEL::RND})},
+    // {oSWP, std::vector<SECLEVEL>({SECLEVEL::SEARCH})},
+    // {oSWP, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL, SECLEVEL::DET,
+    //                              SECLEVEL::RND})},
+    // HACK: RND_str expects the data to be a multiple of 16, so we use
+    // DET (it supports decryption UDF) to handle the padding for us.
+    {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL, SECLEVEL::DET,
+                                    SECLEVEL::RND})}
+};
+
+typedef std::map<onion, SECLEVEL>  OnionLevelMap;
+
+enum class SECURITY_RATING {PLAIN, BEST_EFFORT, SENSITIVE};
