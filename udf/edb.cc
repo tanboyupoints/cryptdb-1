@@ -23,6 +23,8 @@
 
 #define DEBUG 1
 
+#include <memory>
+
 #include <crypto/BasicCrypto.hh>
 #include <crypto/blowfish.hh>
 #include <crypto/SWPSearch.hh>
@@ -40,54 +42,65 @@ typedef long long longlong;
 #include <mysql.h>
 #include <ctype.h>
 
-my_bool  decrypt_int_sem_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
-ulonglong decrypt_int_sem(UDF_INIT *initid, UDF_ARGS *args, char *is_null,
-                         char *error);
+my_bool decrypt_int_sem_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                             char *const message);
+ulonglong decrypt_int_sem(UDF_INIT *const initid, UDF_ARGS *const args,
+                          char *const is_null, char *const error);
 
+my_bool decrypt_int_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                              char *const message);
+ulonglong decrypt_int_det(UDF_INIT *const initid, UDF_ARGS *const args,
+                          char *const is_null, char *const error);
 
-my_bool  decrypt_int_det_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
-ulonglong decrypt_int_det(UDF_INIT *initid, UDF_ARGS *args, char *is_null,
-                         char *error);
+my_bool decrypt_text_sem_init(UDF_INIT *const initid,
+                              UDF_ARGS *const args, char *const message);
+void decrypt_text_sem_deinit(UDF_INIT *const initid);
+char *decrypt_text_sem(UDF_INIT *const initid, UDF_ARGS *const args,
+                       char *const result, unsigned long *const length,
+                       char *const is_null, char *const error);
 
-my_bool  decrypt_text_sem_init(UDF_INIT *initid, UDF_ARGS *args,
-                               char *message);
-void     decrypt_text_sem_deinit(UDF_INIT *initid);
-char *   decrypt_text_sem(UDF_INIT *initid, UDF_ARGS *args, char *result,
-                          unsigned long *length, char *is_null, char *error);
+my_bool encrypt_int_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                             char *const message);
+ulonglong encrypt_int_det(UDF_INIT *const initid, UDF_ARGS *const args,
+                          char *const is_null, char *const error);
 
-my_bool  encrypt_int_det_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
-ulonglong encrypt_int_det(UDF_INIT *initid, UDF_ARGS *args, char *is_null,
-                         char *error);
+my_bool decrypt_text_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                              char *const message);
+void decrypt_text_det_deinit(UDF_INIT *const initid);
+char *decrypt_text_det(UDF_INIT *const initid, UDF_ARGS *const args,
+                       char *const result, unsigned long *const length,
+                       char *const is_null, char *const error);
 
-my_bool  decrypt_text_det_init(UDF_INIT *initid, UDF_ARGS *args,
-                               char *message);
-void     decrypt_text_det_deinit(UDF_INIT *initid);
-char *   decrypt_text_det(UDF_INIT *initid, UDF_ARGS *args, char *result,
-                          unsigned long *length, char *is_null, char *error);
+my_bool search_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                    char *const message);
+ulonglong search(UDF_INIT *const initid, UDF_ARGS *const args,
+                 char *const is_null, char *const error);
 
-my_bool  search_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
-ulonglong search(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error);
+my_bool searchSWP_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                       char *const message);
+void searchSWP_deinit(UDF_INIT *const initid);
+ulonglong searchSWP(UDF_INIT *const initid, UDF_ARGS *const args,
+                    char *const is_null, char *const error);
 
-my_bool  searchSWP_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
-void     searchSWP_deinit(UDF_INIT *initid);
-ulonglong searchSWP(UDF_INIT *initid, UDF_ARGS *args, char *is_null,
-                   char *error);
+my_bool agg_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                 char *const message);
+void agg_deinit(UDF_INIT *const initid);
+void agg_clear(UDF_INIT *const initid, char *const is_null,
+               char *const error);
+my_bool agg_add(UDF_INIT *const initid, UDF_ARGS *const args,
+                char *const is_null, char *const error);
+char *agg(UDF_INIT *const initid, UDF_ARGS *const args,
+          char *const result, unsigned long *const length,
+          char *const is_null, char *const error);
 
-
-my_bool  agg_init(UDF_INIT *initid, UDF_ARGS *args, char *message);
-void     agg_deinit(UDF_INIT *initid);
-void     agg_clear(UDF_INIT *initid, char *is_null, char *error);
-my_bool  agg_add(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error);
-char *   agg(UDF_INIT *initid, UDF_ARGS *args, char *result,
-             unsigned long *length, char *is_null, char *error);
-
-void     func_add_set_deinit(UDF_INIT *initid);
-char *   func_add_set(UDF_INIT *initid, UDF_ARGS *args, char *result,
-                      unsigned long *length, char *is_null, char *error);
+void func_add_set_deinit(UDF_INIT *const initid);
+char *func_add_set(UDF_INIT *const initid, UDF_ARGS *const args,
+                   char *const result, unsigned long *const length,
+                   char *const is_null, char *const error);
 }
 
 static void __attribute__((unused))
-log(std::string s)
+log(const std::string &s)
 {
     /* Writes to the server's error log */
     fprintf(stderr, "%s\n", s.c_str());
@@ -95,27 +108,30 @@ log(std::string s)
 
 
 static std::string
-decrypt_SEM(unsigned char *eValueBytes, uint64_t eValueLen,
-            AES_KEY * aesKey, uint64_t salt)
+decrypt_SEM(const unsigned char *const eValueBytes, uint64_t eValueLen,
+            AES_KEY *const aesKey, uint64_t salt)
 {
-    std::string c((char *) eValueBytes, (unsigned int) eValueLen);
-    return decrypt_AES_CBC(c, aesKey, BytesFromInt(salt, SALT_LEN_BYTES), false);
+    std::string c(reinterpret_cast<const char *>(eValueBytes),
+                  static_cast<unsigned int>(eValueLen));
+    return decrypt_AES_CBC(c, aesKey, BytesFromInt(salt, SALT_LEN_BYTES),
+                           false);
 }
 
 
-static std::list<std::string> *
-split(const std::string & s, unsigned int plen)
+static std::unique_ptr<std::list<std::string>>
+split(const std::string &s, unsigned int plen)
 {
-    unsigned int len = s.length();
+    const unsigned int len = s.length();
     if (len % plen != 0) {
         thrower() << "split receives invalid input";
     }
 
-    unsigned int num = len / plen;
-    std::list<std::string> * res = new std::list<std::string>();
+    const unsigned int num = len / plen;
+    std::unique_ptr<std::list<std::string>>
+        res(new std::list<std::string>());
 
     for (unsigned int i = 0; i < num; i++) {
-        res->push_back(s.substr(i*plen, plen));
+        res.get()->push_back(s.substr(i*plen, plen));
     }
 
     return res;
@@ -123,17 +139,16 @@ split(const std::string & s, unsigned int plen)
 
 
 static bool
-searchExists(const Token & token, const std::string & overall_ciph)
+searchExists(const Token &token, const std::string &overall_ciph)
 {
-    auto l = split(overall_ciph, SWPCiphSize);
-    bool r = SWP::searchExists(token, *l);
-    delete l;
-    return r;
+    const std::unique_ptr<std::list<std::string>>
+        l(split(overall_ciph, SWPCiphSize));
+    return SWP::searchExists(token, *l.get());
 }
 
 
 static bool
-search(const Token & token, const std::string & overall_ciph)
+search(const Token &token, const std::string &overall_ciph)
 {
    return searchExists(token, overall_ciph);
 }
@@ -143,13 +158,13 @@ search(const Token & token, const std::string & overall_ciph)
 #define ARGS args
 
 static uint64_t
-getui(UDF_ARGS * args, int i)
+getui(UDF_ARGS *const args, int i)
 {
-    return (uint64_t) (*((ulonglong *) args->args[i]));
+    return static_cast<uint64_t>(*reinterpret_cast<ulonglong *>(args->args[i]));
 }
 
 static char *
-getba(UDF_ARGS * args, int i, uint64_t &len)
+getba(UDF_ARGS *const args, int i, uint64_t &len)
 {
     len = args->lengths[i];
     return args->args[i];
@@ -168,16 +183,16 @@ getui(ARGS, int i)
 static unsigned char
 getb(ARGS, int i)
 {
-    return (unsigned char)PG_GETARG_INT32(i);
+    return static_cast<unsigned char>(PG_GETARG_INT32(i));
 }
 
 static unsigned char *
-getba(ARGS, int i, unsigned int & len)
+getba(ARGS, int i, unsigned int &len)
 {
-    bytea * eValue = PG_GETARG_BYTEA_P(i);
+    bytea *const eValue = PG_GETARG_BYTEA_P(i);
 
     len = VARSIZE(eValue) - VARHDRSZ;
-    unsigned char * eValueBytes = new unsigned char[len];
+    unsigned char *const  eValueBytes = new unsigned char[len];
     memcpy(eValueBytes, VARDATA(eValue), len);
     return eValueBytes;
 }
@@ -188,29 +203,31 @@ extern "C" {
 
 #if MYSQL_S
 my_bool
-decrypt_int_sem_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
+decrypt_int_sem_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                     char *const message)
 {
     initid->maybe_null = 1;
     return 0;
 }
 
 ulonglong
-decrypt_int_sem(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
+decrypt_int_sem(UDF_INIT *const initid, UDF_ARGS *const args,
+                char *const is_null, char *const error)
 #else /*postgres*/
 Datum
 decrypt_int_sem(PG_FUNCTION_ARGS)
 #endif
 {
-    uint64_t value;
+    AssignOnce<uint64_t> value;
     if (NULL == ARGS->args[0]) {
         value = 0;
         *is_null = 1;
     } else {
-        uint64_t eValue = getui(ARGS, 0);
+        const uint64_t eValue = getui(ARGS, 0);
 
         uint64_t keyLen;
-        char * keyBytes = getba(args, 1, keyLen);
-        std::string key = std::string(keyBytes, keyLen);
+        char *const keyBytes = getba(args, 1, keyLen);
+        const std::string key = std::string(keyBytes, keyLen);
 
         uint64_t salt = getui(args, 2);
 
@@ -222,9 +239,9 @@ decrypt_int_sem(PG_FUNCTION_ARGS)
 
 
 #if MYSQL_S
-     return (ulonglong) value;
+     return static_cast<ulonglong>(value.get());
 #else /* postgres */
-    PG_RETURN_INT64(value);
+    PG_RETURN_INT64(value.get());
 #endif
 }
 
@@ -232,31 +249,33 @@ decrypt_int_sem(PG_FUNCTION_ARGS)
 
 #if MYSQL_S
 my_bool
-decrypt_int_det_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
+decrypt_int_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                     char *const message)
 {
     initid->maybe_null = 1;
     return 0;
 }
 
 ulonglong
-decrypt_int_det(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
+decrypt_int_det(UDF_INIT *const initid, UDF_ARGS *const args,
+                char *const is_null, char *const error)
 #else /* postgres */
 Datum
 decrypt_int_det(PG_FUNCTION_ARGS)
 #endif
 {
-    uint64_t value;
+    AssignOnce<uint64_t> value;
     if (NULL == ARGS->args[0]) {
         value = 0;
         *is_null = 1;
     } else {
-        uint64_t eValue = getui(ARGS, 0);
+        const uint64_t eValue = getui(ARGS, 0);
 
         uint64_t keyLen;
-        char * keyBytes = getba(args, 1, keyLen);
-        std::string key = std::string(keyBytes, keyLen);
+        char *const keyBytes = getba(args, 1, keyLen);
+        const std::string key = std::string(keyBytes, keyLen);
 
-        uint64_t shift = getui(ARGS, 2);
+        const uint64_t shift = getui(ARGS, 2);
 
         blowfish bf(key);
         value = bf.decrypt(eValue) - shift;
@@ -264,9 +283,9 @@ decrypt_int_det(PG_FUNCTION_ARGS)
 
 
 #if MYSQL_S
-    return (ulonglong) value;
+    return static_cast<ulonglong>(value.get());
 #else /* postgres */
-    PG_RETURN_INT64(value);
+    PG_RETURN_INT64(value.get());
 #endif
 
 }
@@ -274,14 +293,15 @@ decrypt_int_det(PG_FUNCTION_ARGS)
 
 
 my_bool
-decrypt_text_sem_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
+decrypt_text_sem_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                      char *const message)
 {
     initid->maybe_null = 1;
     return 0;
 }
 
 void
-decrypt_text_sem_deinit(UDF_INIT *initid)
+decrypt_text_sem_deinit(UDF_INIT *const initid)
 {
     /*
      * in mysql-server/sql/item_func.cc, udf_handler::fix_fields
@@ -292,65 +312,69 @@ decrypt_text_sem_deinit(UDF_INIT *initid)
 }
 
 char *
-decrypt_text_sem(UDF_INIT *initid, UDF_ARGS *args,
-                 char *result, unsigned long *length,
-                 char *is_null, char *error) {
-    std::string value;
+decrypt_text_sem(UDF_INIT *const initid, UDF_ARGS *const args,
+                 char *const result, unsigned long *const length,
+                 char *const is_null, char *const error)
+{
+    AssignOnce<std::string> value;
     if (NULL == ARGS->args[0]) {
         value = "";
         *is_null = 1;
     } else {
         uint64_t eValueLen;
-        char *eValueBytes = getba(args, 0, eValueLen);
+        char *const eValueBytes = getba(args, 0, eValueLen);
 
         uint64_t keyLen;
-        char * keyBytes = getba(args, 1, keyLen);
-        std::string key = std::string(keyBytes, keyLen);
+        char *const keyBytes = getba(args, 1, keyLen);
+        const std::string key = std::string(keyBytes, keyLen);
 
         uint64_t salt = getui(ARGS, 2);
 
-        AES_KEY *aesKey = get_AES_dec_key(key);
-        value = decrypt_SEM((unsigned char *)eValueBytes, eValueLen, aesKey, salt);
-        delete aesKey;
+        const std::unique_ptr<AES_KEY> aesKey(get_AES_dec_key(key));
+        value =
+            decrypt_SEM(reinterpret_cast<unsigned char *>(eValueBytes),
+                        eValueLen, aesKey.get(), salt);
     }
 
     // NOTE: This is not creating a proper C string, no guarentee of NUL
     // termination.
-    char * res = new char[value.length()];
+    char *const res = new char[value.get().length()];
     initid->ptr = res;
-    memcpy(res, value.data(), value.length());
-    *length =  value.length();
+    memcpy(res, value.get().data(), value.get().length());
+    *length = value.get().length();
 
-    return (char*) initid->ptr;
+    return static_cast<char*>(initid->ptr);
 }
 
 
 
 #if MYSQL_S
 my_bool
-encrypt_int_det_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
+encrypt_int_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                     char *const message)
 {
     return 0;
 }
 
 ulonglong
-encrypt_int_det(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
+encrypt_int_det(UDF_INIT *const initid, UDF_ARGS *const args,
+                char *const is_null, char *const error)
 #else /* postgres */
 Datum
 decrypt_int_det(PG_FUNCTION_ARGS)
 #endif
 {
-    uint64_t eValue = getui(ARGS, 0);
+    const uint64_t eValue = getui(ARGS, 0);
 
     uint64_t keyLen;
-    char * keyBytes = getba(args, 1, keyLen);
-    std::string key = std::string(keyBytes, keyLen);
+    char *const keyBytes = getba(args, 1, keyLen);
+    const std::string key = std::string(keyBytes, keyLen);
 
     blowfish bf(key);
-    uint64_t value = bf.encrypt(eValue);
+    const uint64_t value = bf.encrypt(eValue);
 
 #if MYSQL_S
-    return (ulonglong) value;
+    return static_cast<ulonglong>(value);
 #else /* postgres */
     PG_RETURN_INT64(value);
 #endif
@@ -360,13 +384,14 @@ decrypt_int_det(PG_FUNCTION_ARGS)
 
 #if MYSQL_S
 my_bool
-decrypt_text_det_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
+decrypt_text_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                      char *const message)
 {
     return 0;
 }
 
 void
-decrypt_text_det_deinit(UDF_INIT *initid)
+decrypt_text_det_deinit(UDF_INIT *const initid)
 {
     /*
      * in mysql-server/sql/item_func.cc, udf_handler::fix_fields
@@ -377,35 +402,35 @@ decrypt_text_det_deinit(UDF_INIT *initid)
 }
 
 char *
-decrypt_text_det(UDF_INIT *initid, UDF_ARGS *args,
-                 char *result, unsigned long *length,
-                 char *is_null, char *error)
+decrypt_text_det(UDF_INIT *const initid, UDF_ARGS *const args,
+                 char *const result, unsigned long *const length,
+                 char *const is_null, char *const error)
 #else /* postgres */
 Datum
 decrypt_text_det(PG_FUNCTION_ARGS)
 #endif
 {
-     uint64_t eValueLen;
-    char *eValueBytes = getba(args, 0, eValueLen);
+    uint64_t eValueLen;
+    char *const eValueBytes = getba(args, 0, eValueLen);
 
     uint64_t keyLen;
-    char *keyBytes = getba(args, 1, keyLen);
-    std::string key = std::string(keyBytes, keyLen);
+    char *const keyBytes = getba(args, 1, keyLen);
+    const std::string key = std::string(keyBytes, keyLen);
 
-    AES_KEY * aesKey = get_AES_dec_key(key);
-    std::string value =
-        decrypt_AES_CMC(std::string(eValueBytes, (unsigned int)eValueLen),
-                        aesKey, false);
-    delete aesKey;
+    const std::unique_ptr<AES_KEY> aesKey(get_AES_dec_key(key));
+    const std::string value =
+        decrypt_AES_CMC(std::string(eValueBytes,
+                                    static_cast<unsigned int>(eValueLen)),
+                        aesKey.get(), false);
 
 #if MYSQL_S
-    char * res = new char[value.length()];
+    char *const res = new char[value.length()];
     initid->ptr = res;
     memcpy(res, value.data(), value.length());
-    *length =  value.length();
-    return (char*) initid->ptr;
+    *length = value.length();
+    return initid->ptr;
 #else
-    bytea * res = (bytea *) palloc(eValueLen+VARHDRSZ);
+    bytea *const res = (bytea *) palloc(eValueLen+VARHDRSZ);
     SET_VARSIZE(res, eValueLen+VARHDRSZ);
     memcpy(VARDATA(res), value, eValueLen);
     PG_RETURN_BYTEA_P(res);
@@ -423,29 +448,31 @@ decrypt_text_det(PG_FUNCTION_ARGS)
 
 #if MYSQL_S
 my_bool
-search_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
+search_init(UDF_INIT *const initid, UDF_ARGS *const args,
+            char *const message)
 {
     return 0;
 }
 
 
 ulonglong
-search(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
+search(UDF_INIT *const initid, UDF_ARGS *const args, char *const is_null,
+       char *const error)
 #else
 Datum
 search(PG_FUNCTION_ARGS)
 #endif
 {
     uint64_t wordLen;
-    char * word = (char *)getba(ARGS, 0, wordLen);
-    if (wordLen != (unsigned int)word[0]) {
+    char *word = getba(ARGS, 0, wordLen);
+    if (wordLen != static_cast<unsigned int>(word[0])) {
         std::cerr << "ERR: wordLen is not equal to fist byte of word!!! ";
     }
     word = word + 1;     // +1 skips over the length field
     //cerr << "given expr to search for has " << wordLen << " length \n";
 
     uint64_t fieldLen;
-    char *field = (char *) getba(ARGS, 1, fieldLen);
+    char *const field = getba(ARGS, 1, fieldLen);
 
     //cerr << "searching for "; myPrint((unsigned char *)word, wordLen); cerr
     // << " in field "; myPrint((unsigned char *)field, fieldLen); cerr <<
@@ -453,7 +480,7 @@ search(PG_FUNCTION_ARGS)
 
     unsigned int i = 0;
     while (i < fieldLen) {
-        unsigned int currLen = (unsigned int)field[i];
+        const unsigned int currLen = static_cast<unsigned int>(field[i]);
         if (currLen != wordLen) {
             i = i + currLen+1;
             continue;
@@ -488,39 +515,41 @@ search(PG_FUNCTION_ARGS)
 //TODO: write a version of search for postgres
 
 my_bool
-searchSWP_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
+searchSWP_init(UDF_INIT *const initid, UDF_ARGS *const args,
+               char *const message)
 {
-    Token * t = new Token();
+    Token *const t = new Token();
 
     uint64_t ciphLen;
-    char *ciph = getba(args, 1, ciphLen);
+    char *const ciph = getba(args, 1, ciphLen);
 
     uint64_t wordKeyLen;
-    char *wordKey = getba(args, 2, wordKeyLen);
+    char *const wordKey = getba(args, 2, wordKeyLen);
 
     t->ciph = std::string(ciph, ciphLen);
     t->wordKey = std::string(wordKey, wordKeyLen);
 
-    initid->ptr = (char *) t;
+    initid->ptr = reinterpret_cast<char *>(t);
 
     return 0;
 }
 
 void
-searchSWP_deinit(UDF_INIT *initid)
+searchSWP_deinit(UDF_INIT *const initid)
 {
-    Token *t = (Token *) initid->ptr;
+    Token *const t = reinterpret_cast<Token *>(initid->ptr);
     delete t;
 }
 
 ulonglong
-searchSWP(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
+searchSWP(UDF_INIT *const initid, UDF_ARGS *const args,
+          char *const is_null, char *const error)
 {
     uint64_t allciphLen;
-    char * allciph = getba(ARGS, 0, allciphLen);
-    std::string overallciph = std::string(allciph, allciphLen);
+    char *const allciph = getba(ARGS, 0, allciphLen);
+    const std::string overallciph = std::string(allciph, allciphLen);
 
-    Token * t = (Token *) initid->ptr;
+    Token *const t = reinterpret_cast<Token *>(initid->ptr);
 
     return search(*t, overallciph);
 }
@@ -538,50 +567,53 @@ struct agg_state {
 };
 
 my_bool
-agg_init(UDF_INIT *initid, UDF_ARGS *args, char *message)
+agg_init(UDF_INIT *const initid, UDF_ARGS *const args, char *const message)
 {
     std::cerr << "in agg_init \n";
-    agg_state *as = new agg_state();
+    agg_state *const as = new agg_state();
     as->rbuf = malloc(Paillier_len_bytes);
-    initid->ptr = (char *) as;
+    initid->ptr = reinterpret_cast<char *>(as);
     initid->maybe_null = 1;
     std::cerr << "returning from agg_init \n";
     return 0;
 }
 
 void
-agg_deinit(UDF_INIT *initid)
+agg_deinit(UDF_INIT *const initid)
 {
-    agg_state *as = (agg_state *) initid->ptr;
+    agg_state *const as = reinterpret_cast<agg_state *>(initid->ptr);
     free(as->rbuf);
     delete as;
 }
 
 void
-agg_clear(UDF_INIT *initid, char *is_null, char *error)
+agg_clear(UDF_INIT *const initid, char *const is_null, char *const error)
 {
-    agg_state *as = (agg_state *) initid->ptr;
+    agg_state *const as = reinterpret_cast<agg_state *>(initid->ptr);
     as->sum = to_ZZ(1);
     as->n2_set = 0;
 }
 
 //args will be element to add, constant N2
 my_bool
-agg_add(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
+agg_add(UDF_INIT *const initid, UDF_ARGS *const args, char *const is_null,
+        char *const error)
 {
     //cerr << "in agg_add \n";
-    agg_state *as = (agg_state *) initid->ptr;
+    agg_state *const as = reinterpret_cast<agg_state *>(initid->ptr);
     if (!as->n2_set) {
-	//cerr << "n2 length is " << args->lengths[1] << "\n";
-	//cerr << "n2 first byte is " << (int)args->args[1][0] << "\n";
-	ZZFromBytes(as->n2, (const uint8_t *) args->args[1],
-                        args->lengths[1]);
-	//cerr << "n2 is " << as->n2 << "\n";
+        //cerr << "n2 length is " << args->lengths[1] << "\n";
+        //cerr << "n2 first byte is " << (int)args->args[1][0] << "\n";
+        ZZFromBytes(as->n2,
+                    reinterpret_cast<const uint8_t *>(args->args[1]),
+                    args->lengths[1]);
+        //cerr << "n2 is " << as->n2 << "\n";
         as->n2_set = 1;
     }
 
     ZZ e;
-    ZZFromBytes(e, (const uint8_t *) args->args[0], args->lengths[0]);
+    ZZFromBytes(e, reinterpret_cast<const uint8_t *>(args->args[0]),
+                args->lengths[0]);
 
     //cerr << "element to add " << e << "\n";
     MulMod(as->sum, as->sum, e, as->n2);
@@ -590,34 +622,34 @@ agg_add(UDF_INIT *initid, UDF_ARGS *args, char *is_null, char *error)
 }
 
 char *
-agg(UDF_INIT *initid, UDF_ARGS *args, char *result,
-    unsigned long *length, char *is_null, char *error)
+agg(UDF_INIT *const initid, UDF_ARGS *const args, char *const result,
+    unsigned long *const length, char *const is_null, char *const error)
 {
-    agg_state *as = (agg_state *) initid->ptr;
-    BytesFromZZ((uint8_t *) as->rbuf, as->sum,
-                 Paillier_len_bytes);
+    agg_state *const as = reinterpret_cast<agg_state *>(initid->ptr);
+    BytesFromZZ(static_cast<uint8_t *>(as->rbuf), as->sum,
+                Paillier_len_bytes);
     *length = Paillier_len_bytes;
-    return (char *) as->rbuf;
+    return static_cast<char *>(as->rbuf);
 }
 
 // for update with increment
 
 void
-func_add_set_deinit(UDF_INIT *initid)
+func_add_set_deinit(UDF_INIT *const initid)
 {
     if (initid->ptr)
         free(initid->ptr);
 }
 
 char *
-func_add_set(UDF_INIT *initid, UDF_ARGS *args,
-             char *result, unsigned long *length,
-             char *is_null, char *error)
+func_add_set(UDF_INIT *const initid, UDF_ARGS *const args,
+             char *const result, unsigned long *const length,
+             char *const is_null, char *const error)
 {
     if (initid->ptr)
         free(initid->ptr);
 
-    uint64_t out_len;
+    AssignOnce<uint64_t> out_len;
     ZZ res;
     if (NULL == ARGS->args[0]) {
         out_len = 0;
@@ -627,18 +659,23 @@ func_add_set(UDF_INIT *initid, UDF_ARGS *args,
         out_len = args->lengths[2];
 
         ZZ field, val, n2;
-        ZZFromBytes(field, (const uint8_t *) args->args[0], args->lengths[0]);
-        ZZFromBytes(val, (const uint8_t *) args->args[1], args->lengths[1]);
-        ZZFromBytes(n2, (const uint8_t *) args->args[2], args->lengths[2]);
+        ZZFromBytes(field,
+                    reinterpret_cast<const uint8_t *>(args->args[0]),
+                    args->lengths[0]);
+        ZZFromBytes(val, reinterpret_cast<const uint8_t *>(args->args[1]),
+                    args->lengths[1]);
+        ZZFromBytes(n2, reinterpret_cast<const uint8_t *>(args->args[2]),
+                    args->lengths[2]);
 
         MulMod(res, field, val, n2);
     }
 
-    void *rbuf = malloc((size_t)out_len);
-    initid->ptr = (char *) rbuf;
-    BytesFromZZ((uint8_t *) rbuf, res, (size_t)out_len);
+    void *const rbuf = malloc(static_cast<size_t>(out_len.get()));
+    initid->ptr = static_cast<char *>(rbuf);
+    BytesFromZZ(static_cast<uint8_t *>(rbuf), res,
+                static_cast<size_t>(out_len.get()));
 
-    *length = (long unsigned int) out_len;
+    *length = static_cast<long unsigned int>(out_len.get());
     return initid->ptr;
 }
 
