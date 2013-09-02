@@ -29,7 +29,6 @@ static QueryList Insert = QueryList("SingleInsert",
         "", "", "" },
     { "CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)",
         "", "", ""},
-                                    // TODO parser currently has no KEY functionality (broken?)
     { "CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text, PRIMARY KEY (id))",
       "", "", "" },
     { Query("INSERT INTO test_insert VALUES (1, 21, 100, '24 Rosedale, Toronto, ONT', 'Pat Carlson')", false),
@@ -866,8 +865,8 @@ static QueryList DefaultValue = QueryList("DefaultValue",
     { Query("INSERT INTO t (x) VALUES (5)", false),
       Query("INSERT INTO t (x, y) VALUES (18, -53)", false),
       // Query("INSERT INTO u () VALUES ()", false),
-      Query("INSERT INTO u VALUES (DEFAULT)", false),
-      Query("INSERT INTO u VALUES (DEFAULT(z))", false),
+      // Query("INSERT INTO u VALUES (DEFAULT)", false),
+      // Query("INSERT INTO u VALUES (DEFAULT(z))", false),
       Query("SELECT * FROM t WHERE x = 12", false),
       Query("INSERT INTO t (x) VALUES (19)", false),
       Query("SELECT * FROM t WHERE x = 19", false),
@@ -1203,7 +1202,7 @@ static void
 RunTest(const TestConfig &tc) {
     // ###############################
     //      TOTAL RESULT: 351/353.
-    //    (No Best Effort: 311/311)
+    //    (No Best Effort: 326/326)
     // ###############################
 
     std::vector<Score> scores;
