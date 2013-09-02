@@ -4,12 +4,12 @@
 #include <main/metadata_tables.hh>
 
 #define ROLLBACK_AND_RETURN_ON_FAIL(status, c, ret)     \
-    {                                                   \
-        if (!status) {                                  \
-            assert(c->execute("ROLLBACK;"));            \
-            return ret;                                 \
-        }                                               \
-    }                                                   
+{                                                       \
+    if (!status) {                                      \
+        assert(c->execute("ROLLBACK;"));                \
+        return ret;                                     \
+    }                                                   \
+}
 
 // FIXME: Memory leaks when we allocate MetaKey<...>, use smart pointer.
 
@@ -983,7 +983,16 @@ OnionMeta *Analysis::getOnionMeta(const std::string &table,
                                   onion o) const
 {
     OnionMeta * const om =
-        this->getFieldMeta(table, field)->getOnionMeta(o);
+        this->getOnionMeta(this->getFieldMeta(table, field), o);
+    assert(om);
+
+    return om;
+}
+
+OnionMeta *Analysis::getOnionMeta(const FieldMeta *const fm,
+                                  onion o) const
+{
+    OnionMeta *const om = fm->getOnionMeta(o);
     assert(om);
 
     return om;

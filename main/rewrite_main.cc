@@ -143,6 +143,13 @@ recoverableDeltaError(unsigned int err)
     return ret;
 }
 
+#define RETURN_FALSE_IF_FALSE(status)       \
+{                                           \
+    if (!status) {                          \
+        return false;                       \
+    }                                       \
+}
+
 static bool
 fixDelta(const std::unique_ptr<Connect> &conn,
          const std::unique_ptr<Connect> &e_conn,
@@ -159,7 +166,7 @@ fixDelta(const std::unique_ptr<Connect> &conn,
         " SELECT query FROM pdb." + query_table_name +
         "  WHERE delta_output_id = " + std::to_string(delta_output_id) +
         "    AND local = TRUE;";
-    assert(e_conn->execute(get_local_query_query, dbres));
+    RETURN_FALSE_IF_FALSE(e_conn->execute(get_local_query_query, dbres));
 
     // Onion adjustment queries do not have local.
     ScopedMySQLRes local_r(dbres->n);
@@ -175,7 +182,7 @@ fixDelta(const std::unique_ptr<Connect> &conn,
     } else if (0 == local_row_count) {
         expect_ddl = false;
     } else {
-        throw CryptDBError("Too many local queries!");
+        return false;
     }
 
 
@@ -185,7 +192,7 @@ fixDelta(const std::unique_ptr<Connect> &conn,
         "  WHERE delta_output_id = " + std::to_string(delta_output_id) +
         "    AND local = FALSE;"
         "  ORDER BY ASC id";
-    assert(e_conn->execute(remote_query, dbres));
+    RETURN_FALSE_IF_FALSE(e_conn->execute(remote_query, dbres));
 
     ScopedMySQLRes remote_r(dbres->n);
     MYSQL_ROW remote_row;
@@ -204,17 +211,16 @@ fixDelta(const std::unique_ptr<Connect> &conn,
     }
 
     // Do sanity check.
-    assert((expect_ddl && remote_queries.size() == 1 &&
-            local_queries.size() == 1) ||
-           (!expect_ddl && remote_queries.size() >= 1 &&
-            local_queries.size() == 0));
+    RETURN_FALSE_IF_FALSE((expect_ddl && remote_queries.size() == 1 &&
+                           local_queries.size() == 1) ||
+                          (!expect_ddl && remote_queries.size() >= 1 &&
+                           local_queries.size() == 0));
 
     if (expect_ddl) {  // Handle single DDL query.
         if (false == conn->execute(remote_queries.back())) {
             unsigned int err = conn->get_mysql_errno();
             if (false == recoverableDeltaError(err)) {
-                throw CryptDBError("Unrecoverable error in Delta "
-                                   " recovery!");
+                return false;
             }
         }
     } else {        // Handle one or more DML queries.
@@ -225,18 +231,19 @@ fixDelta(const std::unique_ptr<Connect> &conn,
             " SELECT * FROM " + dml_table +
             "  WHERE delta_output_id = " +
             " " +    std::to_string(delta_output_id) + ";";
-        assert(conn->execute(dml_query, dbres));
+        RETURN_FALSE_IF_FALSE(conn->execute(dml_query, dbres));
         
         ScopedMySQLRes r(dbres->n);
         const unsigned long long dml_row_count =
             mysql_num_rows(r.res());
         if (0 == dml_row_count) {
-            assert(conn->execute("START TRANSACTION;"));
+            RETURN_FALSE_IF_FALSE(conn->execute("START TRANSACTION;"));
             for (auto it : remote_queries) {
-                assert(conn->execute(it));
+                RETURN_FALSE_IF_FALSE(conn->execute(it));
             }
-            assert(saveDMLCompletion(conn, delta_output_id));
-            assert(conn->execute("COMMIT"));
+            RETURN_FALSE_IF_FALSE(saveDMLCompletion(conn,
+                                                    delta_output_id));
+            RETURN_FALSE_IF_FALSE(conn->execute("COMMIT"));
         } else if (1 > dml_row_count) {
             throw CryptDBError("Too many DML table results!");
         }
@@ -244,24 +251,24 @@ fixDelta(const std::unique_ptr<Connect> &conn,
 
     // Cleanup database and do local query.
     {
-        assert(e_conn->execute("START TRANSACTION;"));
+        RETURN_FALSE_IF_FALSE(e_conn->execute("START TRANSACTION;"));
         if (false == setRegularTableToBleedingTable(e_conn)) {
-            assert(e_conn->execute("ROLLBACK;"));
-            throw CryptDBError("regular=bleeding fail!");
+            e_conn->execute("ROLLBACK;");
+            return false;
         }
 
         if (false == cleanupDeltaOutputAndQuery(e_conn,delta_output_id)) {
-            assert(e_conn->execute("ROLLBACK;"));
-            throw CryptDBError("cleaning up delta fail!");
+            e_conn->execute("ROLLBACK;");
+            return false;
         }
-        assert(e_conn->execute("COMMIT;"));
+        RETURN_FALSE_IF_FALSE(e_conn->execute("COMMIT;"));
     }
 
     // FIXME: local_query can be DDL.
     // > This can be fixed with a bleeding table.
-    assert(local_queries.size() <= 1);
+    RETURN_FALSE_IF_FALSE(local_queries.size() <= 1);
     for (auto it : local_queries) {
-        assert(e_conn->execute(it));
+        RETURN_FALSE_IF_FALSE(e_conn->execute(it));
     }
 
     return true;
@@ -276,7 +283,7 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
     DBResult *dbres;
     const std::string get_deltas =
         " SELECT id FROM pdb." + table_name + ";";
-    assert(e_conn->execute(get_deltas, dbres));
+    RETURN_FALSE_IF_FALSE(e_conn->execute(get_deltas, dbres));
 
     ScopedMySQLRes r(dbres->n);
     const unsigned long long row_count = mysql_num_rows(r.res());
@@ -293,9 +300,11 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
             atoi(string_delta_output_id.c_str());
         return fixDelta(conn, e_conn, delta_output_id);
     } else {
-        throw CryptDBError("Too many DeltaOutputz!");
+        return false;
     }
 }
+
+#undef RETURN_FALSE_IF_FALSE
 
 // This function will not build all of our tables when it is run
 // on an empty database.  If you don't have a parent, your table won't be
@@ -327,7 +336,7 @@ loadSchemaInfo(const std::unique_ptr<Connect> &conn,
     // FIXME: Ideally we would do this before loading the schema.
     // But first we must decide on a place to create the database from.
     assert(sanityCheck(schema));
-    
+
     return schema;
 }
 
@@ -502,8 +511,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
                  onion o, AssignOnce<SECLEVEL> * const new_level,
                  const std::string &cur_db)
 {
-    OnionMeta * const om = fm->getOnionMeta(o);
-    assert(om);
+    OnionMeta *const om = a.getOnionMeta(fm, o);
     const std::string tableanon =
         a.getTableMeta(itf->table_name)->getAnonTableName();
 
@@ -694,15 +702,16 @@ do_optimize_const_item(T *i, Analysis &a) {
 }
 
 Item *
-decrypt_item_layers(Item * i, FieldMeta *fm, onion o, uint64_t IV,
+decrypt_item_layers(Item *i, FieldMeta *fm, onion o, uint64_t IV,
                     const std::vector<Item *> &res)
 {
     assert(!i->is_null());
 
-    Item * dec = i;
-    Item * prev_dec = NULL;
+    Item *dec = i;
+    Item *prev_dec = NULL;
 
     OnionMeta *om = fm->getOnionMeta(o);
+    assert(om);
     auto enc_layers = om->layers;
     for (auto it = enc_layers.rbegin(); it != enc_layers.rend(); ++it) {
         dec = (*it)->decrypt(dec, IV);
