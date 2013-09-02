@@ -76,8 +76,8 @@ isWaitingField(Item *const arg, Analysis &a)
         if (fm->hasOnion(oWAIT) && fm->hasOnion(oPLAIN)) {
             OnionMeta * const om_wait = fm->getOnionMeta(oWAIT);
             OnionMeta * const om_plain = fm->getOnionMeta(oPLAIN);
-            if (a.getOnionLevel(om_wait) == SECLEVEL::WAITING
-                && a.getOnionLevel(om_plain) != SECLEVEL::WAITING) {
+            if (a.getOnionLevel(om_wait) == SECLEVEL::BLOCKING
+                && a.getOnionLevel(om_plain) != SECLEVEL::BLOCKING) {
                 return true;
             }
         }
@@ -97,7 +97,7 @@ isUsingExtraField(Item *const arg, Analysis &a)
             OnionMeta * const om_wait = fm->getOnionMeta(oWAIT);
             OnionMeta * const om_plain = fm->getOnionMeta(oPLAIN);
             if (a.getOnionLevel(om_wait) == SECLEVEL::PLAINVAL
-                && a.getOnionLevel(om_plain) == SECLEVEL::WAITING) {
+                && a.getOnionLevel(om_plain) == SECLEVEL::BLOCKING) {
                 return true;
             }
         }
@@ -144,12 +144,12 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
         my_es.intersect(childr_rp[0]->es_out).
               intersect(childr_rp[1]->es_out);
 
-    if (solution.empty()) {
+    if (false == solution.available()) {
         // Throwing an exception here supports cases where we have an
         // operation that needs to go to PLAIN and one of the fields is
         // already at plain (using the extra field). The above intersect
         // will fail to see that taking the other plain down to PLAINVAL
-        // is an option because this first field has SECLEVEL::WAITING
+        // is an option because this first field has SECLEVEL::BLOCKING
         // on oPLAIN.
         throwFieldToPlainIfBlocked(args[0], args[1], a);
         throwFieldToPlainIfBlocked(args[1], args[0], a);
@@ -972,7 +972,7 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
 
         EncSet supported_es = needed_es.intersect(es1).intersect(es2);
 
-        if (supported_es.empty()) {
+        if (false == supported_es.available()) {
                 std::cerr << "cannot support " << i << " BECAUSE it needs any of " << needed_es << "\n" \
              << "BUT children only have (" << r1 << "\n" << r2 << ")\n";
             assert(false);

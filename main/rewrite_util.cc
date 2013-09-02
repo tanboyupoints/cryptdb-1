@@ -34,7 +34,7 @@ rewrite(Item * const i, const EncSet &req_enc, Analysis &a)
     RewritePlan * const rp = getAssert(a.rewritePlans, i);
     assert(rp);
     const EncSet solution = rp->es_out.intersect(req_enc);
-    if (solution.empty()) {
+    if (false == solution.available()) {
         // FIXME: Error message;
         assert(false);
     }
@@ -325,7 +325,7 @@ getKeyOnionMeta(const FieldMeta * const fm)
 
 // TODO: Add Key for oDET onion as well.
 std::vector<Key*>
-rewrite_key(const TableMeta * const tm, Key * const key,
+rewrite_key(const std::shared_ptr<TableMeta> &tm, Key * const key,
             const Analysis &a)
 {
     std::vector<Key*> output_keys;
@@ -334,7 +334,7 @@ rewrite_key(const TableMeta * const tm, Key * const key,
         List_iterator<Key_part_spec>(key->columns);
     // FIXME: Memleak.
     const std::string new_name =
-        a.getAnonIndexName(tm, convert_lex_str(key->name));
+        a.getAnonIndexName(tm.get(), convert_lex_str(key->name));
     new_key->name = string_to_lex_str(new_name);
     new_key->columns = 
         reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
@@ -343,7 +343,7 @@ rewrite_key(const TableMeta * const tm, Key * const key,
                 const std::string field_name =
                     convert_lex_str(key_part->field_name);
                 const FieldMeta * const fm =
-                    a.getFieldMeta(tm, field_name);
+                    a.getFieldMeta(tm.get(), field_name);
                 // HACK: Should return multiple onions.
                 const OnionMeta * const om = getKeyOnionMeta(fm);
                 key_part->field_name =
@@ -380,7 +380,8 @@ string_to_bool(const std::string &s)
 
 List<Create_field>
 createAndRewriteField(Analysis &a, const ProxyState &ps,
-                      Create_field * const cf, TableMeta * const tm,
+                      Create_field * const cf,
+                      const std::shared_ptr<TableMeta> &tm,
                       bool new_table,
                       List<Create_field> &rewritten_cfield_list)
 {
@@ -390,15 +391,15 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     const std::string name = std::string(cf->field_name);
     auto buildFieldMeta =
         [] (const std::string name, Create_field * const cf,
-            const ProxyState &ps, TableMeta * const tm)
+            const ProxyState &ps, const std::shared_ptr<TableMeta> &tm)
     {
         if (Field::NEXT_NUMBER == cf->unireg_check) {
             return new FieldMeta(name, cf, NULL, SECURITY_RATING::PLAIN,
-                                 tm->leaseIncUniq());
+                                 tm.get()->leaseIncUniq());
         } else {
             return new FieldMeta(name, cf, ps.masterKey,
                                  ps.defaultSecurityRating(),
-                                 tm->leaseIncUniq());
+                                 tm.get()->leaseIncUniq());
         }
     };
     std::shared_ptr<FieldMeta> fm =
@@ -409,10 +410,10 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
         tm->addChild(new IdentityMetaKey(name), fm);
     } else {
         // FIXME: PTR.
-        a.deltas.push_back(new CreateDelta(fm.get(), tm,
+        a.deltas.push_back(new CreateDelta(fm, tm.get(),
                                            new IdentityMetaKey(name)));
         a.deltas.push_back(new ReplaceDelta(tm, a.getSchema(),
-                                            a.getSchema()->getKey(tm)));
+                                            a.getSchema()->getKey(tm.get())));
     }
 
     // -----------------------------

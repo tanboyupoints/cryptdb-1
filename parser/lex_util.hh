@@ -24,42 +24,44 @@
 
 //copies any data structure shallowly
 template <typename T>
-T *copy(const T * const x) {
-    T * const res = static_cast<T *>(malloc(sizeof(T)));
+T *copy(const T *const x) {
+    T *const res = static_cast<T *>(malloc(sizeof(T)));
     memcpy(res, x, sizeof(T));
     return res;
 }
 
 /* Makes a new item based on
  * information from an old item */
-Item_field *make_item(Item_field * const t,
+Item_field *make_item(Item_field *const t,
                       const std::string &table_name = "",
                       const std::string &field_name = "");
-Item_ref *make_item(Item_ref * const t, Item * const new_ref,
+Item_ref *make_item(Item_ref *const t, Item *const new_ref,
                     const std::string &table_name = "",
                     const std::string &field_name = "");
-Item_string *make_item(Item_string *i);
-Item_int *make_item(Item_int *i);
-Item_null *make_item(Item_null *i);
-ORDER *make_order(ORDER *old_order, Item *i);
+Item_string *make_item(Item_string *const i);
+Item_int *make_item(Item_int *const i);
+Item_null *make_item(Item_null *const i);
+Item_func *make_item(Item_func *const i);
+Item *clone_item(Item *const i);
+ORDER *make_order(ORDER *const old_order, Item *const i);
 
 
 // sets the select_lex in a lex
 void
-set_select_lex(LEX * lex, SELECT_LEX * select_lex);
+set_select_lex(LEX *const lex, SELECT_LEX *const select_lex);
 
 void
-set_where(st_select_lex * sl, Item * where);
+set_where(st_select_lex *const sl, Item *const where);
 
 void
-set_having(st_select_lex *sl, Item *having);
+set_having(st_select_lex *const sl, Item *const having);
 
 
 // Creates a SQL_I_List that contains one element
 template <typename T>
 SQL_I_List<T> *
-oneElemList(T * elem) {
-    SQL_I_List<T> * res = new SQL_I_List<T>();
+oneElemList(T *const elem) {
+    SQL_I_List<T> *const res = new SQL_I_List<T>();
     res->elements = 1;
     res->first = elem;
     res->next = NULL;
@@ -69,12 +71,13 @@ oneElemList(T * elem) {
 
 template <typename T>
 List<T> *
-dptrToList(T **es, unsigned int count)
+dptrToList(T **const es, unsigned int count)
 {
-    List<T> * const out = new List<T>();
+    List<T> *const out = new List<T>();
     for (unsigned int i = 0; i < count; ++i) {
         out->push_back(es[i]);
     }
 
     return out;
 }
+

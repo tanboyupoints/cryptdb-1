@@ -55,7 +55,7 @@ class CreateHandler : public DDLHandler {
             //         Update TABLE       
             // -----------------------------
             // TODO: Use appropriate values for has_sensitive and has_salt.
-            TableMeta *tm = new TableMeta(true, true);
+            const std::shared_ptr<TableMeta> tm(new TableMeta(true, true));
             IdentityMetaKey *key = new IdentityMetaKey(table);
             a.deltas.push_back(new CreateDelta(tm, a.getSchema(), key));
 
@@ -156,10 +156,10 @@ class DropHandler : public DDLHandler {
             }
 
             // Remove from *Meta structures.
-            TableMeta *tm = a.getTableMeta(table);
+            std::shared_ptr<TableMeta> tm(a.getTableMeta(table));
             // FIXME: Key only necessary for CREATE.
             a.deltas.push_back(new DeleteDelta(tm, a.getSchema(),
-                                               a.getSchema()->getKey(tm)));
+                                               a.getSchema()->getKey(tm.get())));
         }
     }
 };

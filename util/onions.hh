@@ -25,6 +25,7 @@ typedef enum onion {
 
 enum class SECLEVEL {
     INVALID,
+    BLOCKING,
     PLAINVAL,
     OPE,
     DETJOIN,
@@ -32,7 +33,6 @@ enum class SECLEVEL {
     SEARCH,
     HOM,
     RND,
-    WAITING,
 };
 
 bool needsSalt(SECLEVEL l);
@@ -60,7 +60,8 @@ static onionlayout BEST_EFFORT_NUM_ONION_LAYOUT = {
     // encoding for negative numbers in SECLEVEL::RND.
     {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL, SECLEVEL::DET,
                                     SECLEVEL::RND})},
-    {oWAIT, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL, SECLEVEL::WAITING})}
+    {oWAIT, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL,
+                                   SECLEVEL::BLOCKING})}
 };
 
 static onionlayout STR_ONION_LAYOUT = {

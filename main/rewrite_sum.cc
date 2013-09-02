@@ -30,7 +30,7 @@ static void
 check_if_empty(const EncSet & sol, Item * i, const EncSet & my_es,
                const reason & child_r)
 {
-    if (sol.empty()) {
+    if (false == sol.available()) {
         std::cerr << "current crypto schemes do not support this query" << std::endl
                   << "BECAUSE " << i << " NEEDS " << my_es << std::endl
                   << "AND children have " << child_r << std::endl;
@@ -79,7 +79,7 @@ class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
         
         std::string why = "count";
         if (i->has_with_distinct()) {
-            if (solution.empty()) {
+            if (false == solution.available()) {
                 throw CryptDBError("count distinct must support equality");
             }
             why += " distinct";

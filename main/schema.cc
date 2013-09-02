@@ -176,6 +176,17 @@ EncLayer *OnionMeta::getLayerBack() const
     return layers.back().get();
 }
 
+bool OnionMeta::hasEncLayer(const SECLEVEL &sl) const
+{
+    for (auto it : layers) {
+        if (it->level() == sl) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 EncLayer *OnionMeta::getLayer(const SECLEVEL &sl) const
 {
     if (layers.size() == 0) {

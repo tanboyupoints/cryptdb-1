@@ -98,6 +98,7 @@ public:
     AbstractMetaKey *getKey(const DBMeta *const child) const;
     EncLayer *getLayerBack() const;
     EncLayer *getLayer(const SECLEVEL &sl) const;
+    bool hasEncLayer(const SECLEVEL &sl) const;
     unsigned long getUniq() const {return uniq_count;}
 
     // Need access to layers.

@@ -25,8 +25,7 @@ public:
     bool hasSecLevel(SECLEVEL level) const;
     EncSet intersect(const EncSet & es2) const;
     SECLEVEL onionLevel(onion o) const;
-
-    bool empty() const { return osl.empty(); }
+    bool available() const;
 
     bool singleton() const { return osl.size() == 1; }
 
@@ -337,7 +336,7 @@ class Delta {
 public:
     enum TableType {REGULAR_TABLE, BLEEDING_TABLE};
 
-    Delta(const DBMeta * const meta,
+    Delta(const std::shared_ptr<DBMeta> meta,
           const DBMeta * const parent_meta,
           const AbstractMetaKey * const key)
         : meta(meta), parent_meta(parent_meta), key(key) {}
@@ -350,7 +349,7 @@ public:
                        TableType table_type) = 0;
 
 protected:
-    const DBMeta * const meta;
+    const std::shared_ptr<DBMeta> meta;
     const DBMeta * const parent_meta;
     const AbstractMetaKey * const key;
 
@@ -362,7 +361,7 @@ protected:
 // functionally derived.
 class CreateDelta : public Delta {
 public:
-    CreateDelta(const DBMeta * const meta,
+    CreateDelta(const std::shared_ptr<DBMeta> meta,
                 const DBMeta * const parent_meta,
                 const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
@@ -376,7 +375,7 @@ public:
 
 class ReplaceDelta : public Delta {
 public:
-    ReplaceDelta(const DBMeta * const meta,
+    ReplaceDelta(const std::shared_ptr<DBMeta> meta,
                  const DBMeta * const parent_meta,
                  const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
@@ -390,7 +389,7 @@ public:
 
 class DeleteDelta : public Delta {
 public:
-    DeleteDelta(const DBMeta * const meta,
+    DeleteDelta(const std::shared_ptr<DBMeta> meta,
                 const DBMeta * const parent_meta,
                 const AbstractMetaKey * const key)
         : Delta(meta, parent_meta, key) {}
@@ -599,18 +598,15 @@ public:
                                  const std::string &index_name) const;
     std::string getAnonIndexName(const TableMeta * const tm,
                                  const std::string &index_name) const;
+    // FIXME.
     EncLayer *getBackEncLayer(OnionMeta * const om) const;
-    EncLayer *popBackEncLayer(OnionMeta * const om);
+    std::shared_ptr<EncLayer> popBackEncLayer(OnionMeta * const om);
     SECLEVEL getOnionLevel(OnionMeta * const om) const;
     std::vector<std::shared_ptr<EncLayer>>
         getEncLayers(OnionMeta * const om) const;
     // HACK.
     const SchemaInfo *getSchema() {return schema;}
 
-    // TODO: Make private.
-    std::map<OnionMeta *, std::vector<std::shared_ptr<EncLayer>>>
-        to_adjust_enc_layers;
-    
     std::vector<Delta *> deltas;
 
 private:

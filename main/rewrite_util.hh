@@ -49,7 +49,7 @@ rewrite_create_field(const FieldMeta * const fm, Create_field * const f,
                      const Analysis &a);
 
 std::vector<Key *>
-rewrite_key(const TableMeta * const tm, Key * const key,
+rewrite_key(const std::shared_ptr<TableMeta> &tm, Key * const key,
             const Analysis &a);
 
 std::string
@@ -59,7 +59,8 @@ bool string_to_bool(const std::string &s);
 
 List<Create_field>
 createAndRewriteField(Analysis &a, const ProxyState &ps,
-                      Create_field * const cf, TableMeta * const tm,
+                      Create_field * const cf,
+                      const std::shared_ptr<TableMeta> &tm,
                       bool new_table,
                       List<Create_field> &rewritten_cfield_list);
 
