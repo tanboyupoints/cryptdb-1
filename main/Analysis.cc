@@ -5,9 +5,9 @@
 
 #define ROLLBACK_AND_RETURN_ON_FAIL(status, c, ret)     \
 {                                                       \
-    if (!status) {                                      \
-        assert(c->execute("ROLLBACK;"));                \
-        return ret;                                     \
+    if (!(status)) {                                    \
+        assert((c)->execute("ROLLBACK;"));              \
+        return (ret);                                   \
     }                                                   \
 }
 

@@ -33,23 +33,23 @@ extern CItemFuncNameDir funcNames;
 
 #define ANON                ANON_NAME(__anon_id_)
 
-
-//TODO: potential inconsistency problem because we update state,
-//but only the proxy is responsible for WRT to updateMeta
+#define RETURN_FALSE_IF_FALSE(status)       \
+{                                           \
+    if (!(status)) {                        \
+        return false;                       \
+    }                                       \
+}
 
 //TODO: use getAssert in more places
 //TODO: replace table/field with FieldMeta * for speed and conciseness
 
-//TODO: rewrite_proj may not need to be part of each class;
-// it just does gather, choos and then rewrite
-
 static Item_field *
 stringToItemField(const std::string &field,
-                  const std::string &table, Item_field * const itf) {
-
-    THD * const thd = current_thd;
+                  const std::string &table, Item_field *const itf)
+{
+    THD *const thd = current_thd;
     assert(thd);
-    Item_field * const res = new Item_field(thd, itf);
+    Item_field *const res = new Item_field(thd, itf);
     res->name = NULL; //no alias
     res->field_name = make_thd_string(field);
     res->table_name = make_thd_string(table);
@@ -58,7 +58,7 @@ stringToItemField(const std::string &field,
 }
 
 static inline std::string
-extract_fieldname(Item_field * const i)
+extract_fieldname(Item_field *const i)
 {
     std::stringstream fieldtemp;
     fieldtemp << *i;
@@ -68,7 +68,7 @@ extract_fieldname(Item_field * const i)
 
 //TODO: remove this at some point
 static inline void
-mysql_query_wrapper(MYSQL * const m, const std::string &q)
+mysql_query_wrapper(MYSQL *const m, const std::string &q)
 {
     if (mysql_query(m, q.c_str())) {
         cryptdb_err() << "query failed: " << q
@@ -79,13 +79,13 @@ mysql_query_wrapper(MYSQL * const m, const std::string &q)
     // Calling mysql_query seems to have destructive effects
     // on the current_thd. Thus, we must call create_embedded_thd
     // again.
-    void* ret = create_embedded_thd(0);
+    void *const ret = create_embedded_thd(0);
     if (!ret) assert(false);
 }
 
 // FIXME: Account for oWAIT.
 bool
-sanityCheck(FieldMeta * const fm)
+sanityCheck(FieldMeta *const fm)
 {
     /*
     for (auto it : fm->children) {
@@ -104,7 +104,7 @@ sanityCheck(FieldMeta * const fm)
 }
 
 static bool
-sanityCheck(TableMeta * const tm)
+sanityCheck(TableMeta *const tm)
 {
     for (auto it : tm->children) {
         std::shared_ptr<FieldMeta> fm = it.second;
@@ -115,7 +115,7 @@ sanityCheck(TableMeta * const tm)
 }
 
 static bool
-sanityCheck(SchemaInfo *schema)
+sanityCheck(SchemaInfo *const schema)
 {
     for (auto it : schema->children) {
         std::shared_ptr<TableMeta> tm = it.second;
@@ -133,7 +133,7 @@ sanityCheck(SchemaInfo *schema)
 static bool
 recoverableDeltaError(unsigned int err)
 {
-    bool ret =
+    const bool ret =
         ER_TABLE_EXISTS_ERROR == err ||     // Table already exists.
         ER_DUP_FIELDNAME == err ||          // Column already exists.
         ER_DUP_KEYNAME == err ||            // Key already exists.
@@ -141,13 +141,6 @@ recoverableDeltaError(unsigned int err)
         ER_CANT_DROP_FIELD_OR_KEY == err;   // Key/Col doesn't exist.
 
     return ret;
-}
-
-#define RETURN_FALSE_IF_FALSE(status)       \
-{                                           \
-    if (!status) {                          \
-        return false;                       \
-    }                                       \
 }
 
 static bool
@@ -175,7 +168,7 @@ fixDelta(const std::unique_ptr<Connect> &conn,
     if (1 == local_row_count) {
         expect_ddl = true;
         const MYSQL_ROW local_row = mysql_fetch_row(local_r.res());
-        const unsigned long * const local_l =
+        const unsigned long *const local_l =
             mysql_fetch_lengths(local_r.res());
         const std::string local_query(local_row[0], local_l[0]);
         local_queries.push_back(local_query);
@@ -198,7 +191,7 @@ fixDelta(const std::unique_ptr<Connect> &conn,
     MYSQL_ROW remote_row;
     std::list<std::string> remote_queries;
     while ((remote_row = mysql_fetch_row(remote_r.res()))) {
-        const unsigned long * const remote_l =
+        const unsigned long *const remote_l =
             mysql_fetch_lengths(remote_r.res());
         const std::string remote_query(remote_row[0], remote_l[0]);
         const std::string remote_ddl(remote_row[1], remote_l[1]);
@@ -232,7 +225,7 @@ fixDelta(const std::unique_ptr<Connect> &conn,
             "  WHERE delta_output_id = " +
             " " +    std::to_string(delta_output_id) + ";";
         RETURN_FALSE_IF_FALSE(conn->execute(dml_query, dbres));
-        
+
         ScopedMySQLRes r(dbres->n);
         const unsigned long long dml_row_count =
             mysql_num_rows(r.res());
@@ -294,7 +287,7 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
         return true;
     } else if (1 == row_count) {
         MYSQL_ROW row = mysql_fetch_row(r.res());
-        const unsigned long * const l = mysql_fetch_lengths(r.res());
+        const unsigned long *const l = mysql_fetch_lengths(r.res());
         const std::string string_delta_output_id(row[0], l[0]);
         const unsigned long delta_output_id =
             atoi(string_delta_output_id.c_str());
@@ -303,8 +296,6 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
         return false;
     }
 }
-
-#undef RETURN_FALSE_IF_FALSE
 
 // This function will not build all of our tables when it is run
 // on an empty database.  If you don't have a parent, your table won't be
@@ -319,10 +310,10 @@ loadSchemaInfo(const std::unique_ptr<Connect> &conn,
     // Must be done before loading the children.
     assert(deltaSanityCheck(conn, e_conn));
 
-    SchemaInfo *schema = new SchemaInfo(); 
+    SchemaInfo *const schema = new SchemaInfo();
     // Recursively rebuild the AbstractMeta<Whatever> and it's children.
-    std::function<DBMeta*(DBMeta *)> loadChildren =
-        [&loadChildren, &e_conn](DBMeta *parent) {
+    std::function<DBMeta *(DBMeta *const)> loadChildren =
+        [&loadChildren, &e_conn](DBMeta *const parent) {
             auto kids = parent->fetchChildren(e_conn);
             for (auto it : kids) {
                 // FIXME: PTR.
@@ -351,7 +342,7 @@ printEC(std::unique_ptr<Connect> e_conn, const std::string & command) {
 */
 
 static void
-printEmbeddedState(const ProxyState & ps) {
+printEmbeddedState(const ProxyState &ps) {
 /*
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables from pdb;");
@@ -364,51 +355,45 @@ printEmbeddedState(const ProxyState & ps) {
 */
 }
 
-template <typename type> static void
-translatorHelper(const char **texts, type *enums, int count)
+template <typename Type> static void
+translatorHelper(std::vector<std::string> texts,
+                 std::vector<Type> enums)
 {
-    std::vector<type> vec_enums(count);
-    std::vector<std::string> vec_texts(count);
-
-    for (int i = 0; i < count; ++i) {
-        vec_texts[i] = texts[i];
-        vec_enums[i] = enums[i];
-    }
-
-    TypeText<type>::addSet(vec_enums, vec_texts);
+    TypeText<Type>::addSet(enums, texts);
 }
 
-#define arraysize(a) (sizeof(a)/sizeof(a[0]))
-
-static void
+static bool
 buildTypeTextTranslator()
 {
     // Onions.
-    const char *onion_chars[] =
-        {"oINVALID", "oPLAIN", "oWAIT", "oDET", "oOPE", "oAGG", "oSWP"};
-    onion onions[] = {oINVALID, oPLAIN, oWAIT, oDET, oOPE, oAGG, oSWP};
-    static_assert(arraysize(onion_chars) == arraysize(onions),
-                  "onion size mismatch!");
-    int count = arraysize(onion_chars);
-    translatorHelper((const char **)onion_chars, (onion *)onions, count);
+    const std::vector<std::string> onion_strings
+    {
+        "oINVALID", "oPLAIN", "oWAIT", "oDET", "oOPE", "oAGG", "oSWP"
+    };
+    const std::vector<onion> onions
+    {
+        oINVALID, oPLAIN, oWAIT, oDET, oOPE, oAGG, oSWP
+    };
+    RETURN_FALSE_IF_FALSE(onion_strings.size() == onions.size());
+    translatorHelper<onion>(onion_strings, onions);
 
     // SecLevels.
-    const char *seclevel_chars[] = {"RND", "DET", "DETJOIN", "OPE", "HOM",
-                                    "SEARCH", "PLAINVAL", "BLOCKING",
-                                    "INVALID"};
-    SECLEVEL seclevels[] = {SECLEVEL::RND, SECLEVEL::DET,
-                            SECLEVEL::DETJOIN, SECLEVEL::OPE,
-                            SECLEVEL::HOM, SECLEVEL::SEARCH,
-                            SECLEVEL::PLAINVAL, SECLEVEL::BLOCKING,
-                            SECLEVEL::INVALID};
-    static_assert(arraysize(seclevel_chars) == arraysize(seclevels),
-                  "SECLEVEL size mismatch!");
-    count = arraysize(seclevel_chars);
-    translatorHelper((const char **)seclevel_chars,
-                     (SECLEVEL *)seclevels, count);
+    const std::vector<std::string> seclevel_strings
+    {
+        "RND", "DET", "DETJOIN", "OPE", "HOM", "SEARCH", "PLAINVAL",
+        "BLOCKING", "INVALID"
+    };
+    const std::vector<SECLEVEL> seclevels
+    {
+        SECLEVEL::RND, SECLEVEL::DET, SECLEVEL::DETJOIN, SECLEVEL::OPE,
+        SECLEVEL::HOM, SECLEVEL::SEARCH, SECLEVEL::PLAINVAL,
+        SECLEVEL::BLOCKING, SECLEVEL::INVALID
+    };
+    RETURN_FALSE_IF_FALSE(seclevel_strings.size() == seclevels.size());
+    translatorHelper(seclevel_strings, seclevels);
 
     // MYSQL types.
-    const char *mysql_type_chars[] =
+    const std::vector<std::string> mysql_type_strings
     {
         "MYSQL_TYPE_BIT", "MYSQL_TYPE_BLOB", "MYSQL_TYPE_DATE",
         "MYSQL_TYPE_DATETIME", "MYSQL_TYPE_DECIMAL", "MYSQL_TYPE_DOUBLE",
@@ -421,7 +406,7 @@ buildTypeTextTranslator()
         "MYSQL_TYPE_TINY_BLOB", "MYSQL_TYPE_VAR_STRING",
         "MYSQL_TYPE_VARCHAR", "MYSQL_TYPE_YEAR"
     };
-    enum enum_field_types mysql_types[] =
+    const std::vector<enum enum_field_types> mysql_types
     {
         MYSQL_TYPE_BIT, MYSQL_TYPE_BLOB, MYSQL_TYPE_DATE,
         MYSQL_TYPE_DATETIME, MYSQL_TYPE_DECIMAL, MYSQL_TYPE_DOUBLE,
@@ -434,83 +419,72 @@ buildTypeTextTranslator()
         MYSQL_TYPE_TINY_BLOB, MYSQL_TYPE_VAR_STRING,
         MYSQL_TYPE_VARCHAR, MYSQL_TYPE_YEAR
     };
-    static_assert(arraysize(mysql_type_chars) == arraysize(mysql_types),
-                  "mysql type size mismatch!");
-    count = arraysize(mysql_type_chars);
-    translatorHelper((const char **)mysql_type_chars,
-                     (enum enum_field_types *)mysql_types, count);
+    RETURN_FALSE_IF_FALSE(mysql_type_strings.size() ==
+                            mysql_types.size());
+    translatorHelper(mysql_type_strings, mysql_types);
 
     // Onion Layouts.
-    const char *onion_layout_chars[] =
+    const std::vector<std::string> onion_layout_strings
     {
         "PLAIN_ONION_LAYOUT", "NUM_ONION_LAYOUT",
         "BEST_EFFORT_NUM_ONION_LAYOUT", "STR_ONION_LAYOUT",
         "BEST_EFFORT_STR_ONION_LAYOUT"
         
     };
-    onionlayout onion_layouts[] =
+    const std::vector<onionlayout> onion_layouts
     {
         PLAIN_ONION_LAYOUT, NUM_ONION_LAYOUT,
         BEST_EFFORT_NUM_ONION_LAYOUT, STR_ONION_LAYOUT,
         BEST_EFFORT_STR_ONION_LAYOUT
     };
-    static_assert(arraysize(onion_layout_chars) ==
-                    arraysize(onion_layouts),
-                  "onionlayout size mismatch!");
-    count = arraysize(onion_layout_chars);
-    translatorHelper((const char **)onion_layout_chars,
-                     (onionlayout *)onion_layouts, count);
+    RETURN_FALSE_IF_FALSE(onion_layout_strings.size() ==
+                            onion_layouts.size());
+    translatorHelper(onion_layout_strings, onion_layouts);
 
     // Geometry type.
-    const char *geometry_type_chars[] =
+    const std::vector<std::string> geometry_type_strings
     {
         "GEOM_GEOMETRY", "GEOM_POINT", "GEOM_LINESTRING", "GEOM_POLYGON",
         "GEOM_MULTIPOINT", "GEOM_MULTILINESTRING", "GEOM_MULTIPOLYGON",
         "GEOM_GEOMETRYCOLLECTION"
     };
-    Field::geometry_type geometry_types[] =
+    std::vector<Field::geometry_type> geometry_types
     {
         Field::GEOM_GEOMETRY, Field::GEOM_POINT, Field::GEOM_LINESTRING,
         Field::GEOM_POLYGON, Field::GEOM_MULTIPOINT,
         Field::GEOM_MULTILINESTRING, Field::GEOM_MULTIPOLYGON,
         Field::GEOM_GEOMETRYCOLLECTION
     };
-    static_assert(arraysize(geometry_type_chars) ==
-                    arraysize(geometry_types),
-                  "geometry type size mismatch!");
-    count = arraysize(geometry_type_chars);
-    translatorHelper((const char **)geometry_type_chars,
-                    (Field::geometry_type *)geometry_types, count);
+    RETURN_FALSE_IF_FALSE(geometry_type_strings.size() ==
+                            geometry_types.size());
+    translatorHelper(geometry_type_strings, geometry_types);
 
     // Security Rating.
-    const char *security_rating_chars[] =
+    const std::vector<std::string> security_rating_strings
     {
         "SENSITIVE", "BEST_EFFORT", "PLAIN"
     };
-    SECURITY_RATING security_rating_types[] =
+    const std::vector<SECURITY_RATING> security_rating_types
     {
         SECURITY_RATING::SENSITIVE, SECURITY_RATING::BEST_EFFORT,
         SECURITY_RATING::PLAIN
     };
-    static_assert(arraysize(security_rating_chars) ==
-                    arraysize(security_rating_types),
-                  "security rating size mismatch!");
-    count = arraysize(security_rating_chars);
-    translatorHelper((const char **)security_rating_chars,
-                    (SECURITY_RATING *)security_rating_types, count);
+    RETURN_FALSE_IF_FALSE(security_rating_strings.size()
+                            == security_rating_types.size());
+    translatorHelper(security_rating_strings, security_rating_types);
 
-    return;
+    return true;
 }
-
-#undef arraysize
 
 //l gets updated to the new level
 static std::string
 removeOnionLayer(Analysis &a, const ProxyState &ps,
-                 const FieldMeta * const fm, Item_field * const itf,
-                 onion o, AssignOnce<SECLEVEL> * const new_level,
+                 const FieldMeta *const fm, Item_field *const itf,
+                 onion o, SECLEVEL *const new_level,
                  const std::string &cur_db)
 {
+    AssignOnce<SECLEVEL> local_new_level;
+
     OnionMeta *const om = a.getOnionMeta(fm, o);
     const std::string tableanon =
         a.getTableMeta(itf->table_name)->getAnonTableName();
@@ -521,7 +495,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
 
     // Update the Meta.
     a.deltas.push_back(new DeleteDelta(back_el, om, NULL));
-    *new_level = a.getOnionLevel(om);
+    local_new_level = a.getOnionLevel(om);
 
     //removes onion layer at the DB
     Item_field * const salt =
@@ -531,7 +505,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
     AssignOnce<std::string> fieldanon;
     AssignOnce<Item *> decUDF;
     if (fm->needExtraPlainColumn()
-        && SECLEVEL::PLAINVAL == new_level->get()) {
+        && SECLEVEL::PLAINVAL == local_new_level.get()) {
 
         OnionMeta * const wait_om = fm->getOnionMeta(oWAIT);
         fieldanon = wait_om->getAnonOnionName();
@@ -550,7 +524,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
         a.deltas.push_back(new DeleteDelta(waiting_el, wait_om, NULL));
     } else {
         fieldanon = om->getAnonOnionName();
-        Item_field * const field =
+        Item_field *const field =
             stringToItemField(fieldanon.get(), tableanon, itf);
 
         decUDF = back_el.get()->decryptUDF(field, salt);
@@ -561,12 +535,13 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
           << "    SET " << fieldanon.get()  << " = " << *decUDF.get()
           << ";";
 
-    std::cerr << "\nADJUST: \n" << query.str() << "\n";
+    std::cerr << "\nADJUST: \n" << query.str() << std::endl;
 
     //execute decryption query
 
-    LOG(cdb_v) << "adjust onions: \n" << query.str() << "\n";
+    LOG(cdb_v) << "adjust onions: \n" << query.str() << std::endl;
 
+    *new_level = local_new_level.get();
     return query.str();
 }
 
@@ -581,20 +556,18 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
  */
 static std::list<std::string>
 adjustOnion(Analysis &a, const ProxyState &ps, onion o,
-            const FieldMeta * const fm, SECLEVEL tolevel,
-            Item_field * const itf, const std::string &cur_db)
+            const FieldMeta *const fm, SECLEVEL tolevel,
+            Item_field *const itf, const std::string &cur_db)
 {
-    OnionMeta * const om = fm->getOnionMeta(o);
+    OnionMeta *const om = fm->getOnionMeta(o);
     SECLEVEL newlevel = a.getOnionLevel(om);
     assert(newlevel != SECLEVEL::INVALID);
 
     std::list<std::string> adjust_queries;
     while (newlevel > tolevel) {
-        AssignOnce<SECLEVEL> step_level;
         auto query =
-            removeOnionLayer(a, ps, fm, itf, o, &step_level, cur_db);
+            removeOnionLayer(a, ps, fm, itf, o, &newlevel, cur_db);
         adjust_queries.push_back(query);
-        newlevel = step_level.get();
     }
     assert(newlevel == tolevel);
 
@@ -603,8 +576,8 @@ adjustOnion(Analysis &a, const ProxyState &ps, onion o,
 //TODO: propagate these adjustments in the embedded database?
 
 static inline bool
-FieldQualifies(const FieldMeta * restriction,
-               const FieldMeta * field)
+FieldQualifies(const FieldMeta *const restriction,
+               const FieldMeta *const field)
 {
     return !restriction || restriction == field;
 }
@@ -702,15 +675,15 @@ do_optimize_const_item(T *i, Analysis &a) {
 }
 
 Item *
-decrypt_item_layers(Item *i, FieldMeta *fm, onion o, uint64_t IV,
-                    const std::vector<Item *> &res)
+decrypt_item_layers(Item *const i, const FieldMeta *const fm, onion o,
+                    uint64_t IV, const std::vector<Item *> &res)
 {
     assert(!i->is_null());
 
     Item *dec = i;
     Item *prev_dec = NULL;
 
-    OnionMeta *om = fm->getOnionMeta(o);
+    const OnionMeta *const om = fm->getOnionMeta(o);
     assert(om);
     auto enc_layers = om->layers;
     for (auto it = enc_layers.rbegin(); it != enc_layers.rend(); ++it) {
@@ -841,7 +814,7 @@ optimize_table_list(List<TABLE_LIST> *tll, Analysis &a)
 }
 
 static bool
-noRewrite(LEX * lex) {
+noRewrite(const LEX *const lex) {
     switch (lex->sql_command) {
     case SQLCOM_SHOW_DATABASES:
     case SQLCOM_SET_OPTION:
@@ -862,14 +835,14 @@ noRewrite(LEX * lex) {
 Rewriter::Rewriter()
 {
     // Must be called before loadSchemaInfo.
-    buildTypeTextTranslator();
+    assert(buildTypeTextTranslator());
 
     dml_dispatcher = buildDMLDispatcher();
     ddl_dispatcher = buildDDLDispatcher();
 }
 
 static std::string
-lex_to_query(LEX *lex)
+lex_to_query(LEX *const lex)
 {
     std::ostringstream o;
     o << *lex;
@@ -883,18 +856,20 @@ mysql_noop()
     return "do 0;";
 }
 
-RewriteOutput * 
+RewriteOutput *
 Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
                         const std::string &query)
 {
     std::unique_ptr<query_parse> p;
     try {
-        p = std::unique_ptr<query_parse>(new query_parse(ps.dbName(), query));
+        p =
+            std::unique_ptr<query_parse>(new query_parse(ps.dbName(),
+                                                         query));
     } catch (std::runtime_error &e) {
-        std::cout << "Error: " << query << std::endl;
+        std::cerr << "Bad Query: " << query << std::endl;
         return new SimpleOutput(mysql_noop());
     }
-    LEX *lex = p.get()->lex();
+    LEX *const lex = p.get()->lex();
 
     LOG(cdb_v) << "pre-analyze " << *lex;
 
@@ -902,9 +877,9 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
     if (noRewrite(lex)) {
         return new SimpleOutput(query);
     } else if (dml_dispatcher->canDo(lex)) {
-        SQLHandler *handler = dml_dispatcher->dispatch(lex);
+        const SQLHandler *const handler = dml_dispatcher->dispatch(lex);
         try {
-            LEX *out_lex = handler->transformLex(a, lex, ps);
+            LEX *const out_lex = handler->transformLex(a, lex, ps);
             if (true == a.special_update) {
                 const auto plain_table =
                     lex->select_lex.top_join_list.head()->table_name;
@@ -933,8 +908,8 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
             return new AdjustOnionOutput(a.deltas, adjust_queries);
         }
     } else if (ddl_dispatcher->canDo(lex)) {
-        SQLHandler *handler = ddl_dispatcher->dispatch(lex);
-        LEX *out_lex = handler->transformLex(a, lex, ps);
+        const SQLHandler *const handler = ddl_dispatcher->dispatch(lex);
+        LEX *const out_lex = handler->transformLex(a, lex, ps);
         return new DDLOutput(query, lex_to_query(out_lex), a.deltas);
     } else {
         throw CryptDBError("Rewriter can not dispatch bad lex");
@@ -970,12 +945,13 @@ struct DirectiveData {
 // > DIRECTIVE SELECT <table_name | field_name | rating>
 //               FROM cryptdb_metadata
 //              WHERE <table_name | field_name | rating> = [value]
-RewriteOutput * 
+RewriteOutput *
 Rewriter::handleDirective(Analysis &a, const ProxyState &ps,
                           const std::string &query)
 {
     DirectiveData data(query);
-    FieldMeta *fm = a.getFieldMeta(data.table_name, data.field_name);
+    const FieldMeta *const fm =
+        a.getFieldMeta(data.table_name, data.field_name);
     const SECURITY_RATING current_rating = fm->getSecurityRating();
     if (current_rating < data.sec_rating) {
         throw CryptDBError("cryptdb does not support going to a more "
@@ -990,7 +966,7 @@ Rewriter::handleDirective(Analysis &a, const ProxyState &ps,
 
 static
 bool
-cryptdbDirective(const std::string query)
+cryptdbDirective(const std::string &query)
 {
     std::size_t found = query.find("DIRECTIVE");
     if (std::string::npos == found) {
@@ -1007,7 +983,7 @@ cryptdbDirective(const std::string query)
 }
 
 QueryRewrite
-Rewriter::rewrite(const ProxyState &ps, const std::string & q,
+Rewriter::rewrite(const ProxyState &ps, const std::string &q,
                   SchemaInfo **out_schema)
 {
     LOG(cdb_v) << "q " << q;
@@ -1064,7 +1040,7 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
     LOG(cdb_v) << "rows in result " << rows << "\n";
     const unsigned int cols = dbres.names.size();
 
-    ResType * const res = new ResType();
+    ResType *const res = new ResType();
 
     // un-anonymize the names
     for (auto it = dbres.names.begin();
@@ -1095,7 +1071,7 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
             continue;
         }
 
-        FieldMeta * const fm = rf.getOLK().key;
+        FieldMeta *const fm = rf.getOLK().key;
         for (unsigned int r = 0; r < rows; r++) {
             if (!fm || dbres.rows[r][c]->is_null()) {
                 res->rows[r][col_index] = dbres.rows[r][c];
@@ -1103,7 +1079,7 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
                 uint64_t salt = 0;
                 const int salt_pos = rf.getSaltPosition();
                 if (salt_pos >= 0) {
-                    Item_int * const salt_item =
+                    Item_int *const salt_item =
                         static_cast<Item_int *>(dbres.rows[r][salt_pos]);
                     assert_s(!salt_item->null_value, "salt item is null");
                     salt = salt_item->value;
@@ -1155,11 +1131,11 @@ executeQuery(ProxyState &ps, const std::string &q)
         if (!qr.output->getQuery(&out_queryz)) {
             throw CryptDBError("Failed to retrieve query!");
         }
-    
+
         DBResult *dbres = NULL;
         for (auto it : out_queryz) {
             prettyPrintQuery(it);
-            
+
             if (!ps.getConn()->execute(it, dbres)) {
                 qr.output->handleQueryFailure(ps.getEConn());
                 throw CryptDBError("Failed to execute query!");
@@ -1171,7 +1147,7 @@ executeQuery(ProxyState &ps, const std::string &q)
 
         if (qr.output->queryAgain()) {
             return executeQuery(ps, q);
-        } 
+        }
 
         if (dbres) {
             ResType *res = new ResType(dbres->unpack());
@@ -1229,3 +1205,4 @@ printRes(const ResType &r) {
     }
 }
 
+#undef RETURN_FALSE_IF_FALSE
