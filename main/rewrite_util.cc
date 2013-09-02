@@ -36,9 +36,15 @@ rewrite(Item * const i, const EncSet &req_enc, Analysis &a)
     const EncSet solution = rp->es_out.intersect(req_enc);
     if (false == solution.available()) {
         // FIXME: Error message;
-        assert(false);
+        std::cout << "Item with type: ["
+                  << TypeText<enum Item::Type>::toText(i->type()) << "]"
+                  << " NEEDS " << rp->es_out << std::endl
+                  << " BECAUSE " << rp->r.why_t << std::endl
+                  << " AND it must supported one of these schemes "
+                  << req_enc << std::endl;
+        throw ContinueError();
     }
-    
+
     return itemTypes.do_rewrite(i, solution.chooseOne(), rp, a);
 }
 

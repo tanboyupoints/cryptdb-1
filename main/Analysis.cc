@@ -135,7 +135,7 @@ EncSet::chooseOne(bool require_key) const
         }
     }
 
-    throw CryptDBError("No OLK to choose!");
+    return OLK::invalidOLK();
 }
 
 bool
@@ -177,13 +177,8 @@ EncSet::onionLevel(onion o) const
 bool
 EncSet::available() const
 {
-    for (auto it : osl) {
-        if (SECLEVEL::BLOCKING != it.second.first) {
-            return true;
-        }
-    }
-
-    return false;
+    // FIXME: Slow, but chooseOne and available must match semantics.
+    return OLK::isValid(this->chooseOne());
 }
 
 bool

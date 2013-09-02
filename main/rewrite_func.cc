@@ -185,14 +185,16 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
 }
 
 static RewritePlan *
-iterateGather(Item_func *i, const EncSet &out_es, EncSet child_es,
-              const std::string &why, reason &tr, Analysis &a)
+iterateGather(Item_func *i, const EncSet &out_es,
+              const EncSet &constr_child_es, const std::string &why,
+              reason &tr, Analysis &a)
 {
     tr = reason(out_es, why, i);
 
     const unsigned int arg_count = i->argument_count();
     RewritePlan ** const childr_rp = new RewritePlan*[arg_count];
     Item ** const args = i->arguments();
+    EncSet child_es = constr_child_es;
     for (unsigned int index = 0; index < arg_count; ++index) {
         reason r;
         childr_rp[index] = gather(args[index], r, a);
@@ -200,8 +202,18 @@ iterateGather(Item_func *i, const EncSet &out_es, EncSet child_es,
         child_es = child_es.intersect(childr_rp[index]->es_out);
     }
 
-    return new RewritePlanOneOLK(out_es, child_es.chooseOne(false),
-                                 childr_rp, tr);
+    OLK child_olk = child_es.chooseOne(false);
+    if (false == OLK::isValid(child_olk)) {
+        std::cout << "Could not find encryption scheme for children of"
+                  << " item of type ["
+                  << TypeText<enum Item::Type>::toText(i->type()) << "]"
+                  << std::endl
+                  << " BECAUSE " << why << std::endl
+                  << " AND the children were constrained by "
+                  << constr_child_es << std::endl;
+        throw ContinueError();
+    }
+    return new RewritePlanOneOLK(out_es, child_olk, childr_rp, tr);
 }
 
 static RewritePlan *

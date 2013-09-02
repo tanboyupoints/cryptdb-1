@@ -431,6 +431,43 @@ buildTypeTextTranslator()
     translatorHelper((const char **)mysql_type_chars,
                      (enum enum_field_types *)mysql_types, count);
 
+    // MYSQL item types.
+    const char *mysql_item_chars[] =
+    {
+        "FIELD_ITEM", "FUNC_ITEM", "SUM_FUNC_ITEM", "STRING_ITEM",
+        "INT_ITEM", "REAL_ITEM", "NULL_ITEM", "VARBIN_ITEM",
+        "COPY_STR_ITEM", "FIELD_AVG_ITEM", "DEFAULT_VALUE_ITEM",
+        "PROC_ITEM", "COND_ITEM", "REF_ITEM", "FIELD_STD_ITEM",
+        "FIELD_VARIANCE_ITEM", "INSERT_VALUE_ITEM",
+        "SUBSELECT_ITEM", "ROW_ITEM", "CACHE_ITEM", "TYPE_HOLDER",
+        "PARAM_ITEM", "TRIGGER_FIELD_ITEM", "DECIMAL_ITEM",
+        "XPATH_NODESET", "XPATH_NODESET_CMP", "VIEW_FIXER_ITEM"
+    };
+    enum Item::Type mysql_item_types[] =
+    {
+        Item::Type::FIELD_ITEM, Item::Type::FUNC_ITEM,
+        Item::Type::SUM_FUNC_ITEM, Item::Type::STRING_ITEM,
+        Item::Type::INT_ITEM, Item::Type::REAL_ITEM,
+        Item::Type::NULL_ITEM, Item::Type::VARBIN_ITEM,
+        Item::Type::COPY_STR_ITEM, Item::Type::FIELD_AVG_ITEM,
+        Item::Type::DEFAULT_VALUE_ITEM, Item::Type::PROC_ITEM,
+        Item::Type::COND_ITEM, Item::Type::REF_ITEM,
+        Item::Type::FIELD_STD_ITEM, Item::Type::FIELD_VARIANCE_ITEM,
+        Item::Type::INSERT_VALUE_ITEM, Item::Type::SUBSELECT_ITEM,
+        Item::Type::ROW_ITEM, Item::Type::CACHE_ITEM,
+        Item::Type::TYPE_HOLDER, Item::Type::PARAM_ITEM,
+        Item::Type::TRIGGER_FIELD_ITEM, Item::Type::DECIMAL_ITEM,
+        Item::Type::XPATH_NODESET, Item::Type::XPATH_NODESET_CMP,
+        Item::Type::VIEW_FIXER_ITEM
+    };
+    static_assert(arraysize(mysql_item_chars) ==
+                    arraysize(mysql_item_types),
+                  "mysql item types size mismatch!");
+    count = arraysize(mysql_item_chars);
+    translatorHelper(static_cast<const char **>(mysql_item_chars),
+                     static_cast<enum Item::Type *>(mysql_item_types),
+                     count);
+
     // Onion Layouts.
     const char *onion_layout_chars[] =
     {
@@ -882,7 +919,7 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
     try {
         p = std::unique_ptr<query_parse>(new query_parse(ps.dbName(), query));
     } catch (std::runtime_error &e) {
-        std::cout << "Error: " << query << std::endl;
+        std::cerr << "Invalid Query: " << query << std::endl;
         return new SimpleOutput(mysql_noop());
     }
     LEX *lex = p.get()->lex();
@@ -1183,6 +1220,8 @@ executeQuery(ProxyState &ps, const std::string &q)
         std::cout << "Unexpected Error: " << e.what() << " in query "
                   << q << std::endl;
         return NULL;
+    }  catch (ContinueError &e) {
+        return executeQuery(ps, mysql_noop());
     }  catch (CryptDBError &e) {
         std::cout << "Internal Error: " << e.msg << " in query " << q
                   << std::endl;

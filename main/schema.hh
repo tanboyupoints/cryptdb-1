@@ -54,6 +54,9 @@ public:
     static OLK invalidOLK() {
         return OLK(oINVALID, SECLEVEL::INVALID, NULL);
     }
+    static bool isValid(const OLK &olk) {
+        return oINVALID != olk.o && SECLEVEL::INVALID != olk.l;
+    }
 };
 
 /*
