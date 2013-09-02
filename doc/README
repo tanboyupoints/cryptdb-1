@@ -1,4 +1,5 @@
 CryptDB: http://css.csail.mit.edu/cryptdb
+Wiki: https://github.com/burrows-labs/cryptdb-wiki/wiki/_pages
 
 Getting Started
     > Build CryptDB, as described in doc/BUILD.
