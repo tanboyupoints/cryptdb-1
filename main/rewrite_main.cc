@@ -376,8 +376,8 @@ buildTypeTextTranslator()
 {
     // Onions.
     const char *onion_chars[] =
-        {"oPLAIN", "oWAIT", "oDET", "oOPE", "oAGG", "oSWP"};
-    onion onions[] = {oPLAIN, oWAIT, oDET, oOPE, oAGG, oSWP};
+        {"oINVALID", "oPLAIN", "oWAIT", "oDET", "oOPE", "oAGG", "oSWP"};
+    onion onions[] = {oINVALID, oPLAIN, oWAIT, oDET, oOPE, oAGG, oSWP};
     static_assert(arraysize(onion_chars) == arraysize(onions),
                   "onion size mismatch!");
     int count = arraysize(onion_chars);
@@ -492,6 +492,8 @@ buildTypeTextTranslator()
 
     return;
 }
+
+#undef arraysize
 
 //l gets updated to the new level
 static std::string
