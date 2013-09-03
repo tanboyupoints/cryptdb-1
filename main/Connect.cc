@@ -42,16 +42,16 @@ Connect::do_connect(const std::string &server, const std::string &user,
         "--character-set-server=utf8",
         "--language=" MYSQL_BUILD_DIR "/sql/share/"
     };
-    assert(0 == mysql_library_init(sizeof(dummy_argv) / sizeof(*dummy_argv),
-                                  (char**) dummy_argv, 0));
+    assert(0 == mysql_library_init(sizeof(dummy_argv)/sizeof(*dummy_argv),
+                                   const_cast<char**>(dummy_argv), 0));
 
     conn = mysql_init(NULL);
 
-    /* Make sure we always connect via TCP, and not via Unix domain sockets */
+    /* Connect via TCP, and not via Unix domain sockets */
     uint proto = MYSQL_PROTOCOL_TCP;
     mysql_options(conn, MYSQL_OPT_PROTOCOL, &proto);
 
-    /* Connect to the real server even if linked against embedded libmysqld */
+    /* Connect to real server even if linked against embedded libmysqld */
     mysql_options(conn, MYSQL_OPT_USE_REMOTE_CONNECTION, 0);
 
     /* Connect to database */
@@ -77,12 +77,12 @@ Connect::select_db(const std::string &dbname)
     return mysql_select_db(conn, dbname.c_str()) ? false : true;
 }
 
-Connect * Connect::getEmbedded(const std::string & embed_db,
-                               const std::string & dbname) {
-
+Connect *Connect::getEmbedded(const std::string &embed_db,
+                              const std::string &dbname)
+{
     init_mysql(embed_db);
 
-    MYSQL * m = mysql_init(0);
+    MYSQL *const m = mysql_init(0);
     assert(m);
 
     mysql_options(m, MYSQL_OPT_USE_EMBEDDED_CONNECTION, 0);
@@ -93,7 +93,7 @@ Connect * Connect::getEmbedded(const std::string & embed_db,
         cryptdb_err() << "mysql_real_connect: " << mysql_error(m);
     }
 
-    Connect * conn = new Connect(m);
+    Connect *const conn = new Connect(m);
     conn->close_on_destroy = true;
 
     // We build the database here instead of initially connecting to it
@@ -105,7 +105,7 @@ Connect * Connect::getEmbedded(const std::string & embed_db,
 }
 
 bool
-Connect::execute(const std::string &query, DBResult * & res)
+Connect::execute(const std::string &query, DBResult *&res)
 {
     //silently ignore empty queries
     if (query.length() == 0) {
@@ -123,7 +123,7 @@ Connect::execute(const std::string &query, DBResult * & res)
         res = DBResult::wrap(mysql_store_result(conn));
     }
 
-    void* ret = create_embedded_thd(0);
+    void *const ret = create_embedded_thd(0);
     if (!ret) assert(false);
 
     return success;
@@ -153,7 +153,7 @@ Connect::last_insert_id()
 }
 
 unsigned long
-Connect::real_escape_string(char *to, const char *from,
+Connect::real_escape_string(char *const to, const char *const from,
                             unsigned long length)
 {
     return mysql_real_escape_string(conn, to, from, length);
@@ -177,9 +177,9 @@ DBResult::DBResult()
 }
 
 DBResult *
-DBResult::wrap(DBResult_native *n)
+DBResult::wrap(DBResult_native *const n)
 {
-    DBResult *r = new DBResult();
+    DBResult *const r = new DBResult();
     r->n = n;
     return r;
 }
@@ -190,20 +190,22 @@ DBResult::~DBResult()
 }
 
 static Item *
-getItem(char * content, enum_field_types type, uint len) {
+getItem(char *const content, enum_field_types type, uint len)
+{
     if (content == NULL) {
         return new Item_null();
     }
-    Item * i;
-    std::string content_str = std::string(content, len);
+    AssignOnce<Item *> i;
+    const std::string content_str = std::string(content, len);
     if (IsMySQLTypeNumeric(type)) {
-        ulonglong val = valFromStr(content_str);
+        const ulonglong val = valFromStr(content_str);
         i = new Item_int(val);
     } else {
-        i = new Item_string(make_thd_string(content_str), len, &my_charset_bin);
+        i = new Item_string(make_thd_string(content_str), len,
+                            &my_charset_bin);
     }
 
-    return i;
+    return i.get();
 }
 
 // returns the data in the last server response
@@ -211,11 +213,12 @@ getItem(char * content, enum_field_types type, uint len) {
 ResType
 DBResult::unpack()
 {
-    if (n == NULL)
+    if (n == NULL) {
         return ResType();
+    }
 
-    size_t rows = (size_t)mysql_num_rows(n);
-    int cols  = -1;
+    const size_t rows = static_cast<size_t>(mysql_num_rows(n));
+    AssignOnce<int> cols;
     if (rows > 0) {
         cols = mysql_num_fields(n);
     } else {
@@ -225,9 +228,10 @@ DBResult::unpack()
     ResType res;
 
     for (int j = 0;; j++) {
-        MYSQL_FIELD *field = mysql_fetch_field(n);
-        if (!field)
+        MYSQL_FIELD *const field = mysql_fetch_field(n);
+        if (!field) {
             break;
+        }
 
         res.names.push_back(field->name);
         res.types.push_back(field->type);
@@ -235,14 +239,15 @@ DBResult::unpack()
 
     for (int index = 0;; index++) {
         MYSQL_ROW row = mysql_fetch_row(n);
-        if (!row)
+        if (!row) {
             break;
-        unsigned long *lengths = mysql_fetch_lengths(n);
+        }
+        unsigned long *const lengths = mysql_fetch_lengths(n);
 
         std::vector<Item *> resrow;
 
-        for (int j = 0; j < cols; j++) {
-            Item * it = getItem(row[j], res.types[j], lengths[j]);
+        for (int j = 0; j < cols.get(); j++) {
+            Item *const it = getItem(row[j], res.types[j], lengths[j]);
             resrow.push_back(it);
         }
 
