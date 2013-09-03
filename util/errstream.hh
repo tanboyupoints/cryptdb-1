@@ -26,7 +26,7 @@ public:
 
 private:
     const std::string file_name;
-    unsigned int line_number;
+    const unsigned int line_number;
 };
 
 class BadItemArgumentCount : public AbstractCryptDBError {
@@ -42,23 +42,24 @@ public:
 private:
     // const Item::Type type;
     const unsigned int type;
-    int expected;
-    int actual;
+    const int expected;
+    const int actual;
 };
 
 class UnexpectedSecurityLevel : public AbstractCryptDBError {
 public:
     UnexpectedSecurityLevel(const std::string &file_name, int line_number,
-                            SECLEVEL expected, SECLEVEL actual)
-        : AbstractCryptDBError(file_name, line_number),
+                            onion o, SECLEVEL expected, SECLEVEL actual)
+        : AbstractCryptDBError(file_name, line_number), o(o),
           expected(expected), actual(actual) {}
     ~UnexpectedSecurityLevel() {}
 
     std::string to_string() const final;
 
 private:
-    SECLEVEL expected;
-    SECLEVEL actual;
+    const onion o;
+    const SECLEVEL expected;
+    const SECLEVEL actual;
 };
 
 std::ostream &operator<<(std::ostream &out,

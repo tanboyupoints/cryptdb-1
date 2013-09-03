@@ -194,7 +194,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
         OnionMeta * om = constr.key->getOnionMeta(oAGG);
         assert(om);
         EncLayer *el = a.getBackEncLayer(om);
-        TEST_UnexpectedSecurityLevel(SECLEVEL::HOM, el->level());
+        TEST_UnexpectedSecurityLevel(oAGG, SECLEVEL::HOM, el->level());
         return static_cast<HOM *>(el)->sumUDA(args.front());
     }
 };

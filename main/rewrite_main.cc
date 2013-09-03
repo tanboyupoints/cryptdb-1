@@ -503,10 +503,11 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
 
         OnionMeta * const wait_om = fm->getOnionMeta(oWAIT);
         fieldanon = wait_om->getAnonOnionName();
+
         Item_field * const field =
             stringToItemField(om->getAnonOnionName(), tableanon, itf);
         decUDF = back_el.get()->decryptUDF(field, salt);
-        TEST_UnexpectedSecurityLevel(SECLEVEL::PLAINVAL,
+        TEST_UnexpectedSecurityLevel(o, SECLEVEL::PLAINVAL,
                                      a.getBackEncLayer(om)->level());
 
         // HACK.
@@ -515,7 +516,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
 
         const std::shared_ptr<EncLayer>
             waiting_el(a.getBackEncLayer(wait_om));
-        TEST_UnexpectedSecurityLevel(SECLEVEL::BLOCKING,
+        TEST_UnexpectedSecurityLevel(oWAIT, SECLEVEL::BLOCKING,
                                      waiting_el->level());
         a.deltas.push_back(new DeleteDelta(waiting_el, wait_om, NULL));
     } else {
@@ -565,7 +566,7 @@ adjustOnion(Analysis &a, const ProxyState &ps, onion o,
             removeOnionLayer(a, ps, fm, itf, o, &newlevel, cur_db);
         adjust_queries.push_back(query);
     }
-    TEST_UnexpectedSecurityLevel(tolevel, newlevel);
+    TEST_UnexpectedSecurityLevel(o, tolevel, newlevel);
 
     return adjust_queries;
 }

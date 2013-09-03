@@ -28,17 +28,17 @@ testBadItemArgumentCount(const std::string &file_name,
 
 inline void
 testUnexpectedSecurityLevel(const std::string &file_name,
-                            unsigned int line_number, SECLEVEL expected,
-                            SECLEVEL actual)
+                            unsigned int line_number, onion o,
+                            SECLEVEL expected, SECLEVEL actual)
 {
     if (expected != actual) {
-        throw UnexpectedSecurityLevel(file_name, line_number, expected,
-                                      actual);
+        throw UnexpectedSecurityLevel(file_name, line_number, o,
+                                      expected, actual);
     }
 }
 
-#define TEST_UnexpectedSecurityLevel(expected, actual)              \
+#define TEST_UnexpectedSecurityLevel(o, expected, actual)           \
 {                                                                   \
-    testUnexpectedSecurityLevel(__FILE__, __LINE__, (expected),     \
-                                (actual));                          \
+    testUnexpectedSecurityLevel(__FILE__, __LINE__, (o),            \
+                                (expected), (actual));              \
 }
