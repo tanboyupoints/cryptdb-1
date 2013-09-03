@@ -3,7 +3,6 @@
 #include <main/rewrite_util.hh>
 #include <main/enum_text.hh>
 #include <main/rewrite_main.hh>
-#include <main/init_onions.hh>
 #include <parser/lex_util.hh>
 #include <parser/stringify.hh>
 #include <List_helpers.hh>
@@ -38,7 +37,7 @@ rewrite(Item * const i, const EncSet &req_enc, Analysis &a)
         // FIXME: Error message;
         assert(false);
     }
-    
+
     return itemTypes.do_rewrite(i, solution.chooseOne(), rp, a);
 }
 

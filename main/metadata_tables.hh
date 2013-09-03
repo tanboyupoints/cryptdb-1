@@ -14,7 +14,7 @@ namespace MetaDataTables {
         std::string bleedingMetaObject();
     };
 
-    void initialize(const std::unique_ptr<Connect> &conn,
+    bool initialize(const std::unique_ptr<Connect> &conn,
                     const std::unique_ptr<Connect> &e_conn);
 };
 

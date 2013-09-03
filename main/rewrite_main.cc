@@ -23,6 +23,7 @@
 #include <main/ddl_handler.hh>
 #include <main/List_helpers.hh>
 #include <main/metadata_tables.hh>
+#include <main/macro_util.hh>
 
 #include "field.h"
 
@@ -32,13 +33,6 @@ extern CItemSumFuncDir sumFuncTypes;
 extern CItemFuncNameDir funcNames;
 
 #define ANON                ANON_NAME(__anon_id_)
-
-#define RETURN_FALSE_IF_FALSE(status)       \
-{                                           \
-    if (!(status)) {                        \
-        return false;                       \
-    }                                       \
-}
 
 //TODO: use getAssert in more places
 //TODO: replace table/field with FieldMeta * for speed and conciseness
@@ -1205,4 +1199,3 @@ printRes(const ResType &r) {
     }
 }
 
-#undef RETURN_FALSE_IF_FALSE

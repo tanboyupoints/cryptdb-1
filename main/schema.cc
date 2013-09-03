@@ -6,7 +6,6 @@
 #include <parser/stringify.hh>
 #include <main/schema.hh>
 #include <main/rewrite_main.hh>
-#include <main/init_onions.hh>
 #include <main/rewrite_util.hh>
 #include <main/dbobject.hh>
 #include <main/metadata_tables.hh>
@@ -239,6 +238,39 @@ FieldMeta::deserialize(unsigned int id, const std::string &serial)
                        onion_layout, sec_rating, uniq_count, counter));
 }
 
+// If mkey == NULL, the field is not encrypted
+static bool
+init_onions_layout(const AES_KEY *const m_key,
+                   FieldMeta *const fm, Create_field *const cf)
+{
+    if (fm->has_salt != static_cast<bool>(m_key)) {
+        return false;
+    }
+
+    if (0 != fm->children.size()) {
+        return false;
+    }
+
+    for (auto it: fm->onion_layout) {
+        const onion o = it.first;
+        const std::vector<SECLEVEL> levels = it.second;
+        // A new OnionMeta will only occur with a new FieldMeta so
+        // we never have to build Deltaz for our OnionMetaz.
+        std::unique_ptr<OnionMeta>
+            om(new OnionMeta(o, levels, m_key, cf, fm->leaseIncUniq()));
+        const std::string onion_name = om->getAnonOnionName();
+        fm->addChild(new OnionMetaKey(o), std::move(om));
+
+        LOG(cdb_v) << "adding onion layer " << onion_name
+                   << " for " << fm->fname;
+
+        //set outer layer
+        // fm->setCurrentOnionLevel(o, it.second.back());
+    }
+
+    return true;
+}
+
 FieldMeta::FieldMeta(const std::string &name, Create_field * const field,
                      const AES_KEY * const m_key,
                      SECURITY_RATING sec_rating,
@@ -249,7 +281,7 @@ FieldMeta::FieldMeta(const std::string &name, Create_field * const field,
                                   &plain_number)),
       sec_rating(sec_rating), uniq_count(uniq_count), counter(0)
 {
-    init_onions_layout(m_key, this, field);
+    assert(init_onions_layout(m_key, this, field));
 }
 
 std::string FieldMeta::serialize(const DBObject &parent) const

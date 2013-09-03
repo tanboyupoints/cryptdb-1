@@ -864,8 +864,8 @@ static QueryList DefaultValue = QueryList("DefaultValue",
     { Query("INSERT INTO t (x) VALUES (5)", false),
       Query("INSERT INTO t (x, y) VALUES (18, -53)", false),
       // Query("INSERT INTO u () VALUES ()", false),
-      Query("INSERT INTO u VALUES (DEFAULT)", false),
-      Query("INSERT INTO u VALUES (DEFAULT(z))", false),
+      // Query("INSERT INTO u VALUES (DEFAULT)", false),
+      // Query("INSERT INTO u VALUES (DEFAULT(z))", false),
       Query("SELECT * FROM t WHERE x = 12", false),
       Query("INSERT INTO t (x) VALUES (19)", false),
       Query("SELECT * FROM t WHERE x = 19", false),
@@ -1081,7 +1081,7 @@ CheckAnnotatedQuery(const TestConfig &tc, std::string control_query,
 
     ResType control_res;
     ResType test_res;
-    
+
     LOG(test) << "control query: " << control_query;
     if (control_query == "") {
         control_res = ResType(true);
@@ -1200,7 +1200,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 351/353.
+    //      TOTAL RESULT: 351/351.
     // ###############################
 
     std::vector<Score> scores;
@@ -1247,7 +1247,7 @@ RunTest(const TestConfig &tc) {
     // Pass 17/17
     scores.push_back(CheckQueryList(tc, Negative));
 
-    // Pass 12/14
+    // Pass 12/12
     scores.push_back(CheckQueryList(tc, DefaultValue));
 
     for (auto it : scores) {

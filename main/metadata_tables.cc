@@ -3,6 +3,7 @@
 
 #include <main/metadata_tables.hh>
 #include <main/Connect.hh>
+#include <main/macro_util.hh>
 
 std::string MetaDataTables::Name::delta()
 {
@@ -29,19 +30,19 @@ std::string MetaDataTables::Name::bleedingMetaObject()
     return "BleedingMetaObject";
 }
 
-void MetaDataTables::initialize(const std::unique_ptr<Connect> &conn,
+bool MetaDataTables::initialize(const std::unique_ptr<Connect> &conn,
                                 const std::unique_ptr<Connect> &e_conn)
 {
     const std::string create_db =
         " CREATE DATABASE IF NOT EXISTS pdb;";
-    assert(e_conn.get()->execute(create_db));
+    RETURN_FALSE_IF_FALSE(e_conn.get()->execute(create_db));
 
     const std::string create_delta_table =
         " CREATE TABLE IF NOT EXISTS pdb." + Name::delta() +
         "    (remote_complete BOOLEAN NOT NULL,"
         "     id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
-    assert(e_conn.get()->execute(create_delta_table));
+    RETURN_FALSE_IF_FALSE(e_conn.get()->execute(create_delta_table));
 
     const std::string create_query_table =
         " CREATE TABLE IF NOT EXISTS pdb." + Name::query() +
@@ -51,14 +52,14 @@ void MetaDataTables::initialize(const std::unique_ptr<Connect> &conn,
         "    ddl BOOLEAN NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
-    assert(e_conn.get()->execute(create_query_table));
+    RETURN_FALSE_IF_FALSE(e_conn.get()->execute(create_query_table));
 
     const std::string create_dml_table =
         " CREATE TABLE IF NOT EXISTS " + Name::dmlCompletion() +
         "   (delta_output_id BIGINT NOT NULL,"
         "    id SERIAL)"
         " ENGINE=InnoDB;";
-    assert(conn.get()->execute(create_dml_table));
+    RETURN_FALSE_IF_FALSE(conn.get()->execute(create_dml_table));
 
     const std::string create_meta_table =
         " CREATE TABLE IF NOT EXISTS pdb." + Name::metaObject() +
@@ -67,7 +68,7 @@ void MetaDataTables::initialize(const std::unique_ptr<Connect> &conn,
         "    parent_id BIGINT NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
-    assert(e_conn.get()->execute(create_meta_table));
+    RETURN_FALSE_IF_FALSE(e_conn.get()->execute(create_meta_table));
 
     const std::string create_bleeding_table =
         " CREATE TABLE IF NOT EXISTS pdb." + Name::bleedingMetaObject() +
@@ -76,8 +77,8 @@ void MetaDataTables::initialize(const std::unique_ptr<Connect> &conn,
         "    parent_id BIGINT NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
-    assert(e_conn.get()->execute(create_bleeding_table));
+    RETURN_FALSE_IF_FALSE(e_conn.get()->execute(create_bleeding_table));
 
-    return;
+    return true;
 }
 
