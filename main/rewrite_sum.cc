@@ -186,13 +186,16 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
     {
         LOG(cdb_v) << "Item_sum_sum rewrite " << *i;
 
-        std::list<Item *> args = rewrite_agg_args(i, constr, (RewritePlanOneOLK *)rp, a, 1);
+        std::list<Item *> args =
+            rewrite_agg_args(i, constr,
+                             static_cast<const RewritePlanOneOLK *>(rp),
+                             a, 1);
 
         OnionMeta * om = constr.key->getOnionMeta(oAGG);
         assert(om);
         EncLayer *el = a.getBackEncLayer(om);
-        assert_s(el->level() == SECLEVEL::HOM, "incorrect onion level on onion oHOM");
-        return ((HOM *)el)->sumUDA(args.front());
+        TEST_UnexpectedSecurityLevel(SECLEVEL::HOM, el->level());
+        return static_cast<HOM *>(el)->sumUDA(args.front());
     }
 };
 

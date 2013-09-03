@@ -506,7 +506,8 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
         Item_field * const field =
             stringToItemField(om->getAnonOnionName(), tableanon, itf);
         decUDF = back_el.get()->decryptUDF(field, salt);
-        assert(a.getBackEncLayer(om)->level() == SECLEVEL::PLAINVAL);
+        TEST_UnexpectedSecurityLevel(SECLEVEL::PLAINVAL,
+                                     a.getBackEncLayer(om)->level());
 
         // HACK.
         const std::shared_ptr<EncLayer> do_nothing_el(new Blocking());
@@ -514,7 +515,8 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
 
         const std::shared_ptr<EncLayer>
             waiting_el(a.getBackEncLayer(wait_om));
-        assert(waiting_el->level() == SECLEVEL::BLOCKING);
+        TEST_UnexpectedSecurityLevel(SECLEVEL::BLOCKING,
+                                     waiting_el->level());
         a.deltas.push_back(new DeleteDelta(waiting_el, wait_om, NULL));
     } else {
         fieldanon = om->getAnonOnionName();
@@ -563,7 +565,7 @@ adjustOnion(Analysis &a, const ProxyState &ps, onion o,
             removeOnionLayer(a, ps, fm, itf, o, &newlevel, cur_db);
         adjust_queries.push_back(query);
     }
-    assert(newlevel == tolevel);
+    TEST_UnexpectedSecurityLevel(tolevel, newlevel);
 
     return adjust_queries;
 }
@@ -1171,7 +1173,7 @@ executeQuery(ProxyState &ps, const std::string &q)
         } else {
             return NULL;
         }
-    } catch (BadItemArgumentCount &e) {
+    } catch (AbstractCryptDBError &e) {
         std::cout << e << std::endl;
         DBResult *dbres;
         assert(mysql_noop_dbres(ps.getConn(), &dbres));

@@ -5,6 +5,8 @@
 #include <stdexcept>
 #include <string>
 
+#include <util/onions.hh>
+
 class CryptDBError {
 public:
     CryptDBError(const std::string &m) : msg(m) {}
@@ -42,6 +44,21 @@ private:
     const unsigned int type;
     int expected;
     int actual;
+};
+
+class UnexpectedSecurityLevel : public AbstractCryptDBError {
+public:
+    UnexpectedSecurityLevel(const std::string &file_name, int line_number,
+                            SECLEVEL expected, SECLEVEL actual)
+        : AbstractCryptDBError(file_name, line_number),
+          expected(expected), actual(actual) {}
+    ~UnexpectedSecurityLevel() {}
+
+    std::string to_string() const final;
+
+private:
+    SECLEVEL expected;
+    SECLEVEL actual;
 };
 
 std::ostream &operator<<(std::ostream &out,

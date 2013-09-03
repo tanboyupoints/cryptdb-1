@@ -572,8 +572,7 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
             OnionMeta * const om = curr_olk.key->getOnionMeta(oAGG);
             assert(om);
             EncLayer * const el = a.getBackEncLayer(om);
-            assert_s(el->level() == SECLEVEL::HOM,
-                     "incorrect onion level on onion oHOM");
+            TEST_UnexpectedSecurityLevel(SECLEVEL::HOM, el->level());
             return static_cast<HOM *>(el)->sumUDF(arg0, arg1);
         } else {
             IT * const out_i = new IT(arg0, arg1);
