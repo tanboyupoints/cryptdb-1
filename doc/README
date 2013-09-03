@@ -1,7 +1,11 @@
 CryptDB: http://css.csail.mit.edu/cryptdb
 Wiki: https://github.com/burrows-labs/cryptdb-wiki/wiki/_pages
 
-Getting Started
+#########################################
+#########################################
+########### Getting Started #############
+#########################################
+#########################################
     > Build CryptDB, as described in doc/BUILD.
     > Username/Password
         By default cryptdb uses 'root' for the username and 'letmein'
@@ -10,7 +14,12 @@ Getting Started
             + Shell: main/cdb_test.cc line 109.
             + Proxy: mysqlproxy/wrapper.lua line 17.
 
-A few ways to run CryptDB:
+#########################################
+#########################################
+####### A few ways to run CryptDB #######
+#########################################
+#########################################
+
     I. Shell
         > To Start: obj/main/cdb_test  /var/lib/shadow-mysql
         > Type SQL queries that will be encrypted.
@@ -33,7 +42,12 @@ A few ways to run CryptDB:
         > To Start:
             obj/test/test queries plain proxy-single
 
-Failing queries:
+#########################################
+#########################################
+############ Failing queries ############
+#########################################
+#########################################
+
     > CryptDB currently supports a subset of MySQL's capabilities. Queries
       can fail for a few reasons.
       I) CryptDB can support the query, but we have not yet implemented it.
@@ -63,11 +77,30 @@ Failing queries:
       III) State corruption (ie a bug in our code), this will likely lead
            to a crash.
 
-Misc.
+#########################################
+#########################################
+################ Misc ###################
+#########################################
+#########################################
+
     > For example queries, take a look at our tests test/TestQueries.cc
     > The benchmarks in the CryptDB paper are based on an older version of
       CryptDB and likely do not reflect current performance.  It is our
       intention to improve the performance of this new version.
     > Consider connecting directly to MySQL to see what is in the raw
       database.
+    > Cleaning the embedded database.
+        + To get a fresh embedded database to work with, issue these
+          commands.
+            $ rm -r /var/lib/shadow-mysql/*
+            $ mysql -u root -pletmein -e "drop database cryptdbtest"
+            $ mysql -u root -pletmein -e "create database cryptdbtest"
+            $ mysql -u root -pletmein -e "drop database cryptdbtest_control"
+            $ mysql -u root -pletmein -e "create database cryptdbtest_control"
+    > Modifying the UDFs.
+        + If you make changes to edb/udf.cc, you must reinstall the UDFs
+          before your changes will take affect.
+            > sudo service mysql stop
+            > sudo make install
+            > sudo service mysql start
 

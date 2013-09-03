@@ -587,6 +587,7 @@ public:
     bool addAlias(const std::string &alias, const std::string &table);
     OnionMeta *getOnionMeta(const std::string &table,
                             const std::string &field, onion o) const;
+    OnionMeta *getOnionMeta(const FieldMeta *const fm, onion o) const;
     FieldMeta *getFieldMeta(const std::string &table,
                             const std::string &field) const;
     FieldMeta *getFieldMeta(const TableMeta * const tm,

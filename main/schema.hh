@@ -108,7 +108,8 @@ public:
     friend class Analysis;
     friend class FieldMeta;
     friend bool sanityCheck(FieldMeta * const);
-    friend Item *decrypt_item_layers(Item *, FieldMeta *, onion, uint64_t,
+    friend Item *decrypt_item_layers(Item *const, const FieldMeta *const,
+                                     onion, uint64_t,
                                      const std::vector<Item *> &);
 
 private:
@@ -165,10 +166,10 @@ public:
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
 
-    SECURITY_RATING getSecurityRating() {return sec_rating;}
+    SECURITY_RATING getSecurityRating() const {return sec_rating;}
     unsigned long leaseIncUniq() {return counter++;}
     // FIXME: Change name.
-    unsigned long getCurrentUniqCounter() {return counter;}
+    unsigned long getCurrentUniqCounter() const {return counter;}
     bool needExtraPlainColumn() const;
     std::string getToPlainName() const;
     bool hasOnion(onion o) const;
