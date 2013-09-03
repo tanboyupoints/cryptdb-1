@@ -20,7 +20,7 @@
 #include <main/CryptoHandlers.hh>
 #include <parser/lex_util.hh>
 #include <main/enum_text.hh>
-
+#include <main/macro_util.hh>
 
 // gives names to classes and objects we don't care to know the name of 
 #define ANON                ANON_NAME(__anon_id_func_)
@@ -133,7 +133,7 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
                const EncSet & other_encset = PLAIN_EncSet)
 {
     Item ** const args = i->arguments();
-    assert(i->argument_count() == 2);
+    TEST_BadItemArgumentCount(i->type(), 2, i->argument_count());
 
     reason r1, r2;
     RewritePlan ** const childr_rp = new RewritePlan*[2];
@@ -218,7 +218,7 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
     virtual RewritePlan * do_gather_type(Item_func_neg *i, reason &tr,
                                          Analysis &a) const
     {
-        assert(i->argument_count() == 1);
+        TEST_BadItemArgumentCount(i->type(), 1, i->argument_count());
 
         auto arg = i->arguments()[0];
         if (arg->type() == Item::Type::FIELD_ITEM) {
@@ -348,8 +348,7 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
         };
         const EncSet my_es = getEncSet();
 
-        assert_s(i->argument_count() == 2,
-                 "expected two arguments for comparison");
+        TEST_BadItemArgumentCount(i->type(), 2, i->argument_count());
         return typical_gather(a, i, my_es, why, tr, false, PLAIN_EncSet);
     }
 
@@ -364,7 +363,7 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
     {
         LOG(cdb_v) << "do_rewrite_type Item_func " << *i << " constr "
                    << EncSet(constr);
-        assert_s(i->argument_count() == 2, "compare function does not have two arguments as expected");
+        TEST_BadItemArgumentCount(i->type(), 2, i->argument_count());
         return rewrite_args_FN(i, constr,
                                static_cast<const RewritePlanOneOLK *>(rp),
                                a);
@@ -385,7 +384,7 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
                                          Analysis & a) const
     {
         const unsigned int arg_count = i->argument_list()->elements;
-        assert(2 <= arg_count);
+        TEST_BadItemArgumentCount(i->type(), 2, arg_count);
 
         const EncSet out_es = PLAIN_EncSet;
         EncSet child_es = EQ_EncSet;
@@ -459,7 +458,7 @@ class CItemNullcheck : public CItemSubtypeFT<Item_bool_func, FT> {
     virtual RewritePlan * do_gather_type(Item_bool_func *i, reason &tr, Analysis & a) const
     {
         Item ** const args = i->arguments();
-        assert(i->argument_count() == 1);
+        TEST_BadItemArgumentCount(i->type(), 1, i->argument_count());
 
         reason r;
         RewritePlan ** const child_rp = new RewritePlan*[1];
@@ -553,8 +552,7 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
                    << " with constr " << EncSet(constr);
 
         //rewrite children
-        assert_s(i->argument_count() == 2,
-                 " expecting two arguments for additive operator ");
+        TEST_BadItemArgumentCount(i->type(), 2, i->argument_count());
         Item ** const args = i->arguments();
 
         const RewritePlanOneOLK * const rp =
@@ -607,7 +605,7 @@ class CItemMath : public CItemSubtypeFN<IT, NAME> {
                                    const RewritePlan * _rp,
                                    Analysis & a) const
     {
-        assert(i->argument_count() == 2);
+        TEST_BadItemArgumentCount(i->type(), 2, i->argument_count());
         Item **args = i->arguments();
 
         const RewritePlanOneOLK * const rp =
@@ -766,7 +764,7 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
     virtual RewritePlan * do_gather_type(Item_func_like *i, reason &tr,
                                          Analysis & a) const
     {
-        assert(i->argument_count() == 2);
+        TEST_BadItemArgumentCount(i->type(), 2, i->argument_count());
         const std::string why = "like";
         return allPlainIterateGather(i, why, tr, a);
 
@@ -953,11 +951,7 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
     virtual RewritePlan * do_gather_type(Item_func_min_max *i, reason &tr, Analysis & a) const
     {
         Item ** const args = i->arguments();
-        const uint argcount = i->argument_count();
-        if (argcount != 2) {
-                std::cerr << "expected two arguments in " << *i << "\n";
-            assert(false);
-        }
+        TEST_BadItemArgumentCount(i->type(), 2, i->argument_count());
         //at least one has to be a constant as we don't support join now
         assert_s(args[0]->const_item() || args[1]->const_item(), "ope join not yet implemented");
 
@@ -1086,7 +1080,7 @@ static class ANON : public CItemSubtypeFN<Item_func_nullif, str_nullif> {
                                          reason &tr, Analysis & a)
         const
     {
-        assert(i->argument_count() == 2);
+        TEST_BadItemArgumentCount(i->type(), 2, i->argument_count());
         RewritePlan ** const childr_rp = new RewritePlan*[2];
         Item ** const args = i->arguments();
 

@@ -17,11 +17,11 @@
 
 #include <main/rewrite_main.hh>
 #include <main/rewrite_util.hh>
-#include <util/cryptdb_log.hh>
-#include <main/CryptoHandlers.hh>
-#include <parser/lex_util.hh>
 #include <main/enum_text.hh>
-
+#include <main/CryptoHandlers.hh>
+#include <main/macro_util.hh>
+#include <util/cryptdb_log.hh>
+#include <parser/lex_util.hh>
 
 // gives names to classes and objects we don't care to know the name of 
 #define ANON                ANON_NAME(__anon_id_sum_)
@@ -48,9 +48,8 @@ rewrite_agg_args(Item_sum * oldi, const OLK & constr,
                  int no_args = -1)
 {
     if (no_args >= 0) {
-        assert_s(oldi->get_arg_count() == (uint)no_args,
-                 "support for aggregation with this number of arguments "
-                    " not currently implemented");
+        TEST_BadItemArgumentCount(oldi->type(), no_args,
+                                  oldi->get_arg_count());
     } else {
         no_args = oldi->get_arg_count();
     }
@@ -114,28 +113,33 @@ static CItemCount<Item_sum::Sumfunctype::COUNT_DISTINCT_FUNC> ANON;
 
 template<Item_sum::Sumfunctype SFT, class IT>
 class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
-    virtual RewritePlan * do_gather_type(Item_sum_hybrid *i, reason &tr, Analysis & a) const {
-      assert(i->get_arg_count() == 1);
-      Item *child = i->get_arg(0);
-      RewritePlan **child_rp = new RewritePlan*[1];
-      reason r;
-      child_rp[0] = gather(child, r, a);
-      EncSet es = child_rp[0]->es_out;
-      EncSet needed = ORD_EncSet;
-      EncSet supported = needed.intersect(es);
-      check_if_empty(supported, i, needed, r);
-      OLK olk = supported.chooseOne();
-      EncSet out = EncSet(olk);
-      tr= reason(out, "min/max", i);
-      return new RewritePlanOneOLK(out, olk, child_rp, tr);
+    virtual RewritePlan * do_gather_type(Item_sum_hybrid *i, reason &tr,
+                                         Analysis &a) const
+    {
+        TEST_BadItemArgumentCount(i->type(), 1, i->get_arg_count());
+
+        Item *const child = i->get_arg(0);
+        RewritePlan **const child_rp = new RewritePlan*[1];
+        reason r;
+        child_rp[0] = gather(child, r, a);
+        const EncSet needed = ORD_EncSet;
+        const EncSet supported = needed.intersect(child_rp[0]->es_out);
+        check_if_empty(supported, i, needed, r);
+        const OLK olk = supported.chooseOne();
+        const EncSet out = EncSet(olk);
+        tr = reason(out, "min/max", i);
+        // INVESTIGATE: Should 'out' be 'supported'?
+        return new RewritePlanOneOLK(out, olk, child_rp, tr);
     }
 
-    virtual Item * do_rewrite_type(Item_sum_hybrid *i,
-           const OLK & constr, const RewritePlan * rp,
-           Analysis & a) const
+    virtual Item *do_rewrite_type(Item_sum_hybrid *i, const OLK &constr,
+                                  const RewritePlan *rp, Analysis &a)
+        const
     {
         std::list<Item *> args =
-            rewrite_agg_args(i, constr, (RewritePlanOneOLK *)rp, a, 1);
+            rewrite_agg_args(i, constr,
+                             static_cast<const RewritePlanOneOLK *>(rp),
+                             a, 1);
         return new IT(args.front());
     }
 };
@@ -149,7 +153,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
                                          Analysis & a) const
     {
         LOG(cdb_v) << "gather Item_sum_sum " << *i;
-        assert_s(i->get_arg_count() == 1, "expected one argument for sum");
+        TEST_BadItemArgumentCount(i->type(), 1, i->get_arg_count());
         Item * child_item = i->get_arg(0);
         reason child_r;
         RewritePlan ** childr_rp = new RewritePlan*[1];

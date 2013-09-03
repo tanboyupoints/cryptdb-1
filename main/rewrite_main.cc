@@ -850,6 +850,18 @@ mysql_noop()
     return "do 0;";
 }
 
+static
+bool
+mysql_noop_dbres(const std::unique_ptr<Connect> &c, DBResult **dbres)
+{
+    if (!(c.get()->execute(mysql_noop(), *dbres))) {
+        dbres = NULL;
+        return false;
+    }
+
+    return true;
+}
+
 RewriteOutput *
 Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
                         const std::string &query)
@@ -1107,6 +1119,7 @@ prettyPrintQueryResult(ResType res)
     std::cout << std::endl;
 }
 
+// FIXME: DBResult and ResType memleaks.
 ResType *
 executeQuery(ProxyState &ps, const std::string &q)
 {
@@ -1158,6 +1171,11 @@ executeQuery(ProxyState &ps, const std::string &q)
         } else {
             return NULL;
         }
+    } catch (BadItemArgumentCount &e) {
+        std::cout << e << std::endl;
+        DBResult *dbres;
+        assert(mysql_noop_dbres(ps.getConn(), &dbres));
+        return new ResType(dbres->unpack());
     } catch (std::runtime_error &e) {
         std::cout << "Unexpected Error: " << e.what() << " in query "
                   << q << std::endl;
