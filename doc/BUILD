@@ -106,7 +106,7 @@ EOM$
     > make
     > sudo make install
     > mkdir /var/lib/shadow-mysql
-    > sudo chmod <account-running-mysql> /var/lib/shadow-mysql
+    > sudo chown <account-running-mysql> /var/lib/shadow-mysql
 
 
 Now go to doc/README for information on how to use CryptDB.
