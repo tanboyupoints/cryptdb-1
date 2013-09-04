@@ -16,11 +16,11 @@ Building CryptDB
 #########################################
 #########################################
 
-    > sudo apt-get install liblua5.1-0.dev libntl-dev libmysqlclient-dev \
+    > sudo apt-get install liblua5.1-0-dev libntl-dev libmysqlclient-dev \
                            libssl-dev libbsd-dev libevent-dev            \
                            libglib2.0-dev libgmp-dev mysql-server        \
                            libaio-dev automake gtk-doc-tools flex cmake  \
-                           libncurses5-dev bison g++ bzr
+                           libncurses5-dev bison g++ bzr make
     > During the installation of mysql-server it may ask you to provide
       a password for the root user. For the purpose of this document we
       will use the password 'letmein' (without the single quotes).

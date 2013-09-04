@@ -40,7 +40,9 @@ public:
           expected(expected), actual(actual) {}
     ~BadItemArgumentCount() {}
 
-    std::string to_string() const final;
+    // final requires g++ 4.7
+    // std::string to_string() const final;
+    std::string to_string() const;
 
 private:
     // const Item::Type type;
@@ -57,7 +59,8 @@ public:
           expected(expected), actual(actual) {}
     ~UnexpectedSecurityLevel() {}
 
-    std::string to_string() const final;
+    // std::string to_string() const final;
+    std::string to_string() const;
 
 private:
     const onion o;
@@ -77,7 +80,8 @@ public:
           child_count(child_count) {}
     ~NoAvailableEncSet() {}
 
-    std::string to_string() const final;
+    // std::string to_string() const final;
+    std::string to_string() const;
 
 private:
     // const Item *const i;
