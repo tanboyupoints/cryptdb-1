@@ -183,11 +183,20 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
                              static_cast<const RewritePlanOneOLK *>(rp),
                              a, 1);
 
-        OnionMeta *const om = constr.key->getOnionMeta(oAGG);
-        assert(om);
-        const EncLayer *const el = a.getBackEncLayer(om);
-        TEST_UnexpectedSecurityLevel(oAGG, SECLEVEL::HOM, el->level());
-        return static_cast<const HOM *>(el)->sumUDA(args.front());
+        if (oAGG == constr.o) {
+            OnionMeta *const om = constr.key->getOnionMeta(oAGG);
+            assert(om);
+            const EncLayer *const el = a.getBackEncLayer(om);
+            TEST_UnexpectedSecurityLevel(oAGG, SECLEVEL::HOM,
+                                         el->level());
+            return static_cast<const HOM *>(el)->sumUDA(args.front());
+        } else {
+            TEST_UnexpectedSecurityLevel(constr.o, SECLEVEL::PLAINVAL,
+                                         constr.l);
+            Item_sum_sum *const out_i =
+                new Item_sum_sum(i->get_arg(0), i->has_with_distinct());
+            return out_i;
+        }
     }
 };
 

@@ -39,7 +39,7 @@ encrypt_item(Item * i, const OLK & olk, Analysis & a)
     // > SELECT 8*9 FROM t
 */
     FieldMeta * const fm = olk.key;
-    if (!fm && oPLAIN == olk.o) {
+    if (!fm && olk.l == SECLEVEL::PLAINVAL) {
         return i;
     }
     assert(fm);

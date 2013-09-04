@@ -569,12 +569,12 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
             itemTypes.do_rewrite(args[1], child_olk, rp->childr_rp[1], a);
 
         if (oAGG == constr.o) {
-            OnionMeta * const om = curr_olk.key->getOnionMeta(oAGG);
+            OnionMeta *const om = curr_olk.key->getOnionMeta(oAGG);
             assert(om);
-            EncLayer * const el = a.getBackEncLayer(om);
+            const EncLayer *const el = a.getBackEncLayer(om);
             TEST_UnexpectedSecurityLevel(oAGG, SECLEVEL::HOM,
                                          el->level());
-            return static_cast<HOM *>(el)->sumUDF(arg0, arg1);
+            return static_cast<const HOM *>(el)->sumUDF(arg0, arg1);
         } else {
             IT * const out_i = new IT(arg0, arg1);
             return out_i;

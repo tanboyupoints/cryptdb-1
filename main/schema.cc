@@ -374,7 +374,7 @@ onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
                                       bool * const plain_number)
 {
     if (sec_rating == SECURITY_RATING::PLAIN) {
-        assert(!m_key);
+        // assert(!m_key);
         return PLAIN_ONION_LAYOUT;
     }
 
