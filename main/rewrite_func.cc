@@ -127,16 +127,17 @@ throwFieldToPlainIfBlocked(Item *const waiting_arg,
 // Only works with nodes with one outgoing encset, which could be other_encset
 // if encset_from_intersection is false, or else is the intersection with the children
 static RewritePlan *
-typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
-               std::string why, reason & my_r,
+typical_gather(Analysis &a, Item_func *i, const EncSet &my_es,
+               const std::string &why, reason &my_r,
                bool encset_from_intersection,
-               const EncSet & other_encset = PLAIN_EncSet)
+               const EncSet &other_encset = PLAIN_EncSet)
 {
-    Item ** const args = i->arguments();
-    TEST_BadItemArgumentCount(i->type(), 2, i->argument_count());
+    const unsigned int arg_count = i->argument_count();
+    TEST_BadItemArgumentCount(i->type(), 2, arg_count);
 
     reason r1, r2;
-    RewritePlan ** const childr_rp = new RewritePlan*[2];
+    Item *const *const args = i->arguments();
+    RewritePlan **const childr_rp = new RewritePlan*[2];
     childr_rp[0] = gather(args[0], r1, a);
     childr_rp[1] = gather(args[1], r2, a);
 
@@ -154,11 +155,10 @@ typical_gather(Analysis & a, Item_func * i, const EncSet &my_es,
         throwFieldToPlainIfBlocked(args[0], args[1], a);
         throwFieldToPlainIfBlocked(args[1], args[0], a);
 
-        std::cerr << "crypto schemes does not support this query BECAUSE "
-                  << i << " NEEDS " << my_es << "\n"
-                  << " BECAUSE " << why << "\n" \
-                  << " AND children have:  " << r1 << r2 << "\n";
-        assert(false);
+        // NOTE: Redundant in the sense that we know the test will fail,
+        // but we need to give the opportunity to handle the above cases.
+        TEST_NoAvailableEncSet(solution, i->type(), my_es, why,
+                               childr_rp, arg_count);
     }
 
     std::function<EncSet ()> getEncSet =
@@ -279,7 +279,7 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
             Item *const neg_i = new Item_int(-int_arg->value);
 
             return itemTypes.do_rewrite(neg_i, constr,
-                            rp_one->childr_rp[0], a);
+                                        rp_one->childr_rp[0], a);
         } else if (oWAIT == constr.o || oPLAIN == constr.o) {
             return rewrite_args_FN(i, constr, rp_one, a);
         } else {
@@ -948,33 +948,33 @@ getArgs(Item_func * itf) {
 
 template<const char *FN, class IT>
 class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
-    virtual RewritePlan * do_gather_type(Item_func_min_max *i, reason &tr, Analysis & a) const
+    virtual RewritePlan *do_gather_type(Item_func_min_max *i, reason &tr,
+                                        Analysis & a) const
     {
-        Item ** const args = i->arguments();
-        TEST_BadItemArgumentCount(i->type(), 2, i->argument_count());
+        const unsigned int arg_count = i->argument_count();
+        TEST_BadItemArgumentCount(i->type(), 2, arg_count);
+
+        Item *const *const args = i->arguments();
         //at least one has to be a constant as we don't support join now
-        assert_s(args[0]->const_item() || args[1]->const_item(), "ope join not yet implemented");
+        assert_s(args[0]->const_item() || args[1]->const_item(),
+                 "ope join not yet implemented");
 
         reason r1, r2;
-        RewritePlan ** const childr_rp = new RewritePlan*[2];
+        RewritePlan **const childr_rp = new RewritePlan*[2];
         childr_rp[0] = gather(args[0], r1, a);
-            childr_rp[1] = gather(args[1], r2, a);
+        childr_rp[1] = gather(args[1], r2, a);
         const EncSet es1 = childr_rp[0]->es_out;
         const EncSet es2 = childr_rp[1]->es_out;
-
         const EncSet needed_es = ORD_EncSet;
+        const EncSet supported_es =
+            needed_es.intersect(es1).intersect(es2);
 
-        EncSet supported_es = needed_es.intersect(es1).intersect(es2);
-
-        if (false == supported_es.available()) {
-                std::cerr << "cannot support " << i << " BECAUSE it needs any of " << needed_es << "\n" \
-             << "BUT children only have (" << r1 << "\n" << r2 << ")\n";
-            assert(false);
-        }
+        const std::string why = "min_max func";
+        TEST_NoAvailableEncSet(supported_es, i->type(), needed_es, why,
+                               childr_rp, arg_count);
 
         const EncSet out_es = es1.intersect(es2);
-
-        tr = reason(out_es, "min_max func", i);
+        tr = reason(out_es, why, i);
         tr.add_child(r1);
         tr.add_child(r2);
 
@@ -982,45 +982,49 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
         return new RewritePlanOneOLK(out_es, supported_es.chooseOne(),
                                      childr_rp, tr);
     }
-    virtual Item * do_optimize_type(Item_func_min_max *i, Analysis & a) const
+
+    virtual Item *do_optimize_type(Item_func_min_max *i,
+                                   Analysis & a) const
     {
         return do_optimize_type_self_and_args(i, a);
     }
 
-    virtual Item * do_rewrite_type(Item_func_min_max *i, const OLK & constr,
-                                   const RewritePlan * _rp,
-                                   Analysis & a) const
+    virtual Item *do_rewrite_type(Item_func_min_max *i,
+                                  const OLK &constr,
+                                  const RewritePlan * _rp,
+                                  Analysis &a) const
     {
-        RewritePlanOneOLK * const rp = (RewritePlanOneOLK *)_rp;
+        const RewritePlanOneOLK *const rp =
+            static_cast<const RewritePlanOneOLK *>(_rp);
 
         if (SECLEVEL::PLAINVAL == rp->olk.l) { // no change
             return i;
         }
 
         // replace with IF( cond_arg0 cond cond_arg1, args0, args1)
-        Item ** const args = i->arguments();
-        Item * const cond_arg0 =
+        Item *const *const args = i->arguments();
+        Item *const cond_arg0 =
             itemTypes.do_rewrite(args[0], rp->olk, rp->childr_rp[0], a);
-        Item * const cond_arg1 =
+        Item *const cond_arg1 =
             itemTypes.do_rewrite(args[1], rp->olk, rp->childr_rp[1], a);
 
-        int cmp_sign =
+        const int cmp_sign =
             i->*rob<Item_func_min_max, int,
                     &Item_func_min_max::cmp_sign>::ptr();
 
-        Item * cond;
+        AssignOnce<Item *> cond;
         if (cmp_sign) {
             cond = new Item_func_gt(cond_arg0, cond_arg1);
         } else {
             cond = new Item_func_lt(cond_arg0, cond_arg1);
         }
 
-        return new Item_func_if(cond,
-                    itemTypes.do_rewrite(args[0], constr,
-                                 rp->childr_rp[0], a),
-                    itemTypes.do_rewrite(args[1], constr,
-                                 rp->childr_rp[1], a));
-        }
+        return new Item_func_if(cond.get(),
+                                itemTypes.do_rewrite(args[0], constr,
+                                                rp->childr_rp[0], a),
+                                itemTypes.do_rewrite(args[1], constr,
+                                                rp->childr_rp[1], a));
+    }
 };
 
 //TODO: do we still need the file analyze.cc?

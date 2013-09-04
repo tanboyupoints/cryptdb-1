@@ -26,19 +26,6 @@
 // gives names to classes and objects we don't care to know the name of 
 #define ANON                ANON_NAME(__anon_id_sum_)
 
-static void
-check_if_empty(const EncSet & sol, Item * i, const EncSet & my_es,
-               const reason & child_r)
-{
-    if (false == sol.available()) {
-        std::cerr << "current crypto schemes do not support this query" << std::endl
-                  << "BECAUSE " << i << " NEEDS " << my_es << std::endl
-                  << "AND children have " << child_r << std::endl;
-        assert(false);
-    }
-}
-
-
 // rewrites the arguments of aggregators
 // no_args specifies a certain number of arguments that I must have
 // if negative, i can have any no. of arguments
@@ -71,25 +58,28 @@ class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
     virtual RewritePlan * do_gather_type(Item_sum_count *i, reason &tr,
                                          Analysis & a) const
     {
+        const unsigned int arg_count = i->get_arg_count();
+        TEST_BadItemArgumentCount(i->type(), 1, arg_count);
+        Item *const child = i->get_arg(0);
+
         reason r;
-        RewritePlan **childr_rp = new RewritePlan*[1];
-        childr_rp[0] = gather(i->get_arg(0), r, a);
-        const EncSet solution = childr_rp[0]->es_out.intersect(EQ_EncSet);
-        
+        RewritePlan **const childr_rp = new RewritePlan*[arg_count];
+        childr_rp[0] = gather(child, r, a);
+        const EncSet needed = EQ_EncSet;
+        const EncSet solution = childr_rp[0]->es_out.intersect(needed);
+
         std::string why = "count";
         if (i->has_with_distinct()) {
-            if (false == solution.available()) {
-                throw CryptDBError("count distinct must support equality");
-            }
             why += " distinct";
+            TEST_NoAvailableEncSet(solution, i->type(), needed, why,
+                                   childr_rp, arg_count);
         }
 
-        OLK out_olk = PLAIN_EncSet.chooseOne();
-
-        tr = reason(EncSet(out_olk), why, i);
+        const EncSet out_enc_set = PLAIN_EncSet;
+        tr = reason(out_enc_set, why, i);
         tr.add_child(r);
 
-        return new RewritePlanOneOLK(EncSet(out_olk), solution.chooseOne(),
+        return new RewritePlanOneOLK(out_enc_set, solution.chooseOne(),
                                      childr_rp, tr);
     }
 
@@ -116,18 +106,21 @@ class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
     virtual RewritePlan * do_gather_type(Item_sum_hybrid *i, reason &tr,
                                          Analysis &a) const
     {
-        TEST_BadItemArgumentCount(i->type(), 1, i->get_arg_count());
-
+        const unsigned int arg_count = i->get_arg_count();
+        TEST_BadItemArgumentCount(i->type(), 1, arg_count);
         Item *const child = i->get_arg(0);
-        RewritePlan **const child_rp = new RewritePlan*[1];
+
         reason r;
+        RewritePlan **const child_rp = new RewritePlan*[arg_count];
         child_rp[0] = gather(child, r, a);
         const EncSet needed = ORD_EncSet;
         const EncSet supported = needed.intersect(child_rp[0]->es_out);
-        check_if_empty(supported, i, needed, r);
+        const std::string why = "min/max";
+        TEST_NoAvailableEncSet(supported, i->type(), needed, why,
+                               child_rp, arg_count);
         const OLK olk = supported.chooseOne();
         const EncSet out = EncSet(olk);
-        tr = reason(out, "min/max", i);
+        tr = reason(out, why, i);
         // INVESTIGATE: Should 'out' be 'supported'?
         return new RewritePlanOneOLK(out, olk, child_rp, tr);
     }
@@ -150,39 +143,38 @@ static CItemChooseOrder<Item_sum::Sumfunctype::MAX_FUNC, Item_sum_max> ANON;
 template<Item_sum::Sumfunctype SFT>
 class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
     virtual RewritePlan * do_gather_type(Item_sum_sum *i, reason &tr,
-                                         Analysis & a) const
+                                         Analysis &a) const
     {
         LOG(cdb_v) << "gather Item_sum_sum " << *i;
-        TEST_BadItemArgumentCount(i->type(), 1, i->get_arg_count());
-        Item * child_item = i->get_arg(0);
+        const unsigned int arg_count = i->get_arg_count();
+        TEST_BadItemArgumentCount(i->type(), 1, arg_count);
+        Item *const child_item = i->get_arg(0);
+
         reason child_r;
-        RewritePlan ** childr_rp = new RewritePlan*[1];
-        RewritePlan * child_rp = gather(child_item, child_r, a);
-        childr_rp[0] = child_rp;
-        EncSet child_es = child_rp->es_out;
+        RewritePlan **const childr_rp = new RewritePlan*[arg_count];
+        childr_rp[0] = gather(child_item, child_r, a);
 
         if (i->has_with_distinct()) {
             UNIMPLEMENTED;
         }
 
-        EncSet my_es = ADD_EncSet;
+        const EncSet my_es = ADD_EncSet;
+        const EncSet solution = my_es.intersect(childr_rp[0]->es_out);
+        const std::string why = "summation";
+        TEST_NoAvailableEncSet(solution, i->type(), my_es, why,
+                               childr_rp, arg_count);
 
-        EncSet solution = my_es.intersect(child_es);
+        const OLK olk = solution.chooseOne();
+        const EncSet return_es = EncSet(olk);
+        tr = reason(return_es, why, i);
 
-        check_if_empty(solution, i, my_es, child_r);
-
-        OLK olk = solution.chooseOne();
-
-        EncSet return_es = EncSet(olk);
-        tr = reason(return_es, "summation", i);
-
-        return new RewritePlanOneOLK(return_es, olk, childr_rp, tr); ;
+        return new RewritePlanOneOLK(return_es, olk, childr_rp, tr);
     }
 
-    virtual Item * do_rewrite_type(Item_sum_sum * i,
-                                   const OLK & constr,
-                                   const RewritePlan * rp,
-                                   Analysis & a) const
+    virtual Item * do_rewrite_type(Item_sum_sum *i,
+                                   const OLK &constr,
+                                   const RewritePlan *rp,
+                                   Analysis &a) const
     {
         LOG(cdb_v) << "Item_sum_sum rewrite " << *i;
 
@@ -191,11 +183,11 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
                              static_cast<const RewritePlanOneOLK *>(rp),
                              a, 1);
 
-        OnionMeta * om = constr.key->getOnionMeta(oAGG);
+        OnionMeta *const om = constr.key->getOnionMeta(oAGG);
         assert(om);
-        EncLayer *el = a.getBackEncLayer(om);
+        const EncLayer *const el = a.getBackEncLayer(om);
         TEST_UnexpectedSecurityLevel(oAGG, SECLEVEL::HOM, el->level());
-        return static_cast<HOM *>(el)->sumUDA(args.front());
+        return static_cast<const HOM *>(el)->sumUDA(args.front());
     }
 };
 

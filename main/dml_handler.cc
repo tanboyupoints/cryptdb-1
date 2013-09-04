@@ -1,8 +1,9 @@
 #include <main/dml_handler.hh>
 #include <main/rewrite_main.hh>
-#include <parser/lex_util.hh>
 #include <main/rewrite_util.hh>
 #include <main/dispatcher.hh>
+#include <main/macro_util.hh>
+#include <parser/lex_util.hh>
 
 extern CItemTypesDir itemTypes;
 
@@ -364,29 +365,25 @@ analyze_field_value_pair(Item_field * field, Item * val, Analysis & a) {
 }
 
 static SQL_I_List<ORDER> *
-rewrite_order(Analysis & a, SQL_I_List<ORDER> & lst,
-              const EncSet & constr, const std::string & name)
+rewrite_order(Analysis &a, SQL_I_List<ORDER> &lst,
+              const EncSet &constr, const std::string &name)
 {
     SQL_I_List<ORDER> *new_lst = copy(&lst);
     ORDER * prev = NULL;
     for (ORDER *o = lst.first; o; o = o->next) {
-        Item *i = *o->item;
-        RewritePlan * rp = getAssert(a.rewritePlans, i);
+        Item *const i = *o->item;
+        RewritePlan *const rp = getAssert(a.rewritePlans, i);
         assert(rp);
-        EncSet es = constr.intersect(rp->es_out);
-        if (false == es.available()) {
-                std::cerr << " cannot support query because " << name
-                          << " item " << i << " needs to output any of "
-                          << constr << "\n"
-                  << " BUT it can only output " << rp->es_out
-                          << " BECAUSE " << "(" << rp->r << ")\n";
-            assert(false);
-        }
-        OLK olk = es.chooseOne();
+        const EncSet es = constr.intersect(rp->es_out);
+        // FIXME: Add version that will take a second EncSet of what
+        // we had available (ie, rp->es_out).
+        TEST_NoAvailableEncSet(es, i->type(), constr, rp->r.why_t,
+                               NULL, 0);
+        const OLK olk = es.chooseOne();
 
-        Item * new_item = itemTypes.do_rewrite(*o->item, olk, rp, a);
-        ORDER * neworder = make_order(o, new_item);
-        if (prev == NULL) {
+        Item *const new_item = itemTypes.do_rewrite(*o->item, olk, rp, a);
+        ORDER *const neworder = make_order(o, new_item);
+        if (NULL == prev) {
             *new_lst = *oneElemList(neworder);
         } else {
             prev->next = neworder;
@@ -436,8 +433,8 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
 {
     *invalids = false;
     for (;;) {
-        Item * const field_item = fd_it++;
-        Item * const value_item = val_it++;
+        Item *const field_item = fd_it++;
+        Item *const value_item = val_it++;
         if (!field_item) {
             assert(NULL == value_item);
             break;
@@ -445,20 +442,24 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
         assert(NULL != value_item);
 
         assert(field_item->type() == Item::FIELD_ITEM);
-        const Item_field * const ifd =
+        const Item_field *const ifd =
             static_cast<Item_field *>(field_item);
-        FieldMeta * const fm =
+        FieldMeta *const fm =
             a.getFieldMeta(ifd->table_name, ifd->field_name);
 
-        const RewritePlan * const rp =
+        const RewritePlan *const rp =
             getAssert(a.rewritePlans, value_item);
-        const EncSet r_es = rp->es_out.intersect(EncSet(a, fm));
-        assert(r_es.available());
+        const EncSet needed = EncSet(a, fm);
+        const EncSet r_es = rp->es_out.intersect(needed);
+        // FIXME: Add version for situations when we don't know about
+        // children.
+        TEST_NoAvailableEncSet(r_es, ifd->type(), needed, rp->r.why_t,
+                               NULL, 0);
 
         // Determine salt for field
         bool add_salt = false;
         if (fm->has_salt) {
-            auto it_salt = a.salts.find(fm);
+            const auto it_salt = a.salts.find(fm);
             if ((it_salt == a.salts.end()) && needsSalt(r_es)) {
                 add_salt = true;
                 const salt_type salt = randomValue();
@@ -467,16 +468,16 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
         }
 
         for (auto pair : r_es.osl) {
-            OLK olk = {pair.first, pair.second.first, fm};
-            RewritePlan *rp_field =
+            const OLK olk = {pair.first, pair.second.first, fm};
+            RewritePlan *const rp_field =
                 getAssert(a.rewritePlans, field_item);
-            Item *re_field =
+            Item *const re_field =
                 itemTypes.do_rewrite(field_item, olk, rp_field, a);
             res_items->push_back(re_field);
 
-            RewritePlan *rp_value =
+            RewritePlan *const rp_value =
                 getAssert(a.rewritePlans, value_item);
-            Item *re_value =
+            Item *const re_value =
                 itemTypes.do_rewrite(value_item, olk, rp_value, a);
             res_values->push_back(re_value);
         }

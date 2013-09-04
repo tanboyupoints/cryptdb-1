@@ -1458,8 +1458,8 @@ public:
     Item * decrypt(Item * const c, uint64_t IV);
 
     //expr is the expression (e.g. a field) over which to sum
-    Item * sumUDA(Item * const expr);
-    Item * sumUDF(Item * const i1, Item * const i2);
+    Item *sumUDA(Item *const expr) const;
+    Item *sumUDF(Item *const i1, Item *const i2) const;
 
 private:
     uint decimals;
@@ -1674,7 +1674,7 @@ static udf_func u_sum_f = {
 };
 
 Item *
-HOM::sumUDA(Item * const expr)
+HOM::sumUDA(Item *const expr) const
 {
     List<Item> l;
     l.push_back(expr);
@@ -1683,7 +1683,7 @@ HOM::sumUDA(Item * const expr)
 }
 
 Item *
-HOM::sumUDF(Item * const i1, Item * const i2)
+HOM::sumUDF(Item *const i1, Item *const i2) const
 {
     List<Item> l;
     l.push_back(i1);

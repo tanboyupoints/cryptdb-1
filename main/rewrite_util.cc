@@ -3,9 +3,10 @@
 #include <main/rewrite_util.hh>
 #include <main/enum_text.hh>
 #include <main/rewrite_main.hh>
+#include <main/List_helpers.hh>
+#include <main/macro_util.hh>
 #include <parser/lex_util.hh>
 #include <parser/stringify.hh>
-#include <List_helpers.hh>
 
 extern CItemTypesDir itemTypes;
 
@@ -28,15 +29,15 @@ optimize(Item ** const i, Analysis &a) {
 // that should be rewritten
 // @item_cache defaults to NULL
 Item *
-rewrite(Item * const i, const EncSet &req_enc, Analysis &a)
+rewrite(Item *const i, const EncSet &req_enc, Analysis &a)
 {
-    RewritePlan * const rp = getAssert(a.rewritePlans, i);
+    RewritePlan *const rp = getAssert(a.rewritePlans, i);
     assert(rp);
     const EncSet solution = rp->es_out.intersect(req_enc);
-    if (false == solution.available()) {
-        // FIXME: Error message;
-        assert(false);
-    }
+    // FIXME: Use version that takes reason, expects 0 children,
+    // and lets us indicate what our EncSet does have.
+    TEST_NoAvailableEncSet(solution, i->type(), req_enc, rp->r.why_t,
+                           NULL, 0);
 
     return itemTypes.do_rewrite(i, solution.chooseOne(), rp, a);
 }

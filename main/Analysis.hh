@@ -4,158 +4,9 @@
 #include <util/onions.hh>
 #include <util/cryptdb_log.hh>
 #include <main/schema.hh>
+#include <main/rewrite_ds.hh>
 #include <parser/embedmysql.hh>
 #include <parser/stringify.hh>
-
-/**
- * Used to keep track of encryption constraints during
- * analysis
- */
-class EncSet {
-public:
-    EncSet(OnionLevelFieldMap input) : osl(input) {}
-    EncSet(Analysis &a, FieldMeta * const fm);
-    explicit EncSet(const OLK & olk);
-
-    /**
-     * decides which encryption scheme to use out of multiple in a set
-     */
-    OLK chooseOne(bool require_key=true) const;
-    bool contains(const OLK & olk) const;
-    bool hasSecLevel(SECLEVEL level) const;
-    EncSet intersect(const EncSet & es2) const;
-    SECLEVEL onionLevel(onion o) const;
-    bool available() const;
-
-    bool singleton() const { return osl.size() == 1; }
-
-    bool single_crypted_and_or_plainvals() const {
-        unsigned int crypted = 0;
-        unsigned int plain = 0;
-        for (auto it : osl) {
-            if (SECLEVEL::PLAINVAL == it.second.first) {
-                ++plain;
-            } else {
-                ++crypted;
-            }
-        }
-
-        return 1 >= crypted || plain > 0;
-    }
-
-    OLK extract_singleton() const {
-        assert_s(singleton(), std::string("encset has size ") +
-                              StringFromVal(osl.size()));
-        auto it = osl.begin();
-        return OLK(it->first, it->second.first, it->second.second);
-    }
-
-    OnionLevelFieldMap osl; //max level on each onion
-};
-
-
-std::ostream&
-operator<<(std::ostream &out, const EncSet & es);
-
-const EncSet EQ_EncSet = {
-    {
-        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-        {oDET,   LevelFieldPair(SECLEVEL::DET, NULL)},
-        {oOPE,   LevelFieldPair(SECLEVEL::OPE, NULL)},
-    }
-};
-
-const EncSet JOIN_EncSet = {
-    {
-        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-        {oDET,   LevelFieldPair(SECLEVEL::DETJOIN, NULL)},
-    }
-};
-
-const EncSet ORD_EncSet = {
-    {
-        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-        {oOPE, LevelFieldPair(SECLEVEL::OPE, NULL)},
-    }
-};
-
-const EncSet PLAIN_EncSet = {
-    {
-        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-    }
-};
-
-//todo: there should be a map of FULL_EncSets depending on item type
-const EncSet FULL_EncSet = {
-    {
-        // HACK: SECLEVEL must be PLAINVAL so that intersect/chooseOne
-        // will consider it usable.
-        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-
-        {oPLAIN, LevelFieldPair(SECLEVEL::RND, NULL)},
-        {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
-        {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
-        {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
-        {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
-    }
-};
-
-const EncSet FULL_EncSet_Str = {
-    {
-        {oPLAIN, LevelFieldPair(SECLEVEL::RND, NULL)},
-        {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
-        {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
-        {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
-    }
-};
-
-const EncSet FULL_EncSet_Int = {
-    {
-        // HACK: SECLEVEL must be PLAINVAL so that intersect/chooseOne
-        // will consider it usable.
-        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-
-        {oPLAIN, LevelFieldPair(SECLEVEL::RND, NULL)},
-        {oDET, LevelFieldPair(SECLEVEL::RND, NULL)},
-        {oOPE, LevelFieldPair(SECLEVEL::RND, NULL)},
-        {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
-    }
-};
-
-const EncSet Search_EncSet = {
-    {
-        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-        {oSWP, LevelFieldPair(SECLEVEL::SEARCH, NULL)},
-    }
-};
-
-const EncSet ADD_EncSet = {
-    {
-        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-        {oPLAIN, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)},
-        {oAGG, LevelFieldPair(SECLEVEL::HOM, NULL)},
-    }
-};
-
-const EncSet PLAINWAIT_EncSet {
-    {
-        {oWAIT, LevelFieldPair(SECLEVEL::PLAINVAL, NULL)}
-    }
-};
-
-const EncSet EMPTY_EncSet = {
-    {{}}
-};
-
-
-// returns true if any of the layers in ed
-// need salt
-bool
-needsSalt(EncSet ed);
 
 /***************************************************/
 
@@ -201,70 +52,6 @@ public:
     Item_field * const itf;
 };
 
-
-class reason {
-public:
-    reason(const EncSet & es, const std::string &why_t_arg,
-                Item * const why_t_item_arg)
-        :  encset(es), why_t(why_t_arg), why_t_item(why_t_item_arg)
-    { childr = new std::list<reason>();}
-    reason()
-        : encset(EMPTY_EncSet), why_t(""), why_t_item(NULL),
-          childr(NULL) {}
-    void add_child(const reason & ch) {
-        childr->push_back(ch);
-    }
-
-    EncSet encset;
-
-    std::string why_t;
-    Item *why_t_item;
-
-    std::list<reason> * childr;
-};
-
-std::ostream&
-operator<<(std::ostream &out, const reason &r);
-
-// The rewrite plan of a lex node: the information a
-// node remembers after gather, to be used during rewrite
-// Other more specific RewritePlan-s inherit from this class
-class RewritePlan {
-public:
-    const reason r;
-    const EncSet es_out; // encset that this item can output
-
-    RewritePlan(const EncSet &es, reason r) : r(r), es_out(es) {};
-
-    //only keep plans that have parent_olk in es
-//    void restrict(const EncSet & es);
-
-};
-
-//rewrite plan in which we only need to remember one olk
-// to know how to rewrite
-class RewritePlanOneOLK: public RewritePlan {
-public:
-    const OLK olk;
-    // the following store how to rewrite children
-    RewritePlan ** const childr_rp;
-
-    RewritePlanOneOLK(const EncSet &es_out, const OLK &olk,
-                      RewritePlan ** const childr_rp, reason r)
-        : RewritePlan(es_out, r), olk(olk), childr_rp(childr_rp) {}
-};
-
-class RewritePlanPerChildOLK : public RewritePlan {
-public:
-    const std::vector<std::pair<RewritePlan *, OLK>> child_olks;
-
-    RewritePlanPerChildOLK(const EncSet &es_out,
-                           std::vector<std::pair<RewritePlan *, OLK>>
-                            child_olks,
-                           reason r)
-        : RewritePlan(es_out, r), child_olks(child_olks) {}
-};
-
 // TODO: Maybe we want a database name argument/member.
 typedef class ConnectionInfo {
 public:
@@ -279,9 +66,6 @@ public:
     ConnectionInfo() : server(""), port(0), user(""), passwd("") {};
 
 } ConnectionInfo;
-
-std::ostream&
-operator<<(std::ostream &out, const RewritePlan * const rp);
 
 // state maintained at the proxy
 typedef struct ProxyState {
@@ -565,6 +349,7 @@ bool setRegularTableToBleedingTable(const std::unique_ptr<Connect> &e_conn);
 bool cleanupDeltaOutputAndQuery(const std::unique_ptr<Connect> &e_conn,
                                 unsigned long delta_output_id);
 
+class RewritePlan;
 class Analysis {
 public:
     Analysis(const SchemaInfo * const schema)

@@ -7,6 +7,9 @@
 
 #include <util/onions.hh>
 
+class EncSet;
+class RewritePlan;
+
 class CryptDBError {
 public:
     CryptDBError(const std::string &m) : msg(m) {}
@@ -60,6 +63,30 @@ private:
     const onion o;
     const SECLEVEL expected;
     const SECLEVEL actual;
+};
+
+class NoAvailableEncSet : public AbstractCryptDBError {
+public:
+    NoAvailableEncSet(const std::string &file_name, int line_number,
+                      unsigned int type, const EncSet &req_enc_set,
+                      const std::string &why,
+                      const RewritePlan *const *const childr_rp,
+                      unsigned int child_count)
+        : AbstractCryptDBError(file_name, line_number), type(type),
+          req_enc_set(req_enc_set), why(why), childr_rp(childr_rp),
+          child_count(child_count) {}
+    ~NoAvailableEncSet() {}
+
+    std::string to_string() const final;
+
+private:
+    // const Item *const i;
+    const unsigned int type;
+    // FIXME: This reference is not safe.
+    const EncSet &req_enc_set;
+    const std::string why;
+    const RewritePlan *const *const childr_rp;
+    const unsigned int child_count;
 };
 
 std::ostream &operator<<(std::ostream &out,

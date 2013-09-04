@@ -107,7 +107,7 @@ clone_item(Item *const i)
 }
 
 ORDER *
-make_order(ORDER *const old_order, Item *const i)
+make_order(const ORDER *const old_order, Item *const i)
 {
     ORDER *const new_order = static_cast<ORDER *>(malloc(sizeof(ORDER)));
     memcpy(new_order, old_order, sizeof(ORDER));

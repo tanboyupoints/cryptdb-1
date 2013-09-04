@@ -94,6 +94,9 @@ executeQuery(ProxyState &ps, const std::string &q);
         throw std::runtime_error(std::string("Unimplemented: ") + \
                         std::string(__PRETTY_FUNCTION__))
 
+class reason;
+class OLK;
+
 class CItemType {
  public:
     virtual RewritePlan * do_gather(Item *, reason&, Analysis &) const = 0;

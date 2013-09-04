@@ -103,8 +103,8 @@ public:
     Item * decrypt(Item * const c, uint64_t IV);
 
     //expr is the expression (e.g. a field) over which to sum
-    Item * sumUDA(Item * const expr);
-    Item * sumUDF(Item * const i1, Item * const i2);
+    Item *sumUDA(Item *const expr) const;
+    Item *sumUDF(Item *const i1, Item *const i2) const;
 
 protected:
     std::string seed_key;

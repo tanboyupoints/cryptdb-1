@@ -3,6 +3,7 @@
 #include <string>
 
 #include <main/Analysis.hh>
+#include <main/rewrite_ds.hh>
 
 #include <sql_list.h>
 #include <sql_table.h>

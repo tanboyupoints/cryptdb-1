@@ -20,41 +20,6 @@
 
 class Analysis;
 struct FieldMeta;
-/**
- * Field here is either:
- * A) empty string, representing any field or
- * B) the field that the onion is key-ed on. this
- *    only has semantic meaning for DET and OPE
- */
-typedef std::pair<SECLEVEL, FieldMeta *> LevelFieldPair;
-
-typedef std::map<SECLEVEL, FieldMeta *> LevelFieldMap;
-typedef std::pair<onion, LevelFieldPair> OnionLevelFieldPair;
-typedef std::map<onion, LevelFieldPair> OnionLevelFieldMap;
-
-// onion-level-key: all the information needed to know how to encrypt a
-// constant
-class OLK {
-public:
-    OLK(onion o, SECLEVEL l, FieldMeta * key) : o(o), l(l), key(key) {}
-    // FIXME: Default constructor required so we can use make_pair.
-    OLK() {;}
-    onion o;
-    SECLEVEL l;
-    FieldMeta * key; // a field meta is a key because each encryption key
-                     // ever used in CryptDB belongs to a field; a field
-                     // contains the encryption and decryption handlers
-                     // for its keys (see layers)
-    bool operator<(const OLK & olk ) const {
-        return (o < olk.o) || ((o == olk.o) && (l < olk.l));
-    }
-    bool operator==(const OLK & olk ) const {
-        return (o == olk.o) && (l == olk.l);
-    }
-    static OLK invalidOLK() {
-        return OLK(oINVALID, SECLEVEL::INVALID, NULL);
-    }
-};
 
 /*
  * The name must be unique as it is used as a unique identifier when

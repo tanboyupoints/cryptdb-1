@@ -43,7 +43,7 @@ Item_int *make_item(Item_int *const i);
 Item_null *make_item(Item_null *const i);
 Item_func *make_item(Item_func *const i);
 Item *clone_item(Item *const i);
-ORDER *make_order(ORDER *const old_order, Item *const i);
+ORDER *make_order(const ORDER *const old_order, Item *const i);
 
 
 // sets the select_lex in a lex

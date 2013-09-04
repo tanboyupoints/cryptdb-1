@@ -118,7 +118,8 @@ EncSet::chooseOne(bool require_key) const
         const onion o = onion_order[i];
         const auto it = osl.find(o);
         if (it != osl.end()) {
-            if (SECLEVEL::BLOCKING == it->second.first) {
+            if (SECLEVEL::BLOCKING == it->second.first
+                || SECLEVEL::INVALID == it->second.first) {
                 continue;
             }
             // HACK.
@@ -178,12 +179,38 @@ bool
 EncSet::available() const
 {
     for (auto it : osl) {
-        if (SECLEVEL::BLOCKING != it.second.first) {
+        if (SECLEVEL::BLOCKING != it.second.first
+            && SECLEVEL::INVALID != it.second.first
+            && oINVALID != it.first) {
+
             return true;
         }
     }
 
     return false;
+}
+
+bool EncSet::single_crypted_and_or_plainvals() const
+{
+    unsigned int crypted = 0;
+    unsigned int plain = 0;
+    for (auto it : osl) {
+        if (SECLEVEL::PLAINVAL == it.second.first) {
+            ++plain;
+        } else {
+            ++crypted;
+        }
+    }
+
+    return 1 >= crypted || plain > 0;
+}
+
+OLK EncSet::extract_singleton() const
+{
+    assert_s(singleton(), std::string("encset has size ") +
+                            StringFromVal(osl.size()));
+    const auto it = osl.begin();
+    return OLK(it->first, it->second.first, it->second.second);
 }
 
 bool
