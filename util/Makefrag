@@ -3,7 +3,7 @@ UTILSRC := onions.cc cryptdb_log.cc ctr.cc util.cc errstream.cc
 
 all:    $(OBJDIR)/libedbutil.so
 $(OBJDIR)/libedbutil.so: $(patsubst %.cc,$(OBJDIR)/util/%.o,$(UTILSRC))
-	$(CXX) -shared -o $@ $^ $(LDFLAGS) 
+	$(CXX) -shared -o $@ $^ $(LDFLAGS) -lcryptdb
 	 
 install: install_util
 

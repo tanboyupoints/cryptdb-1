@@ -47,7 +47,7 @@ EncSet::intersect(const EncSet & es2) const
 
             const onion o = it->first;
             const onion o2 = it2->first;
-            
+
             assert(o == o2);
 
             const SECLEVEL sl =
