@@ -42,6 +42,7 @@ Item_string *make_item(Item_string *const i);
 Item_int *make_item(Item_int *const i);
 Item_null *make_item(Item_null *const i);
 Item_func *make_item(Item_func *const i);
+Item_decimal *make_item(Item_decimal *const i);
 Item *clone_item(Item *const i);
 ORDER *make_order(const ORDER *const old_order, Item *const i);
 

@@ -206,9 +206,11 @@ makeNiceDefault(const Create_field * const cf)
     assert(cf->def);
 
     switch (cf->sql_type) {
-        case MYSQL_TYPE_DECIMAL:
-            throw CryptDBError("implement default decimal type!");
-
+        case MYSQL_TYPE_NEWDECIMAL:
+            assert_s(cf->def->type() == Item::Type::DECIMAL_ITEM,
+                     "We only support decimal types as default value"
+                     " for decimals (ie, no strings)");
+            return make_item(static_cast<Item_decimal *>(cf->def));
         case MYSQL_TYPE_TINY:
         case MYSQL_TYPE_SHORT:
         case MYSQL_TYPE_INT24:
@@ -229,11 +231,11 @@ makeNiceDefault(const Create_field * const cf)
         case MYSQL_TYPE_LONG_BLOB:
         case MYSQL_TYPE_MEDIUM_BLOB:
             return make_item(static_cast<Item_string *>(cf->def));
-
         case MYSQL_TYPE_NULL:
             return make_item(static_cast<Item_null *>(cf->def));
-        default:
+        default: {
             throw CryptDBError("unrecognized default type!");
+        }
     }
 }
 

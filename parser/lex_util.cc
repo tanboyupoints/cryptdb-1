@@ -21,36 +21,39 @@ init_new_ident(Item_ident *const i, const std::string &table_name = "",
 }
 
 Item_field *
-make_item(Item_field * const t, const std::string &table_name,
+make_item(Item_field *const i, const std::string &table_name,
           const std::string &field_name)
 {
-    THD *thd = current_thd;
+    assert(i->type() == Item::Type::FIELD_ITEM);
+
+    THD *const thd = current_thd;
     assert(thd);
 
     // bootstrap i0 from t
-    Item_field *i0 = new Item_field(thd, t);
-    init_new_ident(i0, table_name, field_name); 
+    Item_field *const i0 = new Item_field(thd, i);
+    init_new_ident(i0, table_name, field_name);
 
     return i0;
 }
 
 Item_ref *
-make_item(Item_ref *const t, Item *const new_ref,
+make_item(Item_ref *const i, Item *const new_ref,
           const std::string &table_name,
           const std::string &field_name)
 {
+    assert(i->type() == Item::Type::REF_ITEM);
     assert(field_name.size() > 0 && table_name.size() > 0);
 
     THD *const thd = current_thd;
     assert(thd);
 
     // bootstrap i0 from t
-    Item_ref *const i0 = new Item_ref(thd, t);
+    Item_ref *const i0 = new Item_ref(thd, i);
 
     i0->ref = new Item *;
     *i0->ref = new_ref;
 
-    init_new_ident(i0, table_name, field_name); 
+    init_new_ident(i0, table_name, field_name);
 
     return i0;
 }
@@ -58,7 +61,8 @@ make_item(Item_ref *const t, Item *const new_ref,
 Item_string *
 make_item(Item_string *const i)
 {
-    std::string s = ItemToString(i);
+    assert(i->type() == Item::Type::STRING_ITEM);
+    const std::string s = ItemToString(i);
     return new Item_string(make_thd_string(s), s.length(),
                            i->default_charset());
 }
@@ -66,18 +70,21 @@ make_item(Item_string *const i)
 Item_int *
 make_item(Item_int *const i)
 {
+    assert(i->type() == Item::Type::INT_ITEM);
     return new Item_int(i->value);
 }
 
 Item_null *
 make_item(Item_null *const i)
 {
+    assert(i->type() == Item::Type::NULL_ITEM);
     return new Item_null(i->name);
 }
 
 Item_func *
 make_item(Item_func *const i)
 {
+    assert(i->type() == Item::Type::FUNC_ITEM);
     switch (i->functype()) {
         case Item_func::Functype::NEG_FUNC:
             return new Item_func_neg(i->arguments()[0]);
@@ -86,6 +93,14 @@ make_item(Item_func *const i)
     }
 }
 
+Item_decimal *
+make_item(Item_decimal *const i)
+{
+    assert(i->type() == Item::Type::DECIMAL_ITEM);
+    return static_cast<Item_decimal *>(i->clone_item());
+}
+
+// FIXME: Constants should use Item::clone_item like we do for Decimal
 Item *
 clone_item(Item *const i)
 {
@@ -99,7 +114,7 @@ clone_item(Item *const i)
         case Item::Type::FUNC_ITEM:
             return make_item(static_cast<Item_func *>(i));
         case Item::Type::DECIMAL_ITEM:
-            throw CryptDBError("Clone decimal item!");
+            return make_item(static_cast<Item_decimal *>(i));
         default:
             throw CryptDBError("Unable to clone: " +
                                std::to_string(i->type()));

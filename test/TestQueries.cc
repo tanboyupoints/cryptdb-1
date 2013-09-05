@@ -877,6 +877,43 @@ static QueryList DefaultValue = QueryList("DefaultValue",
     { "DROP TABLE t",
       "DROP TABLE u"});
 
+static QueryList Decimal = QueryList("Decimal",
+    { "CREATE TABLE dec_0 (x DECIMAL(5, 2),"
+      "                    y DECIMAL(10, 5) NOT NULL DEFAULT 12.125)",
+      "CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))",
+      "", ""},
+    { "CREATE TABLE dec_0 (x DECIMAL(5, 2),"
+      "                    y DECIMAL(10, 5) NOT NULL DEFAULT 12.125)",
+      "CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))",
+      "", ""},
+    { "CREATE TABLE dec_0 (x DECIMAL(5, 2),"
+      "                    y DECIMAL(10, 5) NOT NULL DEFAULT 12.125)",
+      "CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))",
+      "", ""},
+    { Query("INSERT INTO dec_0 VALUES (50, 100.5)", false),
+      Query("INSERT INTO dec_0 VALUES (20.50, 1000.5)", false),
+      Query("INSERT INTO dec_0 VALUES (50, 100.59)", false),
+      Query("INSERT INTO dec_0 (x) VALUES (1.1)", false),
+      Query("INSERT INTO dec_1 VALUES (118, -49.2)", false),
+      Query("INSERT INTO dec_1 VALUES (5, -49.2)", false),
+      Query("INSERT INTO dec_1 VALUES (8, 1000.5)", false),
+      Query("SELECT * FROM dec_0 WHERE x = 50", false),
+      Query("SELECT * FROM dec_0 WHERE x < 50", false),
+      Query("SELECT * FROM dec_0 WHERE y = 100.5", false),
+      Query("SELECT * FROM dec_0", false),
+      Query("INSERT INTO dec_0 VALUES (19, 100.5)", false),
+      Query("SELECT * FROM dec_0 WHERE y = 100.5", false),
+      Query("SELECT * FROM dec_1 WHERE a = 5 AND b = -49.2", false),
+      Query("SELECT * FROM dec_1", false),
+      Query("SELECT * FROM dec_0, dec_1 WHERE dec_0.y = dec_1.b", false)},
+    { "DROP TABLE dec_0",
+      "DROP TABLE dec_1"},
+    { "DROP TABLE dec_0",
+      "DROP TABLE dec_1"},
+    { "DROP TABLE dec_0",
+      "DROP TABLE dec_1"});
+
+
 //-----------------------------------------------------------------------
 
 Connection::Connection(const TestConfig &input_tc, test_mode input_type) {
@@ -1200,7 +1237,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 351/351.
+    //      TOTAL RESULT: 372/373.
     // ###############################
 
     std::vector<Score> scores;
@@ -1249,6 +1286,9 @@ RunTest(const TestConfig &tc) {
 
     // Pass 12/12
     scores.push_back(CheckQueryList(tc, DefaultValue));
+
+    // Pass 21/22
+    scores.push_back(CheckQueryList(tc, Decimal));
 
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;
