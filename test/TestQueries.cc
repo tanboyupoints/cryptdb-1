@@ -878,15 +878,15 @@ static QueryList DefaultValue = QueryList("DefaultValue",
       "DROP TABLE u"});
 
 static QueryList Decimal = QueryList("Decimal",
-    { "CREATE TABLE dec_0 (x DECIMAL(5, 2),"
+    { "CREATE TABLE dec_0 (x DECIMAL(10, 5),"
       "                    y DECIMAL(10, 5) NOT NULL DEFAULT 12.125)",
       "CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))",
       "", ""},
-    { "CREATE TABLE dec_0 (x DECIMAL(5, 2),"
+    { "CREATE TABLE dec_0 (x DECIMAL(10, 5),"
       "                    y DECIMAL(10, 5) NOT NULL DEFAULT 12.125)",
       "CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))",
       "", ""},
-    { "CREATE TABLE dec_0 (x DECIMAL(5, 2),"
+    { "CREATE TABLE dec_0 (x DECIMAL(10, 5),"
       "                    y DECIMAL(10, 5) NOT NULL DEFAULT 12.125)",
       "CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))",
       "", ""},
