@@ -78,6 +78,12 @@ class Connection {
     void start();
     void stop();
 
+    ProxyState *getProxyState()
+    {
+        assert(re_set.size() == 1);
+        return *re_set.begin();
+    }
+
  private:
     test_mode type;
     TestConfig tc;
