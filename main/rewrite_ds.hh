@@ -41,6 +41,11 @@ public:
     static OLK invalidOLK() {
         return OLK(oINVALID, SECLEVEL::INVALID, NULL);
     }
+    // WARN: This semantic can not reliably tell you if an OLK can
+    // support operations. Such a meaning is contextual.
+    static bool isNotInvalid(const OLK &olk) {
+        return olk.o != oINVALID && olk.l != SECLEVEL::INVALID;
+    }
 };
 
 /**
