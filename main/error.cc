@@ -2,7 +2,7 @@
 
 #include <main/enum_text.hh>
 #include <main/rewrite_ds.hh>
-#include <util/errstream.hh>
+#include <main/error.hh>
 #include <util/onions.hh>
 
 std::ostream &operator<<(std::ostream &out,

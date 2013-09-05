@@ -1,7 +1,7 @@
 #pragma once
 
 #include <main/rewrite_ds.hh>
-#include <util/errstream.hh>
+#include <main/error.hh>
 
 #define RETURN_FALSE_IF_FALSE(status)       \
 {                                           \
