@@ -420,6 +420,39 @@ buildTypeTextTranslator()
                             mysql_types.size());
     translatorHelper(mysql_type_strings, mysql_types);
 
+    // MYSQL item types.
+    const std::vector<std::string> mysql_item_strings
+    {
+        "FIELD_ITEM", "FUNC_ITEM", "SUM_FUNC_ITEM", "STRING_ITEM",
+        "INT_ITEM", "REAL_ITEM", "NULL_ITEM", "VARBIN_ITEM",
+        "COPY_STR_ITEM", "FIELD_AVG_ITEM", "DEFAULT_VALUE_ITEM",
+        "PROC_ITEM", "COND_ITEM", "REF_ITEM", "FIELD_STD_ITEM",
+        "FIELD_VARIANCE_ITEM", "INSERT_VALUE_ITEM",
+        "SUBSELECT_ITEM", "ROW_ITEM", "CACHE_ITEM", "TYPE_HOLDER",
+        "PARAM_ITEM", "TRIGGER_FIELD_ITEM", "DECIMAL_ITEM",
+        "XPATH_NODESET", "XPATH_NODESET_CMP", "VIEW_FIXER_ITEM"
+    };
+    const std::vector<enum Item::Type> mysql_item_types
+    {
+        Item::Type::FIELD_ITEM, Item::Type::FUNC_ITEM,
+        Item::Type::SUM_FUNC_ITEM, Item::Type::STRING_ITEM,
+        Item::Type::INT_ITEM, Item::Type::REAL_ITEM,
+        Item::Type::NULL_ITEM, Item::Type::VARBIN_ITEM,
+        Item::Type::COPY_STR_ITEM, Item::Type::FIELD_AVG_ITEM,
+        Item::Type::DEFAULT_VALUE_ITEM, Item::Type::PROC_ITEM,
+        Item::Type::COND_ITEM, Item::Type::REF_ITEM,
+        Item::Type::FIELD_STD_ITEM, Item::Type::FIELD_VARIANCE_ITEM,
+        Item::Type::INSERT_VALUE_ITEM, Item::Type::SUBSELECT_ITEM,
+        Item::Type::ROW_ITEM, Item::Type::CACHE_ITEM,
+        Item::Type::TYPE_HOLDER, Item::Type::PARAM_ITEM,
+        Item::Type::TRIGGER_FIELD_ITEM, Item::Type::DECIMAL_ITEM,
+        Item::Type::XPATH_NODESET, Item::Type::XPATH_NODESET_CMP,
+        Item::Type::VIEW_FIXER_ITEM
+    };
+    RETURN_FALSE_IF_FALSE(mysql_item_strings.size() ==
+                            mysql_item_types.size());
+    translatorHelper(mysql_item_strings, mysql_item_types);
+
     // Onion Layouts.
     const std::vector<std::string> onion_layout_strings
     {
