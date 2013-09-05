@@ -72,7 +72,7 @@ typedef struct ProxyState {
     ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                const std::string &dbname, const std::string &master_key,
                SECURITY_RATING default_sec_rating =
-                SECURITY_RATING::BEST_EFFORT);
+                SECURITY_RATING::SENSITIVE);
     ~ProxyState();
     std::string dbName() const {return dbname;}
     SECURITY_RATING defaultSecurityRating() const
