@@ -1276,7 +1276,10 @@ RunTest(const TestConfig &tc) {
     scores.push_back(CheckQueryList(tc, Null));
 
     // Pass 22/22
-    scores.push_back(CheckQueryList(tc, BestEffort));
+    ProxyState *const ps = test->getProxyState();
+    if (ps->defaultSecurityRating() == SECURITY_RATING::BEST_EFFORT) {
+        scores.push_back(CheckQueryList(tc, BestEffort));
+    }
 
     // Pass 16/16
     scores.push_back(CheckQueryList(tc, Auto));
