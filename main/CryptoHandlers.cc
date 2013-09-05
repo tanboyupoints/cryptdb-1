@@ -520,126 +520,73 @@ RND_str::decryptUDF(Item * const col, Item * const ivcol)
 /********** DET ************************/
 
 
-class DET_int : public EncLayer {
+class DET_abstract_number : public EncLayer {
 public:
-    DET_int(Create_field * const cf,  const std::string &seed_key);
-    
-    std::string doSerialize() const
-    {
-        return std::to_string(shift) + " " + key;
-    }
+    DET_abstract_number(const std::string &key, int64_t shift);
+    DET_abstract_number(unsigned int id, const std::string &serial);
+
+    virtual std::string name() const = 0;
+    virtual SECLEVEL level() const = 0;
+
+    std::string doSerialize() const;
+    Create_field *newCreateField(const Create_field *const cf,
+                                 const std::string &anonname = "");
+
+    // FIXME: final
+    Item *encrypt(Item *const ptext, uint64_t IV);
+    Item *decrypt(Item *const ctext, uint64_t IV);
+    Item *decryptUDF(Item *const col, Item *const ivcol = NULL);
+
+protected:
+    const std::string key;
+    const blowfish bf;
+    const int64_t shift;
+    static const int bf_key_size = 16;
+
+private:
+    std::string getKeyFromSerial(const std::string &serial);
+    static int64_t getShift(const std::string &serial);
+};
+
+class DET_abstract_integer : public DET_abstract_number {
+public:
+    DET_abstract_integer(Create_field *const cf,
+                         const std::string &seed_key);
+    DET_abstract_integer(unsigned int id, const std::string &serial);
+
+private:
+    static int64_t getShift(const Create_field *const f);
+};
+
+class DET_abstract_decimal : public DET_abstract_number {
+public:
+    DET_abstract_decimal(Create_field *const cf,
+                         const std::string &seed_key);
+    DET_abstract_decimal(unsigned int id, const std::string &serial);
+
+    // FIXME: final.
+    std::string doSerialize() const;
+    Item *encrypt(Item *const ptext, uint64_t IV);
+    Item *decrypt(Item *const ctext, uint64_t IV);
+
+protected:
+    const uint decimals;      // number of decimals
+
+private:
+    static uint getDecimals(const std::string &serial);
+    static std::string underSerial(const std::string &serial);
+};
+
+
+class DET_int : public DET_abstract_integer {
+public:
+    DET_int(Create_field *const cf, const std::string &seed_key);
     // create object from serialized contents
     DET_int(unsigned int id, const std::string &serial);
 
     virtual SECLEVEL level() const {return SECLEVEL::DET;}
     std::string name() const {return "DET_int";}
-    Create_field * newCreateField(const Create_field * const cf,
-                                  const std::string &anonname = "");
-
-    Item * encrypt(Item * const ptext, uint64_t IV);
-    Item * decrypt(Item * const ctext, uint64_t IV);
-    Item * decryptUDF(Item * const col, Item * const ivcol = NULL);
-
-protected:
-    std::string key;
-    blowfish bf;
-    const int64_t shift;
-    static const int bf_key_size = 16;
-    static const int ciph_size = 8;
-
-private:
-    std::string getKeyFromSerial(const std::string &serial);
-    static int64_t getShift(const std::string &serial);
-    static int64_t getShift(const Create_field * const f);
 };
-
-/*
-class DET_tinyint : public DET_int {
-    public:
-    DET_tinyint(Create_field * const cf, const std::string &seed_key);
-
-    // create object from serialized contents
-    DET_tinyint(unsigned int id, const std::string &serial);
-
-    std::string name() const {return "DET_tinyint";}
-
-    Item * encrypt(Item * const ptext, uint64_t IV);
-    Item * decrypt(Item * const ctext, uint64_t IV);
-};
-
-
-DET_tinyint::DET_tinyint(Create_field * const cf,
-                         const std::string &seed_key)
-    : DET_int(cf, seed_key)
-{}
-
-DET_tinyint::DET_tinyint(unsigned int id, const std::string &serial)
-    : DET_int(id, serial)
-{}
-
-Item *
-DET_tinyint::encrypt(Item * const ptext, uint64_t IV)
-{
-    const ulonglong val = static_cast<Item_int *>(ptext)->value;
-    
-    static const longlong tiny_max = 0xff;
-    if(tiny_max < static_cast<Item_int *>(ptext)->val_int())
-        throw CryptDBError("Backend storage unit it not TINYINT, won't floor. ");
-        
-    LOG(encl) << "DET_tinyint encrypt " << val << " IV " << IV << "--->";
-    // delegates
-    return DET_int::encrypt(ptext, static_cast<ulong>(val));
-}
-
-Item *
-DET_tinyint::decrypt(Item * const ctext, uint64_t IV) {
-    // delegates
-    return DET_int::decrypt(ctext, IV);
-}
-
-class DET_mediumint : public DET_int {
-    public:
-    DET_mediumint(Create_field * const cf, const std::string &seed_key);
-
-    // create object from serialized contents
-    DET_mediumint(unsigned int id, const std::string &serial);
-
-    std::string name() const {return "DET_mediumint";}
-
-    Item * encrypt(Item * const ptext, uint64_t IV);
-    Item * decrypt(Item * const ctext, uint64_t IV);
-};
-
-
-DET_mediumint::DET_mediumint(Create_field * const cf,
-                             const std::string &seed_key)
-    : DET_int(cf, seed_key)
-{}
-
-DET_mediumint::DET_mediumint(unsigned int id, const std::string &serial)
-    : DET_int(id, serial)
-{}
-
-Item *
-DET_mediumint::encrypt(Item * const ptext, uint64_t IV)
-{
-    const ulonglong val = static_cast<Item_int *>(ptext)->value;
-
-    static const longlong medium_max = 0xffffff;
-    if(medium_max < static_cast<Item_int *>(ptext)->val_int())
-        throw CryptDBError("Backend storage unit it not MEDIUMINT, won't floor. ");
-    
-    LOG(encl) << "DET_tinyint encrypt " << val << " IV " << IV << "--->";
-    return DET_int::encrypt(ptext, static_cast<ulong>(val));
-}
-
-Item *
-DET_mediumint::decrypt(Item * const ctext, uint64_t IV)
-{
-    return DET_int::decrypt(ctext, IV);
-}
-*/
-
 
 static udf_func u_decDETInt = {
     LEXSTRING("decrypt_int_det"),
@@ -655,23 +602,16 @@ static udf_func u_decDETInt = {
     0L,
 };
 
-class DET_dec : public DET_int {
+class DET_dec : public DET_abstract_decimal {
 public:
-    DET_dec(Create_field * const cf,  const std::string &seed_key);
+    DET_dec(Create_field *const cf, const std::string &seed_key);
 
-    std::string doSerialize() const;
     // create object from serialized contents
     DET_dec(unsigned int id, const std::string &serial);
 
+    // FIXME: final
+    SECLEVEL level() const {return SECLEVEL::DET;}
     std::string name() const {return "DET_dec";}
-
-    Item * encrypt(Item * const ptext, uint64_t IV);
-    Item * decrypt(Item * const ctext, uint64_t IV);
- 
-protected:
-    uint decimals; // number of decimals
-    ulonglong shift;
-    
 };
 
 class DET_str : public EncLayer {
@@ -730,31 +670,114 @@ DETFactory::deserialize(unsigned int id, const SerialLayer &sl)
     }
 }
 
-
-DET_int::DET_int(Create_field * const f, const std::string &seed_key)
-    : key(prng_expand(seed_key, bf_key_size)), bf(key),
-      shift(getShift(f))
+DET_abstract_number::DET_abstract_number(const std::string &key,
+                                         int64_t shift)
+    : EncLayer(), key(key), bf(key), shift(shift)
 {}
 
-DET_int::DET_int(unsigned int id, const std::string &serial)
+DET_abstract_number::DET_abstract_number(unsigned int id,
+                                         const std::string &serial)
     : EncLayer(id), key(getKeyFromSerial(serial)), bf(key),
       shift(getShift(serial))
 {}
 
+std::string DET_abstract_number::doSerialize() const
+{
+    return std::to_string(shift) + " " + key;
+}
+
+Create_field *
+DET_abstract_number::newCreateField(const Create_field * const cf,
+                                    const std::string &anonname)
+{
+    const int64_t ciph_size = 8;
+    // MYSQL_TYPE_LONGLONG because blowfish works on 64 bit blocks.
+    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG,
+                             anonname);
+}
+
+Item *
+DET_abstract_number::encrypt(Item *const ptext, uint64_t IV)
+{
+    // assert(!stringItem(ptext));
+    const longlong value = static_cast<Item_int*>(ptext)->val_int();
+
+    const ulonglong res = static_cast<ulonglong>(bf.encrypt(value+shift));
+    LOG(encl) << "DET_int enc " << value << "--->" << res;
+    return new Item_int(res);
+}
+
+Item *
+DET_abstract_number::decrypt(Item *const ctext, uint64_t IV)
+{
+    const ulonglong value = static_cast<Item_int *>(ctext)->value;
+
+    if (shift) {
+        //std::cout << "value: " << value <<  " shift: " << shift << "\n";
+
+        longlong retdec = static_cast<longlong>(bf.decrypt(value));
+        retdec -= shift;
+        LOG(encl) << "DET_int dec " << value << "--->" << retdec;
+        return new Item_int(retdec);
+    }
+
+    const ulonglong retdec = bf.decrypt(value) - shift;
+    LOG(encl) << "DET_int dec " << value << "--->" << retdec;
+    return new Item_int(retdec);
+}
+
+Item *
+DET_abstract_number::decryptUDF(Item *const col, Item *const ivcol)
+{
+    List<Item> l;
+    l.push_back(col);
+
+    l.push_back(get_key_item(key));
+    // Only used for signed columns, otherwise zero.
+    l.push_back(new Item_int(static_cast<ulonglong>(shift)));
+
+    Item *const udfdec = new Item_func_udf_int(&u_decDETInt, l);
+    udfdec->name = NULL;
+
+    AssignOnce<Item *> udf;
+    if (0 == shift) {
+        // CAST for unsigned
+        udf = new Item_func_unsigned(udfdec);
+        udf.get()->name = NULL;
+    } else {
+        // CAST for signed.
+        udf = new Item_func_signed(udfdec);
+        udf.get()->name = NULL;
+    }
+
+    return udf.get();
+}
+
 std::string
-DET_int::getKeyFromSerial(const std::string &serial)
+DET_abstract_number::getKeyFromSerial(const std::string &serial)
 {
     return serial.substr(serial.find(' ')+1, std::string::npos);
 }
 
 int64_t
-DET_int::getShift(const std::string &serial)
+DET_abstract_number::getShift(const std::string &serial)
 {
     return atol(serial.substr(0, serial.find(' ')).c_str());
 }
 
+DET_abstract_integer::DET_abstract_integer(Create_field *const cf,
+                                           const std::string &seed_key)
+    : DET_abstract_number(prng_expand(seed_key, bf_key_size),
+                          getShift(cf))
+{}
+
+DET_abstract_integer::DET_abstract_integer(unsigned int id,
+                                           const std::string &serial)
+    : DET_abstract_number(id, serial)
+{}
+
 int64_t
-DET_int::getShift(const Create_field * const cf)
+DET_abstract_integer::getShift(const Create_field * const cf)
 {
     if (cf->flags & UNSIGNED_FLAG) {
         return 0x00;
@@ -776,95 +799,98 @@ DET_int::getShift(const Create_field * const cf)
     }
 }
 
-Create_field *
-DET_int::newCreateField(const Create_field * const cf,
-                        const std::string &anonname)
+DET_abstract_decimal::DET_abstract_decimal(Create_field *const cf,
+                                           const std::string &seed_key)
+    : DET_abstract_number(seed_key, pow(10, cf->decimals)),
+      decimals(cf->decimals)
 {
-    // MYSQL_TYPE_LONGLONG because blowfish works on 64 bit blocks.
-    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG,
-                             anonname);
-}
-
-Item *
-DET_int::encrypt(Item * const ptext, uint64_t IV)
-{
-    // assert(!stringItem(ptext));
-    const longlong value = static_cast<Item_int*>(ptext)->val_int();
-
-    const ulonglong res = static_cast<ulonglong>(bf.encrypt(value+shift));
-    LOG(encl) << "DET_int enc " << value << "--->" << res;
-    return new Item_int(res);
-}
-
-Item *
-DET_int::decrypt(Item * const ctext, uint64_t IV)
-{
-    const ulonglong value = static_cast<Item_int*>(ctext)->value;
-
-    if (shift) {
-        //std::cout << "value: " << value <<  " shift: " << shift << "\n";
-
-        longlong retdec = static_cast<longlong>(bf.decrypt(value));
-        retdec -= shift;
-        LOG(encl) << "DET_int dec " << value << "--->" << retdec;
-        return new Item_int(retdec);
-    }
-
-    ulonglong retdec = bf.decrypt(value);
-    retdec -= shift;
-    LOG(encl) << "DET_int dec " << value << "--->" << retdec;
-    return new Item_int(retdec);
-}
-
-
-Item *
-DET_int::decryptUDF(Item * const col, Item * const ivcol)
-{
-    List<Item> l;
-    l.push_back(col);
-
-    l.push_back(get_key_item(key));
-    // Only used for signed columns, otherwise zero.
-    l.push_back(new Item_int(static_cast<ulonglong>(shift)));
-
-    Item * const udfdec = new Item_func_udf_int(&u_decDETInt, l);
-    udfdec->name = NULL;
-
-    AssignOnce<Item *> udf;
-    if (0 == shift) {
-        // CAST for unsigned
-        udf = new Item_func_unsigned(udfdec);
-        udf.get()->name = NULL;
-    } else {
-        // CAST for signed.
-        udf = new Item_func_signed(udfdec);
-        udf.get()->name = NULL;
-    }
-
-    return udf.get();
-}
-
-DET_dec::DET_dec(Create_field * const cf, const std::string &seed_key)
-    : DET_int(cf, seed_key) 
-{
-    // make sure we have at most 8 precision
-    // a number of the form DECIMAL(a, b) has decimals = b and length = a + b
+    // > make sure we have at most 8 precision
+    // > a number with form DECIMAL(a, b) has decimals = b
+    //   and length = a + b
     assert_s(cf->length - cf->decimals <= 8,
              " this type of decimal not supported ");
 
-    decimals = cf->decimals;
-    shift = pow(10, decimals);
+    // decimals = cf->decimals;
+    // shift = pow(10, decimals);
+}
+
+DET_abstract_decimal::DET_abstract_decimal(unsigned int id,
+                                           const std::string &serial)
+    : DET_abstract_number(id, underSerial(serial)),
+      decimals(getDecimals(serial))
+{}
+
+std::string
+DET_abstract_decimal::doSerialize() const
+{
+    return std::to_string(decimals) + " " +
+            DET_abstract_number::doSerialize();
+}
+
+static Item_int *
+decimal_to_int(Item_decimal * const v, uint decimals,
+               const ulonglong &shift)
+{
+    const ulonglong res =  v->val_real() * shift;
+
+    return new Item_int(res);
+}
+
+Item *DET_abstract_decimal::encrypt(Item *const ptext, uint64_t IV)
+{
+    Item_decimal * const ptext_dec = static_cast<Item_decimal *>(ptext);
+    const std::unique_ptr<Item_int>
+        ptext_int(decimal_to_int(ptext_dec, decimals, shift));
+    Item * const result =
+        DET_abstract_number::encrypt(ptext_int.get(), IV);
+
+    return result;
+}
+
+Item *DET_abstract_decimal::decrypt(Item *const ctext, uint64_t IV)
+{
+    const std::unique_ptr<Item_int>
+        res_int(static_cast<Item_int*>(DET_abstract_number::decrypt(ctext,
+                                                                    IV)));
+    Item_decimal * const res =
+        new Item_decimal(res_int.get()->value*1.0/shift, decimals,
+                         decimals);
+    LOG(encl) << "DET_dec dec " << res_int->value << "--->"
+              << res->val_real();
+
+    return res;
+}
+
+uint DET_abstract_decimal::getDecimals(const std::string &serial)
+{
+    return atoi(serial.substr(0, serial.find(' ')).c_str());
 }
 
 std::string
-DET_dec::doSerialize() const
+DET_abstract_decimal::underSerial(const std::string &serial)
 {
-    return std::to_string(decimals) + " " + DET_int::doSerialize();
+    const uint pos = serial.find(" ");
+    return serial.substr(pos + 1, std::string::npos);
 }
 
+DET_int::DET_int(Create_field *const f, const std::string &seed_key)
+    : DET_abstract_integer(f, seed_key)
+{}
+
+DET_int::DET_int(unsigned int id, const std::string &serial)
+    : DET_abstract_integer(id, serial)
+{}
+
+DET_dec::DET_dec(Create_field * const cf, const std::string &seed_key)
+    : DET_abstract_decimal(cf, seed_key)
+{}
+
+DET_dec::DET_dec(unsigned int id, const std::string &serial)
+    : DET_abstract_decimal(id, serial)
+{}
 
 static std::string
-parent_serial(uint * const decimals, const std::string &serial)
+parent_serial(uint *const decimals, const std::string &serial)
 {
     std::stringstream layerinfo(serial);
 
@@ -874,50 +900,6 @@ parent_serial(uint * const decimals, const std::string &serial)
 
     return serial.substr(pos+1, serial.length()-pos);
 }
-
-DET_dec::DET_dec(unsigned int id, const std::string &serial)
-    : DET_int(id, parent_serial(&decimals, serial))
-{
-    shift = pow(10, decimals);   
-}
-
-static Item_int *
-decimal_to_int(Item_decimal * const v, uint decimals,
-               const ulonglong &shift)
-{
-    const ulonglong res =  v->val_real() * shift;
-    
-    return new Item_int(res);
-}
-Item *
-DET_dec::encrypt(Item * const ptext, uint64_t IV)
-{
-    Item_decimal * const ptext_dec = static_cast<Item_decimal *>(ptext);
-    const std::unique_ptr<Item_int>
-        ptext_int(decimal_to_int(ptext_dec, decimals, shift));
-    Item * const result = DET_int::encrypt(ptext_int.get(), IV);
-    
-    return result;
-}
-
-Item *
-DET_dec::decrypt(Item * const ctext, uint64_t IV)
-{
-    const std::unique_ptr<Item_int>
-        res_int(static_cast<Item_int*>(DET_int::decrypt(ctext, IV)));
-
-    Item_decimal * const res =
-        new Item_decimal(res_int.get()->value*1.0/shift, decimals,
-                         decimals);
-
-    LOG(encl) << "DET_dec dec " << res_int->value << "--->"
-              << res->val_real();
-
-    return res;
-}
-
-
-
 
 DET_str::DET_str(Create_field * const f, const std::string &seed_key)
 {
@@ -937,7 +919,7 @@ DET_str::newCreateField(const Create_field * const cf,
                         const std::string &anonname)
 {
     auto typelen = type_len_for_AES_str(cf->sql_type, cf->length, true);
-    
+
     return createFieldHelper(cf, typelen.second, typelen.first, anonname,
                              &my_charset_bin);
 }
@@ -996,59 +978,18 @@ DET_str::decryptUDF(Item * const col, Item * const ivcol)
 /*************** DETJOIN *********************/
 
 
-class DETJOIN_int : public DET_int {
+class DETJOIN_int : public DET_abstract_integer {
     //TODO
 public:
-    DETJOIN_int(Create_field * const cf, const std::string &seed_key)
-        : DET_int(cf, seed_key) {}
-
+    DETJOIN_int(Create_field *const cf, const std::string &seed_key)
+        : DET_abstract_integer(cf, seed_key) {}
     // serialize from parent;  unserialize:
     DETJOIN_int(unsigned int id, const std::string &serial)
-        : DET_int(id, serial) {}
+        : DET_abstract_integer(id, serial) {}
 
     SECLEVEL level() const {return SECLEVEL::DETJOIN;}
     std::string name() const {return "DETJOIN_int";}
-    
-private:
 };
-
-/*
-class DETJOIN_tinyint : public DET_tinyint {
-    //TODO
-public:
-    DETJOIN_tinyint(Create_field * const cf, const std::string &seed_key)
-        : DET_tinyint(cf, seed_key) {}
-
-    // serialize from parent;  unserialize:
-    DETJOIN_tinyint(unsigned int id, const std::string &serial) 
-        : DET_tinyint(id, serial) {}
-
-    SECLEVEL level() const {return SECLEVEL::DETJOIN;}
-    std::string name() const {return "DETJOIN_tinyint";}
-    
-private:
-   
-};
-
-class DETJOIN_mediumint : public DET_mediumint {
-public:
-    DETJOIN_mediumint(Create_field * const cf,
-                      const std::string &seed_key)
-        : DET_mediumint(cf, seed_key) {}
-
-    // serialize from parent;  unserialize:
-    DETJOIN_mediumint(unsigned int id, const std::string &serial) 
-        : DET_mediumint(id, serial) {}
-
-    SECLEVEL level() const {return SECLEVEL::DETJOIN;}
-    std::string name() const {return "DETJOIN_mediumint";}
-    
-private:
-   
-};
-*/
-
-
 
 class DETJOIN_str : public DET_str {
 public:
@@ -1065,22 +1006,20 @@ private:
  
 };
 
-class DETJOIN_dec: public DET_dec {
+class DETJOIN_dec : public DET_abstract_decimal {
     //TODO
 public:
-    DETJOIN_dec(Create_field * const cf, const std::string &seed_key)
-        : DET_dec(cf, seed_key) {}
+    DETJOIN_dec(Create_field *const cf, const std::string &seed_key)
+        : DET_abstract_decimal(cf, seed_key) {}
 
     // serialize from parent;  unserialize:
     DETJOIN_dec(unsigned int id, const std::string &serial)
-        : DET_dec(id, serial) {}
+        : DET_abstract_decimal(id, serial) {}
 
+    // FIXME: final
     SECLEVEL level() const {return SECLEVEL::DETJOIN;}
     std::string name() const {return "DETJOIN_dec";}
-
-private:
 };
-
 
 EncLayer *
 DETJOINFactory::create(Create_field * const cf,
@@ -1090,12 +1029,6 @@ DETJOINFactory::create(Create_field * const cf,
         if (cf->sql_type == MYSQL_TYPE_DECIMAL
             || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
             return new DETJOIN_dec(cf, key);
-/*
-        } else if (cf->sql_type == MYSQL_TYPE_INT24) {
-            return new DETJOIN_mediumint(cf, key);
-        } else if (cf->sql_type == MYSQL_TYPE_TINY) {
-            return new DETJOIN_tinyint(cf, key);
-*/
         } else {
             return new DETJOIN_int(cf, key);
         }
