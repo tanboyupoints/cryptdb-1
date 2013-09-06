@@ -117,8 +117,7 @@ EncSet::chooseOne(bool require_key) const
         const onion o = onion_order[i];
         const auto it = osl.find(o);
         if (it != osl.end()) {
-            if (SECLEVEL::BLOCKING == it->second.first
-                || SECLEVEL::INVALID == it->second.first) {
+            if (SECLEVEL::INVALID == it->second.first) {
                 continue;
             }
             // HACK.

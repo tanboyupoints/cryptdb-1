@@ -372,13 +372,13 @@ buildTypeTextTranslator()
     const std::vector<std::string> seclevel_strings
     {
         "RND", "DET", "DETJOIN", "OPE", "HOM", "SEARCH", "PLAINVAL",
-        "BLOCKING", "INVALID"
+        "INVALID"
     };
     const std::vector<SECLEVEL> seclevels
     {
         SECLEVEL::RND, SECLEVEL::DET, SECLEVEL::DETJOIN, SECLEVEL::OPE,
         SECLEVEL::HOM, SECLEVEL::SEARCH, SECLEVEL::PLAINVAL,
-        SECLEVEL::BLOCKING, SECLEVEL::INVALID
+        SECLEVEL::INVALID
     };
     RETURN_FALSE_IF_FALSE(seclevel_strings.size() == seclevels.size());
     translatorHelper(seclevel_strings, seclevels);
