@@ -66,3 +66,19 @@ testNoAvailableEncSet(const std::string &file_name,
                           (req_enc_set), (why), (childr_rp),        \
                           (child_count));                           \
 }
+
+inline void
+testTextMessageError(const std::string &file_name,
+                     unsigned int line_number, bool test,
+                     const std::string &message)
+{
+    if (false == test) {
+        throw TextMessageError(file_name, line_number, message);
+    }
+}
+
+#define TEST_TextMessageError(test, message)                        \
+{                                                                   \
+    testTextMessageError(__FILE__, __LINE__, (test), (message));    \
+}                                                                   \
+

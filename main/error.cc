@@ -59,3 +59,9 @@ std::string NoAvailableEncSet::to_string() const
 
     return s.str();
 }
+
+std::string TextMessageError::to_string() const
+{
+    return "Error: " + message + "\n"
+           + AbstractCryptDBError::to_string();
+}

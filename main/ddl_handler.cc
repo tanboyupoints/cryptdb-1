@@ -1,11 +1,12 @@
 #include <main/ddl_handler.hh>
 
-#include <parser/lex_util.hh>
 #include <main/rewrite_util.hh>
 #include <main/List_helpers.hh>
 #include <main/rewrite_main.hh>
 #include <main/alter_sub_handler.hh>
 #include <main/dispatcher.hh>
+#include <main/macro_util.hh>
+#include <parser/lex_util.hh>
 
 // > TODO: mysql permits a single ALTER TABLE command to invoke _multiple_
 //   and _different_ subcommands.
@@ -102,7 +103,11 @@ class CreateHandler : public DDLHandler {
 
             // Make sure we aren't trying to create a table that
             // already exists.
-            assert(lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS);
+            const bool test =
+                lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS;
+            TEST_TextMessageError(test,
+                                  "Table " + table + " already exists!");
+
             // -----------------------------
             //         Rewrite TABLE       
             // -----------------------------
