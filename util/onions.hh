@@ -14,7 +14,6 @@ typedef enum onion {
     oSWP,
     oPLAIN,
     oBESTEFFORT,
-    oWAIT,
     oINVALID,
 } onion;
 
@@ -59,9 +58,7 @@ static onionlayout BEST_EFFORT_NUM_ONION_LAYOUT = {
     // Requires SECLEVEL::DET, otherwise you will have to implement
     // encoding for negative numbers in SECLEVEL::RND.
     {oPLAIN, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL, SECLEVEL::DET,
-                                    SECLEVEL::RND})},
-    {oWAIT, std::vector<SECLEVEL>({SECLEVEL::PLAINVAL,
-                                   SECLEVEL::BLOCKING})}
+                                    SECLEVEL::RND})}
 };
 
 static onionlayout STR_ONION_LAYOUT = {

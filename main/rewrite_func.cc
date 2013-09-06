@@ -66,61 +66,6 @@ rewrite_args_FN(T *i, const OLK &constr, const RewritePlanOneOLK *rp,
     return out_i;
 }
 
-static bool
-isWaitingField(Item *const arg, Analysis &a)
-{
-    if (arg->type() == Item::Type::FIELD_ITEM) {
-        Item_field * const f = static_cast<Item_field *>(arg);
-        FieldMeta * const fm =
-            a.getFieldMeta(f->table_name, f->field_name);
-        if (fm->hasOnion(oWAIT) && fm->hasOnion(oPLAIN)) {
-            OnionMeta * const om_wait = fm->getOnionMeta(oWAIT);
-            OnionMeta * const om_plain = fm->getOnionMeta(oPLAIN);
-            if (a.getOnionLevel(om_wait) == SECLEVEL::BLOCKING
-                && a.getOnionLevel(om_plain) != SECLEVEL::BLOCKING) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-static bool
-isUsingExtraField(Item *const arg, Analysis &a)
-{
-    if (arg->type() == Item::Type::FIELD_ITEM) {
-        Item_field * const f = static_cast<Item_field *>(arg);
-        FieldMeta * const fm =
-            a.getFieldMeta(f->table_name, f->field_name);
-        if (fm->hasOnion(oWAIT) && fm->hasOnion(oPLAIN)) {
-            OnionMeta * const om_wait = fm->getOnionMeta(oWAIT);
-            OnionMeta * const om_plain = fm->getOnionMeta(oPLAIN);
-            if (a.getOnionLevel(om_wait) == SECLEVEL::PLAINVAL
-                && a.getOnionLevel(om_plain) == SECLEVEL::BLOCKING) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-static void
-throwFieldToPlainIfBlocked(Item *const waiting_arg,
-                           Item *const using_arg, Analysis &a)
-{
-    if (isWaitingField(waiting_arg, a)
-        && isUsingExtraField(using_arg, a)) {
-
-        Item_field * const f = static_cast<Item_field *>(waiting_arg);
-        FieldMeta * const fm =
-            a.getFieldMeta(f->table_name, f->field_name);
-        throw OnionAdjustExcept(oPLAIN, fm, SECLEVEL::PLAINVAL,
-                                f);
-    }
-}
-
 // An implementation of gather for the common case operation
 // Works for Item_func with two arguments, solution encset is intersect of
 // children and my_es
@@ -144,22 +89,8 @@ typical_gather(Analysis &a, Item_func *i, const EncSet &my_es,
     const EncSet solution =
         my_es.intersect(childr_rp[0]->es_out).
               intersect(childr_rp[1]->es_out);
-
-    if (false == solution.available()) {
-        // Throwing an exception here supports cases where we have an
-        // operation that needs to go to PLAIN and one of the fields is
-        // already at plain (using the extra field). The above intersect
-        // will fail to see that taking the other plain down to PLAINVAL
-        // is an option because this first field has SECLEVEL::BLOCKING
-        // on oPLAIN.
-        throwFieldToPlainIfBlocked(args[0], args[1], a);
-        throwFieldToPlainIfBlocked(args[1], args[0], a);
-
-        // NOTE: Redundant in the sense that we know the test will fail,
-        // but we need to give the opportunity to handle the above cases.
-        TEST_NoAvailableEncSet(solution, i->type(), my_es, why,
-                               childr_rp, arg_count);
-    }
+    TEST_NoAvailableEncSet(solution, i->type(), my_es, why,
+                           childr_rp, arg_count);
 
     std::function<EncSet ()> getEncSet =
         [encset_from_intersection, solution] ()
@@ -222,20 +153,11 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
 
         auto arg = i->arguments()[0];
         if (arg->type() == Item::Type::FIELD_ITEM) {
-            if (isWaitingField(arg, a)) {
-                Item_field * const f = static_cast<Item_field *>(arg);
-                FieldMeta * const fm =
-                    a.getFieldMeta(f->table_name, f->field_name);
+            const EncSet out_es = PLAIN_EncSet;
+            const EncSet child_es = PLAIN_EncSet;
+            const std::string why = "neg";
 
-                throw OnionAdjustExcept(oPLAIN, fm, SECLEVEL::PLAINVAL,
-                                        f);
-            } else {
-                const EncSet out_es = PLAIN_EncSet;
-                const EncSet child_es = PLAIN_EncSet;
-                const std::string why = "neg";
-
-                return iterateGather(i, out_es, child_es, why, tr, a);
-            }
+            return iterateGather(i, out_es, child_es, why, tr, a);
         } else if (arg->type() == Item::Type::INT_ITEM
                    || arg->type() == Item::Type::FIELD_ITEM) {
             const EncSet out_es = FULL_EncSet_Int;
@@ -280,7 +202,7 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
 
             return itemTypes.do_rewrite(neg_i, constr,
                                         rp_one->childr_rp[0], a);
-        } else if (oWAIT == constr.o || oPLAIN == constr.o) {
+        } else if (oPLAIN == constr.o) {
             return rewrite_args_FN(i, constr, rp_one, a);
         } else {
             throw CryptDBError("Bad onion for NEG!");

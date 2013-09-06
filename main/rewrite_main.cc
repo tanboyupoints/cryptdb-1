@@ -77,11 +77,9 @@ mysql_query_wrapper(MYSQL *const m, const std::string &q)
     if (!ret) assert(false);
 }
 
-// FIXME: Account for oWAIT.
 bool
 sanityCheck(FieldMeta *const fm)
 {
-    /*
     for (auto it : fm->children) {
         // FIXME: PTR.
         std::shared_ptr<OnionMeta> om = it.second;
@@ -93,7 +91,6 @@ sanityCheck(FieldMeta *const fm)
             assert(layer.get()->level() == secs[i]);
         }
     }
-    */
     return true;
 }
 
@@ -362,11 +359,11 @@ buildTypeTextTranslator()
     // Onions.
     const std::vector<std::string> onion_strings
     {
-        "oINVALID", "oPLAIN", "oWAIT", "oDET", "oOPE", "oAGG", "oSWP"
+        "oINVALID", "oPLAIN", "oDET", "oOPE", "oAGG", "oSWP"
     };
     const std::vector<onion> onions
     {
-        oINVALID, oPLAIN, oWAIT, oDET, oOPE, oAGG, oSWP
+        oINVALID, oPLAIN, oDET, oOPE, oAGG, oSWP
     };
     RETURN_FALSE_IF_FALSE(onion_strings.size() == onions.size());
     translatorHelper<onion>(onion_strings, onions);
@@ -513,59 +510,32 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
                  onion o, SECLEVEL *const new_level,
                  const std::string &cur_db)
 {
-    AssignOnce<SECLEVEL> local_new_level;
-
     OnionMeta *const om = a.getOnionMeta(fm, o);
-    const std::string tableanon =
-        a.getTableMeta(itf->table_name)->getAnonTableName();
 
     // Remove the EncLayer.
-    auto meta_key = om->getKey(a.getBackEncLayer(om));
     std::shared_ptr<EncLayer> back_el(a.popBackEncLayer(om));
 
     // Update the Meta.
     a.deltas.push_back(new DeleteDelta(back_el, om, NULL));
-    local_new_level = a.getOnionLevel(om);
+    const SECLEVEL local_new_level = a.getOnionLevel(om);
 
     //removes onion layer at the DB
-    Item_field * const salt =
+    const std::string tableanon =
+        a.getTableMeta(itf->table_name)->getAnonTableName();
+
+    Item_field *const salt =
         stringToItemField(fm->getSaltName(), tableanon, itf);
     std::cout << TypeText<onion>::toText(o) << std::endl;
 
-    AssignOnce<std::string> fieldanon;
-    AssignOnce<Item *> decUDF;
-    if (fm->needExtraPlainColumn()
-        && SECLEVEL::PLAINVAL == local_new_level.get()) {
+    const std::string fieldanon = om->getAnonOnionName();
+    Item_field *const field =
+        stringToItemField(fieldanon, tableanon, itf);
 
-        OnionMeta * const wait_om = fm->getOnionMeta(oWAIT);
-        fieldanon = wait_om->getAnonOnionName();
-
-        Item_field * const field =
-            stringToItemField(om->getAnonOnionName(), tableanon, itf);
-        decUDF = back_el.get()->decryptUDF(field, salt);
-        TEST_UnexpectedSecurityLevel(o, SECLEVEL::PLAINVAL,
-                                     a.getBackEncLayer(om)->level());
-
-        // HACK.
-        const std::shared_ptr<EncLayer> do_nothing_el(new Blocking());
-        a.deltas.push_back(new CreateDelta(do_nothing_el, om, meta_key));
-
-        const std::shared_ptr<EncLayer>
-            waiting_el(a.getBackEncLayer(wait_om));
-        TEST_UnexpectedSecurityLevel(oWAIT, SECLEVEL::BLOCKING,
-                                     waiting_el->level());
-        a.deltas.push_back(new DeleteDelta(waiting_el, wait_om, NULL));
-    } else {
-        fieldanon = om->getAnonOnionName();
-        Item_field *const field =
-            stringToItemField(fieldanon.get(), tableanon, itf);
-
-        decUDF = back_el.get()->decryptUDF(field, salt);
-    }
+    Item *const decUDF = back_el.get()->decryptUDF(field, salt);
 
     std::stringstream query;
     query << " UPDATE " << cur_db << "." << tableanon
-          << "    SET " << fieldanon.get()  << " = " << *decUDF.get()
+          << "    SET " << fieldanon  << " = " << *decUDF
           << ";";
 
     std::cerr << "\nADJUST: \n" << query.str() << std::endl;
@@ -574,7 +544,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
 
     LOG(cdb_v) << "adjust onions: \n" << query.str() << std::endl;
 
-    *new_level = local_new_level.get();
+    *new_level = local_new_level;
     return query.str();
 }
 

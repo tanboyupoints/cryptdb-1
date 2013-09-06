@@ -443,7 +443,6 @@ template <typename T>
 class AssignOnce {
 public:
     AssignOnce() : frozen(false) {}
-    AssignOnce(T value) : value(value), frozen(true) {}
     ~AssignOnce() {;}
     const AssignOnce& operator=(T value) {
         if (true == frozen) {
