@@ -430,29 +430,6 @@ static class ANON : public CItemSubtypeFT<Item_func_get_system_var, Item_func::F
     }
 } ANON;
 
-/*
- * When a higher level Rewrite node has a key to support an operation
- * that a lower level node needs.
- */
-static bool
-addingGetCurrentAndChildOLK(OLK in_curr_olk, OLK in_child_olk,
-                            OLK *const out_curr_olk,
-                            OLK *const out_child_olk)
-{
-    OLK merged_olk;
-    const bool merge_res =
-        mergeCompleteOLK(in_child_olk, in_curr_olk, &merged_olk);
-    if (true == merge_res) {
-        *out_curr_olk  = merged_olk;
-        *out_child_olk = merged_olk;
-    } else {
-        *out_curr_olk  = in_curr_olk;
-        *out_child_olk = in_child_olk;
-    }
-
-    return true;
-}
-
 template<class IT, const char *NAME>
 class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
     virtual RewritePlan * do_gather_type(IT *i, reason &tr,
@@ -482,16 +459,13 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
 
         std::cerr << "Rewrite plan is " << rp << "\n";
 
-        OLK curr_olk, child_olk;
-        assert(addingGetCurrentAndChildOLK(rp->olk, constr, &curr_olk,
-                                           &child_olk));
         Item * const arg0 =
-            itemTypes.do_rewrite(args[0], child_olk, rp->childr_rp[0], a);
+            itemTypes.do_rewrite(args[0], constr, rp->childr_rp[0], a);
         Item * const arg1 =
-            itemTypes.do_rewrite(args[1], child_olk, rp->childr_rp[1], a);
+            itemTypes.do_rewrite(args[1], constr, rp->childr_rp[1], a);
 
         if (oAGG == constr.o) {
-            OnionMeta *const om = curr_olk.key->getOnionMeta(oAGG);
+            OnionMeta *const om = rp->olk.key->getOnionMeta(oAGG);
             assert(om);
             const EncLayer *const el = a.getBackEncLayer(om);
             TEST_UnexpectedSecurityLevel(oAGG, SECLEVEL::HOM,
