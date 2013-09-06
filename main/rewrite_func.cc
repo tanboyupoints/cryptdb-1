@@ -111,7 +111,7 @@ typical_gather(Analysis &a, Item_func *i, const EncSet &my_es,
     my_r.add_child(r2);
 
     return new RewritePlanOneOLK(out_es,
-                                 solution.chooseOne(false), childr_rp,
+                                 solution.chooseOne(), childr_rp,
                                  my_r);
 }
 
@@ -131,7 +131,7 @@ iterateGather(Item_func *i, const EncSet &out_es, EncSet child_es,
         child_es = child_es.intersect(childr_rp[index]->es_out);
     }
 
-    return new RewritePlanOneOLK(out_es, child_es.chooseOne(false),
+    return new RewritePlanOneOLK(out_es, child_es.chooseOne(),
                                  childr_rp, tr);
 }
 

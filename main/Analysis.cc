@@ -99,7 +99,7 @@ operator<<(std::ostream &out, const EncSet &es)
 
 
 OLK
-EncSet::chooseOne(bool require_key) const
+EncSet::chooseOne() const
 {
     // Order of selection is encoded in this array.
     // The onions appearing earlier are the more preferred ones.
@@ -120,10 +120,9 @@ EncSet::chooseOne(bool require_key) const
             if (SECLEVEL::INVALID == it->second.first) {
                 continue;
             }
-            // HACK.
-            if (require_key && (it->second.second == 0 &&
-                (it->second.first != SECLEVEL::PLAINVAL &&
-                 o != oPLAIN))) {
+            if (0 == it->second.second
+                && (it->second.first != SECLEVEL::PLAINVAL
+                    && o != oPLAIN)) {
                 /*
                  * If no key, skip this OLK.
                  */

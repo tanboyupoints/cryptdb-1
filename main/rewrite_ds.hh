@@ -61,7 +61,7 @@ public:
     /**
      * decides which encryption scheme to use out of multiple in a set
      */
-    OLK chooseOne(bool require_key=true) const;
+    OLK chooseOne() const;
     bool contains(const OLK &olk) const;
     bool hasSecLevel(SECLEVEL level) const;
     EncSet intersect(const EncSet &es2) const;
