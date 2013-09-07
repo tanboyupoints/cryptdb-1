@@ -109,11 +109,13 @@ public:
     FieldMeta(unsigned int id, const std::string &fname, bool has_salt,
               const std::string &salt_name, bool plain_number,
               onionlayout onion_layout, SECURITY_RATING sec_rating,
-              unsigned long uniq_count, unsigned long counter)
+              unsigned long uniq_count, unsigned long counter,
+              bool has_default, const std::string &default_value)
         : MappedDBMeta(id), fname(fname), has_salt(has_salt),
           salt_name(salt_name), plain_number(plain_number),
           onion_layout(onion_layout), sec_rating(sec_rating),
-          uniq_count(uniq_count), counter(counter) {}
+          uniq_count(uniq_count), counter(counter),
+          has_default(has_default), default_value(default_value) {}
     ~FieldMeta() {;}
 
     std::string serialize(const DBObject &parent) const;
@@ -132,15 +134,17 @@ public:
     unsigned long leaseIncUniq() {return counter++;}
     // FIXME: Change name.
     unsigned long getCurrentUniqCounter() const {return counter;}
-    bool needExtraPlainColumn() const;
-    std::string getToPlainName() const;
     bool hasOnion(onion o) const;
+    bool hasDefault() const {return has_default;}
+    std::string defaultValue() const {return default_value;}
 
 private:
     constexpr static const char *type_name = "fieldMeta";
     const SECURITY_RATING sec_rating;
     unsigned long uniq_count;
     unsigned long counter;
+    const bool has_default;
+    const std::string default_value;
 
     SECLEVEL getOnionLevel(onion o) const;
     bool setOnionLevel(onion o, SECLEVEL maxl);
@@ -177,6 +181,7 @@ public:
     std::string serialize(const DBObject &parent) const;
     std::string getAnonTableName() const;
     std::vector<FieldMeta *> orderedFieldMetas() const;
+    std::vector<FieldMeta *> defaultedFieldMetas() const;
     // FIXME: Use rtti.
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}

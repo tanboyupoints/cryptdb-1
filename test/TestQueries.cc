@@ -851,31 +851,56 @@ static QueryList BestEffort = QueryList("BestEffort",
     { "DROP TABLE t"},
     { "DROP TABLE t"});
 
+// We do not support queries like this.
+// > INSERT INTO t () VALUES ();
+// > INSERT INTO t VALUES (DEFAULT);
+// > INSERT INTO t VALUES (DEFAULT(x));
 static QueryList DefaultValue = QueryList("DefaultValue",
-    { "CREATE TABLE t (x integer, y integer NOT NULL DEFAULT 12)",
-      "CREATE TABLE u (z integer NOT NULL DEFAULT 100)",
+    { "CREATE TABLE def_0 (x INTEGER NOT NULL DEFAULT 10,"
+      "                    y VARCHAR(100) NOT NULL DEFAULT 'purpflowers',"
+      "                    z INTEGER)",
+      "CREATE TABLE def_1 (a INTEGER NOT NULL DEFAULT '100',"
+      "                    b INTEGER,"
+      "                    c VARCHAR(100))",
       "", ""},
-    { "CREATE TABLE t (x integer, y integer NOT NULL DEFAULT 12)",
-      "CREATE TABLE u (z integer NOT NULL DEFAULT 100)",
+    { "CREATE TABLE def_0 (x INTEGER NOT NULL DEFAULT 10,"
+      "                    y VARCHAR(100) NOT NULL DEFAULT 'purpflowers',"
+      "                    z INTEGER)",
+      "CREATE TABLE def_1 (a INTEGER NOT NULL DEFAULT '100',"
+      "                    b INTEGER,"
+      "                    c VARCHAR(100))",
       "", ""},
-    { "CREATE TABLE t (x integer, y integer NOT NULL DEFAULT 12)",
-      "CREATE TABLE u (z integer NOT NULL DEFAULT 100)",
+    { "CREATE TABLE def_0 (x INTEGER NOT NULL DEFAULT 10,"
+      "                    y VARCHAR(100) NOT NULL DEFAULT 'purpflowers',"
+      "                    z INTEGER)",
+      "CREATE TABLE def_1 (a INTEGER NOT NULL DEFAULT '100',"
+      "                    b INTEGER,"
+      "                    c VARCHAR(100))",
       "", ""},
-    { Query("INSERT INTO t (x) VALUES (5)", false),
-      Query("INSERT INTO t (x, y) VALUES (18, -53)", false),
-      // Query("INSERT INTO u () VALUES ()", false),
-      // Query("INSERT INTO u VALUES (DEFAULT)", false),
-      // Query("INSERT INTO u VALUES (DEFAULT(z))", false),
-      Query("SELECT * FROM t WHERE x = 12", false),
-      Query("INSERT INTO t (x) VALUES (19)", false),
-      Query("SELECT * FROM t WHERE x = 19", false),
-      Query("SELECT * FROM t", false)},
-    { "DROP TABLE t",
-      "DROP TABLE u"},
-    { "DROP TABLE t",
-      "DROP TABLE u"},
-    { "DROP TABLE t",
-      "DROP TABLE u"});
+    { Query("INSERT INTO def_0 VALUES (100, 'singsongs', 500),"
+            "                         (220, 'heyfriend', 15)", false),
+      Query("INSERT INTO def_0 (z) VALUES (500), (220), (32)", false),
+      Query("INSERT INTO def_0 (z, x) VALUES (500, '500')", false),
+      Query("INSERT INTO def_0 (z) VALUES (100)", false),
+      Query("INSERT INTO def_1 VALUES (250, 10000, 'smile!')", false),
+      Query("INSERT INTO def_1 (a, b, c) VALUES (250, 100, '!')", false),
+      Query("INSERT INTO def_1 (b, c) VALUES (250, 'smile!'),"
+            "                                (99, 'happybday!')", false),
+      Query("SELECT * FROM def_0, def_1", false),
+      Query("SELECT * FROM def_0 WHERE x = 10", false),
+      Query("INSERT INTO def_0 (z) VALUES (500), (12), (19)", false),
+      Query("SELECT * FROM def_0 WHERE x = 10", false),
+      Query("SELECT * FROM def_0 WHERE y = 'purpflowers'", false),
+      Query("INSERT INTO def_0 (z) VALUES (450), (200), (300)", false),
+      Query("SELECT * FROM def_0 WHERE y = 'purpflowers'", false),
+      Query("SELECT * FROM def_0, def_1", false)},
+    { "DROP TABLE def_0",
+      "DROP TABLE def_1"},
+    { "DROP TABLE def_0",
+      "DROP TABLE def_1"},
+    { "DROP TABLE def_0",
+      "DROP TABLE def_1"});
+
 
 static QueryList Decimal = QueryList("Decimal",
     { "CREATE TABLE dec_0 (x DECIMAL(10, 5),"
@@ -1237,7 +1262,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 368/368.
+    //      TOTAL RESULT: 377/377.
     // ###############################
 
     std::vector<Score> scores;
@@ -1287,7 +1312,7 @@ RunTest(const TestConfig &tc) {
     // Pass 16/16
     scores.push_back(CheckQueryList(tc, Negative));
 
-    // Pass 12/12
+    // Pass 21/21
     scores.push_back(CheckQueryList(tc, DefaultValue));
 
     // Pass 19/19

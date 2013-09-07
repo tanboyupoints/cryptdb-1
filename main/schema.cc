@@ -232,10 +232,13 @@ FieldMeta::deserialize(unsigned int id, const std::string &serial)
         TypeText<SECURITY_RATING>::toType(vec[5]);
     const unsigned int uniq_count = atoi(vec[6].c_str());
     const unsigned int counter = atoi(vec[7].c_str());
+    const bool has_default = string_to_bool(vec[8]);
+    const std::string default_value = vec[9];
 
     return std::unique_ptr<FieldMeta>
         (new FieldMeta(id, fname, has_salt, salt_name, plain_number,
-                       onion_layout, sec_rating, uniq_count, counter));
+                       onion_layout, sec_rating, uniq_count, counter,
+                       has_default, default_value));
 }
 
 // If mkey == NULL, the field is not encrypted
@@ -279,7 +282,9 @@ FieldMeta::FieldMeta(const std::string &name, Create_field * const field,
       salt_name(BASE_SALT_NAME + getpRandomName()), 
       onion_layout(getOnionLayout(m_key, field, sec_rating,
                                   &plain_number)),
-      sec_rating(sec_rating), uniq_count(uniq_count), counter(0)
+      sec_rating(sec_rating), uniq_count(uniq_count), counter(0),
+      has_default(field->def),
+      default_value(has_default ? ItemToString(field->def) : "")
 {
     assert(init_onions_layout(m_key, this, field));
 }
@@ -297,7 +302,9 @@ std::string FieldMeta::serialize(const DBObject &parent) const
         serialize_string(TypeText<onionlayout>::toText(onion_layout)) +
         serialize_string(TypeText<SECURITY_RATING>::toText(sec_rating)) +
         serialize_string(std::to_string(uniq_count)) +
-        serialize_string(std::to_string(counter));
+        serialize_string(std::to_string(counter)) +
+        serialize_string(bool_to_string(has_default)) +
+        serialize_string(default_value);
 
    return serial;
 }
@@ -403,18 +410,6 @@ onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
     }
 }
 
-bool FieldMeta::needExtraPlainColumn() const
-{
-    return plain_number;
-}
-
-std::string FieldMeta::getToPlainName() const
-{
-    // FIXME.
-    assert(this->needExtraPlainColumn());
-    return "plainname";
-}
-
 bool FieldMeta::hasOnion(onion o) const
 {
     const std::unique_ptr<OnionMetaKey> key(new OnionMetaKey(o));
@@ -472,6 +467,24 @@ std::vector<FieldMeta *> TableMeta::orderedFieldMetas() const
               }); 
 
     return v;
+}
+
+std::vector<FieldMeta *> TableMeta::defaultedFieldMetas() const
+{
+    std::vector<FieldMeta *> v;
+    for (auto it : children) {
+        // FIXME: PTR.
+        v.push_back(it.second.get());
+    }
+
+    std::vector<FieldMeta *> out_v;
+    std::copy_if(v.begin(), v.end(), std::back_inserter(out_v),
+                 [] (const FieldMeta *const fm) -> bool
+                 {
+                    return fm->hasDefault();
+                 });
+
+    return out_v;
 }
 
 // TODO: Add salt.

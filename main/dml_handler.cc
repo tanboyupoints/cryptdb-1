@@ -45,6 +45,16 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a);
 static bool
 invalidates(FieldMeta * fm, const EncSet & es);
 
+template <typename ContainerType>
+void rewriteInsertHelper(Item *const i, Analysis &a, FieldMeta *const fm,
+                         ContainerType *const append_list)
+{
+    std::vector<Item *> l;
+    itemTypes.do_rewrite_insert(i, a, l, fm);
+    for (auto it : l) {
+        append_list->push_back(it);
+    }
+}
 class InsertHandler : public DMLHandler {
     virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps) const
     {
@@ -60,92 +70,95 @@ class InsertHandler : public DMLHandler {
         return;
     }
 
-    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+    virtual LEX *rewrite(Analysis &a, LEX *const lex, const ProxyState &ps)
         const
     {
-        LEX * new_lex = copy(lex);
+        LEX *const new_lex = copy(lex);
 
         const std::string &table =
                 lex->select_lex.table_list.first->table_name;
+        const TableMeta *const tm = a.getTableMeta(table);
 
         //rewrite table name
         new_lex->select_lex.table_list.first =
             rewrite_table_list(lex->select_lex.table_list.first, a);
 
-        // fields
+        // -------------------------
+        // Fields (and default data)
+        // -------------------------
         std::vector<FieldMeta *> fmVec;
+        std::vector<Item *> implicit_defaults;
         if (lex->field_list.head()) {
             auto it = List_iterator<Item>(lex->field_list);
             List<Item> newList;
             for (;;) {
-                Item *i = it++;
-                if (!i)
+                Item *const i = it++;
+                if (!i) {
                     break;
-                assert(i->type() == Item::FIELD_ITEM);
-                Item_field *ifd = static_cast<Item_field*>(i);
-                //cerr << "field " << ifd->table_name << "." << ifd->field_name << endl;
+                }
+                TEST_TextMessageError(i->type() == Item::FIELD_ITEM,
+                                      "Expected field item!");
+                Item_field *const ifd = static_cast<Item_field*>(i);
                 fmVec.push_back(a.getFieldMeta(ifd->table_name,
                                                ifd->field_name));
-                std::vector<Item *> l;
-                itemTypes.do_rewrite_insert(i, a, l, NULL);
-                for (auto it0 = l.begin(); it0 != l.end(); ++it0) {
-                    newList.push_back(*it0);
-                }
+                rewriteInsertHelper(i, a, NULL, &newList);
             }
-            new_lex->field_list = newList;
-        }
 
-        if (fmVec.empty()) {
-            // Use the table order.
-            TableMeta *tm = a.getTableMeta(table);
+            // Collect the implicit defaults.
+            std::vector<FieldMeta *> field_implicit_defaults =
+                vectorDifference(tm->defaultedFieldMetas(), fmVec);
+            Item_field *const seed_item_field =
+                static_cast<Item_field *>(new_lex->field_list.head());
+            for (auto implicit_it : field_implicit_defaults) {
+                // Get default fields.
+                Item_field *const item_field =
+                    make_item(seed_item_field, table, implicit_it->fname);
+                rewriteInsertHelper(item_field, a, NULL, &newList);
+
+                // Get default values.
+                const std::string def_value = implicit_it->defaultValue();
+                rewriteInsertHelper(make_item_string(def_value), a,
+                                    implicit_it, &implicit_defaults);
+            }
+
+            new_lex->field_list = newList;
+        } else {
+            // No field list, use the table order.
+            // > Because there is no field list, fields with default
+            //   values must be explicity INSERTed so we don't have to
+            //   take any action with respect to defaults.
+            assert(fmVec.empty());
             std::vector<FieldMeta *> fmetas = tm->orderedFieldMetas();
             fmVec.assign(fmetas.begin(), fmetas.end());
         }
 
-        // values
+        // -----------------
+        //      Values
+        // -----------------
         if (lex->many_values.head()) {
             auto it = List_iterator<List_item>(lex->many_values);
             List<List_item> newList;
             for (;;) {
-                List_item *li = it++;
-                if (!li)
+                List_item *const li = it++;
+                if (!li) {
                     break;
+                }
                 assert(li->elements == fmVec.size());
-                List<Item> *newList0 = new List<Item>();
+                List<Item> *const newList0 = new List<Item>();
                 auto it0 = List_iterator<Item>(*li);
                 auto fmVecIt = fmVec.begin();
                 for (;;) {
-                    Item *i = it0++;
+                    Item *const i = it0++;
                     if (!i) {
                         assert(fmVec.end() == fmVecIt);
                         break;
                     }
                     assert(fmVec.end() != fmVecIt);
-                    std::vector<Item *> l;
-                    // Prevent the dereferencing of a bad iterator if
-                    // the user supplies more values than fields and the
-                    // parser fails to throw an error.
-                    // TODO: It seems like the expected behavior
-                    // is for the parser to catch this bad state, so we
-                    // will fail until further notice.
-                    assert(fmVecIt != fmVec.end());
-                    itemTypes.do_rewrite_insert(i, a, l, *fmVecIt);
-                    for (auto it1 = l.begin(); it1 != l.end(); ++it1) {
-                        newList0->push_back(*it1);
-                        /*String s;
-                        (*it1)->print(&s, QT_ORDINARY);
-                        cerr << s << endl;*/
-                    }
-                    /*
-                    // HACK: Extra plain column.
-                    if ((*fmVecIt)->needExtraPlainColumn()) {
-                        std::string name = "nullvalue";
-                        char *nullname =
-                            current_thd->strdup(name.c_str());
-                        newList0->push_back(new Item_null(nullname));
-                    }
-                    */
+                    rewriteInsertHelper(i, a, *fmVecIt, newList0);
                     ++fmVecIt;
+                }
+                for (auto def_it : implicit_defaults) {
+                    newList0->push_back(def_it);
                 }
                 newList.push_back(newList0);
             }

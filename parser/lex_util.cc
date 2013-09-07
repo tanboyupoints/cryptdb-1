@@ -121,6 +121,13 @@ clone_item(Item *const i)
     }
 }
 
+Item_string *
+make_item_string(const std::string &s)
+{
+    return new Item_string(make_thd_string(s), s.length(),
+                           Item::default_charset());
+}
+
 ORDER *
 make_order(const ORDER *const old_order, Item *const i)
 {
