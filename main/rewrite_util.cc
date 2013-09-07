@@ -185,7 +185,11 @@ get_create_field(const Analysis &a, Create_field * const f,
                  OnionMeta * const om, const std::string &name)
 {
     Create_field *new_cf = f;
-    
+
+    // Default value is handled during INSERTion.
+    auto save_default = f->def;
+    f->def = NULL;
+
     auto enc_layers = a.getEncLayers(om);
     assert(enc_layers.size() > 0);
     for (auto l : enc_layers) {
@@ -197,48 +201,13 @@ get_create_field(const Analysis &a, Create_field * const f,
         }
     }
 
+    // Restore the default so we don't memleak it.
+    f->def = save_default;
     return new_cf;
 }
 
-static Item *
-makeNiceDefault(const Create_field * const cf)
-{
-    assert(cf->def);
-
-    switch (cf->sql_type) {
-        case MYSQL_TYPE_NEWDECIMAL:
-            assert_s(cf->def->type() == Item::Type::DECIMAL_ITEM,
-                     "We only support decimal types as default value"
-                     " for decimals (ie, no strings)");
-            return make_item(static_cast<Item_decimal *>(cf->def));
-        case MYSQL_TYPE_TINY:
-        case MYSQL_TYPE_SHORT:
-        case MYSQL_TYPE_INT24:
-        case MYSQL_TYPE_LONG:
-        case MYSQL_TYPE_LONGLONG: {
-            const std::string val = ItemToString(cf->def);
-            return new Item_int(atoi(val.c_str()));
-        }
-        case MYSQL_TYPE_DATE:
-            throw CryptDBError("handle MYSQL_TYPE_DATE");
-        case MYSQL_TYPE_TIME:
-            throw CryptDBError("handle MYSQL_TYPE_TIME");
-        case MYSQL_TYPE_DATETIME:
-        case MYSQL_TYPE_VARCHAR:
-        case MYSQL_TYPE_VAR_STRING:
-        case MYSQL_TYPE_STRING:
-        case MYSQL_TYPE_TINY_BLOB:
-        case MYSQL_TYPE_LONG_BLOB:
-        case MYSQL_TYPE_MEDIUM_BLOB:
-            return make_item(static_cast<Item_string *>(cf->def));
-        case MYSQL_TYPE_NULL:
-            return make_item(static_cast<Item_null *>(cf->def));
-        default: {
-            throw CryptDBError("unrecognized default type!");
-        }
-    }
-}
-
+// NOTE: The fields created here should have NULL default pointers
+// as such is handled during INSERTion.
 std::vector<Create_field *>
 rewrite_create_field(const FieldMeta * const fm,
                      Create_field * const f, const Analysis &a)
@@ -249,36 +218,23 @@ rewrite_create_field(const FieldMeta * const fm,
 
     //check if field is not encrypted
     if (fm->children.empty()) {
-        output_cfields.push_back(f);
-        //cerr << "onions were empty" << endl;
+        Create_field *const new_f = f->clone(current_thd->mem_root);
+        new_f->def = NULL;
+        output_cfields.push_back(new_f);
         return output_cfields;
     }
 
-    const bool has_default = f->def != NULL;
-    const uint64_t default_salt =
-        fm->has_salt && has_default ? randomValue() : 0;
-
     // create each onion column
     for (auto oit : fm->orderedOnionMetas()) {
-        const onion o = oit.first->getValue();
         OnionMeta * const om = oit.second;
         Create_field * const new_cf =
             get_create_field(a, f, om, om->getAnonOnionName());
-        assert(has_default == static_cast<bool>(new_cf->def));
-        if (new_cf->def) {
-            // AWARE: Could be pulled out, but would require an additional
-            // if statement for has_default.
-            const std::unique_ptr<Item> def(makeNiceDefault(f));
-            new_cf->def =
-                encrypt_item_layers(def.get(), o, om, a, default_salt);
-        }
 
         output_cfields.push_back(new_cf);
     }
 
     // create salt column
     if (fm->has_salt) {
-        //cerr << fm->salt_name << endl;
         THD * const thd         = current_thd;
         Create_field * const f0 = f->clone(thd->mem_root);
         f0->field_name          = thd->strdup(fm->getSaltName().c_str());
@@ -286,24 +242,10 @@ rewrite_create_field(const FieldMeta * const fm,
                                                              // unsigned
         f0->sql_type            = MYSQL_TYPE_LONGLONG;
         f0->length              = 8;
-
-        if (has_default) {
-            f0->def = new Item_int(static_cast<ulonglong>(default_salt));
-        }
+        f0->def                 = NULL;
 
         output_cfields.push_back(f0);
     }
-
-    /*
-    // HACK: Create the extra plain column.
-    if (fm->needExtraPlainColumn()) {
-        Create_field * const extra_plain_cf =
-            f->clone(current_thd->mem_root);
-        extra_plain_cf->field_name =
-            current_thd->strdup(fm->getToPlainName().c_str());
-        output_cfields.push_back(extra_plain_cf);
-    }
-    */
 
     return output_cfields;
 }
