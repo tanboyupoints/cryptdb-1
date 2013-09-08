@@ -266,28 +266,31 @@ getKeyOnionMeta(const FieldMeta * const fm)
 }
 
 // TODO: Add Key for oDET onion as well.
-std::vector<Key*>
-rewrite_key(const std::shared_ptr<TableMeta> &tm, Key * const key,
+std::vector<Key *>
+rewrite_key(const std::shared_ptr<TableMeta> &tm, Key *const key,
             const Analysis &a)
 {
-    std::vector<Key*> output_keys;
-    Key * const new_key = key->clone(current_thd->mem_root);
-    const auto col_it =
-        List_iterator<Key_part_spec>(key->columns);
-    // FIXME: Memleak.
+    std::vector<Key *> output_keys;
+    Key *const new_key = key->clone(current_thd->mem_root);
+
+    // Set anonymous name.
     const std::string new_name =
         a.getAnonIndexName(tm.get(), convert_lex_str(key->name));
     new_key->name = string_to_lex_str(new_name);
-    new_key->columns = 
+
+    // Set anonymous columns.
+    const auto col_it =
+        List_iterator<Key_part_spec>(key->columns);
+    new_key->columns =
         reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
             [tm, a] (List<Key_part_spec> out_field_list,
-                        Key_part_spec *key_part) {
+                        Key_part_spec *const key_part) {
                 const std::string field_name =
                     convert_lex_str(key_part->field_name);
-                const FieldMeta * const fm =
+                const FieldMeta *const fm =
                     a.getFieldMeta(tm.get(), field_name);
-                // HACK: Should return multiple onions.
-                const OnionMeta * const om = getKeyOnionMeta(fm);
+                // FIXME: Should return multiple onions.
+                const OnionMeta *const om = getKeyOnionMeta(fm);
                 key_part->field_name =
                     string_to_lex_str(om->getAnonOnionName());
                 out_field_list.push_back(key_part);

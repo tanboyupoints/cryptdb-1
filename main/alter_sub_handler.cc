@@ -124,7 +124,7 @@ class AddIndexSubHandler : public AlterSubHandler {
                                   const ProxyState &ps,
                                   const Preamble &preamble) const
     {
-        LEX *new_lex = copy(lex);
+        LEX *const new_lex = copy(lex);
 
         std::shared_ptr<TableMeta> tm(a.getTableMeta(preamble.table));
 
@@ -137,9 +137,9 @@ class AddIndexSubHandler : public AlterSubHandler {
         // Add each new index.
         auto key_it =
             List_iterator<Key>(lex->alter_info.key_list);
-        new_lex->alter_info.key_list = 
+        new_lex->alter_info.key_list =
             reduceList<Key>(key_it, List<Key>(),
-                [tm, &a] (List<Key> out_list, Key *key) {
+                [tm, &a] (List<Key> out_list, Key *const key) {
                     // -----------------------------
                     //         Rewrite INDEX
                     // -----------------------------
@@ -148,7 +148,7 @@ class AddIndexSubHandler : public AlterSubHandler {
 
                     return out_list;
             });
- 
+
         return new_lex;
     }
 };
