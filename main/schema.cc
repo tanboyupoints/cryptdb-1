@@ -246,7 +246,8 @@ static bool
 init_onions_layout(const AES_KEY *const m_key,
                    FieldMeta *const fm, Create_field *const cf)
 {
-    if (fm->has_salt != static_cast<bool>(m_key)) {
+    if (fm->has_salt != (static_cast<bool>(m_key)
+                         && PLAIN_ONION_LAYOUT != fm->onion_layout)) {
         return false;
     }
 
@@ -278,10 +279,11 @@ FieldMeta::FieldMeta(const std::string &name, Create_field * const field,
                      const AES_KEY * const m_key,
                      SECURITY_RATING sec_rating,
                      unsigned long uniq_count)
-    : fname(name), has_salt(static_cast<bool>(m_key)),
-      salt_name(BASE_SALT_NAME + getpRandomName()), 
+    : fname(name), salt_name(BASE_SALT_NAME + getpRandomName()),
       onion_layout(getOnionLayout(m_key, field, sec_rating,
                                   &plain_number)),
+      has_salt(static_cast<bool>(m_key)
+              && onion_layout != PLAIN_ONION_LAYOUT),
       sec_rating(sec_rating), uniq_count(uniq_count), counter(0),
       has_default(field->def),
       default_value(has_default ? ItemToString(field->def) : "")
@@ -389,7 +391,11 @@ onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
         throw CryptDBError("Should be using SECURITY_RATING::PLAIN!");
     }
 
-    onionlayout basic_layout;
+    // Don't encrypt AUTO_INCREMENT.
+    if (Field::NEXT_NUMBER == f->unireg_check) {
+        return PLAIN_ONION_LAYOUT;
+    }
+
     if (SECURITY_RATING::SENSITIVE == sec_rating) {
         *plain_number = false;
         if (true == IsMySQLTypeNumeric(f->sql_type)) {

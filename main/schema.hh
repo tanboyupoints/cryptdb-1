@@ -92,11 +92,11 @@ struct TableMeta;
 typedef class FieldMeta : public MappedDBMeta<OnionMeta, OnionMetaKey> {
 public:
     const std::string fname;
-    const bool has_salt; //whether this field has its own salt
     const std::string salt_name;
     // FIXME: AssignOnce.
     bool plain_number;
     const onionlayout onion_layout;
+    const bool has_salt; //whether this field has its own salt
 
     // New.
     FieldMeta(const std::string &name, Create_field * const field,
@@ -111,9 +111,9 @@ public:
               onionlayout onion_layout, SECURITY_RATING sec_rating,
               unsigned long uniq_count, unsigned long counter,
               bool has_default, const std::string &default_value)
-        : MappedDBMeta(id), fname(fname), has_salt(has_salt),
-          salt_name(salt_name), plain_number(plain_number),
-          onion_layout(onion_layout), sec_rating(sec_rating),
+        : MappedDBMeta(id), fname(fname), salt_name(salt_name),
+          plain_number(plain_number), onion_layout(onion_layout),
+          has_salt(has_salt), sec_rating(sec_rating),
           uniq_count(uniq_count), counter(counter),
           has_default(has_default), default_value(default_value) {}
     ~FieldMeta() {;}

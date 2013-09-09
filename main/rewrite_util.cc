@@ -214,15 +214,9 @@ rewrite_create_field(const FieldMeta * const fm,
 {
     LOG(cdb_v) << "in rewrite create field for " << *f;
 
-    std::vector<Create_field *> output_cfields;
+    assert(fm->children.size() > 0);
 
-    //check if field is not encrypted
-    if (fm->children.empty()) {
-        Create_field *const new_f = f->clone(current_thd->mem_root);
-        new_f->def = NULL;
-        output_cfields.push_back(new_f);
-        return output_cfields;
-    }
+    std::vector<Create_field *> output_cfields;
 
     // create each onion column
     for (auto oit : fm->orderedOnionMetas()) {
@@ -238,8 +232,9 @@ rewrite_create_field(const FieldMeta * const fm,
         THD * const thd         = current_thd;
         Create_field * const f0 = f->clone(thd->mem_root);
         f0->field_name          = thd->strdup(fm->getSaltName().c_str());
-        f0->flags               = f0->flags | UNSIGNED_FLAG; // salt is
-                                                             // unsigned
+        // Salt is unsigned and is not AUTO_INCREMENT.
+        f0->flags               =
+            (f0->flags | UNSIGNED_FLAG) & ~AUTO_INCREMENT_FLAG;; 
         f0->sql_type            = MYSQL_TYPE_LONGLONG;
         f0->length              = 8;
         f0->def                 = NULL;
@@ -353,15 +348,9 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
         [] (const std::string name, Create_field * const cf,
             const ProxyState &ps, const std::shared_ptr<TableMeta> &tm)
     {
-        // If AUTO_INCREMENT, don't encrypt.
-        if (Field::NEXT_NUMBER == cf->unireg_check) {
-            return new FieldMeta(name, cf, NULL, SECURITY_RATING::PLAIN,
-                                 tm.get()->leaseIncUniq());
-        } else {
-            return new FieldMeta(name, cf, ps.masterKey,
-                                 ps.defaultSecurityRating(),
-                                 tm.get()->leaseIncUniq());
-        }
+        return new FieldMeta(name, cf, ps.masterKey,
+                             ps.defaultSecurityRating(),
+                             tm.get()->leaseIncUniq());
     };
     std::shared_ptr<FieldMeta> fm =
         std::shared_ptr<FieldMeta>(buildFieldMeta(name, cf, ps, tm));
