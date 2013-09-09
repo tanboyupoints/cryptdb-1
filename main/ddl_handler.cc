@@ -93,12 +93,13 @@ class CreateHandler : public DDLHandler {
                 List_iterator<Key>(lex->alter_info.key_list);
             new_lex->alter_info.key_list =
                 reduceList<Key>(key_it, List<Key>(),
-                    [&tm, &a] (List<Key> out_list, Key *key) {
+                    [&tm, &a] (List<Key> out_list, Key *const key)
+                    {
                         auto keys = rewrite_key(tm, key, a);
                         out_list.concat(vectorToList(keys));
 
                         return out_list;
-                });
+                    });
         } else { // Table already exists.
 
             // Make sure we aren't trying to create a table that

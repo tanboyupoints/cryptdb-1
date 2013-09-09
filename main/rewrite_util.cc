@@ -275,10 +275,13 @@ rewrite_key(const std::shared_ptr<TableMeta> &tm, Key *const key,
         // Set anonymous columns.
         const auto col_it =
             List_iterator<Key_part_spec>(key->columns);
+        // HACK: Determine if we succeed in creating the INDEX on
+        // each onion.
+        bool fail = false;
         new_key->columns =
             reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
-                [o, tm, a] (List<Key_part_spec> out_field_list,
-                            Key_part_spec *const key_part)
+                [o, tm, a, &fail] (List<Key_part_spec> out_field_list,
+                                   Key_part_spec *const key_part)
                 {
                     Key_part_spec *const new_key_part = copy(key_part);
                     const std::string field_name =
@@ -286,8 +289,8 @@ rewrite_key(const std::shared_ptr<TableMeta> &tm, Key *const key,
                     const FieldMeta *const fm =
                         a.getFieldMeta(tm.get(), field_name);
                     const OnionMeta *const om = fm->getOnionMeta(o);
-                    // NOTE: Silently failing to create INDEX.
                     if (NULL == om) {
+                        fail = true;
                         return out_field_list;  /* lambda */
                     }
 
@@ -296,7 +299,18 @@ rewrite_key(const std::shared_ptr<TableMeta> &tm, Key *const key,
                     out_field_list.push_back(new_key_part);
                     return out_field_list; /* lambda */
                 });
-        output_keys.push_back(new_key);
+        if (false == fail) {
+            output_keys.push_back(new_key);
+        }
+    }
+
+    // Only create one PRIMARY KEY.
+    if (Key::PRIMARY == key->type) {
+        if (output_keys.size() > 0) {
+            return std::vector<Key *>({output_keys.front()});
+        } else {
+            return std::vector<Key *>();
+        }
     }
 
     return output_keys;
@@ -339,6 +353,7 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
         [] (const std::string name, Create_field * const cf,
             const ProxyState &ps, const std::shared_ptr<TableMeta> &tm)
     {
+        // If AUTO_INCREMENT, don't encrypt.
         if (Field::NEXT_NUMBER == cf->unireg_check) {
             return new FieldMeta(name, cf, NULL, SECURITY_RATING::PLAIN,
                                  tm.get()->leaseIncUniq());
