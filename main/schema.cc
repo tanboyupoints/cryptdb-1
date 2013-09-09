@@ -488,9 +488,11 @@ std::vector<FieldMeta *> TableMeta::defaultedFieldMetas() const
 }
 
 // TODO: Add salt.
-std::string TableMeta::getAnonIndexName(const std::string &index_name) const
+std::string TableMeta::getAnonIndexName(const std::string &index_name,
+                                        onion o) const
 {
-    const std::string hash_input = anon_table_name + index_name;
+    const std::string hash_input =
+        anon_table_name + index_name + TypeText<onion>::toText(o);
     const std::size_t hsh = std::hash<std::string>()(hash_input);
 
     return std::string("index_") + std::to_string(hsh);

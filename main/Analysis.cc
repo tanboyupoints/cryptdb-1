@@ -1058,17 +1058,19 @@ std::string Analysis::getAnonTableName(const std::string &table) const
 }
 
 std::string Analysis::getAnonIndexName(const std::string &table,
-                                       const std::string &index_name)
+                                       const std::string &index_name,
+                                       onion o)
     const
 {
-    return this->getTableMeta(table)->getAnonIndexName(index_name); 
+    return this->getTableMeta(table)->getAnonIndexName(index_name, o); 
 }
 
 std::string Analysis::getAnonIndexName(const TableMeta * const tm,
-                                       const std::string &index_name)
+                                       const std::string &index_name,
+                                       onion o)
     const
 {
-    return tm->getAnonIndexName(index_name); 
+    return tm->getAnonIndexName(index_name, o); 
 }
 
 std::string Analysis::unAliasTable(const std::string &table) const

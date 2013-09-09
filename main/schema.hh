@@ -194,7 +194,8 @@ private:
     constexpr static const char *type_name = "tableMeta";
     unsigned int counter;
 
-    std::string getAnonIndexName(const std::string &index_name) const;
+    std::string getAnonIndexName(const std::string &index_name,
+                                 onion o) const;
 } TableMeta;
 
 

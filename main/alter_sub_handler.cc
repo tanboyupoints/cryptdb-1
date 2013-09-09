@@ -146,7 +146,7 @@ class AddIndexSubHandler : public AlterSubHandler {
                     auto new_keys = rewrite_key(tm, key, a);
                     out_list.concat(vectorToList(new_keys));
 
-                    return out_list;
+                    return out_list;    /* lambda */
             });
 
         return new_lex;
@@ -196,12 +196,17 @@ class DropIndexSubHandler : public AlterSubHandler {
     {
         // Rewrite the Alter_drop data structure.
         List<Alter_drop> out_list;
-        THD *thd = current_thd;
-        Alter_drop *new_adrop = adrop->clone(thd->mem_root);  
-        new_adrop->name =
-            make_thd_string(a.getAnonIndexName(table, adrop->name));
+        const std::vector<onion> key_onions = getOnionIndexTypes();
+        for (auto onion_it : key_onions) {
+            const onion o = onion_it;
+            Alter_drop *const new_adrop =
+                adrop->clone(current_thd->mem_root);  
+            new_adrop->name =
+                make_thd_string(a.getAnonIndexName(table, adrop->name, o));
 
-        out_list.push_back(new_adrop);
+            out_list.push_back(new_adrop);
+        }
+
         return out_list;
     }
 };

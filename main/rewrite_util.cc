@@ -250,53 +250,53 @@ rewrite_create_field(const FieldMeta * const fm,
     return output_cfields;
 }
 
-static
-const OnionMeta *
-getKeyOnionMeta(const FieldMeta * const fm)
+std::vector<onion>
+getOnionIndexTypes()
 {
-    std::vector<onion> onions({oOPE, oDET, oPLAIN});
-    for (auto it : onions) {
-        const OnionMeta * const om = fm->getOnionMeta(it);
-        if (NULL != om) {
-            return om;
-        }
-    }
-
-    assert(false);
+    return std::vector<onion>({oOPE, oDET, oPLAIN});
 }
 
-// TODO: Add Key for oDET onion as well.
 std::vector<Key *>
 rewrite_key(const std::shared_ptr<TableMeta> &tm, Key *const key,
             const Analysis &a)
 {
     std::vector<Key *> output_keys;
-    Key *const new_key = key->clone(current_thd->mem_root);
 
-    // Set anonymous name.
-    const std::string new_name =
-        a.getAnonIndexName(tm.get(), convert_lex_str(key->name));
-    new_key->name = string_to_lex_str(new_name);
+    const std::vector<onion> key_onions = getOnionIndexTypes();
+    for (auto onion_it : key_onions) {
+        const onion o = onion_it;
+        Key *const new_key = key->clone(current_thd->mem_root);
 
-    // Set anonymous columns.
-    const auto col_it =
-        List_iterator<Key_part_spec>(key->columns);
-    new_key->columns =
-        reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
-            [tm, a] (List<Key_part_spec> out_field_list,
-                        Key_part_spec *const key_part) {
-                const std::string field_name =
-                    convert_lex_str(key_part->field_name);
-                const FieldMeta *const fm =
-                    a.getFieldMeta(tm.get(), field_name);
-                // FIXME: Should return multiple onions.
-                const OnionMeta *const om = getKeyOnionMeta(fm);
-                key_part->field_name =
-                    string_to_lex_str(om->getAnonOnionName());
-                out_field_list.push_back(key_part);
-                return out_field_list; /* lambda */
-            });
-    output_keys.push_back(new_key);
+        // Set anonymous name.
+        const std::string new_name =
+            a.getAnonIndexName(tm.get(), convert_lex_str(key->name), o);
+        new_key->name = string_to_lex_str(new_name);
+
+        // Set anonymous columns.
+        const auto col_it =
+            List_iterator<Key_part_spec>(key->columns);
+        new_key->columns =
+            reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
+                [o, tm, a] (List<Key_part_spec> out_field_list,
+                            Key_part_spec *const key_part) {
+                    Key_part_spec *const new_key_part = copy(key_part);
+                    const std::string field_name =
+                        convert_lex_str(new_key_part->field_name);
+                    const FieldMeta *const fm =
+                        a.getFieldMeta(tm.get(), field_name);
+                    const OnionMeta *const om = fm->getOnionMeta(o);
+                    // NOTE: Silently failing to create INDEX.
+                    if (NULL == om) {
+                        return out_field_list;
+                    }
+
+                    new_key_part->field_name =
+                        string_to_lex_str(om->getAnonOnionName());
+                    out_field_list.push_back(new_key_part);
+                    return out_field_list; /* lambda */
+                });
+        output_keys.push_back(new_key);
+    }
 
     return output_keys;
 }
@@ -438,26 +438,6 @@ encrypt_item_all_onions(Item *i, FieldMeta *fm,
         const onion o = it.first->getValue();
         OnionMeta * const om = it.second;
         l.push_back(encrypt_item_layers(i, o, om, a, IV));
-    }
-}
-
-bool
-mergeCompleteOLK(OLK olk1, OLK olk2, OLK *out_olk)
-{
-    if (olk1.o != olk2.o && olk1.l != olk2.l) {
-        return false;
-    } else if (olk1.key && olk2.key) {
-        *out_olk = olk1;
-        return olk1.key == olk2.key;
-    } else if (olk1.key) {
-        *out_olk = olk1;
-        return true;
-    } else if (olk2.key) {
-        *out_olk = olk2;
-        return true;
-    } else {
-        *out_olk = olk1;
-        return olk1.l == SECLEVEL::PLAINVAL;
     }
 }
 
