@@ -278,7 +278,8 @@ rewrite_key(const std::shared_ptr<TableMeta> &tm, Key *const key,
         new_key->columns =
             reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
                 [o, tm, a] (List<Key_part_spec> out_field_list,
-                            Key_part_spec *const key_part) {
+                            Key_part_spec *const key_part)
+                {
                     Key_part_spec *const new_key_part = copy(key_part);
                     const std::string field_name =
                         convert_lex_str(new_key_part->field_name);
@@ -287,7 +288,7 @@ rewrite_key(const std::shared_ptr<TableMeta> &tm, Key *const key,
                     const OnionMeta *const om = fm->getOnionMeta(o);
                     // NOTE: Silently failing to create INDEX.
                     if (NULL == om) {
-                        return out_field_list;
+                        return out_field_list;  /* lambda */
                     }
 
                     new_key_part->field_name =
