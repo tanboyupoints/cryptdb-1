@@ -226,19 +226,18 @@ FieldMeta::deserialize(unsigned int id, const std::string &serial)
     const std::string fname = vec[0];
     const bool has_salt = string_to_bool(vec[1]);
     const std::string salt_name = vec[2];
-    const bool plain_number = string_to_bool(vec[3]);
-    const onionlayout onion_layout = TypeText<onionlayout>::toType(vec[4]);
+    const onionlayout onion_layout = TypeText<onionlayout>::toType(vec[3]);
     const SECURITY_RATING sec_rating =
-        TypeText<SECURITY_RATING>::toType(vec[5]);
-    const unsigned int uniq_count = atoi(vec[6].c_str());
-    const unsigned int counter = atoi(vec[7].c_str());
-    const bool has_default = string_to_bool(vec[8]);
-    const std::string default_value = vec[9];
+        TypeText<SECURITY_RATING>::toType(vec[4]);
+    const unsigned int uniq_count = atoi(vec[5].c_str());
+    const unsigned int counter = atoi(vec[6].c_str());
+    const bool has_default = string_to_bool(vec[7]);
+    const std::string default_value = vec[8];
 
     return std::unique_ptr<FieldMeta>
-        (new FieldMeta(id, fname, has_salt, salt_name, plain_number,
-                       onion_layout, sec_rating, uniq_count, counter,
-                       has_default, default_value));
+        (new FieldMeta(id, fname, has_salt, salt_name, onion_layout,
+                       sec_rating, uniq_count, counter, has_default,
+                       default_value));
 }
 
 // If mkey == NULL, the field is not encrypted
@@ -280,8 +279,7 @@ FieldMeta::FieldMeta(const std::string &name, Create_field * const field,
                      SECURITY_RATING sec_rating,
                      unsigned long uniq_count)
     : fname(name), salt_name(BASE_SALT_NAME + getpRandomName()),
-      onion_layout(getOnionLayout(m_key, field, sec_rating,
-                                  &plain_number)),
+      onion_layout(getOnionLayout(m_key, field, sec_rating)),
       has_salt(static_cast<bool>(m_key)
               && onion_layout != PLAIN_ONION_LAYOUT),
       sec_rating(sec_rating), uniq_count(uniq_count), counter(0),
@@ -300,7 +298,6 @@ std::string FieldMeta::serialize(const DBObject &parent) const
         serialize_string(fname) +
         serialize_string(bool_to_string(has_salt)) +
         serialized_salt_name +
-        serialize_string(bool_to_string(plain_number)) +
         serialize_string(TypeText<onionlayout>::toText(onion_layout)) +
         serialize_string(TypeText<SECURITY_RATING>::toText(sec_rating)) +
         serialize_string(std::to_string(uniq_count)) +
@@ -379,8 +376,7 @@ OnionMeta *FieldMeta::getOnionMeta(onion o) const
 
 onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
                                       const Create_field * const f,
-                                      SECURITY_RATING sec_rating,
-                                      bool * const plain_number)
+                                      SECURITY_RATING sec_rating)
 {
     if (sec_rating == SECURITY_RATING::PLAIN) {
         // assert(!m_key);
@@ -397,7 +393,6 @@ onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
     }
 
     if (SECURITY_RATING::SENSITIVE == sec_rating) {
-        *plain_number = false;
         if (true == IsMySQLTypeNumeric(f->sql_type)) {
             return NUM_ONION_LAYOUT;
         } else {
@@ -405,10 +400,8 @@ onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
         }
     } else if (SECURITY_RATING::BEST_EFFORT == sec_rating) {
         if (true == IsMySQLTypeNumeric(f->sql_type)) {
-            *plain_number = true;
             return BEST_EFFORT_NUM_ONION_LAYOUT;
         } else {
-            *plain_number = false;
             return BEST_EFFORT_STR_ONION_LAYOUT;
         }
     } else {

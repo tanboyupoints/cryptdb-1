@@ -93,8 +93,6 @@ typedef class FieldMeta : public MappedDBMeta<OnionMeta, OnionMetaKey> {
 public:
     const std::string fname;
     const std::string salt_name;
-    // FIXME: AssignOnce.
-    bool plain_number;
     const onionlayout onion_layout;
     const bool has_salt; //whether this field has its own salt
 
@@ -107,15 +105,15 @@ public:
     static std::unique_ptr<FieldMeta>
         deserialize(unsigned int id, const std::string &serial);
     FieldMeta(unsigned int id, const std::string &fname, bool has_salt,
-              const std::string &salt_name, bool plain_number,
-              onionlayout onion_layout, SECURITY_RATING sec_rating,
-              unsigned long uniq_count, unsigned long counter,
-              bool has_default, const std::string &default_value)
+              const std::string &salt_name, onionlayout onion_layout,
+              SECURITY_RATING sec_rating, unsigned long uniq_count,
+              unsigned long counter, bool has_default,
+              const std::string &default_value)
         : MappedDBMeta(id), fname(fname), salt_name(salt_name),
-          plain_number(plain_number), onion_layout(onion_layout),
-          has_salt(has_salt), sec_rating(sec_rating),
-          uniq_count(uniq_count), counter(counter),
-          has_default(has_default), default_value(default_value) {}
+          onion_layout(onion_layout), has_salt(has_salt),
+          sec_rating(sec_rating), uniq_count(uniq_count),
+          counter(counter), has_default(has_default),
+          default_value(default_value) {}
     ~FieldMeta() {;}
 
     std::string serialize(const DBObject &parent) const;
@@ -150,8 +148,7 @@ private:
     bool setOnionLevel(onion o, SECLEVEL maxl);
     static onionlayout getOnionLayout(const AES_KEY * const m_key,
                                       const Create_field * const f,
-                                      SECURITY_RATING sec_rating,
-                                      bool * const plain_number);
+                                      SECURITY_RATING sec_rating);
 } FieldMeta;
 
 typedef class TableMeta : public MappedDBMeta<FieldMeta, IdentityMetaKey> {
