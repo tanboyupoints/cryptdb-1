@@ -306,7 +306,9 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
                                          Analysis & a) const
     {
         const unsigned int arg_count = i->argument_list()->elements;
-        TEST_BadItemArgumentCount(i->type(), 2, arg_count);
+        // > Multiple ANDs in a query are represented with a single AND
+        //   in the LEX.
+        // TEST_BadItemArgumentCount(i->type(), 2, arg_count);
 
         const EncSet out_es = PLAIN_EncSet;
         EncSet child_es = EQ_EncSet;
