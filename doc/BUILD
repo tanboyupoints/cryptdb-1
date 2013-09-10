@@ -36,8 +36,9 @@ Building CryptDB
     > automake --version
     > If your autotools version >= 1.12
         + Go to this URL http://tinyurl.com/ljs7oba
-        + Follow the instructions pertaining to de-ANSI-fication and
-          ansi2knr.
+        + Edit configure.in by following the instructions pertaining to
+          de-ANSI-fication/ansi2knr at this URL: 
+            * https://www.flameeyes.eu/autotools-mythbuster/forwardporting/automake.html
     > sh ./autogen.sh
     > ./configure --enable-maintainer-mode --with-lua=lua5.1
     > make
