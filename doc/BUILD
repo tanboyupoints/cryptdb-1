@@ -35,7 +35,6 @@ Building CryptDB
     > cd mysql-proxy
     > automake --version
     > If your autotools version >= 1.12
-        + Go to this URL http://tinyurl.com/ljs7oba
         + Edit configure.in by following the instructions pertaining to
           de-ANSI-fication/ansi2knr at this URL: 
             * https://www.flameeyes.eu/autotools-mythbuster/forwardporting/automake.html
