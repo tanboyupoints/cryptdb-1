@@ -218,6 +218,10 @@ rewrite_create_field(const FieldMeta * const fm,
 
     std::vector<Create_field *> output_cfields;
 
+    // Don't add the default value to the schema.
+    Item *const save_def = f->def;
+    f->def = NULL;
+
     // create each onion column
     for (auto oit : fm->orderedOnionMetas()) {
         OnionMeta * const om = oit.second;
@@ -233,14 +237,19 @@ rewrite_create_field(const FieldMeta * const fm,
         Create_field * const f0 = f->clone(thd->mem_root);
         f0->field_name          = thd->strdup(fm->getSaltName().c_str());
         // Salt is unsigned and is not AUTO_INCREMENT.
+        // > NOT_NULL_FLAG is useful for debugging if mysql STRICT_MODE
+        //   is turned on.
         f0->flags               =
-            (f0->flags | UNSIGNED_FLAG) & ~AUTO_INCREMENT_FLAG;; 
+            (f0->flags | UNSIGNED_FLAG | NOT_NULL_FLAG)
+            & ~AUTO_INCREMENT_FLAG;
         f0->sql_type            = MYSQL_TYPE_LONGLONG;
         f0->length              = 8;
-        f0->def                 = NULL;
 
         output_cfields.push_back(f0);
     }
+
+    // Restore the default to the original Create_field parameter.
+    f->def = save_def;
 
     return output_cfields;
 }

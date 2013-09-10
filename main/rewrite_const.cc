@@ -30,18 +30,9 @@ encrypt_item(Item * i, const OLK & olk, Analysis & a)
 {
     assert(!i->is_null());
 
-/*
-    // HACK
-    // Necessary because gathering PLAINVAL is not going to have
-    // a FieldMeta associated with it when we are doing an operation
-    // on a constant without a field.
-    // > SELECT 2 FROM t
-    // > SELECT 8*9 FROM t
-*/
     FieldMeta * const fm = olk.key;
+    // HACK + BROKEN.
     if (!fm && oPLAIN == olk.o) {
-    // FIXME: This should be as follows.
-    // if (!fm && SECLEVEL::PLAINVAL == olk.l) {
         return i;
     }
     assert(fm);
