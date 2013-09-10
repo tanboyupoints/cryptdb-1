@@ -108,27 +108,6 @@ encrypt_item_all_onions(Item *i, FieldMeta *fm,
 std::vector<onion>
 getOnionIndexTypes();
 
-template <typename ItemType>
-static void
-typical_rewrite_insert_type(ItemType *i, Analysis &a,
-                            std::vector<Item *> &l, FieldMeta *fm)
-{
-    uint64_t salt = 0;
-
-    if (fm->has_salt) {
-        salt = randomValue();
-    } else {
-        //TODO: need to use table salt in this case
-    }
-
-    // FIXME: What does this do?
-    if (i->type() == Item::Type::INT_ITEM && i->is_datetime()) {
-        ((Item_int *)i)->value = 0;
-    }
-    encrypt_item_all_onions(i, fm, salt, l, a);
-
-    if (fm->has_salt) {
-        l.push_back(new Item_int((ulonglong) salt));
-    }
-}
-
+void
+typical_rewrite_insert_type(Item *const i, Analysis &a,
+                            std::vector<Item *> &l, FieldMeta *const fm);

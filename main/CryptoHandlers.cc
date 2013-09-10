@@ -23,6 +23,7 @@ using namespace NTL;
  * because sometimes your 'Item_int', is actually an Item_string and you
  * need to either let MySQL code handle the conversion (Item::val_uint())
  * or you need to handle it yourself (strtoull).
+ */
 
 /* Implementation class hierarchy is as in .hh file plus:
 

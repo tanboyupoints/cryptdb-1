@@ -455,3 +455,22 @@ encrypt_item_all_onions(Item *i, FieldMeta *fm,
     }
 }
 
+void
+typical_rewrite_insert_type(Item *const i, Analysis &a,
+                            std::vector<Item *> &l, FieldMeta *const fm)
+{
+    uint64_t salt = 0;
+
+    if (fm->has_salt) {
+        salt = randomValue();
+    } else {
+        //TODO: need to use table salt in this case
+    }
+
+    encrypt_item_all_onions(i, fm, salt, l, a);
+
+    if (fm->has_salt) {
+        l.push_back(new Item_int(static_cast<ulonglong>(salt)));
+    }
+}
+

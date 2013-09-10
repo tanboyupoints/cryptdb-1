@@ -9,6 +9,7 @@
 #include <main/rewrite_util.hh>
 #include <main/dbobject.hh>
 #include <main/metadata_tables.hh>
+#include <main/macro_util.hh>
 
 std::vector<std::shared_ptr<DBMeta>>
 DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
@@ -374,6 +375,27 @@ OnionMeta *FieldMeta::getOnionMeta(onion o) const
     return om.get();
 }
 
+static bool encryptionNotSupported(const Create_field *const cf)
+{
+    switch (cf->sql_type) {
+        case MYSQL_TYPE_FLOAT:
+        case MYSQL_TYPE_DOUBLE:
+        case MYSQL_TYPE_TIMESTAMP:
+        case MYSQL_TYPE_DATE:
+        case MYSQL_TYPE_TIME:
+        case MYSQL_TYPE_DATETIME:
+        case MYSQL_TYPE_YEAR:
+        case MYSQL_TYPE_NEWDATE:
+        case MYSQL_TYPE_BIT:
+        case MYSQL_TYPE_ENUM:
+        case MYSQL_TYPE_SET:
+        case MYSQL_TYPE_GEOMETRY:
+            return true;
+        default:
+            return false;
+    }
+}
+
 onionlayout FieldMeta::determineOnionLayout(const AES_KEY *const m_key,
                                             const Create_field *const f,
                                             SECURITY_RATING sec_rating)
@@ -385,6 +407,13 @@ onionlayout FieldMeta::determineOnionLayout(const AES_KEY *const m_key,
 
     if (!m_key) {
         throw CryptDBError("Should be using SECURITY_RATING::PLAIN!");
+    }
+
+    if (encryptionNotSupported(f)) {
+        TEST_TextMessageError(SECURITY_RATING::SENSITIVE != sec_rating,
+                              "A SENSITIVE security rating requires the"
+                              " field to be supported with cryptography!");
+        return PLAIN_ONION_LAYOUT;
     }
 
     // Don't encrypt AUTO_INCREMENT.
