@@ -82,8 +82,7 @@ make_item_by_type(std::string value, enum_field_types type)
 static Item_null *
 make_null(const std::string &name = "")
 {
-    // FIXME: Memleak.
-    char *n = strdup(name.c_str());
+    char *const n = current_thd->strdup(name.c_str());
     return new Item_null(n);
 }
 

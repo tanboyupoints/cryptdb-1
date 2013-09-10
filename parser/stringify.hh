@@ -364,13 +364,10 @@ convert_lex_str(const LEX_STRING &l)
     return std::string(l.str, l.length);
 }
 
-// FIXME: Memleak.
-// > Use sql/thr_malloc.cc {sql_alloc}
 inline LEX_STRING
 string_to_lex_str(const std::string &s)
 {
-    char *const cstr = new char[s.length() + 1];
-    strncpy(cstr, s.c_str(), s.length());
+    char *const cstr = current_thd->strdup(s.c_str());
     return LEX_STRING({cstr, s.length()});
 }
 
