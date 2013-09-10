@@ -237,8 +237,8 @@ rewrite_create_field(const FieldMeta * const fm,
         Create_field * const f0 = f->clone(thd->mem_root);
         f0->field_name          = thd->strdup(fm->getSaltName().c_str());
         // Salt is unsigned and is not AUTO_INCREMENT.
-        // > NOT_NULL_FLAG is useful for debugging if mysql STRICT_MODE
-        //   is turned on.
+        // > NOT_NULL_FLAG is useful for debugging if mysql strict mode
+        //   (ie, STRICT_ALL_TABLES) is turned on.
         f0->flags               =
             (f0->flags | UNSIGNED_FLAG | NOT_NULL_FLAG)
             & ~AUTO_INCREMENT_FLAG;
