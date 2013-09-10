@@ -459,13 +459,7 @@ void
 typical_rewrite_insert_type(Item *const i, Analysis &a,
                             std::vector<Item *> &l, FieldMeta *const fm)
 {
-    uint64_t salt = 0;
-
-    if (fm->has_salt) {
-        salt = randomValue();
-    } else {
-        //TODO: need to use table salt in this case
-    }
+    const uint64_t salt = fm->has_salt ? randomValue() : 0;
 
     encrypt_item_all_onions(i, fm, salt, l, a);
 
