@@ -279,12 +279,12 @@ FieldMeta::FieldMeta(const std::string &name, Create_field * const field,
                      SECURITY_RATING sec_rating,
                      unsigned long uniq_count)
     : fname(name), salt_name(BASE_SALT_NAME + getpRandomName()),
-      onion_layout(getOnionLayout(m_key, field, sec_rating)),
+      onion_layout(determineOnionLayout(m_key, field, sec_rating)),
       has_salt(static_cast<bool>(m_key)
               && onion_layout != PLAIN_ONION_LAYOUT),
       sec_rating(sec_rating), uniq_count(uniq_count), counter(0),
-      has_default(field->def),
-      default_value(has_default ? ItemToString(field->def) : "")
+      has_default(determineHasDefault(field)),
+      default_value(determineDefaultValue(has_default, field))
 {
     assert(init_onions_layout(m_key, this, field));
 }
@@ -374,9 +374,9 @@ OnionMeta *FieldMeta::getOnionMeta(onion o) const
     return om.get();
 }
 
-onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
-                                      const Create_field * const f,
-                                      SECURITY_RATING sec_rating)
+onionlayout FieldMeta::determineOnionLayout(const AES_KEY *const m_key,
+                                            const Create_field *const f,
+                                            SECURITY_RATING sec_rating)
 {
     if (sec_rating == SECURITY_RATING::PLAIN) {
         // assert(!m_key);
@@ -405,7 +405,34 @@ onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
             return BEST_EFFORT_STR_ONION_LAYOUT;
         }
     } else {
-        throw CryptDBError("Bad SECURITY_RATING in getOnionLayout!");
+        throw CryptDBError("Bad SECURITY_RATING in determineOnionLayout!");
+    }
+}
+
+bool FieldMeta::determineHasDefault(const Create_field *const cf)
+{
+    return cf->def || cf->flags & NOT_NULL_FLAG;
+}
+
+std::string FieldMeta::determineDefaultValue(bool has_default,
+                                             const Create_field *const cf)
+{
+    const static std::string zero_string = "'0'";
+    const static std::string empty_string = "";
+
+    if (false == has_default) {
+        // This value should never be used.
+        return empty_string;
+    }
+
+    if (cf->def) {
+        return ItemToString(cf->def);
+    } else {
+        if (true == IsMySQLTypeNumeric(cf->sql_type)) {
+            return zero_string;
+        } else {
+            return empty_string;
+        }
     }
 }
 

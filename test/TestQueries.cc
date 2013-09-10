@@ -938,6 +938,38 @@ static QueryList Decimal = QueryList("Decimal",
     { "DROP TABLE dec_0",
       "DROP TABLE dec_1"});
 
+static QueryList NonStrictMode = QueryList("NonStrictMode",
+    { "CREATE TABLE not_strict (x INTEGER NOT NULL,"
+      "                         y INTEGER NOT NULL DEFAULT 100,"
+      "                         z VARCHAR(100) NOT NULL)",
+      "", "", ""},
+    { "CREATE TABLE not_strict (x INTEGER NOT NULL,"
+      "                         y INTEGER NOT NULL DEFAULT 100,"
+      "                         z VARCHAR(100) NOT NULL)",
+      "", "", ""},
+    { "CREATE TABLE not_strict (x INTEGER NOT NULL,"
+      "                         y INTEGER NOT NULL DEFAULT 100,"
+      "                         z VARCHAR(100) NOT NULL)",
+      "", "", ""},
+    { Query("INSERT INTO not_strict VALUES (150, 230, 'flowers')", false),
+      Query("INSERT INTO not_strict VALUES (850, 930, 'rainbow')", false),
+      Query("INSERT INTO not_strict (y) VALUES (11930)", false),
+      Query("SELECT * FROM not_strict WHERE x = 0", false),
+      Query("SELECT * FROM not_strict WHERE z = ''", false),
+      Query("INSERT INTO not_strict (y) VALUES (1212)", false),
+      Query("SELECT * FROM not_strict WHERE x = 0", false),
+      Query("SELECT * FROM not_strict WHERE z = ''", false),
+      Query("INSERT INTO not_strict (x) VALUES (0)", false),
+      Query("INSERT INTO not_strict (x, z) VALUES (12001, 'sun')", false),
+      Query("INSERT INTO not_strict (z) VALUES ('curtlanguage')", false),
+      Query("SELECT * FROM not_strict WHERE x = 0", false),
+      Query("SELECT * FROM not_strict WHERE z = ''", false),
+      Query("SELECT * FROM not_strict WHERE x < 110", false),
+      Query("SELECT * FROM not_strict", false)},
+    { "DROP TABLE not_strict"},
+    { "DROP TABLE not_strict"},
+    { "DROP TABLE not_strict"});
+
 
 //-----------------------------------------------------------------------
 
@@ -1262,7 +1294,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 377/377.
+    //      TOTAL RESULT: 397/397.
     // ###############################
 
     std::vector<Score> scores;
@@ -1317,6 +1349,9 @@ RunTest(const TestConfig &tc) {
 
     // Pass 19/19
     scores.push_back(CheckQueryList(tc, Decimal));
+
+    // Pass 20/20
+    scores.push_back(CheckQueryList(tc, NonStrictMode));
 
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;

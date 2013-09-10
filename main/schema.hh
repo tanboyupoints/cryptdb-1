@@ -146,9 +146,12 @@ private:
 
     SECLEVEL getOnionLevel(onion o) const;
     bool setOnionLevel(onion o, SECLEVEL maxl);
-    static onionlayout getOnionLayout(const AES_KEY * const m_key,
-                                      const Create_field * const f,
-                                      SECURITY_RATING sec_rating);
+    static onionlayout determineOnionLayout(const AES_KEY *const m_key,
+                                            const Create_field *const f,
+                                            SECURITY_RATING sec_rating);
+    static bool determineHasDefault(const Create_field *const cf);
+    static std::string determineDefaultValue(bool has_default,
+                                             const Create_field *const cf);
 } FieldMeta;
 
 typedef class TableMeta : public MappedDBMeta<FieldMeta, IdentityMetaKey> {
