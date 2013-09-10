@@ -88,4 +88,17 @@ private:
     const unsigned int child_count;
 };
 
+class TextMessageError : public AbstractCryptDBError {
+public:
+    TextMessageError(const std::string &file_name, int line_number,
+                     const std::string &message)
+        : AbstractCryptDBError(file_name, line_number),
+          message(message) {}
+    ~TextMessageError() {}
 
+    // std::string to_string() const final;
+    std::string to_string() const;
+
+private:
+    const std::string message;
+};

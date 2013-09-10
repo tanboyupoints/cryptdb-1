@@ -99,7 +99,7 @@ operator<<(std::ostream &out, const EncSet &es)
 
 
 OLK
-EncSet::chooseOne(bool require_key) const
+EncSet::chooseOne() const
 {
     // Order of selection is encoded in this array.
     // The onions appearing earlier are the more preferred ones.
@@ -109,7 +109,6 @@ EncSet::chooseOne(bool require_key) const
         oAGG,
         oSWP,
         oPLAIN,
-        oWAIT
     };
 
     static size_t onion_size =
@@ -118,14 +117,12 @@ EncSet::chooseOne(bool require_key) const
         const onion o = onion_order[i];
         const auto it = osl.find(o);
         if (it != osl.end()) {
-            if (SECLEVEL::BLOCKING == it->second.first
-                || SECLEVEL::INVALID == it->second.first) {
+            if (SECLEVEL::INVALID == it->second.first) {
                 continue;
             }
-            // HACK.
-            if (require_key && (it->second.second == 0 &&
-                (it->second.first != SECLEVEL::PLAINVAL &&
-                 o != oPLAIN))) {
+            if (0 == it->second.second
+                && (it->second.first != SECLEVEL::PLAINVAL
+                    && o != oPLAIN)) {
                 /*
                  * If no key, skip this OLK.
                  */
@@ -1061,17 +1058,19 @@ std::string Analysis::getAnonTableName(const std::string &table) const
 }
 
 std::string Analysis::getAnonIndexName(const std::string &table,
-                                       const std::string &index_name)
+                                       const std::string &index_name,
+                                       onion o)
     const
 {
-    return this->getTableMeta(table)->getAnonIndexName(index_name); 
+    return this->getTableMeta(table)->getAnonIndexName(index_name, o); 
 }
 
 std::string Analysis::getAnonIndexName(const TableMeta * const tm,
-                                       const std::string &index_name)
+                                       const std::string &index_name,
+                                       onion o)
     const
 {
-    return tm->getAnonIndexName(index_name); 
+    return tm->getAnonIndexName(index_name, o); 
 }
 
 std::string Analysis::unAliasTable(const std::string &table) const

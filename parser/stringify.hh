@@ -120,8 +120,7 @@ std::string ListJoin(List<T> lst, std::string delim,
     std::ostringstream accum;
 
     auto it = List_iterator<T>(lst);
-    T *element = it++;
-    for (;element; element = it++) {
+    for (T *element = it++; element; element = it++) {
         std::string finalized_element = finalize(*element);
         accum << finalized_element;
         accum << delim;
@@ -368,9 +367,8 @@ convert_lex_str(const LEX_STRING &l)
 inline LEX_STRING
 string_to_lex_str(const std::string &s)
 {
-    char *cstr = new char[s.length() + 1];
-    strncpy(cstr, s.c_str(), s.length());
-    return (LEX_STRING){cstr, s.length()};
+    char *const cstr = current_thd->strdup(s.c_str());
+    return LEX_STRING({cstr, s.length()});
 }
 
 static std::ostream&
@@ -526,11 +524,13 @@ static std::string prefix_add_column(Create_field cf) {
 }
 
 static std::function<std::string(Key_part_spec)>
-do_prefix_add_index(std::string index_name) {
+do_prefix_add_index()
+{
     std::function<std::string(Key_part_spec key_part)> fn =
-        [index_name](Key_part_spec key_part) {
+        [] (Key_part_spec key_part)
+        {
             std::ostringstream ss;
-            ss << " ADD INDEX " << index_name << " (" << key_part << ")";
+            ss << key_part;
             return ss.str();
         };
 
@@ -538,11 +538,14 @@ do_prefix_add_index(std::string index_name) {
 }
 
 static std::string
-prefix_add_index(Key key) {
-    std::string index_name = convert_lex_str(key.name);
+prefix_add_index(Key key)
+{
+    const std::string index_name = convert_lex_str(key.name);
     std::ostringstream key_output;
-    key_output << ListJoin<Key_part_spec>(key.columns, ",",
-                                          do_prefix_add_index(index_name));
+    key_output << " ADD INDEX " << index_name << " ("
+               << ListJoin<Key_part_spec>(key.columns, ",",
+                                          do_prefix_add_index())
+               << ")";
     return key_output.str();
 }
 static inline std::ostream&

@@ -381,9 +381,11 @@ public:
     bool tableMetaExists(const std::string &table) const;
     std::string getAnonTableName(const std::string &table) const;
     std::string getAnonIndexName(const std::string &table,
-                                 const std::string &index_name) const;
+                                 const std::string &index_name,
+                                 onion o) const;
     std::string getAnonIndexName(const TableMeta * const tm,
-                                 const std::string &index_name) const;
+                                 const std::string &index_name,
+                                 onion o) const;
     // FIXME.
     EncLayer *getBackEncLayer(OnionMeta * const om) const;
     std::shared_ptr<EncLayer> popBackEncLayer(OnionMeta * const om);

@@ -1,11 +1,12 @@
 #include <main/CryptoHandlers.hh>
+#include <main/macro_util.hh>
 #include <parser/lex_util.hh>
 #include <crypto/ope.hh>
 #include <crypto/BasicCrypto.hh>
 #include <crypto/SWPSearch.hh>
+#include <crypto/arc4.hh>
 #include <util/util.hh>
 #include <util/cryptdb_log.hh>
-#include <crypto/arc4.hh>
 #include <util/zz.hh>
 
 #include <cmath>
@@ -16,6 +17,13 @@
 using namespace NTL;
 
 #include <utility>
+
+/*
+ * Don't try to manually pull values out of Items with Item_int::value
+ * because sometimes your 'Item_int', is actually an Item_string and you
+ * need to either let MySQL code handle the conversion (Item::val_uint())
+ * or you need to handle it yourself (strtoull).
+ */
 
 /* Implementation class hierarchy is as in .hh file plus:
 
@@ -140,7 +148,6 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * const cf,
         case SECLEVEL::HOM: {return HOMFactory::create(cf, key);}
         case SECLEVEL::SEARCH: {return new Search(cf, key);}
         case SECLEVEL::PLAINVAL: {return new PlainText();}
-        case SECLEVEL::BLOCKING: {return new Blocking();}
         default:{}
     }
     throw CryptDBError("unknown or unimplemented security level \n");
@@ -174,9 +181,6 @@ EncLayerFactory::deserializeLayer(unsigned int id,
         
         case SECLEVEL::PLAINVAL:
             return new PlainText(id);
-
-        case SECLEVEL::BLOCKING:
-            return new Blocking(id);
 
         default:{}
     }
@@ -382,7 +386,7 @@ RND_int::encrypt(Item * const ptext, uint64_t IV)
 {
     // assert(!stringItem(ptext));
     //TODO: should have encrypt_SEM work for any length
-    const uint64_t p = static_cast<const Item_int *>(ptext)->value;
+    const uint64_t p = ptext->val_uint();
     const uint64_t c = bf.encrypt(p ^ IV);
     LOG(encl) << "RND_int encrypt " << p << " IV " << IV << "-->" << c;
 
@@ -700,7 +704,7 @@ Item *
 DET_abstract_number::encrypt(Item *const ptext, uint64_t IV)
 {
     // assert(!stringItem(ptext));
-    const longlong value = static_cast<Item_int*>(ptext)->val_int();
+    const ulonglong value = ptext->val_uint();
 
     const ulonglong res = static_cast<ulonglong>(bf.encrypt(value+shift));
     LOG(encl) << "DET_int enc " << value << "--->" << res;
@@ -1106,10 +1110,10 @@ OPE_tinyint::OPE_tinyint(unsigned int id, const std::string &serial)
 Item *
 OPE_tinyint::encrypt(Item * const ptext, uint64_t IV)
 {
-    const ulonglong val = static_cast<Item_int *>(ptext)->value;
+    const ulonglong val = ptext->val_uint();
 
-    static const longlong tiny_max = 0xff;
-    if(tiny_max < static_cast<Item_int *>(ptext)->val_int())
+    static const ulonglong tiny_max = 0xff;
+    if (tiny_max < ptext->val_uint())
         throw CryptDBError("Backend storage unit it not TINYINT, won't floor. ");
 
     LOG(encl) << "OPE_tinyint encrypt " << val << " IV " << IV << "--->";
@@ -1147,10 +1151,10 @@ OPE_mediumint::OPE_mediumint(unsigned int id, const std::string &serial)
 Item *
 OPE_mediumint::encrypt(Item * const ptext, uint64_t IV)
 {
-    const ulonglong val = static_cast<Item_int *>(ptext)->value;
+    const ulonglong val = ptext->val_uint();
 
-    static const longlong medium_max = 0xffffff;
-    if(medium_max < static_cast<Item_int *>(ptext)->val_int())
+    static const ulonglong medium_max = 0xffffff;
+    if (medium_max < ptext->val_uint())
         throw CryptDBError("Backend storage unit it not MEDIUMINT, won't floor. ");
 
     LOG(encl) << "OPE_mediumint encrypt " << val << " IV " << IV << "--->";
@@ -1310,7 +1314,8 @@ Item *
 OPE_int::encrypt(Item * const ptext, uint64_t IV)
 {
     // assert(!stringItem(ptext));
-    const ulong pval = (ulong)static_cast<Item_int *>(ptext)->value;
+    // AWARE: Truncation.
+    const uint32_t pval = ptext->val_uint();
     const ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ(pval)));
     LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV
               << "--->" << enc;
@@ -1426,7 +1431,7 @@ HOMFactory::deserialize(unsigned int id, const SerialLayer &serial)
 static ZZ
 ItemIntToZZ(Item * const ptext)
 {
-    const ulonglong val = static_cast<Item_int *>(ptext)->value;
+    const ulonglong val = ptext->val_uint();
     return ZZFromUint64(val);
 }
 
@@ -1828,27 +1833,6 @@ std::string
 PlainText::doSerialize() const
 {
     return std::string("");
-}
-
-Create_field *
-DoNothing::newCreateField(const Create_field * const cf,
-                          const std::string &anonname)
-{
-    Create_field *const f0 = PlainText::newCreateField(cf, anonname);
-
-    f0->def   = NULL;
-    f0->flags = f0->flags & ~NOT_NULL_FLAG;
-
-    return f0;
-}
-
-Item *
-DoNothing::encrypt(Item * const, uint64_t)
-{
-    std::string name = "nullvalue";
-    char *nullname =
-        current_thd->strdup(name.c_str());
-    return new Item_null(nullname);
 }
 
 const std::vector<udf_func*> udf_list = {

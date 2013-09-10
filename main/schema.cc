@@ -9,6 +9,7 @@
 #include <main/rewrite_util.hh>
 #include <main/dbobject.hh>
 #include <main/metadata_tables.hh>
+#include <main/macro_util.hh>
 
 std::vector<std::shared_ptr<DBMeta>>
 DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
@@ -226,16 +227,18 @@ FieldMeta::deserialize(unsigned int id, const std::string &serial)
     const std::string fname = vec[0];
     const bool has_salt = string_to_bool(vec[1]);
     const std::string salt_name = vec[2];
-    const bool plain_number = string_to_bool(vec[3]);
-    const onionlayout onion_layout = TypeText<onionlayout>::toType(vec[4]);
+    const onionlayout onion_layout = TypeText<onionlayout>::toType(vec[3]);
     const SECURITY_RATING sec_rating =
-        TypeText<SECURITY_RATING>::toType(vec[5]);
-    const unsigned int uniq_count = atoi(vec[6].c_str());
-    const unsigned int counter = atoi(vec[7].c_str());
+        TypeText<SECURITY_RATING>::toType(vec[4]);
+    const unsigned int uniq_count = atoi(vec[5].c_str());
+    const unsigned int counter = atoi(vec[6].c_str());
+    const bool has_default = string_to_bool(vec[7]);
+    const std::string default_value = vec[8];
 
     return std::unique_ptr<FieldMeta>
-        (new FieldMeta(id, fname, has_salt, salt_name, plain_number,
-                       onion_layout, sec_rating, uniq_count, counter));
+        (new FieldMeta(id, fname, has_salt, salt_name, onion_layout,
+                       sec_rating, uniq_count, counter, has_default,
+                       default_value));
 }
 
 // If mkey == NULL, the field is not encrypted
@@ -243,7 +246,8 @@ static bool
 init_onions_layout(const AES_KEY *const m_key,
                    FieldMeta *const fm, Create_field *const cf)
 {
-    if (fm->has_salt != static_cast<bool>(m_key)) {
+    if (fm->has_salt != (static_cast<bool>(m_key)
+                         && PLAIN_ONION_LAYOUT != fm->onion_layout)) {
         return false;
     }
 
@@ -275,11 +279,13 @@ FieldMeta::FieldMeta(const std::string &name, Create_field * const field,
                      const AES_KEY * const m_key,
                      SECURITY_RATING sec_rating,
                      unsigned long uniq_count)
-    : fname(name), has_salt(static_cast<bool>(m_key)),
-      salt_name(BASE_SALT_NAME + getpRandomName()), 
-      onion_layout(getOnionLayout(m_key, field, sec_rating,
-                                  &plain_number)),
-      sec_rating(sec_rating), uniq_count(uniq_count), counter(0)
+    : fname(name), salt_name(BASE_SALT_NAME + getpRandomName()),
+      onion_layout(determineOnionLayout(m_key, field, sec_rating)),
+      has_salt(static_cast<bool>(m_key)
+              && onion_layout != PLAIN_ONION_LAYOUT),
+      sec_rating(sec_rating), uniq_count(uniq_count), counter(0),
+      has_default(determineHasDefault(field)),
+      default_value(determineDefaultValue(has_default, field))
 {
     assert(init_onions_layout(m_key, this, field));
 }
@@ -293,11 +299,12 @@ std::string FieldMeta::serialize(const DBObject &parent) const
         serialize_string(fname) +
         serialize_string(bool_to_string(has_salt)) +
         serialized_salt_name +
-        serialize_string(bool_to_string(plain_number)) +
         serialize_string(TypeText<onionlayout>::toText(onion_layout)) +
         serialize_string(TypeText<SECURITY_RATING>::toText(sec_rating)) +
         serialize_string(std::to_string(uniq_count)) +
-        serialize_string(std::to_string(counter));
+        serialize_string(std::to_string(counter)) +
+        serialize_string(bool_to_string(has_default)) +
+        serialize_string(default_value);
 
    return serial;
 }
@@ -368,10 +375,30 @@ OnionMeta *FieldMeta::getOnionMeta(onion o) const
     return om.get();
 }
 
-onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
-                                      const Create_field * const f,
-                                      SECURITY_RATING sec_rating,
-                                      bool * const plain_number)
+static bool encryptionNotSupported(const Create_field *const cf)
+{
+    switch (cf->sql_type) {
+        case MYSQL_TYPE_FLOAT:
+        case MYSQL_TYPE_DOUBLE:
+        case MYSQL_TYPE_TIMESTAMP:
+        case MYSQL_TYPE_DATE:
+        case MYSQL_TYPE_TIME:
+        case MYSQL_TYPE_DATETIME:
+        case MYSQL_TYPE_YEAR:
+        case MYSQL_TYPE_NEWDATE:
+        case MYSQL_TYPE_BIT:
+        case MYSQL_TYPE_ENUM:
+        case MYSQL_TYPE_SET:
+        case MYSQL_TYPE_GEOMETRY:
+            return true;
+        default:
+            return false;
+    }
+}
+
+onionlayout FieldMeta::determineOnionLayout(const AES_KEY *const m_key,
+                                            const Create_field *const f,
+                                            SECURITY_RATING sec_rating)
 {
     if (sec_rating == SECURITY_RATING::PLAIN) {
         // assert(!m_key);
@@ -382,9 +409,19 @@ onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
         throw CryptDBError("Should be using SECURITY_RATING::PLAIN!");
     }
 
-    onionlayout basic_layout;
+    if (encryptionNotSupported(f)) {
+        TEST_TextMessageError(SECURITY_RATING::SENSITIVE != sec_rating,
+                              "A SENSITIVE security rating requires the"
+                              " field to be supported with cryptography!");
+        return PLAIN_ONION_LAYOUT;
+    }
+
+    // Don't encrypt AUTO_INCREMENT.
+    if (Field::NEXT_NUMBER == f->unireg_check) {
+        return PLAIN_ONION_LAYOUT;
+    }
+
     if (SECURITY_RATING::SENSITIVE == sec_rating) {
-        *plain_number = false;
         if (true == IsMySQLTypeNumeric(f->sql_type)) {
             return NUM_ONION_LAYOUT;
         } else {
@@ -392,27 +429,40 @@ onionlayout FieldMeta::getOnionLayout(const AES_KEY * const m_key,
         }
     } else if (SECURITY_RATING::BEST_EFFORT == sec_rating) {
         if (true == IsMySQLTypeNumeric(f->sql_type)) {
-            *plain_number = true;
             return BEST_EFFORT_NUM_ONION_LAYOUT;
         } else {
-            *plain_number = false;
             return BEST_EFFORT_STR_ONION_LAYOUT;
         }
     } else {
-        throw CryptDBError("Bad SECURITY_RATING in getOnionLayout!");
+        throw CryptDBError("Bad SECURITY_RATING in determineOnionLayout!");
     }
 }
 
-bool FieldMeta::needExtraPlainColumn() const
+bool FieldMeta::determineHasDefault(const Create_field *const cf)
 {
-    return plain_number;
+    return cf->def || cf->flags & NOT_NULL_FLAG;
 }
 
-std::string FieldMeta::getToPlainName() const
+std::string FieldMeta::determineDefaultValue(bool has_default,
+                                             const Create_field *const cf)
 {
-    // FIXME.
-    assert(this->needExtraPlainColumn());
-    return "plainname";
+    const static std::string zero_string = "'0'";
+    const static std::string empty_string = "";
+
+    if (false == has_default) {
+        // This value should never be used.
+        return empty_string;
+    }
+
+    if (cf->def) {
+        return ItemToString(cf->def);
+    } else {
+        if (true == IsMySQLTypeNumeric(cf->sql_type)) {
+            return zero_string;
+        } else {
+            return empty_string;
+        }
+    }
 }
 
 bool FieldMeta::hasOnion(onion o) const
@@ -474,10 +524,30 @@ std::vector<FieldMeta *> TableMeta::orderedFieldMetas() const
     return v;
 }
 
-// TODO: Add salt.
-std::string TableMeta::getAnonIndexName(const std::string &index_name) const
+std::vector<FieldMeta *> TableMeta::defaultedFieldMetas() const
 {
-    const std::string hash_input = anon_table_name + index_name;
+    std::vector<FieldMeta *> v;
+    for (auto it : children) {
+        // FIXME: PTR.
+        v.push_back(it.second.get());
+    }
+
+    std::vector<FieldMeta *> out_v;
+    std::copy_if(v.begin(), v.end(), std::back_inserter(out_v),
+                 [] (const FieldMeta *const fm) -> bool
+                 {
+                    return fm->hasDefault();
+                 });
+
+    return out_v;
+}
+
+// TODO: Add salt.
+std::string TableMeta::getAnonIndexName(const std::string &index_name,
+                                        onion o) const
+{
+    const std::string hash_input =
+        anon_table_name + index_name + TypeText<onion>::toText(o);
     const std::size_t hsh = std::hash<std::string>()(hash_input);
 
     return std::string("index_") + std::to_string(hsh);

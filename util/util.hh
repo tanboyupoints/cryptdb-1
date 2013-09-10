@@ -13,12 +13,15 @@
 #include <list>
 #include <map>
 #include <stdint.h>
-#include <sys/time.h>
 #include <vector>
 #include <set>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <algorithm>
+
+#include <sys/time.h>
+
 #include <NTL/ZZ.h>
 
 #include <util/errstream.hh>
@@ -443,7 +446,6 @@ template <typename T>
 class AssignOnce {
 public:
     AssignOnce() : frozen(false) {}
-    AssignOnce(T value) : value(value), frozen(true) {}
     ~AssignOnce() {;}
     const AssignOnce& operator=(T value) {
         if (true == frozen) {
@@ -473,3 +475,18 @@ private:
     AssignOnce(const AssignOnce &other);
 };
 
+// Taken from jsmith @ cplusplus.com
+template <typename T>
+std::vector<T> vectorDifference(const std::vector<T> &model,
+                                const std::vector<T> &pattern)
+{
+    std::set<T> s_model(model.begin(), model.end());
+    std::set<T> s_pattern(pattern.begin(), pattern.end());
+    std::vector<T> result;
+
+    std::set_difference(s_model.begin(), s_model.end(),
+                        s_pattern.begin(), s_pattern.end(),
+                        std::back_inserter(result));
+
+    return result;
+}

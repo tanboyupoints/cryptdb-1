@@ -65,6 +65,11 @@ make_item_by_type(std::string value, enum_field_types type)
     case MYSQL_TYPE_LONG_BLOB:
     case MYSQL_TYPE_VARCHAR:
     case MYSQL_TYPE_VAR_STRING:
+    case MYSQL_TYPE_TIMESTAMP:
+    case MYSQL_TYPE_DATE:
+    case MYSQL_TYPE_NEWDATE:
+    case MYSQL_TYPE_TIME:
+    case MYSQL_TYPE_DATETIME:
         i = new Item_string(make_thd_string(value), value.length(), &my_charset_bin);
         break;
 
@@ -77,8 +82,7 @@ make_item_by_type(std::string value, enum_field_types type)
 static Item_null *
 make_null(const std::string &name = "")
 {
-    // FIXME: Memleak.
-    char *n = strdup(name.c_str());
+    char *const n = current_thd->strdup(name.c_str());
     return new Item_null(n);
 }
 
@@ -248,7 +252,7 @@ rewrite(lua_State *L)
 
             Rewriter r;
             SchemaInfo *out_schema;
-            QueryRewrite *&qr = clients[client]->qr =
+            QueryRewrite *const qr = clients[client]->qr =
                 new QueryRewrite(r.rewrite(*ps, query, &out_schema));
             ps->setPreviousSchema(out_schema);
             ps->setSchemaStaleness(qr->output->stalesSchema());

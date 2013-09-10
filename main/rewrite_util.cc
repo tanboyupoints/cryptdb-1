@@ -185,7 +185,11 @@ get_create_field(const Analysis &a, Create_field * const f,
                  OnionMeta * const om, const std::string &name)
 {
     Create_field *new_cf = f;
-    
+
+    // Default value is handled during INSERTion.
+    auto save_default = f->def;
+    f->def = NULL;
+
     auto enc_layers = a.getEncLayers(om);
     assert(enc_layers.size() > 0);
     for (auto l : enc_layers) {
@@ -197,163 +201,121 @@ get_create_field(const Analysis &a, Create_field * const f,
         }
     }
 
+    // Restore the default so we don't memleak it.
+    f->def = save_default;
     return new_cf;
 }
 
-static Item *
-makeNiceDefault(const Create_field * const cf)
-{
-    assert(cf->def);
-
-    switch (cf->sql_type) {
-        case MYSQL_TYPE_NEWDECIMAL:
-            assert_s(cf->def->type() == Item::Type::DECIMAL_ITEM,
-                     "We only support decimal types as default value"
-                     " for decimals (ie, no strings)");
-            return make_item(static_cast<Item_decimal *>(cf->def));
-        case MYSQL_TYPE_TINY:
-        case MYSQL_TYPE_SHORT:
-        case MYSQL_TYPE_INT24:
-        case MYSQL_TYPE_LONG:
-        case MYSQL_TYPE_LONGLONG: {
-            const std::string val = ItemToString(cf->def);
-            return new Item_int(atoi(val.c_str()));
-        }
-        case MYSQL_TYPE_DATE:
-            throw CryptDBError("handle MYSQL_TYPE_DATE");
-        case MYSQL_TYPE_TIME:
-            throw CryptDBError("handle MYSQL_TYPE_TIME");
-        case MYSQL_TYPE_DATETIME:
-        case MYSQL_TYPE_VARCHAR:
-        case MYSQL_TYPE_VAR_STRING:
-        case MYSQL_TYPE_STRING:
-        case MYSQL_TYPE_TINY_BLOB:
-        case MYSQL_TYPE_LONG_BLOB:
-        case MYSQL_TYPE_MEDIUM_BLOB:
-            return make_item(static_cast<Item_string *>(cf->def));
-        case MYSQL_TYPE_NULL:
-            return make_item(static_cast<Item_null *>(cf->def));
-        default: {
-            throw CryptDBError("unrecognized default type!");
-        }
-    }
-}
-
+// NOTE: The fields created here should have NULL default pointers
+// as such is handled during INSERTion.
 std::vector<Create_field *>
 rewrite_create_field(const FieldMeta * const fm,
                      Create_field * const f, const Analysis &a)
 {
     LOG(cdb_v) << "in rewrite create field for " << *f;
 
+    assert(fm->children.size() > 0);
+
     std::vector<Create_field *> output_cfields;
 
-    //check if field is not encrypted
-    if (fm->children.empty()) {
-        output_cfields.push_back(f);
-        //cerr << "onions were empty" << endl;
-        return output_cfields;
-    }
-
-    const bool has_default = f->def != NULL;
-    const uint64_t default_salt =
-        fm->has_salt && has_default ? randomValue() : 0;
+    // Don't add the default value to the schema.
+    Item *const save_def = f->def;
+    f->def = NULL;
 
     // create each onion column
     for (auto oit : fm->orderedOnionMetas()) {
-        const onion o = oit.first->getValue();
         OnionMeta * const om = oit.second;
         Create_field * const new_cf =
             get_create_field(a, f, om, om->getAnonOnionName());
-        // Don't add a default for the oWAIT onion.
-        assert(has_default == static_cast<bool>(new_cf->def)
-               || o == oWAIT);
-        if (new_cf->def) {
-            // AWARE: Could be pulled out, but would require an additional
-            // if statement for has_default.
-            const std::unique_ptr<Item> def(makeNiceDefault(f));
-            new_cf->def =
-                encrypt_item_layers(def.get(), o, om, a, default_salt);
-        }
 
         output_cfields.push_back(new_cf);
     }
 
     // create salt column
     if (fm->has_salt) {
-        //cerr << fm->salt_name << endl;
         THD * const thd         = current_thd;
         Create_field * const f0 = f->clone(thd->mem_root);
         f0->field_name          = thd->strdup(fm->getSaltName().c_str());
-        f0->flags               = f0->flags | UNSIGNED_FLAG; // salt is
-                                                             // unsigned
+        // Salt is unsigned and is not AUTO_INCREMENT.
+        // > NOT_NULL_FLAG is useful for debugging if mysql strict mode
+        //   (ie, STRICT_ALL_TABLES) is turned on.
+        f0->flags               =
+            (f0->flags | UNSIGNED_FLAG | NOT_NULL_FLAG)
+            & ~AUTO_INCREMENT_FLAG;
         f0->sql_type            = MYSQL_TYPE_LONGLONG;
         f0->length              = 8;
-
-        if (has_default) {
-            f0->def = new Item_int(static_cast<ulonglong>(default_salt));
-        }
 
         output_cfields.push_back(f0);
     }
 
-    /*
-    // HACK: Create the extra plain column.
-    if (fm->needExtraPlainColumn()) {
-        Create_field * const extra_plain_cf =
-            f->clone(current_thd->mem_root);
-        extra_plain_cf->field_name =
-            current_thd->strdup(fm->getToPlainName().c_str());
-        output_cfields.push_back(extra_plain_cf);
-    }
-    */
+    // Restore the default to the original Create_field parameter.
+    f->def = save_def;
 
     return output_cfields;
 }
 
-static
-const OnionMeta *
-getKeyOnionMeta(const FieldMeta * const fm)
+std::vector<onion>
+getOnionIndexTypes()
 {
-    std::vector<onion> onions({oOPE, oDET, oPLAIN});
-    for (auto it : onions) {
-        const OnionMeta * const om = fm->getOnionMeta(it);
-        if (NULL != om) {
-            return om;
+    return std::vector<onion>({oOPE, oDET, oPLAIN});
+}
+
+std::vector<Key *>
+rewrite_key(const std::shared_ptr<TableMeta> &tm, Key *const key,
+            const Analysis &a)
+{
+    std::vector<Key *> output_keys;
+
+    const std::vector<onion> key_onions = getOnionIndexTypes();
+    for (auto onion_it : key_onions) {
+        const onion o = onion_it;
+        Key *const new_key = key->clone(current_thd->mem_root);
+
+        // Set anonymous name.
+        const std::string new_name =
+            a.getAnonIndexName(tm.get(), convert_lex_str(key->name), o);
+        new_key->name = string_to_lex_str(new_name);
+
+        // Set anonymous columns.
+        const auto col_it =
+            List_iterator<Key_part_spec>(key->columns);
+        // HACK: Determine if we succeed in creating the INDEX on
+        // each onion.
+        bool fail = false;
+        new_key->columns =
+            reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
+                [o, tm, a, &fail] (List<Key_part_spec> out_field_list,
+                                   Key_part_spec *const key_part)
+                {
+                    Key_part_spec *const new_key_part = copy(key_part);
+                    const std::string field_name =
+                        convert_lex_str(new_key_part->field_name);
+                    const FieldMeta *const fm =
+                        a.getFieldMeta(tm.get(), field_name);
+                    const OnionMeta *const om = fm->getOnionMeta(o);
+                    if (NULL == om) {
+                        fail = true;
+                        return out_field_list;  /* lambda */
+                    }
+
+                    new_key_part->field_name =
+                        string_to_lex_str(om->getAnonOnionName());
+                    out_field_list.push_back(new_key_part);
+                    return out_field_list; /* lambda */
+                });
+        if (false == fail) {
+            output_keys.push_back(new_key);
         }
     }
 
-    assert(false);
-}
-
-// TODO: Add Key for oDET onion as well.
-std::vector<Key*>
-rewrite_key(const std::shared_ptr<TableMeta> &tm, Key * const key,
-            const Analysis &a)
-{
-    std::vector<Key*> output_keys;
-    Key * const new_key = key->clone(current_thd->mem_root);
-    const auto col_it =
-        List_iterator<Key_part_spec>(key->columns);
-    // FIXME: Memleak.
-    const std::string new_name =
-        a.getAnonIndexName(tm.get(), convert_lex_str(key->name));
-    new_key->name = string_to_lex_str(new_name);
-    new_key->columns = 
-        reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
-            [tm, a] (List<Key_part_spec> out_field_list,
-                        Key_part_spec *key_part) {
-                const std::string field_name =
-                    convert_lex_str(key_part->field_name);
-                const FieldMeta * const fm =
-                    a.getFieldMeta(tm.get(), field_name);
-                // HACK: Should return multiple onions.
-                const OnionMeta * const om = getKeyOnionMeta(fm);
-                key_part->field_name =
-                    string_to_lex_str(om->getAnonOnionName());
-                out_field_list.push_back(key_part);
-                return out_field_list; /* lambda */
-            });
-    output_keys.push_back(new_key);
+    // Only create one PRIMARY KEY.
+    if (Key::PRIMARY == key->type) {
+        if (output_keys.size() > 0) {
+            return std::vector<Key *>({output_keys.front()});
+        } else {
+            return std::vector<Key *>();
+        }
+    }
 
     return output_keys;
 }
@@ -395,14 +357,9 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
         [] (const std::string name, Create_field * const cf,
             const ProxyState &ps, const std::shared_ptr<TableMeta> &tm)
     {
-        if (Field::NEXT_NUMBER == cf->unireg_check) {
-            return new FieldMeta(name, cf, NULL, SECURITY_RATING::PLAIN,
-                                 tm.get()->leaseIncUniq());
-        } else {
-            return new FieldMeta(name, cf, ps.masterKey,
-                                 ps.defaultSecurityRating(),
-                                 tm.get()->leaseIncUniq());
-        }
+        return new FieldMeta(name, cf, ps.masterKey,
+                             ps.defaultSecurityRating(),
+                             tm.get()->leaseIncUniq());
     };
     std::shared_ptr<FieldMeta> fm =
         std::shared_ptr<FieldMeta>(buildFieldMeta(name, cf, ps, tm));
@@ -498,23 +455,16 @@ encrypt_item_all_onions(Item *i, FieldMeta *fm,
     }
 }
 
-bool
-mergeCompleteOLK(OLK olk1, OLK olk2, OLK *out_olk)
+void
+typical_rewrite_insert_type(Item *const i, Analysis &a,
+                            std::vector<Item *> &l, FieldMeta *const fm)
 {
-    if (olk1.o != olk2.o && olk1.l != olk2.l) {
-        return false;
-    } else if (olk1.key && olk2.key) {
-        *out_olk = olk1;
-        return olk1.key == olk2.key;
-    } else if (olk1.key) {
-        *out_olk = olk1;
-        return true;
-    } else if (olk2.key) {
-        *out_olk = olk2;
-        return true;
-    } else {
-        *out_olk = olk1;
-        return olk1.l == SECLEVEL::PLAINVAL;
+    const uint64_t salt = fm->has_salt ? randomValue() : 0;
+
+    encrypt_item_all_onions(i, fm, salt, l, a);
+
+    if (fm->has_salt) {
+        l.push_back(new Item_int(static_cast<ulonglong>(salt)));
     }
 }
 
