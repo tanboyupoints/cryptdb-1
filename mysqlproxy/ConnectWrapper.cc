@@ -252,7 +252,7 @@ rewrite(lua_State *L)
 
             Rewriter r;
             SchemaInfo *out_schema;
-            QueryRewrite *&qr = clients[client]->qr =
+            QueryRewrite *const qr = clients[client]->qr =
                 new QueryRewrite(r.rewrite(*ps, query, &out_schema));
             ps->setPreviousSchema(out_schema);
             ps->setSchemaStaleness(qr->output->stalesSchema());

@@ -859,6 +859,7 @@ mysql_noop()
     return "do 0;";
 }
 
+/*
 static
 bool
 mysql_noop_dbres(const std::unique_ptr<Connect> &c, DBResult **dbres)
@@ -870,6 +871,7 @@ mysql_noop_dbres(const std::unique_ptr<Connect> &c, DBResult **dbres)
 
     return true;
 }
+*/
 
 RewriteOutput *
 Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
@@ -1014,15 +1016,21 @@ Rewriter::rewrite(const ProxyState &ps, const std::string &q,
     } else {
         schema = ps.getPreviousSchema();
     }
+
     assert(schema.get());
     Analysis analysis = Analysis(schema.get());
-    
+
     RewriteOutput *output;
-    if (cryptdbDirective(q)) {
-        output = this->handleDirective(analysis, ps, q);
-    } else {
-        // FIXME: Memleak return of 'dispatchOnLex()'
-        output = this->dispatchOnLex(analysis, ps, q);
+    try {
+        if (cryptdbDirective(q)) {
+            output = this->handleDirective(analysis, ps, q);
+        } else {
+            // FIXME: Memleak return of 'dispatchOnLex()'
+            output = this->dispatchOnLex(analysis, ps, q);
+        }
+    } catch (AbstractCryptDBError &e) {
+        std::cout << e << std::endl;
+        output = new SimpleOutput(mysql_noop());
     }
 
     *out_schema = schema.get();
@@ -1180,11 +1188,6 @@ executeQuery(ProxyState &ps, const std::string &q)
         } else {
             return NULL;
         }
-    } catch (AbstractCryptDBError &e) {
-        std::cout << e << std::endl;
-        DBResult *dbres;
-        assert(mysql_noop_dbres(ps.getConn(), &dbres));
-        return new ResType(dbres->unpack());
     } catch (std::runtime_error &e) {
         std::cout << "Unexpected Error: " << e.what() << " in query "
                   << q << std::endl;
