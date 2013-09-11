@@ -606,21 +606,21 @@ static class ANON : public CItemSubtypeFT<Item_extract, Item_func::Functype::EXT
 
 // FIXME: Use encryption/rewriting.
 template<const char *NAME>
-class CItemDateExtractFunc : public CItemSubtypeFN<Item_int_func, NAME> {
-    virtual RewritePlan * do_gather_type(Item_int_func *i, reason &tr,
-                                         Analysis & a) const
+class CItemDateExtractFunc : public CItemSubtypeFN<Item_func, NAME> {
+    virtual RewritePlan *do_gather_type(Item_func *i, reason &tr,
+                                        Analysis &a) const
     {
-        const std::string why = "date extract";
+        const std::string why = NAME;
         return allPlainIterateGather(i, why, tr, a);
     }
 
-    virtual Item * do_optimize_type(Item_int_func *i, Analysis & a) const
+    virtual Item *do_optimize_type(Item_func *i, Analysis &a) const
     {
         return do_optimize_type_self_and_args(i, a);
     }
 
-    virtual Item * do_rewrite_type(Item_int_func *i, const OLK & constr,
-                                   const RewritePlan * rp, Analysis & a)
+    virtual Item *do_rewrite_type(Item_func *i, const OLK &constr,
+                                  const RewritePlan *rp, Analysis &a)
         const
     {
         return rewrite_args_FN(i, constr,
@@ -629,6 +629,35 @@ class CItemDateExtractFunc : public CItemSubtypeFN<Item_int_func, NAME> {
     }
 };
 
+extern const char str_second[] = "second";
+static CItemDateExtractFunc<str_second> ANON;
+
+extern const char str_minute[] = "minute";
+static CItemDateExtractFunc<str_minute> ANON;
+
+extern const char str_hour[] = "hour";
+static CItemDateExtractFunc<str_hour> ANON;
+
+extern const char str_to_days[] = "to_days";
+static CItemDateExtractFunc<str_to_days> ANON;
+
+extern const char str_year[] = "year";
+static CItemDateExtractFunc<str_year> ANON;
+
+extern const char str_month[] = "month";
+static CItemDateExtractFunc<str_month> ANON;
+
+extern const char str_week[] = "week";
+static CItemDateExtractFunc<str_week> ANON;
+
+extern const char str_dayofmonth[] = "dayofmonth";
+static CItemDateExtractFunc<str_dayofmonth> ANON;
+
+extern const char str_unix_timestamp[] = "unix_timestamp";
+static CItemDateExtractFunc<str_unix_timestamp> ANON;
+
+extern const char str_date_format[] = "date_format";
+static CItemDateExtractFunc<str_date_format> ANON;
 
 template<const char *NAME>
 class CItemBitfunc : public CItemSubtypeFN<Item_func_bit, NAME> {
@@ -1088,16 +1117,29 @@ static class ANON : public CItemSubtypeFN<Item_in_optimizer, str_in_optimizer> {
     virtual RewritePlan * do_gather_type(Item_in_optimizer *i, reason &tr, Analysis & a) const
     {
         LOG(cdb_v) << "CItemSubtypeFN (L1107) do_gather " << *i;
+        const std::string why = str_in_optimizer;
+        return allPlainIterateGather(i, why, tr, a);
 
-        UNIMPLEMENTED;
+        /*
         //Item **args = i->arguments();
         //analyze(args[0], reason(EMPTY_EncSet, "in_opt", i, &tr), a);
         //analyze(args[1], reason(EMPTY_EncSet, "in_opt", i, &tr), a);
         return NULL;
+        */
     }
     virtual Item * do_optimize_type(Item_in_optimizer *i, Analysis & a) const
     {
         return do_optimize_type_self_and_args(i, a);
+    }
+
+    virtual Item *do_rewrite_type(Item_in_optimizer *i,
+                                  const OLK &constr,
+                                  const RewritePlan *rp, Analysis &a)
+        const
+    {
+        return rewrite_args_FN(i, constr,
+                               static_cast<const RewritePlanOneOLK *>(rp),
+                               a);
     }
 } ANON;
 
@@ -1157,30 +1199,6 @@ static CItemStrconv<str_left> ANON;
 extern const char str_regexp[] = "regexp";
 static CItemStrconv<str_regexp> ANON;
  
-extern const char str_second[] = "second";
-static CItemDateExtractFunc<str_second> ANON;
-
-extern const char str_minute[] = "minute";
-static CItemDateExtractFunc<str_minute> ANON;
-
-extern const char str_hour[] = "hour";
-static CItemDateExtractFunc<str_hour> ANON;
-
-extern const char str_to_days[] = "to_days";
-static CItemDateExtractFunc<str_to_days> ANON;
-
-extern const char str_year[] = "year";
-static CItemDateExtractFunc<str_year> ANON;
-
-extern const char str_month[] = "month";
-static CItemDateExtractFunc<str_month> ANON;
-
-extern const char str_dayofmonth[] = "dayofmonth";
-static CItemDateExtractFunc<str_dayofmonth> ANON;
-
-extern const char str_unix_timestamp[] = "unix_timestamp";
-static CItemDateExtractFunc<str_unix_timestamp> ANON;
-
 extern const char str_date_add_interval[] = "date_add_interval";
 // Use encryption/rewriting.
 static class ANON : public CItemSubtypeFN<Item_date_add_interval, str_date_add_interval> {
@@ -1261,19 +1279,30 @@ static class ANON: public CItemSubtypeFT<Item_char_typecast, Item_func::Functype
     }
 } ANON;
 
+template <const char *NAME>
+class CItemFuncMiscPlain : public CItemSubtypeFN<Item_func, NAME> {
+    virtual RewritePlan *do_gather_type(Item_func *i, reason &tr,
+                                        Analysis &a) const
+    {
+        const std::string why = NAME;
+        return allPlainIterateGather(i, why, tr, a);
+    }
+
+    virtual Item *do_rewrite_type(Item_func *i, const OLK &constr,
+                                  const RewritePlan *rp, Analysis &a)
+        const
+    {
+        return rewrite_args_FN(i, constr,
+                               static_cast<const RewritePlanOneOLK *>(rp),
+                               a);
+    }
+};
+
+extern const char str_field[] = "field";
+static CItemFuncMiscPlain<str_field> ANON;
+
+extern const char str_cast_as_unsigned[] = "cast_as_unsigned";
+static CItemFuncMiscPlain<str_cast_as_unsigned> ANON;
+
 extern const char str_cast_as_signed[] = "cast_as_signed";
-static class ANON : public CItemSubtypeFN<Item_func_signed, str_cast_as_signed> {
-    virtual RewritePlan * do_gather_type(Item_func_signed *i, reason &tr,
-                                         Analysis & a) const
-    {
-        /*LOG(cdb_v) << "do_a_t Item_func_signed reason " << tr;
-        analyze(i->arguments()[0], tr, a);
-        return tr.encset;
-	*/
-        UNIMPLEMENTED;
-    }
-    virtual Item * do_optimize_type(Item_func_signed *i, Analysis & a) const
-    {
-        return do_optimize_type_self_and_args(i, a);
-    }
-} ANON;
+static CItemFuncMiscPlain<str_cast_as_signed> ANON;
