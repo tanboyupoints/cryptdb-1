@@ -67,7 +67,8 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         assert(onion_level != SECLEVEL::INVALID);
         if (constr.l < onion_level) {
             //need adjustment, throw exception
-            throw OnionAdjustExcept(constr.o, fm, constr.l, i);
+            throw OnionAdjustExcept(constr.o, fm, constr.l,
+                                    std::string(i->table_name));
         }
 
         const std::string anon_table_name =

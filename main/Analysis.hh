@@ -43,13 +43,13 @@ typedef struct ReturnMeta {
 class OnionAdjustExcept {
 public:
     OnionAdjustExcept(onion o, const FieldMeta * const fm,
-                      SECLEVEL l, Item_field * const itf)
-        : o(o), fm(fm), tolevel(l), itf(itf) {}
+                      SECLEVEL l, const std::string &table_name)
+        : o(o), fm(fm), tolevel(l), table_name(table_name) {}
 
     const onion o;
     const FieldMeta * const fm;
     const SECLEVEL tolevel;
-    Item_field * const itf;
+    const std::string table_name;
 };
 
 // TODO: Maybe we want a database name argument/member.

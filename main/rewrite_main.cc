@@ -37,6 +37,7 @@ extern CItemFuncNameDir funcNames;
 //TODO: use getAssert in more places
 //TODO: replace table/field with FieldMeta * for speed and conciseness
 
+/*
 static Item_field *
 stringToItemField(const std::string &field,
                   const std::string &table, Item_field *const itf)
@@ -50,6 +51,7 @@ stringToItemField(const std::string &field,
 
     return res;
 }
+*/
 
 static inline std::string
 extract_fieldname(Item_field *const i)
@@ -506,7 +508,8 @@ buildTypeTextTranslator()
 //l gets updated to the new level
 static std::string
 removeOnionLayer(Analysis &a, const ProxyState &ps,
-                 const FieldMeta *const fm, Item_field *const itf,
+                 const FieldMeta *const fm,
+                 const std::string &table_name,
                  onion o, SECLEVEL *const new_level,
                  const std::string &cur_db)
 {
@@ -521,15 +524,18 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
 
     //removes onion layer at the DB
     const std::string tableanon =
-        a.getTableMeta(itf->table_name)->getAnonTableName();
+        a.getTableMeta(table_name)->getAnonTableName();
 
+    const std::string anon_table_name = a.getAnonTableName(table_name);
     Item_field *const salt =
-        stringToItemField(fm->getSaltName(), tableanon, itf);
+        new Item_field(NULL, ps.dbName().c_str(), anon_table_name.c_str(),
+                       fm->getSaltName().c_str());
     std::cout << TypeText<onion>::toText(o) << std::endl;
 
     const std::string fieldanon = om->getAnonOnionName();
     Item_field *const field =
-        stringToItemField(fieldanon, tableanon, itf);
+        new Item_field(NULL, ps.dbName().c_str(), anon_table_name.c_str(),
+                       om->getAnonOnionName().c_str());
 
     Item *const decUDF = back_el.get()->decryptUDF(field, salt);
 
@@ -560,7 +566,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
 static std::list<std::string>
 adjustOnion(Analysis &a, const ProxyState &ps, onion o,
             const FieldMeta *const fm, SECLEVEL tolevel,
-            Item_field *const itf, const std::string &cur_db)
+            const std::string &table_name, const std::string &cur_db)
 {
     OnionMeta *const om = fm->getOnionMeta(o);
     SECLEVEL newlevel = a.getOnionLevel(om);
@@ -569,7 +575,7 @@ adjustOnion(Analysis &a, const ProxyState &ps, onion o,
     std::list<std::string> adjust_queries;
     while (newlevel > tolevel) {
         auto query =
-            removeOnionLayer(a, ps, fm, itf, o, &newlevel, cur_db);
+            removeOnionLayer(a, ps, fm, table_name, o, &newlevel, cur_db);
         adjust_queries.push_back(query);
     }
     TEST_UnexpectedSecurityLevel(o, tolevel, newlevel);
@@ -741,23 +747,59 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
         optimize_select_lex(i->get_select_lex(), a);
         return i;
     }
+    virtual Item *do_rewrite_type(Item_subselect *i, const OLK &constr,
+                                  const RewritePlan *rp, Analysis &a)
+        const
+    {
+        return i->clone_item();
+    }
 } ANON;
 
 static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
-    virtual RewritePlan * do_gather_type(Item_cache *i, reason &tr, Analysis & a) const
+    virtual RewritePlan *do_gather_type(Item_cache *i, reason &tr,
+                                        Analysis &a) const
     {
+        TEST_TextMessageError(false ==
+                                i->field()->orig_table->alias_name_used,
+                              "Can not mix CACHE_ITEM and table alias.");
+        const std::string table_name =
+            std::string(i->field()->orig_table->alias);
+        const std::string field_name =
+            std::string(i->field()->field_name);
+        OnionMeta *const om =
+            a.getOnionMeta(table_name, field_name, oPLAIN);
+        if (a.getOnionLevel(om) != SECLEVEL::PLAINVAL) {
+            const FieldMeta *const fm =
+                a.getFieldMeta(table_name, field_name);
+
+            throw OnionAdjustExcept(oPLAIN, fm, SECLEVEL::PLAINVAL,
+                                    table_name);
+        }
+
+        const EncSet out_es = PLAIN_EncSet;
+        tr = reason(out_es, "is cache item", i);
+
+        return new RewritePlan(out_es, tr);
+
         /*
         Item *example = i->*rob<Item_cache, Item*, &Item_cache::example>::ptr();
         if (example)
             return gather(example, tr, a);
-        return tr.encset;*/
+        return tr.encset;
         UNIMPLEMENTED;
         return NULL;
+        */
     }
     virtual Item * do_optimize_type(Item_cache *i, Analysis & a) const
     {
         // TODO(stephentu): figure out how to use rob here
         return i;
+    }
+    virtual Item *do_rewrite_type(Item_cache *i, const OLK &constr,
+                                  const RewritePlan *rp, Analysis &a)
+        const
+    {
+        return i->clone_item();
     }
 } ANON;
 
@@ -903,7 +945,7 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
             LOG(cdb_v) << "caught onion adjustment";
             std::cout << "Adjusting onion!" << std::endl;
             auto adjust_queries = 
-                adjustOnion(a, ps, e.o, e.fm, e.tolevel, e.itf,
+                adjustOnion(a, ps, e.o, e.fm, e.tolevel, e.table_name,
                             ps.dbName());
             return new AdjustOnionOutput(a.deltas, adjust_queries);
         }
