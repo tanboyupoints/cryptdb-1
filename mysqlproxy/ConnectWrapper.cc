@@ -373,6 +373,17 @@ passDecryptedPtr(lua_State *L)
     return returnResultSet(L, *res_type);
 }
 
+inline std::vector<Item *>
+itemNullVector(unsigned int count)
+{
+    std::vector<Item *> out;
+    for (unsigned int i = 0; i < count; ++i) {
+        out.push_back(make_null());
+    }
+
+    return out;
+}
+
 static int
 decrypt(lua_State *L)
 {
@@ -426,30 +437,23 @@ decrypt(lua_State *L)
 
         /* initialize all items to NULL, since Lua skips
            nil array entries */
-        std::vector<Item *> row(res.types.size());
+        std::vector<Item *> row = itemNullVector(res.types.size());
 
         lua_pushnil(L);
-        int key, last_key = -1;
         while (lua_next(L, -2)) {
-            key = luaL_checkint(L, -2) - 1;
-            const int key_diff = key - last_key;
-            if (key_diff > 1) {
-                for (int k_i = key - 1; k_i > last_key; --k_i) {
-                    row[k_i] = make_null();
-                }
-            } else if (key_diff < 0) {
-                throw CryptDBError("Bad key in decrypt!");
-            }
+            int key = luaL_checkint(L, -2) - 1;
 
-            assert(key >= 0 && (uint) key < res.types.size());
-            std::string data = xlua_tolstring(L, -1);
-            Item * value = make_item_by_type(data, res.types[key]);
+            assert(key >= 0 && static_cast<uint>(key) < res.types.size());
+            const std::string data = xlua_tolstring(L, -1);
+            Item *const value = make_item_by_type(data, res.types[key]);
             row[key] = value;
 
             lua_pop(L, 1);
-            last_key = key;
         }
-        assert((unsigned int)key == res.names.size() - 1);
+        // We can not use this assert because rows that contain many
+        // NULLs don't return their columns in a strictly increasing
+        // order.
+        // assert((unsigned int)key == res.names.size() - 1);
 
         res.rows.push_back(row);
         lua_pop(L, 1);

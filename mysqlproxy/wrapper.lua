@@ -1,4 +1,5 @@
-assert(package.loadlib(os.getenv("EDBDIR").."/libexecute.so",
+-- assert(package.loadlib(os.getenv("EDBDIR").."/libexecute.so",
+assert(package.loadlib("/home/burrows/code/cryptdb/obj/libexecute.so",
                        "lua_cryptdb_init"))()
 local proto = assert(require("mysql.proto"))
 local use_database = false
@@ -62,7 +63,7 @@ end
 
 function read_query_real(packet)
     local query = string.sub(packet, 2)
-    dprint("read_query: " .. query)
+    print("read_query: " .. query)
 
     if string.byte(packet) == proxy.COM_QUERY then
         new_queries =
@@ -152,6 +153,7 @@ function read_query_result_real(inj)
                     end
                 end
 
+_=[[
                 -- DEMO
                 if #rows > 0 then
                    dprint(" ")
@@ -165,6 +167,7 @@ function read_query_result_real(inj)
                     dprint(r)
                     r = ""
                 end
+]]
                 if true == decryptp then
                     dfields, drows =
                         CryptDB.decrypt(client, fields, rows)
@@ -175,6 +178,7 @@ function read_query_result_real(inj)
             end
 
             if dfields and drows then
+_=[[
                 -- DEMO
                 f_names = ""
                 r = ""
@@ -195,7 +199,7 @@ function read_query_result_real(inj)
                     dprint(r)
                     r = "" 
                 end
-
+]]
                 proxy.response.type = proxy.MYSQLD_PACKET_OK
                 proxy.response.affected_rows = resultset.affected_rows
                 proxy.response.insert_id = resultset.insert_id
