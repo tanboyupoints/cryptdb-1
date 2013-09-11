@@ -537,7 +537,7 @@ rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
     AssignOnce<OLK> olk;
     AssignOnce<Item *> ir;
     if (i->type() == Item::Type::FIELD_ITEM) {
-        Item_field *field_i = static_cast<Item_field *>(i);
+        Item_field *const field_i = static_cast<Item_field *>(i);
         const auto cached_rewritten_i = a.item_cache.find(field_i);
         if (cached_rewritten_i != a.item_cache.end()) {
             ir = cached_rewritten_i->second.first;
@@ -552,7 +552,7 @@ rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
     }
     assert(ir.assigned() && ir.get());
     newList->push_back(ir.get());
-    bool use_salt = needsSalt(olk.get());
+    const bool use_salt = needsSalt(olk.get());
 
     // This line implicity handles field aliasing for at least some cases.
     // As i->name can/will be the alias.
@@ -560,9 +560,9 @@ rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
 
     if (use_salt) {
         const std::string anon_table_name =
-            ((Item_field *)ir.get())->table_name;
+            static_cast<Item_field *>(ir.get())->table_name;
         const std::string anon_field_name = olk.get().key->getSaltName();
-        Item_field *ir_field =
+        Item_field *const ir_field =
             make_item(static_cast<Item_field *>(ir.get()),
                       anon_table_name, anon_field_name);
         newList->push_back(ir_field);
