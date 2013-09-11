@@ -2,6 +2,7 @@
 
 #include <list>
 #include <vector>
+#include <memory>
 
 #include <util/onions.hh>
 
@@ -227,10 +228,9 @@ public:
 
 class RewritePlanWithAnalysis : public RewritePlan {
 public:
-    Analysis *const a;
+    const std::unique_ptr<Analysis> a;
     RewritePlanWithAnalysis(const EncSet &es_out, reason r,
-                            Analysis *const a)
-        : RewritePlan(es_out, r), a(a) {}
+                            std::unique_ptr<Analysis> a);
 };
 
 std::ostream&

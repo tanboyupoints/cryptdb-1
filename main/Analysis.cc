@@ -1109,5 +1109,11 @@ Analysis::getEncLayers(OnionMeta * const om) const
     return om->layers;
 }
 
+RewritePlanWithAnalysis::RewritePlanWithAnalysis(const EncSet &es_out,
+                                                 reason r,
+                                            std::unique_ptr<Analysis> a)
+    : RewritePlan(es_out, r), a(std::move(a))
+{}
+
 #undef ROLLBACK_AND_RETURN_ON_FAIL
 

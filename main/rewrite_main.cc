@@ -752,24 +752,24 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
         const std::string why = "subselect";
 
         // Gather subquery.
-        // FIXME: Use unique_ptr
-        Analysis *const subquery_analysis = new Analysis(a.getSchema());
+        std::unique_ptr<Analysis>
+            subquery_analysis(new Analysis(a.getSchema()));
         st_select_lex *const select_lex = i->get_select_lex();
         process_table_list(&select_lex->top_join_list,
                            *subquery_analysis);
-        process_select_lex(select_lex, *subquery_analysis);
+        process_select_lex(select_lex, *subquery_analysis.get());
 
         // HACK: Forces the subquery to use PLAINVAL for it's
         // projections.
         auto item_it = List_iterator<Item>(select_lex->item_list);
         for (;;) {
-            Item *item = item_it++;
+            Item *const item = item_it++;
             if (!item) {
                 break;
             }
 
             RewritePlan *const item_rp =
-                subquery_analysis->rewritePlans[item];
+                subquery_analysis.get()->rewritePlans[item];
             TEST_NoAvailableEncSet(item_rp->es_out, i->type(),
                                    PLAIN_EncSet, why, NULL, 0);
             item_rp->es_out = PLAIN_EncSet;
@@ -786,7 +786,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
                     getLeftExpr(static_cast<Item_in_subselect *>(i));
                 reason r;
                 RewritePlan *const rp_left_expr =
-                    gather(left_expr, r, *subquery_analysis);
+                    gather(left_expr, r, *subquery_analysis.get());
                 tr.add_child(r);
                 a.rewritePlans[left_expr] = rp_left_expr;
                 break;
@@ -800,7 +800,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
         }
 
         return new RewritePlanWithAnalysis(out_es, tr,
-                                           subquery_analysis);
+                                           std::move(subquery_analysis));
     }
     virtual Item * do_optimize_type(Item_subselect *i, Analysis & a) const {
         optimize_select_lex(i->get_select_lex(), a);
@@ -818,12 +818,12 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
         //    General Subquery Rewrite
         // ------------------------------
         st_select_lex *const new_select_lex =
-            rewrite_select_lex(select_lex, *rp_w_analysis->a);
+            rewrite_select_lex(select_lex, *rp_w_analysis->a.get());
 
         // Rewrite table names.
         new_select_lex->top_join_list =
             rewrite_table_list(select_lex->top_join_list,
-                               *rp_w_analysis->a);
+                               *rp_w_analysis->a.get());
 
         // Rewrite SELECT params.
         // HACK: memcpy
