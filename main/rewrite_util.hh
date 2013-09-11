@@ -111,3 +111,14 @@ getOnionIndexTypes();
 void
 typical_rewrite_insert_type(Item *const i, Analysis &a,
                             std::vector<Item *> &l, FieldMeta *const fm);
+
+// FIXME: Add def to rewrite_util.cc.
+void
+process_select_lex(st_select_lex *select_lex, Analysis &a);
+
+void
+process_table_list(List<TABLE_LIST> *tll, Analysis &a);
+
+st_select_lex *
+rewrite_select_lex(st_select_lex *select_lex, Analysis &a);
+

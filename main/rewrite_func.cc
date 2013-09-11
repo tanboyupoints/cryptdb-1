@@ -1116,9 +1116,14 @@ extern const char str_in_optimizer[] = "<in_optimizer>";
 static class ANON : public CItemSubtypeFN<Item_in_optimizer, str_in_optimizer> {
     virtual RewritePlan * do_gather_type(Item_in_optimizer *i, reason &tr, Analysis & a) const
     {
+        throw CryptDBError("Shouldn't be Item_in_optimizer items!");
+        return NULL;
+
+        /*
         LOG(cdb_v) << "CItemSubtypeFN (L1107) do_gather " << *i;
         const std::string why = str_in_optimizer;
         return allPlainIterateGather(i, why, tr, a);
+        */
 
         /*
         //Item **args = i->arguments();

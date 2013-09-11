@@ -12,9 +12,6 @@ static void
 process_select_lex(LEX *lex, Analysis & a);
 
 static void
-process_select_lex(st_select_lex *select_lex, Analysis & a);
-
-static void
 process_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a);
 
@@ -30,17 +27,11 @@ rewrite_filters_lex(st_select_lex *select_lex, Analysis &a);
 static bool
 needsSalt(OLK olk);
 
-static st_select_lex *
-rewrite_select_lex(st_select_lex *select_lex, Analysis & a);
-
 static void
 rewrite_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a,
                           bool *invalids, List<Item> *res_items,
                           List<Item> *res_values);
-
-static void
-process_table_list(List<TABLE_LIST> *tll, Analysis & a);
 
 static bool
 invalidates(FieldMeta * fm, const EncSet & es);
@@ -55,6 +46,7 @@ void rewriteInsertHelper(Item *const i, Analysis &a, FieldMeta *const fm,
         append_list->push_back(it);
     }
 }
+
 class InsertHandler : public DMLHandler {
     virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps) const
     {
@@ -321,7 +313,7 @@ process_select_lex(LEX *lex, Analysis & a)
     process_select_lex(&lex->select_lex, a);
 }
 
-static void
+void
 process_select_lex(st_select_lex *select_lex, Analysis &a)
 {
     //select clause
@@ -515,9 +507,10 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
 }
 
 static void
-addToReturn(ReturnMeta * rm, int pos, const OLK & constr, bool has_salt,
-            std::string name) {
-    if ((unsigned int)pos != rm->rfmeta.size()) {
+addToReturn(ReturnMeta *rm, int pos, const OLK &constr, bool has_salt,
+            const std::string &name)
+{
+    if (static_cast<unsigned int>(pos) != rm->rfmeta.size()) {
         throw CryptDBError("ReturnMeta has badly ordered ReturnFields!");
     }
     const int salt_pos = has_salt ? pos + 1 : -1;
@@ -527,8 +520,9 @@ addToReturn(ReturnMeta * rm, int pos, const OLK & constr, bool has_salt,
 }
 
 static void
-addSaltToReturn(ReturnMeta * rm, int pos) {
-    if ((unsigned int)pos != rm->rfmeta.size()) {
+addSaltToReturn(ReturnMeta *rm, int pos)
+{
+    if (static_cast<unsigned int>(pos) != rm->rfmeta.size()) {
         throw CryptDBError("ReturnMeta has badly ordered ReturnFields!");
     }
     std::pair<int, ReturnField>
@@ -576,7 +570,7 @@ rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
     }
 }
 
-static st_select_lex *
+st_select_lex *
 rewrite_select_lex(st_select_lex *select_lex, Analysis &a)
 {
     // rewrite_filters_lex must be called before rewrite_proj because
@@ -663,7 +657,7 @@ process_table_joins_and_derived(List<TABLE_LIST> *tll, Analysis & a)
     }
 }
 
-static void
+void
 process_table_list(List<TABLE_LIST> *tll, Analysis & a)
 {
     /*

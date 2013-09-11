@@ -733,15 +733,50 @@ intersect(const EncSet & es, FieldMeta * fm) {
  */
 static void optimize_select_lex(st_select_lex *select_lex, Analysis & a);
 
+static Item *getLeftExpr(Item_in_subselect *i)
+{
+    Item *left_expr = i->*rob<Item_in_subselect, Item*,
+                              &Item_in_subselect::left_expr>::ptr();
+    assert(left_expr);
+
+    return left_expr;
+
+}
+
+// HACK: global Analysis
+static Analysis *g_a = NULL;
 static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_ITEM> {
-    virtual RewritePlan * do_gather_type(Item_subselect *i, reason &tr, Analysis & a) const
+    virtual RewritePlan *do_gather_type(Item_subselect *i, reason &tr,
+                                        Analysis &a) const
     {
-        /*
-        st_select_lex *select_lex = i->get_select_lex();
-        process_select_lex(select_lex, a);
-        return tr.encset;*/
-        UNIMPLEMENTED;
-        return NULL;
+        // Gather subquery.
+        g_a = new Analysis(a.getSchema());
+        st_select_lex *const select_lex = i->get_select_lex();
+        process_table_list(&select_lex->top_join_list, *g_a);
+        process_select_lex(select_lex, *g_a);
+
+        switch (i->substype()) {
+            case Item_subselect::subs_type::EXISTS_SUBS:
+                assert(false);
+            case Item_subselect::subs_type::IN_SUBS: {
+                Item *const left_expr = 
+                    getLeftExpr(static_cast<Item_in_subselect *>(i));
+                // FIXME: reason.
+                reason r;
+                gather(left_expr, r, *g_a);
+                break;
+            }
+            case Item_subselect::subs_type::ALL_SUBS:
+                assert(false);
+            case Item_subselect::subs_type::ANY_SUBS:
+                assert(false);
+            default:
+                throw CryptDBError("Unknown subquery type!");
+        }
+        const EncSet out_es = PLAIN_EncSet;
+        tr = reason(out_es, "subselect", i);
+
+        return new RewritePlan(out_es, tr);
     }
     virtual Item * do_optimize_type(Item_subselect *i, Analysis & a) const {
         optimize_select_lex(i->get_select_lex(), a);
@@ -751,14 +786,59 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
                                   const RewritePlan *rp, Analysis &a)
         const
     {
-        return i->clone_item();
+        st_select_lex *const select_lex = i->get_select_lex();
+        st_select_lex *const new_select_lex =
+            rewrite_select_lex(select_lex, *g_a);
+
+        // ------------------------------
+        //    General Subquery Rewrite
+        // ------------------------------
+        {
+            // Rewrite table names.
+            new_select_lex->top_join_list =
+                rewrite_table_list(select_lex->top_join_list, *g_a);
+
+            // Rewrite SELECT params.
+            // HACK: memcpy
+            memcpy(select_lex, new_select_lex, sizeof(st_select_lex));
+        }
+
+        // ------------------------------
+        //   Specific Subquery Rewrite
+        // ------------------------------
+        {
+            switch (i->substype()) {
+                case Item_subselect::subs_type::EXISTS_SUBS:
+                    assert(false);
+                case Item_subselect::subs_type::IN_SUBS: {
+                    Item *const left_expr =
+                        getLeftExpr(static_cast<Item_in_subselect *>(i));
+                    Item *const new_left_expr =
+                        itemTypes.do_rewrite(left_expr, constr,
+                                             rp, a);
+                    return new Item_in_subselect(new_left_expr,
+                                                 new_select_lex);
+                }
+                case Item_subselect::subs_type::ALL_SUBS:
+                    assert(false);
+                case Item_subselect::subs_type::ANY_SUBS:
+                    assert(false);
+                default:
+                    throw CryptDBError("Unknown subquery type!");
+            }
+        }
     }
 } ANON;
 
+// NOTE: Shouldn't be needed unless we allow mysql to rewrite subqueries.
 static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
     virtual RewritePlan *do_gather_type(Item_cache *i, reason &tr,
                                         Analysis &a) const
     {
+        UNIMPLEMENTED;
+        return NULL;
+
+        /*
         TEST_TextMessageError(false ==
                                 i->field()->orig_table->alias_name_used,
                               "Can not mix CACHE_ITEM and table alias.");
@@ -780,6 +860,7 @@ static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
         tr = reason(out_es, "is cache item", i);
 
         return new RewritePlan(out_es, tr);
+        */
 
         /*
         Item *example = i->*rob<Item_cache, Item*, &Item_cache::example>::ptr();
@@ -799,7 +880,8 @@ static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
                                   const RewritePlan *rp, Analysis &a)
         const
     {
-        return i->clone_item();
+        UNIMPLEMENTED;
+        return NULL;
     }
 } ANON;
 
