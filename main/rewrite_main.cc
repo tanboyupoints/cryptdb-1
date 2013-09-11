@@ -895,27 +895,10 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         return new SimpleOutput(query);
     } else if (dml_dispatcher->canDo(lex)) {
         const SQLHandler *const handler = dml_dispatcher->dispatch(lex);
+        AssignOnce<LEX *> out_lex;
+
         try {
-            LEX *const out_lex = handler->transformLex(a, lex, ps);
-            if (true == a.special_update) {
-                const auto plain_table =
-                    lex->select_lex.top_join_list.head()->table_name;
-                const auto crypted_table =
-                    out_lex->select_lex.top_join_list.head()->table_name;
-                std::string where_clause;
-                if (lex->select_lex.where) {
-                    std::ostringstream where_stream;
-                    where_stream << " " << *lex->select_lex.where << " ";
-                    where_clause = where_stream.str();
-                } else {
-                    where_clause = " TRUE ";
-                }
-                return new SpecialUpdate(query, lex_to_query(out_lex),
-                                         plain_table, crypted_table,
-                                         where_clause, ps);
-            } else {
-                return new DMLOutput(query, lex_to_query(out_lex));
-            }
+            out_lex = handler->transformLex(a, lex, ps);
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
             std::cout << "Adjusting onion!" << std::endl;
@@ -924,6 +907,29 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
                             ps.dbName());
             return new AdjustOnionOutput(a.deltas, adjust_queries);
         }
+
+        // Return if it's a regular DML query.
+        if (false == a.special_update) {
+            return new DMLOutput(query, lex_to_query(out_lex.get()));
+        }
+
+        // Handle HOMorphic UPDATE.
+        const auto plain_table =
+            lex->select_lex.top_join_list.head()->table_name;
+        const auto crypted_table =
+            out_lex.get()->select_lex.top_join_list.head()->table_name;
+        std::string where_clause;
+        if (lex->select_lex.where) {
+            std::ostringstream where_stream;
+            where_stream << " " << *lex->select_lex.where << " ";
+            where_clause = where_stream.str();
+        } else {
+            where_clause = " TRUE ";
+        }
+
+        return new SpecialUpdate(query, lex_to_query(out_lex.get()),
+                                 plain_table, crypted_table,
+                                 where_clause, ps);
     } else if (ddl_dispatcher->canDo(lex)) {
         const SQLHandler *const handler = ddl_dispatcher->dispatch(lex);
         LEX *const out_lex = handler->transformLex(a, lex, ps);
