@@ -826,7 +826,13 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
                                *rp_w_analysis->a.get());
 
         // Rewrite SELECT params.
-        // HACK: memcpy
+        // HACK: The engine inside of the Item_subselect _can_ have a
+        // pointer back to the Item_subselect that contains it.
+        // > ie, subselect_single_select_engine::join::select_lex
+        // > The way this is done varies from engine to engine thus a
+        //   general solution seems difficuly.
+        // > set_select_lex() attemps to rectify this problem in other
+        //   cases
         memcpy(select_lex, new_select_lex, sizeof(st_select_lex));
 
         // ------------------------------

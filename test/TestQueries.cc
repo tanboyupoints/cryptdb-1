@@ -111,7 +111,10 @@ static QueryList Select = QueryList("SingleSelect",
       Query("SELECT min(t.id) a FROM test_select AS t", false),
       Query("SELECT t.address AS b FROM test_select t", false),
       Query("SELECT * FROM test_select HAVING age", false),
-      Query("SELECT * FROM test_select HAVING age && id", false)
+      Query("SELECT * FROM test_select HAVING age && id", false),
+      // BestEffort (Add more subquery tests as we expand functionality)
+      Query("SELECT * FROM test_select WHERE id IN (SELECT id FROM test_select)", false),
+      Query("SELECT * FROM test_select WHERE id IN (SELECT 1 FROM test_select)", false)
       },
     { "DROP TABLE test_select" },
     { "DROP TABLE test_select" },
@@ -1294,12 +1297,12 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 397/397.
+    //      TOTAL RESULT: 399/399.
     // ###############################
 
     std::vector<Score> scores;
 
-    // Pass 49/49
+    // Pass 51/51
     scores.push_back(CheckQueryList(tc, Select));
 
     // Pass 26/26
