@@ -49,8 +49,8 @@ class DropColumnSubHandler : public AlterSubHandler {
         auto drop_it =
             List_iterator<Alter_drop>(lex->alter_info.drop_list);
         List<Alter_drop> col_drop_list =
-            filterList(drop_it,
-                [](Alter_drop *adrop)
+            filterList<Alter_drop>(drop_it,
+                [](Alter_drop *const adrop)
         {
             return Alter_drop::COLUMN == adrop->type;
         });
@@ -167,8 +167,8 @@ class DropIndexSubHandler : public AlterSubHandler {
         auto drop_it =
             List_iterator<Alter_drop>(lex->alter_info.drop_list);
         List<Alter_drop> key_drop_list =
-            filterList(drop_it,
-                [](Alter_drop *adrop)
+            filterList<Alter_drop>(drop_it,
+                [](Alter_drop *const adrop)
                 {
                     return Alter_drop::KEY == adrop->type;
                 });
