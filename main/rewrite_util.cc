@@ -480,8 +480,7 @@ bool queryPreamble(ProxyState &ps, const std::string &q,
     SchemaInfo *out_schema;
     QueryRewrite *const qr = *out_qr =
         new QueryRewrite(Rewriter::rewrite(ps, q, &out_schema));
-    ps.setPreviousSchema(out_schema);
-    ps.setSchemaStaleness(qr->output->stalesSchema());
+    ps.updateSchemaCache(out_schema, qr->output->stalesSchema());
 
     assert(qr->output->beforeQuery(ps.getConn(), ps.getEConn()));
 

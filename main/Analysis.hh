@@ -83,17 +83,14 @@ typedef struct ProxyState {
     {
         return previous_schema;
     }
-    void setPreviousSchema(SchemaInfo * const schema)
+    void updateSchemaCache(SchemaInfo *const schema, bool staleness)
     {
         previous_schema = schema;
+        schema_staleness = staleness;
     }
     bool schemaIsStale() const
     {
         return schema_staleness;
-    }
-    void setSchemaStaleness(bool staleness)
-    {
-        schema_staleness = staleness;
     }
 
     const AES_KEY * const masterKey;
