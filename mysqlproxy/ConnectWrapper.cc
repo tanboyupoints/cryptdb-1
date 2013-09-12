@@ -456,8 +456,8 @@ decrypt(lua_State *L)
 
     ResType rd;
     try {
-        Rewriter r;
-        ResType *rt = r.decryptResults(res, clients[client]->rmeta);
+        ResType *const rt =
+            Rewriter::decryptResults(res, clients[client]->rmeta);
         assert(rt);
         rd = *rt;
     }

@@ -413,9 +413,8 @@ encrypt_item_layers(Item * const i, onion o, OnionMeta * const om,
 std::string
 rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q)
 {
-    Rewriter r;
     SchemaInfo *out_schema;
-    QueryRewrite qr = r.rewrite(ps, q, &out_schema);
+    QueryRewrite qr = Rewriter::rewrite(ps, q, &out_schema);
     assert(false == qr.output->stalesSchema());
     assert(false == qr.output->queryAgain());
 
@@ -478,9 +477,9 @@ bool queryPreamble(ProxyState &ps, const std::string &q,
                    QueryRewrite **const out_qr,
                    std::list<std::string> *const out_queryz)
 {
-    Rewriter r;
     SchemaInfo *out_schema;
-    QueryRewrite *const qr = *out_qr = new QueryRewrite(r.rewrite(ps, q, &out_schema));
+    QueryRewrite *const qr = *out_qr =
+        new QueryRewrite(Rewriter::rewrite(ps, q, &out_schema));
     ps.setPreviousSchema(out_schema);
     ps.setSchemaStaleness(qr->output->stalesSchema());
 

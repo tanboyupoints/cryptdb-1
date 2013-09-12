@@ -505,6 +505,17 @@ buildTypeTextTranslator()
     return true;
 }
 
+// Allows us to preserve boolean return values from
+// buildTypeTextTranslator, handle it as a static constant in
+// Rewriter and panic when it fails.
+static bool
+buildTypeTextTranslatorHack()
+{
+    assert(buildTypeTextTranslator());
+
+    return true;
+}
+
 //l gets updated to the new level
 static std::string
 removeOnionLayer(Analysis &a, const ProxyState &ps,
@@ -993,15 +1004,6 @@ noRewrite(const LEX *const lex) {
     return false;
 }
 
-Rewriter::Rewriter()
-{
-    // Must be called before loadSchemaInfo.
-    assert(buildTypeTextTranslator());
-
-    dml_dispatcher = buildDMLDispatcher();
-    ddl_dispatcher = buildDDLDispatcher();
-}
-
 static std::string
 lex_to_query(LEX *const lex)
 {
@@ -1023,6 +1025,10 @@ mysql_noop_dbres(const std::unique_ptr<Connect> &c, DBResult **dbres)
     return true;
 }
 */
+
+const bool Rewriter::translator_dummy = buildTypeTextTranslatorHack();
+const SQLDispatcher *Rewriter::dml_dispatcher = buildDMLDispatcher();
+const SQLDispatcher *Rewriter::ddl_dispatcher = buildDDLDispatcher();
 
 RewriteOutput *
 Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
@@ -1158,7 +1164,7 @@ cryptdbDirective(const std::string &query)
 
 QueryRewrite
 Rewriter::rewrite(const ProxyState &ps, const std::string &q,
-                  SchemaInfo **out_schema)
+                  SchemaInfo **const out_schema)
 {
     LOG(cdb_v) << "q " << q;
     assert(0 == mysql_thread_init());
@@ -1180,10 +1186,10 @@ Rewriter::rewrite(const ProxyState &ps, const std::string &q,
     RewriteOutput *output;
     try {
         if (cryptdbDirective(q)) {
-            output = this->handleDirective(analysis, ps, q);
+            output = Rewriter::handleDirective(analysis, ps, q);
         } else {
             // FIXME: Memleak return of 'dispatchOnLex()'
-            output = this->dispatchOnLex(analysis, ps, q);
+            output = Rewriter::dispatchOnLex(analysis, ps, q);
         }
     } catch (AbstractCryptDBError &e) {
         std::cout << e << std::endl;
@@ -1349,10 +1355,8 @@ executeQuery(ProxyState &ps, const std::string &q)
             // > Such can be accomodated by making this an if-statement.
             assert(qr->output->doDecryption());
 
-            // NOTE: Rewriterz are disposable, they should carry no
-            // state.
-            Rewriter r;
-            ResType *const dec_res = r.decryptResults(*res, qr->rmeta);
+            ResType *const dec_res =
+                Rewriter::decryptResults(*res, qr->rmeta);
             prettyPrintQueryResult(*dec_res);
 
             return dec_res;
