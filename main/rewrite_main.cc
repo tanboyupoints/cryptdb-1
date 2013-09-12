@@ -230,7 +230,7 @@ fixDelta(const std::unique_ptr<Connect> &conn,
             RETURN_FALSE_IF_FALSE(saveDMLCompletion(conn,
                                                     delta_output_id));
             RETURN_FALSE_IF_FALSE(conn->execute("COMMIT"));
-        } else if (1 > dml_row_count) {
+        } else if (1 < dml_row_count) {
             throw CryptDBError("Too many DML table results!");
         }
     }

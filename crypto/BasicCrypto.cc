@@ -190,7 +190,9 @@ pad(vector<unsigned char> data, unsigned int unit)
     } else {
         padding = multipleLen - data.size();
     }
+    assert(padding > 0 && padding <= AES_BLOCK_BYTES);
     size_t paddedLen = data.size() + padding;
+    assert((paddedLen > 0) && ((paddedLen % AES_BLOCK_BYTES) == 0));
 
     // cerr << "length of padding " << padding << " length of padded data " << paddedLen << "\n";
 
@@ -203,11 +205,16 @@ pad(vector<unsigned char> data, unsigned int unit)
 static vector<unsigned char>
 unpad(vector<unsigned char> data)
 {
-    size_t len = data.size();
+    const size_t len = data.size();
+    assert((len > 0) && ((len % AES_BLOCK_BYTES) == 0));
+    const size_t pad_count = static_cast<int>(data[len-1]);
     //cerr << "padding to remove " << (int)data[len-1] << "\n";
-    size_t actualLen = len - (int)data[len-1];
+    const size_t actualLen = len - pad_count;
     //cerr << " len is " << len << " and data[len-1] " << (int)data[len-1] << "\n";
-    assert(data[len-1] <= len);     // invalid pad value when unpadding
+    // Padding will never be larger than a block.
+    assert((pad_count > 0) && (pad_count <= AES_BLOCK_BYTES));
+    // Tells us when we have a bad length.
+    assert(pad_count <= len);
     vector<unsigned char> res(actualLen);
     memcpy(&res[0], &data[0], actualLen);
     return res;
@@ -219,7 +226,7 @@ encrypt_AES_CBC(const string &ptext, const AES_KEY * enckey, string salt, bool d
 {
     //TODO: separately for numbers to avoid need for padding
 
-    assert(dopad || ((ptext.size() % 16) == 0));
+    assert(dopad || ((ptext.size() % AES_BLOCK_BYTES) == 0));
 
     vector<unsigned char> ptext_buf;
     if (dopad) {
@@ -241,7 +248,7 @@ encrypt_AES_CBC(const string &ptext, const AES_KEY * enckey, string salt, bool d
 string
 decrypt_AES_CBC(const string &ctext, const AES_KEY * deckey, string salt, bool dounpad)
 {
-    assert((ctext.size() % 16) == 0);
+    assert((ctext.size() > 0) && ((ctext.size() % AES_BLOCK_BYTES) == 0));
 
     vector<unsigned char> ptext_buf(ctext.size());
     auto ivec = getIVec(salt);
