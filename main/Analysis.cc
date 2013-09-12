@@ -201,10 +201,25 @@ OLK EncSet::extract_singleton() const
     return OLK(it->first, it->second.first, it->second.second);
 }
 
+// needsSaltz must have consistent semantics.
+static bool
+needsSalt(SECLEVEL l)
+{
+    return l == SECLEVEL::RND;
+}
+
 bool
-needsSalt(EncSet es) {
+needsSalt(OLK olk)
+{
+    return olk.key && olk.key->has_salt && needsSalt(olk.l);
+}
+
+bool
+needsSalt(EncSet es)
+{
     for (auto pair : es.osl) {
-        if (pair.second.first == SECLEVEL::RND) {
+        OLK olk(pair.first, pair.second.first, pair.second.second);
+        if (needsSalt(olk)) {
             return true;
         }
     }

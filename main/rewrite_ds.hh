@@ -154,6 +154,9 @@ const EncSet EMPTY_EncSet {
     OnionLevelFieldMap()
 };
 
+bool
+needsSalt(OLK olk);
+
 // returns true if any of the layers in ed
 // need salt
 bool

@@ -33,8 +33,6 @@ enum class SECLEVEL {
     RND,
 };
 
-bool needsSalt(SECLEVEL l);
-
 //Onion layouts - initial structure of onions
 typedef std::map<onion, std::vector<SECLEVEL> > onionlayout;
 

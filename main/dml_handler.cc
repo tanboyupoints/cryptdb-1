@@ -24,9 +24,6 @@ analyze_field_value_pair(Item_field * field, Item * val, Analysis & a);
 static st_select_lex *
 rewrite_filters_lex(st_select_lex *select_lex, Analysis &a);
 
-static bool
-needsSalt(OLK olk);
-
 static void
 rewrite_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a,
@@ -596,11 +593,6 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis &a)
     new_select_lex->item_list = newList;
 
     return new_select_lex;
-}
-
-static bool
-needsSalt(OLK olk) {
-    return olk.key && olk.key->has_salt && needsSalt(olk.l);
 }
 
 static void
