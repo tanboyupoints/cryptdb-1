@@ -81,7 +81,7 @@ typedef struct ProxyState {
     }
     SchemaInfo *getPreviousSchema() const
     {
-        return previous_schema;
+        return previous_schema.get();
     }
     void updateSchemaCache(SchemaInfo *const schema, bool staleness)
     {
@@ -112,7 +112,7 @@ private:
     // FIXME: Remove once cryptdb supports multiple databases.
     const std::string dbname;
     const SECURITY_RATING default_sec_rating;
-    SchemaInfo *previous_schema;
+    MaxOneReadPerAssign<SchemaInfo *> previous_schema;
     bool schema_staleness;
 } ProxyState;
 

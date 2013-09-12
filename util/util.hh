@@ -475,6 +475,37 @@ private:
     AssignOnce(const AssignOnce &other);
 };
 
+template <typename T>
+class MaxOneReadPerAssign {
+public:
+    MaxOneReadPerAssign(T value) : value(value), available(true) {}
+    ~MaxOneReadPerAssign() {;}
+
+    T get() const
+    {
+        if (false == available) {
+            throw CryptDBError("MaxOneReadPerAssign is unavailable!");
+        }
+        // NOTE: mutable so that 'get()' can be used in the getters of
+        // other classes without forcing the classes to declare the
+        // getters as non-const.
+        available = false;
+        return value;
+    }
+
+    const MaxOneReadPerAssign& operator=(T new_value)
+    {
+        value = new_value;
+        available = true;
+
+        return *this;
+    }
+
+private:
+    T value;
+    mutable bool available;
+};
+
 // Taken from jsmith @ cplusplus.com
 template <typename T>
 std::vector<T> vectorDifference(const std::vector<T> &model,
