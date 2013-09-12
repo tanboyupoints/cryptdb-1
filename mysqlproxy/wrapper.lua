@@ -171,6 +171,9 @@ _=[[
                     dfields, drows =
                         CryptDB.decrypt(client, fields, rows)
                 else
+                    -- FIXME: This data may be illformed as we don't do
+                    -- the fixups with respect to NULL that take place in
+                    -- CryptDB.decrypt.
                     dfields = fields
                     drows = rows
                 end

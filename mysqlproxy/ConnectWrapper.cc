@@ -335,10 +335,10 @@ epilogue(lua_State *L)
             executeQuery(*ps, clients[client]->last_query);
         assert(res_type);
 
-        // HACK/FIXME: This should use the doDecryption from the second
-        // query rewriting.
-        lua_pushboolean(L, qr->output->doDecryption());
-        lua_pushinteger(L, (lua_Integer)res_type);
+        // Tell lua not to decrypt the results because executeQuery
+        // handles decryption.
+        lua_pushboolean(L, false);
+        lua_pushinteger(L, reinterpret_cast<lua_Integer>(res_type));
         return 2;
     }
 
