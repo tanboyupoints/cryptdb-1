@@ -634,8 +634,6 @@ bool SpecialUpdate::getQuery(std::list<std::string> * const queryz) const
     queryz->clear();
     queryz->push_back("START TRANSACTION; ");
 
-    // FIXME: Broken, these queries must be rewritten.
-
     // DELETE the rows matching the WHERE clause from the database.
     const std::string delete_q =
         " DELETE FROM " + this->plain_table +
@@ -657,12 +655,11 @@ bool SpecialUpdate::getQuery(std::list<std::string> * const queryz) const
     return true;
 }
 
-// FIXME: Implement.
 bool
 SpecialUpdate::handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
     const
 {
-    return false;
+    return true;
 }
 
 bool SpecialUpdate::afterQuery(const std::unique_ptr<Connect> &e_conn)
