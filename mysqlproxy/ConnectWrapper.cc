@@ -8,6 +8,7 @@
 #include <util/scoped_lock.hh>
 
 #include <main/rewrite_main.hh>
+#include <main/rewrite_util.hh>
 #include <parser/sql_utils.hh>
 
 // FIXME: Ownership semantics.
@@ -227,6 +228,7 @@ disconnect(lua_State *L)
     return 0;
 }
 
+// FIXME: Use TELL policy.
 static int
 rewrite(lua_State *L)
 {
@@ -264,7 +266,32 @@ rewrite(lua_State *L)
                 throw CryptDBError("Failed to get rewritten query!");
                 assert(qr->output->handleQueryFailure(ps->getEConn()));
             }
-            
+
+            switch (qr->output->queryChannel()) {
+                case RewriteOutput::Channel::SIDE:
+                    for (auto it : new_queries) {
+                        if (!ps->getSideChannelConn()->execute(it)) {
+                            qr->output->handleQueryFailure(ps->getEConn());
+                            throw CryptDBError("Failed to execute query!");
+                        }
+                    }
+
+                    // We have no queries for the proxy to execute.
+                    new_queries.clear();
+                    // HACK: epilogue() will use the metadata
+                    // associated with AdjustOnionOutput.
+                    // > Considering that the metadata will tell us to
+                    // issue the query again, all is well. But if such
+                    // weren't the case we _could_ get a mismatch
+                    // between the metadata and the noop query.
+                    new_queries.push_back(mysql_noop());
+                    break;
+                case RewriteOutput::Channel::REGULAR:
+                    break;
+                default:
+                    throw CryptDBError("Unrecognized Channel!");
+            }
+
             clients[client]->rmeta = qr->rmeta;
         } catch (CryptDBError &e) {
             LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;

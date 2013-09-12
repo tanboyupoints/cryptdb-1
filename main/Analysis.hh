@@ -98,6 +98,10 @@ typedef struct ProxyState {
 
     const AES_KEY * const masterKey;
     const std::unique_ptr<Connect> &getConn() const {return conn;}
+    const std::unique_ptr<Connect> &getSideChannelConn() const
+    {
+        return side_channel_conn;
+    }
     const std::unique_ptr<Connect> &getEConn() const {return e_conn;}
 
     static int db_init(const std::string &embed_dir);
@@ -106,6 +110,7 @@ private:
     const int mysql_dummy;
     // connection to remote and embedded server
     const std::unique_ptr<Connect> conn;
+    const std::unique_ptr<Connect> side_channel_conn;
     const std::unique_ptr<Connect> e_conn;
     // FIXME: Remove once cryptdb supports multiple databases.
     const std::string dbname;
@@ -187,8 +192,10 @@ public:
 
 class Rewriter;
 
-class RewriteOutput { 
+class RewriteOutput {
 public:
+    enum class Channel {REGULAR, SIDE};
+
     RewriteOutput(const std::string &original_query)
         : original_query(original_query) {}
     virtual ~RewriteOutput() = 0;
@@ -200,9 +207,13 @@ public:
         const = 0;
     virtual bool afterQuery(const std::unique_ptr<Connect> &e_conn)
         const = 0;
+    // This ASK code is a symptom of returning the rewritten query
+    // to the proxy which then issues the query. A more TELL policy
+    // would likely lead to cleaner execution of queries.
     virtual bool queryAgain() const;
     virtual bool doDecryption() const;
     virtual bool stalesSchema() const;
+    virtual RewriteOutput::Channel queryChannel() const;
 
     static ResType *sendQuery(const std::unique_ptr<Connect> &c,
                               const std::string &q);
@@ -285,6 +296,7 @@ public:
     virtual bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
         const = 0;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const = 0;
+    // FIXME: final.
     bool stalesSchema() const;
 
     static bool save(const std::unique_ptr<Connect> &e_conn,
@@ -333,7 +345,12 @@ public:
     bool getQuery(std::list<std::string> * const queryz) const;
     bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+    // FIXME: final.
     bool queryAgain() const;
+    // FIXME: final.
+    bool doDecryption() const __attribute__((noreturn));
+    // FIXME: final.
+    RewriteOutput::Channel queryChannel() const;
 
 private:
     const std::list<std::string> adjust_queries;

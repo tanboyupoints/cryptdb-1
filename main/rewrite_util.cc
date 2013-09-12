@@ -468,3 +468,9 @@ typical_rewrite_insert_type(Item *const i, Analysis &a,
     }
 }
 
+std::string
+mysql_noop()
+{
+    return "do 0;";
+}
+

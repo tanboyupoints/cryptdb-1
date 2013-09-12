@@ -1010,13 +1010,6 @@ lex_to_query(LEX *const lex)
     return o.str();
 }
 
-static
-std::string
-mysql_noop()
-{
-    return "do 0;";
-}
-
 /*
 static
 bool
@@ -1300,7 +1293,21 @@ prettyPrintQueryResult(ResType res)
     std::cout << std::endl;
 }
 
+static const std::unique_ptr<Connect> &
+deductConnection(RewriteOutput *const output, const ProxyState &ps)
+{
+    switch (output->queryChannel()) {
+        case RewriteOutput::Channel::REGULAR:
+            return ps.getConn();
+        case RewriteOutput::Channel::SIDE:
+            return ps.getSideChannelConn();
+        default:
+            throw CryptDBError("Unrecognized Channel!");
+    }
+}
+
 // FIXME: DBResult and ResType memleaks.
+// FIXME: Use TELL policy.
 ResType *
 executeQuery(ProxyState &ps, const std::string &q)
 {
@@ -1317,20 +1324,25 @@ executeQuery(ProxyState &ps, const std::string &q)
         // Execute query.
         std::list<std::string> out_queryz;
         if (!qr.output->getQuery(&out_queryz)) {
+            qr.output->handleQueryFailure(ps.getEConn());
             throw CryptDBError("Failed to retrieve query!");
         }
+
+        const std::unique_ptr<Connect>
+            &query_conn(deductConnection(qr.output, ps));
 
         DBResult *dbres = NULL;
         for (auto it : out_queryz) {
             prettyPrintQuery(it);
 
-            if (!ps.getConn()->execute(it, dbres)) {
+            if (!query_conn->execute(it, dbres)) {
                 qr.output->handleQueryFailure(ps.getEConn());
                 throw CryptDBError("Failed to execute query!");
             }
             assert(dbres);
         }
 
+        // Query epilogue.
         assert(qr.output->afterQuery(ps.getEConn()));
 
         if (qr.output->queryAgain()) {

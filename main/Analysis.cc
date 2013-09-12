@@ -314,6 +314,8 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                                                    // connections in init
                                                    // list.
       conn(new Connect(ci.server, ci.user, ci.passwd, dbname, ci.port)),
+      side_channel_conn(new Connect(ci.server, ci.user, ci.passwd,
+                                    dbname, ci.port)),
       e_conn(Connect::getEmbedded(embed_dir, dbname)), dbname(dbname),
       default_sec_rating(default_sec_rating), previous_schema(NULL),
       schema_staleness(true)
@@ -498,6 +500,11 @@ bool RewriteOutput::doDecryption() const
 bool RewriteOutput::stalesSchema() const
 {
     return false;
+}
+
+enum RewriteOutput::Channel RewriteOutput::queryChannel() const
+{
+    return Channel::REGULAR;
 }
 
 ResType *RewriteOutput::sendQuery(const std::unique_ptr<Connect> &c,
@@ -992,6 +999,17 @@ const std::list<std::string> AdjustOnionOutput::local_qz() const
 bool AdjustOnionOutput::queryAgain() const
 {
     return true;
+}
+
+bool AdjustOnionOutput::doDecryption() const
+{
+    throw CryptDBError("AdjustOnionOutput doesn't understand"
+                       " decryption!");
+}
+
+enum RewriteOutput::Channel AdjustOnionOutput::queryChannel() const
+{
+    return Channel::SIDE;
 }
 
 bool Analysis::addAlias(const std::string &alias,

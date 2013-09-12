@@ -121,3 +121,5 @@ process_table_list(List<TABLE_LIST> *tll, Analysis &a);
 st_select_lex *
 rewrite_select_lex(st_select_lex *select_lex, Analysis &a);
 
+std::string
+mysql_noop();
