@@ -23,7 +23,7 @@ class AddColumnSubHandler : public AlterSubHandler {
         auto add_it =
             List_iterator<Create_field>(lex->alter_info.create_list);
         new_lex->alter_info.create_list = 
-            reduceList<Create_field>(add_it, List<Create_field>(),
+            accumList<Create_field>(add_it,
                 [&a, &ps, &tm] (List<Create_field> out_list,
                                 Create_field *cf)
             {
@@ -58,7 +58,7 @@ class DropColumnSubHandler : public AlterSubHandler {
         // Rewrite and Remove.
         drop_it = List_iterator<Alter_drop>(col_drop_list);
         new_lex->alter_info.drop_list =
-            reduceList<Alter_drop>(drop_it, List<Alter_drop>(),
+            accumList<Alter_drop>(drop_it,
                 [preamble, &a, this] (List<Alter_drop> out_list,
                                             Alter_drop *adrop)
         {
@@ -138,7 +138,7 @@ class AddIndexSubHandler : public AlterSubHandler {
         auto key_it =
             List_iterator<Key>(lex->alter_info.key_list);
         new_lex->alter_info.key_list =
-            reduceList<Key>(key_it, List<Key>(),
+            accumList<Key>(key_it,
                 [tm, &a] (List<Key> out_list, Key *const key) {
                     // -----------------------------
                     //         Rewrite INDEX
@@ -174,11 +174,10 @@ class DropIndexSubHandler : public AlterSubHandler {
                 });
 
         // Rewrite.
-        // FIXME: Handle oDET index as well.
         drop_it =
             List_iterator<Alter_drop>(key_drop_list);
         new_lex->alter_info.drop_list =
-            reduceList<Alter_drop>(drop_it, List<Alter_drop>(),
+            accumList<Alter_drop>(drop_it,
                 [preamble, tm, &a, this]
                     (List<Alter_drop> out_list, Alter_drop *adrop)
                 {

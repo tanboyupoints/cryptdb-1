@@ -25,25 +25,22 @@ mapList(List_iterator<T> it, F op) {
     return newList;
 }
 
-// A bit off.
-template <typename T, typename F, typename O> O
-reduceList(List_iterator<T> it, O init, F op) {
-    List<T> newList;
-    O accum = init;
-    T* element = it++;
+template <typename Type> List<Type>
+accumList(List_iterator<Type> it,
+          std::function<List<Type>(List<Type>, Type *)> op)
+{
+    List<Type> accum;
 
-    for (; element ; element = it++) {
+    for (Type *element = it++; element ; element = it++) {
         accum = op(accum, element);
     }
 
     return accum;
 }
 
-// FIXME: Concating this into a mysql List is likely introducting a memleak.
-// > We should be able to remove this 'new' as concat doesn't keep the address.
 template <typename T> List<T> *
 vectorToList(std::vector<T*> v) {
-    List<T> *lst = new List<T>;
+    List<T> *const lst = new (current_thd->mem_root) List<T>;
     for (auto it : v) {
         lst->push_back(it);
     }

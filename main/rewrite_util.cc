@@ -283,7 +283,7 @@ rewrite_key(const std::shared_ptr<TableMeta> &tm, Key *const key,
         // each onion.
         bool fail = false;
         new_key->columns =
-            reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
+            accumList<Key_part_spec>(col_it,
                 [o, tm, a, &fail] (List<Key_part_spec> out_field_list,
                                    Key_part_spec *const key_part)
                 {
