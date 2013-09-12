@@ -2,14 +2,7 @@
 #include <main/rewrite_util.hh>
 #include <main/rewrite_main.hh>
 #include <main/metadata_tables.hh>
-
-#define ROLLBACK_AND_RETURN_ON_FAIL(status, c, ret)     \
-{                                                       \
-    if (!(status)) {                                    \
-        assert((c)->execute("ROLLBACK;"));              \
-        return (ret);                                   \
-    }                                                   \
-}
+#include <main/macro_util.hh>
 
 // FIXME: Memory leaks when we allocate MetaKey<...>, use smart pointer.
 
@@ -598,15 +591,21 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     const std::string values_string =
         vector_join<std::vector<Item*>>(select_res_type->rows, ",",
                                         itemJoin);
+
+    // Do the query on the embedded database inside of a transaction
+    // so that we can prevent failure artifacts from populating the
+    // embedded dabase.
+    RETURN_FALSE_IF_FALSE(e_conn->execute("START TRANSACTION;"));
+
     // Push the plaintext rows to the embedded database.
     const std::string push_q =
         " INSERT INTO " + this->plain_table +
         " VALUES " + values_string + ";";
-    assert(e_conn->execute(push_q));
+    ROLLBACK_AND_RFIF(e_conn->execute(push_q), e_conn);
 
     // Run the original (unmodified) query on the data in the embedded
     // database.
-    assert(e_conn->execute(this->original_query));
+    ROLLBACK_AND_RFIF(e_conn->execute(this->original_query), e_conn);
 
     // > Collect the results from the embedded database.
     // > This code relies on single threaded access to the database
@@ -615,7 +614,7 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     DBResult *dbres;
     const std::string select_results_q =
         " SELECT * FROM " + this->plain_table + ";";
-    assert(e_conn->execute(select_results_q, dbres));
+    ROLLBACK_AND_RFIF(e_conn->execute(select_results_q, dbres), e_conn);
     const std::unique_ptr<ResType>
         interim_res(new ResType(dbres->unpack()));
     this->output_values = 
@@ -624,7 +623,9 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     // Cleanup the embedded database.
     const std::string cleanup_q =
         "DELETE FROM " + this->plain_table + ";";
-    assert(e_conn->execute(cleanup_q));
+    ROLLBACK_AND_RFIF(e_conn->execute(cleanup_q), e_conn);
+
+    ROLLBACK_AND_RFIF(e_conn->execute("COMMIT;"), e_conn);
 
     return true;
 }
@@ -842,19 +843,19 @@ handleDeltaBeforeQuery(const std::unique_ptr<Connect> &conn,
     assert(e_conn->execute("START TRANSACTION;"));
     for (auto it : deltas) {
         b = it->apply(e_conn, Delta::BLEEDING_TABLE);
-        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
+        ROLLBACK_AND_RFIF(b, e_conn);
     }
 
     b = DeltaOutput::save(e_conn, delta_output_id);
-    ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
+    ROLLBACK_AND_RFIF(b, e_conn);
 
     for (auto it : local_qz) {
         b = saveQuery(e_conn, it, *delta_output_id, true, false);
-        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
+        ROLLBACK_AND_RFIF(b, e_conn);
     }
     for (auto it : remote_qz) {
         b = saveQuery(e_conn, it, *delta_output_id, false, remote_ddl);
-        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
+        ROLLBACK_AND_RFIF(b, e_conn);
     }
     assert(e_conn->execute("COMMIT;"));
 
@@ -875,11 +876,11 @@ handleDeltaAfterQuery(const std::unique_ptr<Connect> &e_conn,
     assert(e_conn->execute("START TRANSACTION;"));
     for (auto it : deltas) {
         b = it->apply(e_conn, Delta::REGULAR_TABLE);
-        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
+        ROLLBACK_AND_RFIF(b, e_conn);
     }
 
     b = cleanupDeltaOutputAndQuery(e_conn, delta_output_id);
-    ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
+    ROLLBACK_AND_RFIF(b, e_conn);
 
     assert(e_conn->execute("COMMIT;"));
 
@@ -1126,6 +1127,4 @@ RewritePlanWithAnalysis::RewritePlanWithAnalysis(const EncSet &es_out,
                                             std::unique_ptr<Analysis> a)
     : RewritePlan(es_out, r), a(std::move(a))
 {}
-
-#undef ROLLBACK_AND_RETURN_ON_FAIL
 
