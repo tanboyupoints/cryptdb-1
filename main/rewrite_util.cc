@@ -418,7 +418,7 @@ rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q)
     QueryRewrite qr = r.rewrite(ps, q, &out_schema);
     assert(false == qr.output->stalesSchema());
     assert(false == qr.output->queryAgain());
-    
+
     std::list<std::string> out_queryz;
     if (!qr.output->getQuery(&out_queryz)) {
         throw CryptDBError("Failed to retrieve query!");
@@ -474,3 +474,47 @@ mysql_noop()
     return "do 0;";
 }
 
+bool queryPreamble(ProxyState &ps, const std::string &q,
+                   QueryRewrite **const out_qr,
+                   std::list<std::string> *const out_queryz)
+{
+    Rewriter r;
+    SchemaInfo *out_schema;
+    QueryRewrite *const qr = *out_qr = new QueryRewrite(r.rewrite(ps, q, &out_schema));
+    ps.setPreviousSchema(out_schema);
+    ps.setSchemaStaleness(qr->output->stalesSchema());
+
+    assert(qr->output->beforeQuery(ps.getConn(), ps.getEConn()));
+
+    if (!qr->output->getQuery(out_queryz)) {
+        qr->output->handleQueryFailure(ps.getEConn());
+        return false;
+    }
+
+    switch (qr->output->queryChannel()) {
+        case RewriteOutput::Channel::SIDE:
+            for (auto it : *out_queryz) {
+                if (!ps.getSideChannelConn()->execute(it)) {
+                    qr->output->handleQueryFailure(ps.getEConn());
+                    return false;
+                }
+            }
+
+            // We have no queries for the caller to execute.
+            out_queryz->clear();
+            // HACK: The caller will use the metadata
+            // associated with AdjustOnionOutput.
+            // > Considering that the metadata will tell us to
+            // issue the query again, all is well. But if such
+            // weren't the case we _could_ get a mismatch
+            // between the metadata and the noop query.
+            out_queryz->push_back(mysql_noop());
+            break;
+        case RewriteOutput::Channel::REGULAR:
+            break;
+        default:
+            return false;
+    }
+
+    return true;
+}

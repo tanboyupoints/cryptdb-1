@@ -1312,54 +1312,49 @@ ResType *
 executeQuery(ProxyState &ps, const std::string &q)
 {
     try {
-        Rewriter r;
-        SchemaInfo *out_schema;
-        QueryRewrite qr = r.rewrite(ps, q, &out_schema);
-        ps.setPreviousSchema(out_schema);
-        ps.setSchemaStaleness(qr.output->stalesSchema());
-
-        // Query preamble.
-        assert(qr.output->beforeQuery(ps.getConn(), ps.getEConn()));
-
-        // Execute query.
+        QueryRewrite *qr = NULL;
         std::list<std::string> out_queryz;
-        if (!qr.output->getQuery(&out_queryz)) {
-            qr.output->handleQueryFailure(ps.getEConn());
-            throw CryptDBError("Failed to retrieve query!");
-        }
+        assert(queryPreamble(ps, q, &qr, &out_queryz));
+        assert(qr);
 
         const std::unique_ptr<Connect>
-            &query_conn(deductConnection(qr.output, ps));
+            &query_conn(deductConnection(qr->output, ps));
 
         DBResult *dbres = NULL;
         for (auto it : out_queryz) {
             prettyPrintQuery(it);
 
             if (!query_conn->execute(it, dbres)) {
-                qr.output->handleQueryFailure(ps.getEConn());
+                qr->output->handleQueryFailure(ps.getEConn());
                 throw CryptDBError("Failed to execute query!");
             }
             assert(dbres);
         }
 
         // Query epilogue.
-        assert(qr.output->afterQuery(ps.getEConn()));
+        assert(qr->output->afterQuery(ps.getEConn()));
 
-        if (qr.output->queryAgain()) {
+        if (qr->output->queryAgain()) {
             return executeQuery(ps, q);
         }
 
+        printEmbeddedState(ps);
+
         if (dbres) {
-            ResType *res = new ResType(dbres->unpack());
+            ResType *const res = new ResType(dbres->unpack());
+
             prettyPrintQueryResult(*res);
+            // > Presumably we may want to pass something through here
+            // that doesn't need to be decrypted (ie, a no-op).
+            // > Such can be accomodated by making this an if-statement.
+            assert(qr->output->doDecryption());
 
-            ResType *dec_res;
-            if (true == qr.output->doDecryption()) {
-                dec_res = r.decryptResults(*res, qr.rmeta);
-                prettyPrintQueryResult(*dec_res);
-            }
+            // NOTE: Rewriterz are disposable, they should carry no
+            // state.
+            Rewriter r;
+            ResType *const dec_res = r.decryptResults(*res, qr->rmeta);
+            prettyPrintQueryResult(*dec_res);
 
-            printEmbeddedState(ps);
             return dec_res;
         } else {
             return NULL;

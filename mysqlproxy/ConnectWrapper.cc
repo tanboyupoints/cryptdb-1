@@ -236,13 +236,13 @@ rewrite(lua_State *L)
     scoped_lock l(&big_lock);
     assert(0 == mysql_thread_init());
 
-    std::string client = xlua_tolstring(L, 1);
+    const std::string client = xlua_tolstring(L, 1);
     if (clients.find(client) == clients.end()) {
         return 0;
     }
 
-    std::string query = xlua_tolstring(L, 2);
-    std::string query_data = xlua_tolstring(L, 3);
+    const std::string query = xlua_tolstring(L, 2);
+    const std::string query_data = xlua_tolstring(L, 3);
 
     std::list<std::string> new_queries;
 
@@ -252,46 +252,12 @@ rewrite(lua_State *L)
         try {
             assert(ps);
 
-            Rewriter r;
-            SchemaInfo *out_schema;
-            QueryRewrite *const qr = clients[client]->qr =
-                new QueryRewrite(r.rewrite(*ps, query, &out_schema));
-            ps->setPreviousSchema(out_schema);
-            ps->setSchemaStaleness(qr->output->stalesSchema());
+            QueryRewrite *qr = NULL;
+            assert(queryPreamble(*ps, query, &qr, &new_queries));
+            assert(qr);
 
-            assert(qr->output->beforeQuery(ps->getConn(),
-                                           ps->getEConn()));
-
-            if (!qr->output->getQuery(&new_queries)) {
-                throw CryptDBError("Failed to get rewritten query!");
-                assert(qr->output->handleQueryFailure(ps->getEConn()));
-            }
-
-            switch (qr->output->queryChannel()) {
-                case RewriteOutput::Channel::SIDE:
-                    for (auto it : new_queries) {
-                        if (!ps->getSideChannelConn()->execute(it)) {
-                            qr->output->handleQueryFailure(ps->getEConn());
-                            throw CryptDBError("Failed to execute query!");
-                        }
-                    }
-
-                    // We have no queries for the proxy to execute.
-                    new_queries.clear();
-                    // HACK: epilogue() will use the metadata
-                    // associated with AdjustOnionOutput.
-                    // > Considering that the metadata will tell us to
-                    // issue the query again, all is well. But if such
-                    // weren't the case we _could_ get a mismatch
-                    // between the metadata and the noop query.
-                    new_queries.push_back(mysql_noop());
-                    break;
-                case RewriteOutput::Channel::REGULAR:
-                    break;
-                default:
-                    throw CryptDBError("Unrecognized Channel!");
-            }
-
+            // FIXME: Redundant.
+            clients[client]->qr = qr;
             clients[client]->rmeta = qr->rmeta;
         } catch (CryptDBError &e) {
             LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
@@ -304,8 +270,10 @@ rewrite(lua_State *L)
         *(clients[client]->PLAIN_LOG) << query << "\n";
     }
 
-    lua_createtable(L, (int) new_queries.size(), 0);
-    int top = lua_gettop(L);
+    // NOTE: Potentially out of int range.
+    assert(new_queries.size() < INT_MAX);
+    lua_createtable(L, static_cast<int>(new_queries.size()), 0);
+    const int top = lua_gettop(L);
     int index = 1;
     for (auto it : new_queries) {
         xlua_pushlstring(L, it);
