@@ -790,6 +790,8 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
         tr = reason(out_es, why, i);
 
         switch (i->substype()) {
+            case Item_subselect::subs_type::SINGLEROW_SUBS:
+                assert(false);
             case Item_subselect::subs_type::EXISTS_SUBS:
                 assert(false);
             case Item_subselect::subs_type::IN_SUBS: {
@@ -851,6 +853,8 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
         // ------------------------------
         {
             switch (i->substype()) {
+                case Item_subselect::subs_type::SINGLEROW_SUBS:
+                    assert(false);
                 case Item_subselect::subs_type::EXISTS_SUBS:
                     assert(false);
                 case Item_subselect::subs_type::IN_SUBS: {
@@ -1092,7 +1096,7 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         LEX *const out_lex = handler->transformLex(a, lex, ps);
         return new DDLOutput(query, lex_to_query(out_lex), a.deltas);
     } else {
-        throw CryptDBError("Rewriter can not dispatch bad lex");
+        return NULL;
     }
 }
 
@@ -1190,6 +1194,9 @@ Rewriter::rewrite(const ProxyState &ps, const std::string &q,
         } else {
             // FIXME: Memleak return of 'dispatchOnLex()'
             output = Rewriter::dispatchOnLex(analysis, ps, q);
+            if (!output) {
+                output = new SimpleOutput(mysql_noop());
+            }
         }
     } catch (AbstractCryptDBError &e) {
         std::cout << e << std::endl;
