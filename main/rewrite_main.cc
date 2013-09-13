@@ -1350,16 +1350,15 @@ executeQuery(ProxyState &ps, const std::string &q)
             ResType *const res = new ResType(dbres->unpack());
 
             prettyPrintQueryResult(*res);
-            // > Presumably we may want to pass something through here
-            // that doesn't need to be decrypted (ie, a no-op).
-            // > Such can be accomodated by making this an if-statement.
-            assert(qr->output->doDecryption());
+            if (qr->output->doDecryption()) {
+                ResType *const dec_res =
+                    Rewriter::decryptResults(*res, qr->rmeta);
+                prettyPrintQueryResult(*dec_res);
 
-            ResType *const dec_res =
-                Rewriter::decryptResults(*res, qr->rmeta);
-            prettyPrintQueryResult(*dec_res);
-
-            return dec_res;
+                return dec_res;
+            }
+            
+            return res;
         } else {
             return NULL;
         }

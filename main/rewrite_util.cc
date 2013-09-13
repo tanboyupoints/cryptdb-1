@@ -414,9 +414,13 @@ std::string
 rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q)
 {
     SchemaInfo *out_schema;
-    QueryRewrite qr = Rewriter::rewrite(ps, q, &out_schema);
+    const QueryRewrite qr = Rewriter::rewrite(ps, q, &out_schema);
     assert(false == qr.output->stalesSchema());
     assert(false == qr.output->queryAgain());
+
+    // FIXME: const_cast
+    const_cast<ProxyState &>(ps).updateSchemaCache(out_schema,
+                                            qr.output->stalesSchema());
 
     std::list<std::string> out_queryz;
     if (!qr.output->getQuery(&out_queryz)) {
