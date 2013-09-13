@@ -67,7 +67,7 @@ function read_query_real(packet)
     if string.byte(packet) == proxy.COM_QUERY then
         new_queries =
             CryptDB.rewrite(proxy.connection.client.src.name, query)
-        if false == use_database then
+        if new_queries and false == use_database then
             table.insert(new_queries, 1, "USE cryptdbtest")
             use_database = true
         end
