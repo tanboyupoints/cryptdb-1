@@ -995,6 +995,7 @@ noRewrite(const LEX *const lex) {
     case SQLCOM_SHOW_DATABASES:
     case SQLCOM_SET_OPTION:
     case SQLCOM_BEGIN:
+    case SQLCOM_ROLLBACK:
     case SQLCOM_COMMIT:
     case SQLCOM_SHOW_TABLES:
         return true;

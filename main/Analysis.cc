@@ -322,7 +322,7 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
 {
     assert(conn && e_conn);
 
-    MetaDataTables::initialize(conn, e_conn);
+    assert(MetaDataTables::initialize(conn, e_conn));
 
     loadUDFs(conn);
 

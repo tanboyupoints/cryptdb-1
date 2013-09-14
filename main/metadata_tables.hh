@@ -12,6 +12,7 @@ namespace MetaDataTables {
         std::string dmlCompletion();
         std::string metaObject();
         std::string bleedingMetaObject();
+        std::string transactionHelper();
     };
 
     bool initialize(const std::unique_ptr<Connect> &conn,
