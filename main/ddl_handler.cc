@@ -21,13 +21,12 @@ class AlterHandler : public DDLHandler {
     {
         const AlterSubHandler *handler;
         assert(sub_dispatcher->canDo(lex));
-        assert(handler =
-            (const AlterSubHandler*)sub_dispatcher->dispatch(lex));
+        assert(handler = sub_dispatcher->dispatch(lex));
         return handler->transformLex(a, lex, ps);
     }
-    
+
     AlterDispatcher *sub_dispatcher;
-    
+
 public:
     AlterHandler()
     {

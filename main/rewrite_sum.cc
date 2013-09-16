@@ -89,7 +89,9 @@ class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
                                    Analysis & a) const
     {
         std::list<Item *> args =
-            rewrite_agg_args(i, constr, (RewritePlanOneOLK *)rp, a, 1);
+            rewrite_agg_args(i, constr,
+                             static_cast<const RewritePlanOneOLK *>(rp),
+                             a, 1);
         auto out_item = new Item_sum_count(args.front());
         out_item->set_distinct(i->has_with_distinct());
         return out_item;
