@@ -1002,6 +1002,7 @@ noRewrite(const LEX *const lex) {
     case SQLCOM_ROLLBACK:
     case SQLCOM_COMMIT:
     case SQLCOM_SHOW_TABLES:
+    case SQLCOM_SHOW_VARIABLES:
         return true;
     case SQLCOM_SELECT: {
 

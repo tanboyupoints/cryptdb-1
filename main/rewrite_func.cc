@@ -331,7 +331,8 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
             childr_rp[index] = gather(argitem, r, a);
             const OLK olk =
                 EQ_EncSet.intersect(childr_rp[index]->es_out).chooseOne();
-            out_child_olks.push_back(std::make_pair(childr_rp[index], olk));
+            out_child_olks.push_back(std::make_pair(childr_rp[index],
+                                     olk));
             tr.add_child(r);
             ++index;
         }
@@ -348,11 +349,11 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
                                    const RewritePlan * rp, Analysis & a) const
     {
         const unsigned int arg_count = i->argument_list()->elements;
-        Item ** const items = new Item*[arg_count];
 
         const RewritePlanPerChildOLK * const rp_per_child =
             static_cast<const RewritePlanPerChildOLK * const>(rp);
         auto it = List_iterator<Item>(*i->argument_list());
+        List<Item> out_list;
         unsigned int index = 0;
         for (;;) {
             Item * const argitem = it++;
@@ -360,17 +361,18 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
                 break;
             }
             assert(index < arg_count);
-        
+
             RewritePlan * const c_rp =
                 rp_per_child->child_olks[index].first;
             const OLK olk = rp_per_child->child_olks[index].second;
-            items[index] = itemTypes.do_rewrite(argitem, olk, c_rp, a);
-            items[index]->name = NULL;
+            Item *const out_item =
+                itemTypes.do_rewrite(argitem, olk, c_rp, a);
+            out_item->name = NULL;
+            out_list.push_back(out_item);
             ++index;
         }
 
-        IT * const res = new IT(items[0], items[1]);
-        return res;
+        return new IT(out_list);
     }
 };
 
