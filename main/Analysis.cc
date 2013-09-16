@@ -3,6 +3,7 @@
 #include <main/rewrite_main.hh>
 #include <main/metadata_tables.hh>
 #include <main/macro_util.hh>
+#include <main/stored_procedures.hh>
 
 // FIXME: Memory leaks when we allocate MetaKey<...>, use smart pointer.
 
@@ -325,6 +326,8 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
     assert(MetaDataTables::initialize(conn, e_conn));
 
     loadUDFs(conn);
+
+    assert(loadStoredProcedures(conn));
 
     // HACK: This is necessary as above functions use a USE statement.
     // ie, loadUDFs.

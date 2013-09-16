@@ -1,37 +1,148 @@
 #include <string>
 
 #include <main/stored_procedures.hh>
-// FIXME: Path.
-
-static std::string
-readFile(const std::string &path)
-{
-    std::ifstream file(path);
-    std::stringstream stream_contents;
-    stream_contents << file.rdbuf();
-
-    return stream_contents.str();
-}
 
 static bool
 addStoredProcedures(const std::unique_ptr<Connect> &conn)
 {
-    // FIXME: path.
-    const std::string path = "/home/burrows/code/cryptdb/main/transaction.sql";
-    const std::string contents = readFile(path);
+    const std::vector<std::string> add_procs({
+        // ---------------------------------------
+        //   def currentTransactionID(integer id)
+        // ---------------------------------------
+        " CREATE PROCEDURE cryptdbtest.currentTransactionID"
+        "   (OUT out_id VARCHAR(20))"
+        " BEGIN"
+        "   SELECT trx_id INTO out_id FROM INFORMATION_SCHEMA.INNODB_TRX"
+        "    WHERE INFORMATION_SCHEMA.INNODB_TRX.TRX_MYSQL_THREAD_ID ="
+        "          (SELECT CONNECTION_ID());"
+        " END",
 
-    return conn->execute(contents);
+        // ---------------------------------------
+        //       def lazyTransactionBegin()
+        // ---------------------------------------
+        /*
+            The corner case for this procedure is a call graph like this.
+            >>> START TRANSACTION;
+            >>> UPDATE t SET x = x + 1;
+                > lazyTransactionBegin();
+                > ...
+                > lazyTransactionCommit();
+            >>> ...
+                > ...
+                > ...
+            >>> COMMIT;
+
+            Where '>>>' are queries issue by user and '>' are CryptDB
+            transformations.
+
+            (*) It appers that transactions are not propagated to the
+            INFORMATION_SCHEMA.INNODB_TRX table until a query is
+            issued against a table that supports transactions.
+
+            So it follows that in the above sequence the
+            'START TRANSACTION' issued by the user will essentially be
+            ignored in favor of a transaction started by
+            lazyTransactionBegin(). This should lead to consistent,
+            expected behavior provided (*) is correct rationale.
+        */
+        " CREATE PROCEDURE cryptdbtest.lazyTransactionBegin ()"
+        " BEGIN"
+        "   DECLARE status BOOLEAN;"
+        "   DECLARE old_transaction_id VARCHAR(20);"
+        "   DECLARE new_transaction_id VARCHAR(20);"
+
+        "   CALL currentTransactionID(@old_transaction_id);"
+        "   SELECT trx_state = 'RUNNING' INTO status"
+        "     FROM INFORMATION_SCHEMA.INNODB_TRX"
+        "    WHERE INFORMATION_SCHEMA.INNODB_TRX.TRX_ID ="
+        "          @old_transaction_id;"
+
+        // Start a transaction if necessary and record it's origin"
+        // (this proc or the user)"
+        "   IF status IS NULL OR FALSE = status THEN"
+        "       START TRANSACTION;"
+
+        // This propagates transaction metadata into INFORMATION_SCHEMA
+        "       SELECT NULL FROM TransactionHelper;"
+
+        // We can't set the transaction id here because
+        // INFORMATION_SCHEMA.INNODB_TRXs doesn't reflect our efforts
+        // until we return from this procedure.
+        "       INSERT INTO TransactionHelper (thread_id, do_commit)"
+        "            VALUES ((SELECT CONNECTION_ID()), TRUE);"
+        "   ELSE"
+        "       INSERT INTO TransactionHelper (thread_id, do_commit)"
+        "            VALUES ((SELECT CONNECTION_ID()), FALSE);"
+        "   END IF;"
+        " END",
+
+        // ---------------------------------------
+        //         def hackTransaction();
+        // ---------------------------------------
+        " CREATE PROCEDURE cryptdbtest.hackTransaction ()"
+        " BEGIN"
+        "    DECLARE transaction_id VARCHAR(20);"
+
+        "    CALL currentTransactionID(@transaction_id);"
+        "    UPDATE TransactionHelper SET trx_id = @transaction_id"
+        "     WHERE thread_id = (SELECT CONNECTION_ID());"
+        " END",
+
+        // ---------------------------------------
+        //      def lazyTransactionCommit()
+        // ---------------------------------------
+        " CREATE PROCEDURE cryptdbtest.lazyTransactionCommit ()"
+        " BEGIN"
+        "    DECLARE status BOOLEAN;"
+        "    DECLARE transaction_id INTEGER;"
+
+        "    CALL currentTransactionID(@transaction_id);"
+        "    SELECT do_commit INTO status FROM TransactionHelper"
+        "     WHERE trx_id = @transaction_id"
+        "       AND thread_id = (SELECT CONNECTION_ID());"
+
+        // > DELETE this row otherwise hackTransaction will UPDATE it
+        //   again and the above SELECT will also catch it.
+        // > Alternatively we could ORDER BY id AND LIMIT 1 in
+        //   hackTransaction and here.
+        "    DELETE FROM TransactionHelper"
+        "          WHERE trx_id = @transaction_id;"
+
+        "   IF TRUE = status THEN"
+        "       COMMIT;"
+        "   END IF;"
+        " END"});
+
+
+    for (auto it : add_procs) {
+        if (!conn->execute(it)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 static bool
 dropStoredProcedures(const std::unique_ptr<Connect> &conn)
 {
-    // FIXME: path.
-    const std::string path =
-        "/home/burrows/code/cryptdb/main/transaction_drop.sql";
-    const std::string contents = readFile(path);
+    const std::vector<std::string>
+        drop_procs({"DROP PROCEDURE IF EXISTS"
+                    "   cryptdbtest.currentTransactionID;",
+                    "DROP PROCEDURE IF EXISTS"
+                    "   cryptdbtest.lazyTransactionBegin;",
+                    "DROP PROCEDURE IF EXISTS"
+                    "   cryptdbtest.hackTransaction;",
+                    "DROP PROCEDURE IF EXISTS"
+                    "   cryptdbtest.lazyTransactionCommit;"});
 
-    return conn->execute(contents);
+    for (auto it : drop_procs) {
+        if (!conn->execute(it)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 // FIXME: Replace assert with RETURN_FALSE_IF_FALSE once we've debugged.
