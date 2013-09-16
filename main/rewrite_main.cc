@@ -791,7 +791,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
 
         switch (i->substype()) {
             case Item_subselect::subs_type::SINGLEROW_SUBS:
-                assert(false);
+                break;
             case Item_subselect::subs_type::EXISTS_SUBS:
                 assert(false);
             case Item_subselect::subs_type::IN_SUBS: {
@@ -854,7 +854,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
         {
             switch (i->substype()) {
                 case Item_subselect::subs_type::SINGLEROW_SUBS:
-                    assert(false);
+                    return new Item_singlerow_subselect(new_select_lex);
                 case Item_subselect::subs_type::EXISTS_SUBS:
                     assert(false);
                 case Item_subselect::subs_type::IN_SUBS: {

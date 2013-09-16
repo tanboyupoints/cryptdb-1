@@ -419,6 +419,8 @@ rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q)
     assert(false == qr.output->queryAgain());
 
     // FIXME: const_cast
+    // HACK: Aggresive cache updateing as we don't know how the caller
+    // is going to use the rewritten query.
     const_cast<ProxyState &>(ps).updateSchemaCache(out_schema,
                                             qr.output->stalesSchema());
 
@@ -484,6 +486,8 @@ bool queryPreamble(ProxyState &ps, const std::string &q,
     SchemaInfo *out_schema;
     QueryRewrite *const qr = *out_qr =
         new QueryRewrite(Rewriter::rewrite(ps, q, &out_schema));
+    // HACK: Aggressive cache updating as our cache doesn't actually go
+    // bad until we start executing queries.
     ps.updateSchemaCache(out_schema, qr->output->stalesSchema());
 
     assert(qr->output->beforeQuery(ps.getConn(), ps.getEConn()));
