@@ -145,7 +145,6 @@ dropStoredProcedures(const std::unique_ptr<Connect> &conn)
     return true;
 }
 
-// FIXME: Replace assert with RETURN_FALSE_IF_FALSE once we've debugged.
 bool
 loadStoredProcedures(const std::unique_ptr<Connect> &conn)
 {
