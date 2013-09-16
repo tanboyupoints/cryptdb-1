@@ -211,6 +211,7 @@ public:
     virtual bool doDecryption() const;
     virtual bool stalesSchema() const;
     virtual RewriteOutput::Channel queryChannel() const;
+    virtual bool multipleResultSets() const;
 
     static ResType *sendQuery(const std::unique_ptr<Connect> &c,
                               const std::string &q);
@@ -269,6 +270,7 @@ public:
     bool getQuery(std::list<std::string> * const queryz) const;
     bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+    bool multipleResultSets() const;
 
 private:
     const std::string new_query;

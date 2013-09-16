@@ -510,6 +510,11 @@ enum RewriteOutput::Channel RewriteOutput::queryChannel() const
     return Channel::REGULAR;
 }
 
+bool RewriteOutput::multipleResultSets() const
+{
+    return false;
+}
+
 ResType *RewriteOutput::sendQuery(const std::unique_ptr<Connect> &c,
                                   const std::string &q)
 {
@@ -643,7 +648,8 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
 bool SpecialUpdate::getQuery(std::list<std::string> * const queryz) const
 {
     queryz->clear();
-    queryz->push_back("START TRANSACTION; ");
+    queryz->push_back("CALL lazyTransactionBegin();");
+    queryz->push_back("CALL hackTransaction();");
 
     // DELETE the rows matching the WHERE clause from the database.
     const std::string delete_q =
@@ -661,7 +667,7 @@ bool SpecialUpdate::getQuery(std::list<std::string> * const queryz) const
         rewriteAndGetSingleQuery(ps, push_results_q);
     queryz->push_back(re_push);
 
-    queryz->push_back("COMMIT; ");
+    queryz->push_back("CALL lazyTransactionCommit();");
 
     return true;
 }
@@ -675,6 +681,11 @@ SpecialUpdate::handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
 
 bool SpecialUpdate::afterQuery(const std::unique_ptr<Connect> &e_conn)
     const
+{
+    return true;
+}
+
+bool SpecialUpdate::multipleResultSets() const
 {
     return true;
 }

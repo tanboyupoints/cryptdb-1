@@ -14,7 +14,9 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
         " BEGIN"
         "   SELECT trx_id INTO out_id FROM INFORMATION_SCHEMA.INNODB_TRX"
         "    WHERE INFORMATION_SCHEMA.INNODB_TRX.TRX_MYSQL_THREAD_ID ="
-        "          (SELECT CONNECTION_ID());"
+        "          (SELECT CONNECTION_ID())"
+        "      AND INFORMATION_SCHEMA.INNODB_TRX.TRX_STATE ="
+        "          'RUNNING';"
         " END",
 
         // ---------------------------------------
@@ -52,22 +54,19 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
         "   DECLARE new_transaction_id VARCHAR(20);"
 
         "   CALL currentTransactionID(@old_transaction_id);"
-        "   SELECT trx_state = 'RUNNING' INTO status"
-        "     FROM INFORMATION_SCHEMA.INNODB_TRX"
-        "    WHERE INFORMATION_SCHEMA.INNODB_TRX.TRX_ID ="
-        "          @old_transaction_id;"
 
-        // Start a transaction if necessary and record it's origin"
-        // (this proc or the user)"
-        "   IF status IS NULL OR FALSE = status THEN"
+            // Start a transaction if necessary and record it's origin"
+            // (this proc or the user)"
+        "   IF @old_transaction_id IS NULL THEN"
         "       START TRANSACTION;"
 
-        // This propagates transaction metadata into INFORMATION_SCHEMA
+                // This propagates transaction metadata into
+                // INFORMATION_SCHEMA
         "       SELECT NULL FROM TransactionHelper;"
 
-        // We can't set the transaction id here because
-        // INFORMATION_SCHEMA.INNODB_TRXs doesn't reflect our efforts
-        // until we return from this procedure.
+                // We can't set the transaction id here because
+                // INFORMATION_SCHEMA.INNODB_TRXs doesn't reflect our
+                // efforts until we return from this procedure.
         "       INSERT INTO TransactionHelper (thread_id, do_commit)"
         "            VALUES ((SELECT CONNECTION_ID()), TRUE);"
         "   ELSE"
@@ -96,15 +95,18 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
         "    DECLARE status BOOLEAN;"
         "    DECLARE transaction_id INTEGER;"
 
+             // ORDER BY + LIMIT is necessary as we must deal with
+             // artefacts if lazyTransactionCommit() fails to execute
+             // for a prior query.
         "    CALL currentTransactionID(@transaction_id);"
         "    SELECT do_commit INTO status FROM TransactionHelper"
         "     WHERE trx_id = @transaction_id"
-        "       AND thread_id = (SELECT CONNECTION_ID());"
+        "       AND thread_id = (SELECT CONNECTION_ID())"
+        "  ORDER BY id DESC"
+        "     LIMIT 1;"
 
-        // > DELETE this row otherwise hackTransaction will UPDATE it
-        //   again and the above SELECT will also catch it.
-        // > Alternatively we could ORDER BY id AND LIMIT 1 in
-        //   hackTransaction and here.
+             // > DELETE this row otherwise hackTransaction will UPDATE
+             // it again.
         "    DELETE FROM TransactionHelper"
         "          WHERE trx_id = @transaction_id;"
 
@@ -112,7 +114,6 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
         "       COMMIT;"
         "   END IF;"
         " END"});
-
 
     for (auto it : add_procs) {
         if (!conn->execute(it)) {

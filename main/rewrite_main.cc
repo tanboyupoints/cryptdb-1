@@ -1017,20 +1017,6 @@ lex_to_query(LEX *const lex)
     return o.str();
 }
 
-/*
-static
-bool
-mysql_noop_dbres(const std::unique_ptr<Connect> &c, DBResult **dbres)
-{
-    if (!(c.get()->execute(mysql_noop(), *dbres))) {
-        dbres = NULL;
-        return false;
-    }
-
-    return true;
-}
-*/
-
 const bool Rewriter::translator_dummy = buildTypeTextTranslatorHack();
 const SQLDispatcher *Rewriter::dml_dispatcher = buildDMLDispatcher();
 const SQLDispatcher *Rewriter::ddl_dispatcher = buildDDLDispatcher();
@@ -1338,11 +1324,15 @@ executeQuery(ProxyState &ps, const std::string &q)
         for (auto it : out_queryz) {
             prettyPrintQuery(it);
 
-            if (!query_conn->execute(it, dbres)) {
+            if (!query_conn->execute(it, dbres,
+                                     qr->output->multipleResultSets())) {
                 qr->output->handleQueryFailure(ps.getEConn());
                 throw CryptDBError("Failed to execute query!");
             }
-            assert(dbres);
+
+            // XOR: Either we have one result set, or we were expecting
+            // multiple result sets and we threw them all away.
+            assert(!!dbres != !!qr->output->multipleResultSets());
         }
 
         // Query epilogue.
@@ -1365,10 +1355,13 @@ executeQuery(ProxyState &ps, const std::string &q)
 
                 return dec_res;
             }
-            
+
             return res;
         } else {
-            return NULL;
+            // HACK: Successful query so let's return no-op
+            DBResult *noop_dbres;
+            assert(ps.getConn()->execute(mysql_noop(), noop_dbres));
+            return new ResType(noop_dbres->unpack());
         }
     } catch (std::runtime_error &e) {
         std::cout << "Unexpected Error: " << e.what() << " in query "
