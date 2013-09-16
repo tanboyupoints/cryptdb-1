@@ -973,6 +973,36 @@ static QueryList NonStrictMode = QueryList("NonStrictMode",
     { "DROP TABLE not_strict"},
     { "DROP TABLE not_strict"});
 
+static QueryList Transactions = QueryList("Transactions",
+    { "CREATE TABLE trans (a integer, b integer, c integer)ENGINE=InnoDB",
+      "", "", "", ""},
+    { "CREATE TABLE trans (a integer, b integer, c integer)ENGINE=InnoDB",
+      "", "", "", ""},
+    { "CREATE TABLE trans (a integer, b integer, c integer)ENGINE=InnoDB",
+      "", "", "", ""},
+    { Query("INSERT INTO trans VALUES (1, 2, 3)", false),
+      Query("INSERT INTO trans VALUES (33, 22, 11)", false),
+      Query("SELECT * FROM trans", false),
+      Query("START TRANSACTION", false),
+      Query("INSERT INTO trans VALUES (333, 222, 111)", false),
+      Query("ROLLBACK", false),
+      Query("SELECT * FROM trans", false),
+      Query("INSERT INTO trans VALUES (45, 22, 15)", false),
+      Query("UPDATE trans SET a = a + 1, b = c + 1", false),
+      Query("START TRANSACTION", false),
+      Query("UPDATE trans SET a = a + a, b = b + 12", false),
+      Query("SELECT * FROM trans", false),
+      Query("ROLLBACK", false),
+      Query("SELECT * FROM trans", false),
+      Query("START TRANSACTION", false),
+      Query("UPDATE trans SET a = c, b = a + 1", false),
+      Query("COMMIT", false),
+      Query("ROLLBACK", false),
+      Query("SELECT * FROM trans", false)},
+    { "DROP TABLE trans"},
+    { "DROP TABLE trans"},
+    { "DROP TABLE trans"});
+
 
 //-----------------------------------------------------------------------
 
@@ -1297,7 +1327,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 399/399.
+    //      TOTAL RESULT: 424/424.
     // ###############################
 
     std::vector<Score> scores;
@@ -1355,6 +1385,9 @@ RunTest(const TestConfig &tc) {
 
     // Pass 20/20
     scores.push_back(CheckQueryList(tc, NonStrictMode));
+
+    // Pass 25/25
+    scores.push_back(CheckQueryList(tc, Transactions));
 
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;
