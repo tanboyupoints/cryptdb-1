@@ -527,6 +527,10 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
     OnionMeta *const om = a.getOnionMeta(fm, o);
 
     // Remove the EncLayer.
+    // HACK: 'Pop'ping the layer is unsafe as it's being used as a
+    // technique to transmit information to successive calls of
+    // removeOnionLayer. This information is in no way respected by the
+    // persistency logic.
     std::shared_ptr<EncLayer> back_el(a.popBackEncLayer(om));
 
     // Update the Meta.
