@@ -350,7 +350,7 @@ passDecryptedPtr(lua_State *L)
     assert(0 == mysql_thread_init());
     
     // FIXME: Necessary?
-    THD *thd = (THD*) create_embedded_thd(0);
+    THD *const thd = static_cast<THD *>(create_embedded_thd(0));
     auto thd_cleanup = cleanup([&thd]
         {
             thd->clear_data_list();
@@ -363,7 +363,8 @@ passDecryptedPtr(lua_State *L)
     if (clients.find(client) == clients.end())
         return 0;
 
-    ResType *res_type = (ResType *)lua_tointeger(L, 2);
+    const ResType *const res_type =
+        reinterpret_cast<ResType *>(lua_tointeger(L, 2));
 
     return returnResultSet(L, *res_type);
 }
@@ -386,7 +387,7 @@ decrypt(lua_State *L)
     scoped_lock l(&big_lock);
     assert(0 == mysql_thread_init());
 
-    THD *thd = (THD*) create_embedded_thd(0);
+    THD *const thd = static_cast<THD *>(create_embedded_thd(0));
     auto thd_cleanup = cleanup([&thd]
         {
             thd->clear_data_list();
