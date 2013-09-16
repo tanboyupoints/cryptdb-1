@@ -1,6 +1,7 @@
 #include <string>
 
 #include <main/stored_procedures.hh>
+#include <main/macro_util.hh>
 
 static bool
 addStoredProcedures(const std::unique_ptr<Connect> &conn)
@@ -83,8 +84,12 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
         "    DECLARE transaction_id VARCHAR(20);"
 
         "    CALL currentTransactionID(@transaction_id);"
+             // This UPDATE will potentially modify failure artefacts
+             // as lazyTransactionCommit() may not have had the
+             // opportunity to remove them from the table.
         "    UPDATE TransactionHelper SET trx_id = @transaction_id"
-        "     WHERE thread_id = (SELECT CONNECTION_ID());"
+        "     WHERE thread_id = (SELECT CONNECTION_ID())"
+        "       AND trx_id IS NULL;"
         " END",
 
         // ---------------------------------------
@@ -105,8 +110,6 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
         "  ORDER BY id DESC"
         "     LIMIT 1;"
 
-             // > DELETE this row otherwise hackTransaction will UPDATE
-             // it again.
         "    DELETE FROM TransactionHelper"
         "          WHERE trx_id = @transaction_id;"
 
@@ -116,9 +119,7 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
         " END"});
 
     for (auto it : add_procs) {
-        if (!conn->execute(it)) {
-            return false;
-        }
+        RETURN_FALSE_IF_FALSE(conn->execute(it));
     }
 
     return true;
@@ -138,9 +139,7 @@ dropStoredProcedures(const std::unique_ptr<Connect> &conn)
                     "   cryptdbtest.lazyTransactionCommit;"});
 
     for (auto it : drop_procs) {
-        if (!conn->execute(it)) {
-            return false;
-        }
+        RETURN_FALSE_IF_FALSE(conn->execute(it));
     }
 
     return true;
@@ -150,8 +149,8 @@ dropStoredProcedures(const std::unique_ptr<Connect> &conn)
 bool
 loadStoredProcedures(const std::unique_ptr<Connect> &conn)
 {
-    assert(dropStoredProcedures(conn));
-    assert(addStoredProcedures(conn));
+    RETURN_FALSE_IF_FALSE(dropStoredProcedures(conn));
+    RETURN_FALSE_IF_FALSE(addStoredProcedures(conn));
 
     return true;
 }
