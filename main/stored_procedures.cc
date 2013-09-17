@@ -2,6 +2,7 @@
 
 #include <main/stored_procedures.hh>
 #include <main/macro_util.hh>
+#include <main/metadata_tables.hh>
 
 static bool
 addStoredProcedures(const std::unique_ptr<Connect> &conn)
@@ -20,9 +21,9 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
         "          'RUNNING';"
         " END",
 
-        // ---------------------------------------
-        //       def lazyTransactionBegin()
-        // ---------------------------------------
+        // ----------------------------------------------
+        //   def homAdditionTransaction(delete, insert)
+        // ----------------------------------------------
         /*
             The corner case for this procedure is a call graph like this.
             >>> START TRANSACTION;
@@ -48,75 +49,38 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
             lazyTransactionBegin(). This should lead to consistent,
             expected behavior provided (*) is correct rationale.
         */
-        " CREATE PROCEDURE cryptdbtest.lazyTransactionBegin ()"
+        " CREATE PROCEDURE cryptdbtest.homAdditionTransaction"
+        "       (IN delete_query VARCHAR(50000),"
+        "        IN insert_query VARCHAR(50000))"
         " BEGIN"
-        "   DECLARE status BOOLEAN;"
         "   DECLARE old_transaction_id VARCHAR(20);"
-        "   DECLARE new_transaction_id VARCHAR(20);"
+        "   DECLARE where_clause VARCHAR(255);"
 
         "   CALL currentTransactionID(@old_transaction_id);"
 
             // Start a transaction if necessary and record it's origin"
             // (this proc or the user)"
         "   IF @old_transaction_id IS NULL THEN"
+        "       COMMIT;"
         "       START TRANSACTION;"
-
-                // This propagates transaction metadata into
-                // INFORMATION_SCHEMA
-        "       SELECT NULL FROM TransactionHelper;"
-
-                // We can't set the transaction id here because
-                // INFORMATION_SCHEMA.INNODB_TRXs doesn't reflect our
-                // efforts until we return from this procedure.
-        "       INSERT INTO TransactionHelper (thread_id, do_commit)"
-        "            VALUES ((SELECT CONNECTION_ID()), TRUE);"
-        "   ELSE"
-        "       INSERT INTO TransactionHelper (thread_id, do_commit)"
-        "            VALUES ((SELECT CONNECTION_ID()), FALSE);"
         "   END IF;"
-        " END",
 
-        // ---------------------------------------
-        //         def hackTransaction();
-        // ---------------------------------------
-        " CREATE PROCEDURE cryptdbtest.hackTransaction ()"
-        " BEGIN"
-        "    DECLARE transaction_id VARCHAR(20);"
+            // DELETE old values pertaining to WHERE clause
+        "   SET @query = delete_query;"
+        "   PREPARE dq FROM @query;"
+        "   EXECUTE dq;"
 
-        "    CALL currentTransactionID(@transaction_id);"
-             // This UPDATE will potentially modify failure artefacts
-             // as lazyTransactionCommit() may not have had the
-             // opportunity to remove them from the table.
-        "    UPDATE TransactionHelper SET trx_id = @transaction_id"
-        "     WHERE thread_id = (SELECT CONNECTION_ID())"
-        "       AND trx_id IS NULL;"
-        " END",
+            // INSERT new values using subquery from temp table.
+        "   SET @query = insert_query;"
+        "   PREPARE iq FROM @query;"
+        "   EXECUTE iq;"
 
-        // ---------------------------------------
-        //      def lazyTransactionCommit()
-        // ---------------------------------------
-        " CREATE PROCEDURE cryptdbtest.lazyTransactionCommit ()"
-        " BEGIN"
-        "    DECLARE status BOOLEAN;"
-        "    DECLARE transaction_id INTEGER;"
-
-             // ORDER BY + LIMIT is necessary as we must deal with
-             // artefacts if lazyTransactionCommit() fails to execute
-             // for a prior query.
-        "    CALL currentTransactionID(@transaction_id);"
-        "    SELECT do_commit INTO status FROM TransactionHelper"
-        "     WHERE trx_id = @transaction_id"
-        "       AND thread_id = (SELECT CONNECTION_ID())"
-        "  ORDER BY id DESC"
-        "     LIMIT 1;"
-
-        "    DELETE FROM TransactionHelper"
-        "          WHERE trx_id = @transaction_id;"
-
-        "   IF TRUE = status THEN"
+            // Close our transaction if we started one.
+        "   IF @old_transaction_id IS NULL THEN"
         "       COMMIT;"
         "   END IF;"
         " END"});
+
 
     for (auto it : add_procs) {
         RETURN_FALSE_IF_FALSE(conn->execute(it));
@@ -132,11 +96,7 @@ dropStoredProcedures(const std::unique_ptr<Connect> &conn)
         drop_procs({"DROP PROCEDURE IF EXISTS"
                     "   cryptdbtest.currentTransactionID;",
                     "DROP PROCEDURE IF EXISTS"
-                    "   cryptdbtest.lazyTransactionBegin;",
-                    "DROP PROCEDURE IF EXISTS"
-                    "   cryptdbtest.hackTransaction;",
-                    "DROP PROCEDURE IF EXISTS"
-                    "   cryptdbtest.lazyTransactionCommit;"});
+                    "   cryptdbtest.homAdditionTransaction;"});
 
     for (auto it : drop_procs) {
         RETURN_FALSE_IF_FALSE(conn->execute(it));

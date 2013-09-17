@@ -648,8 +648,6 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
 bool SpecialUpdate::getQuery(std::list<std::string> * const queryz) const
 {
     queryz->clear();
-    queryz->push_back("CALL lazyTransactionBegin();");
-    queryz->push_back("CALL hackTransaction();");
 
     // DELETE the rows matching the WHERE clause from the database.
     const std::string delete_q =
@@ -657,17 +655,18 @@ bool SpecialUpdate::getQuery(std::list<std::string> * const queryz) const
         " WHERE " + this->where_clause + ";";
     const std::string re_delete =
         rewriteAndGetSingleQuery(ps, delete_q);
-    queryz->push_back(re_delete);
 
     // > Add each row from the embedded database to the data database.
-    const std::string push_results_q =
+    const std::string insert_q =
         " INSERT INTO " + this->plain_table +
         " VALUES " + this->output_values.get() + ";";
-    const std::string re_push =
-        rewriteAndGetSingleQuery(ps, push_results_q);
-    queryz->push_back(re_push);
+    const std::string re_insert =
+        rewriteAndGetSingleQuery(ps, insert_q);
 
-    queryz->push_back("CALL lazyTransactionCommit();");
+    queryz->push_back(" CALL homAdditionTransaction ("
+                      " '" + escapeString(ps.getConn(), re_delete) + "', "
+                      " '" + escapeString(ps.getConn(),
+                                          re_insert) + "');");
 
     return true;
 }

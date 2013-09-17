@@ -30,11 +30,6 @@ std::string MetaDataTables::Name::bleedingMetaObject()
     return "BleedingMetaObject";
 }
 
-std::string MetaDataTables::Name::transactionHelper()
-{
-    return "TransactionHelper";
-}
-
 bool MetaDataTables::initialize(const std::unique_ptr<Connect> &conn,
                                 const std::unique_ptr<Connect> &e_conn)
 {
@@ -83,16 +78,6 @@ bool MetaDataTables::initialize(const std::unique_ptr<Connect> &conn,
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
     RETURN_FALSE_IF_FALSE(e_conn.get()->execute(create_bleeding_table));
-
-    const std::string create_transaction_helper_table =
-        " CREATE TABLE IF NOT EXISTS "
-        "       cryptdbtest." + Name::transactionHelper() +
-        "   (thread_id INTEGER NOT NULL,"
-        "    trx_id VARCHAR(20),"
-        "    do_commit BOOLEAN NOT NULL,"
-        "    id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-    RETURN_FALSE_IF_FALSE(conn.get()->execute(create_transaction_helper_table));
 
     return true;
 }
