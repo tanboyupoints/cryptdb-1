@@ -44,7 +44,7 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
             So it follows that in the above sequence the
             'START TRANSACTION' issued by the user will essentially be
             ignored in favor of a transaction started by
-            lazyTransactionBegin(). This should lead to consistent,
+            homAdditionTransction(). This should lead to consistent,
             expected behavior provided (*) is correct rationale.
         */
         " CREATE PROCEDURE cryptdbtest.homAdditionTransaction"
@@ -59,9 +59,6 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
             // Start a transaction if necessary and record it's origin"
             // (this proc or the user)"
         "   IF @old_transaction_id IS NULL THEN"
-                // Cancel a transaction like the one described in the
-                // corner case, then start our own.
-        "       COMMIT;"
         "       START TRANSACTION;"
         "   END IF;"
 
