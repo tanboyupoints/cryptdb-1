@@ -649,6 +649,10 @@ bool SpecialUpdate::getQuery(std::list<std::string> * const queryz) const
 {
     queryz->clear();
 
+    // This query is necessary to propagate a transaction into
+    // INFORMATION_SCHEMA.
+    queryz->push_back("SELECT NULL FROM " + this->crypted_table + ";");
+
     // DELETE the rows matching the WHERE clause from the database.
     const std::string delete_q =
         " DELETE FROM " + this->plain_table +
