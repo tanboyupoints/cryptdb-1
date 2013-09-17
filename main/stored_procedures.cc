@@ -9,7 +9,7 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
 {
     const std::vector<std::string> add_procs({
         // ---------------------------------------
-        //   def currentTransactionID(integer id)
+        //   def currentTransactionID(id)
         // ---------------------------------------
         " CREATE PROCEDURE cryptdbtest.currentTransactionID"
         "   (OUT out_id VARCHAR(20))"
@@ -28,9 +28,7 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
             The corner case for this procedure is a call graph like this.
             >>> START TRANSACTION;
             >>> UPDATE t SET x = x + 1;
-                > lazyTransactionBegin();
-                > ...
-                > lazyTransactionCommit();
+                > homAdditionTransaction(...);
             >>> ...
                 > ...
                 > ...
@@ -61,6 +59,8 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
             // Start a transaction if necessary and record it's origin"
             // (this proc or the user)"
         "   IF @old_transaction_id IS NULL THEN"
+                // Cancel a transaction like the one described in the
+                // corner case, then start our own.
         "       COMMIT;"
         "       START TRANSACTION;"
         "   END IF;"
