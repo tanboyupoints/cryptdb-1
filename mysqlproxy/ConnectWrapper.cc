@@ -20,7 +20,6 @@ public:
     WrapperState() {;}
     std::string last_query;
     std::ofstream * PLAIN_LOG;
-    ReturnMeta rmeta;
     std::string cur_db;
     QueryRewrite * qr;
 };
@@ -47,7 +46,7 @@ static int
 returnResultSet(lua_State *L, const ResType &res);
 
 static Item *
-make_item_by_type(std::string value, enum_field_types type)
+make_item_by_type(const std::string &value, enum_field_types type)
 {
     Item * i;
 
@@ -57,7 +56,7 @@ make_item_by_type(std::string value, enum_field_types type)
     case MYSQL_TYPE_LONGLONG:
     case MYSQL_TYPE_INT24:
     case MYSQL_TYPE_TINY:
-        i = new Item_int((long long) valFromStr(value));
+        i = new Item_int(static_cast<long long>(valFromStr(value)));
         break;
 
     case MYSQL_TYPE_BLOB:
@@ -71,7 +70,8 @@ make_item_by_type(std::string value, enum_field_types type)
     case MYSQL_TYPE_NEWDATE:
     case MYSQL_TYPE_TIME:
     case MYSQL_TYPE_DATETIME:
-        i = new Item_string(make_thd_string(value), value.length(), &my_charset_bin);
+        i = new Item_string(make_thd_string(value), value.length(),
+                            &my_charset_bin);
         break;
 
     default:
@@ -88,21 +88,21 @@ make_null(const std::string &name = "")
 }
 
 static std::string
-xlua_tolstring(lua_State *l, int index)
+xlua_tolstring(lua_State *const l, int index)
 {
     size_t len;
-    const char *s = lua_tolstring(l, index, &len);
+    char const *const s = lua_tolstring(l, index, &len);
     return std::string(s, len);
 }
 
 static void
-xlua_pushlstring(lua_State *l, const std::string &s)
+xlua_pushlstring(lua_State *const l, const std::string &s)
 {
     lua_pushlstring(l, s.data(), s.length());
 }
 
 static int
-connect(lua_State *L)
+connect(lua_State *const L)
 {
     ANON_REGION(__func__, &perf_cg);
     scoped_lock l(&big_lock);
@@ -115,7 +115,7 @@ connect(lua_State *L)
     const std::string psswd = xlua_tolstring(L, 5);
     const std::string embed_dir = xlua_tolstring(L, 6);
 
-    ConnectionInfo ci = ConnectionInfo(server, user, psswd, port);
+    ConnectionInfo const ci = ConnectionInfo(server, user, psswd, port);
 
     if (clients.find(client) != clients.end()) {
            LOG(warn) << "duplicate client entry";
@@ -133,11 +133,12 @@ connect(lua_State *L)
                      << "user = " << user << "; "
                      << "password = " << psswd;
 
+        std::string const false_str = "FALSE";
         const std::string dbname = "cryptdbtest";
         const std::string mkey = "113341234";  // XXX do not change as
                                                // it's used for tpcc exps
-        char * ev = getenv("ENC_BY_DEFAULT");
-        if (ev && "FALSE" == toUpperCase(ev)) {
+        const char * ev = getenv("ENC_BY_DEFAULT");
+        if (ev && equalsIgnoreCase(false_str, ev)) {
             std::cerr << "\n\n enc by default false " << "\n\n";
             ps = new ProxyState(ci, embed_dir, dbname, mkey,
                                 SECURITY_RATING::PLAIN);
@@ -154,7 +155,7 @@ connect(lua_State *L)
         }
 
         ev = getenv("EXECUTE_QUERIES");
-        if (ev && "FALSE" == toUpperCase(ev)) {
+        if (ev && equalsIgnoreCase(false_str, ev)) {
             LOG(wrapper) << "do not execute queries";
             EXECUTE_QUERIES = false;
         } else {
@@ -179,7 +180,7 @@ connect(lua_State *L)
 
                 assert_s(system(("rm -f" + logPlainQueries + "; touch " + logPlainQueries).c_str()) >= 0, "failed to rm -f and touch " + logPlainQueries);
 
-                std::ofstream * PLAIN_LOG =
+                std::ofstream * const PLAIN_LOG =
                     new std::ofstream(logPlainQueries, std::ios_base::app);
                 LOG(wrapper) << "proxy logs plain queries at " << logPlainQueries;
                 assert_s(PLAIN_LOG != NULL, "could not create file " + logPlainQueries);
@@ -195,7 +196,7 @@ connect(lua_State *L)
             assert_s(system((" touch " + logPlainQueries).c_str()) >= 0, "failed to remove or touch plain log");
             LOG(wrapper) << "proxy logs plain queries at " << logPlainQueries;
 
-            std::ofstream * PLAIN_LOG =
+            std::ofstream * const PLAIN_LOG =
                 new std::ofstream(logPlainQueries, std::ios_base::app);
             assert_s(PLAIN_LOG != NULL, "could not create file " + logPlainQueries);
             clients[client]->PLAIN_LOG = PLAIN_LOG;
@@ -208,15 +209,16 @@ connect(lua_State *L)
 }
 
 static int
-disconnect(lua_State *L)
+disconnect(lua_State *const L)
 {
     ANON_REGION(__func__, &perf_cg);
     scoped_lock l(&big_lock);
     assert(0 == mysql_thread_init());
 
-    std::string client = xlua_tolstring(L, 1);
-    if (clients.find(client) == clients.end())
+    const std::string client = xlua_tolstring(L, 1);
+    if (clients.find(client) == clients.end()) {
         return 0;
+    }
 
     LOG(wrapper) << "disconnect " << client;
     if (clients[client]->qr) {
@@ -230,7 +232,7 @@ disconnect(lua_State *L)
 
 // FIXME: Use TELL policy.
 static int
-rewrite(lua_State *L)
+rewrite(lua_State *const L)
 {
     ANON_REGION(__func__, &perf_cg);
     scoped_lock l(&big_lock);
@@ -258,9 +260,7 @@ rewrite(lua_State *L)
             assert(qr);
             assert(preamble_status.get() != PREAMBLE_STATUS::FAILURE);
 
-            // FIXME: Redundant.
             clients[client]->qr = qr;
-            clients[client]->rmeta = qr->rmeta;
         } catch (CryptDBError &e) {
             LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
             lua_pushboolean(L, false);
@@ -293,13 +293,13 @@ rewrite(lua_State *L)
 }
 
 static int
-queryFailure(lua_State *L)
+queryFailure(lua_State *const L)
 {
     ANON_REGION(__func__, &perf_cg);
     scoped_lock l(&big_lock);
     assert(0 == mysql_thread_init());
 
-    std::string client = xlua_tolstring(L, 1);
+    const std::string client = xlua_tolstring(L, 1);
     if (clients.find(client) == clients.end()) {
         throw CryptDBError("Failed to properly handle failed query!");
     }
@@ -316,7 +316,7 @@ queryFailure(lua_State *L)
 }
 
 static int
-rollbackOnionAdjust(lua_State *L)
+rollbackOnionAdjust(lua_State *const L)
 {
     ANON_REGION(__func__, &perf_cg);
     scoped_lock l(&big_lock);
@@ -343,8 +343,8 @@ itemNullVector(unsigned int count)
 }
 
 static void
-getResTypeFromLuaTable(lua_State *L, int fields_index, int rows_index,
-                       ResType *const out_res)
+getResTypeFromLuaTable(lua_State *const L, int fields_index,
+                       int rows_index, ResType *const out_res)
 {
     /* iterate over the fields argument */
     lua_pushnil(L);
@@ -355,12 +355,13 @@ getResTypeFromLuaTable(lua_State *L, int fields_index, int rows_index,
         lua_pushnil(L);
         while (lua_next(L, -2)) {
             const std::string k = xlua_tolstring(L, -2);
-            if (k == "name")
+            if ("name" == k) {
                 out_res->names.push_back(xlua_tolstring(L, -1));
-            else if (k == "type")
+            } else if ("type" == k) {
                 out_res->types.push_back(static_cast<enum_field_types>(luaL_checkint(L, -1)));
-            else
+            } else {
                 LOG(warn) << "unknown key " << k;
+            }
             lua_pop(L, 1);
         }
 
@@ -403,7 +404,7 @@ getResTypeFromLuaTable(lua_State *L, int fields_index, int rows_index,
 }
 
 static int
-envoi(lua_State *L)
+envoi(lua_State *const L)
 {
     ANON_REGION(__func__, &perf_cg);
     scoped_lock l(&big_lock);
@@ -424,10 +425,9 @@ envoi(lua_State *L)
     }
 
     assert(EXECUTE_QUERIES);
-
     assert(ps);
-    assert(clients[client]->qr);
 
+    assert(clients[client]->qr);
     QueryRewrite const *const qr = clients[client]->qr;
     assert(qr->output->afterQuery(ps->getEConn()));
     if (qr->output->queryAgain()) {
@@ -445,7 +445,7 @@ envoi(lua_State *L)
     try {
         if (true == qr->output->doDecryption()) {
             ResType *const rt =
-                Rewriter::decryptResults(res, clients[client]->rmeta);
+                Rewriter::decryptResults(res, clients[client]->qr->rmeta);
             assert(rt);
             rd = *rt;
         } else {
@@ -462,14 +462,14 @@ envoi(lua_State *L)
 }
 
 static int
-returnResultSet(lua_State *L, const ResType &rd)
+returnResultSet(lua_State *const L, const ResType &rd)
 {
     /* return decrypted result set */
     lua_createtable(L, (int)rd.names.size(), 0);
-    int t_fields = lua_gettop(L);
+    int const t_fields = lua_gettop(L);
     for (uint i = 0; i < rd.names.size(); i++) {
         lua_createtable(L, 0, 1);
-        int t_field = lua_gettop(L);
+        int const t_field = lua_gettop(L);
 
         /* set name for field */
         xlua_pushlstring(L, rd.names[i]);
@@ -486,14 +486,14 @@ returnResultSet(lua_State *L, const ResType &rd)
         lua_rawseti(L, t_fields, i+1);
     }
 
-    lua_createtable(L, (int) rd.rows.size(), 0);
-    int t_rows = lua_gettop(L);
+    lua_createtable(L, static_cast<int>(rd.rows.size()), 0);
+    int const t_rows = lua_gettop(L);
     for (uint i = 0; i < rd.rows.size(); i++) {
-        lua_createtable(L, (int) rd.rows[i].size(), 0);
-        int t_row = lua_gettop(L);
+        lua_createtable(L, static_cast<int>(rd.rows[i].size()), 0);
+        int const t_row = lua_gettop(L);
 
         for (uint j = 0; j < rd.rows[i].size(); j++) {
-            if (rd.rows[i][j] == NULL) {
+            if (NULL == rd.rows[i][j]) {
                 lua_pushnil(L);
             } else {
                 xlua_pushlstring(L, ItemToString(rd.rows[i][j]));
@@ -519,10 +519,10 @@ cryptdb_lib[] = {
     { 0, 0 },
 };
 
-extern "C" int lua_cryptdb_init(lua_State *L);
+extern "C" int lua_cryptdb_init(lua_State * L);
 
 int
-lua_cryptdb_init(lua_State *L)
+lua_cryptdb_init(lua_State *const L)
 {
     luaL_openlib(L, "CryptDB", cryptdb_lib, 0);
     return 1;
