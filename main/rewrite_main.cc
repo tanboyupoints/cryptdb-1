@@ -1258,6 +1258,14 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
     return res;
 }
 
+static ResType *
+mysql_noop_res(const ProxyState &ps)
+{
+    DBResult *noop_dbres;
+    assert(ps.getConn()->execute(mysql_noop(), noop_dbres));
+    return new ResType(noop_dbres->unpack());
+}
+
 // FIXME: DBResult and ResType memleaks.
 // FIXME: Use TELL policy.
 ResType *
@@ -1286,6 +1294,9 @@ executeQuery(ProxyState &ps, const std::string &q)
             assert(!!dbres != !!qr->output->multipleResultSets());
         }
 
+        // ----------------------------------
+        //       Post Query Processing
+        // ----------------------------------
         if (PREAMBLE_STATUS::ROLLBACK == preamble_status) {
             assert(queryHandleRollback(ps, q));
             return new ResType(dbres->unpack());
@@ -1293,18 +1304,9 @@ executeQuery(ProxyState &ps, const std::string &q)
 
         assert(PREAMBLE_STATUS::SUCCESS == preamble_status);
 
-        // Query epilogue.
-        AssignOnce<ResType *> intermediate_res;
-        if (dbres) {
-            intermediate_res = new ResType(dbres->unpack());
-        } else {
-            DBResult *noop_dbres;
-            assert(ps.getConn()->execute(mysql_noop(), noop_dbres));
-            intermediate_res = new ResType(noop_dbres->unpack());
-        }
-
-        ResType *const out_res =
-            queryEpilogue(ps, qr, intermediate_res.get(), q, true);
+        ResType *const res =
+            dbres ? new ResType(dbres->unpack()) : mysql_noop_res(ps);
+        ResType *const out_res = queryEpilogue(ps, qr, res, q, true);
         assert(out_res);
 
         return out_res;
