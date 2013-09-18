@@ -1,7 +1,6 @@
 assert(package.loadlib(os.getenv("EDBDIR").."/libexecute.so",
                        "lua_cryptdb_init"))()
 local proto = assert(require("mysql.proto"))
-local use_database = false
 
 --
 -- Interception points provided by mysqlproxy
@@ -68,10 +67,6 @@ function read_query_real(packet)
     if string.byte(packet) == proxy.COM_QUERY then
         do_rollback, new_queries =
             CryptDB.rewrite(proxy.connection.client.src.name, query)
-        if new_queries and false == use_database then
-            table.insert(new_queries, 1, "USE cryptdbtest")
-            use_database = true
-        end
 
         if not new_queries then
             proxy.response.type = proxy.MYSQLD_PACKET_ERR
