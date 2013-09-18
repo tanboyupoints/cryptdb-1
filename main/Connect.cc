@@ -48,7 +48,7 @@ Connect::do_connect(const std::string &server, const std::string &user,
     conn = mysql_init(NULL);
 
     /* Connect via TCP, and not via Unix domain sockets */
-    uint proto = MYSQL_PROTOCOL_TCP;
+    const uint proto = MYSQL_PROTOCOL_TCP;
     mysql_options(conn, MYSQL_OPT_PROTOCOL, &proto);
 
     /* Connect to real server even if linked against embedded libmysqld */

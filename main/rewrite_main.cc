@@ -204,7 +204,7 @@ fixDelta(const std::unique_ptr<Connect> &conn,
 
     if (expect_ddl) {  // Handle single DDL query.
         if (false == conn->execute(remote_queries.back())) {
-            unsigned int err = conn->get_mysql_errno();
+            unsigned int const err = conn->get_mysql_errno();
             if (false == recoverableDeltaError(err)) {
                 return false;
             }
@@ -1298,19 +1298,6 @@ prettyPrintQueryResult(ResType res)
     std::cout << std::endl;
 }
 
-static const std::unique_ptr<Connect> &
-deductConnection(RewriteOutput *const output, const ProxyState &ps)
-{
-    switch (output->queryChannel()) {
-        case RewriteOutput::Channel::REGULAR:
-            return ps.getConn();
-        case RewriteOutput::Channel::SIDE:
-            return ps.getSideChannelConn();
-        default:
-            throw CryptDBError("Unrecognized Channel!");
-    }
-}
-
 // FIXME: DBResult and ResType memleaks.
 // FIXME: Use TELL policy.
 ResType *
@@ -1319,18 +1306,17 @@ executeQuery(ProxyState &ps, const std::string &q)
     try {
         QueryRewrite *qr = NULL;
         std::list<std::string> out_queryz;
-        assert(queryPreamble(ps, q, &qr, &out_queryz));
-        assert(qr);
-
-        const std::unique_ptr<Connect>
-            &query_conn(deductConnection(qr->output, ps));
+        // out_queryz: queries intended to be run against remote server.
+        const PREAMBLE_STATUS status =
+            queryPreamble(ps, q, &qr, &out_queryz);
+        assert(PREAMBLE_STATUS::FAILURE != status);
 
         DBResult *dbres = NULL;
         for (auto it : out_queryz) {
             prettyPrintQuery(it);
 
-            if (!query_conn->execute(it, dbres,
-                                     qr->output->multipleResultSets())) {
+            if (!ps.getConn()->execute(it, dbres,
+                                       qr->output->multipleResultSets())) {
                 qr->output->handleQueryFailure(ps.getEConn());
                 throw CryptDBError("Failed to execute query!");
             }
@@ -1340,6 +1326,16 @@ executeQuery(ProxyState &ps, const std::string &q)
             assert(!!dbres != !!qr->output->multipleResultSets());
         }
 
+        if (PREAMBLE_STATUS::ROLLBACK == status) {
+            QueryRewrite *adjust_qr;
+            PREAMBLE_STATUS const status =
+                queryPreamble(ps, q, &adjust_qr, &out_queryz);
+            assert(PREAMBLE_STATUS::SUCCESS == status);
+            assert(adjust_qr->output->afterQuery(ps.getEConn()));
+            return new ResType(dbres->unpack());
+        }
+
+        assert(PREAMBLE_STATUS::SUCCESS == status);
         // Query epilogue.
         assert(qr->output->afterQuery(ps.getEConn()));
 

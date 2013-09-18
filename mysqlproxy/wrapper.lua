@@ -51,8 +51,9 @@ end
 -- Helper functions
 --
 
-RES_IGNORE  = 1
-RES_DECRYPT = 2
+RES_IGNORE   = 1
+RES_DECRYPT  = 2
+RES_ROLLBACK = 3
 
 function dprint(x)
     if os.getenv("CRYPTDB_PROXY_DEBUG") then
@@ -65,7 +66,7 @@ function read_query_real(packet)
     print("read_query: " .. query)
 
     if string.byte(packet) == proxy.COM_QUERY then
-        new_queries =
+        do_rollback, new_queries =
             CryptDB.rewrite(proxy.connection.client.src.name, query)
         if new_queries and false == use_database then
             table.insert(new_queries, 1, "USE cryptdbtest")
@@ -88,11 +89,14 @@ function read_query_real(packet)
             dprint("rewritten query[" .. i .. "]: " .. v)
             local result_key
             if i == table.maxn(new_queries) then
-                result_key = RES_DECRYPT
+                if true == do_rollback then
+                    result_key = RES_ROLLBACK
+                else
+                    result_key = RES_DECRYPT
+                end
             else
                 result_key = RES_IGNORE
             end
-
             proxy.queries:append(result_key,
                                  string.char(proxy.COM_QUERY) .. v,
                                  { resultset_is_needed = true })
@@ -111,6 +115,16 @@ function read_query_result_real(inj)
 
     if inj.id == RES_IGNORE then
         return proxy.PROXY_IGNORE_RESULT
+    elseif inj.id == RES_ROLLBACK then
+        CryptDB.rollbackOnionAdjust(client)
+
+        proxy.response.type = proxy.MYSQLD_PACKET_ERR
+        proxy.response.errmsg = "Proxy did ROLLBACK"
+        -- ER_LOCK_DEADLOCK::error = 1213
+        proxy.response.errcode = 1213
+        -- ER_LOCK_DEADLOCK::sqlstate = 40001
+        proxy.response.sqlstate = 40001
+        return proxy.PROXY_SEND_RESULT
     elseif inj.id == RES_DECRYPT then
         local resultset = inj.resultset
 

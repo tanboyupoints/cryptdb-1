@@ -461,7 +461,7 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
         const RewritePlanOneOLK * const rp =
             static_cast<const RewritePlanOneOLK *>(_rp);
 
-        std::cerr << "Rewrite plan is " << rp << "\n";
+        LOG(cdb_v) << "Rewrite plan is " << rp << "\n";
 
         Item * const arg0 =
             itemTypes.do_rewrite(args[0], constr, rp->childr_rp[0], a);

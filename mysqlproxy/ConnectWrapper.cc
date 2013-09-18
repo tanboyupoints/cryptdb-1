@@ -245,6 +245,7 @@ rewrite(lua_State *L)
     const std::string query_data = xlua_tolstring(L, 3);
 
     std::list<std::string> new_queries;
+    AssignOnce<PREAMBLE_STATUS> preamble_status;
 
     clients[client]->last_query = query;
     t.lap_ms();
@@ -253,22 +254,29 @@ rewrite(lua_State *L)
             assert(ps);
 
             QueryRewrite *qr = NULL;
-            assert(queryPreamble(*ps, query, &qr, &new_queries));
+            preamble_status = queryPreamble(*ps, query, &qr, &new_queries);
             assert(qr);
+            assert(preamble_status.get() != PREAMBLE_STATUS::FAILURE);
 
             // FIXME: Redundant.
             clients[client]->qr = qr;
             clients[client]->rmeta = qr->rmeta;
         } catch (CryptDBError &e) {
             LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
+            lua_pushboolean(L, false);
             lua_pushnil(L);
-            return 1;
+            return 2;
         }
     }
 
     if (LOG_PLAIN_QUERIES) {
         *(clients[client]->PLAIN_LOG) << query << "\n";
     }
+
+    assert(PREAMBLE_STATUS::SUCCESS == preamble_status.get() ||
+           (PREAMBLE_STATUS::ROLLBACK == preamble_status.get() &&
+            new_queries.size() == 1));
+    lua_pushboolean(L, PREAMBLE_STATUS::ROLLBACK == preamble_status.get());
 
     // NOTE: Potentially out of int range.
     assert(new_queries.size() < INT_MAX);
@@ -281,7 +289,7 @@ rewrite(lua_State *L)
         index++;
     }
 
-    return 1;
+    return 2;
 }
 
 static int
@@ -301,7 +309,7 @@ queryFailure(lua_State *L)
     assert(ps);
     assert(clients[client]->qr);
 
-    QueryRewrite *qr = clients[client]->qr;
+    QueryRewrite *const qr = clients[client]->qr;
     assert(qr->output->handleQueryFailure(ps->getEConn()));
 
     return 0;
@@ -340,6 +348,38 @@ epilogue(lua_State *L)
     lua_pushboolean(L, qr->output->doDecryption());
     lua_pushnil(L);
     return 2;
+}
+
+static int
+rollbackOnionAdjust(lua_State *L)
+{
+    ANON_REGION(__func__, &perf_cg);
+    scoped_lock l(&big_lock);
+    assert(0 == mysql_thread_init());
+
+    // FIXME: Necessary?
+    THD *const thd = static_cast<THD *>(create_embedded_thd(0));
+    auto thd_cleanup = cleanup([&thd]
+        {
+            thd->clear_data_list();
+            thd->store_globals();
+            thd->unlink();
+            delete thd;
+        });
+
+    const std::string client = xlua_tolstring(L, 1);
+    if (clients.find(client) == clients.end())
+        return 0;
+
+    std::list<std::string> out_queryz;
+    QueryRewrite *adjust_qr;
+    PREAMBLE_STATUS const preamble_status =
+        queryPreamble(*ps, clients[client]->last_query, &adjust_qr,
+                      &out_queryz);
+    assert(PREAMBLE_STATUS::SUCCESS == preamble_status);
+    assert(adjust_qr->output->afterQuery(ps->getEConn()));
+
+    return 0;
 }
 
 static int
@@ -525,6 +565,7 @@ cryptdb_lib[] = {
     F(disconnect),
     F(rewrite),
     F(decrypt),
+    F(rollbackOnionAdjust),
     F(passDecryptedPtr),
     F(epilogue),
     F(queryFailure),

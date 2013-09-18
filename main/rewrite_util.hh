@@ -125,7 +125,9 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis &a);
 std::string
 mysql_noop();
 
-bool
+enum class PREAMBLE_STATUS {SUCCESS, FAILURE, ROLLBACK};
+
+PREAMBLE_STATUS
 queryPreamble(ProxyState &ps, const std::string &q,
               QueryRewrite **const out_qr,
               std::list<std::string> *const out_queryz);
