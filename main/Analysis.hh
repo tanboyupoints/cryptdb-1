@@ -280,6 +280,7 @@ private:
     const ProxyState &ps;
 
     AssignOnce<std::string> output_values;
+    AssignOnce<bool> do_nothing;
 };
 
 class DeltaOutput : public RewriteOutput {

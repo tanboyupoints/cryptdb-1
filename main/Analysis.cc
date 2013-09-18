@@ -595,8 +595,10 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
                         select_q));
     assert(select_res_type);
     if (select_res_type->rows.size() == 0) { // No work to be done.
-        return sendQuery(conn, new_query);
+        this->do_nothing = true;
+        return true;
     }
+    this->do_nothing = false;
 
     const auto itemJoin = [](std::vector<Item*> row) {
         return "(" +
@@ -632,7 +634,7 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     ROLLBACK_AND_RFIF(e_conn->execute(select_results_q, dbres), e_conn);
     const std::unique_ptr<ResType>
         interim_res(new ResType(dbres->unpack()));
-    this->output_values = 
+    this->output_values =
         vector_join<std::vector<Item*>>(interim_res->rows, ",",
                                         itemJoin);
     // Cleanup the embedded database.
@@ -648,6 +650,11 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
 bool SpecialUpdate::getQuery(std::list<std::string> * const queryz) const
 {
     queryz->clear();
+
+    if (true == this->do_nothing.get()) {
+        queryz->push_back(mysql_noop());
+        return true;
+    }
 
     // This query is necessary to propagate a transaction into
     // INFORMATION_SCHEMA.
