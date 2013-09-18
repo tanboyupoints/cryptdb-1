@@ -1003,6 +1003,25 @@ static QueryList Transactions = QueryList("Transactions",
     { "DROP TABLE trans"},
     { "DROP TABLE trans"});
 
+static QueryList Deadlocks = QueryList("Deadlocks",
+    { "CREATE TABLE deadlock (x integer, y integer) ENGINE=InnoDB", "",
+      "", ""},
+    { "CREATE TABLE deadlock (x integer, y integer) ENGINE=InnoDB", "",
+      "", ""},
+    { "CREATE TABLE deadlock (x integer, y integer) ENGINE=InnoDB", "",
+      "", ""},
+    { Query("INSERT INTO deadlock VALUES (1, 100), (2, 200), (3, 300)",
+            false),
+      Query("START TRANSACTION", false),
+      Query("UPDATE deadlock SET x = x + 1, y = y + 2", false),
+      Query("SELECT * FROM deadlock WHERE x < 10", false),
+      Query("SELECT * FROM deadlock WHERE x < 10", false)},
+    { "DROP TABLE deadlock"},
+    { "DROP TABLE deadlock"},
+    { "DROP TABLE deadlock"});
+
+
+
 
 //-----------------------------------------------------------------------
 
@@ -1327,7 +1346,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 424/424.
+    //      TOTAL RESULT: 433/434.
     // ###############################
 
     std::vector<Score> scores;
@@ -1388,6 +1407,10 @@ RunTest(const TestConfig &tc) {
 
     // Pass 25/25
     scores.push_back(CheckQueryList(tc, Transactions));
+
+    // Pass 9/10
+    // NOTE: Should fail one test.
+    scores.push_back(CheckQueryList(tc, Deadlocks));
 
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;
