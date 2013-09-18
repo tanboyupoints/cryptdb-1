@@ -316,41 +316,6 @@ queryFailure(lua_State *L)
 }
 
 static int
-epilogue(lua_State *L)
-{
-    ANON_REGION(__func__, &perf_cg);
-    scoped_lock l(&big_lock);
-    assert(0 == mysql_thread_init());
-
-    std::string client = xlua_tolstring(L, 1);
-    if (clients.find(client) == clients.end())
-        return 0;
-
-    assert(EXECUTE_QUERIES);
-
-    assert(ps);
-    assert(clients[client]->qr);
-
-    QueryRewrite const *const qr = clients[client]->qr;
-    assert(qr->output->afterQuery(ps->getEConn()));
-    if (qr->output->queryAgain()) {
-        ResType *const res_type =
-            executeQuery(*ps, clients[client]->last_query);
-        assert(res_type);
-
-        // Tell lua not to decrypt the results because executeQuery
-        // handles decryption.
-        lua_pushboolean(L, false);
-        lua_pushinteger(L, reinterpret_cast<lua_Integer>(res_type));
-        return 2;
-    }
-
-    lua_pushboolean(L, qr->output->doDecryption());
-    lua_pushnil(L);
-    return 2;
-}
-
-static int
 rollbackOnionAdjust(lua_State *L)
 {
     ANON_REGION(__func__, &perf_cg);
@@ -364,23 +329,6 @@ rollbackOnionAdjust(lua_State *L)
     assert(queryHandleRollback(*ps, clients[client]->last_query));
 
     return 0;
-}
-
-static int
-passDecryptedPtr(lua_State *L)
-{
-    ANON_REGION(__func__, &perf_cg);
-    scoped_lock l(&big_lock);
-    assert(0 == mysql_thread_init());
-
-    const std::string client = xlua_tolstring(L, 1);
-    if (clients.find(client) == clients.end())
-        return 0;
-
-    const ResType *const res_type =
-        reinterpret_cast<ResType *>(lua_tointeger(L, 2));
-
-    return returnResultSet(L, *res_type);
 }
 
 inline std::vector<Item *>
@@ -455,7 +403,7 @@ getResTypeFromLuaTable(lua_State *L, int fields_index, int rows_index,
 }
 
 static int
-decrypt(lua_State *L)
+envoi(lua_State *L)
 {
     ANON_REGION(__func__, &perf_cg);
     scoped_lock l(&big_lock);
@@ -471,23 +419,31 @@ decrypt(lua_State *L)
         });
 
     const std::string client = xlua_tolstring(L, 1);
-    if (clients.find(client) == clients.end())
+    if (clients.find(client) == clients.end()) {
         return 0;
-    const bool decryptp = lua_toboolean(L, 2);
-    const ResType *const hack_res_type =
-        reinterpret_cast<ResType *>(lua_tointeger(L, 3));
+    }
 
-    if (false == decryptp && hack_res_type) {
-        assert(hack_res_type);
-        return returnResultSet(L, *hack_res_type);
+    assert(EXECUTE_QUERIES);
+
+    assert(ps);
+    assert(clients[client]->qr);
+
+    QueryRewrite const *const qr = clients[client]->qr;
+    assert(qr->output->afterQuery(ps->getEConn()));
+    if (qr->output->queryAgain()) {
+        ResType *const res_type =
+            executeQuery(*ps, clients[client]->last_query);
+        assert(res_type);
+
+        return returnResultSet(L, *res_type);
     }
 
     ResType res;
-    getResTypeFromLuaTable(L, 4, 5, &res);
+    getResTypeFromLuaTable(L, 2, 3, &res);
 
     ResType rd;
     try {
-        if (true == decryptp) {
+        if (true == qr->output->doDecryption()) {
             ResType *const rt =
                 Rewriter::decryptResults(res, clients[client]->rmeta);
             assert(rt);
@@ -548,7 +504,6 @@ returnResultSet(lua_State *L, const ResType &rd)
         lua_rawseti(L, t_rows, i+1);
     }
 
-    //cerr << clients[client]->last_query << " took (too long) " << t.lap_ms() << endl;;
     return 2;
 }
 
@@ -558,10 +513,8 @@ cryptdb_lib[] = {
     F(connect),
     F(disconnect),
     F(rewrite),
-    F(decrypt),
+    F(envoi),
     F(rollbackOnionAdjust),
-    F(passDecryptedPtr),
-    F(epilogue),
     F(queryFailure),
     { 0, 0 },
 };

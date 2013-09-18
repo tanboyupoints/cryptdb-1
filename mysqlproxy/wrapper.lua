@@ -136,9 +136,6 @@ function read_query_result_real(inj)
             local rows = {}
             local query = inj.query:sub(2)
 
-            -- Handle the backend of the query.
-            decryptp, res_ptr = CryptDB.epilogue(client)
-
             -- mysqlproxy doesn't return real lua arrays, so re-package
             local resfields = resultset.fields
             for i = 1, #resfields do
@@ -154,8 +151,9 @@ function read_query_result_real(inj)
                 end
             end
 
+            -- Handle the backend of the query.
             dfields, drows =
-                CryptDB.decrypt(client, decryptp, res_ptr, fields, rows)
+                CryptDB.envoi(client, fields, rows)
 
             if dfields and drows then
                 proxy.response.type = proxy.MYSQLD_PACKET_OK
