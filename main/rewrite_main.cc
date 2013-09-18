@@ -1307,9 +1307,9 @@ executeQuery(ProxyState &ps, const std::string &q)
         QueryRewrite *qr = NULL;
         std::list<std::string> out_queryz;
         // out_queryz: queries intended to be run against remote server.
-        const PREAMBLE_STATUS status =
+        PREAMBLE_STATUS const preamble_status =
             queryPreamble(ps, q, &qr, &out_queryz);
-        assert(PREAMBLE_STATUS::FAILURE != status);
+        assert(PREAMBLE_STATUS::FAILURE != preamble_status);
 
         DBResult *dbres = NULL;
         for (auto it : out_queryz) {
@@ -1326,16 +1326,13 @@ executeQuery(ProxyState &ps, const std::string &q)
             assert(!!dbres != !!qr->output->multipleResultSets());
         }
 
-        if (PREAMBLE_STATUS::ROLLBACK == status) {
-            QueryRewrite *adjust_qr;
-            PREAMBLE_STATUS const status =
-                queryPreamble(ps, q, &adjust_qr, &out_queryz);
-            assert(PREAMBLE_STATUS::SUCCESS == status);
-            assert(adjust_qr->output->afterQuery(ps.getEConn()));
+        if (PREAMBLE_STATUS::ROLLBACK == preamble_status) {
+            assert(queryHandleRollback(ps, q));
             return new ResType(dbres->unpack());
         }
 
-        assert(PREAMBLE_STATUS::SUCCESS == status);
+        assert(PREAMBLE_STATUS::SUCCESS == preamble_status);
+
         // Query epilogue.
         assert(qr->output->afterQuery(ps.getEConn()));
 

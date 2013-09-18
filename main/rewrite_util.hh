@@ -132,3 +132,5 @@ queryPreamble(ProxyState &ps, const std::string &q,
               QueryRewrite **const out_qr,
               std::list<std::string> *const out_queryz);
 
+bool
+queryHandleRollback(ProxyState &ps, const std::string &query);

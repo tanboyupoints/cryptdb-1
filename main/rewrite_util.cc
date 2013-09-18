@@ -479,9 +479,10 @@ mysql_noop()
     return "do 0;";
 }
 
-PREAMBLE_STATUS queryPreamble(ProxyState &ps, const std::string &q,
-                              QueryRewrite **const out_qr,
-                              std::list<std::string> *const out_queryz)
+PREAMBLE_STATUS
+queryPreamble(ProxyState &ps, const std::string &q,
+              QueryRewrite **const out_qr,
+              std::list<std::string> *const out_queryz)
 {
     SchemaInfo *out_schema;
     QueryRewrite *const qr = *out_qr =
@@ -553,4 +554,21 @@ side_channel_epilogue:
     }
 
     return PREAMBLE_STATUS::SUCCESS;
+}
+
+bool
+queryHandleRollback(ProxyState &ps, const std::string &query)
+{
+    QueryRewrite *qr;
+    std::list<std::string> out_queryz;
+    PREAMBLE_STATUS const preamble_status =
+        queryPreamble(ps, query, &qr, &out_queryz);
+    if (PREAMBLE_STATUS::FAILURE == preamble_status) {
+        return false;
+    }
+
+    assert(PREAMBLE_STATUS::SUCCESS == preamble_status);
+    assert(qr->output->afterQuery(ps.getEConn()));
+
+    return true;
 }

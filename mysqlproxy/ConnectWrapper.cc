@@ -331,10 +331,10 @@ epilogue(lua_State *L)
     assert(ps);
     assert(clients[client]->qr);
 
-    QueryRewrite *qr = clients[client]->qr;
+    QueryRewrite const *const qr = clients[client]->qr;
     assert(qr->output->afterQuery(ps->getEConn()));
     if (qr->output->queryAgain()) {
-        ResType *res_type =
+        ResType *const res_type =
             executeQuery(*ps, clients[client]->last_query);
         assert(res_type);
 
@@ -357,27 +357,11 @@ rollbackOnionAdjust(lua_State *L)
     scoped_lock l(&big_lock);
     assert(0 == mysql_thread_init());
 
-    // FIXME: Necessary?
-    THD *const thd = static_cast<THD *>(create_embedded_thd(0));
-    auto thd_cleanup = cleanup([&thd]
-        {
-            thd->clear_data_list();
-            thd->store_globals();
-            thd->unlink();
-            delete thd;
-        });
-
     const std::string client = xlua_tolstring(L, 1);
     if (clients.find(client) == clients.end())
         return 0;
 
-    std::list<std::string> out_queryz;
-    QueryRewrite *adjust_qr;
-    PREAMBLE_STATUS const preamble_status =
-        queryPreamble(*ps, clients[client]->last_query, &adjust_qr,
-                      &out_queryz);
-    assert(PREAMBLE_STATUS::SUCCESS == preamble_status);
-    assert(adjust_qr->output->afterQuery(ps->getEConn()));
+    assert(queryHandleRollback(*ps, clients[client]->last_query));
 
     return 0;
 }
@@ -388,16 +372,6 @@ passDecryptedPtr(lua_State *L)
     ANON_REGION(__func__, &perf_cg);
     scoped_lock l(&big_lock);
     assert(0 == mysql_thread_init());
-    
-    // FIXME: Necessary?
-    THD *const thd = static_cast<THD *>(create_embedded_thd(0));
-    auto thd_cleanup = cleanup([&thd]
-        {
-            thd->clear_data_list();
-            thd->store_globals();
-            thd->unlink();
-            delete thd;
-        });
 
     const std::string client = xlua_tolstring(L, 1);
     if (clients.find(client) == clients.end())
@@ -420,6 +394,66 @@ itemNullVector(unsigned int count)
     return out;
 }
 
+static void
+getResTypeFromLuaTable(lua_State *L, int fields_index, int rows_index,
+                       ResType *const out_res)
+{
+    /* iterate over the fields argument */
+    lua_pushnil(L);
+    while (lua_next(L, fields_index)) {
+        if (!lua_istable(L, -1))
+            LOG(warn) << "mismatch";
+
+        lua_pushnil(L);
+        while (lua_next(L, -2)) {
+            const std::string k = xlua_tolstring(L, -2);
+            if (k == "name")
+                out_res->names.push_back(xlua_tolstring(L, -1));
+            else if (k == "type")
+                out_res->types.push_back(static_cast<enum_field_types>(luaL_checkint(L, -1)));
+            else
+                LOG(warn) << "unknown key " << k;
+            lua_pop(L, 1);
+        }
+
+        lua_pop(L, 1);
+    }
+
+    assert(out_res->names.size() == out_res->types.size());
+
+    /* iterate over the rows argument */
+    lua_pushnil(L);
+    while (lua_next(L, rows_index)) {
+        if (!lua_istable(L, -1))
+            LOG(warn) << "mismatch";
+
+        /* initialize all items to NULL, since Lua skips
+           nil array entries */
+        std::vector<Item *> row = itemNullVector(out_res->types.size());
+
+        lua_pushnil(L);
+        while (lua_next(L, -2)) {
+            const int key = luaL_checkint(L, -2) - 1;
+
+            assert(key >= 0
+                   && static_cast<uint>(key) < out_res->types.size());
+            const std::string data = xlua_tolstring(L, -1);
+            Item *const value =
+                make_item_by_type(data, out_res->types[key]);
+            row[key] = value;
+
+            lua_pop(L, 1);
+        }
+        // We can not use this assert because rows that contain many
+        // NULLs don't return their columns in a strictly increasing
+        // order.
+        // assert((unsigned int)key == out_res->names.size() - 1);
+
+        out_res->rows.push_back(row);
+        lua_pop(L, 1);
+    }
+}
+
 static int
 decrypt(lua_State *L)
 {
@@ -439,68 +473,28 @@ decrypt(lua_State *L)
     const std::string client = xlua_tolstring(L, 1);
     if (clients.find(client) == clients.end())
         return 0;
+    const bool decryptp = lua_toboolean(L, 2);
+    const ResType *const hack_res_type =
+        reinterpret_cast<ResType *>(lua_tointeger(L, 3));
+
+    if (false == decryptp && hack_res_type) {
+        assert(hack_res_type);
+        return returnResultSet(L, *hack_res_type);
+    }
 
     ResType res;
-
-    /* iterate over the fields argument */
-    lua_pushnil(L);
-    while (lua_next(L, 2)) {
-        if (!lua_istable(L, -1))
-            LOG(warn) << "mismatch";
-
-        lua_pushnil(L);
-        while (lua_next(L, -2)) {
-            std::string k = xlua_tolstring(L, -2);
-            if (k == "name")
-                res.names.push_back(xlua_tolstring(L, -1));
-            else if (k == "type")
-                res.types.push_back((enum_field_types)luaL_checkint(L, -1));
-            else
-                LOG(warn) << "unknown key " << k;
-            lua_pop(L, 1);
-        }
-
-        lua_pop(L, 1);
-    }
-
-    assert(res.names.size() == res.types.size());
-
-    /* iterate over the rows argument */
-    lua_pushnil(L);
-    while (lua_next(L, 3)) {
-        if (!lua_istable(L, -1))
-            LOG(warn) << "mismatch";
-
-        /* initialize all items to NULL, since Lua skips
-           nil array entries */
-        std::vector<Item *> row = itemNullVector(res.types.size());
-
-        lua_pushnil(L);
-        while (lua_next(L, -2)) {
-            int key = luaL_checkint(L, -2) - 1;
-
-            assert(key >= 0 && static_cast<uint>(key) < res.types.size());
-            const std::string data = xlua_tolstring(L, -1);
-            Item *const value = make_item_by_type(data, res.types[key]);
-            row[key] = value;
-
-            lua_pop(L, 1);
-        }
-        // We can not use this assert because rows that contain many
-        // NULLs don't return their columns in a strictly increasing
-        // order.
-        // assert((unsigned int)key == res.names.size() - 1);
-
-        res.rows.push_back(row);
-        lua_pop(L, 1);
-    }
+    getResTypeFromLuaTable(L, 4, 5, &res);
 
     ResType rd;
     try {
-        ResType *const rt =
-            Rewriter::decryptResults(res, clients[client]->rmeta);
-        assert(rt);
-        rd = *rt;
+        if (true == decryptp) {
+            ResType *const rt =
+                Rewriter::decryptResults(res, clients[client]->rmeta);
+            assert(rt);
+            rd = *rt;
+        } else {
+            rd = res;
+        }
     }
     catch(CryptDBError e) {
         lua_pushnil(L);
