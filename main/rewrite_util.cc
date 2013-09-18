@@ -572,3 +572,73 @@ queryHandleRollback(ProxyState &ps, const std::string &query)
 
     return true;
 }
+
+/*
+static void
+printEC(std::unique_ptr<Connect> e_conn, const std::string & command) {
+    DBResult * dbres;
+    assert_s(e_conn->execute(command, dbres), "command failed");
+    ResType res = dbres->unpack();
+    printRes(res);
+}
+*/
+
+static void
+printEmbeddedState(const ProxyState &ps) {
+/*
+    printEC(ps.e_conn, "show databases;");
+    printEC(ps.e_conn, "show tables from pdb;");
+    std::cout << "regular" << std::endl << std::endl;
+    printEC(ps.e_conn, "select * from pdb.MetaObject;");
+    std::cout << "bleeding" << std::endl << std::endl;
+    printEC(ps.e_conn, "select * from pdb.BleedingMetaObject;");
+    printEC(ps.e_conn, "select * from pdb.Query;");
+    printEC(ps.e_conn, "select * from pdb.DeltaOutput;");
+*/
+}
+
+
+void
+prettyPrintQuery(const std::string &query)
+{
+    std::cout << std::endl << RED_BEGIN
+              << "QUERY: " << COLOR_END << query << std::endl;
+}
+
+static void
+prettyPrintQueryResult(ResType res)
+{
+    std::cout << std::endl << RED_BEGIN
+              << "RESULTS: " << COLOR_END << std::endl;
+    printRes(res);
+    std::cout << std::endl;
+}
+
+ResType *
+queryEpilogue(ProxyState &ps, QueryRewrite *const qr, ResType *const res,
+              const std::string &query, bool pp)
+{
+    assert(qr->output->afterQuery(ps.getEConn()));
+
+    if (qr->output->queryAgain()) {
+        return executeQuery(ps, query);
+    }
+
+    if (pp) {
+        printEmbeddedState(ps);
+        prettyPrintQueryResult(*res);
+    }
+
+    if (qr->output->doDecryption()) {
+        ResType *const dec_res =
+            Rewriter::decryptResults(*res, qr->rmeta);
+        if (pp) {
+            prettyPrintQueryResult(*dec_res);
+        }
+
+        return dec_res;
+    }
+
+    return res;
+}
+

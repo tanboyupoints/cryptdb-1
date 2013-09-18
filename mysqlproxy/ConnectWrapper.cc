@@ -427,38 +427,16 @@ envoi(lua_State *const L)
     assert(EXECUTE_QUERIES);
     assert(ps);
 
-    assert(clients[client]->qr);
-    QueryRewrite const *const qr = clients[client]->qr;
-    assert(qr->output->afterQuery(ps->getEConn()));
-    if (qr->output->queryAgain()) {
-        ResType *const res_type =
-            executeQuery(*ps, clients[client]->last_query);
-        assert(res_type);
-
-        return returnResultSet(L, *res_type);
-    }
-
     ResType res;
     getResTypeFromLuaTable(L, 2, 3, &res);
+    const WrapperState *const wrapper = clients[client];
+    assert(wrapper->qr);
+    ResType *const out_res =
+        queryEpilogue(*ps, wrapper->qr, &res, wrapper->last_query,
+                      false);
+    assert(out_res);
 
-    ResType rd;
-    try {
-        if (true == qr->output->doDecryption()) {
-            ResType *const rt =
-                Rewriter::decryptResults(res, clients[client]->qr->rmeta);
-            assert(rt);
-            rd = *rt;
-        } else {
-            rd = res;
-        }
-    }
-    catch(CryptDBError e) {
-        lua_pushnil(L);
-        lua_pushnil(L);
-        return 2;
-    }
-
-    return returnResultSet(L, rd);
+    return returnResultSet(L, *out_res);
 }
 
 static int

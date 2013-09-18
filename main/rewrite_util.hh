@@ -134,3 +134,10 @@ queryPreamble(ProxyState &ps, const std::string &q,
 
 bool
 queryHandleRollback(ProxyState &ps, const std::string &query);
+
+void
+prettyPrintQuery(const std::string &query);
+
+ResType *
+queryEpilogue(ProxyState &ps, QueryRewrite *const qr, ResType *const res,
+              const std::string &query, bool pp);

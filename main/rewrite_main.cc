@@ -324,30 +324,6 @@ loadSchemaInfo(const std::unique_ptr<Connect> &conn,
     return schema;
 }
 
-/*
-static void
-printEC(std::unique_ptr<Connect> e_conn, const std::string & command) {
-    DBResult * dbres;
-    assert_s(e_conn->execute(command, dbres), "command failed");
-    ResType res = dbres->unpack();
-    printRes(res);
-}
-*/
-
-static void
-printEmbeddedState(const ProxyState &ps) {
-/*
-    printEC(ps.e_conn, "show databases;");
-    printEC(ps.e_conn, "show tables from pdb;");
-    std::cout << "regular" << std::endl << std::endl;
-    printEC(ps.e_conn, "select * from pdb.MetaObject;");
-    std::cout << "bleeding" << std::endl << std::endl;
-    printEC(ps.e_conn, "select * from pdb.BleedingMetaObject;");
-    printEC(ps.e_conn, "select * from pdb.Query;");
-    printEC(ps.e_conn, "select * from pdb.DeltaOutput;");
-*/
-}
-
 template <typename Type> static void
 translatorHelper(std::vector<std::string> texts,
                  std::vector<Type> enums)
@@ -1282,22 +1258,6 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
     return res;
 }
 
-static void
-prettyPrintQuery(const std::string &query)
-{
-    std::cout << std::endl << RED_BEGIN
-              << "QUERY: " << COLOR_END << query << std::endl;
-}
-
-static void
-prettyPrintQueryResult(ResType res)
-{
-    std::cout << std::endl << RED_BEGIN
-              << "RESULTS: " << COLOR_END << std::endl;
-    printRes(res);
-    std::cout << std::endl;
-}
-
 // FIXME: DBResult and ResType memleaks.
 // FIXME: Use TELL policy.
 ResType *
@@ -1334,33 +1294,20 @@ executeQuery(ProxyState &ps, const std::string &q)
         assert(PREAMBLE_STATUS::SUCCESS == preamble_status);
 
         // Query epilogue.
-        assert(qr->output->afterQuery(ps.getEConn()));
-
-        if (qr->output->queryAgain()) {
-            return executeQuery(ps, q);
-        }
-
-        printEmbeddedState(ps);
-
+        AssignOnce<ResType *> intermediate_res;
         if (dbres) {
-            ResType *const res = new ResType(dbres->unpack());
-
-            prettyPrintQueryResult(*res);
-            if (qr->output->doDecryption()) {
-                ResType *const dec_res =
-                    Rewriter::decryptResults(*res, qr->rmeta);
-                prettyPrintQueryResult(*dec_res);
-
-                return dec_res;
-            }
-
-            return res;
+            intermediate_res = new ResType(dbres->unpack());
         } else {
-            // HACK: Successful query so let's return no-op
             DBResult *noop_dbres;
             assert(ps.getConn()->execute(mysql_noop(), noop_dbres));
-            return new ResType(noop_dbres->unpack());
+            intermediate_res = new ResType(noop_dbres->unpack());
         }
+
+        ResType *const out_res =
+            queryEpilogue(ps, qr, intermediate_res.get(), q, true);
+        assert(out_res);
+
+        return out_res;
     } catch (std::runtime_error &e) {
         std::cout << "Unexpected Error: " << e.what() << " in query "
                   << q << std::endl;
