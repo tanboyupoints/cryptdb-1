@@ -469,6 +469,19 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
             }
         }
 
+        // Does r_es support all onions on field?
+        *invalids = *invalids || invalidates(fm, r_es);
+        if (true == *invalids) {
+            // Is the HOM onion available? If so we will try to handle
+            // higher up.
+            auto hom = r_es.osl.find(oAGG);
+            if (hom != r_es.osl.end()) {
+                continue;
+            }
+
+            // We will have to go to PLAIN for this query.
+        }
+
         for (auto pair : r_es.osl) {
             const OLK olk = {pair.first, pair.second.first, fm};
             RewritePlan *const rp_field =
@@ -497,9 +510,6 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
                                            anon_field_name));
             res_values->push_back(new Item_int((ulonglong)salt));
         }
-
-        // Determine if the query invalidates onions.
-        *invalids = *invalids || invalidates(fm, r_es);
     }
 }
 
