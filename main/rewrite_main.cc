@@ -296,7 +296,7 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
 //  1> Schema buildling (CREATE TABLE IF NOT EXISTS...)
 //  2> INSERTing
 //  3> SELECTing
-static SchemaInfo *
+SchemaInfo *
 loadSchemaInfo(const std::unique_ptr<Connect> &conn,
                const std::unique_ptr<Connect> &e_conn)
 {
@@ -1136,24 +1136,14 @@ cryptdbDirective(const std::string &query)
 
 QueryRewrite
 Rewriter::rewrite(const ProxyState &ps, const std::string &q,
-                  SchemaInfo **const out_schema)
+                  SchemaInfo *const schema)
 {
     LOG(cdb_v) << "q " << q;
     assert(0 == mysql_thread_init());
     //assert(0 == create_embedded_thd(0));
 
-    // printEmbeddedState(ps);
-
-    // FIXME: Memleak 'schema'.
-    AssignOnce<SchemaInfo *> schema;
-    if (ps.schemaIsStale()) {
-        schema = loadSchemaInfo(ps.getConn(), ps.getEConn());
-    } else {
-        schema = ps.getPreviousSchema();
-    }
-
-    assert(schema.get());
-    Analysis analysis = Analysis(schema.get());
+    assert(schema);
+    Analysis analysis(schema);
 
     RewriteOutput *output;
     try {
@@ -1171,7 +1161,6 @@ Rewriter::rewrite(const ProxyState &ps, const std::string &q,
         output = new SimpleOutput(mysql_noop());
     }
 
-    *out_schema = schema.get();
     return QueryRewrite(true, *analysis.rmeta, output);
 }
 
@@ -1273,10 +1262,13 @@ executeQuery(ProxyState &ps, const std::string &q)
 {
     try {
         QueryRewrite *qr = NULL;
-        std::list<std::string> out_queryz;
         // out_queryz: queries intended to be run against remote server.
+        std::list<std::string> out_queryz;
+        // FIXME: Cache.
+        SchemaInfo *const schema =
+            loadSchemaInfo(ps.getConn(), ps.getEConn());
         PREAMBLE_STATUS const preamble_status =
-            queryPreamble(ps, q, &qr, &out_queryz);
+            queryPreamble(ps, q, &qr, &out_queryz, schema);
         assert(PREAMBLE_STATUS::FAILURE != preamble_status);
 
         DBResult *dbres = NULL;
@@ -1298,7 +1290,7 @@ executeQuery(ProxyState &ps, const std::string &q)
         //       Post Query Processing
         // ----------------------------------
         if (PREAMBLE_STATUS::ROLLBACK == preamble_status) {
-            assert(queryHandleRollback(ps, q));
+            assert(queryHandleRollback(ps, q, schema));
             return new ResType(dbres->unpack());
         }
 

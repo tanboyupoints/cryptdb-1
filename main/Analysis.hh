@@ -69,6 +69,9 @@ public:
 
 // state maintained at the proxy
 typedef struct ProxyState {
+    // FIXME: Make private.
+    const AES_KEY * const masterKey;
+
     ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                const std::string &dbname, const std::string &master_key,
                SECURITY_RATING default_sec_rating =
@@ -79,21 +82,7 @@ typedef struct ProxyState {
     {
         return default_sec_rating;
     }
-    SchemaInfo *getPreviousSchema() const
-    {
-        return previous_schema.get();
-    }
-    void updateSchemaCache(SchemaInfo *const schema, bool staleness)
-    {
-        previous_schema = schema;
-        schema_staleness = staleness;
-    }
-    bool schemaIsStale() const
-    {
-        return schema_staleness;
-    }
 
-    const AES_KEY * const masterKey;
     const std::unique_ptr<Connect> &getConn() const {return conn;}
     const std::unique_ptr<Connect> &getSideChannelConn() const
     {
@@ -112,8 +101,6 @@ private:
     // FIXME: Remove once cryptdb supports multiple databases.
     const std::string dbname;
     const SECURITY_RATING default_sec_rating;
-    MaxOneReadPerAssign<SchemaInfo *> previous_schema;
-    bool schema_staleness;
 } ProxyState;
 
 
@@ -199,7 +186,8 @@ public:
 
     virtual bool beforeQuery(const std::unique_ptr<Connect> &conn,
                              const std::unique_ptr<Connect> &e_conn) = 0;
-    virtual bool getQuery(std::list<std::string> * const queryz) const = 0;
+    virtual bool getQuery(std::list<std::string> *const queryz,
+                          SchemaInfo *const schema) const = 0;
     virtual bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
         const = 0;
     virtual bool afterQuery(const std::unique_ptr<Connect> &e_conn)
@@ -228,7 +216,8 @@ public:
 
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
-    bool getQuery(std::list<std::string> * const queryz) const;
+    bool getQuery(std::list<std::string> * const queryz,
+                  SchemaInfo *const schema) const;
     bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     bool doDecryption() const;
@@ -243,7 +232,8 @@ public:
 
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
-    bool getQuery(std::list<std::string> * const queryz) const;
+    bool getQuery(std::list<std::string> * const queryz,
+                  SchemaInfo *const schema) const;
     bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
 
@@ -267,7 +257,8 @@ public:
 
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
-    bool getQuery(std::list<std::string> * const queryz) const;
+    bool getQuery(std::list<std::string> * const queryz,
+                  SchemaInfo *const schema) const;
     bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     bool multipleResultSets() const;
@@ -292,7 +283,8 @@ public:
 
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn) = 0;
-    virtual bool getQuery(std::list<std::string> * const queryz) const = 0;
+    virtual bool getQuery(std::list<std::string> * const queryz,
+                          SchemaInfo *const schema) const = 0;
     virtual bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
         const = 0;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const = 0;
@@ -318,7 +310,8 @@ public:
 
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
-    bool getQuery(std::list<std::string> * const queryz) const;
+    bool getQuery(std::list<std::string> * const queryz,
+                  SchemaInfo *const schema) const;
     bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
 
@@ -342,7 +335,8 @@ public:
 
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
-    bool getQuery(std::list<std::string> * const queryz) const;
+    bool getQuery(std::list<std::string> * const queryz,
+                  SchemaInfo *const schema) const;
     bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     // FIXME: final.

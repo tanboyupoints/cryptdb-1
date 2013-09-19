@@ -411,21 +411,15 @@ encrypt_item_layers(Item * const i, onion o, OnionMeta * const om,
 }
 
 std::string
-rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q)
+rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
+                         SchemaInfo *const schema)
 {
-    SchemaInfo *out_schema;
-    const QueryRewrite qr = Rewriter::rewrite(ps, q, &out_schema);
+    const QueryRewrite qr = Rewriter::rewrite(ps, q, schema);
     assert(false == qr.output->stalesSchema());
     assert(false == qr.output->queryAgain());
 
-    // FIXME: const_cast
-    // HACK: Aggresive cache updateing as we don't know how the caller
-    // is going to use the rewritten query.
-    const_cast<ProxyState &>(ps).updateSchemaCache(out_schema,
-                                            qr.output->stalesSchema());
-
     std::list<std::string> out_queryz;
-    if (!qr.output->getQuery(&out_queryz)) {
+    if (!qr.output->getQuery(&out_queryz, schema)) {
         throw CryptDBError("Failed to retrieve query!");
     }
     assert(out_queryz.size() == 1);
@@ -482,18 +476,15 @@ mysql_noop()
 PREAMBLE_STATUS
 queryPreamble(ProxyState &ps, const std::string &q,
               QueryRewrite **const out_qr,
-              std::list<std::string> *const out_queryz)
+              std::list<std::string> *const out_queryz,
+              SchemaInfo *const schema)
 {
-    SchemaInfo *out_schema;
     QueryRewrite *const qr = *out_qr =
-        new QueryRewrite(Rewriter::rewrite(ps, q, &out_schema));
-    // HACK: Aggressive cache updating as our cache doesn't actually go
-    // bad until we start executing queries.
-    ps.updateSchemaCache(out_schema, qr->output->stalesSchema());
+        new QueryRewrite(Rewriter::rewrite(ps, q, schema));
 
     assert(qr->output->beforeQuery(ps.getConn(), ps.getEConn()));
 
-    if (!qr->output->getQuery(out_queryz)) {
+    if (!qr->output->getQuery(out_queryz, schema)) {
         qr->output->handleQueryFailure(ps.getEConn());
         return PREAMBLE_STATUS::FAILURE;
     }
@@ -557,12 +548,13 @@ side_channel_epilogue:
 }
 
 bool
-queryHandleRollback(ProxyState &ps, const std::string &query)
+queryHandleRollback(ProxyState &ps, const std::string &query,
+                    SchemaInfo *const schema)
 {
     QueryRewrite *qr;
     std::list<std::string> out_queryz;
     PREAMBLE_STATUS const preamble_status =
-        queryPreamble(ps, query, &qr, &out_queryz);
+        queryPreamble(ps, query, &qr, &out_queryz, schema);
     if (PREAMBLE_STATUS::FAILURE == preamble_status) {
         return false;
     }

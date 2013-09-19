@@ -71,7 +71,8 @@ encrypt_item_layers(Item * const i, onion o, OnionMeta * const om,
                     const Analysis &a, uint64_t IV = 0);
 
 std::string
-rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q);
+rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
+                         SchemaInfo *const schema);
 
 // FIXME(burrows): Generalize to support any container with next AND end
 // semantics.
@@ -130,10 +131,12 @@ enum class PREAMBLE_STATUS {SUCCESS, FAILURE, ROLLBACK};
 PREAMBLE_STATUS
 queryPreamble(ProxyState &ps, const std::string &q,
               QueryRewrite **const out_qr,
-              std::list<std::string> *const out_queryz);
+              std::list<std::string> *const out_queryz,
+              SchemaInfo *const schema);
 
 bool
-queryHandleRollback(ProxyState &ps, const std::string &query);
+queryHandleRollback(ProxyState &ps, const std::string &query,
+                    SchemaInfo *const schema);
 
 void
 prettyPrintQuery(const std::string &query);

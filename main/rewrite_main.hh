@@ -62,7 +62,7 @@ public:
 
     static QueryRewrite
         rewrite(const ProxyState &ps, const std::string &q,
-                SchemaInfo **const out_schema);
+                SchemaInfo *const schema);
     static ResType *
         decryptResults(const ResType &dbres, const ReturnMeta &rm);
 
@@ -291,5 +291,6 @@ public:
     CItemSubtypeFN() { funcNames.reg(std::string(TYPE), this); }
 };
 
-
-
+SchemaInfo *
+loadSchemaInfo(const std::unique_ptr<Connect> &conn,
+               const std::unique_ptr<Connect> &e_conn);

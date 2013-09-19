@@ -318,8 +318,7 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
       side_channel_conn(new Connect(ci.server, ci.user, ci.passwd,
                                     dbname, ci.port)),
       e_conn(Connect::getEmbedded(embed_dir, dbname)), dbname(dbname),
-      default_sec_rating(default_sec_rating), previous_schema(NULL),
-      schema_staleness(true)
+      default_sec_rating(default_sec_rating)
 {
     assert(conn && e_conn);
 
@@ -539,7 +538,8 @@ bool SimpleOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
     return true;
 }
 
-bool SimpleOutput::getQuery(std::list<std::string> *const queryz) const
+bool SimpleOutput::getQuery(std::list<std::string> *const queryz,
+                            SchemaInfo *const) const
 {
     queryz->clear();
     queryz->push_back(original_query);
@@ -571,7 +571,8 @@ bool DMLOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
     return true;
 }
 
-bool DMLOutput::getQuery(std::list<std::string> * const queryz) const
+bool DMLOutput::getQuery(std::list<std::string> * const queryz,
+                         SchemaInfo *const) const
 {
     queryz->clear();
     queryz->push_back(new_query);
@@ -655,8 +656,11 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     return true;
 }
 
-bool SpecialUpdate::getQuery(std::list<std::string> * const queryz) const
+bool SpecialUpdate::getQuery(std::list<std::string> * const queryz,
+                             SchemaInfo *const schema) const
 {
+    assert(queryz && schema);
+
     queryz->clear();
 
     if (true == this->do_nothing.get()) {
@@ -673,14 +677,14 @@ bool SpecialUpdate::getQuery(std::list<std::string> * const queryz) const
         " DELETE FROM " + this->plain_table +
         " WHERE " + this->where_clause + ";";
     const std::string re_delete =
-        rewriteAndGetSingleQuery(ps, delete_q);
+        rewriteAndGetSingleQuery(ps, delete_q, schema);
 
     // > Add each row from the embedded database to the data database.
     const std::string insert_q =
         " INSERT INTO " + this->plain_table +
         " VALUES " + this->output_values.get() + ";";
     const std::string re_insert =
-        rewriteAndGetSingleQuery(ps, insert_q);
+        rewriteAndGetSingleQuery(ps, insert_q, schema);
 
     queryz->push_back(" CALL homAdditionTransaction ("
                       " '" + escapeString(ps.getConn(), re_delete) + "', "
@@ -944,7 +948,8 @@ bool DDLOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
     return b;
 }
 
-bool DDLOutput::getQuery(std::list<std::string> * const queryz) const
+bool DDLOutput::getQuery(std::list<std::string> * const queryz,
+                         SchemaInfo *const) const
 {
     queryz->clear();
 
@@ -988,7 +993,8 @@ bool AdjustOnionOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
     return b;
 }
 
-bool AdjustOnionOutput::getQuery(std::list<std::string> * const queryz)
+bool AdjustOnionOutput::getQuery(std::list<std::string> * const queryz,
+                                 SchemaInfo *const)
     const
 {
     queryz->clear();
