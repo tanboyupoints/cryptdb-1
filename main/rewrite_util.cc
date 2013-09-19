@@ -437,9 +437,7 @@ escapeString(const std::unique_ptr<Connect> &c,
     c->real_escape_string(escaped.get(), escape_me.c_str(),
                           escape_me.size());
 
-    const std::string out = std::string(escaped.get());
-
-    return out;
+    return std::string(escaped.get());
 }
 
 void

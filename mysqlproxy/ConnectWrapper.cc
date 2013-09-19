@@ -11,17 +11,78 @@
 #include <main/rewrite_util.hh>
 #include <parser/sql_utils.hh>
 
+class SchemaState {
+public:
+    SchemaState() : staleness(true), schema(NULL) {}
+    SchemaState(bool staleness, SchemaInfo *const schema)
+        : staleness(staleness), schema(schema) {}
+
+    bool getSchema(SchemaInfo **schema_out) const
+    {
+        if (true == staleness) {
+            return false;
+        }
+
+        *schema_out = schema;
+        return true;
+    }
+
+private:
+    const bool staleness;
+    SchemaInfo *const schema;
+};
+
 // FIXME: Ownership semantics.
 class WrapperState {
     WrapperState(const WrapperState &other);
     WrapperState &operator=(const WrapperState &rhs);
 
 public:
-    WrapperState() {;}
     std::string last_query;
     std::ofstream * PLAIN_LOG;
     std::string cur_db;
     QueryRewrite * qr;
+
+    WrapperState() : schema_cache(new SchemaState()),
+        potential_schema(NULL) {}
+    ~WrapperState() {}
+
+    void updateSchemaCache(bool staleness)
+    {
+        // FIXME: Memleak.
+        assert(potential_schema);
+        schema_cache =
+            std::unique_ptr<SchemaState>(new SchemaState(staleness,
+                                                         potential_schema));
+        potential_schema = NULL;
+    }
+
+    SchemaInfo *getSchema(const std::unique_ptr<Connect> &conn,
+                          const std::unique_ptr<Connect> &e_conn)
+    {
+        SchemaInfo *schema;
+        if (false == schema_cache->getSchema(&schema)) {
+            schema = loadSchemaInfo(conn, e_conn);
+        }
+        assert(schema);
+
+        return schema;
+    }
+
+    bool setPotentialSchema(SchemaInfo *const schema)
+    {
+        if (NULL == schema) {
+            return false;
+        }
+
+        // FIXME: Memleak.
+        potential_schema = schema;
+        return true;
+    }
+
+private:
+    std::unique_ptr<SchemaState> schema_cache;
+    SchemaInfo *potential_schema;
 };
 
 static Timer t;
@@ -242,6 +303,7 @@ rewrite(lua_State *const L)
     if (clients.find(client) == clients.end()) {
         return 0;
     }
+    WrapperState *const wrapper = clients[client];
 
     const std::string query = xlua_tolstring(L, 2);
     const std::string query_data = xlua_tolstring(L, 3);
@@ -249,23 +311,23 @@ rewrite(lua_State *const L)
     std::list<std::string> new_queries;
     AssignOnce<PREAMBLE_STATUS> preamble_status;
 
-    clients[client]->last_query = query;
+    wrapper->last_query = query;
     t.lap_ms();
     if (EXECUTE_QUERIES) {
         try {
             assert(ps);
 
             QueryRewrite *qr = NULL;
-            // HACK.
             SchemaInfo *const schema =
-                loadSchemaInfo(ps->getConn(), ps->getEConn());
+                wrapper->getSchema(ps->getConn(), ps->getEConn());
             preamble_status =
                 queryPreamble(*ps, query, &qr, &new_queries, schema);
+
             assert(qr);
             assert(preamble_status.get() != PREAMBLE_STATUS::FAILURE);
 
-            // FIXME: Cache schema.
-            clients[client]->qr = qr;
+            assert(wrapper->setPotentialSchema(schema));
+            wrapper->qr = qr;
         } catch (CryptDBError &e) {
             LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
             lua_pushboolean(L, false);
@@ -275,7 +337,7 @@ rewrite(lua_State *const L)
     }
 
     if (LOG_PLAIN_QUERIES) {
-        *(clients[client]->PLAIN_LOG) << query << "\n";
+        *(wrapper->PLAIN_LOG) << query << "\n";
     }
 
     assert(PREAMBLE_STATUS::SUCCESS == preamble_status.get() ||
@@ -431,18 +493,20 @@ envoi(lua_State *const L)
     if (clients.find(client) == clients.end()) {
         return 0;
     }
+    WrapperState *const wrapper = clients[client];
 
     assert(EXECUTE_QUERIES);
     assert(ps);
 
     ResType res;
     getResTypeFromLuaTable(L, 2, 3, &res);
-    const WrapperState *const wrapper = clients[client];
     assert(wrapper->qr);
     ResType *const out_res =
         queryEpilogue(*ps, wrapper->qr, &res, wrapper->last_query,
                       false);
     assert(out_res);
+
+    wrapper->updateSchemaCache(wrapper->qr->output->stalesSchema());
 
     return returnResultSet(L, *out_res);
 }
