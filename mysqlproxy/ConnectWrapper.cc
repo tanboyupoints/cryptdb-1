@@ -68,13 +68,14 @@ public:
         return schema;
     }
 
+    // FIXME: Use smart pointer.
     bool setPotentialSchema(SchemaInfo *const schema)
     {
         if (NULL == schema) {
             return false;
         }
 
-        if (potential_schema) {
+        if (potential_schema != schema) {
             delete potential_schema;
         }
         potential_schema = schema;
