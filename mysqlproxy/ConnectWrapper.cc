@@ -49,7 +49,6 @@ public:
 
     void updateSchemaCache(bool staleness)
     {
-        // FIXME: Memleak.
         assert(potential_schema);
         schema_cache =
             std::unique_ptr<SchemaState>(new SchemaState(staleness,
@@ -75,7 +74,9 @@ public:
             return false;
         }
 
-        // FIXME: Memleak.
+        if (potential_schema) {
+            delete potential_schema;
+        }
         potential_schema = schema;
         return true;
     }
