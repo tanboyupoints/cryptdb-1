@@ -96,7 +96,7 @@ private:
 
 class SchemaCache;
 ResType *
-executeQuery(ProxyState &ps, const std::string &q,
+executeQuery(const ProxyState &ps, const std::string &q,
              SchemaCache *const schema_cache=NULL);
 
 #define UNIMPLEMENTED \

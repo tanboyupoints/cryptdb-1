@@ -273,7 +273,6 @@ rewrite(lua_State *const L)
             assert(qr);
             assert(preamble_status.get() != PREAMBLE_STATUS::FAILURE);
 
-            assert(schema_cache.setPotentialSchema(schema));
             c_wrapper->qr = qr;
         } catch (CryptDBError &e) {
             LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
@@ -349,7 +348,7 @@ rollbackOnionAdjust(lua_State *const L)
         schema_cache.getSchema(ps->getConn(), ps->getEConn());
     assert(queryHandleRollback(*ps, c_wrapper->last_query, schema));
 
-    schema_cache.updateSchemaCache(c_wrapper->qr->output->stalesSchema());
+    schema_cache.updateStaleness(c_wrapper->qr->output->stalesSchema());
     return 0;
 }
 
@@ -458,7 +457,7 @@ envoi(lua_State *const L)
                       false);
     assert(out_res);
 
-    c_wrapper->getSchemaCache().updateSchemaCache(c_wrapper->qr->output->stalesSchema());
+    c_wrapper->getSchemaCache().updateStaleness(c_wrapper->qr->output->stalesSchema());
 
     return returnResultSet(L, *out_res);
 }

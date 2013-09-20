@@ -135,41 +135,28 @@ queryPreamble(const ProxyState &ps, const std::string &q,
               SchemaInfo *const schema);
 
 bool
-queryHandleRollback(ProxyState &ps, const std::string &query,
+queryHandleRollback(const ProxyState &ps, const std::string &query,
                     SchemaInfo *const schema);
 
 void
 prettyPrintQuery(const std::string &query);
 
 ResType *
-queryEpilogue(ProxyState &ps, QueryRewrite *const qr, ResType *const res,
-              const std::string &query, bool pp);
-
-class SchemaState {
-public:
-    SchemaState() : staleness(true), schema(NULL) {}
-    SchemaState(bool staleness, SchemaInfo *const schema)
-        : staleness(staleness), schema(schema) {}
-
-    bool getSchema(SchemaInfo **schema_out) const;
-
-private:
-    const bool staleness;
-    SchemaInfo *const schema;
-};
+queryEpilogue(const ProxyState &ps, QueryRewrite *const qr,
+              ResType *const res, const std::string &query, bool pp);
 
 class SchemaCache {
 public:
-    SchemaCache() : state(new SchemaState()), potential_schema(NULL) {}
-    ~SchemaCache() {}
+    SchemaCache() : staleness(true) {}
+    SchemaCache(bool staleness, SchemaInfo *const schema)
+        : staleness(staleness), schema(schema) {}
 
-    void updateSchemaCache(bool staleness);
     SchemaInfo *getSchema(const std::unique_ptr<Connect> &conn,
                           const std::unique_ptr<Connect> &e_conn);
-    bool setPotentialSchema(SchemaInfo *const schema);
+    void updateStaleness(bool staleness);
 
 private:
-    std::unique_ptr<SchemaState> state;
-    SchemaInfo *potential_schema;
+    bool staleness;
+    std::unique_ptr<SchemaInfo>schema;
 };
 
