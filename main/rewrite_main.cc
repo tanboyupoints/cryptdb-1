@@ -496,22 +496,19 @@ buildTypeTextTranslatorHack()
 static std::string
 removeOnionLayer(Analysis &a, const ProxyState &ps,
                  const FieldMeta *const fm,
+                 OnionMetaAdjustor *const om_adjustor,
                  const std::string &table_name,
-                 onion o, SECLEVEL *const new_level,
+                 SECLEVEL *const new_level,
                  const std::string &cur_db)
 {
-    OnionMeta *const om = a.getOnionMeta(fm, o);
-
     // Remove the EncLayer.
-    // HACK: 'Pop'ping the layer is unsafe as it's being used as a
-    // technique to transmit information to successive calls of
-    // removeOnionLayer. This information is in no way respected by the
-    // persistency logic.
-    std::shared_ptr<EncLayer> back_el(a.popBackEncLayer(om));
+    std::shared_ptr<EncLayer> back_el(om_adjustor->popBackEncLayer());
 
     // Update the Meta.
-    a.deltas.push_back(new DeleteDelta(back_el, om, NULL));
-    const SECLEVEL local_new_level = a.getOnionLevel(om);
+    a.deltas.push_back(new DeleteDelta(back_el,
+                                       om_adjustor->getOnionMeta(),
+                                       NULL));
+    const SECLEVEL local_new_level = om_adjustor->getSecLevel();
 
     //removes onion layer at the DB
     const std::string tableanon =
@@ -521,12 +518,11 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
     Item_field *const salt =
         new Item_field(NULL, ps.dbName().c_str(), anon_table_name.c_str(),
                        fm->getSaltName().c_str());
-    std::cout << TypeText<onion>::toText(o) << std::endl;
 
-    const std::string fieldanon = om->getAnonOnionName();
+    const std::string fieldanon = om_adjustor->getAnonOnionName();
     Item_field *const field =
         new Item_field(NULL, ps.dbName().c_str(), anon_table_name.c_str(),
-                       om->getAnonOnionName().c_str());
+                       fieldanon.c_str());
 
     Item *const decUDF = back_el.get()->decryptUDF(field, salt);
 
@@ -559,14 +555,18 @@ adjustOnion(Analysis &a, const ProxyState &ps, onion o,
             const FieldMeta *const fm, SECLEVEL tolevel,
             const std::string &table_name, const std::string &cur_db)
 {
-    OnionMeta *const om = fm->getOnionMeta(o);
-    SECLEVEL newlevel = a.getOnionLevel(om);
+    std::cout << "onion: " << TypeText<onion>::toText(o) << std::endl;
+    // Make a copy of the onion meta for the purpose of making
+    // modifications during removeOnionLayer(...)
+    OnionMetaAdjustor om_adjustor(fm->getOnionMeta(o));
+    SECLEVEL newlevel = om_adjustor.getSecLevel();
     assert(newlevel != SECLEVEL::INVALID);
 
     std::list<std::string> adjust_queries;
     while (newlevel > tolevel) {
         auto query =
-            removeOnionLayer(a, ps, fm, table_name, o, &newlevel, cur_db);
+            removeOnionLayer(a, ps, fm, &om_adjustor, table_name,
+                             &newlevel, cur_db);
         adjust_queries.push_back(query);
     }
     TEST_UnexpectedSecurityLevel(o, tolevel, newlevel);
@@ -1354,5 +1354,33 @@ printRes(const ResType &r) {
         std::cerr << ss.str() << std::endl;
         //LOG(edb_v) << ss.str();
     }
+}
+
+EncLayer *OnionMetaAdjustor::getBackEncLayer() const
+{
+    return duped_om->layers.back().get();
+}
+
+std::shared_ptr<EncLayer> OnionMetaAdjustor::popBackEncLayer()
+{
+    std::shared_ptr<EncLayer> out_layer(duped_om->layers.back());
+    duped_om->layers.pop_back();
+
+    return out_layer;
+}
+
+SECLEVEL OnionMetaAdjustor::getSecLevel() const
+{
+    return duped_om->getSecLevel();
+}
+
+const OnionMeta *OnionMetaAdjustor::getOnionMeta() const
+{
+    return original_om;
+}
+
+std::string OnionMetaAdjustor::getAnonOnionName() const
+{
+    return original_om->getAnonOnionName();
 }
 

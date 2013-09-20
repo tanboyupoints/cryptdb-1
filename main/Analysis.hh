@@ -397,12 +397,11 @@ public:
     std::string getAnonIndexName(const TableMeta * const tm,
                                  const std::string &index_name,
                                  onion o) const;
-    // FIXME.
-    EncLayer *getBackEncLayer(OnionMeta * const om) const;
-    std::shared_ptr<EncLayer> popBackEncLayer(OnionMeta * const om);
-    SECLEVEL getOnionLevel(OnionMeta * const om) const;
-    std::vector<std::shared_ptr<EncLayer>>
-        getEncLayers(OnionMeta * const om) const;
+    // FIXME: PTR.
+    static EncLayer *getBackEncLayer(OnionMeta * const om);
+    static SECLEVEL getOnionLevel(OnionMeta * const om);
+    static std::vector<std::shared_ptr<EncLayer>>
+        getEncLayers(OnionMeta * const om);
     // HACK.
     const SchemaInfo *getSchema() {return schema;}
 

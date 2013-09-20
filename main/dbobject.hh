@@ -201,6 +201,7 @@ public:
     virtual std::shared_ptr<ChildType>
         getChild(const KeyType * const key) const;
     AbstractMetaKey *getKey(const DBMeta *const child) const;
+    virtual bool myChild(const DBMeta *const child) const;
     virtual std::vector<std::shared_ptr<DBMeta>>
         fetchChildren(const std::unique_ptr<Connect> &e_conn);
     void applyToChildren(std::function<void(const std::shared_ptr<DBMeta>)>

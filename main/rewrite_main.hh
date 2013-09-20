@@ -25,6 +25,7 @@
 #include <main/ddl_handler.hh>
 #include <parser/Annotation.hh>
 #include <parser/stringify.hh>
+#include <parser/lex_util.hh>
 
 #include <util/errstream.hh>
 #include <util/cleanup.hh>
@@ -296,3 +297,20 @@ public:
 SchemaInfo *
 loadSchemaInfo(const std::unique_ptr<Connect> &conn,
                const std::unique_ptr<Connect> &e_conn);
+
+class OnionMetaAdjustor {
+public:
+    OnionMetaAdjustor(const OnionMeta *const om) : original_om(om),
+        duped_om(copy(om)) {}
+    ~OnionMetaAdjustor() {}
+
+    EncLayer *getBackEncLayer() const;
+    std::shared_ptr<EncLayer> popBackEncLayer();
+    SECLEVEL getSecLevel() const;
+    const OnionMeta *getOnionMeta() const;
+    std::string getAnonOnionName() const;
+
+private:
+    const OnionMeta *const original_om;
+    OnionMeta *const duped_om;
+};

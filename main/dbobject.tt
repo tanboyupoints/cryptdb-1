@@ -79,7 +79,7 @@ MappedDBMeta<ChildType, KeyType>::getChild(const KeyType * const key) const
     return NULL;
 }
 
-// FIXME: Slow.
+// NOTE: Slow.
 template <typename ChildType, typename KeyType>
 AbstractMetaKey *
 MappedDBMeta<ChildType, KeyType>::getKey(const DBMeta * const child) const
@@ -91,6 +91,20 @@ MappedDBMeta<ChildType, KeyType>::getKey(const DBMeta * const child) const
     }
 
     return NULL;
+}
+
+// NOTE: Slow.
+template <typename ChildType, typename KeyType>
+bool
+MappedDBMeta<ChildType, KeyType>::myChild(const DBMeta * const child) const
+{
+    for (auto it : children) {
+        if (it.second.get() == child) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 template <typename ChildType, typename KeyType>

@@ -65,6 +65,7 @@ public:
     // Need access to layers.
     friend class Analysis;
     friend class FieldMeta;
+    friend class OnionMetaAdjustor;
     friend bool sanityCheck(FieldMeta * const);
     friend Item *decrypt_item_layers(Item *const, const FieldMeta *const,
                                      onion, uint64_t,

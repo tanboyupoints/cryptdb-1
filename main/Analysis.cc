@@ -1151,27 +1151,18 @@ std::string Analysis::unAliasTable(const std::string &table) const
 }
 
 // FIXME.
-EncLayer *Analysis::getBackEncLayer(OnionMeta * const om) const
+EncLayer *Analysis::getBackEncLayer(OnionMeta * const om)
 {
     return om->layers.back().get();
 }
 
-std::shared_ptr<EncLayer> Analysis::popBackEncLayer(OnionMeta * const om)
-{
-    // FIXME: PTR.
-    std::shared_ptr<EncLayer> out_layer(om->layers.back());
-    om->layers.pop_back();
-
-    return out_layer;
-}
-
-SECLEVEL Analysis::getOnionLevel(OnionMeta * const om) const
+SECLEVEL Analysis::getOnionLevel(OnionMeta * const om)
 {
     return om->getSecLevel();
 }
 
 std::vector<std::shared_ptr<EncLayer>>
-Analysis::getEncLayers(OnionMeta * const om) const
+Analysis::getEncLayers(OnionMeta * const om)
 {
     return om->layers;
 }
