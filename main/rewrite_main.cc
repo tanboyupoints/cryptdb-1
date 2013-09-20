@@ -503,7 +503,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
 
     // Update the Meta.
     a.deltas.push_back(new DeleteDelta(back_el,
-                                       *om_adjustor->getOnionMeta()));
+                                       om_adjustor->getOnionMeta()));
     const SECLEVEL local_new_level = om_adjustor->getSecLevel();
 
     //removes onion layer at the DB
@@ -554,7 +554,7 @@ adjustOnion(Analysis &a, const ProxyState &ps, onion o,
     std::cout << "onion: " << TypeText<onion>::toText(o) << std::endl;
     // Make a copy of the onion meta for the purpose of making
     // modifications during removeOnionLayer(...)
-    OnionMetaAdjustor om_adjustor(fm.getOnionMeta(o));
+    OnionMetaAdjustor om_adjustor(*fm.getOnionMeta(o));
     SECLEVEL newlevel = om_adjustor.getSecLevel();
     assert(newlevel != SECLEVEL::INVALID);
 
@@ -1354,29 +1354,41 @@ printRes(const ResType &r) {
 
 EncLayer &OnionMetaAdjustor::getBackEncLayer() const
 {
-    return *duped_om->layers.back().get();
+    return *duped_layers.back();
 }
 
 EncLayer &OnionMetaAdjustor::popBackEncLayer()
 {
-    EncLayer *const out_layer = duped_om->layers.back().get();
-    duped_om->layers.pop_back();
+    EncLayer *const out_layer = duped_layers.back();
+    duped_layers.pop_back();
 
     return *out_layer;
 }
 
 SECLEVEL OnionMetaAdjustor::getSecLevel() const
 {
-    return duped_om->getSecLevel();
+    return duped_layers.back()->level();
 }
 
-const OnionMeta *OnionMetaAdjustor::getOnionMeta() const
+const OnionMeta &OnionMetaAdjustor::getOnionMeta() const
 {
     return original_om;
 }
 
 std::string OnionMetaAdjustor::getAnonOnionName() const
 {
-    return original_om->getAnonOnionName();
+    return original_om.getAnonOnionName();
 }
 
+std::vector<EncLayer *>
+OnionMetaAdjustor::pullCopyLayers(OnionMeta const &om)
+{
+    std::vector<EncLayer *> v;
+
+    auto const &enc_layers = om.layers;
+    for (auto it = enc_layers.begin(); it != enc_layers.end(); it++) {
+        v.push_back((*it).get());
+    }
+
+    return v;
+}

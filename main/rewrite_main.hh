@@ -300,17 +300,19 @@ loadSchemaInfo(const std::unique_ptr<Connect> &conn,
 
 class OnionMetaAdjustor {
 public:
-    OnionMetaAdjustor(const OnionMeta *const om) : original_om(om),
-        duped_om(copy(om)) {}
+    OnionMetaAdjustor(OnionMeta const &om) : original_om(om),
+        duped_layers(pullCopyLayers(om)) {}
     ~OnionMetaAdjustor() {}
 
     EncLayer &getBackEncLayer() const;
     EncLayer &popBackEncLayer();
     SECLEVEL getSecLevel() const;
-    const OnionMeta *getOnionMeta() const;
+    const OnionMeta &getOnionMeta() const;
     std::string getAnonOnionName() const;
 
 private:
-    const OnionMeta *const original_om;
-    OnionMeta *const duped_om;
+    OnionMeta const &original_om;
+    std::vector<EncLayer *> duped_layers;
+
+    static std::vector<EncLayer *> pullCopyLayers(OnionMeta const &om);
 };

@@ -126,13 +126,11 @@ OnionMeta::fetchChildren(const std::unique_ptr<Connect> &e_conn)
         if (index >= this->layers.size()) {
             this->layers.resize(index + 1);
         }
-        // FIXME: URGENT.
         std::unique_ptr<EncLayer>
             layer(EncLayerFactory::deserializeLayer(atoi(id.c_str()),
                                                     serial));
         this->layers[index] = std::move(layer);
-
-        return layer.get();
+        return this->layers[index].get();
     };
 
     return DBMeta::doFetchChildren(e_conn, deserialHelper);
@@ -166,7 +164,7 @@ EncLayer *OnionMeta::getLayerBack() const
     if (layers.size() == 0) {
         throw CryptDBError("Tried getting EncLayer when there are none!");
     }
-    // FIXME: PTR.
+
     return layers.back().get();
 }
 
@@ -248,8 +246,7 @@ init_onions_layout(const AES_KEY *const m_key,
         std::unique_ptr<OnionMeta>
             om(new OnionMeta(o, levels, m_key, cf, fm->leaseIncUniq()));
         const std::string onion_name = om->getAnonOnionName();
-        // FIXME: URGENT.
-        fm->addChild(OnionMetaKey(o), om.get());
+        fm->addChild(OnionMetaKey(o), std::move(om));
 
         LOG(cdb_v) << "adding onion layer " << onion_name
                    << " for " << fm->fname;

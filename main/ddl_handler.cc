@@ -51,13 +51,8 @@ class CreateHandler : public DDLHandler {
         // Create the table regardless of 'IF NOT EXISTS' if the table
         // doesn't exist.
         if (false == a.tableMetaExists(table)) {
-            // -----------------------------
-            //         Update TABLE       
-            // -----------------------------
             // TODO: Use appropriate values for has_sensitive and has_salt.
             std::unique_ptr<TableMeta> tm(new TableMeta(true, true));
-            a.deltas.push_back(new CreateDelta(std::move(tm), a.getSchema(),
-                                               new IdentityMetaKey(table)));
 
             // -----------------------------
             //         Rewrite TABLE       
@@ -70,7 +65,7 @@ class CreateHandler : public DDLHandler {
             // > This will _NOT_ gracefully handle a malformed CREATE TABLE
             // query.
             assert(1 == new_lex->select_lex.table_list.elements);
-            TABLE_LIST *tbl =
+            TABLE_LIST *const tbl =
                 rewrite_table_list(new_lex->select_lex.table_list.first,
                                    tm->getAnonTableName());
             new_lex->select_lex.table_list = *oneElemList<TABLE_LIST>(tbl);
@@ -80,7 +75,7 @@ class CreateHandler : public DDLHandler {
             new_lex->alter_info.create_list =
                 accumList<Create_field>(it,
                     [&a, &ps, &tm] (List<Create_field> out_list,
-                                    Create_field *cf) {
+                                    Create_field *const cf) {
                         return createAndRewriteField(a, ps, cf, tm.get(),
                                                      true, out_list);
                 });
@@ -99,6 +94,13 @@ class CreateHandler : public DDLHandler {
 
                         return out_list;
                     });
+
+            // -----------------------------
+            //         Update TABLE       
+            // -----------------------------
+            a.deltas.push_back(new CreateDelta(std::move(tm),
+                                               a.getSchema(),
+                                              new IdentityMetaKey(table)));
         } else { // Table already exists.
 
             // Make sure we aren't trying to create a table that

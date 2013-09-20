@@ -346,9 +346,6 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
                       TableMeta *const tm, bool new_table,
                       List<Create_field> &rewritten_cfield_list)
 {
-    // -----------------------------
-    //         Update FIELD       
-    // -----------------------------
     const std::string name = std::string(cf->field_name);
     auto buildFieldMeta =
         [] (const std::string name, Create_field * const cf,
@@ -360,24 +357,25 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     };
     std::unique_ptr<FieldMeta> fm(buildFieldMeta(name, cf, ps, tm));
 
+    // -----------------------------
+    //         Rewrite FIELD       
+    // -----------------------------
+    const auto new_fields = rewrite_create_field(fm.get(), cf, a);
+    rewritten_cfield_list.concat(vectorToList(new_fields));
+
+    // -----------------------------
+    //         Update FIELD       
+    // -----------------------------
+
     // Here we store the key name for the first time. It will be applied
     // after the Delta is read out of the database.
     if (true == new_table) {
-        // FIXME: URGENT.
-        tm->addChild(IdentityMetaKey(name), fm.get());
+        tm->addChild(IdentityMetaKey(name), std::move(fm));
     } else {
-        // FIXME: PTR.
         a.deltas.push_back(new CreateDelta(std::move(fm), *tm,
                                            new IdentityMetaKey(name)));
         a.deltas.push_back(new ReplaceDelta(*tm, a.getSchema()));
     }
-
-    // -----------------------------
-    //         Rewrite FIELD       
-    // -----------------------------
-    // FIXME: UREGENT.
-    const auto new_fields = rewrite_create_field(fm.get(), cf, a);
-    rewritten_cfield_list.concat(vectorToList(new_fields));
 
     return rewritten_cfield_list;
 }

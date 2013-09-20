@@ -17,31 +17,21 @@ bool MetaKey<KeyType>::operator ==(const MetaKey<KeyType> &rhs) const
 template <typename ChildType, typename KeyType>
 bool
 MappedDBMeta<ChildType, KeyType>::addChild(KeyType key,
-                                           ChildType *const meta)
+                                           std::unique_ptr<ChildType> meta)
 {
     if (childExists(key)) {
         return false;
     }
 
-    children[key] = std::unique_ptr<ChildType>(meta);
+    children[key] = std::move(meta);
     return true;
-}
-
-template <typename ChildType, typename KeyType>
-typename std::map<KeyType, std::unique_ptr<ChildType>>::const_iterator
-MappedDBMeta<ChildType, KeyType>::findChild(const KeyType &key) const
-{
-    auto it = children.find(key);
-    assert(it != children.end());
-
-    return it;
 }
 
 template <typename ChildType, typename KeyType>
 bool
 MappedDBMeta<ChildType, KeyType>::childExists(const KeyType &key) const
 {
-    return children.end() != this->findChild(key);
+    return children.end() != children.find(key);
 }
 
 // Slow.
@@ -87,18 +77,15 @@ MappedDBMeta<ChildType, KeyType>::fetchChildren(const std::unique_ptr<Connect> &
         [this] (const std::string &key, const std::string &serial,
                 const std::string &id)
         {
-            const KeyType *const meta_key =
-                AbstractMetaKey::factory<KeyType>(key);
+            const std::unique_ptr<KeyType>
+                meta_key(AbstractMetaKey::factory<KeyType>(key));
             auto dChild = ChildType::deserialize;
-            std::unique_ptr<ChildType> new_old_meta(dChild(atoi(id.c_str()),
-                                          serial));
+            std::unique_ptr<ChildType>
+                new_old_meta(dChild(atoi(id.c_str()), serial));
 
             // Gobble the child.
-            // FIXME: URGENT.
-            this->addChild(*meta_key, new_old_meta.get());
-
-            // FIXME: URGENT.
-            return new_old_meta.get();
+            this->addChild(*meta_key, std::move(new_old_meta));
+            return this->getChild(*meta_key);
         };
 
     return DBMeta::doFetchChildren(e_conn, deserialize);

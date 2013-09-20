@@ -1119,7 +1119,7 @@ std::string Analysis::getAnonIndexName(const std::string &table,
                                        onion o)
     const
 {
-    return this->getTableMeta(table).getAnonIndexName(index_name, o); 
+    return this->getTableMeta(table).getAnonIndexName(index_name, o);
 }
 
 std::string Analysis::getAnonIndexName(const TableMeta &tm,
@@ -1127,7 +1127,7 @@ std::string Analysis::getAnonIndexName(const TableMeta &tm,
                                        onion o)
     const
 {
-    return tm.getAnonIndexName(index_name, o); 
+    return tm.getAnonIndexName(index_name, o);
 }
 
 std::string Analysis::unAliasTable(const std::string &table) const
