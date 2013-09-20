@@ -147,16 +147,19 @@ void OnionMeta::applyToChildren(std::function<void(std::shared_ptr<DBMeta>)>
     }
 }
 
-AbstractMetaKey *OnionMeta::getKey(const DBMeta *const child) const
+UIntMetaKey const &OnionMeta::getKey(const DBMeta *const child) const
 {
     for (std::vector<EncLayer *>::size_type i = 0; i< layers.size(); ++i) {
         // FIXME: PTR.
         if (child == layers[i].get()) {
-            return new UIntMetaKey(i);
+            auto key = new UIntMetaKey(i);
+            // FIXME: Memleak.
+            return *key;
         }
     }
 
-    return NULL;
+    // FIXME.
+    assert(false);
 }
 
 EncLayer *OnionMeta::getLayerBack() const
@@ -255,7 +258,7 @@ init_onions_layout(const AES_KEY *const m_key,
         std::unique_ptr<OnionMeta>
             om(new OnionMeta(o, levels, m_key, cf, fm->leaseIncUniq()));
         const std::string onion_name = om->getAnonOnionName();
-        fm->addChild(new OnionMetaKey(o), std::move(om));
+        fm->addChild(OnionMetaKey(o), std::move(om));
 
         LOG(cdb_v) << "adding onion layer " << onion_name
                    << " for " << fm->fname;
@@ -307,18 +310,18 @@ std::string FieldMeta::stringify() const
     return res;
 }
 
-std::vector<std::pair<OnionMetaKey *, OnionMeta *>>
+std::vector<std::pair<const OnionMetaKey *, OnionMeta *>>
 FieldMeta::orderedOnionMetas() const
 {
-    std::vector<std::pair<OnionMetaKey *, OnionMeta *>> v;
+    std::vector<std::pair<const OnionMetaKey *, OnionMeta *>> v;
     for (auto it : children) {
         // FIXME: PTR.
-        v.push_back(std::make_pair(it.first, it.second.get()));
+        v.push_back(std::make_pair(&it.first, it.second.get()));
     }
 
     std::sort(v.begin(), v.end(),
-              [] (std::pair<OnionMetaKey *, OnionMeta *> a,
-                  std::pair<OnionMetaKey *, OnionMeta *> b) {
+              [] (std::pair<const OnionMetaKey *, OnionMeta *> a,
+                  std::pair<const OnionMetaKey *, OnionMeta *> b) {
                 return a.second->getUniq() <
                        b.second->getUniq();
               });
@@ -334,8 +337,7 @@ std::string FieldMeta::getSaltName() const
 
 SECLEVEL FieldMeta::getOnionLevel(onion o) const
 {
-    std::unique_ptr<OnionMetaKey> key(new OnionMetaKey(o));
-    const auto om = getChild(key.get());
+    const auto om = getChild(OnionMetaKey(o));
     if (om == NULL) {
         return SECLEVEL::INVALID;
     }
@@ -361,8 +363,7 @@ bool FieldMeta::setOnionLevel(onion o, SECLEVEL maxl)
 
 OnionMeta *FieldMeta::getOnionMeta(onion o) const
 {
-    const std::unique_ptr<OnionMetaKey> key(new OnionMetaKey(o));
-    const std::shared_ptr<OnionMeta> om = getChild(key.get());
+    const std::shared_ptr<OnionMeta> om = getChild(OnionMetaKey(o));
     // FIXME: PTR.
     return om.get();
 }
@@ -459,8 +460,7 @@ std::string FieldMeta::determineDefaultValue(bool has_default,
 
 bool FieldMeta::hasOnion(onion o) const
 {
-    const std::unique_ptr<OnionMetaKey> key(new OnionMetaKey(o));
-    return childExists(key.get());
+    return childExists(OnionMetaKey(o));
 }
 
 std::unique_ptr<TableMeta>
@@ -549,32 +549,14 @@ FieldMeta *
 SchemaInfo::getFieldMeta(const std::string &table,
                          const std::string &field) const
 {
-    std::unique_ptr<IdentityMetaKey>
-        table_key(new IdentityMetaKey(table));
-    std::shared_ptr<TableMeta> tm = getChild(table_key.get());
+    std::shared_ptr<TableMeta> tm = getChild(IdentityMetaKey(table));
     if (NULL == tm) {
         return NULL;
     }
 
-    std::unique_ptr<IdentityMetaKey>
-        field_key(new IdentityMetaKey(field));
-    std::shared_ptr<FieldMeta> fm = tm->getChild(field_key.get());
+    std::shared_ptr<FieldMeta> fm = tm->getChild(IdentityMetaKey(field));
 
     // FIXME: PTR.
     return fm.get();
-}
-
-// FIXME: Slow.
-std::string
-SchemaInfo::getTableNameFromFieldMeta(const FieldMeta * const fm) const
-{
-    for (auto it : children) {
-        const AbstractMetaKey * const key = it.second->getKey(fm);
-        if (key) {
-            return it.first->getValue();
-        }
-    }
-
-    throw CryptDBError("Failed to get table name from FieldMeta");
 }
 

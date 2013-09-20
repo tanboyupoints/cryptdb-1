@@ -674,7 +674,7 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
 bool invalidates(FieldMeta * fm, const EncSet & es)
 {
     for (auto o_l : fm->children) {
-        onion o = o_l.first->getValue();
+        onion const o = o_l.first.getValue();
         if (es.osl.find(o) == es.osl.end()) {
             return true;
         }

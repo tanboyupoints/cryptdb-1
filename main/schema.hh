@@ -56,7 +56,7 @@ public:
     std::vector<std::shared_ptr<DBMeta>>
         fetchChildren(const std::unique_ptr<Connect> &e_conn);
     void applyToChildren(std::function<void(std::shared_ptr<DBMeta>)>) const;
-    AbstractMetaKey *getKey(const DBMeta *const child) const;
+    UIntMetaKey const &getKey(const DBMeta *const child) const;
     EncLayer *getLayerBack() const;
     EncLayer *getLayer(const SECLEVEL &sl) const;
     bool hasEncLayer(const SECLEVEL &sl) const;
@@ -115,7 +115,7 @@ public:
 
     std::string serialize(const DBObject &parent) const;
     std::string stringify() const;
-    std::vector<std::pair<OnionMetaKey *, OnionMeta *>>
+    std::vector<std::pair<const OnionMetaKey *, OnionMeta *>>
         orderedOnionMetas() const;
     std::string getSaltName() const;
     unsigned long getUniq() const {return uniq_count;}
@@ -205,8 +205,6 @@ public:
 
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
-    std::string getTableNameFromFieldMeta(const FieldMeta * const fm)
-        const;
 
     friend class Analysis;
 

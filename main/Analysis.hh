@@ -110,9 +110,8 @@ public:
     enum TableType {REGULAR_TABLE, BLEEDING_TABLE};
 
     Delta(const std::shared_ptr<DBMeta> meta,
-          const DBMeta * const parent_meta,
-          const AbstractMetaKey * const key)
-        : meta(meta), parent_meta(parent_meta), key(key) {}
+          const DBMeta * const parent_meta)
+        : meta(meta), parent_meta(parent_meta) {}
 
     /*
      * Take the update action against the database. Contains high level
@@ -124,7 +123,6 @@ public:
 protected:
     const std::shared_ptr<DBMeta> meta;
     const DBMeta * const parent_meta;
-    const AbstractMetaKey * const key;
 
     std::string tableNameFromType(TableType table_type) const;
 };
@@ -136,22 +134,35 @@ class CreateDelta : public Delta {
 public:
     CreateDelta(const std::shared_ptr<DBMeta> meta,
                 const DBMeta * const parent_meta,
-                const AbstractMetaKey * const key)
-        : Delta(meta, parent_meta, key) {}
+                AbstractMetaKey *const key)
+        : Delta(meta, parent_meta), key(key) {}
 
     bool save(const std::unique_ptr<Connect> &e_conn,
               unsigned long * const delta_output_id);
     bool apply(const std::unique_ptr<Connect> &e_conn,
                TableType table_type);
     bool destroyRecord(const std::unique_ptr<Connect> &e_conn);
+
+private:
+    std::unique_ptr<AbstractMetaKey> key;
 };
 
-class ReplaceDelta : public Delta {
+class DerivedKeyDelta : public Delta {
+public:
+    DerivedKeyDelta(const std::shared_ptr<DBMeta> meta,
+                   const DBMeta * const parent_meta)
+        : Delta(meta, parent_meta), key(parent_meta->getKey(meta.get()))
+    {}
+
+protected:
+    const AbstractMetaKey &key;
+};
+
+class ReplaceDelta : public DerivedKeyDelta {
 public:
     ReplaceDelta(const std::shared_ptr<DBMeta> meta,
-                 const DBMeta * const parent_meta,
-                 const AbstractMetaKey * const key)
-        : Delta(meta, parent_meta, key) {}
+                 const DBMeta * const parent_meta)
+        : DerivedKeyDelta(meta, parent_meta) {}
 
     bool save(const std::unique_ptr<Connect> &e_conn,
               unsigned long * const delta_output_id);
@@ -160,12 +171,11 @@ public:
     bool destroyRecord(const std::unique_ptr<Connect> &e_conn);
 };
 
-class DeleteDelta : public Delta {
+class DeleteDelta : public DerivedKeyDelta {
 public:
     DeleteDelta(const std::shared_ptr<DBMeta> meta,
-                const DBMeta * const parent_meta,
-                const AbstractMetaKey * const key)
-        : Delta(meta, parent_meta, key) {}
+                const DBMeta * const parent_meta)
+        : DerivedKeyDelta(meta, parent_meta) {}
 
     bool save(const std::unique_ptr<Connect> &e_conn,
               unsigned long * const delta_output_id);

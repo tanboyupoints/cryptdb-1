@@ -44,14 +44,11 @@ deductPlainTableName(const std::string &field_name,
 {
     assert(context);
 
-    std::unique_ptr<IdentityMetaKey>
-        key(new IdentityMetaKey(field_name));
-
     const TABLE_LIST *current_table =
         context->first_name_resolution_table;
     do {
         TableMeta *const tm = a.getTableMeta(current_table->table_name);
-        if (tm->childExists(key.get())) {
+        if (tm->childExists(IdentityMetaKey(field_name))) {
             return std::string(current_table->table_name);
         }
 

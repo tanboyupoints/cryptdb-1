@@ -17,9 +17,9 @@ EncSet::EncSet(Analysis &a, FieldMeta * const fm) {
     osl.clear();
     for (auto pair : fm->children) {
         // FIXME: PTR.
-        OnionMeta * const om = pair.second.get();
-        const OnionMetaKey * const key = pair.first;
-        osl[key->getValue()] = LevelFieldPair(a.getOnionLevel(om), fm);
+        OnionMeta *const om = pair.second.get();
+        OnionMetaKey const &key = pair.first;
+        osl[key.getValue()] = LevelFieldPair(a.getOnionLevel(om), fm);
     }
 }
 
@@ -392,14 +392,21 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
             parent_id = parent->getDatabaseID();
         }
 
-        std::string serial_key;
-        if (NULL == k) {
-            AbstractMetaKey *ck = parent->getKey(object);
-            assert(ck);
-            serial_key = ck->getSerial();
-        } else {
-            serial_key = k->getSerial();
-        }
+        std::function<std::string(const DBMeta *const,
+                                  const DBMeta *const,
+                                  const AbstractMetaKey *const)>
+            getSerialKey =
+                [] (const DBMeta *const p, const DBMeta *const o,
+                    const AbstractMetaKey *const keee)
+            {
+                if (NULL == keee) {
+                    return p->getKey(o).getSerial();  /* lambda */
+                }
+
+                return keee->getSerial();      /* lambda */
+            };
+
+        const std::string serial_key = getSerialKey(parent, object, k);
         const std::string esc_serial_key =
             escapeString(e_conn, serial_key);
 
@@ -431,7 +438,7 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
         object->applyToChildren(localCreateHandler);
     };
 
-    helper(e_conn, meta.get(), parent_meta, key, NULL);
+    helper(e_conn, meta.get(), parent_meta, key.get(), NULL);
     return true;
 }
 
@@ -445,7 +452,7 @@ bool ReplaceDelta::apply(const std::unique_ptr<Connect> &e_conn,
     const std::string child_serial = meta.get()->serialize(*parent_meta);
     const std::string esc_child_serial =
         escapeString(e_conn, child_serial);
-    const std::string serial_key = key->getSerial();
+    const std::string serial_key = key.getSerial();
     const std::string esc_serial_key = escapeString(e_conn, serial_key);
 
     const std::string query = 
@@ -1093,30 +1100,22 @@ FieldMeta *Analysis::getFieldMeta(const std::string &table,
 FieldMeta *Analysis::getFieldMeta(const TableMeta * const tm,
                                   const std::string &field) const
 {
-    // FIXME: PTR.
-    const std::unique_ptr<IdentityMetaKey>
-        key(new IdentityMetaKey(field));
-    std::shared_ptr<FieldMeta> fm = tm->getChild(key.get());
+    std::shared_ptr<FieldMeta> fm = tm->getChild(IdentityMetaKey(field));
     assert(fm);
     return fm.get();
 }
 
 TableMeta *Analysis::getTableMeta(const std::string &table) const
 {
-    // FIXME: PTR.
-    const std::unique_ptr<IdentityMetaKey>
-        key(new IdentityMetaKey(unAliasTable(table)));
-
-    std::shared_ptr<TableMeta> tm = this->schema->getChild(key.get());
+    std::shared_ptr<TableMeta> tm =
+        this->schema->getChild(IdentityMetaKey(unAliasTable(table)));
     assert(tm);
     return tm.get();
 }
 
 bool Analysis::tableMetaExists(const std::string &table) const
 {
-    const std::unique_ptr<IdentityMetaKey>
-        key(new IdentityMetaKey(unAliasTable(table)));
-    return this->schema->childExists(key.get());
+    return this->schema->childExists(IdentityMetaKey(unAliasTable(table)));
 }
 
 std::string Analysis::getAnonTableName(const std::string &table) const

@@ -67,8 +67,7 @@ class DropColumnSubHandler : public AlterSubHandler {
             TableMeta *tm = a.getTableMeta(preamble.table);
             List<Alter_drop> lst = this->rewrite(fm.get(), adrop);
             out_list.concat(&lst);
-            a.deltas.push_back(new DeleteDelta(fm, tm,
-                                               tm->getKey(fm.get())));
+            a.deltas.push_back(new DeleteDelta(fm, tm));
             return out_list; /* lambda */
         });
 

@@ -366,13 +366,12 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     // Here we store the key name for the first time. It will be applied
     // after the Delta is read out of the database.
     if (true == new_table) {
-        tm->addChild(new IdentityMetaKey(name), fm);
+        tm->addChild(IdentityMetaKey(name), fm);
     } else {
         // FIXME: PTR.
         a.deltas.push_back(new CreateDelta(fm, tm.get(),
                                            new IdentityMetaKey(name)));
-        a.deltas.push_back(new ReplaceDelta(tm, a.getSchema(),
-                                            a.getSchema()->getKey(tm.get())));
+        a.deltas.push_back(new ReplaceDelta(tm, a.getSchema()));
     }
 
     // -----------------------------

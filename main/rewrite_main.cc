@@ -85,7 +85,7 @@ sanityCheck(FieldMeta *const fm)
     for (auto it : fm->children) {
         // FIXME: PTR.
         std::shared_ptr<OnionMeta> om = it.second;
-        const onion o = it.first->getValue();
+        const onion o = it.first.getValue();
         const std::vector<SECLEVEL> &secs = fm->onion_layout.at(o);
         for (unsigned int i = 0; i < om.get()->layers.size(); ++i) {
             std::shared_ptr<EncLayer> layer = om.get()->layers[i];
@@ -506,8 +506,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
 
     // Update the Meta.
     a.deltas.push_back(new DeleteDelta(back_el,
-                                       om_adjustor->getOnionMeta(),
-                                       NULL));
+                                       om_adjustor->getOnionMeta()));
     const SECLEVEL local_new_level = om_adjustor->getSecLevel();
 
     //removes onion layer at the DB

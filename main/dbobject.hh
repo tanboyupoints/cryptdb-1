@@ -149,7 +149,8 @@ public:
     virtual void
         applyToChildren(std::function<void(const std::shared_ptr<DBMeta>)>)
         const = 0;
-    virtual AbstractMetaKey *getKey(const DBMeta *const child) const = 0;
+    virtual AbstractMetaKey const &getKey(const DBMeta *const child)
+        const = 0;
 
 protected:
     std::vector<std::shared_ptr<DBMeta>>
@@ -177,14 +178,13 @@ public:
         return;
     }
 
-    AbstractMetaKey *getKey(const DBMeta *const child) const
+    AbstractMetaKey const &getKey(const DBMeta *const child) const
     {
-        return NULL;
+        // FIXME:
+        assert(false);
     }
 };
 
-// > TODO: Make getDatabaseID() protected by templating on the Concrete type
-//   and making it a friend.
 // > TODO: Use static deserialization functions for the derived types so we
 //   can get rid of the <Constructor>(std::string serial) functions and put
 //   'const' back on the members.
@@ -196,25 +196,25 @@ public:
     MappedDBMeta() {}
     MappedDBMeta(unsigned int id) : DBMeta(id) {}
     virtual ~MappedDBMeta();
-    virtual bool addChild(KeyType *key, std::shared_ptr<ChildType> meta);
-    virtual bool childExists(KeyType * key) const;
+    virtual bool addChild(KeyType key,
+                          std::shared_ptr<ChildType> meta);
+    virtual bool childExists(const KeyType &key) const;
     virtual std::shared_ptr<ChildType>
-        getChild(const KeyType * const key) const;
-    AbstractMetaKey *getKey(const DBMeta *const child) const;
-    virtual bool myChild(const DBMeta *const child) const;
+        getChild(const KeyType &key) const;
+    KeyType const &getKey(const DBMeta *const child) const;
     virtual std::vector<std::shared_ptr<DBMeta>>
         fetchChildren(const std::unique_ptr<Connect> &e_conn);
     void applyToChildren(std::function<void(const std::shared_ptr<DBMeta>)>
         fn) const;
 
     // FIXME: Make protected.
-    std::map<KeyType *, std::shared_ptr<ChildType>> children;
+    std::map<KeyType, std::shared_ptr<ChildType>> children;
 
 private:
     // Helpers.
     typename
-        std::map<KeyType *, std::shared_ptr<ChildType>>::const_iterator
-        findChild(KeyType *key) const;
+        std::map<KeyType , std::shared_ptr<ChildType>>::const_iterator
+        findChild(const KeyType &key) const;
 };
 
 #include <dbobject.tt>
