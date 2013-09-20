@@ -129,7 +129,7 @@ mysql_noop();
 enum class PREAMBLE_STATUS {SUCCESS, FAILURE, ROLLBACK};
 
 PREAMBLE_STATUS
-queryPreamble(ProxyState &ps, const std::string &q,
+queryPreamble(const ProxyState &ps, const std::string &q,
               QueryRewrite **const out_qr,
               std::list<std::string> *const out_queryz,
               SchemaInfo *const schema);
@@ -144,3 +144,32 @@ prettyPrintQuery(const std::string &query);
 ResType *
 queryEpilogue(ProxyState &ps, QueryRewrite *const qr, ResType *const res,
               const std::string &query, bool pp);
+
+class SchemaState {
+public:
+    SchemaState() : staleness(true), schema(NULL) {}
+    SchemaState(bool staleness, SchemaInfo *const schema)
+        : staleness(staleness), schema(schema) {}
+
+    bool getSchema(SchemaInfo **schema_out) const;
+
+private:
+    const bool staleness;
+    SchemaInfo *const schema;
+};
+
+class SchemaCache {
+public:
+    SchemaCache() : state(new SchemaState()), potential_schema(NULL) {}
+    ~SchemaCache() {}
+
+    void updateSchemaCache(bool staleness);
+    SchemaInfo *getSchema(const std::unique_ptr<Connect> &conn,
+                          const std::unique_ptr<Connect> &e_conn);
+    bool setPotentialSchema(SchemaInfo *const schema);
+
+private:
+    std::unique_ptr<SchemaState> state;
+    SchemaInfo *potential_schema;
+};
+

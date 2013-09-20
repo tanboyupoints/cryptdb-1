@@ -12,6 +12,7 @@
 #include <util/errstream.hh>
 #include <util/cleanup.hh>
 #include <util/cryptdb_log.hh>
+#include <main/rewrite_main.hh>
 
 #include <test/TestQueries.hh>
 
@@ -1175,7 +1176,10 @@ Connection::executeRewriter(std::string query) {
 
     //cout << query << endl;
     ProxyState *ps = *re_it;
-    ResType *dec_res = executeQuery(*ps, query);
+    // If this assert fails, deteremine if one schema_cache makes sense
+    // for multiple connections.
+    assert(re_set.size() == 1);
+    ResType *dec_res = executeQuery(*ps, query, &this->schema_cache);
     if (dec_res) {
         return *dec_res;
     } else {

@@ -1258,18 +1258,25 @@ mysql_noop_res(const ProxyState &ps)
 // FIXME: DBResult and ResType memleaks.
 // FIXME: Use TELL policy.
 ResType *
-executeQuery(ProxyState &ps, const std::string &q)
+executeQuery(ProxyState &ps, const std::string &q,
+             SchemaCache *schema_cache)
 {
+    SchemaCache temp_schema_cache;
+    if (NULL == schema_cache) {
+        schema_cache = &temp_schema_cache;
+    }
+
     try {
         QueryRewrite *qr = NULL;
         // out_queryz: queries intended to be run against remote server.
         std::list<std::string> out_queryz;
-        // FIXME: Cache.
         SchemaInfo *const schema =
-            loadSchemaInfo(ps.getConn(), ps.getEConn());
+            schema_cache->getSchema(ps.getConn(), ps.getEConn());
         PREAMBLE_STATUS const preamble_status =
             queryPreamble(ps, q, &qr, &out_queryz, schema);
         assert(PREAMBLE_STATUS::FAILURE != preamble_status);
+
+        assert(schema_cache->setPotentialSchema(schema));
 
         DBResult *dbres = NULL;
         for (auto it : out_queryz) {
@@ -1289,6 +1296,12 @@ executeQuery(ProxyState &ps, const std::string &q)
         // ----------------------------------
         //       Post Query Processing
         // ----------------------------------
+        // > Handle schema cacheing immediately after executing a query.
+        //   + Updating the cache here is 'aggresive' in the case
+        //     where we are doing an onion adjustment ROLLBACK
+        //     and queryHandleRollback fails.
+        schema_cache->updateSchemaCache(qr->output->stalesSchema());
+
         if (PREAMBLE_STATUS::ROLLBACK == preamble_status) {
             assert(queryHandleRollback(ps, q, schema));
             return new ResType(dbres->unpack());

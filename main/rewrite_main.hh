@@ -94,8 +94,10 @@ private:
     MYSQL_RES *r;
 };
 
+class SchemaCache;
 ResType *
-executeQuery(ProxyState &ps, const std::string &q);
+executeQuery(ProxyState &ps, const std::string &q,
+             SchemaCache *const schema_cache=NULL);
 
 #define UNIMPLEMENTED \
         throw std::runtime_error(std::string("Unimplemented: ") + \

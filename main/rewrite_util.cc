@@ -472,7 +472,7 @@ mysql_noop()
 }
 
 PREAMBLE_STATUS
-queryPreamble(ProxyState &ps, const std::string &q,
+queryPreamble(const ProxyState &ps, const std::string &q,
               QueryRewrite **const out_qr,
               std::list<std::string> *const out_queryz,
               SchemaInfo *const schema)
@@ -630,5 +630,53 @@ queryEpilogue(ProxyState &ps, QueryRewrite *const qr, ResType *const res,
     }
 
     return res;
+}
+
+bool SchemaState::getSchema(SchemaInfo **schema_out) const
+{
+    if (true == staleness) {
+        return false;
+    }
+
+    *schema_out = schema;
+    return true;
+}
+
+void
+SchemaCache::updateSchemaCache(bool staleness)
+{
+    assert(potential_schema);
+    state =
+        std::unique_ptr<SchemaState>(new SchemaState(staleness,
+                                                     potential_schema));
+    potential_schema = NULL;
+}
+
+SchemaInfo *
+SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
+                       const std::unique_ptr<Connect> &e_conn)
+{
+    SchemaInfo *schema;
+    if (false == state->getSchema(&schema)) {
+        schema = loadSchemaInfo(conn, e_conn);
+    }
+    assert(schema);
+
+    return schema;
+}
+
+// FIXME: Use smart pointer.
+bool
+SchemaCache::setPotentialSchema(SchemaInfo *const schema)
+{
+    if (NULL == schema) {
+        return false;
+    }
+
+    if (potential_schema != schema) {
+        delete potential_schema;
+    }
+    potential_schema = schema;
+    return true;
 }
 
