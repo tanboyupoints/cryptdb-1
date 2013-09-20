@@ -81,8 +81,7 @@ public:
 private:
     // const Item *const i;
     const unsigned int type;
-    // FIXME: This reference is not safe.
-    const EncSet &req_enc_set;
+    const EncSet req_enc_set;
     const std::string why;
     const RewritePlan *const *const childr_rp;
     const unsigned int child_count;
