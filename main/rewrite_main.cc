@@ -37,6 +37,7 @@ extern CItemFuncNameDir funcNames;
 //TODO: use getAssert in more places
 //TODO: replace table/field with FieldMeta * for speed and conciseness
 
+/*
 static Item_field *
 stringToItemField(const std::string &field,
                   const std::string &table, Item_field *const itf)
@@ -50,6 +51,7 @@ stringToItemField(const std::string &field,
 
     return res;
 }
+*/
 
 static inline std::string
 extract_fieldname(Item_field *const i)
@@ -202,7 +204,7 @@ fixDelta(const std::unique_ptr<Connect> &conn,
 
     if (expect_ddl) {  // Handle single DDL query.
         if (false == conn->execute(remote_queries.back())) {
-            unsigned int err = conn->get_mysql_errno();
+            unsigned int const err = conn->get_mysql_errno();
             if (false == recoverableDeltaError(err)) {
                 return false;
             }
@@ -228,7 +230,7 @@ fixDelta(const std::unique_ptr<Connect> &conn,
             RETURN_FALSE_IF_FALSE(saveDMLCompletion(conn,
                                                     delta_output_id));
             RETURN_FALSE_IF_FALSE(conn->execute("COMMIT"));
-        } else if (1 > dml_row_count) {
+        } else if (1 < dml_row_count) {
             throw CryptDBError("Too many DML table results!");
         }
     }
@@ -294,7 +296,7 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
 //  1> Schema buildling (CREATE TABLE IF NOT EXISTS...)
 //  2> INSERTing
 //  3> SELECTing
-static SchemaInfo *
+SchemaInfo *
 loadSchemaInfo(const std::unique_ptr<Connect> &conn,
                const std::unique_ptr<Connect> &e_conn)
 {
@@ -320,30 +322,6 @@ loadSchemaInfo(const std::unique_ptr<Connect> &conn,
     assert(sanityCheck(schema));
 
     return schema;
-}
-
-/*
-static void
-printEC(std::unique_ptr<Connect> e_conn, const std::string & command) {
-    DBResult * dbres;
-    assert_s(e_conn->execute(command, dbres), "command failed");
-    ResType res = dbres->unpack();
-    printRes(res);
-}
-*/
-
-static void
-printEmbeddedState(const ProxyState &ps) {
-/*
-    printEC(ps.e_conn, "show databases;");
-    printEC(ps.e_conn, "show tables from pdb;");
-    std::cout << "regular" << std::endl << std::endl;
-    printEC(ps.e_conn, "select * from pdb.MetaObject;");
-    std::cout << "bleeding" << std::endl << std::endl;
-    printEC(ps.e_conn, "select * from pdb.BleedingMetaObject;");
-    printEC(ps.e_conn, "select * from pdb.Query;");
-    printEC(ps.e_conn, "select * from pdb.DeltaOutput;");
-*/
 }
 
 template <typename Type> static void
@@ -503,16 +481,32 @@ buildTypeTextTranslator()
     return true;
 }
 
+// Allows us to preserve boolean return values from
+// buildTypeTextTranslator, handle it as a static constant in
+// Rewriter and panic when it fails.
+static bool
+buildTypeTextTranslatorHack()
+{
+    assert(buildTypeTextTranslator());
+
+    return true;
+}
+
 //l gets updated to the new level
 static std::string
 removeOnionLayer(Analysis &a, const ProxyState &ps,
-                 const FieldMeta *const fm, Item_field *const itf,
+                 const FieldMeta *const fm,
+                 const std::string &table_name,
                  onion o, SECLEVEL *const new_level,
                  const std::string &cur_db)
 {
     OnionMeta *const om = a.getOnionMeta(fm, o);
 
     // Remove the EncLayer.
+    // HACK: 'Pop'ping the layer is unsafe as it's being used as a
+    // technique to transmit information to successive calls of
+    // removeOnionLayer. This information is in no way respected by the
+    // persistency logic.
     std::shared_ptr<EncLayer> back_el(a.popBackEncLayer(om));
 
     // Update the Meta.
@@ -521,15 +515,18 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
 
     //removes onion layer at the DB
     const std::string tableanon =
-        a.getTableMeta(itf->table_name)->getAnonTableName();
+        a.getTableMeta(table_name)->getAnonTableName();
 
+    const std::string anon_table_name = a.getAnonTableName(table_name);
     Item_field *const salt =
-        stringToItemField(fm->getSaltName(), tableanon, itf);
+        new Item_field(NULL, ps.dbName().c_str(), anon_table_name.c_str(),
+                       fm->getSaltName().c_str());
     std::cout << TypeText<onion>::toText(o) << std::endl;
 
     const std::string fieldanon = om->getAnonOnionName();
     Item_field *const field =
-        stringToItemField(fieldanon, tableanon, itf);
+        new Item_field(NULL, ps.dbName().c_str(), anon_table_name.c_str(),
+                       om->getAnonOnionName().c_str());
 
     Item *const decUDF = back_el.get()->decryptUDF(field, salt);
 
@@ -560,7 +557,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
 static std::list<std::string>
 adjustOnion(Analysis &a, const ProxyState &ps, onion o,
             const FieldMeta *const fm, SECLEVEL tolevel,
-            Item_field *const itf, const std::string &cur_db)
+            const std::string &table_name, const std::string &cur_db)
 {
     OnionMeta *const om = fm->getOnionMeta(o);
     SECLEVEL newlevel = a.getOnionLevel(om);
@@ -569,7 +566,7 @@ adjustOnion(Analysis &a, const ProxyState &ps, onion o,
     std::list<std::string> adjust_queries;
     while (newlevel > tolevel) {
         auto query =
-            removeOnionLayer(a, ps, fm, itf, o, &newlevel, cur_db);
+            removeOnionLayer(a, ps, fm, table_name, o, &newlevel, cur_db);
         adjust_queries.push_back(query);
     }
     TEST_UnexpectedSecurityLevel(o, tolevel, newlevel);
@@ -727,37 +724,193 @@ intersect(const EncSet & es, FieldMeta * fm) {
  */
 static void optimize_select_lex(st_select_lex *select_lex, Analysis & a);
 
+static Item *getLeftExpr(Item_in_subselect *const i)
+{
+    Item *const left_expr =
+        i->*rob<Item_in_subselect, Item*,
+                &Item_in_subselect::left_expr>::ptr();
+    assert(left_expr);
+
+    return left_expr;
+
+}
+
+// HACK: Forces query down to PLAINVAL.
 static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_ITEM> {
-    virtual RewritePlan * do_gather_type(Item_subselect *i, reason &tr, Analysis & a) const
+    virtual RewritePlan *do_gather_type(Item_subselect *i, reason &tr,
+                                        Analysis &a) const
     {
-        /*
-        st_select_lex *select_lex = i->get_select_lex();
-        process_select_lex(select_lex, a);
-        return tr.encset;*/
-        UNIMPLEMENTED;
-        return NULL;
+        const std::string why = "subselect";
+
+        // Gather subquery.
+        std::unique_ptr<Analysis>
+            subquery_analysis(new Analysis(a.getSchema()));
+        st_select_lex *const select_lex = i->get_select_lex();
+        process_table_list(&select_lex->top_join_list,
+                           *subquery_analysis);
+        process_select_lex(select_lex, *subquery_analysis.get());
+
+        // HACK: Forces the subquery to use PLAINVAL for it's
+        // projections.
+        auto item_it = List_iterator<Item>(select_lex->item_list);
+        for (;;) {
+            Item *const item = item_it++;
+            if (!item) {
+                break;
+            }
+
+            RewritePlan *const item_rp =
+                subquery_analysis.get()->rewritePlans[item];
+            TEST_NoAvailableEncSet(item_rp->es_out, i->type(),
+                                   PLAIN_EncSet, why, NULL, 0);
+            item_rp->es_out = PLAIN_EncSet;
+        }
+
+        const EncSet out_es = PLAIN_EncSet;
+        tr = reason(out_es, why, i);
+
+        switch (i->substype()) {
+            case Item_subselect::subs_type::SINGLEROW_SUBS:
+                break;
+            case Item_subselect::subs_type::EXISTS_SUBS:
+                assert(false);
+            case Item_subselect::subs_type::IN_SUBS: {
+                Item *const left_expr = 
+                    getLeftExpr(static_cast<Item_in_subselect *>(i));
+                reason r;
+                RewritePlan *const rp_left_expr =
+                    gather(left_expr, r, *subquery_analysis.get());
+                tr.add_child(r);
+                a.rewritePlans[left_expr] = rp_left_expr;
+                break;
+            }
+            case Item_subselect::subs_type::ALL_SUBS:
+                assert(false);
+            case Item_subselect::subs_type::ANY_SUBS:
+                assert(false);
+            default:
+                throw CryptDBError("Unknown subquery type!");
+        }
+
+        return new RewritePlanWithAnalysis(out_es, tr,
+                                           std::move(subquery_analysis));
     }
     virtual Item * do_optimize_type(Item_subselect *i, Analysis & a) const {
         optimize_select_lex(i->get_select_lex(), a);
         return i;
     }
+    virtual Item *do_rewrite_type(Item_subselect *i, const OLK &constr,
+                                  const RewritePlan *rp, Analysis &a)
+        const
+    {
+        const RewritePlanWithAnalysis *const rp_w_analysis =
+            static_cast<const RewritePlanWithAnalysis *>(rp);
+        st_select_lex *const select_lex = i->get_select_lex();
+
+        // ------------------------------
+        //    General Subquery Rewrite
+        // ------------------------------
+        st_select_lex *const new_select_lex =
+            rewrite_select_lex(select_lex, *rp_w_analysis->a.get());
+
+        // Rewrite table names.
+        new_select_lex->top_join_list =
+            rewrite_table_list(select_lex->top_join_list,
+                               *rp_w_analysis->a.get());
+
+        // Rewrite SELECT params.
+        // HACK: The engine inside of the Item_subselect _can_ have a
+        // pointer back to the Item_subselect that contains it.
+        // > ie, subselect_single_select_engine::join::select_lex
+        // > The way this is done varies from engine to engine thus a
+        //   general solution seems difficuly.
+        // > set_select_lex() attemps to rectify this problem in other
+        //   cases
+        memcpy(select_lex, new_select_lex, sizeof(st_select_lex));
+
+        // ------------------------------
+        //   Specific Subquery Rewrite
+        // ------------------------------
+        {
+            switch (i->substype()) {
+                case Item_subselect::subs_type::SINGLEROW_SUBS:
+                    return new Item_singlerow_subselect(new_select_lex);
+                case Item_subselect::subs_type::EXISTS_SUBS:
+                    assert(false);
+                case Item_subselect::subs_type::IN_SUBS: {
+                    Item *const left_expr =
+                        getLeftExpr(static_cast<Item_in_subselect *>(i));
+                    RewritePlan *const rp_left_expr =
+                        getAssert(a.rewritePlans, left_expr);
+                    Item *const new_left_expr =
+                        itemTypes.do_rewrite(left_expr, constr,
+                                             rp_left_expr, a);
+                    return new Item_in_subselect(new_left_expr,
+                                                 new_select_lex);
+                }
+                case Item_subselect::subs_type::ALL_SUBS:
+                    assert(false);
+                case Item_subselect::subs_type::ANY_SUBS:
+                    assert(false);
+                default:
+                    throw CryptDBError("Unknown subquery type!");
+            }
+        }
+    }
 } ANON;
 
+// NOTE: Shouldn't be needed unless we allow mysql to rewrite subqueries.
 static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
-    virtual RewritePlan * do_gather_type(Item_cache *i, reason &tr, Analysis & a) const
+    virtual RewritePlan *do_gather_type(Item_cache *i, reason &tr,
+                                        Analysis &a) const
     {
+        UNIMPLEMENTED;
+        return NULL;
+
+        /*
+        TEST_TextMessageError(false ==
+                                i->field()->orig_table->alias_name_used,
+                              "Can not mix CACHE_ITEM and table alias.");
+        const std::string table_name =
+            std::string(i->field()->orig_table->alias);
+        const std::string field_name =
+            std::string(i->field()->field_name);
+        OnionMeta *const om =
+            a.getOnionMeta(table_name, field_name, oPLAIN);
+        if (a.getOnionLevel(om) != SECLEVEL::PLAINVAL) {
+            const FieldMeta *const fm =
+                a.getFieldMeta(table_name, field_name);
+
+            throw OnionAdjustExcept(oPLAIN, fm, SECLEVEL::PLAINVAL,
+                                    table_name);
+        }
+
+        const EncSet out_es = PLAIN_EncSet;
+        tr = reason(out_es, "is cache item", i);
+
+        return new RewritePlan(out_es, tr);
+        */
+
         /*
         Item *example = i->*rob<Item_cache, Item*, &Item_cache::example>::ptr();
         if (example)
             return gather(example, tr, a);
-        return tr.encset;*/
+        return tr.encset;
         UNIMPLEMENTED;
         return NULL;
+        */
     }
     virtual Item * do_optimize_type(Item_cache *i, Analysis & a) const
     {
         // TODO(stephentu): figure out how to use rob here
         return i;
+    }
+    virtual Item *do_rewrite_type(Item_cache *i, const OLK &constr,
+                                  const RewritePlan *rp, Analysis &a)
+        const
+    {
+        UNIMPLEMENTED;
+        return NULL;
     }
 } ANON;
 
@@ -822,8 +975,10 @@ noRewrite(const LEX *const lex) {
     case SQLCOM_SHOW_DATABASES:
     case SQLCOM_SET_OPTION:
     case SQLCOM_BEGIN:
+    case SQLCOM_ROLLBACK:
     case SQLCOM_COMMIT:
     case SQLCOM_SHOW_TABLES:
+    case SQLCOM_SHOW_VARIABLES:
         return true;
     case SQLCOM_SELECT: {
 
@@ -835,15 +990,6 @@ noRewrite(const LEX *const lex) {
     return false;
 }
 
-Rewriter::Rewriter()
-{
-    // Must be called before loadSchemaInfo.
-    assert(buildTypeTextTranslator());
-
-    dml_dispatcher = buildDMLDispatcher();
-    ddl_dispatcher = buildDDLDispatcher();
-}
-
 static std::string
 lex_to_query(LEX *const lex)
 {
@@ -852,26 +998,9 @@ lex_to_query(LEX *const lex)
     return o.str();
 }
 
-static
-std::string
-mysql_noop()
-{
-    return "do 0;";
-}
-
-/*
-static
-bool
-mysql_noop_dbres(const std::unique_ptr<Connect> &c, DBResult **dbres)
-{
-    if (!(c.get()->execute(mysql_noop(), *dbres))) {
-        dbres = NULL;
-        return false;
-    }
-
-    return true;
-}
-*/
+const bool Rewriter::translator_dummy = buildTypeTextTranslatorHack();
+const SQLDispatcher *Rewriter::dml_dispatcher = buildDMLDispatcher();
+const SQLDispatcher *Rewriter::ddl_dispatcher = buildDDLDispatcher();
 
 RewriteOutput *
 Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
@@ -895,41 +1024,47 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         return new SimpleOutput(query);
     } else if (dml_dispatcher->canDo(lex)) {
         const SQLHandler *const handler = dml_dispatcher->dispatch(lex);
+        AssignOnce<LEX *> out_lex;
+
         try {
-            LEX *const out_lex = handler->transformLex(a, lex, ps);
-            if (true == a.special_update) {
-                const auto plain_table =
-                    lex->select_lex.top_join_list.head()->table_name;
-                const auto crypted_table =
-                    out_lex->select_lex.top_join_list.head()->table_name;
-                std::string where_clause;
-                if (lex->select_lex.where) {
-                    std::ostringstream where_stream;
-                    where_stream << " " << *lex->select_lex.where << " ";
-                    where_clause = where_stream.str();
-                } else {
-                    where_clause = " TRUE ";
-                }
-                return new SpecialUpdate(query, lex_to_query(out_lex),
-                                         plain_table, crypted_table,
-                                         where_clause, ps);
-            } else {
-                return new DMLOutput(query, lex_to_query(out_lex));
-            }
+            out_lex = handler->transformLex(a, lex, ps);
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
             std::cout << "Adjusting onion!" << std::endl;
             auto adjust_queries = 
-                adjustOnion(a, ps, e.o, e.fm, e.tolevel, e.itf,
+                adjustOnion(a, ps, e.o, e.fm, e.tolevel, e.table_name,
                             ps.dbName());
             return new AdjustOnionOutput(a.deltas, adjust_queries);
         }
+
+        // Return if it's a regular DML query.
+        if (false == a.special_update) {
+            return new DMLOutput(query, lex_to_query(out_lex.get()));
+        }
+
+        // Handle HOMorphic UPDATE.
+        const auto plain_table =
+            lex->select_lex.top_join_list.head()->table_name;
+        const auto crypted_table =
+            out_lex.get()->select_lex.top_join_list.head()->table_name;
+        std::string where_clause;
+        if (lex->select_lex.where) {
+            std::ostringstream where_stream;
+            where_stream << " " << *lex->select_lex.where << " ";
+            where_clause = where_stream.str();
+        } else {
+            where_clause = " TRUE ";
+        }
+
+        return new SpecialUpdate(query, lex_to_query(out_lex.get()),
+                                 plain_table, crypted_table,
+                                 where_clause, ps);
     } else if (ddl_dispatcher->canDo(lex)) {
         const SQLHandler *const handler = ddl_dispatcher->dispatch(lex);
         LEX *const out_lex = handler->transformLex(a, lex, ps);
         return new DDLOutput(query, lex_to_query(out_lex), a.deltas);
     } else {
-        throw CryptDBError("Rewriter can not dispatch bad lex");
+        return NULL;
     }
 }
 
@@ -1001,39 +1136,31 @@ cryptdbDirective(const std::string &query)
 
 QueryRewrite
 Rewriter::rewrite(const ProxyState &ps, const std::string &q,
-                  SchemaInfo **out_schema)
+                  SchemaInfo *const schema)
 {
     LOG(cdb_v) << "q " << q;
     assert(0 == mysql_thread_init());
     //assert(0 == create_embedded_thd(0));
 
-    // printEmbeddedState(ps);
-
-    // FIXME: Memleak 'schema'.
-    AssignOnce<SchemaInfo *> schema;
-    if (ps.schemaIsStale()) {
-        schema = loadSchemaInfo(ps.getConn(), ps.getEConn());
-    } else {
-        schema = ps.getPreviousSchema();
-    }
-
-    assert(schema.get());
-    Analysis analysis = Analysis(schema.get());
+    assert(schema);
+    Analysis analysis(schema);
 
     RewriteOutput *output;
     try {
         if (cryptdbDirective(q)) {
-            output = this->handleDirective(analysis, ps, q);
+            output = Rewriter::handleDirective(analysis, ps, q);
         } else {
             // FIXME: Memleak return of 'dispatchOnLex()'
-            output = this->dispatchOnLex(analysis, ps, q);
+            output = Rewriter::dispatchOnLex(analysis, ps, q);
+            if (!output) {
+                output = new SimpleOutput(mysql_noop());
+            }
         }
     } catch (AbstractCryptDBError &e) {
         std::cout << e << std::endl;
         output = new SimpleOutput(mysql_noop());
     }
 
-    *out_schema = schema.get();
     return QueryRewrite(true, *analysis.rmeta, output);
 }
 
@@ -1120,74 +1247,74 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
     return res;
 }
 
-static void
-prettyPrintQuery(const std::string &query)
+static ResType *
+mysql_noop_res(const ProxyState &ps)
 {
-    std::cout << std::endl << RED_BEGIN
-              << "QUERY: " << COLOR_END << query << std::endl;
-}
-
-static void
-prettyPrintQueryResult(ResType res)
-{
-    std::cout << std::endl << RED_BEGIN
-              << "RESULTS: " << COLOR_END << std::endl;
-    printRes(res);
-    std::cout << std::endl;
+    DBResult *noop_dbres;
+    assert(ps.getConn()->execute(mysql_noop(), noop_dbres));
+    return new ResType(noop_dbres->unpack());
 }
 
 // FIXME: DBResult and ResType memleaks.
+// FIXME: Use TELL policy.
 ResType *
-executeQuery(ProxyState &ps, const std::string &q)
+executeQuery(const ProxyState &ps, const std::string &q,
+             SchemaCache *schema_cache)
 {
+    // Allows us to use default value of NULL for schema_cache in places
+    // where cacheing the schema offers little advantage.
+    SchemaCache temp_schema_cache;
+    if (NULL == schema_cache) {
+        schema_cache = &temp_schema_cache;
+    }
+
     try {
-        Rewriter r;
-        SchemaInfo *out_schema;
-        QueryRewrite qr = r.rewrite(ps, q, &out_schema);
-        ps.setPreviousSchema(out_schema);
-        ps.setSchemaStaleness(qr.output->stalesSchema());
-
-        // Query preamble.
-        assert(qr.output->beforeQuery(ps.getConn(), ps.getEConn()));
-
-        // Execute query.
+        QueryRewrite *qr = NULL;
+        // out_queryz: queries intended to be run against remote server.
         std::list<std::string> out_queryz;
-        if (!qr.output->getQuery(&out_queryz)) {
-            throw CryptDBError("Failed to retrieve query!");
-        }
+        SchemaInfo *const schema =
+            schema_cache->getSchema(ps.getConn(), ps.getEConn());
+        PREAMBLE_STATUS const preamble_status =
+            queryPreamble(ps, q, &qr, &out_queryz, schema);
+        assert(PREAMBLE_STATUS::FAILURE != preamble_status);
 
         DBResult *dbres = NULL;
         for (auto it : out_queryz) {
             prettyPrintQuery(it);
 
-            if (!ps.getConn()->execute(it, dbres)) {
-                qr.output->handleQueryFailure(ps.getEConn());
+            if (!ps.getConn()->execute(it, dbres,
+                                       qr->output->multipleResultSets())) {
+                qr->output->handleQueryFailure(ps.getEConn());
                 throw CryptDBError("Failed to execute query!");
             }
-            assert(dbres);
+
+            // XOR: Either we have one result set, or we were expecting
+            // multiple result sets and we threw them all away.
+            assert(!!dbres != !!qr->output->multipleResultSets());
         }
 
-        assert(qr.output->afterQuery(ps.getEConn()));
+        // ----------------------------------
+        //       Post Query Processing
+        // ----------------------------------
+        // > Handle schema cacheing immediately after executing a query.
+        //   + Updating the cache here is 'aggresive' in the case
+        //     where we are doing an onion adjustment ROLLBACK
+        //     and queryHandleRollback fails.
+        schema_cache->updateStaleness(qr->output->stalesSchema());
 
-        if (qr.output->queryAgain()) {
-            return executeQuery(ps, q);
+        if (PREAMBLE_STATUS::ROLLBACK == preamble_status) {
+            assert(queryHandleRollback(ps, q, schema));
+            return new ResType(dbres->unpack());
         }
 
-        if (dbres) {
-            ResType *res = new ResType(dbres->unpack());
-            prettyPrintQueryResult(*res);
+        assert(PREAMBLE_STATUS::SUCCESS == preamble_status);
 
-            ResType *dec_res;
-            if (true == qr.output->doDecryption()) {
-                dec_res = r.decryptResults(*res, qr.rmeta);
-                prettyPrintQueryResult(*dec_res);
-            }
+        ResType *const res =
+            dbres ? new ResType(dbres->unpack()) : mysql_noop_res(ps);
+        ResType *const out_res = queryEpilogue(ps, qr, res, q, true);
+        assert(out_res);
 
-            printEmbeddedState(ps);
-            return dec_res;
-        } else {
-            return NULL;
-        }
+        return out_res;
     } catch (std::runtime_error &e) {
         std::cout << "Unexpected Error: " << e.what() << " in query "
                   << q << std::endl;

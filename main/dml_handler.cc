@@ -12,9 +12,6 @@ static void
 process_select_lex(LEX *lex, Analysis & a);
 
 static void
-process_select_lex(st_select_lex *select_lex, Analysis & a);
-
-static void
 process_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a);
 
@@ -27,20 +24,11 @@ analyze_field_value_pair(Item_field * field, Item * val, Analysis & a);
 static st_select_lex *
 rewrite_filters_lex(st_select_lex *select_lex, Analysis &a);
 
-static bool
-needsSalt(OLK olk);
-
-static st_select_lex *
-rewrite_select_lex(st_select_lex *select_lex, Analysis & a);
-
 static void
 rewrite_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a,
                           bool *invalids, List<Item> *res_items,
                           List<Item> *res_values);
-
-static void
-process_table_list(List<TABLE_LIST> *tll, Analysis & a);
 
 static bool
 invalidates(FieldMeta * fm, const EncSet & es);
@@ -55,6 +43,7 @@ void rewriteInsertHelper(Item *const i, Analysis &a, FieldMeta *const fm,
         append_list->push_back(it);
     }
 }
+
 class InsertHandler : public DMLHandler {
     virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps) const
     {
@@ -321,7 +310,7 @@ process_select_lex(LEX *lex, Analysis & a)
     process_select_lex(&lex->select_lex, a);
 }
 
-static void
+void
 process_select_lex(st_select_lex *select_lex, Analysis &a)
 {
     //select clause
@@ -480,6 +469,19 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
             }
         }
 
+        // Does r_es support all onions on field?
+        *invalids = *invalids || invalidates(fm, r_es);
+        if (true == *invalids) {
+            // Is the HOM onion available? If so we will try to handle
+            // higher up.
+            auto hom = r_es.osl.find(oAGG);
+            if (hom != r_es.osl.end()) {
+                continue;
+            }
+
+            // We will have to go to PLAIN for this query.
+        }
+
         for (auto pair : r_es.osl) {
             const OLK olk = {pair.first, pair.second.first, fm};
             RewritePlan *const rp_field =
@@ -508,16 +510,14 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
                                            anon_field_name));
             res_values->push_back(new Item_int((ulonglong)salt));
         }
-
-        // Determine if the query invalidates onions.
-        *invalids = *invalids || invalidates(fm, r_es);
     }
 }
 
 static void
-addToReturn(ReturnMeta * rm, int pos, const OLK & constr, bool has_salt,
-            std::string name) {
-    if ((unsigned int)pos != rm->rfmeta.size()) {
+addToReturn(ReturnMeta *rm, int pos, const OLK &constr, bool has_salt,
+            const std::string &name)
+{
+    if (static_cast<unsigned int>(pos) != rm->rfmeta.size()) {
         throw CryptDBError("ReturnMeta has badly ordered ReturnFields!");
     }
     const int salt_pos = has_salt ? pos + 1 : -1;
@@ -527,8 +527,9 @@ addToReturn(ReturnMeta * rm, int pos, const OLK & constr, bool has_salt,
 }
 
 static void
-addSaltToReturn(ReturnMeta * rm, int pos) {
-    if ((unsigned int)pos != rm->rfmeta.size()) {
+addSaltToReturn(ReturnMeta *rm, int pos)
+{
+    if (static_cast<unsigned int>(pos) != rm->rfmeta.size()) {
         throw CryptDBError("ReturnMeta has badly ordered ReturnFields!");
     }
     std::pair<int, ReturnField>
@@ -543,7 +544,7 @@ rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
     AssignOnce<OLK> olk;
     AssignOnce<Item *> ir;
     if (i->type() == Item::Type::FIELD_ITEM) {
-        Item_field *field_i = static_cast<Item_field *>(i);
+        Item_field *const field_i = static_cast<Item_field *>(i);
         const auto cached_rewritten_i = a.item_cache.find(field_i);
         if (cached_rewritten_i != a.item_cache.end()) {
             ir = cached_rewritten_i->second.first;
@@ -558,7 +559,7 @@ rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
     }
     assert(ir.assigned() && ir.get());
     newList->push_back(ir.get());
-    bool use_salt = needsSalt(olk.get());
+    const bool use_salt = needsSalt(olk.get());
 
     // This line implicity handles field aliasing for at least some cases.
     // As i->name can/will be the alias.
@@ -566,9 +567,9 @@ rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
 
     if (use_salt) {
         const std::string anon_table_name =
-            ((Item_field *)ir.get())->table_name;
+            static_cast<Item_field *>(ir.get())->table_name;
         const std::string anon_field_name = olk.get().key->getSaltName();
-        Item_field *ir_field =
+        Item_field *const ir_field =
             make_item(static_cast<Item_field *>(ir.get()),
                       anon_table_name, anon_field_name);
         newList->push_back(ir_field);
@@ -576,7 +577,7 @@ rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
     }
 }
 
-static st_select_lex *
+st_select_lex *
 rewrite_select_lex(st_select_lex *select_lex, Analysis &a)
 {
     // rewrite_filters_lex must be called before rewrite_proj because
@@ -602,11 +603,6 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis &a)
     new_select_lex->item_list = newList;
 
     return new_select_lex;
-}
-
-static bool
-needsSalt(OLK olk) {
-    return olk.key && olk.key->has_salt && needsSalt(olk.l);
 }
 
 static void
@@ -663,7 +659,7 @@ process_table_joins_and_derived(List<TABLE_LIST> *tll, Analysis & a)
     }
 }
 
-static void
+void
 process_table_list(List<TABLE_LIST> *tll, Analysis & a)
 {
     /*

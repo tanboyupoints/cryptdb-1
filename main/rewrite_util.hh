@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include <main/rewrite_main.hh>
 #include <main/Analysis.hh>
 #include <main/rewrite_ds.hh>
 
@@ -70,7 +71,8 @@ encrypt_item_layers(Item * const i, onion o, OnionMeta * const om,
                     const Analysis &a, uint64_t IV = 0);
 
 std::string
-rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q);
+rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
+                         SchemaInfo *const schema);
 
 // FIXME(burrows): Generalize to support any container with next AND end
 // semantics.
@@ -111,3 +113,50 @@ getOnionIndexTypes();
 void
 typical_rewrite_insert_type(Item *const i, Analysis &a,
                             std::vector<Item *> &l, FieldMeta *const fm);
+
+void
+process_select_lex(st_select_lex *select_lex, Analysis &a);
+
+void
+process_table_list(List<TABLE_LIST> *tll, Analysis &a);
+
+st_select_lex *
+rewrite_select_lex(st_select_lex *select_lex, Analysis &a);
+
+std::string
+mysql_noop();
+
+enum class PREAMBLE_STATUS {SUCCESS, FAILURE, ROLLBACK};
+
+PREAMBLE_STATUS
+queryPreamble(const ProxyState &ps, const std::string &q,
+              QueryRewrite **const out_qr,
+              std::list<std::string> *const out_queryz,
+              SchemaInfo *const schema);
+
+bool
+queryHandleRollback(const ProxyState &ps, const std::string &query,
+                    SchemaInfo *const schema);
+
+void
+prettyPrintQuery(const std::string &query);
+
+ResType *
+queryEpilogue(const ProxyState &ps, QueryRewrite *const qr,
+              ResType *const res, const std::string &query, bool pp);
+
+class SchemaCache {
+public:
+    SchemaCache() : staleness(true) {}
+    SchemaCache(bool staleness, SchemaInfo *const schema)
+        : staleness(staleness), schema(schema) {}
+
+    SchemaInfo *getSchema(const std::unique_ptr<Connect> &conn,
+                          const std::unique_ptr<Connect> &e_conn);
+    void updateStaleness(bool staleness);
+
+private:
+    bool staleness;
+    std::unique_ptr<SchemaInfo>schema;
+};
+

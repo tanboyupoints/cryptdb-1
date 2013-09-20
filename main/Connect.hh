@@ -40,8 +40,9 @@ class Connect {
                                 const std::string &dbname);
 
     // returns true if execution was ok; caller must delete DBResult
-    bool execute(const std::string &query, DBResult *&);
-    bool execute(const std::string &query);
+    bool execute(const std::string &query, DBResult *&,
+                 bool multiple_resultsets=false);
+    bool execute(const std::string &query, bool multiple_resultsets=false);
     bool select_db(const std::string &dbname);
 
     // returns error message if a query caused error

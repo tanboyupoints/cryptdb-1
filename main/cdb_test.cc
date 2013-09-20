@@ -17,7 +17,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 
-#include "main/Connect.hh"
+#include <main/Connect.hh>
 
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -91,7 +91,8 @@ static bool handle_line(ProxyState& ps, const std::string& q)
     return true;
   }
 
-  return executeQuery(ps, q);
+  static SchemaCache schema_cache;
+  return executeQuery(ps, q, &schema_cache);
 }
 
 int

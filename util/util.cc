@@ -68,14 +68,14 @@ randomBytes(unsigned int len)
 {
     std::string s;
     s.resize(len);
-    RAND_bytes((uint8_t*) &s[0], len);
+    RAND_bytes(reinterpret_cast<uint8_t *>(&s[0]), len);
     return s;
 }
 
 uint64_t
 randomValue()
 {
-    return IntFromBytes((const uint8_t*) randomBytes(8).c_str(), 8);
+    return IntFromBytes(reinterpret_cast<const uint8_t *>(randomBytes(8).c_str()), 8);
 }
 
 std::string
@@ -145,14 +145,15 @@ StringFromZZ(const ZZ &x)
 {
     std::string s;
     s.resize(NumBytes(x), 0);
-    BytesFromZZ((uint8_t*) &s[0], x, s.length());
+    BytesFromZZ(reinterpret_cast<uint8_t *>(&s[0]), x, s.length());
     return s;
 }
 
 ZZ
 ZZFromString(const std::string &s)
 {
-    return ZZFromBytes((const uint8_t *) s.data(), s.length());
+    return ZZFromBytes(reinterpret_cast<const uint8_t *>(s.data()),
+                       s.length());
 }
 
 // based on _ntl_gcopy from g_lip_impl.h
@@ -216,13 +217,15 @@ std::string StringFromZZFast(const ZZ& x) {
     else
       abs_sa = -sa;
     mp_limb_t* data = DATA(x.rep);
-    return std::string((char *)data, abs_sa * sizeof(mp_limb_t));
+    return std::string(reinterpret_cast<char *>(data),
+                       abs_sa * sizeof(mp_limb_t));
 }
 
 void ZZFromStringFast(ZZ& x, const std::string& s) {
     assert(s.size() % sizeof(mp_limb_t) == 0);
+    // FIXME: const_cast
     _ntl_gcopy_mp(
-        (mp_limb_t*) s.data(),
+        const_cast<mp_limb_t *>(reinterpret_cast<const mp_limb_t *>(s.data())),
         s.size() / sizeof(mp_limb_t),
         &x.rep);
 }
@@ -231,7 +234,7 @@ void ZZFromStringFast(ZZ& x, const std::string& s) {
 // TODO: figure out how to pad non-8-byte aligned p
 void ZZFromBytesFast(ZZ& x, const unsigned char *p, long n) {
     if (n % sizeof(mp_limb_t) != 0) {
-        x = ZZFromBytes((const uint8_t *) p, n);
+        x = ZZFromBytes(static_cast<const uint8_t *>(p), n);
         return;
     }
     _ntl_gcopy_mp(
@@ -260,7 +263,7 @@ ZZFromUint64 (uint64_t value)
 
 char *
 getCStr(const std::string & x) {
-    char *  res = (char *)malloc(x.size());
+    char *  res = static_cast<char *>(malloc(x.size()));
     memcpy(res, x.c_str(), x.size());
     return res;
 }

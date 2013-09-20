@@ -48,7 +48,7 @@ Connect::do_connect(const std::string &server, const std::string &user,
     conn = mysql_init(NULL);
 
     /* Connect via TCP, and not via Unix domain sockets */
-    uint proto = MYSQL_PROTOCOL_TCP;
+    const uint proto = MYSQL_PROTOCOL_TCP;
     mysql_options(conn, MYSQL_OPT_PROTOCOL, &proto);
 
     /* Connect to real server even if linked against embedded libmysqld */
@@ -56,7 +56,8 @@ Connect::do_connect(const std::string &server, const std::string &user,
 
     /* Connect to database */
     if (!mysql_real_connect(conn, server.c_str(), user.c_str(),
-                            passwd.c_str(), 0, port, 0, 0)) {
+                            passwd.c_str(), 0, port, 0,
+                            CLIENT_MULTI_STATEMENTS)) {
         LOG(warn) << "connecting to server " << server
                   << " db " << dbname
                   << " user " << user
@@ -104,8 +105,12 @@ Connect *Connect::getEmbedded(const std::string &embed_db,
     return conn;
 }
 
+// @multiple_resultsets causes us to ignore query results.
+// > This is a hack that allows us to deal with the two sets which
+// are returned when CALLing a stored procedure.
 bool
-Connect::execute(const std::string &query, DBResult *&res)
+Connect::execute(const std::string &query, DBResult *&res,
+                 bool multiple_resultsets)
 {
     //silently ignore empty queries
     if (query.length() == 0) {
@@ -120,7 +125,24 @@ Connect::execute(const std::string &query, DBResult *&res)
         res = 0;
         success = false;
     } else {
-        res = DBResult::wrap(mysql_store_result(conn));
+        if (false == multiple_resultsets) {
+            res = DBResult::wrap(mysql_store_result(conn));
+        } else {
+            int status;
+            do {
+                DBResult_native *const res_native =
+                    mysql_store_result(conn);
+                if (res_native) {
+                    mysql_free_result(res_native);
+                } else {
+                    assert(mysql_field_count(conn) == 0);
+                }
+                status = mysql_next_result(conn);
+                assert(status <= 0);
+            } while (0 == status);
+
+            res = NULL;
+        }
     }
 
     void *const ret = create_embedded_thd(0);
@@ -131,10 +153,10 @@ Connect::execute(const std::string &query, DBResult *&res)
 
 
 bool
-Connect::execute(const std::string &query)
+Connect::execute(const std::string &query, bool multiple_resultsets)
 {
     DBResult *aux;
-    bool r = execute(query, aux);
+    const bool r = execute(query, aux, multiple_resultsets);
     if (r)
         delete aux;
     return r;

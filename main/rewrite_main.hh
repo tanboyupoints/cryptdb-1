@@ -21,6 +21,8 @@
 #include "field.h"
 
 #include <main/Analysis.hh>
+#include <main/dml_handler.hh>
+#include <main/ddl_handler.hh>
 #include <parser/Annotation.hh>
 #include <parser/stringify.hh>
 
@@ -53,24 +55,29 @@ public:
 
 // Main class processing rewriting
 class Rewriter {
-public:
     Rewriter();
-    // FIXME: Cleanup resources.
     ~Rewriter() {;}
 
-    QueryRewrite rewrite(const ProxyState &ps, const std::string &q,
-                         SchemaInfo **out_schema);
-    ResType *decryptResults(const ResType &dbres, const ReturnMeta &rm);
+public:
 
-    RewriteOutput *
+    static QueryRewrite
+        rewrite(const ProxyState &ps, const std::string &q,
+                SchemaInfo *const schema);
+    static ResType *
+        decryptResults(const ResType &dbres, const ReturnMeta &rm);
+
+private:
+    static RewriteOutput *
         dispatchOnLex(Analysis &a, const ProxyState &ps,
                       const std::string &query);
-    RewriteOutput *
+    static RewriteOutput *
         handleDirective(Analysis &a, const ProxyState &ps,
                         const std::string &query);
 
-    SQLDispatcher *dml_dispatcher;
-    SQLDispatcher *ddl_dispatcher;
+    // HACK: Initialize singletons.
+    static const bool translator_dummy;
+    static const SQLDispatcher *dml_dispatcher;
+    static const SQLDispatcher *ddl_dispatcher;
 };
 
 class ScopedMySQLRes {
@@ -87,8 +94,10 @@ private:
     MYSQL_RES *r;
 };
 
+class SchemaCache;
 ResType *
-executeQuery(ProxyState &ps, const std::string &q);
+executeQuery(const ProxyState &ps, const std::string &q,
+             SchemaCache *const schema_cache=NULL);
 
 #define UNIMPLEMENTED \
         throw std::runtime_error(std::string("Unimplemented: ") + \
@@ -284,5 +293,6 @@ public:
     CItemSubtypeFN() { funcNames.reg(std::string(TYPE), this); }
 };
 
-
-
+SchemaInfo *
+loadSchemaInfo(const std::unique_ptr<Connect> &conn,
+               const std::unique_ptr<Connect> &e_conn);

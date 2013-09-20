@@ -283,7 +283,7 @@ rewrite_key(const std::shared_ptr<TableMeta> &tm, Key *const key,
         // each onion.
         bool fail = false;
         new_key->columns =
-            reduceList<Key_part_spec>(col_it, List<Key_part_spec>(),
+            accumList<Key_part_spec>(col_it,
                 [o, tm, a, &fail] (List<Key_part_spec> out_field_list,
                                    Key_part_spec *const key_part)
                 {
@@ -411,16 +411,15 @@ encrypt_item_layers(Item * const i, onion o, OnionMeta * const om,
 }
 
 std::string
-rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q)
+rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
+                         SchemaInfo *const schema)
 {
-    Rewriter r;
-    SchemaInfo *out_schema;
-    QueryRewrite qr = r.rewrite(ps, q, &out_schema);
+    const QueryRewrite qr = Rewriter::rewrite(ps, q, schema);
     assert(false == qr.output->stalesSchema());
     assert(false == qr.output->queryAgain());
-    
+
     std::list<std::string> out_queryz;
-    if (!qr.output->getQuery(&out_queryz)) {
+    if (!qr.output->getQuery(&out_queryz, schema)) {
         throw CryptDBError("Failed to retrieve query!");
     }
     assert(out_queryz.size() == 1);
@@ -438,9 +437,7 @@ escapeString(const std::unique_ptr<Connect> &c,
     c->real_escape_string(escaped.get(), escape_me.c_str(),
                           escape_me.size());
 
-    const std::string out = std::string(escaped.get());
-
-    return out;
+    return std::string(escaped.get());
 }
 
 void
@@ -466,5 +463,189 @@ typical_rewrite_insert_type(Item *const i, Analysis &a,
     if (fm->has_salt) {
         l.push_back(new Item_int(static_cast<ulonglong>(salt)));
     }
+}
+
+std::string
+mysql_noop()
+{
+    return "do 0;";
+}
+
+PREAMBLE_STATUS
+queryPreamble(const ProxyState &ps, const std::string &q,
+              QueryRewrite **const out_qr,
+              std::list<std::string> *const out_queryz,
+              SchemaInfo *const schema)
+{
+    QueryRewrite *const qr = *out_qr =
+        new QueryRewrite(Rewriter::rewrite(ps, q, schema));
+
+    assert(qr->output->beforeQuery(ps.getConn(), ps.getEConn()));
+
+    if (!qr->output->getQuery(out_queryz, schema)) {
+        qr->output->handleQueryFailure(ps.getEConn());
+        return PREAMBLE_STATUS::FAILURE;
+    }
+
+    MaxOneReadPerAssign<bool> did_rollback(false);
+    switch (qr->output->queryChannel()) {
+        // Must detect the side channel deadlock and reissue the side
+        // query before the transaction it is deadlocking with.
+        case RewriteOutput::Channel::SIDE: {
+            unsigned int const max_attempts = 5;
+            for (unsigned int attempts = 0; attempts < max_attempts;
+                 ++attempts) {
+                MaxOneReadPerAssign<bool> side_channel_success(true);
+                for (auto it : *out_queryz) {
+                    if (!ps.getSideChannelConn()->execute(it)) {
+                        unsigned int const err =
+                            ps.getSideChannelConn()->get_mysql_errno();
+                        // Force the regular mysql connection to ROLLBACK
+                        // and retry onion adjustment if we timed out.
+                        if (ER_LOCK_WAIT_TIMEOUT == err) {
+                            assert(false == did_rollback.get());
+                            // > Possibly violates
+                            //   innodb_rollback_on_timeout=FALSE (default)
+                            // > Doesn't work for proxy.
+                            assert(ps.getSideChannelConn()->execute("ROLLBACK;"));
+                            assert(qr->output->handleQueryFailure(ps.getEConn()));
+                            did_rollback = true;
+                            goto side_channel_epilogue;
+                        }
+
+                        qr->output->handleQueryFailure(ps.getEConn());
+                        return PREAMBLE_STATUS::FAILURE;
+                    }
+                }
+                break;
+            }
+
+side_channel_epilogue:
+            out_queryz->clear();
+            // HACK: The caller will use the metadata
+            // associated with AdjustOnionOutput.
+            // > Considering that the metadata will tell us to
+            // issue the query again, all is well. But if such
+            // weren't the case we _could_ get a mismatch
+            // between the metadata and the noop query.
+            if (true == did_rollback.get()) {
+                out_queryz->push_back("ROLLBACK");
+                return PREAMBLE_STATUS::ROLLBACK;
+            }
+            
+            out_queryz->push_back(mysql_noop());
+            break;
+        }
+        case RewriteOutput::Channel::REGULAR:
+            break;
+        default:
+            return PREAMBLE_STATUS::FAILURE;
+    }
+
+    return PREAMBLE_STATUS::SUCCESS;
+}
+
+bool
+queryHandleRollback(const ProxyState &ps, const std::string &query,
+                    SchemaInfo *const schema)
+{
+    QueryRewrite *qr;
+    std::list<std::string> out_queryz;
+    PREAMBLE_STATUS const preamble_status =
+        queryPreamble(ps, query, &qr, &out_queryz, schema);
+    if (PREAMBLE_STATUS::FAILURE == preamble_status) {
+        return false;
+    }
+
+    assert(PREAMBLE_STATUS::SUCCESS == preamble_status);
+    assert(qr->output->afterQuery(ps.getEConn()));
+
+    return true;
+}
+
+/*
+static void
+printEC(std::unique_ptr<Connect> e_conn, const std::string & command) {
+    DBResult * dbres;
+    assert_s(e_conn->execute(command, dbres), "command failed");
+    ResType res = dbres->unpack();
+    printRes(res);
+}
+*/
+
+static void
+printEmbeddedState(const ProxyState &ps) {
+/*
+    printEC(ps.e_conn, "show databases;");
+    printEC(ps.e_conn, "show tables from pdb;");
+    std::cout << "regular" << std::endl << std::endl;
+    printEC(ps.e_conn, "select * from pdb.MetaObject;");
+    std::cout << "bleeding" << std::endl << std::endl;
+    printEC(ps.e_conn, "select * from pdb.BleedingMetaObject;");
+    printEC(ps.e_conn, "select * from pdb.Query;");
+    printEC(ps.e_conn, "select * from pdb.DeltaOutput;");
+*/
+}
+
+
+void
+prettyPrintQuery(const std::string &query)
+{
+    std::cout << std::endl << RED_BEGIN
+              << "QUERY: " << COLOR_END << query << std::endl;
+}
+
+static void
+prettyPrintQueryResult(ResType res)
+{
+    std::cout << std::endl << RED_BEGIN
+              << "RESULTS: " << COLOR_END << std::endl;
+    printRes(res);
+    std::cout << std::endl;
+}
+
+ResType *
+queryEpilogue(const ProxyState &ps, QueryRewrite *const qr,
+              ResType *const res, const std::string &query, bool pp)
+{
+    assert(qr->output->afterQuery(ps.getEConn()));
+
+    if (qr->output->queryAgain()) {
+        return executeQuery(ps, query);
+    }
+
+    if (pp) {
+        printEmbeddedState(ps);
+        prettyPrintQueryResult(*res);
+    }
+
+    if (qr->output->doDecryption()) {
+        ResType *const dec_res =
+            Rewriter::decryptResults(*res, qr->rmeta);
+        if (pp) {
+            prettyPrintQueryResult(*dec_res);
+        }
+
+        return dec_res;
+    }
+
+    return res;
+}
+
+SchemaInfo *
+SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
+                       const std::unique_ptr<Connect> &e_conn)
+{
+    if (true == staleness) {
+        this->schema.reset(loadSchemaInfo(conn, e_conn));
+    }
+
+    // HACK: get.
+    return this->schema.get();
+}
+
+void SchemaCache::updateStaleness(bool staleness)
+{
+    this->staleness = staleness;
 }
 

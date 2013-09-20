@@ -21,13 +21,12 @@ class AlterHandler : public DDLHandler {
     {
         const AlterSubHandler *handler;
         assert(sub_dispatcher->canDo(lex));
-        assert(handler =
-            (const AlterSubHandler*)sub_dispatcher->dispatch(lex));
+        assert(handler = sub_dispatcher->dispatch(lex));
         return handler->transformLex(a, lex, ps);
     }
-    
+
     AlterDispatcher *sub_dispatcher;
-    
+
 public:
     AlterHandler()
     {
@@ -79,7 +78,7 @@ class CreateHandler : public DDLHandler {
             auto it =
                 List_iterator<Create_field>(lex->alter_info.create_list);
             new_lex->alter_info.create_list =
-                reduceList<Create_field>(it, List<Create_field>(),
+                accumList<Create_field>(it,
                     [&a, &ps, &tm] (List<Create_field> out_list,
                                     Create_field *cf) {
                         return createAndRewriteField(a, ps, cf, tm, 
@@ -92,7 +91,7 @@ class CreateHandler : public DDLHandler {
             auto key_it =
                 List_iterator<Key>(lex->alter_info.key_list);
             new_lex->alter_info.key_list =
-                reduceList<Key>(key_it, List<Key>(),
+                accumList<Key>(key_it,
                     [&tm, &a] (List<Key> out_list, Key *const key)
                     {
                         auto keys = rewrite_key(tm, key, a);

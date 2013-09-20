@@ -9,6 +9,7 @@
 #include <stdlib.h>
 
 #include <main/rewrite_main.hh>
+#include <main/rewrite_util.hh>
 
 #include <test/test_utils.hh>
 
@@ -109,6 +110,8 @@ class Connection {
     std::set<ProxyState *>::iterator re_it;
 
     pid_t proxy_pid;
+
+    SchemaCache schema_cache;
 
     ResType executeConn(std::string query);
     ResType executeEDBProxy(std::string query);

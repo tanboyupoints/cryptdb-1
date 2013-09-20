@@ -10,6 +10,14 @@
     }                                       \
 }
 
+#define ROLLBACK_AND_RFIF(status, conn)                 \
+{                                                       \
+    if (!(status)) {                                    \
+        assert((conn)->execute("ROLLBACK;"));           \
+        return false;                                   \
+    }                                                   \
+}                                                       \
+
 inline void
 testBadItemArgumentCount(const std::string &file_name,
                          unsigned int line_number, int type, int expected,

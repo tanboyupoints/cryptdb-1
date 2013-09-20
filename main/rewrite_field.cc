@@ -32,17 +32,50 @@ CItemFuncNameDir funcNames = CItemFuncNameDir();
 CItemSumFuncDir sumFuncTypes = CItemSumFuncDir();
 
 
+/*
+ * Unclear whether this is the correct formulation for subqueries that
+ * are not contained in SELECT queries. Refer to Name_resolution_context
+ * definition for more information.
+ */
+static std::string
+deductPlainTableName(const std::string &field_name,
+                     Name_resolution_context *const context,
+                     Analysis &a)
+{
+    assert(context);
+
+    std::unique_ptr<IdentityMetaKey>
+        key(new IdentityMetaKey(field_name));
+
+    const TABLE_LIST *current_table =
+        context->first_name_resolution_table;
+    do {
+        TableMeta *const tm = a.getTableMeta(current_table->table_name);
+        if (tm->childExists(key.get())) {
+            return std::string(current_table->table_name);
+        }
+
+        current_table = current_table->next_local;
+    } while (current_table != context->last_name_resolution_table);
+
+    return deductPlainTableName(field_name, context->outer_context, a);
+}
+
 class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
     virtual RewritePlan * do_gather_type(Item_field *i, reason &tr, Analysis & a) const {
         LOG(cdb_v) << "FIELD_ITEM do_gather " << *i;
 
         const std::string fieldname = i->field_name;
-        const std::string table = i->table_name;
 
-        FieldMeta * const fm = a.getFieldMeta(table, fieldname);
+        const std::string table =
+            i->table_name ? i->table_name :
+                            deductPlainTableName(i->field_name,
+                                                 i->context, a);
+ 
+        FieldMeta *const fm = a.getFieldMeta(table, fieldname);
 
-        EncSet es = EncSet(a, fm);
+        const EncSet es = EncSet(a, fm);
 
         tr = reason(es, "is a field", i);
 
@@ -56,22 +89,28 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     {
         LOG(cdb_v) << "do_rewrite_type FIELD_ITEM " << *i;
 
+        const std::string plain_table_name =
+            i->table_name ? i->table_name :
+                            deductPlainTableName(i->field_name,
+                                                 i->context, a);
         const FieldMeta * const fm =
-            a.getFieldMeta(i->table_name, i->field_name);
+            a.getFieldMeta(plain_table_name, i->field_name);
         //assert(constr.key == fm);
 
         //check if we need onion adjustment
         OnionMeta * const om =
-            a.getOnionMeta(i->table_name, i->field_name, constr.o);
+            a.getOnionMeta(plain_table_name, i->field_name,
+                           constr.o);
         const SECLEVEL onion_level = a.getOnionLevel(om);
         assert(onion_level != SECLEVEL::INVALID);
         if (constr.l < onion_level) {
             //need adjustment, throw exception
-            throw OnionAdjustExcept(constr.o, fm, constr.l, i);
+            throw OnionAdjustExcept(constr.o, fm, constr.l,
+                                    std::string(plain_table_name));
         }
 
         const std::string anon_table_name =
-            a.getAnonTableName(i->table_name);
+            a.getAnonTableName(plain_table_name);
         const std::string anon_field_name = om->getAnonOnionName();
 
         Item_field * const res =

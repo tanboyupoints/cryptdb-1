@@ -2,14 +2,8 @@
 #include <main/rewrite_util.hh>
 #include <main/rewrite_main.hh>
 #include <main/metadata_tables.hh>
-
-#define ROLLBACK_AND_RETURN_ON_FAIL(status, c, ret)     \
-{                                                       \
-    if (!(status)) {                                    \
-        assert((c)->execute("ROLLBACK;"));              \
-        return (ret);                                   \
-    }                                                   \
-}
+#include <main/macro_util.hh>
+#include <main/stored_procedures.hh>
 
 // FIXME: Memory leaks when we allocate MetaKey<...>, use smart pointer.
 
@@ -201,10 +195,25 @@ OLK EncSet::extract_singleton() const
     return OLK(it->first, it->second.first, it->second.second);
 }
 
+// needsSaltz must have consistent semantics.
+static bool
+needsSalt(SECLEVEL l)
+{
+    return l == SECLEVEL::RND;
+}
+
 bool
-needsSalt(EncSet es) {
+needsSalt(OLK olk)
+{
+    return olk.key && olk.key->has_salt && needsSalt(olk.l);
+}
+
+bool
+needsSalt(EncSet es)
+{
     for (auto pair : es.osl) {
-        if (pair.second.first == SECLEVEL::RND) {
+        OLK olk(pair.first, pair.second.first, pair.second.second);
+        if (needsSalt(olk)) {
             return true;
         }
     }
@@ -306,15 +315,26 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                                                    // connections in init
                                                    // list.
       conn(new Connect(ci.server, ci.user, ci.passwd, dbname, ci.port)),
+      side_channel_conn(new Connect(ci.server, ci.user, ci.passwd,
+                                    dbname, ci.port)),
       e_conn(Connect::getEmbedded(embed_dir, dbname)), dbname(dbname),
-      default_sec_rating(default_sec_rating), previous_schema(NULL),
-      schema_staleness(true)
+      default_sec_rating(default_sec_rating)
 {
     assert(conn && e_conn);
 
-    MetaDataTables::initialize(conn, e_conn);
+    assert(MetaDataTables::initialize(conn, e_conn));
 
     loadUDFs(conn);
+
+    assert(loadStoredProcedures(conn));
+
+    // The side channel should timeout quickly so that we can reissue
+    // onion adjustment from a deadlock.
+    const unsigned int onion_adjust_timeout = 5;
+    const std::string set_timeout_query =
+        "SET session innodb_lock_wait_timeout = " +
+        std::to_string(onion_adjust_timeout);
+    assert(side_channel_conn->execute(set_timeout_query));
 
     // HACK: This is necessary as above functions use a USE statement.
     // ie, loadUDFs.
@@ -492,6 +512,16 @@ bool RewriteOutput::stalesSchema() const
     return false;
 }
 
+enum RewriteOutput::Channel RewriteOutput::queryChannel() const
+{
+    return Channel::REGULAR;
+}
+
+bool RewriteOutput::multipleResultSets() const
+{
+    return false;
+}
+
 ResType *RewriteOutput::sendQuery(const std::unique_ptr<Connect> &c,
                                   const std::string &q)
 {
@@ -508,7 +538,8 @@ bool SimpleOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
     return true;
 }
 
-bool SimpleOutput::getQuery(std::list<std::string> *const queryz) const
+bool SimpleOutput::getQuery(std::list<std::string> *const queryz,
+                            SchemaInfo *const) const
 {
     queryz->clear();
     queryz->push_back(original_query);
@@ -540,7 +571,8 @@ bool DMLOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
     return true;
 }
 
-bool DMLOutput::getQuery(std::list<std::string> * const queryz) const
+bool DMLOutput::getQuery(std::list<std::string> * const queryz,
+                         SchemaInfo *const) const
 {
     queryz->clear();
     queryz->push_back(new_query);
@@ -566,14 +598,14 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     const std::string select_q =
         " SELECT * FROM " + this->plain_table +
         " WHERE " + this->where_clause + ";";
-    // FIXME: const_cast
     const std::unique_ptr<ResType>
-        select_res_type(executeQuery(const_cast<ProxyState &>(this->ps),
-                        select_q));
+        select_res_type(executeQuery(this->ps, select_q));
     assert(select_res_type);
     if (select_res_type->rows.size() == 0) { // No work to be done.
-        return sendQuery(conn, new_query);
+        this->do_nothing = true;
+        return true;
     }
+    this->do_nothing = false;
 
     const auto itemJoin = [](std::vector<Item*> row) {
         return "(" +
@@ -583,15 +615,21 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     const std::string values_string =
         vector_join<std::vector<Item*>>(select_res_type->rows, ",",
                                         itemJoin);
+
+    // Do the query on the embedded database inside of a transaction
+    // so that we can prevent failure artifacts from populating the
+    // embedded dabase.
+    RETURN_FALSE_IF_FALSE(e_conn->execute("START TRANSACTION;"));
+
     // Push the plaintext rows to the embedded database.
     const std::string push_q =
         " INSERT INTO " + this->plain_table +
         " VALUES " + values_string + ";";
-    assert(e_conn->execute(push_q));
+    ROLLBACK_AND_RFIF(e_conn->execute(push_q), e_conn);
 
     // Run the original (unmodified) query on the data in the embedded
     // database.
-    assert(e_conn->execute(this->original_query));
+    ROLLBACK_AND_RFIF(e_conn->execute(this->original_query), e_conn);
 
     // > Collect the results from the embedded database.
     // > This code relies on single threaded access to the database
@@ -600,58 +638,74 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     DBResult *dbres;
     const std::string select_results_q =
         " SELECT * FROM " + this->plain_table + ";";
-    assert(e_conn->execute(select_results_q, dbres));
+    ROLLBACK_AND_RFIF(e_conn->execute(select_results_q, dbres), e_conn);
     const std::unique_ptr<ResType>
         interim_res(new ResType(dbres->unpack()));
-    this->output_values = 
+    this->output_values =
         vector_join<std::vector<Item*>>(interim_res->rows, ",",
                                         itemJoin);
     // Cleanup the embedded database.
     const std::string cleanup_q =
         "DELETE FROM " + this->plain_table + ";";
-    assert(e_conn->execute(cleanup_q));
+    ROLLBACK_AND_RFIF(e_conn->execute(cleanup_q), e_conn);
+
+    ROLLBACK_AND_RFIF(e_conn->execute("COMMIT;"), e_conn);
 
     return true;
 }
 
-bool SpecialUpdate::getQuery(std::list<std::string> * const queryz) const
+bool SpecialUpdate::getQuery(std::list<std::string> * const queryz,
+                             SchemaInfo *const schema) const
 {
-    queryz->clear();
-    queryz->push_back("START TRANSACTION; ");
+    assert(queryz && schema);
 
-    // FIXME: Broken, these queries must be rewritten.
+    queryz->clear();
+
+    if (true == this->do_nothing.get()) {
+        queryz->push_back(mysql_noop());
+        return true;
+    }
+
+    // This query is necessary to propagate a transaction into
+    // INFORMATION_SCHEMA.
+    queryz->push_back("SELECT NULL FROM " + this->crypted_table + ";");
 
     // DELETE the rows matching the WHERE clause from the database.
     const std::string delete_q =
         " DELETE FROM " + this->plain_table +
         " WHERE " + this->where_clause + ";";
     const std::string re_delete =
-        rewriteAndGetSingleQuery(ps, delete_q);
-    queryz->push_back(re_delete);
+        rewriteAndGetSingleQuery(ps, delete_q, schema);
 
     // > Add each row from the embedded database to the data database.
-    const std::string push_results_q =
+    const std::string insert_q =
         " INSERT INTO " + this->plain_table +
         " VALUES " + this->output_values.get() + ";";
-    const std::string re_push =
-        rewriteAndGetSingleQuery(ps, push_results_q);
-    queryz->push_back(re_push);
+    const std::string re_insert =
+        rewriteAndGetSingleQuery(ps, insert_q, schema);
 
-    queryz->push_back("COMMIT; ");
+    queryz->push_back(" CALL homAdditionTransaction ("
+                      " '" + escapeString(ps.getConn(), re_delete) + "', "
+                      " '" + escapeString(ps.getConn(),
+                                          re_insert) + "');");
 
     return true;
 }
 
-// FIXME: Implement.
 bool
 SpecialUpdate::handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
     const
 {
-    return false;
+    return true;
 }
 
 bool SpecialUpdate::afterQuery(const std::unique_ptr<Connect> &e_conn)
     const
+{
+    return true;
+}
+
+bool SpecialUpdate::multipleResultSets() const
 {
     return true;
 }
@@ -830,19 +884,19 @@ handleDeltaBeforeQuery(const std::unique_ptr<Connect> &conn,
     assert(e_conn->execute("START TRANSACTION;"));
     for (auto it : deltas) {
         b = it->apply(e_conn, Delta::BLEEDING_TABLE);
-        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
+        ROLLBACK_AND_RFIF(b, e_conn);
     }
 
     b = DeltaOutput::save(e_conn, delta_output_id);
-    ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
+    ROLLBACK_AND_RFIF(b, e_conn);
 
     for (auto it : local_qz) {
         b = saveQuery(e_conn, it, *delta_output_id, true, false);
-        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
+        ROLLBACK_AND_RFIF(b, e_conn);
     }
     for (auto it : remote_qz) {
         b = saveQuery(e_conn, it, *delta_output_id, false, remote_ddl);
-        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
+        ROLLBACK_AND_RFIF(b, e_conn);
     }
     assert(e_conn->execute("COMMIT;"));
 
@@ -863,11 +917,11 @@ handleDeltaAfterQuery(const std::unique_ptr<Connect> &e_conn,
     assert(e_conn->execute("START TRANSACTION;"));
     for (auto it : deltas) {
         b = it->apply(e_conn, Delta::REGULAR_TABLE);
-        ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
+        ROLLBACK_AND_RFIF(b, e_conn);
     }
 
     b = cleanupDeltaOutputAndQuery(e_conn, delta_output_id);
-    ROLLBACK_AND_RETURN_ON_FAIL(b, e_conn, false);
+    ROLLBACK_AND_RFIF(b, e_conn);
 
     assert(e_conn->execute("COMMIT;"));
 
@@ -892,7 +946,8 @@ bool DDLOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
     return b;
 }
 
-bool DDLOutput::getQuery(std::list<std::string> * const queryz) const
+bool DDLOutput::getQuery(std::list<std::string> * const queryz,
+                         SchemaInfo *const) const
 {
     queryz->clear();
 
@@ -936,7 +991,8 @@ bool AdjustOnionOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
     return b;
 }
 
-bool AdjustOnionOutput::getQuery(std::list<std::string> * const queryz)
+bool AdjustOnionOutput::getQuery(std::list<std::string> * const queryz,
+                                 SchemaInfo *const)
     const
 {
     queryz->clear();
@@ -979,6 +1035,17 @@ const std::list<std::string> AdjustOnionOutput::local_qz() const
 bool AdjustOnionOutput::queryAgain() const
 {
     return true;
+}
+
+bool AdjustOnionOutput::doDecryption() const
+{
+    throw CryptDBError("AdjustOnionOutput doesn't understand"
+                       " decryption!");
+}
+
+enum RewriteOutput::Channel AdjustOnionOutput::queryChannel() const
+{
+    return Channel::SIDE;
 }
 
 bool Analysis::addAlias(const std::string &alias,
@@ -1109,5 +1176,9 @@ Analysis::getEncLayers(OnionMeta * const om) const
     return om->layers;
 }
 
-#undef ROLLBACK_AND_RETURN_ON_FAIL
+RewritePlanWithAnalysis::RewritePlanWithAnalysis(const EncSet &es_out,
+                                                 reason r,
+                                            std::unique_ptr<Analysis> a)
+    : RewritePlan(es_out, r), a(std::move(a))
+{}
 

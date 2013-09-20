@@ -2,6 +2,7 @@
 
 #include <list>
 #include <vector>
+#include <memory>
 
 #include <util/onions.hh>
 
@@ -153,6 +154,9 @@ const EncSet EMPTY_EncSet {
     OnionLevelFieldMap()
 };
 
+bool
+needsSalt(OLK olk);
+
 // returns true if any of the layers in ed
 // need salt
 bool
@@ -190,7 +194,8 @@ operator<<(std::ostream &out, const reason &r);
 class RewritePlan {
 public:
     const reason r;
-    const EncSet es_out; // encset that this item can output
+    // HACK: Should be const.
+    EncSet es_out; // encset that this item can output
 
     RewritePlan(const EncSet &es, reason r) : r(r), es_out(es) {};
     reason getReason() const {return r;}
@@ -222,6 +227,13 @@ public:
                             child_olks,
                            reason r)
         : RewritePlan(es_out, r), child_olks(child_olks) {}
+};
+
+class RewritePlanWithAnalysis : public RewritePlan {
+public:
+    const std::unique_ptr<Analysis> a;
+    RewritePlanWithAnalysis(const EncSet &es_out, reason r,
+                            std::unique_ptr<Analysis> a);
 };
 
 std::ostream&

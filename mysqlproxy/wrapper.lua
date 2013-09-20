@@ -1,7 +1,6 @@
 assert(package.loadlib(os.getenv("EDBDIR").."/libexecute.so",
                        "lua_cryptdb_init"))()
 local proto = assert(require("mysql.proto"))
-local use_database = false
 
 --
 -- Interception points provided by mysqlproxy
@@ -51,8 +50,9 @@ end
 -- Helper functions
 --
 
-RES_IGNORE  = 1
-RES_DECRYPT = 2
+RES_IGNORE   = 1
+RES_DECRYPT  = 2
+RES_ROLLBACK = 3
 
 function dprint(x)
     if os.getenv("CRYPTDB_PROXY_DEBUG") then
@@ -62,15 +62,11 @@ end
 
 function read_query_real(packet)
     local query = string.sub(packet, 2)
-    dprint("read_query: " .. query)
+    print("read_query: " .. query)
 
     if string.byte(packet) == proxy.COM_QUERY then
-        new_queries =
+        do_rollback, new_queries =
             CryptDB.rewrite(proxy.connection.client.src.name, query)
-        if false == use_database then
-            table.insert(new_queries, 1, "USE cryptdbtest")
-            use_database = true
-        end
 
         if not new_queries then
             proxy.response.type = proxy.MYSQLD_PACKET_ERR
@@ -88,11 +84,14 @@ function read_query_real(packet)
             dprint("rewritten query[" .. i .. "]: " .. v)
             local result_key
             if i == table.maxn(new_queries) then
-                result_key = RES_DECRYPT
+                if true == do_rollback then
+                    result_key = RES_ROLLBACK
+                else
+                    result_key = RES_DECRYPT
+                end
             else
                 result_key = RES_IGNORE
             end
-
             proxy.queries:append(result_key,
                                  string.char(proxy.COM_QUERY) .. v,
                                  { resultset_is_needed = true })
@@ -111,6 +110,16 @@ function read_query_result_real(inj)
 
     if inj.id == RES_IGNORE then
         return proxy.PROXY_IGNORE_RESULT
+    elseif inj.id == RES_ROLLBACK then
+        CryptDB.rollbackOnionAdjust(client)
+
+        proxy.response.type = proxy.MYSQLD_PACKET_ERR
+        proxy.response.errmsg = "Proxy did ROLLBACK"
+        -- ER_LOCK_DEADLOCK::error = 1213
+        proxy.response.errcode = 1213
+        -- ER_LOCK_DEADLOCK::sqlstate = 40001
+        proxy.response.sqlstate = 40001
+        return proxy.PROXY_SEND_RESULT
     elseif inj.id == RES_DECRYPT then
         local resultset = inj.resultset
 
@@ -127,80 +136,32 @@ function read_query_result_real(inj)
             local rows = {}
             local query = inj.query:sub(2)
 
-            -- Handle the backend of the query.
-            decryptp, res_ptr =
-                CryptDB.epilogue(client)
-            if res_ptr then
-                dfields, drows = CryptDB.passDecryptedPtr(client, res_ptr)
-            else
-                 -- for DEMO: printing results
-                local f_names = ""
-                local r = ""
+            -- mysqlproxy doesn't return real lua arrays, so re-package
+            local resfields = resultset.fields
+            for i = 1, #resfields do
+                rfi = resfields[i]
+                fields[i] = { type = resfields[i].type,
+                              name = resfields[i].name }
+            end
 
-                -- mysqlproxy doesn't return real lua arrays, so re-package
-                local resfields = resultset.fields
-                for i = 1, #resfields do
-                    rfi = resfields[i]
-                    fields[i] = { type = rfi.type, name = rfi.name }
-                    f_names = f_names .. "|" .. rfi.name
-                end
-
-                local resrows = resultset.rows
-                if resrows then
-                    for row in resrows do
-                        table.insert(rows, row)
-                    end
-                end
-
-                -- DEMO
-                if #rows > 0 then
-                   dprint(" ")
-                   dprint("Results from server:")
-                end
-                dprint(f_names)
-                for i = 1, #rows do
-                    for j = 1, #rows[i] do
-                        r = r .. "|" .. rows[i][j]
-                    end
-                    dprint(r)
-                    r = ""
-                end
-                if true == decryptp then
-                    dfields, drows =
-                        CryptDB.decrypt(client, fields, rows)
-                else
-                    dfields = fields
-                    drows = rows
+            local resrows = resultset.rows
+            if resrows then
+                for row in resrows do
+                    table.insert(rows, row)
                 end
             end
 
+            -- Handle the backend of the query.
+            dfields, drows =
+                CryptDB.envoi(client, fields, rows)
+
             if dfields and drows then
-                -- DEMO
-                f_names = ""
-                r = ""
-                for i = 1, #dfields do
-                    f_names = f_names .. " | " .. dfields[i].name
-                end
-
-                if #drows > 0 then
-                   dprint(" ")
-                   dprint("Decrypted results:")
-                end
-                dprint(f_names)
-
-                for i = 1, #drows do
-                    for j = 1, #drows[i] do
-                        r = r .. " | " .. drows[i][j]
-                    end
-                    dprint(r)
-                    r = "" 
-                end
-
                 proxy.response.type = proxy.MYSQLD_PACKET_OK
                 proxy.response.affected_rows = resultset.affected_rows
                 proxy.response.insert_id = resultset.insert_id
                 if table.maxn(dfields) > 0 then
-                    proxy.response.resultset = { fields = dfields, rows = drows }
+                    proxy.response.resultset = { fields = dfields,
+                                                 rows = drows }
                 end
             else
                 proxy.response.type = proxy.MYSQLD_PACKET_ERR

@@ -12,6 +12,7 @@
 #include <util/errstream.hh>
 #include <util/cleanup.hh>
 #include <util/cryptdb_log.hh>
+#include <main/rewrite_main.hh>
 
 #include <test/TestQueries.hh>
 
@@ -113,6 +114,8 @@ static QueryList Select = QueryList("SingleSelect",
       // BestEffort.
       // Query("SELECT * FROM test_select HAVING age", false),
       // Query("SELECT * FROM test_select HAVING age && id", false)
+      // Query("SELECT * FROM test_select WHERE id IN (SELECT id FROM test_select)", false),
+      // Query("SELECT * FROM test_select WHERE id IN (SELECT 1 FROM test_select)", false)
       },
     { "DROP TABLE test_select" },
     { "DROP TABLE test_select" },
@@ -973,6 +976,55 @@ static QueryList NonStrictMode = QueryList("NonStrictMode",
     { "DROP TABLE not_strict"},
     { "DROP TABLE not_strict"});
 
+static QueryList Transactions = QueryList("Transactions",
+    { "CREATE TABLE trans (a integer, b integer, c integer)ENGINE=InnoDB",
+      "", "", "", ""},
+    { "CREATE TABLE trans (a integer, b integer, c integer)ENGINE=InnoDB",
+      "", "", "", ""},
+    { "CREATE TABLE trans (a integer, b integer, c integer)ENGINE=InnoDB",
+      "", "", "", ""},
+    { Query("INSERT INTO trans VALUES (1, 2, 3)", false),
+      Query("INSERT INTO trans VALUES (33, 22, 11)", false),
+      Query("SELECT * FROM trans", false),
+      Query("START TRANSACTION", false),
+      Query("INSERT INTO trans VALUES (333, 222, 111)", false),
+      Query("ROLLBACK", false),
+      Query("SELECT * FROM trans", false),
+      Query("INSERT INTO trans VALUES (45, 22, 15)", false),
+      Query("UPDATE trans SET a = a + 1, b = c + 1", false),
+      Query("START TRANSACTION", false),
+      Query("UPDATE trans SET a = a + a, b = b + 12", false),
+      Query("SELECT * FROM trans", false),
+      Query("ROLLBACK", false),
+      Query("SELECT * FROM trans", false),
+      Query("START TRANSACTION", false),
+      Query("UPDATE trans SET a = c, b = a + 1", false),
+      Query("COMMIT", false),
+      Query("ROLLBACK", false),
+      Query("SELECT * FROM trans", false)},
+    { "DROP TABLE trans"},
+    { "DROP TABLE trans"},
+    { "DROP TABLE trans"});
+
+static QueryList Deadlocks = QueryList("Deadlocks",
+    { "CREATE TABLE deadlock (x integer, y integer) ENGINE=InnoDB", "",
+      "", ""},
+    { "CREATE TABLE deadlock (x integer, y integer) ENGINE=InnoDB", "",
+      "", ""},
+    { "CREATE TABLE deadlock (x integer, y integer) ENGINE=InnoDB", "",
+      "", ""},
+    { Query("INSERT INTO deadlock VALUES (1, 100), (2, 200), (3, 300)",
+            false),
+      Query("START TRANSACTION", false),
+      Query("UPDATE deadlock SET x = x + 1, y = y + 2", false),
+      Query("SELECT * FROM deadlock WHERE x < 10", false),
+      Query("SELECT * FROM deadlock WHERE x < 10", false)},
+    { "DROP TABLE deadlock"},
+    { "DROP TABLE deadlock"},
+    { "DROP TABLE deadlock"});
+
+
+
 
 //-----------------------------------------------------------------------
 
@@ -1126,7 +1178,10 @@ Connection::executeRewriter(std::string query) {
 
     //cout << query << endl;
     ProxyState *ps = *re_it;
-    ResType *dec_res = executeQuery(*ps, query);
+    // If this assert fails, deteremine if one schema_cache makes sense
+    // for multiple connections.
+    assert(re_set.size() == 1);
+    ResType *dec_res = executeQuery(*ps, query, &this->schema_cache);
     if (dec_res) {
         return *dec_res;
     } else {
@@ -1297,8 +1352,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 397/397.
-    //         (SENSITIVE: 373/373)
+    //     TOTAL RESULT: 398/398.
     // ###############################
 
     std::vector<Score> scores;
@@ -1356,6 +1410,15 @@ RunTest(const TestConfig &tc) {
 
     // Pass 20/20
     scores.push_back(CheckQueryList(tc, NonStrictMode));
+
+    // Pass 25/25
+    scores.push_back(CheckQueryList(tc, Transactions));
+
+    /*
+    // Pass 9/10
+    // NOTE: Should fail one test.
+    scores.push_back(CheckQueryList(tc, Deadlocks));
+    */
 
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;
