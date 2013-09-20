@@ -304,8 +304,8 @@ public:
         duped_om(copy(om)) {}
     ~OnionMetaAdjustor() {}
 
-    EncLayer *getBackEncLayer() const;
-    std::shared_ptr<EncLayer> popBackEncLayer();
+    EncLayer &getBackEncLayer() const;
+    EncLayer &popBackEncLayer();
     SECLEVEL getSecLevel() const;
     const OnionMeta *getOnionMeta() const;
     std::string getAnonOnionName() const;

@@ -67,6 +67,7 @@ public:
 
     // returns the decryptUDF to remove the onion layer
     virtual Item * decryptUDF(Item * const col, Item * const ivcol = NULL)
+        const
     {
         thrower() << "decryptUDF not supported";
     }
@@ -169,7 +170,7 @@ public:
     Item *encrypt(Item * const ptext, uint64_t IV);
     Item *decrypt(Item * const ctext, uint64_t IV);
     Item *decryptUDF(Item * const col, Item * const ivcol = NULL)
-        __attribute__((noreturn));
+        const __attribute__((noreturn));
     std::string doSerialize() const;
 };
 

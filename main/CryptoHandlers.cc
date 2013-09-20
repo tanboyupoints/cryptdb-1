@@ -305,7 +305,7 @@ public:
 
     Item * encrypt(Item * const ptext, uint64_t IV);
     Item * decrypt(Item * const ctext, uint64_t IV);
-    Item * decryptUDF(Item * const col, Item * const ivcol);
+    Item * decryptUDF(Item * const col, Item * const ivcol) const;
 
 private:
     std::string key;
@@ -331,7 +331,7 @@ public:
 
     Item * encrypt(Item * const ptext, uint64_t IV);
     Item * decrypt(Item * const ctext, uint64_t IV);
-    Item * decryptUDF(Item * const col, Item * const ivcol);
+    Item * decryptUDF(Item * const col, Item * const ivcol) const;
 
 private:
     std::string rawkey;
@@ -419,7 +419,7 @@ static udf_func u_decRNDInt = {
 
 
 Item *
-RND_int::decryptUDF(Item * const col, Item * const ivcol)
+RND_int::decryptUDF(Item * const col, Item * const ivcol) const
 {
     List<Item> l;
     l.push_back(col);
@@ -510,7 +510,7 @@ static udf_func u_decRNDString = {
 
 
 Item *
-RND_str::decryptUDF(Item * const col, Item * const ivcol)
+RND_str::decryptUDF(Item * const col, Item * const ivcol) const
 {
     List<Item> l;
     l.push_back(col);
@@ -539,7 +539,7 @@ public:
     // FIXME: final
     Item *encrypt(Item *const ptext, uint64_t IV);
     Item *decrypt(Item *const ctext, uint64_t IV);
-    Item *decryptUDF(Item *const col, Item *const ivcol = NULL);
+    Item *decryptUDF(Item *const col, Item *const ivcol = NULL) const;
 
 protected:
     const std::string key;
@@ -634,7 +634,7 @@ public:
 
     Item * encrypt(Item * const ptext, uint64_t IV);
     Item * decrypt(Item * const ctext, uint64_t IV);
-    Item * decryptUDF(Item * const col, Item * const ivcol = NULL);
+    Item * decryptUDF(Item * const col, Item * const ivcol = NULL) const;
 
 protected:
     std::string rawkey;
@@ -732,6 +732,7 @@ DET_abstract_number::decrypt(Item *const ctext, uint64_t IV)
 
 Item *
 DET_abstract_number::decryptUDF(Item *const col, Item *const ivcol)
+    const
 {
     List<Item> l;
     l.push_back(col);
@@ -743,18 +744,11 @@ DET_abstract_number::decryptUDF(Item *const col, Item *const ivcol)
     Item *const udfdec = new Item_func_udf_int(&u_decDETInt, l);
     udfdec->name = NULL;
 
-    AssignOnce<Item *> udf;
-    if (0 == shift) {
-        // CAST for unsigned
-        udf = new Item_func_unsigned(udfdec);
-        udf.get()->name = NULL;
-    } else {
-        // CAST for signed.
-        udf = new Item_func_signed(udfdec);
-        udf.get()->name = NULL;
-    }
+    Item *const udf = 0 == shift ? new Item_func_unsigned(udfdec)
+                                 : new Item_func_signed(udfdec);
+    udf->name = NULL;
 
-    return udf.get();
+    return udf;
 }
 
 std::string
@@ -970,7 +964,7 @@ static udf_func u_decDETStr = {
 
 
 Item *
-DET_str::decryptUDF(Item * const col, Item * const ivcol)
+DET_str::decryptUDF(Item * const col, Item * const ivcol) const
 {
     List<Item> l;
     l.push_back(col);
@@ -1824,7 +1818,7 @@ PlainText::decrypt(Item * const ctext, uint64_t IV)
 }
 
 Item *
-PlainText::decryptUDF(Item * const col, Item * const ivcol)
+PlainText::decryptUDF(Item * const col, Item * const ivcol) const
 {
     throw CryptDBError("Can't decrypt from PLAIN");
 }

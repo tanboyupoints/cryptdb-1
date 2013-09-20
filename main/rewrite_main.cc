@@ -80,17 +80,15 @@ mysql_query_wrapper(MYSQL *const m, const std::string &q)
 }
 
 bool
-sanityCheck(FieldMeta *const fm)
+sanityCheck(FieldMeta &fm)
 {
-    for (auto it = fm->children.begin(); it != fm->children.end();
+    for (auto it = fm.children.begin(); it != fm.children.end();
          it++) {
-        // FIXME: PTR.
-        std::shared_ptr<OnionMeta> om = it.second;
-        const onion o = it.first.getValue();
-        const std::vector<SECLEVEL> &secs = fm->onion_layout.at(o);
-        for (unsigned int i = 0; i < om.get()->layers.size(); ++i) {
-            std::shared_ptr<EncLayer> layer = om.get()->layers[i];
-            // FIXME: PTR.
+        OnionMeta *const om = (*it).second.get();
+        const onion o = (*it).first.getValue();
+        const std::vector<SECLEVEL> &secs = fm.onion_layout.at(o);
+        for (size_t i = 0; i < om->layers.size(); ++i) {
+            std::unique_ptr<EncLayer> const &layer = om->layers[i];
             assert(layer.get()->level() == secs[i]);
         }
     }
@@ -98,23 +96,22 @@ sanityCheck(FieldMeta *const fm)
 }
 
 static bool
-sanityCheck(TableMeta *const tm)
+sanityCheck(TableMeta &tm)
 {
-    for (auto it : tm->children) {
-        std::shared_ptr<FieldMeta> fm = it.second;
-        // FIXME: PTR.
-        assert(sanityCheck(fm.get()));
+    for (auto it = tm.children.begin() : tm.children) {
+        const std::unique_ptr<FieldMeta> &fm = (*it).second;
+        assert(sanityCheck(*fm.get()));
     }
     return true;
 }
 
 static bool
-sanityCheck(SchemaInfo *const schema)
+sanityCheck(SchemaInfo &schema)
 {
-    for (auto it : schema->children) {
-        std::shared_ptr<TableMeta> tm = it.second;
-        // FIXME: PTR.
-        assert(sanityCheck(tm.get()));
+    for (auto it = schema.children.begin(); it != schema.children.end();
+         it++) {
+        const std::unique_ptr<TableMeta> &tm = (*it).second;
+        assert(sanityCheck(*tm.get()));
     }
     return true;
 }
@@ -310,8 +307,7 @@ loadSchemaInfo(const std::unique_ptr<Connect> &conn,
         [&loadChildren, &e_conn](DBMeta *const parent) {
             auto kids = parent->fetchChildren(e_conn);
             for (auto it : kids) {
-                // FIXME: PTR.
-                loadChildren(it.get());
+                loadChildren(it);
             }
 
             return parent;  /* lambda */
@@ -320,7 +316,7 @@ loadSchemaInfo(const std::unique_ptr<Connect> &conn,
     loadChildren(schema);
     // FIXME: Ideally we would do this before loading the schema.
     // But first we must decide on a place to create the database from.
-    assert(sanityCheck(schema));
+    assert(sanityCheck(*schema));
 
     return schema;
 }
@@ -503,16 +499,16 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
                  const std::string &cur_db)
 {
     // Remove the EncLayer.
-    std::shared_ptr<EncLayer> back_el(om_adjustor->popBackEncLayer());
+    EncLayer const &back_el = om_adjustor->popBackEncLayer();
 
     // Update the Meta.
     a.deltas.push_back(new DeleteDelta(back_el,
-                                       om_adjustor->getOnionMeta()));
+                                       *om_adjustor->getOnionMeta()));
     const SECLEVEL local_new_level = om_adjustor->getSecLevel();
 
     //removes onion layer at the DB
     const std::string tableanon =
-        a.getTableMeta(table_name)->getAnonTableName();
+        a.getTableMeta(table_name).getAnonTableName();
 
     const std::string anon_table_name = a.getAnonTableName(table_name);
     Item_field *const salt =
@@ -524,7 +520,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
         new Item_field(NULL, ps.dbName().c_str(), anon_table_name.c_str(),
                        fieldanon.c_str());
 
-    Item *const decUDF = back_el.get()->decryptUDF(field, salt);
+    Item *const decUDF = back_el.decryptUDF(field, salt);
 
     std::stringstream query;
     query << " UPDATE " << cur_db << "." << tableanon
@@ -685,7 +681,7 @@ decrypt_item_layers(Item *const i, const FieldMeta *const fm, onion o,
 
     const OnionMeta *const om = fm->getOnionMeta(o);
     assert(om);
-    auto enc_layers = om->layers;
+    const auto &enc_layers = om->layers;
     for (auto it = enc_layers.rbegin(); it != enc_layers.rend(); ++it) {
         dec = (*it)->decrypt(dec, IV);
         LOG(cdb_v) << "dec okay";
@@ -1102,9 +1098,9 @@ Rewriter::handleDirective(Analysis &a, const ProxyState &ps,
                           const std::string &query)
 {
     DirectiveData data(query);
-    const FieldMeta *const fm =
+    const FieldMeta &fm =
         a.getFieldMeta(data.table_name, data.field_name);
-    const SECURITY_RATING current_rating = fm->getSecurityRating();
+    const SECURITY_RATING current_rating = fm.getSecurityRating();
     if (current_rating < data.sec_rating) {
         throw CryptDBError("cryptdb does not support going to a more "
                            "secure rating!");
@@ -1143,7 +1139,7 @@ Rewriter::rewrite(const ProxyState &ps, const std::string &q,
     //assert(0 == create_embedded_thd(0));
 
     assert(schema);
-    Analysis analysis(schema);
+    Analysis analysis(*schema);
 
     RewriteOutput *output;
     try {
@@ -1356,17 +1352,17 @@ printRes(const ResType &r) {
     }
 }
 
-EncLayer *OnionMetaAdjustor::getBackEncLayer() const
+EncLayer &OnionMetaAdjustor::getBackEncLayer() const
 {
-    return duped_om->layers.back().get();
+    return *duped_om->layers.back().get();
 }
 
-std::shared_ptr<EncLayer> OnionMetaAdjustor::popBackEncLayer()
+EncLayer &OnionMetaAdjustor::popBackEncLayer()
 {
-    std::shared_ptr<EncLayer> out_layer(duped_om->layers.back());
+    EncLayer *const out_layer = duped_om->layers.back().get();
     duped_om->layers.pop_back();
 
-    return out_layer;
+    return *out_layer;
 }
 
 SECLEVEL OnionMetaAdjustor::getSecLevel() const
