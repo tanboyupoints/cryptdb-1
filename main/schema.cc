@@ -81,14 +81,6 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels,
 }
 
 std::unique_ptr<OnionMeta>
-OnionMeta::copyWithNewName(const OnionMeta * const om,
-                           const std::string &name)
-{
-    return std::unique_ptr<OnionMeta>(new OnionMeta(om->getDatabaseID(),
-                                                    name, om->getUniq()));
-}
-
-std::unique_ptr<OnionMeta>
 OnionMeta::deserialize(unsigned int id, const std::string &serial)
 {
     assert(id);

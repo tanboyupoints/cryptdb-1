@@ -41,10 +41,6 @@ public:
               const AES_KEY * const m_key, Create_field * const cf,
               unsigned long uniq_count);
 
-    static std::unique_ptr<OnionMeta>
-        copyWithNewName(const OnionMeta * const om,
-                        const std::string &name);
-
     // Restore.
     static std::unique_ptr<OnionMeta>
         deserialize(unsigned int id, const std::string &serial);
