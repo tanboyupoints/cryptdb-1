@@ -188,10 +188,10 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
         if (oAGG == constr.o) {
             OnionMeta *const om = constr.key->getOnionMeta(oAGG);
             assert(om);
-            const EncLayer *const el = a.getBackEncLayer(om);
+            EncLayer const &el = a.getBackEncLayer(*om);
             TEST_UnexpectedSecurityLevel(oAGG, SECLEVEL::HOM,
-                                         el->level());
-            return static_cast<const HOM *>(el)->sumUDA(args.front());
+                                         el.level());
+            return static_cast<const HOM &>(el).sumUDA(args.front());
         } else {
             TEST_UnexpectedSecurityLevel(constr.o, SECLEVEL::PLAINVAL,
                                          constr.l);
@@ -272,9 +272,9 @@ static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
             a.getAnonTableName(plain_table);
 
         const std::string plain_field = i->field_name;
-        OnionMeta * const om =
+        OnionMeta const &om =
             a.getOnionMeta(plain_table, plain_field, constr.o);
-        const std::string anon_field = om->getAnonOnionName();
+        const std::string anon_field = om.getAnonOnionName();
 
         Item *new_ref = itemTypes.do_rewrite(*i->ref, constr, rp, a);
         Item_ref *out_i = make_item(i, new_ref, anon_table, anon_field);

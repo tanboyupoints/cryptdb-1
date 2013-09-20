@@ -31,7 +31,7 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
                           List<Item> *res_values);
 
 static bool
-invalidates(FieldMeta * fm, const EncSet & es);
+invalidates(const FieldMeta &fm, const EncSet & es);
 
 template <typename ContainerType>
 void rewriteInsertHelper(Item *const i, Analysis &a, FieldMeta *const fm,
@@ -66,7 +66,7 @@ class InsertHandler : public DMLHandler {
 
         const std::string &table =
                 lex->select_lex.table_list.first->table_name;
-        const TableMeta *const tm = a.getTableMeta(table);
+        const TableMeta &tm = a.getTableMeta(table);
 
         //rewrite table name
         new_lex->select_lex.table_list.first =
@@ -75,6 +75,7 @@ class InsertHandler : public DMLHandler {
         // -------------------------
         // Fields (and default data)
         // -------------------------
+        // FIXME: Make vector of references.
         std::vector<FieldMeta *> fmVec;
         std::vector<Item *> implicit_defaults;
         if (lex->field_list.head()) {
@@ -88,14 +89,14 @@ class InsertHandler : public DMLHandler {
                 TEST_TextMessageError(i->type() == Item::FIELD_ITEM,
                                       "Expected field item!");
                 Item_field *const ifd = static_cast<Item_field*>(i);
-                fmVec.push_back(a.getFieldMeta(ifd->table_name,
-                                               ifd->field_name));
+                fmVec.push_back(&a.getFieldMeta(ifd->table_name,
+                                                ifd->field_name));
                 rewriteInsertHelper(i, a, NULL, &newList);
             }
 
             // Collect the implicit defaults.
             std::vector<FieldMeta *> field_implicit_defaults =
-                vectorDifference(tm->defaultedFieldMetas(), fmVec);
+                vectorDifference(tm.defaultedFieldMetas(), fmVec);
             Item_field *const seed_item_field =
                 static_cast<Item_field *>(new_lex->field_list.head());
             for (auto implicit_it : field_implicit_defaults) {
@@ -117,7 +118,7 @@ class InsertHandler : public DMLHandler {
             //   values must be explicity INSERTed so we don't have to
             //   take any action with respect to defaults.
             assert(fmVec.empty());
-            std::vector<FieldMeta *> fmetas = tm->orderedFieldMetas();
+            std::vector<FieldMeta *> fmetas = tm.orderedFieldMetas();
             fmVec.assign(fmetas.begin(), fmetas.end());
         }
 
@@ -446,12 +447,12 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
         assert(field_item->type() == Item::FIELD_ITEM);
         const Item_field *const ifd =
             static_cast<Item_field *>(field_item);
-        FieldMeta *const fm =
+        FieldMeta &fm =
             a.getFieldMeta(ifd->table_name, ifd->field_name);
 
         const RewritePlan *const rp =
             getAssert(a.rewritePlans, value_item);
-        const EncSet needed = EncSet(a, fm);
+        const EncSet needed = EncSet(a, &fm);
         const EncSet r_es = rp->es_out.intersect(needed);
         // FIXME: Add version for situations when we don't know about
         // children.
@@ -460,12 +461,12 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
 
         // Determine salt for field
         bool add_salt = false;
-        if (fm->has_salt) {
-            const auto it_salt = a.salts.find(fm);
+        if (fm.has_salt) {
+            const auto it_salt = a.salts.find(&fm);
             if ((it_salt == a.salts.end()) && needsSalt(r_es)) {
                 add_salt = true;
                 const salt_type salt = randomValue();
-                a.salts[fm] = salt;
+                a.salts[&fm] = salt;
             }
         }
 
@@ -483,7 +484,7 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
         }
 
         for (auto pair : r_es.osl) {
-            const OLK olk = {pair.first, pair.second.first, fm};
+            const OLK olk = {pair.first, pair.second.first, &fm};
             RewritePlan *const rp_field =
                 getAssert(a.rewritePlans, field_item);
             Item *const re_field =
@@ -499,13 +500,13 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
 
         // Add the salt field
         if (add_salt) {
-            const salt_type salt = a.salts[fm];
+            const salt_type salt = a.salts[&fm];
             assert(res_items->elements != 0);
             Item_field * const rew_fd =
                 static_cast<Item_field *>(res_items->head());
             assert(rew_fd);
             const std::string anon_table_name = rew_fd->table_name;
-            const std::string anon_field_name = fm->getSaltName();
+            const std::string anon_field_name = fm.getSaltName();
             res_items->push_back(make_item(rew_fd, anon_table_name,
                                            anon_field_name));
             res_values->push_back(new Item_int((ulonglong)salt));
@@ -671,10 +672,11 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
     process_table_joins_and_derived(tll, a);
 }
 
-bool invalidates(FieldMeta * fm, const EncSet & es)
+bool invalidates(const FieldMeta &fm, const EncSet & es)
 {
-    for (auto o_l : fm->children) {
-        onion const o = o_l.first.getValue();
+    for (auto om_it = fm.children.begin(); om_it != fm.children.end();
+         om_it++) {
+        onion const o = (*om_it).first.getValue();
         if (es.osl.find(o) == es.osl.end()) {
             return true;
         }

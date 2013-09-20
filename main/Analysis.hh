@@ -42,12 +42,12 @@ typedef struct ReturnMeta {
 
 class OnionAdjustExcept {
 public:
-    OnionAdjustExcept(onion o, const FieldMeta * const fm,
+    OnionAdjustExcept(onion o, const FieldMeta &fm,
                       SECLEVEL l, const std::string &table_name)
         : o(o), fm(fm), tolevel(l), table_name(table_name) {}
 
     const onion o;
-    const FieldMeta * const fm;
+    const FieldMeta &fm;
     const SECLEVEL tolevel;
     const std::string table_name;
 };
@@ -109,9 +109,7 @@ class Delta {
 public:
     enum TableType {REGULAR_TABLE, BLEEDING_TABLE};
 
-    Delta(const std::shared_ptr<DBMeta> meta,
-          const DBMeta * const parent_meta)
-        : meta(meta), parent_meta(parent_meta) {}
+    Delta(const DBMeta &parent_meta) : parent_meta(parent_meta) {}
 
     /*
      * Take the update action against the database. Contains high level
@@ -121,8 +119,7 @@ public:
                        TableType table_type) = 0;
 
 protected:
-    const std::shared_ptr<DBMeta> meta;
-    const DBMeta * const parent_meta;
+    const DBMeta &parent_meta;
 
     std::string tableNameFromType(TableType table_type) const;
 };
@@ -132,10 +129,10 @@ protected:
 // functionally derived.
 class CreateDelta : public Delta {
 public:
-    CreateDelta(const std::shared_ptr<DBMeta> meta,
-                const DBMeta * const parent_meta,
+    CreateDelta(std::unique_ptr<DBMeta> meta,
+                const DBMeta &parent_meta,
                 AbstractMetaKey *const key)
-        : Delta(meta, parent_meta), key(key) {}
+        : Delta(parent_meta), meta(std::move(meta)), key(key) {}
 
     bool save(const std::unique_ptr<Connect> &e_conn,
               unsigned long * const delta_output_id);
@@ -144,24 +141,26 @@ public:
     bool destroyRecord(const std::unique_ptr<Connect> &e_conn);
 
 private:
-    std::unique_ptr<AbstractMetaKey> key;
+    const std::unique_ptr<DBMeta> meta;
+    const std::unique_ptr<AbstractMetaKey> key;
 };
 
 class DerivedKeyDelta : public Delta {
 public:
-    DerivedKeyDelta(const std::shared_ptr<DBMeta> meta,
-                   const DBMeta * const parent_meta)
-        : Delta(meta, parent_meta), key(parent_meta->getKey(meta.get()))
+    DerivedKeyDelta(const DBMeta &meta,
+                    const DBMeta &parent_meta)
+        : Delta(parent_meta), meta(meta),
+          key(parent_meta.getKey(meta))
     {}
 
 protected:
+    const DBMeta &meta;
     const AbstractMetaKey &key;
 };
 
 class ReplaceDelta : public DerivedKeyDelta {
 public:
-    ReplaceDelta(const std::shared_ptr<DBMeta> meta,
-                 const DBMeta * const parent_meta)
+    ReplaceDelta(const DBMeta &meta, const DBMeta &parent_meta)
         : DerivedKeyDelta(meta, parent_meta) {}
 
     bool save(const std::unique_ptr<Connect> &e_conn,
@@ -173,8 +172,7 @@ public:
 
 class DeleteDelta : public DerivedKeyDelta {
 public:
-    DeleteDelta(const std::shared_ptr<DBMeta> meta,
-                const DBMeta * const parent_meta)
+    DeleteDelta(const DBMeta &meta, const DBMeta &parent_meta)
         : DerivedKeyDelta(meta, parent_meta) {}
 
     bool save(const std::unique_ptr<Connect> &e_conn,
@@ -373,7 +371,7 @@ bool cleanupDeltaOutputAndQuery(const std::unique_ptr<Connect> &e_conn,
 class RewritePlan;
 class Analysis {
 public:
-    Analysis(const SchemaInfo * const schema)
+    Analysis(const SchemaInfo &schema)
         : pos(0), rmeta(new ReturnMeta()), special_update(false),
           schema(schema) {}
 
@@ -391,34 +389,33 @@ public:
 
     // These functions are prefered to their lower level counterparts.
     bool addAlias(const std::string &alias, const std::string &table);
-    OnionMeta *getOnionMeta(const std::string &table,
+    OnionMeta &getOnionMeta(const std::string &table,
                             const std::string &field, onion o) const;
-    OnionMeta *getOnionMeta(const FieldMeta *const fm, onion o) const;
-    FieldMeta *getFieldMeta(const std::string &table,
+    OnionMeta &getOnionMeta(const FieldMeta &fm, onion o) const;
+    FieldMeta &getFieldMeta(const std::string &table,
                             const std::string &field) const;
-    FieldMeta *getFieldMeta(const TableMeta * const tm,
+    FieldMeta &getFieldMeta(const TableMeta &tm,
                             const std::string &field) const;
-    TableMeta *getTableMeta(const std::string &table) const;
+    TableMeta &getTableMeta(const std::string &table) const;
     bool tableMetaExists(const std::string &table) const;
     std::string getAnonTableName(const std::string &table) const;
     std::string getAnonIndexName(const std::string &table,
                                  const std::string &index_name,
                                  onion o) const;
-    std::string getAnonIndexName(const TableMeta * const tm,
+    std::string getAnonIndexName(const TableMeta &tm,
                                  const std::string &index_name,
                                  onion o) const;
-    // FIXME: PTR.
-    static EncLayer *getBackEncLayer(OnionMeta * const om);
-    static SECLEVEL getOnionLevel(OnionMeta * const om);
-    static std::vector<std::shared_ptr<EncLayer>>
-        getEncLayers(OnionMeta * const om);
+    static EncLayer &getBackEncLayer(const OnionMeta &om);
+    static SECLEVEL getOnionLevel(const OnionMeta &om);
+    static std::vector<std::unique_ptr<EncLayer>> const &
+        getEncLayers(const OnionMeta &om);
     // HACK.
-    const SchemaInfo *getSchema() {return schema;}
+    const SchemaInfo &getSchema() {return schema;}
 
     std::vector<Delta *> deltas;
 
 private:
-    const SchemaInfo * const schema;
+    const SchemaInfo &schema;
     std::string unAliasTable(const std::string &table) const;
 };
 

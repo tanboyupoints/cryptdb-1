@@ -53,10 +53,10 @@ public:
     // FIXME: Use rtti.
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
-    std::vector<std::shared_ptr<DBMeta>>
+    std::vector<DBMeta *>
         fetchChildren(const std::unique_ptr<Connect> &e_conn);
-    void applyToChildren(std::function<void(std::shared_ptr<DBMeta>)>) const;
-    UIntMetaKey const &getKey(const DBMeta *const child) const;
+    void applyToChildren(std::function<void(const DBMeta &)>) const;
+    UIntMetaKey const &getKey(const DBMeta &child) const;
     EncLayer *getLayerBack() const;
     EncLayer *getLayer(const SECLEVEL &sl) const;
     bool hasEncLayer(const SECLEVEL &sl) const;
@@ -72,14 +72,14 @@ public:
                                      const std::vector<Item *> &);
 
 private:
-    std::vector<std::shared_ptr<EncLayer>> layers; // first in list is
+    std::vector<std::unique_ptr<EncLayer>> layers; // first in list is
                                                    // lowest layer
     constexpr static const char *type_name = "onionMeta";
     const std::string onionname;
     unsigned long uniq_count;
+    mutable std::list<std::unique_ptr<UIntMetaKey>> generated_keys;
 
-    SECLEVEL getSecLevel();
-    void removeLayerBack();
+    SECLEVEL getSecLevel() const;
 } OnionMeta;
 
 struct TableMeta;
@@ -142,7 +142,6 @@ private:
     const std::string default_value;
 
     SECLEVEL getOnionLevel(onion o) const;
-    bool setOnionLevel(onion o, SECLEVEL maxl);
     static onionlayout determineOnionLayout(const AES_KEY *const m_key,
                                             const Create_field *const f,
                                             SECURITY_RATING sec_rating);

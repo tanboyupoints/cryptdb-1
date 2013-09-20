@@ -51,8 +51,7 @@ rewrite_create_field(const FieldMeta * const fm, Create_field * const f,
                      const Analysis &a);
 
 std::vector<Key *>
-rewrite_key(const std::shared_ptr<TableMeta> &tm, Key * const key,
-            const Analysis &a);
+rewrite_key(const TableMeta &tm, Key * const key, const Analysis &a);
 
 std::string
 bool_to_string(bool b);
@@ -62,12 +61,11 @@ bool string_to_bool(const std::string &s);
 List<Create_field>
 createAndRewriteField(Analysis &a, const ProxyState &ps,
                       Create_field * const cf,
-                      const std::shared_ptr<TableMeta> &tm,
-                      bool new_table,
+                      TableMeta *const tm, bool new_table,
                       List<Create_field> &rewritten_cfield_list);
 
 Item *
-encrypt_item_layers(Item * const i, onion o, OnionMeta * const om,
+encrypt_item_layers(Item * const i, onion o, const OnionMeta &om,
                     const Analysis &a, uint64_t IV = 0);
 
 std::string
@@ -157,6 +155,6 @@ public:
 
 private:
     bool staleness;
-    std::unique_ptr<SchemaInfo>schema;
+    std::unique_ptr<SchemaInfo> schema;
 };
 

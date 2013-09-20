@@ -47,8 +47,8 @@ deductPlainTableName(const std::string &field_name,
     const TABLE_LIST *current_table =
         context->first_name_resolution_table;
     do {
-        TableMeta *const tm = a.getTableMeta(current_table->table_name);
-        if (tm->childExists(IdentityMetaKey(field_name))) {
+        const TableMeta &tm = a.getTableMeta(current_table->table_name);
+        if (tm.childExists(IdentityMetaKey(field_name))) {
             return std::string(current_table->table_name);
         }
 
@@ -64,15 +64,13 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         LOG(cdb_v) << "FIELD_ITEM do_gather " << *i;
 
         const std::string fieldname = i->field_name;
-
         const std::string table =
             i->table_name ? i->table_name :
                             deductPlainTableName(i->field_name,
                                                  i->context, a);
  
-        FieldMeta *const fm = a.getFieldMeta(table, fieldname);
-
-        const EncSet es = EncSet(a, fm);
+        FieldMeta &fm = a.getFieldMeta(table, fieldname);
+        const EncSet es = EncSet(a, &fm);
 
         tr = reason(es, "is a field", i);
 
@@ -90,12 +88,12 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
             i->table_name ? i->table_name :
                             deductPlainTableName(i->field_name,
                                                  i->context, a);
-        const FieldMeta * const fm =
+        const FieldMeta &fm =
             a.getFieldMeta(plain_table_name, i->field_name);
         //assert(constr.key == fm);
 
         //check if we need onion adjustment
-        OnionMeta * const om =
+        const OnionMeta &om =
             a.getOnionMeta(plain_table_name, i->field_name,
                            constr.o);
         const SECLEVEL onion_level = a.getOnionLevel(om);
@@ -108,7 +106,7 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
         const std::string anon_table_name =
             a.getAnonTableName(plain_table_name);
-        const std::string anon_field_name = om->getAnonOnionName();
+        const std::string anon_field_name = om.getAnonOnionName();
 
         Item_field * const res =
             make_item(i, anon_table_name, anon_field_name);
@@ -144,7 +142,7 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
                            std::vector<Item *> &l, FieldMeta *fm) const
     {
         assert(NULL == fm);
-        fm = a.getFieldMeta(i->table_name, i->field_name);
+        fm = &a.getFieldMeta(i->table_name, i->field_name);
         const std::string anon_table_name =
             a.getAnonTableName(i->table_name);
 

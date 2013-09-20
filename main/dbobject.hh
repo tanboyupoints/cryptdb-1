@@ -144,18 +144,18 @@ public:
     virtual ~DBMeta() {;}
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;
-    virtual std::vector<std::shared_ptr<DBMeta>>
+    virtual std::vector<DBMeta *>
         fetchChildren(const std::unique_ptr<Connect> &e_conn) = 0;
     virtual void
-        applyToChildren(std::function<void(const std::shared_ptr<DBMeta>)>)
+        applyToChildren(std::function<void(const DBMeta &)>)
         const = 0;
-    virtual AbstractMetaKey const &getKey(const DBMeta *const child)
+    virtual AbstractMetaKey const &getKey(const DBMeta &child)
         const = 0;
 
 protected:
-    std::vector<std::shared_ptr<DBMeta>>
+    std::vector<DBMeta*>
         doFetchChildren(const std::unique_ptr<Connect> &e_conn,
-                        std::function<std::shared_ptr<DBMeta>
+                        std::function<DBMeta*
                             (const std::string &, const std::string &,
                              const std::string &)>
                             deserialHandler);
@@ -166,19 +166,19 @@ public:
     LeafDBMeta() {}
     LeafDBMeta(unsigned int id) : DBMeta(id) {}
 
-    std::vector<std::shared_ptr<DBMeta>>
+    std::vector<DBMeta *>
         fetchChildren(const std::unique_ptr<Connect> &e_conn)
     {
-        return std::vector<std::shared_ptr<DBMeta>>();
+        return std::vector<DBMeta *>();
     }
 
-    void applyToChildren(std::function<void(const std::shared_ptr<DBMeta>)>
+    void applyToChildren(std::function<void(const DBMeta &)>
         fn) const
     {
         return;
     }
 
-    AbstractMetaKey const &getKey(const DBMeta *const child) const
+    AbstractMetaKey const &getKey(const DBMeta &child) const
     {
         // FIXME:
         assert(false);
@@ -195,25 +195,25 @@ class MappedDBMeta : public DBMeta {
 public:
     MappedDBMeta() {}
     MappedDBMeta(unsigned int id) : DBMeta(id) {}
-    virtual ~MappedDBMeta();
+    virtual ~MappedDBMeta() {}
     virtual bool addChild(KeyType key,
-                          std::shared_ptr<ChildType> meta);
+                          ChildType *meta);
     virtual bool childExists(const KeyType &key) const;
-    virtual std::shared_ptr<ChildType>
+    virtual ChildType *
         getChild(const KeyType &key) const;
-    KeyType const &getKey(const DBMeta *const child) const;
-    virtual std::vector<std::shared_ptr<DBMeta>>
+    KeyType const &getKey(const DBMeta &child) const;
+    virtual std::vector<DBMeta *>
         fetchChildren(const std::unique_ptr<Connect> &e_conn);
-    void applyToChildren(std::function<void(const std::shared_ptr<DBMeta>)>
+    void applyToChildren(std::function<void(const DBMeta &)>
         fn) const;
 
     // FIXME: Make protected.
-    std::map<KeyType, std::shared_ptr<ChildType>> children;
+    std::map<KeyType, std::unique_ptr<ChildType>> children;
 
 private:
     // Helpers.
     typename
-        std::map<KeyType , std::shared_ptr<ChildType>>::const_iterator
+        std::map<KeyType, std::unique_ptr<ChildType>>::const_iterator
         findChild(const KeyType &key) const;
 };
 

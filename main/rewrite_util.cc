@@ -182,19 +182,20 @@ commit_transaction_lex(const std::string &dbname) {
 // and avoid this chaining and passing f as an argument
 static Create_field *
 get_create_field(const Analysis &a, Create_field * const f,
-                 OnionMeta * const om, const std::string &name)
+                 const OnionMeta &om)
 {
+    const std::string name = om.getAnonOnionName();
     Create_field *new_cf = f;
 
     // Default value is handled during INSERTion.
     auto save_default = f->def;
     f->def = NULL;
 
-    auto enc_layers = a.getEncLayers(om);
+    const auto &enc_layers = a.getEncLayers(om);
     assert(enc_layers.size() > 0);
-    for (auto l : enc_layers) {
+    for (auto it = enc_layers.begin(); it != enc_layers.end(); it++) {
         const Create_field * const old_cf = new_cf;
-        new_cf = l->newCreateField(old_cf, name);
+        new_cf = (*it)->newCreateField(old_cf, name);
 
         if (old_cf != f) {
             delete old_cf;
@@ -225,8 +226,7 @@ rewrite_create_field(const FieldMeta * const fm,
     // create each onion column
     for (auto oit : fm->orderedOnionMetas()) {
         OnionMeta * const om = oit.second;
-        Create_field * const new_cf =
-            get_create_field(a, f, om, om->getAnonOnionName());
+        Create_field * const new_cf = get_create_field(a, f, *om);
 
         output_cfields.push_back(new_cf);
     }
@@ -261,8 +261,7 @@ getOnionIndexTypes()
 }
 
 std::vector<Key *>
-rewrite_key(const std::shared_ptr<TableMeta> &tm, Key *const key,
-            const Analysis &a)
+rewrite_key(const TableMeta &tm, Key *const key, const Analysis &a)
 {
     std::vector<Key *> output_keys;
 
@@ -273,7 +272,7 @@ rewrite_key(const std::shared_ptr<TableMeta> &tm, Key *const key,
 
         // Set anonymous name.
         const std::string new_name =
-            a.getAnonIndexName(tm.get(), convert_lex_str(key->name), o);
+            a.getAnonIndexName(tm, convert_lex_str(key->name), o);
         new_key->name = string_to_lex_str(new_name);
 
         // Set anonymous columns.
@@ -284,15 +283,14 @@ rewrite_key(const std::shared_ptr<TableMeta> &tm, Key *const key,
         bool fail = false;
         new_key->columns =
             accumList<Key_part_spec>(col_it,
-                [o, tm, a, &fail] (List<Key_part_spec> out_field_list,
-                                   Key_part_spec *const key_part)
+                [o, &tm, &a, &fail] (List<Key_part_spec> out_field_list,
+                                     Key_part_spec *const key_part)
                 {
                     Key_part_spec *const new_key_part = copy(key_part);
                     const std::string field_name =
                         convert_lex_str(new_key_part->field_name);
-                    const FieldMeta *const fm =
-                        a.getFieldMeta(tm.get(), field_name);
-                    const OnionMeta *const om = fm->getOnionMeta(o);
+                    const FieldMeta &fm = a.getFieldMeta(tm, field_name);
+                    const OnionMeta *const om = fm.getOnionMeta(o);
                     if (NULL == om) {
                         fail = true;
                         return out_field_list;  /* lambda */
@@ -345,8 +343,7 @@ string_to_bool(const std::string &s)
 List<Create_field>
 createAndRewriteField(Analysis &a, const ProxyState &ps,
                       Create_field * const cf,
-                      const std::shared_ptr<TableMeta> &tm,
-                      bool new_table,
+                      TableMeta *const tm, bool new_table,
                       List<Create_field> &rewritten_cfield_list)
 {
     // -----------------------------
@@ -355,29 +352,30 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     const std::string name = std::string(cf->field_name);
     auto buildFieldMeta =
         [] (const std::string name, Create_field * const cf,
-            const ProxyState &ps, const std::shared_ptr<TableMeta> &tm)
+            const ProxyState &ps, TableMeta *const tm)
     {
         return new FieldMeta(name, cf, ps.masterKey,
                              ps.defaultSecurityRating(),
-                             tm.get()->leaseIncUniq());
+                             tm->leaseIncUniq());
     };
-    std::shared_ptr<FieldMeta> fm =
-        std::shared_ptr<FieldMeta>(buildFieldMeta(name, cf, ps, tm));
+    std::unique_ptr<FieldMeta> fm(buildFieldMeta(name, cf, ps, tm));
+
     // Here we store the key name for the first time. It will be applied
     // after the Delta is read out of the database.
     if (true == new_table) {
-        tm->addChild(IdentityMetaKey(name), fm);
+        // FIXME: URGENT.
+        tm->addChild(IdentityMetaKey(name), fm.get());
     } else {
         // FIXME: PTR.
-        a.deltas.push_back(new CreateDelta(fm, tm.get(),
+        a.deltas.push_back(new CreateDelta(std::move(fm), *tm,
                                            new IdentityMetaKey(name)));
-        a.deltas.push_back(new ReplaceDelta(tm, a.getSchema()));
+        a.deltas.push_back(new ReplaceDelta(*tm, a.getSchema()));
     }
 
     // -----------------------------
     //         Rewrite FIELD       
     // -----------------------------
-    // FIXME: PTR.
+    // FIXME: UREGENT.
     const auto new_fields = rewrite_create_field(fm.get(), cf, a);
     rewritten_cfield_list.concat(vectorToList(new_fields));
 
@@ -386,18 +384,18 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
 
 //TODO: which encrypt/decrypt should handle null?
 Item *
-encrypt_item_layers(Item * const i, onion o, OnionMeta * const om,
+encrypt_item_layers(Item * const i, onion o, const OnionMeta &om,
                     const Analysis &a, uint64_t IV) {
     assert(!i->is_null());
 
-    const auto enc_layers = a.getEncLayers(om);
+    const auto &enc_layers = a.getEncLayers(om);
     assert_s(enc_layers.size() > 0, "onion must have at least one layer");
     Item * enc = i;
     Item * prev_enc = NULL;
-    for (auto layer : enc_layers) {
+    for (auto it = enc_layers.begin(); it != enc_layers.end(); it++) {
         LOG(encl) << "encrypt layer "
-                  << TypeText<SECLEVEL>::toText(layer->level()) << "\n";
-        enc = layer->encrypt(enc, IV);
+                  << TypeText<SECLEVEL>::toText((*it)->level()) << "\n";
+        enc = (*it)->encrypt(enc, IV);
         //need to free space for all enc
         //except the last one
         if (prev_enc) {
@@ -447,7 +445,7 @@ encrypt_item_all_onions(Item *i, FieldMeta *fm,
     for (auto it : fm->orderedOnionMetas()) {
         const onion o = it.first->getValue();
         OnionMeta * const om = it.second;
-        l.push_back(encrypt_item_layers(i, o, om, a, IV));
+        l.push_back(encrypt_item_layers(i, o, *om, a, IV));
     }
 }
 

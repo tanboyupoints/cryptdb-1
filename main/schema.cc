@@ -11,17 +11,17 @@
 #include <main/metadata_tables.hh>
 #include <main/macro_util.hh>
 
-std::vector<std::shared_ptr<DBMeta>>
+std::vector<DBMeta *>
 DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
-                        std::function<std::shared_ptr<DBMeta>
-                            (const std::string &, const std::string &,
-                             const std::string &)>
+                        std::function<DBMeta *(const std::string &,
+                                               const std::string &,
+                                               const std::string &)>
                             deserialHandler)
 {
     const std::string table_name = MetaDataTables::Name::metaObject();
 
     // Now that we know the table exists, SELECT the data we want.
-    std::vector<std::shared_ptr<DBMeta>> out_vec;
+    std::vector<DBMeta *> out_vec;
     DBResult *db_res;
     const std::string parent_id = std::to_string(this->getDatabaseID());
     const std::string serials_query = 
@@ -42,7 +42,7 @@ DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
         const std::string child_key(row[1], l[1]);
         const std::string child_id(row[2], l[2]);
 
-        std::shared_ptr<DBMeta> new_old_meta =
+        DBMeta *const new_old_meta =
             deserialHandler(child_key, child_serial_object, child_id);
         out_vec.push_back(new_old_meta);
     }
@@ -63,13 +63,13 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels,
         const std::string key =
             m_key ? getLayerKey(m_key, uniqueFieldName, l)
                   : "plainkey";
-        const std::shared_ptr<EncLayer>
+        std::unique_ptr<EncLayer>
             el(EncLayerFactory::encLayer(o, l, newcf, key));
 
         Create_field * const oldcf = newcf;
         newcf = el->newCreateField(oldcf);
-        
-        this->layers.push_back(el);
+
+        this->layers.push_back(std::move(el));
 
         if (oldcf != cf) {
             delete oldcf;
@@ -107,18 +107,16 @@ std::string OnionMeta::getAnonOnionName() const
     return onionname;
 }
 
-std::vector<std::shared_ptr<DBMeta>>
+std::vector<DBMeta *>
 OnionMeta::fetchChildren(const std::unique_ptr<Connect> &e_conn)
 {
-    std::function<std::shared_ptr<DBMeta>(const std::string &,
-                                          const std::string &,
-                                          const std::string &)>
+    std::function<DBMeta *(const std::string &,
+                           const std::string &,
+                           const std::string &)>
         deserialHelper =
     [this] (const std::string &key, const std::string &serial,
-            const std::string &id) -> std::shared_ptr<EncLayer>
+            const std::string &id) -> EncLayer *
     {
-        std::function<unsigned int(std::string)> strToInt =
-            [](std::string s) {return atoi(s.c_str());};
         // > Probably going to want to use indexes in AbstractMetaKey
         // for now, otherwise you will need to abstract and rederive
         // a keyed and nonkeyed version of Delta.
@@ -128,37 +126,38 @@ OnionMeta::fetchChildren(const std::unique_ptr<Connect> &e_conn)
         if (index >= this->layers.size()) {
             this->layers.resize(index + 1);
         }
-        std::shared_ptr<EncLayer>
+        // FIXME: URGENT.
+        std::unique_ptr<EncLayer>
             layer(EncLayerFactory::deserializeLayer(atoi(id.c_str()),
                                                     serial));
-        this->layers[index] = layer;
+        this->layers[index] = std::move(layer);
 
-        return layer;
+        return layer.get();
     };
 
     return DBMeta::doFetchChildren(e_conn, deserialHelper);
 }
 
-void OnionMeta::applyToChildren(std::function<void(std::shared_ptr<DBMeta>)>
+void OnionMeta::applyToChildren(std::function<void(const DBMeta &)>
     fn) const
 {
-    for (auto it : layers) {
-        fn(it);
+    for (auto it = layers.begin(); it != layers.end(); it++) {
+        fn(*(*it).get());
     }
 }
 
-UIntMetaKey const &OnionMeta::getKey(const DBMeta *const child) const
+UIntMetaKey const &OnionMeta::getKey(const DBMeta &child) const
 {
     for (std::vector<EncLayer *>::size_type i = 0; i< layers.size(); ++i) {
-        // FIXME: PTR.
-        if (child == layers[i].get()) {
-            auto key = new UIntMetaKey(i);
-            // FIXME: Memleak.
+        if (&child == layers[i].get()) {
+            UIntMetaKey *const key = new UIntMetaKey(i);
+            // Hold onto the key so we can destroy it when OnionMeta is
+            // destructed.
+            generated_keys.push_back(std::unique_ptr<UIntMetaKey>(key));
             return *key;
         }
     }
 
-    // FIXME.
     assert(false);
 }
 
@@ -173,8 +172,8 @@ EncLayer *OnionMeta::getLayerBack() const
 
 bool OnionMeta::hasEncLayer(const SECLEVEL &sl) const
 {
-    for (auto it : layers) {
-        if (it->level() == sl) {
+    for (auto it = layers.begin(); it != layers.end(); it++) {
+        if ((*it)->level() == sl) {
             return true;
         }
     }
@@ -189,10 +188,9 @@ EncLayer *OnionMeta::getLayer(const SECLEVEL &sl) const
     }
 
     AssignOnce<EncLayer *> out;
-    for (auto it : layers) {
-        if (it->level() == sl) {
-            // FIXME: PTR.
-            out = it.get();
+    for (auto it = layers.begin(); it != layers.end(); it++) {
+        if ((*it)->level() == sl) {
+            out = (*it).get();
         }
     }
 
@@ -200,15 +198,7 @@ EncLayer *OnionMeta::getLayer(const SECLEVEL &sl) const
     return out.get();
 }
 
-void OnionMeta::removeLayerBack()
-{
-    if (layers.size() == 0) {
-        throw CryptDBError("Tried to remove EncLayer when there are none!");
-    }
-    layers.pop_back();
-}
-
-SECLEVEL OnionMeta::getSecLevel()
+SECLEVEL OnionMeta::getSecLevel() const
 {
     assert(layers.size() > 0);
     return layers.back()->level();
@@ -258,7 +248,8 @@ init_onions_layout(const AES_KEY *const m_key,
         std::unique_ptr<OnionMeta>
             om(new OnionMeta(o, levels, m_key, cf, fm->leaseIncUniq()));
         const std::string onion_name = om->getAnonOnionName();
-        fm->addChild(OnionMetaKey(o), std::move(om));
+        // FIXME: URGENT.
+        fm->addChild(OnionMetaKey(o), om.get());
 
         LOG(cdb_v) << "adding onion layer " << onion_name
                    << " for " << fm->fname;
@@ -314,9 +305,8 @@ std::vector<std::pair<const OnionMetaKey *, OnionMeta *>>
 FieldMeta::orderedOnionMetas() const
 {
     std::vector<std::pair<const OnionMetaKey *, OnionMeta *>> v;
-    for (auto it : children) {
-        // FIXME: PTR.
-        v.push_back(std::make_pair(&it.first, it.second.get()));
+    for (auto it = children.begin(); it != children.end(); it++) {
+        v.push_back(std::make_pair(&(*it).first, (*it).second.get()));
     }
 
     std::sort(v.begin(), v.end(),
@@ -345,27 +335,9 @@ SECLEVEL FieldMeta::getOnionLevel(onion o) const
     return om->getSecLevel();
 }
 
-bool FieldMeta::setOnionLevel(onion o, SECLEVEL maxl)
-{
-    OnionMeta * const om = getOnionMeta(o);
-    if (NULL == om) {
-        return false;
-    }
-    SECLEVEL current_sec_level = om->getSecLevel();
-    if (current_sec_level > maxl) {
-        while (om->getSecLevel() != maxl) {
-            om->removeLayerBack();
-        }
-        return true;
-    }
-    return false;
-}
-
 OnionMeta *FieldMeta::getOnionMeta(onion o) const
 {
-    const std::shared_ptr<OnionMeta> om = getChild(OnionMetaKey(o));
-    // FIXME: PTR.
-    return om.get();
+    return getChild(OnionMetaKey(o));
 }
 
 static bool encryptionNotSupported(const Create_field *const cf)
@@ -503,9 +475,8 @@ std::string TableMeta::getAnonTableName() const
 std::vector<FieldMeta *> TableMeta::orderedFieldMetas() const
 {
     std::vector<FieldMeta *> v;
-    for (auto it : children) {
-        // FIXME: PTR.
-        v.push_back(it.second.get());
+    for (auto it = children.begin(); it != children.end(); it++) {
+        v.push_back((*it).second.get());
     }
 
     std::sort(v.begin(), v.end(),
@@ -519,9 +490,8 @@ std::vector<FieldMeta *> TableMeta::orderedFieldMetas() const
 std::vector<FieldMeta *> TableMeta::defaultedFieldMetas() const
 {
     std::vector<FieldMeta *> v;
-    for (auto it : children) {
-        // FIXME: PTR.
-        v.push_back(it.second.get());
+    for (auto it = children.begin(); it != children.end(); it++) {
+        v.push_back((*it).second.get());
     }
 
     std::vector<FieldMeta *> out_v;
@@ -549,14 +519,13 @@ FieldMeta *
 SchemaInfo::getFieldMeta(const std::string &table,
                          const std::string &field) const
 {
-    std::shared_ptr<TableMeta> tm = getChild(IdentityMetaKey(table));
+    TableMeta *const tm = getChild(IdentityMetaKey(table));
     if (NULL == tm) {
         return NULL;
     }
 
-    std::shared_ptr<FieldMeta> fm = tm->getChild(IdentityMetaKey(field));
+    FieldMeta *const fm = tm->getChild(IdentityMetaKey(field));
 
-    // FIXME: PTR.
-    return fm.get();
+    return fm;
 }
 

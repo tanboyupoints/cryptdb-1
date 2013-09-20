@@ -15,11 +15,11 @@ EncSet::EncSet(Analysis &a, FieldMeta * const fm) {
     }
 
     osl.clear();
-    for (auto pair : fm->children) {
-        // FIXME: PTR.
-        OnionMeta *const om = pair.second.get();
-        OnionMetaKey const &key = pair.first;
-        osl[key.getValue()] = LevelFieldPair(a.getOnionLevel(om), fm);
+    for (auto pair = fm->children.begin(); pair != fm->children.end();
+         pair++) {
+        OnionMeta *const om = (*pair).second.get();
+        OnionMetaKey const &key = (*pair).first;
+        osl[key.getValue()] = LevelFieldPair(a.getOnionLevel(*om), fm);
     }
 }
 
@@ -373,34 +373,32 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
 {
     const std::string table_name = tableNameFromType(table_type);
     std::function<void(const std::unique_ptr<Connect> &e_conn,
-                       const DBMeta * const,
-                       const DBMeta * const,
+                       const DBMeta &, const DBMeta &,
                        const AbstractMetaKey * const,
                        const unsigned int * const)> helper =
         [&helper, table_name] (const std::unique_ptr<Connect> &e_conn,
-                               const DBMeta * const object,
-                               const DBMeta * const parent,
+                               const DBMeta &object,
+                               const DBMeta &parent,
                                const AbstractMetaKey * const k,
                                const unsigned int * const ptr_parent_id)
     {
-        const std::string child_serial = object->serialize(*parent);
-        assert(0 == object->getDatabaseID());
+        const std::string child_serial = object.serialize(parent);
+        assert(0 == object.getDatabaseID());
         unsigned int parent_id;
         if (ptr_parent_id) {
             parent_id = *ptr_parent_id;
         } else {
-            parent_id = parent->getDatabaseID();
+            parent_id = parent.getDatabaseID();
         }
 
-        std::function<std::string(const DBMeta *const,
-                                  const DBMeta *const,
+        std::function<std::string(const DBMeta &, const DBMeta &,
                                   const AbstractMetaKey *const)>
             getSerialKey =
-                [] (const DBMeta *const p, const DBMeta *const o,
+                [] (const DBMeta &p, const DBMeta &o,
                     const AbstractMetaKey *const keee)
             {
                 if (NULL == keee) {
-                    return p->getKey(o).getSerial();  /* lambda */
+                    return p.getKey(o).getSerial();  /* lambda */
                 }
 
                 return keee->getSerial();      /* lambda */
@@ -428,17 +426,16 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
 
         const unsigned int object_id = e_conn->last_insert_id();
 
-        std::function<void(std::shared_ptr<DBMeta>)> localCreateHandler =
+        std::function<void(const DBMeta &)> localCreateHandler =
             [&e_conn, &object, object_id, &helper]
-                (std::shared_ptr<DBMeta> child)
+                (const DBMeta &child)
             {
-                // FIXME: PTR.
-                helper(e_conn, child.get(), object, NULL, &object_id);
+                helper(e_conn, child, object, NULL, &object_id);
             };
-        object->applyToChildren(localCreateHandler);
+        object.applyToChildren(localCreateHandler);
     };
 
-    helper(e_conn, meta.get(), parent_meta, key.get(), NULL);
+    helper(e_conn, *meta.get(), parent_meta, key.get(), NULL);
     return true;
 }
 
@@ -447,9 +444,9 @@ bool ReplaceDelta::apply(const std::unique_ptr<Connect> &e_conn,
 {
     const std::string table_name = tableNameFromType(table_type);
 
-    const unsigned int child_id = meta.get()->getDatabaseID();
-    
-    const std::string child_serial = meta.get()->serialize(*parent_meta);
+    const unsigned int child_id = meta.getDatabaseID();
+
+    const std::string child_serial = meta.serialize(parent_meta);
     const std::string esc_child_serial =
         escapeString(e_conn, child_serial);
     const std::string serial_key = key.getSerial();
@@ -471,13 +468,12 @@ bool DeleteDelta::apply(const std::unique_ptr<Connect> &e_conn,
 {
     const std::string table_name = tableNameFromType(table_type);
     Connect * const e_c = e_conn.get();
-    std::function<void(const DBMeta * const,
-                       const DBMeta * const)> helper =
-        [&e_c, &helper, table_name](const DBMeta * const object,
-                                    const DBMeta * const parent)
+    std::function<void(const DBMeta &, const DBMeta &)> helper =
+        [&e_c, &helper, table_name](const DBMeta &object,
+                                    const DBMeta &parent)
     {
-        const unsigned int object_id = object->getDatabaseID();
-        const unsigned int parent_id = parent->getDatabaseID();
+        const unsigned int object_id = object.getDatabaseID();
+        const unsigned int parent_id = parent.getDatabaseID();
 
         const std::string query =
             " DELETE pdb." + table_name + " "
@@ -489,15 +485,14 @@ bool DeleteDelta::apply(const std::unique_ptr<Connect> &e_conn,
 
         assert(e_c->execute(query));
 
-        std::function<void(std::shared_ptr<DBMeta>)> localDestroyHandler =
-            [&e_c, &object, &helper] (std::shared_ptr<DBMeta> child) {
-                // FIXME: PTR.
-                helper(child.get(), object);
+        std::function<void(const DBMeta &)> localDestroyHandler =
+            [&e_c, &object, &helper] (const DBMeta &child) {
+                helper(child, object);
             };
-        object->applyToChildren(localDestroyHandler);
+        object.applyToChildren(localDestroyHandler);
     };
 
-    helper(meta.get(), parent_meta); 
+    helper(meta, parent_meta); 
     return true;
 }
 
@@ -1067,60 +1062,56 @@ bool Analysis::addAlias(const std::string &alias,
     return true;
 }
 
-OnionMeta *Analysis::getOnionMeta(const std::string &table,
+OnionMeta &Analysis::getOnionMeta(const std::string &table,
                                   const std::string &field,
                                   onion o) const
 {
-    OnionMeta * const om =
-        this->getOnionMeta(this->getFieldMeta(table, field), o);
-    assert(om);
-
-    return om;
+    return this->getOnionMeta(this->getFieldMeta(table, field), o);
 }
 
-OnionMeta *Analysis::getOnionMeta(const FieldMeta *const fm,
+OnionMeta &Analysis::getOnionMeta(const FieldMeta &fm,
                                   onion o) const
 {
-    OnionMeta *const om = fm->getOnionMeta(o);
+    OnionMeta *const om = fm.getOnionMeta(o);
     assert(om);
 
-    return om;
+    return *om;
 }
 
-FieldMeta *Analysis::getFieldMeta(const std::string &table,
+FieldMeta &Analysis::getFieldMeta(const std::string &table,
                                   const std::string &field) const
 {
     const std::string real_table_name = unAliasTable(table);
     FieldMeta * const fm =
-        this->schema->getFieldMeta(real_table_name, field);
+        this->schema.getFieldMeta(real_table_name, field);
     assert(fm);
-    return fm;
+    return *fm;
 }
 
-FieldMeta *Analysis::getFieldMeta(const TableMeta * const tm,
+FieldMeta &Analysis::getFieldMeta(const TableMeta &tm,
                                   const std::string &field) const
 {
-    std::shared_ptr<FieldMeta> fm = tm->getChild(IdentityMetaKey(field));
+    FieldMeta *const fm = tm.getChild(IdentityMetaKey(field));
     assert(fm);
-    return fm.get();
+    return *fm;
 }
 
-TableMeta *Analysis::getTableMeta(const std::string &table) const
+TableMeta &Analysis::getTableMeta(const std::string &table) const
 {
-    std::shared_ptr<TableMeta> tm =
-        this->schema->getChild(IdentityMetaKey(unAliasTable(table)));
+    TableMeta *const tm =
+        this->schema.getChild(IdentityMetaKey(unAliasTable(table)));
     assert(tm);
-    return tm.get();
+    return *tm;
 }
 
 bool Analysis::tableMetaExists(const std::string &table) const
 {
-    return this->schema->childExists(IdentityMetaKey(unAliasTable(table)));
+    return this->schema.childExists(IdentityMetaKey(unAliasTable(table)));
 }
 
 std::string Analysis::getAnonTableName(const std::string &table) const
 {
-    return this->getTableMeta(table)->getAnonTableName();
+    return this->getTableMeta(table).getAnonTableName();
 }
 
 std::string Analysis::getAnonIndexName(const std::string &table,
@@ -1128,15 +1119,15 @@ std::string Analysis::getAnonIndexName(const std::string &table,
                                        onion o)
     const
 {
-    return this->getTableMeta(table)->getAnonIndexName(index_name, o); 
+    return this->getTableMeta(table).getAnonIndexName(index_name, o); 
 }
 
-std::string Analysis::getAnonIndexName(const TableMeta * const tm,
+std::string Analysis::getAnonIndexName(const TableMeta &tm,
                                        const std::string &index_name,
                                        onion o)
     const
 {
-    return tm->getAnonIndexName(index_name, o); 
+    return tm.getAnonIndexName(index_name, o); 
 }
 
 std::string Analysis::unAliasTable(const std::string &table) const
@@ -1149,21 +1140,20 @@ std::string Analysis::unAliasTable(const std::string &table) const
     }
 }
 
-// FIXME.
-EncLayer *Analysis::getBackEncLayer(OnionMeta * const om)
+EncLayer &Analysis::getBackEncLayer(const OnionMeta &om)
 {
-    return om->layers.back().get();
+    return *om.layers.back().get();
 }
 
-SECLEVEL Analysis::getOnionLevel(OnionMeta * const om)
+SECLEVEL Analysis::getOnionLevel(const OnionMeta &om)
 {
-    return om->getSecLevel();
+    return om.getSecLevel();
 }
 
-std::vector<std::shared_ptr<EncLayer>>
-Analysis::getEncLayers(OnionMeta * const om)
+std::vector<std::unique_ptr<EncLayer>> const &
+Analysis::getEncLayers(const OnionMeta &om)
 {
-    return om->layers;
+    return om.layers;
 }
 
 RewritePlanWithAnalysis::RewritePlanWithAnalysis(const EncSet &es_out,

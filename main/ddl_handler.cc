@@ -55,8 +55,8 @@ class CreateHandler : public DDLHandler {
             //         Update TABLE       
             // -----------------------------
             // TODO: Use appropriate values for has_sensitive and has_salt.
-            const std::shared_ptr<TableMeta> tm(new TableMeta(true, true));
-            a.deltas.push_back(new CreateDelta(tm, a.getSchema(),
+            std::unique_ptr<TableMeta> tm(new TableMeta(true, true));
+            a.deltas.push_back(new CreateDelta(std::move(tm), a.getSchema(),
                                                new IdentityMetaKey(table)));
 
             // -----------------------------
@@ -81,7 +81,7 @@ class CreateHandler : public DDLHandler {
                 accumList<Create_field>(it,
                     [&a, &ps, &tm] (List<Create_field> out_list,
                                     Create_field *cf) {
-                        return createAndRewriteField(a, ps, cf, tm, 
+                        return createAndRewriteField(a, ps, cf, tm.get(),
                                                      true, out_list);
                 });
 
@@ -94,7 +94,7 @@ class CreateHandler : public DDLHandler {
                 accumList<Key>(key_it,
                     [&tm, &a] (List<Key> out_list, Key *const key)
                     {
-                        auto keys = rewrite_key(tm, key, a);
+                        auto keys = rewrite_key(*tm.get(), key, a);
                         out_list.concat(vectorToList(keys));
 
                         return out_list;
@@ -161,7 +161,7 @@ class DropHandler : public DDLHandler {
             }
 
             // Remove from *Meta structures.
-            std::shared_ptr<TableMeta> tm(a.getTableMeta(table));
+            TableMeta const &tm = a.getTableMeta(table);
             a.deltas.push_back(new DeleteDelta(tm, a.getSchema()));
         }
     }

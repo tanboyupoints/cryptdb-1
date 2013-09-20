@@ -10,9 +10,10 @@ class AddColumnSubHandler : public AlterSubHandler {
                                   const ProxyState &ps,
                                   const Preamble &preamble) const
     {
-        LEX *new_lex = copy(lex);
+        LEX *const new_lex = copy(lex);
 
-        const std::shared_ptr<TableMeta> tm(a.getTableMeta(preamble.table));
+        // FIXME: This TableMeta should be const.
+        TableMeta &tm = a.getTableMeta(preamble.table);
         // -----------------------------
         //         Rewrite TABLE
         // -----------------------------
@@ -22,12 +23,12 @@ class AddColumnSubHandler : public AlterSubHandler {
         // Create *Meta objects.
         auto add_it =
             List_iterator<Create_field>(lex->alter_info.create_list);
-        new_lex->alter_info.create_list = 
+        new_lex->alter_info.create_list =
             accumList<Create_field>(add_it,
                 [&a, &ps, &tm] (List<Create_field> out_list,
                                 Create_field *cf)
             {
-                    return createAndRewriteField(a, ps, cf, tm,
+                    return createAndRewriteField(a, ps, cf, &tm,
                                                  false, out_list);
             });
 
@@ -62,10 +63,10 @@ class DropColumnSubHandler : public AlterSubHandler {
                 [preamble, &a, this] (List<Alter_drop> out_list,
                                             Alter_drop *adrop)
         {
-            std::shared_ptr<FieldMeta>
-                fm(a.getFieldMeta(preamble.table, adrop->name));
-            TableMeta *tm = a.getTableMeta(preamble.table);
-            List<Alter_drop> lst = this->rewrite(fm.get(), adrop);
+            FieldMeta const &fm =
+                a.getFieldMeta(preamble.table, adrop->name);
+            TableMeta const &tm = a.getTableMeta(preamble.table);
+            List<Alter_drop> lst = this->rewrite(fm, adrop);
             out_list.concat(&lst);
             a.deltas.push_back(new DeleteDelta(fm, tm));
             return out_list; /* lambda */
@@ -74,25 +75,26 @@ class DropColumnSubHandler : public AlterSubHandler {
         return new_lex;
     }
 
-    List<Alter_drop> rewrite(FieldMeta *fm, Alter_drop *adrop) const
+    List<Alter_drop> rewrite(FieldMeta const &fm, Alter_drop *adrop) const
     {
         List<Alter_drop> out_list;
         THD *thd = current_thd;
 
         // Rewrite each onion column.
-        for (auto onion_pair : fm->children) {
+        for (auto om_it = fm.children.begin(); om_it != fm.children.end();
+             om_it++) {
             Alter_drop * const new_adrop = adrop->clone(thd->mem_root);
-            std::shared_ptr<OnionMeta> om = onion_pair.second;
+            OnionMeta *const om = (*om_it).second.get();
             new_adrop->name =
-                thd->strdup(om.get()->getAnonOnionName().c_str());
+                thd->strdup(om->getAnonOnionName().c_str());
             out_list.push_back(new_adrop);
         }
 
         // Rewrite the salt column.
-        if (fm->has_salt) {
+        if (fm.has_salt) {
             Alter_drop * const new_adrop = adrop->clone(thd->mem_root);
             new_adrop->name =
-                thd->strdup(fm->getSaltName().c_str());
+                thd->strdup(fm.getSaltName().c_str());
             out_list.push_back(new_adrop);
         }
 
@@ -125,7 +127,7 @@ class AddIndexSubHandler : public AlterSubHandler {
     {
         LEX *const new_lex = copy(lex);
 
-        std::shared_ptr<TableMeta> tm(a.getTableMeta(preamble.table));
+        TableMeta const &tm = a.getTableMeta(preamble.table);
 
         // -----------------------------
         //         Rewrite TABLE
@@ -138,7 +140,7 @@ class AddIndexSubHandler : public AlterSubHandler {
             List_iterator<Key>(lex->alter_info.key_list);
         new_lex->alter_info.key_list =
             accumList<Key>(key_it,
-                [tm, &a] (List<Key> out_list, Key *const key) {
+                [&tm, &a] (List<Key> out_list, Key *const key) {
                     // -----------------------------
                     //         Rewrite INDEX
                     // -----------------------------
@@ -158,7 +160,7 @@ class DropIndexSubHandler : public AlterSubHandler {
                                   const Preamble &preamble) const
     {
         LEX *new_lex = copy(lex);
-        TableMeta *tm = a.getTableMeta(preamble.table);
+        TableMeta const &tm = a.getTableMeta(preamble.table);
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a);
 
@@ -177,7 +179,7 @@ class DropIndexSubHandler : public AlterSubHandler {
             List_iterator<Alter_drop>(key_drop_list);
         new_lex->alter_info.drop_list =
             accumList<Alter_drop>(drop_it,
-                [preamble, tm, &a, this]
+                [preamble, &tm, &a, this]
                     (List<Alter_drop> out_list, Alter_drop *adrop)
                 {
                         List<Alter_drop> lst =

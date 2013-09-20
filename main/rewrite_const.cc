@@ -43,7 +43,7 @@ encrypt_item(Item * i, const OLK & olk, Analysis & a)
     const auto it = a.salts.find(fm);
     const salt_type IV = (it == a.salts.end()) ? 0 : it->second;
     OnionMeta * const om = fm->getOnionMeta(o);
-    Item * const ret_i = encrypt_item_layers(i, o, om, a, IV);
+    Item * const ret_i = encrypt_item_layers(i, o, *om, a, IV);
 
     return ret_i;
 }

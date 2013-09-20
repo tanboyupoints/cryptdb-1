@@ -82,7 +82,8 @@ mysql_query_wrapper(MYSQL *const m, const std::string &q)
 bool
 sanityCheck(FieldMeta *const fm)
 {
-    for (auto it : fm->children) {
+    for (auto it = fm->children.begin(); it != fm->children.end();
+         it++) {
         // FIXME: PTR.
         std::shared_ptr<OnionMeta> om = it.second;
         const onion o = it.first.getValue();
@@ -495,7 +496,7 @@ buildTypeTextTranslatorHack()
 //l gets updated to the new level
 static std::string
 removeOnionLayer(Analysis &a, const ProxyState &ps,
-                 const FieldMeta *const fm,
+                 const FieldMeta &fm,
                  OnionMetaAdjustor *const om_adjustor,
                  const std::string &table_name,
                  SECLEVEL *const new_level,
@@ -516,7 +517,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
     const std::string anon_table_name = a.getAnonTableName(table_name);
     Item_field *const salt =
         new Item_field(NULL, ps.dbName().c_str(), anon_table_name.c_str(),
-                       fm->getSaltName().c_str());
+                       fm.getSaltName().c_str());
 
     const std::string fieldanon = om_adjustor->getAnonOnionName();
     Item_field *const field =
@@ -551,13 +552,13 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
  */
 static std::list<std::string>
 adjustOnion(Analysis &a, const ProxyState &ps, onion o,
-            const FieldMeta *const fm, SECLEVEL tolevel,
+            const FieldMeta &fm, SECLEVEL tolevel,
             const std::string &table_name, const std::string &cur_db)
 {
     std::cout << "onion: " << TypeText<onion>::toText(o) << std::endl;
     // Make a copy of the onion meta for the purpose of making
     // modifications during removeOnionLayer(...)
-    OnionMetaAdjustor om_adjustor(fm->getOnionMeta(o));
+    OnionMetaAdjustor om_adjustor(fm.getOnionMeta(o));
     SECLEVEL newlevel = om_adjustor.getSecLevel();
     assert(newlevel != SECLEVEL::INVALID);
 
