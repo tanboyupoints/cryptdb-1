@@ -81,9 +81,10 @@ EOM$
 
     > wget http://es.csail.mit.edu/mysql-5.5.14.tar.gz
     > tar zxf mysql-5.5.14.tar.gz
-    > cp -R /path/to/cryptdb/parser/mysql_mods/* mysql-5.5.14/
-    > rm mysql-5.5.14/sql/sql_yacc.{cc,h}
     > cd mysql-5.5.14
+    > cp -R /path/to/cryptdb/parser/mysql_mods/* .
+    > rm sql/sql_yacc.{cc,h}
+    > cat /path/to/cryptdb/doc/subquery_patch | patch -p0
     > mkdir build
     > cd build
     > cmake -DWITH_EMBEDDED_SERVER=on ..
