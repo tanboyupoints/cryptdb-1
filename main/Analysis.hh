@@ -384,7 +384,7 @@ public:
 
     // information for decrypting results
     ReturnMeta * rmeta;
-    
+
     bool special_update;
 
     // These functions are prefered to their lower level counterparts.

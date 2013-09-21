@@ -11,13 +11,15 @@
 template <typename Input, typename FetchMe>
 class Dispatcher {
 public:
-    bool addHandler(long long cmd, FetchMe h) {
+    virtual ~Dispatcher() {}
+
+    bool addHandler(long long cmd, FetchMe *h) {
         auto it = handlers.find(cmd);
         if (handlers.end() != it) {
             return false;
         }
-	
-        handlers[cmd] = h;
+
+        handlers[cmd] = std::unique_ptr<FetchMe>(h);
         return true;
     }
 
@@ -25,35 +27,26 @@ public:
         return handlers.end() != handlers.find(extract(lex));
     }
 
-    const FetchMe dispatch(Input lex) const {
+    const FetchMe *dispatch(Input lex) const {
         auto it = handlers.find(extract(lex));
         if (handlers.end() == it) {
             return NULL;
-        } else {
-            return it->second;
         }
+
+        return it->second.get();
     }
 
-    std::map<long long, FetchMe> handlers;
-
-    virtual ~Dispatcher() {
-        auto cp = handlers;
-        handlers.clear();
-	
-        for (auto it : cp) {
-            delete it.second;
-        }
-    }
+    std::map<long long, std::unique_ptr<FetchMe>> handlers;
 
 private:
     virtual long long extract(Input lex) const = 0;
 };
 
-class SQLDispatcher : public Dispatcher<LEX*, SQLHandler*> {
+class SQLDispatcher : public Dispatcher<LEX*, SQLHandler> {
     virtual long long extract(LEX* lex) const;
 };
 
-class AlterDispatcher : public Dispatcher<LEX*, AlterSubHandler*> {
+class AlterDispatcher : public Dispatcher<LEX*, AlterSubHandler> {
     virtual long long extract(LEX* lex) const;
     long calculateMask() const;
 };

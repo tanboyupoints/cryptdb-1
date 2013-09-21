@@ -690,9 +690,11 @@ SQLDispatcher *buildDMLDispatcher()
 {
     DMLHandler *h;
     SQLDispatcher *dispatcher = new SQLDispatcher();
-    
+
     h = new InsertHandler();
     dispatcher->addHandler(SQLCOM_INSERT, h);
+
+    h = new InsertHandler();
     dispatcher->addHandler(SQLCOM_REPLACE, h);
 
     h = new UpdateHandler;

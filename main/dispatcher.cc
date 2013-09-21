@@ -13,8 +13,8 @@ long long AlterDispatcher::extract(LEX* lex) const
 
 long AlterDispatcher::calculateMask() const {
     long mask = 0;
-    for (auto it : handlers) {
-        mask |= it.first;
+    for (auto it = handlers.begin(); it != handlers.end(); it++) {
+        mask |= (*it).first;
     }
 
     return mask;

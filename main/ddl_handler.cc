@@ -25,13 +25,10 @@ class AlterHandler : public DDLHandler {
         return handler->transformLex(a, lex, ps);
     }
 
-    AlterDispatcher *sub_dispatcher;
+    const std::unique_ptr<AlterDispatcher> sub_dispatcher;
 
 public:
-    AlterHandler()
-    {
-        sub_dispatcher = buildAlterSubDispatcher();
-    }
+    AlterHandler() : sub_dispatcher(buildAlterSubDispatcher()) {}
 };
 
 class CreateHandler : public DDLHandler {

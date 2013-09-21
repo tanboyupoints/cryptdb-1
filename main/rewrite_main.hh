@@ -57,7 +57,7 @@ public:
 // Main class processing rewriting
 class Rewriter {
     Rewriter();
-    ~Rewriter() {;}
+    ~Rewriter();
 
 public:
 
@@ -75,10 +75,9 @@ private:
         handleDirective(Analysis &a, const ProxyState &ps,
                         const std::string &query);
 
-    // HACK: Initialize singletons.
     static const bool translator_dummy;
-    static const SQLDispatcher *dml_dispatcher;
-    static const SQLDispatcher *ddl_dispatcher;
+    static const std::unique_ptr<SQLDispatcher> dml_dispatcher;
+    static const std::unique_ptr<SQLDispatcher> ddl_dispatcher;
 };
 
 class ScopedMySQLRes {

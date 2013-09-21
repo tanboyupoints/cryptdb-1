@@ -995,8 +995,10 @@ lex_to_query(LEX *const lex)
 }
 
 const bool Rewriter::translator_dummy = buildTypeTextTranslatorHack();
-const SQLDispatcher *Rewriter::dml_dispatcher = buildDMLDispatcher();
-const SQLDispatcher *Rewriter::ddl_dispatcher = buildDDLDispatcher();
+const std::unique_ptr<SQLDispatcher> Rewriter::dml_dispatcher =
+    std::unique_ptr<SQLDispatcher>(buildDMLDispatcher());
+const std::unique_ptr<SQLDispatcher> Rewriter::ddl_dispatcher =
+    std::unique_ptr<SQLDispatcher>(buildDDLDispatcher());
 
 RewriteOutput *
 Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
