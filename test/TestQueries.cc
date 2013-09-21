@@ -96,8 +96,9 @@ static QueryList Select = QueryList("SingleSelect",
       Query("SELECT * FROM test_select WHERE name = 'Peter Pan'", false),
       Query("SELECT * FROM test_select WHERE address='Green Gables'", false),
       Query("SELECT * FROM test_select WHERE address <= '221C'", false),
-      // Query("SELECT * FROM test_select WHERE address >= 'Green Gables' AND age > 9", false),
-      // Query("SELECT * FROM test_select WHERE address >= 'Green Gables' OR age > 9", false),
+      Query("SELECT * FROM test_select WHERE address >= 'Green Gables' AND age > 9", false),
+      Query("SELECT * FROM test_select WHERE address >= 'Green Gables' OR age > 9", false),
+      Query("SELECT * FROM test_select WHERE address < 'ffFFF'", false),
       Query("SELECT * FROM test_select ORDER BY id", false),
       Query("SELECT * FROM test_select ORDER BY salary", false),
       Query("SELECT * FROM test_select ORDER BY name", false),
@@ -1350,12 +1351,12 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 433/434.
+    //      TOTAL RESULT: 436/437.
     // ###############################
 
     std::vector<Score> scores;
 
-    // Pass 51/51
+    // Pass 54/54
     scores.push_back(CheckQueryList(tc, Select));
 
     // Pass 26/26

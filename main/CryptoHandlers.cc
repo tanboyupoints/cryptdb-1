@@ -1334,17 +1334,28 @@ OPE_str::newCreateField(const Create_field * const cf,
                              &my_charset_bin);
 }
 
+/*
+ * Make all characters uppercase as mysql string order comparison
+ * is case insensitive.
+ *
+ * mysql> SELECT 'a' = 'a', 'A' = 'a', 'A' < 'b', 'z' > 'M';
+ * +-----------+-----------+-----------+-----------+
+ * | 'a' = 'a' | 'A' = 'a' | 'A' < 'b' | 'z' > 'M' |
+ * +-----------+-----------+-----------+-----------+
+ * |         1 |         1 |         1 |         1 |
+ * +-----------+-----------+-----------+-----------+
+ */
 Item *
 OPE_str::encrypt(Item * const ptext, uint64_t IV) const
 {
-    std::string ps = ItemToString(ptext);
+    std::string ps = toUpperCase(ItemToString(ptext));
     if (ps.size() < plain_size)
         ps = ps + std::string(plain_size - ps.size(), 0);
 
     uint32_t pv = 0;
 
     for (uint i = 0; i < plain_size; i++) {
-        pv = pv * 256 + (int)ps[i];
+        pv = pv * 256 + static_cast<int>(ps[i]);
     }
 
     const ZZ enc = ope.encrypt(to_ZZ(pv));
