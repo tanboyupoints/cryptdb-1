@@ -60,10 +60,10 @@ public:
     // returns a rewritten create field to include in rewritten query
     virtual Create_field *
         newCreateField(const Create_field * const cf,
-                       const std::string &anonname = "") = 0;
+                       const std::string &anonname = "") const = 0;
 
-    virtual Item * encrypt(Item * const ptext, uint64_t IV) = 0;
-    virtual Item * decrypt(Item * const ctext, uint64_t IV) = 0;
+    virtual Item * encrypt(Item * const ptext, uint64_t IV) const = 0;
+    virtual Item * decrypt(Item * const ctext, uint64_t IV) const = 0;
 
     // returns the decryptUDF to remove the onion layer
     virtual Item * decryptUDF(Item * const col, Item * const ivcol = NULL)
@@ -97,18 +97,19 @@ public:
     SECLEVEL level() const {return SECLEVEL::HOM;}
     std::string name() const {return "HOM";}
     Create_field * newCreateField(const Create_field * const cf,
-                                  const std::string &anonname = "");
+                                  const std::string &anonname = "")
+        const;
 
     //TODO needs multi encrypt and decrypt
-    Item * encrypt(Item * const p, uint64_t IV);
-    Item * decrypt(Item * const c, uint64_t IV);
+    Item * encrypt(Item * const p, uint64_t IV) const;
+    Item * decrypt(Item * const c, uint64_t IV) const;
 
     //expr is the expression (e.g. a field) over which to sum
     Item *sumUDA(Item *const expr) const;
     Item *sumUDF(Item *const i1, Item *const i2) const;
 
 protected:
-    std::string seed_key;
+    std::string const seed_key;
     static const uint nbits = 1024;
     Paillier_priv * sk;
 
@@ -126,19 +127,19 @@ public:
     SECLEVEL level() const {return SECLEVEL::SEARCH;}
     std::string name() const {return "SEARCH";}
     Create_field * newCreateField(const Create_field * const cf,
-                                  const std::string &anonname = "");
+                                  const std::string &anonname = "")
+        const;
 
-    Item * encrypt(Item * const ptext, uint64_t IV);
-    Item * decrypt(Item * const ctext,
-                   uint64_t IV) __attribute__((noreturn));
+    Item * encrypt(Item * const ptext, uint64_t IV) const;
+    Item * decrypt(Item * const ctext, uint64_t IV) const
+        __attribute__((noreturn));
 
     //expr is the expression (e.g. a field) over which to sum
-    Item * searchUDF(Item * const field, Item * const expr);
+    Item * searchUDF(Item * const field, Item * const expr) const;
 
 private:
     static const uint key_bytes = 16;
-    std::string key;
-
+    std::string const key;
 };
 
 extern const std::vector<udf_func*> udf_list;
@@ -166,9 +167,10 @@ public:
     virtual std::string name() const {return "PLAINTEXT";}
 
     virtual Create_field *newCreateField(const Create_field * const cf,
-                                         const std::string &anonname = "");
-    Item *encrypt(Item * const ptext, uint64_t IV);
-    Item *decrypt(Item * const ctext, uint64_t IV);
+                                         const std::string &anonname = "")
+        const;
+    Item *encrypt(Item * const ptext, uint64_t IV) const;
+    Item *decrypt(Item * const ctext, uint64_t IV) const;
     Item *decryptUDF(Item * const col, Item * const ivcol = NULL)
         const __attribute__((noreturn));
     std::string doSerialize() const;
