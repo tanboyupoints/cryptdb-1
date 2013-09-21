@@ -63,7 +63,7 @@ public:
 
     static QueryRewrite
         rewrite(const ProxyState &ps, const std::string &q,
-                SchemaInfo *const schema);
+                SchemaInfo const &schema);
     static ResType *
         decryptResults(const ResType &dbres, const ReturnMeta &rm);
 

@@ -407,7 +407,7 @@ encrypt_item_layers(Item * const i, onion o, const OnionMeta &om,
 
 std::string
 rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
-                         SchemaInfo *const schema)
+                         SchemaInfo const &schema)
 {
     const QueryRewrite qr = Rewriter::rewrite(ps, q, schema);
     assert(false == qr.output->stalesSchema());
@@ -470,7 +470,7 @@ PREAMBLE_STATUS
 queryPreamble(const ProxyState &ps, const std::string &q,
               QueryRewrite **const out_qr,
               std::list<std::string> *const out_queryz,
-              SchemaInfo *const schema)
+              SchemaInfo const &schema)
 {
     QueryRewrite *const qr = *out_qr =
         new QueryRewrite(Rewriter::rewrite(ps, q, schema));
@@ -542,7 +542,7 @@ side_channel_epilogue:
 
 bool
 queryHandleRollback(const ProxyState &ps, const std::string &query,
-                    SchemaInfo *const schema)
+                    SchemaInfo const &schema)
 {
     QueryRewrite *qr;
     std::list<std::string> out_queryz;
@@ -627,16 +627,16 @@ queryEpilogue(const ProxyState &ps, QueryRewrite *const qr,
     return res;
 }
 
-SchemaInfo *
+const SchemaInfo &
 SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
                        const std::unique_ptr<Connect> &e_conn)
 {
     if (true == staleness) {
         this->schema.reset(loadSchemaInfo(conn, e_conn));
     }
+    assert(this->schema);
 
-    // HACK: get.
-    return this->schema.get();
+    return *this->schema.get();
 }
 
 void SchemaCache::updateStaleness(bool staleness)

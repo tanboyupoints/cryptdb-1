@@ -70,7 +70,7 @@ encrypt_item_layers(Item * const i, onion o, const OnionMeta &om,
 
 std::string
 rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
-                         SchemaInfo *const schema);
+                         SchemaInfo const &schema);
 
 // FIXME(burrows): Generalize to support any container with next AND end
 // semantics.
@@ -130,11 +130,11 @@ PREAMBLE_STATUS
 queryPreamble(const ProxyState &ps, const std::string &q,
               QueryRewrite **const out_qr,
               std::list<std::string> *const out_queryz,
-              SchemaInfo *const schema);
+              SchemaInfo const &schema);
 
 bool
 queryHandleRollback(const ProxyState &ps, const std::string &query,
-                    SchemaInfo *const schema);
+                    SchemaInfo const &schema);
 
 void
 prettyPrintQuery(const std::string &query);
@@ -146,15 +146,13 @@ queryEpilogue(const ProxyState &ps, QueryRewrite *const qr,
 class SchemaCache {
 public:
     SchemaCache() : staleness(true) {}
-    SchemaCache(bool staleness, SchemaInfo *const schema)
-        : staleness(staleness), schema(schema) {}
 
-    SchemaInfo *getSchema(const std::unique_ptr<Connect> &conn,
-                          const std::unique_ptr<Connect> &e_conn);
+    const SchemaInfo &getSchema(const std::unique_ptr<Connect> &conn,
+                                const std::unique_ptr<Connect> &e_conn);
     void updateStaleness(bool staleness);
 
 private:
     bool staleness;
-    std::unique_ptr<SchemaInfo> schema;
+    std::unique_ptr<const SchemaInfo> schema;
 };
 

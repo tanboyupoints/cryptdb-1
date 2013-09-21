@@ -265,7 +265,7 @@ rewrite(lua_State *const L)
 
             QueryRewrite *qr = NULL;
             SchemaCache &schema_cache = c_wrapper->getSchemaCache();
-            SchemaInfo *const schema =
+            SchemaInfo const &schema =
                 schema_cache.getSchema(ps->getConn(), ps->getEConn());
             preamble_status =
                 queryPreamble(*ps, query, &qr, &new_queries, schema);
@@ -344,7 +344,7 @@ rollbackOnionAdjust(lua_State *const L)
     assert(ps);
 
     SchemaCache &schema_cache = c_wrapper->getSchemaCache();
-    SchemaInfo *const schema =
+    SchemaInfo const &schema =
         schema_cache.getSchema(ps->getConn(), ps->getEConn());
     assert(queryHandleRollback(*ps, c_wrapper->last_query, schema));
 

@@ -195,7 +195,7 @@ public:
     virtual bool beforeQuery(const std::unique_ptr<Connect> &conn,
                              const std::unique_ptr<Connect> &e_conn) = 0;
     virtual bool getQuery(std::list<std::string> *const queryz,
-                          SchemaInfo *const schema) const = 0;
+                          SchemaInfo const &schema) const = 0;
     virtual bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
         const = 0;
     virtual bool afterQuery(const std::unique_ptr<Connect> &e_conn)
@@ -225,7 +225,7 @@ public:
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz,
-                  SchemaInfo *const schema) const;
+                  SchemaInfo const &schema) const;
     bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     bool doDecryption() const;
@@ -241,7 +241,7 @@ public:
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz,
-                  SchemaInfo *const schema) const;
+                  SchemaInfo const &schema) const;
     bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
 
@@ -266,7 +266,7 @@ public:
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz,
-                  SchemaInfo *const schema) const;
+                  SchemaInfo const &schema) const;
     bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     bool multipleResultSets() const;
@@ -292,7 +292,7 @@ public:
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn) = 0;
     virtual bool getQuery(std::list<std::string> * const queryz,
-                          SchemaInfo *const schema) const = 0;
+                          SchemaInfo const &schema) const = 0;
     virtual bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
         const = 0;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const = 0;
@@ -319,7 +319,7 @@ public:
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz,
-                  SchemaInfo *const schema) const;
+                  SchemaInfo const &schema) const;
     bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
 
@@ -344,7 +344,7 @@ public:
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz,
-                  SchemaInfo *const schema) const;
+                  SchemaInfo const &schema) const;
     bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     // FIXME: final.
@@ -409,7 +409,6 @@ public:
     static SECLEVEL getOnionLevel(const OnionMeta &om);
     static std::vector<std::unique_ptr<EncLayer>> const &
         getEncLayers(const OnionMeta &om);
-    // HACK.
     const SchemaInfo &getSchema() {return schema;}
 
     std::vector<Delta *> deltas;

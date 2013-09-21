@@ -1132,14 +1132,13 @@ cryptdbDirective(const std::string &query)
 
 QueryRewrite
 Rewriter::rewrite(const ProxyState &ps, const std::string &q,
-                  SchemaInfo *const schema)
+                  SchemaInfo const &schema)
 {
     LOG(cdb_v) << "q " << q;
     assert(0 == mysql_thread_init());
     //assert(0 == create_embedded_thd(0));
 
-    assert(schema);
-    Analysis analysis(*schema);
+    Analysis analysis(schema);
 
     RewriteOutput *output;
     try {
@@ -1268,7 +1267,7 @@ executeQuery(const ProxyState &ps, const std::string &q,
         QueryRewrite *qr = NULL;
         // out_queryz: queries intended to be run against remote server.
         std::list<std::string> out_queryz;
-        SchemaInfo *const schema =
+        SchemaInfo const &schema =
             schema_cache->getSchema(ps.getConn(), ps.getEConn());
         PREAMBLE_STATUS const preamble_status =
             queryPreamble(ps, q, &qr, &out_queryz, schema);

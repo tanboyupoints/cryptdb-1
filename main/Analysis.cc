@@ -544,7 +544,7 @@ bool SimpleOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
 }
 
 bool SimpleOutput::getQuery(std::list<std::string> *const queryz,
-                            SchemaInfo *const) const
+                            SchemaInfo const &) const
 {
     queryz->clear();
     queryz->push_back(original_query);
@@ -577,7 +577,7 @@ bool DMLOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
 }
 
 bool DMLOutput::getQuery(std::list<std::string> * const queryz,
-                         SchemaInfo *const) const
+                         SchemaInfo const &) const
 {
     queryz->clear();
     queryz->push_back(new_query);
@@ -660,9 +660,9 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
 }
 
 bool SpecialUpdate::getQuery(std::list<std::string> * const queryz,
-                             SchemaInfo *const schema) const
+                             SchemaInfo const &schema) const
 {
-    assert(queryz && schema);
+    assert(queryz);
 
     queryz->clear();
 
@@ -952,7 +952,7 @@ bool DDLOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
 }
 
 bool DDLOutput::getQuery(std::list<std::string> * const queryz,
-                         SchemaInfo *const) const
+                         SchemaInfo const &) const
 {
     queryz->clear();
 
@@ -997,7 +997,7 @@ bool AdjustOnionOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
 }
 
 bool AdjustOnionOutput::getQuery(std::list<std::string> * const queryz,
-                                 SchemaInfo *const)
+                                 SchemaInfo const &)
     const
 {
     queryz->clear();
