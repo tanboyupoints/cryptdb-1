@@ -491,26 +491,23 @@ buildTypeTextTranslatorHack()
 
 //l gets updated to the new level
 static std::string
-removeOnionLayer(Analysis &a, const ProxyState &ps,
+removeOnionLayer(const ProxyState &ps, const TableMeta &tm,
                  const FieldMeta &fm,
                  OnionMetaAdjustor *const om_adjustor,
-                 const std::string &table_name,
                  SECLEVEL *const new_level,
-                 const std::string &cur_db)
+                 const std::string &cur_db,
+                 std::vector<Delta *> *const deltas)
 {
     // Remove the EncLayer.
     EncLayer const &back_el = om_adjustor->popBackEncLayer();
 
     // Update the Meta.
-    a.deltas.push_back(new DeleteDelta(back_el,
-                                       om_adjustor->getOnionMeta()));
+    deltas->push_back(new DeleteDelta(back_el,
+                                      om_adjustor->getOnionMeta()));
     const SECLEVEL local_new_level = om_adjustor->getSecLevel();
 
     //removes onion layer at the DB
-    const std::string tableanon =
-        a.getTableMeta(table_name).getAnonTableName();
-
-    const std::string anon_table_name = a.getAnonTableName(table_name);
+    const std::string anon_table_name = tm.getAnonTableName();
     Item_field *const salt =
         new Item_field(NULL, ps.dbName().c_str(), anon_table_name.c_str(),
                        fm.getSaltName().c_str());
@@ -523,7 +520,7 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
     Item *const decUDF = back_el.decryptUDF(field, salt);
 
     std::stringstream query;
-    query << " UPDATE " << cur_db << "." << tableanon
+    query << " UPDATE " << cur_db << "." << anon_table_name
           << "    SET " << fieldanon  << " = " << *decUDF
           << ";";
 
@@ -546,10 +543,10 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
  * changed schema to persistent storage.
  *
  */
-static std::list<std::string>
-adjustOnion(Analysis &a, const ProxyState &ps, onion o,
-            const FieldMeta &fm, SECLEVEL tolevel,
-            const std::string &table_name, const std::string &cur_db)
+static std::pair<std::vector<Delta *>, std::list<std::string>>
+adjustOnion(const SchemaInfo &schema, const ProxyState &ps, onion o,
+            const TableMeta &tm, const FieldMeta &fm, SECLEVEL tolevel,
+            const std::string &cur_db)
 {
     std::cout << "onion: " << TypeText<onion>::toText(o) << std::endl;
     // Make a copy of the onion meta for the purpose of making
@@ -559,15 +556,16 @@ adjustOnion(Analysis &a, const ProxyState &ps, onion o,
     assert(newlevel != SECLEVEL::INVALID);
 
     std::list<std::string> adjust_queries;
+    std::vector<Delta *> deltas;
     while (newlevel > tolevel) {
         auto query =
-            removeOnionLayer(a, ps, fm, &om_adjustor, table_name,
-                             &newlevel, cur_db);
+            removeOnionLayer(ps, tm, fm, &om_adjustor, &newlevel,
+                             cur_db, &deltas);
         adjust_queries.push_back(query);
     }
     TEST_UnexpectedSecurityLevel(o, tolevel, newlevel);
 
-    return adjust_queries;
+    return make_pair(deltas, adjust_queries);
 }
 //TODO: propagate these adjustments in the embedded database?
 
@@ -1029,10 +1027,14 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
             std::cout << "Adjusting onion!" << std::endl;
-            auto adjust_queries = 
-                adjustOnion(a, ps, e.o, e.fm, e.tolevel, e.table_name,
-                            ps.dbName());
-            return new AdjustOnionOutput(a.deltas, adjust_queries);
+            std::pair<std::vector<Delta *>, std::list<std::string>>
+                out_data =
+                    adjustOnion(a.getSchema(), ps, e.o, e.tm, e.fm,
+                                e.tolevel, ps.dbName());
+            const std::vector<Delta *> &deltas = out_data.first;
+            const std::list<std::string>  &adjust_queries =
+                out_data.second;
+            return new AdjustOnionOutput(deltas, adjust_queries);
         }
 
         // Return if it's a regular DML query.

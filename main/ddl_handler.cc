@@ -62,6 +62,8 @@ class CreateHandler : public DDLHandler {
             // > This will _NOT_ gracefully handle a malformed CREATE TABLE
             // query.
             assert(1 == new_lex->select_lex.table_list.elements);
+            // Take the table name straight from 'tm' as
+            // Analysis::getAnonTableName relies on SchemaInfo.
             TABLE_LIST *const tbl =
                 rewrite_table_list(new_lex->select_lex.table_list.first,
                                    tm->getAnonTableName());

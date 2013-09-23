@@ -1109,12 +1109,31 @@ TableMeta &Analysis::getTableMeta(const std::string &table) const
 
 bool Analysis::tableMetaExists(const std::string &table) const
 {
-    return this->schema.childExists(IdentityMetaKey(unAliasTable(table)));
+    return this->nonAliasTableMetaExists(unAliasTable(table));
+}
+
+bool Analysis::nonAliasTableMetaExists(const std::string &table) const
+{
+    return this->schema.childExists(IdentityMetaKey(table));
 }
 
 std::string Analysis::getAnonTableName(const std::string &table) const
 {
+    if (this->isAlias(table)) {
+        return table;
+    }
+
     return this->getTableMeta(table).getAnonTableName();
+}
+
+std::string
+Analysis::translateNonAliasPlainToAnonTableName(const std::string &table)
+    const
+{
+    TableMeta *const tm = this->schema.getChild(IdentityMetaKey(table));
+    assert(tm);
+
+    return tm->getAnonTableName();
 }
 
 std::string Analysis::getAnonIndexName(const std::string &table,
@@ -1131,6 +1150,11 @@ std::string Analysis::getAnonIndexName(const TableMeta &tm,
     const
 {
     return tm.getAnonIndexName(index_name, o);
+}
+
+bool Analysis::isAlias(const std::string &table) const
+{
+    return table_aliases.end() != table_aliases.find(table);
 }
 
 std::string Analysis::unAliasTable(const std::string &table) const

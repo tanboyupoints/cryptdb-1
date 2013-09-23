@@ -42,14 +42,14 @@ typedef struct ReturnMeta {
 
 class OnionAdjustExcept {
 public:
-    OnionAdjustExcept(onion o, const FieldMeta &fm,
-                      SECLEVEL l, const std::string &table_name)
-        : o(o), fm(fm), tolevel(l), table_name(table_name) {}
+    OnionAdjustExcept(const TableMeta &tm, const FieldMeta &fm, onion o,
+                      SECLEVEL l)
+        : tm(tm), fm(fm), o(o), tolevel(l) {}
 
-    const onion o;
+    const TableMeta &tm;
     const FieldMeta &fm;
+    const onion o;
     const SECLEVEL tolevel;
-    const std::string table_name;
 };
 
 // TODO: Maybe we want a database name argument/member.
@@ -398,7 +398,11 @@ public:
                             const std::string &field) const;
     TableMeta &getTableMeta(const std::string &table) const;
     bool tableMetaExists(const std::string &table) const;
+    bool nonAliasTableMetaExists(const std::string &table) const;
     std::string getAnonTableName(const std::string &table) const;
+    std::string
+        translateNonAliasPlainToAnonTableName(const std::string &table)
+        const;
     std::string getAnonIndexName(const std::string &table,
                                  const std::string &index_name,
                                  onion o) const;
@@ -415,6 +419,7 @@ public:
 
 private:
     const SchemaInfo &schema;
+    bool isAlias(const std::string &table) const;
     std::string unAliasTable(const std::string &table) const;
 };
 

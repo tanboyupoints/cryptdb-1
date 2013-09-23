@@ -1022,6 +1022,45 @@ static QueryList Deadlocks = QueryList("Deadlocks",
     { "DROP TABLE deadlock"},
     { "DROP TABLE deadlock"});
 
+static QueryList TableAliases = QueryList("TableAliases",
+    { "CREATE TABLE star (a integer, b integer, c integer)",
+      "CREATE TABLE mercury (a integer, b integer, c integer)",
+      "CREATE TABLE moon (x integer, y integer, z integer)",
+      ""},
+    { "CREATE TABLE star (a integer, b integer, c integer)",
+      "CREATE TABLE mercury (a integer, b integer, c integer)",
+      "CREATE TABLE moon (x integer, y integer, z integer)",
+      ""},
+    { "CREATE TABLE star (a integer, b integer, c integer)",
+      "CREATE TABLE mercury (a integer, b integer, c integer)",
+      "CREATE TABLE moon (x integer, y integer, z integer)",
+      ""},
+    { Query("INSERT INTO star VALUES (55, 66, 77), (99, 22, 109)", false),
+      Query("INSERT INTO mercury VALUES (55, 18, 17), (16, 15, 14)",
+            false),
+      Query("INSERT INTO moon VALUES (55, 18, 1), (22, 22, 444)", false),
+      Query("SELECT s.a, e.b FROM star AS s INNER JOIN mercury AS e"
+            "                  ON s.a = e.a"
+            "               WHERE s.c < 100", false),
+      Query("SELECT * FROM mercury INNER JOIN mercury AS e"
+            "           ON mercury.a = e.a", false),
+      Query("SELECT o.x, o.y FROM moon AS o INNER JOIN moon AS o2"
+            "                  ON o.x = o2.y", false),
+      Query("SELECT mercury.a, mercury.b, e.a FROM star AS mercury"
+            " INNER JOIN mercury AS e ON (mercury.a = e.a)"
+            " WHERE mercury.b <> 18 AND mercury.b <> 15", false)
+    },
+    { "DROP TABLE star",
+      "DROP TABLE mercury",
+      "DROP TABLE moon"},
+    { "DROP TABLE star",
+      "DROP TABLE mercury",
+      "DROP TABLE moon"},
+    { "DROP TABLE star",
+      "DROP TABLE mercury",
+      "DROP TABLE moon"});
+
+
 
 
 
@@ -1351,7 +1390,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 436/437.
+    //      TOTAL RESULT: 450/451
     // ###############################
 
     std::vector<Score> scores;
@@ -1416,6 +1455,9 @@ RunTest(const TestConfig &tc) {
     // Pass 9/10
     // NOTE: Should fail one test.
     scores.push_back(CheckQueryList(tc, Deadlocks));
+
+    // Pass 14/14
+    scores.push_back(CheckQueryList(tc, TableAliases));
 
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;

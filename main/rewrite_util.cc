@@ -48,9 +48,13 @@ rewrite_table_list(const TABLE_LIST * const t, const Analysis &a)
     // Table name can only be empty when grouping a nested join.
     assert(t->table_name || t->nested_join);
     if (t->table_name) {
+        const std::string plain_name =
+            std::string(t->table_name, t->table_name_length);
+        // Don't use Analysis::getAnonTableName(...) as it respects
+        // aliases and if a table has been aliased with 'plain_name'
+        // it will give us the wrong name.
         const std::string anon_name =
-            a.getAnonTableName(std::string(t->table_name,
-                               t->table_name_length));
+            a.translateNonAliasPlainToAnonTableName(plain_name);
         return rewrite_table_list(t, anon_name);
     } else {
         return copy(t);
@@ -62,15 +66,18 @@ rewrite_table_list(const TABLE_LIST * const t,
                    const std::string &anon_name)
 {
     TABLE_LIST * const new_t = copy(t);
-    new_t->table_name =
-        make_thd_string(anon_name, &new_t->table_name_length);
-    new_t->alias = make_thd_string(anon_name);
+    new_t->table_name = make_thd_string(anon_name);
+    new_t->table_name_length = anon_name.size();
+    if (false == new_t->is_alias) {
+        new_t->alias = make_thd_string(anon_name);
+    }
     new_t->next_local = NULL;
 
     return new_t;
 }
 
-// @if_exists: defaults to false.
+// @if_exists: defaults to false; it is necessary to facilitate
+//   'DROP TABLE IF EXISTS'
 SQL_I_List<TABLE_LIST>
 rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
                    bool if_exists)
@@ -80,7 +87,7 @@ rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
     }
 
     TABLE_LIST * tl;
-    if (if_exists && (false == a.tableMetaExists(tlist.first->table_name))) {
+    if (if_exists && !a.nonAliasTableMetaExists(tlist.first->table_name)) {
        tl = copy(tlist.first);
     } else {
        tl = rewrite_table_list(tlist.first, a);
@@ -93,7 +100,7 @@ rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
     for (TABLE_LIST *tbl = tlist.first->next_local; tbl;
          tbl = tbl->next_local) {
         TABLE_LIST * new_tbl;
-        if (if_exists && (false == a.tableMetaExists(tbl->table_name))) {
+        if (if_exists && !a.nonAliasTableMetaExists(tbl->table_name)) {
             new_tbl = copy(tbl);
         } else {
             new_tbl = rewrite_table_list(tbl, a);

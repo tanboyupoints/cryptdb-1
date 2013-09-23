@@ -100,8 +100,8 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         assert(onion_level != SECLEVEL::INVALID);
         if (constr.l < onion_level) {
             //need adjustment, throw exception
-            throw OnionAdjustExcept(constr.o, fm, constr.l,
-                                    std::string(plain_table_name));
+            const TableMeta &tm = a.getTableMeta(plain_table_name);
+            throw OnionAdjustExcept(tm, fm, constr.o, constr.l);
         }
 
         const std::string anon_table_name =
@@ -136,7 +136,6 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     }
 */
 
-    //do we need do_rewrite_insert?
     virtual void
     do_rewrite_insert_type(Item_field *i, Analysis & a,
                            std::vector<Item *> &l, FieldMeta *fm) const
@@ -160,5 +159,4 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
                                   fm->getSaltName()));
         }
     }
-
 } ANON;
