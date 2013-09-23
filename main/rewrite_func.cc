@@ -655,6 +655,9 @@ static CItemDateExtractFunc<str_week> ANON;
 extern const char str_dayofmonth[] = "dayofmonth";
 static CItemDateExtractFunc<str_dayofmonth> ANON;
 
+extern const char str_dayofweek[] = "dayofweek";
+static CItemDateExtractFunc<str_dayofweek> ANON;
+
 extern const char str_unix_timestamp[] = "unix_timestamp";
 static CItemDateExtractFunc<str_unix_timestamp> ANON;
 
