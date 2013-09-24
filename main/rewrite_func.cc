@@ -53,7 +53,8 @@ rewrite_args_FN(T *i, const OLK &constr, const RewritePlanOneOLK *rp,
 {
     const uint count = i->argument_count();
     T *const out_i = copyWithTHD(i);
-    List<Item> * const arg_list = dptrToList(i->arguments(), count);
+    List<Item> *const arg_list =
+        dptrToListWithTHD(i->arguments(), count);
     out_i->set_arguments(*arg_list);
 
     Item ** const args = out_i->arguments();

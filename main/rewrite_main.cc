@@ -21,7 +21,6 @@
 #include <main/sql_handler.hh>
 #include <main/dml_handler.hh>
 #include <main/ddl_handler.hh>
-#include <main/List_helpers.hh>
 #include <main/metadata_tables.hh>
 #include <main/macro_util.hh>
 

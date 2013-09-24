@@ -3,7 +3,6 @@
 #include <main/rewrite_util.hh>
 #include <main/enum_text.hh>
 #include <main/rewrite_main.hh>
-#include <main/List_helpers.hh>
 #include <main/macro_util.hh>
 #include <parser/lex_util.hh>
 #include <parser/stringify.hh>
@@ -94,7 +93,7 @@ rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
     }
 
     const SQL_I_List<TABLE_LIST> * const new_tlist =
-        oneElemList<TABLE_LIST>(tl);
+        oneElemListWithTHD<TABLE_LIST>(tl);
 
     TABLE_LIST * prev = tl;
     for (TABLE_LIST *tbl = tlist.first->next_local; tbl;
@@ -369,7 +368,7 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     //         Rewrite FIELD       
     // -----------------------------
     const auto new_fields = rewrite_create_field(fm.get(), cf, a);
-    rewritten_cfield_list.concat(vectorToList(new_fields));
+    rewritten_cfield_list.concat(vectorToListWithTHD(new_fields));
 
     // -----------------------------
     //         Update FIELD       

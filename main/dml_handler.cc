@@ -387,7 +387,7 @@ rewrite_order(Analysis &a, SQL_I_List<ORDER> &lst,
         Item *const new_item = itemTypes.do_rewrite(*o->item, olk, rp, a);
         ORDER *const neworder = make_order(o, new_item);
         if (NULL == prev) {
-            *new_lst = *oneElemList(neworder);
+            *new_lst = *oneElemListWithTHD(neworder);
         } else {
             prev->next = neworder;
         }

@@ -1,5 +1,4 @@
 #include <main/alter_sub_handler.hh>
-#include <main/List_helpers.hh>
 #include <main/rewrite_util.hh>
 #include <main/enum_text.hh>
 #include <parser/lex_util.hh>
@@ -145,7 +144,7 @@ class AddIndexSubHandler : public AlterSubHandler {
                     //         Rewrite INDEX
                     // -----------------------------
                     auto new_keys = rewrite_key(tm, key, a);
-                    out_list.concat(vectorToList(new_keys));
+                    out_list.concat(vectorToListWithTHD(new_keys));
 
                     return out_list;    /* lambda */
             });

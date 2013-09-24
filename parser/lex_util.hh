@@ -60,8 +60,8 @@ set_having(st_select_lex *const sl, Item *const having);
 // Creates a SQL_I_List that contains one element
 template <typename T>
 SQL_I_List<T> *
-oneElemList(T *const elem) {
-    SQL_I_List<T> *const res = new SQL_I_List<T>();
+oneElemListWithTHD(T *const elem) {
+    SQL_I_List<T> *const res = new (current_thd->mem_root) SQL_I_List<T>();
     res->elements = 1;
     res->first = elem;
     res->next = NULL;
@@ -71,9 +71,9 @@ oneElemList(T *const elem) {
 
 template <typename T>
 List<T> *
-dptrToList(T **const es, unsigned int count)
+dptrToListWithTHD(T **const es, unsigned int count)
 {
-    List<T> *const out = new List<T>();
+    List<T> *const out = new (current_thd->mem_root) List<T>();
     for (unsigned int i = 0; i < count; ++i) {
         out->push_back(es[i]);
     }
@@ -81,3 +81,62 @@ dptrToList(T **const es, unsigned int count)
     return out;
 }
 
+// Helper functions for doing functional things to List<T> structures.
+template <typename Type> void
+eachList(List_iterator<Type> it, std::function<void(Type *)> op)
+{
+    for (Type *element = it++; element ; element = it++) {
+        op(element);
+    }
+
+    return;
+}
+
+template <typename InType, typename OutType> List<OutType>
+mapList(List_iterator<InType> it, std::function<OutType *(InType *)> op)
+{
+    List<OutType> newList;
+    for (InType *element; element ; element = it++) {
+        newList.push_back(op(element));
+    }
+
+    return newList;
+}
+
+template <typename Type> List<Type>
+accumList(List_iterator<Type> it,
+          std::function<List<Type>(List<Type>, Type *)> op)
+{
+    List<Type> accum;
+
+    for (Type *element = it++; element ; element = it++) {
+        accum = op(accum, element);
+    }
+
+    return accum;
+}
+
+template <typename T> List<T> *
+vectorToListWithTHD(std::vector<T *> v)
+{
+    List<T> *const lst = new (current_thd->mem_root) List<T>;
+    for (auto it : v) {
+        lst->push_back(it);
+    }
+
+    return lst;
+}
+
+template <typename Type> List<Type>
+filterList(List_iterator<Type> it, std::function<bool(Type *)> op)
+{
+    List<Type> new_list;
+
+    for (Type *element = it++; element ; element = it++) {
+        if (true == op(element)) {
+            new_list.push_back(element);
+        }
+    }
+
+    return new_list;
+}

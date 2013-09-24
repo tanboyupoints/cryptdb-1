@@ -1,7 +1,6 @@
 #include <main/ddl_handler.hh>
 
 #include <main/rewrite_util.hh>
-#include <main/List_helpers.hh>
 #include <main/rewrite_main.hh>
 #include <main/alter_sub_handler.hh>
 #include <main/dispatcher.hh>
@@ -67,7 +66,8 @@ class CreateHandler : public DDLHandler {
             TABLE_LIST *const tbl =
                 rewrite_table_list(new_lex->select_lex.table_list.first,
                                    tm->getAnonTableName());
-            new_lex->select_lex.table_list = *oneElemList<TABLE_LIST>(tbl);
+            new_lex->select_lex.table_list =
+                *oneElemListWithTHD<TABLE_LIST>(tbl);
 
             auto it =
                 List_iterator<Create_field>(lex->alter_info.create_list);
@@ -89,7 +89,7 @@ class CreateHandler : public DDLHandler {
                     [&tm, &a] (List<Key> out_list, Key *const key)
                     {
                         auto keys = rewrite_key(*tm.get(), key, a);
-                        out_list.concat(vectorToList(keys));
+                        out_list.concat(vectorToListWithTHD(keys));
 
                         return out_list;
                     });
