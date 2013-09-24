@@ -49,9 +49,11 @@ printRes(const ResType & r);
 class QueryRewrite {
 public:
     QueryRewrite(bool wasRes, ReturnMeta rmeta, RewriteOutput *output)
-        : rmeta(rmeta), output(output) {}
-    ReturnMeta rmeta;
-    RewriteOutput *output;
+        : rmeta(rmeta), output(std::unique_ptr<RewriteOutput>(output)) {}
+    QueryRewrite(QueryRewrite &&other_qr) : rmeta(other_qr.rmeta),
+        output(std::move(other_qr.output)) {}
+    const ReturnMeta rmeta;
+    std::unique_ptr<RewriteOutput> output;
 };
 
 // Main class processing rewriting

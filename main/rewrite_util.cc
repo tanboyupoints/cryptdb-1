@@ -416,7 +416,7 @@ std::string
 rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
                          SchemaInfo const &schema)
 {
-    const QueryRewrite qr = Rewriter::rewrite(ps, q, schema);
+    const QueryRewrite qr(Rewriter::rewrite(ps, q, schema));
     assert(false == qr.output->stalesSchema());
     assert(false == qr.output->queryAgain());
 
