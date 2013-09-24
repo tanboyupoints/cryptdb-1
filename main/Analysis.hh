@@ -372,7 +372,7 @@ class RewritePlan;
 class Analysis {
 public:
     Analysis(const SchemaInfo &schema)
-        : pos(0), rmeta(new ReturnMeta()), special_update(false),
+        : pos(0), special_update(false),
           schema(schema) {}
 
     unsigned int pos; // > a counter indicating how many projection
@@ -383,7 +383,7 @@ public:
     std::map<Item_field *, std::pair<Item_field *, OLK>> item_cache;
 
     // information for decrypting results
-    ReturnMeta * rmeta;
+    ReturnMeta rmeta;
 
     bool special_update;
 

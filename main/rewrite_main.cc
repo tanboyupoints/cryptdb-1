@@ -1160,7 +1160,7 @@ Rewriter::rewrite(const ProxyState &ps, const std::string &q,
         output = new SimpleOutput(mysql_noop());
     }
 
-    return QueryRewrite(true, *analysis.rmeta, output);
+    return QueryRewrite(true, analysis.rmeta, output);
 }
 
 //TODO: replace stringify with <<

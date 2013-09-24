@@ -515,8 +515,8 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
 }
 
 static void
-addToReturn(ReturnMeta *rm, int pos, const OLK &constr, bool has_salt,
-            const std::string &name)
+addToReturn(ReturnMeta *const rm, int pos, const OLK &constr,
+            bool has_salt, const std::string &name)
 {
     if (static_cast<unsigned int>(pos) != rm->rfmeta.size()) {
         throw CryptDBError("ReturnMeta has badly ordered ReturnFields!");
@@ -528,7 +528,7 @@ addToReturn(ReturnMeta *rm, int pos, const OLK &constr, bool has_salt,
 }
 
 static void
-addSaltToReturn(ReturnMeta *rm, int pos)
+addSaltToReturn(ReturnMeta *const rm, int pos)
 {
     if (static_cast<unsigned int>(pos) != rm->rfmeta.size()) {
         throw CryptDBError("ReturnMeta has badly ordered ReturnFields!");
@@ -564,7 +564,7 @@ rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
 
     // This line implicity handles field aliasing for at least some cases.
     // As i->name can/will be the alias.
-    addToReturn(a.rmeta, a.pos++, olk.get(), use_salt, i->name);
+    addToReturn(&a.rmeta, a.pos++, olk.get(), use_salt, i->name);
 
     if (use_salt) {
         const std::string anon_table_name =
@@ -574,7 +574,7 @@ rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
             make_item(static_cast<Item_field *>(ir.get()),
                       anon_table_name, anon_field_name);
         newList->push_back(ir_field);
-        addSaltToReturn(a.rmeta, a.pos++);
+        addSaltToReturn(&a.rmeta, a.pos++);
     }
 }
 
