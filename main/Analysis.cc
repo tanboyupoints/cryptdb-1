@@ -346,7 +346,10 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
 }
 
 ProxyState::~ProxyState()
-{}
+{
+    // FIXME: Why does this call break?
+    // mysql_library_end();
+}
 
 int ProxyState::db_init(const std::string &embed_dir)
 {
