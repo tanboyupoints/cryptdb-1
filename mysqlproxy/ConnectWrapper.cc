@@ -20,14 +20,22 @@ public:
     std::string last_query;
     std::ofstream * PLAIN_LOG;
     std::string cur_db;
-    QueryRewrite * qr;
 
     WrapperState() {}
     ~WrapperState() {}
 
     SchemaCache &getSchemaCache() {return schema_cache;}
+    const std::unique_ptr<QueryRewrite> &getQueryRewrite() const {
+        assert(this->qr);
+        return this->qr;
+    }
+    void setQueryRewrite(QueryRewrite *const in_qr) {
+        // assert(!this->qr);
+        this->qr = std::unique_ptr<QueryRewrite>(in_qr);
+    }
 
 private:
+    std::unique_ptr<QueryRewrite> qr;
     SchemaCache schema_cache;
 };
 
@@ -228,10 +236,10 @@ disconnect(lua_State *const L)
     }
 
     LOG(wrapper) << "disconnect " << client;
-    if (clients[client]->qr) {
-        delete clients[client]->qr;
-    }
-    delete clients[client];
+
+    auto ws = clients[client];
+    clients[client] = NULL;
+    delete ws;
     clients.erase(client);
 
     return 0;
@@ -263,17 +271,17 @@ rewrite(lua_State *const L)
         try {
             assert(ps);
 
-            QueryRewrite *qr = NULL;
             SchemaCache &schema_cache = c_wrapper->getSchemaCache();
             SchemaInfo const &schema =
                 schema_cache.getSchema(ps->getConn(), ps->getEConn());
+
+            std::unique_ptr<QueryRewrite> qr;
             preamble_status =
                 queryPreamble(*ps, query, &qr, &new_queries, schema);
-
             assert(qr);
             assert(preamble_status.get() != PREAMBLE_STATUS::FAILURE);
 
-            c_wrapper->qr = qr;
+            c_wrapper->setQueryRewrite(qr.release());
         } catch (CryptDBError &e) {
             LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
             lua_pushboolean(L, false);
@@ -320,9 +328,9 @@ queryFailure(lua_State *const L)
     assert(EXECUTE_QUERIES);
 
     assert(ps);
-    assert(clients[client]->qr);
 
-    QueryRewrite *const qr = clients[client]->qr;
+    const std::unique_ptr<QueryRewrite> &qr =
+        clients[client]->getQueryRewrite();
     assert(qr->output->handleQueryFailure(ps->getEConn()));
 
     return 0;
@@ -344,11 +352,12 @@ rollbackOnionAdjust(lua_State *const L)
     assert(ps);
 
     SchemaCache &schema_cache = c_wrapper->getSchemaCache();
-    SchemaInfo const &schema =
+    const SchemaInfo &schema =
         schema_cache.getSchema(ps->getConn(), ps->getEConn());
     assert(queryHandleRollback(*ps, c_wrapper->last_query, schema));
 
-    schema_cache.updateStaleness(c_wrapper->qr->output->stalesSchema());
+    const std::unique_ptr<QueryRewrite> &qr = c_wrapper->getQueryRewrite();
+    schema_cache.updateStaleness(qr->output->stalesSchema());
     return 0;
 }
 
@@ -451,13 +460,12 @@ envoi(lua_State *const L)
 
     ResType res;
     getResTypeFromLuaTable(L, 2, 3, &res);
-    assert(c_wrapper->qr);
+    const std::unique_ptr<QueryRewrite> &qr = c_wrapper->getQueryRewrite();
     ResType *const out_res =
-        queryEpilogue(*ps, c_wrapper->qr, &res, c_wrapper->last_query,
-                      false);
+        queryEpilogue(*ps, *qr.get(), &res, c_wrapper->last_query, false);
     assert(out_res);
 
-    c_wrapper->getSchemaCache().updateStaleness(c_wrapper->qr->output->stalesSchema());
+    c_wrapper->getSchemaCache().updateStaleness(qr->output->stalesSchema());
 
     return returnResultSet(L, *out_res);
 }

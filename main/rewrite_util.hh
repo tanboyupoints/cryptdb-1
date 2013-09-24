@@ -128,7 +128,7 @@ enum class PREAMBLE_STATUS {SUCCESS, FAILURE, ROLLBACK};
 
 PREAMBLE_STATUS
 queryPreamble(const ProxyState &ps, const std::string &q,
-              QueryRewrite **const out_qr,
+              std::unique_ptr<QueryRewrite> *qr,
               std::list<std::string> *const out_queryz,
               SchemaInfo const &schema);
 
@@ -140,7 +140,7 @@ void
 prettyPrintQuery(const std::string &query);
 
 ResType *
-queryEpilogue(const ProxyState &ps, QueryRewrite *const qr,
+queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
               ResType *const res, const std::string &query, bool pp);
 
 class SchemaCache {

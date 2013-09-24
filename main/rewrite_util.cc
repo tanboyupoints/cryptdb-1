@@ -475,22 +475,22 @@ mysql_noop()
 
 PREAMBLE_STATUS
 queryPreamble(const ProxyState &ps, const std::string &q,
-              QueryRewrite **const out_qr,
+              std::unique_ptr<QueryRewrite> *const qr,
               std::list<std::string> *const out_queryz,
               SchemaInfo const &schema)
 {
-    QueryRewrite *const qr = *out_qr =
-        new QueryRewrite(Rewriter::rewrite(ps, q, schema));
+    *qr = std::unique_ptr<QueryRewrite>(
+            new QueryRewrite(Rewriter::rewrite(ps, q, schema)));
 
-    assert(qr->output->beforeQuery(ps.getConn(), ps.getEConn()));
+    assert((*qr)->output->beforeQuery(ps.getConn(), ps.getEConn()));
 
-    if (!qr->output->getQuery(out_queryz, schema)) {
-        qr->output->handleQueryFailure(ps.getEConn());
+    if (!(*qr)->output->getQuery(out_queryz, schema)) {
+        (*qr)->output->handleQueryFailure(ps.getEConn());
         return PREAMBLE_STATUS::FAILURE;
     }
 
     MaxOneReadPerAssign<bool> did_rollback(false);
-    switch (qr->output->queryChannel()) {
+    switch ((*qr)->output->queryChannel()) {
         // Must detect the side channel deadlock and reissue the side
         // query before the transaction it is deadlocking with.
         case RewriteOutput::Channel::SIDE: {
@@ -510,12 +510,12 @@ queryPreamble(const ProxyState &ps, const std::string &q,
                             //   innodb_rollback_on_timeout=FALSE (default)
                             // > Doesn't work for proxy.
                             assert(ps.getSideChannelConn()->execute("ROLLBACK;"));
-                            assert(qr->output->handleQueryFailure(ps.getEConn()));
+                            assert((*qr)->output->handleQueryFailure(ps.getEConn()));
                             did_rollback = true;
                             goto side_channel_epilogue;
                         }
 
-                        qr->output->handleQueryFailure(ps.getEConn());
+                        (*qr)->output->handleQueryFailure(ps.getEConn());
                         return PREAMBLE_STATUS::FAILURE;
                     }
                 }
@@ -551,10 +551,11 @@ bool
 queryHandleRollback(const ProxyState &ps, const std::string &query,
                     SchemaInfo const &schema)
 {
-    QueryRewrite *qr;
+    std::unique_ptr<QueryRewrite> qr;
     std::list<std::string> out_queryz;
     PREAMBLE_STATUS const preamble_status =
         queryPreamble(ps, query, &qr, &out_queryz, schema);
+    assert(qr);
     if (PREAMBLE_STATUS::FAILURE == preamble_status) {
         return false;
     }
@@ -607,12 +608,12 @@ prettyPrintQueryResult(ResType res)
 }
 
 ResType *
-queryEpilogue(const ProxyState &ps, QueryRewrite *const qr,
+queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
               ResType *const res, const std::string &query, bool pp)
 {
-    assert(qr->output->afterQuery(ps.getEConn()));
+    assert(qr.output->afterQuery(ps.getEConn()));
 
-    if (qr->output->queryAgain()) {
+    if (qr.output->queryAgain()) {
         return executeQuery(ps, query);
     }
 
@@ -621,9 +622,9 @@ queryEpilogue(const ProxyState &ps, QueryRewrite *const qr,
         prettyPrintQueryResult(*res);
     }
 
-    if (qr->output->doDecryption()) {
+    if (qr.output->doDecryption()) {
         ResType *const dec_res =
-            Rewriter::decryptResults(*res, qr->rmeta);
+            Rewriter::decryptResults(*res, qr.rmeta);
         if (pp) {
             prettyPrintQueryResult(*dec_res);
         }

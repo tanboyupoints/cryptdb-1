@@ -1268,14 +1268,14 @@ executeQuery(const ProxyState &ps, const std::string &q,
     }
 
     try {
-        QueryRewrite *qr = NULL;
+        std::unique_ptr<QueryRewrite> qr;
         // out_queryz: queries intended to be run against remote server.
         std::list<std::string> out_queryz;
         SchemaInfo const &schema =
             schema_cache->getSchema(ps.getConn(), ps.getEConn());
         PREAMBLE_STATUS const preamble_status =
             queryPreamble(ps, q, &qr, &out_queryz, schema);
-        assert(PREAMBLE_STATUS::FAILURE != preamble_status);
+        assert(qr && PREAMBLE_STATUS::FAILURE != preamble_status);
 
         DBResult *dbres = NULL;
         for (auto it : out_queryz) {
@@ -1310,7 +1310,8 @@ executeQuery(const ProxyState &ps, const std::string &q,
 
         ResType *const res =
             dbres ? new ResType(dbres->unpack()) : mysql_noop_res(ps);
-        ResType *const out_res = queryEpilogue(ps, qr, res, q, true);
+        ResType *const out_res =
+            queryEpilogue(ps, *qr.get(), res, q, true);
         assert(out_res);
 
         return out_res;
