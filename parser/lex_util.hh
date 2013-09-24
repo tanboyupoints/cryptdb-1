@@ -24,10 +24,8 @@
 
 //copies any data structure shallowly
 template <typename T>
-T *copy(const T *const x) {
-    T *const res = static_cast<T *>(malloc(sizeof(T)));
-    memcpy(res, x, sizeof(T));
-    return res;
+T *copyWithTHD(const T *const x) {
+    return static_cast<T *>(current_thd->memdup(x, sizeof(T)));
 }
 
 /* Makes a new item based on

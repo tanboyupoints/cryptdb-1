@@ -10,7 +10,7 @@ class AddColumnSubHandler : public AlterSubHandler {
                                   const ProxyState &ps,
                                   const Preamble &preamble) const
     {
-        LEX *const new_lex = copy(lex);
+        LEX *const new_lex = copyWithTHD(lex);
 
         // FIXME: This TableMeta should be const.
         TableMeta &tm = a.getTableMeta(preamble.table);
@@ -41,11 +41,11 @@ class DropColumnSubHandler : public AlterSubHandler {
                                   const ProxyState &ps,
                                   const Preamble &preamble) const
     {
-        LEX *new_lex = copy(lex);
+        LEX *const new_lex = copyWithTHD(lex);
 
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a);
-        
+
         // Get the column drops.
         auto drop_it =
             List_iterator<Alter_drop>(lex->alter_info.drop_list);
@@ -125,7 +125,7 @@ class AddIndexSubHandler : public AlterSubHandler {
                                   const ProxyState &ps,
                                   const Preamble &preamble) const
     {
-        LEX *const new_lex = copy(lex);
+        LEX *const new_lex = copyWithTHD(lex);
 
         TableMeta const &tm = a.getTableMeta(preamble.table);
 
@@ -159,7 +159,7 @@ class DropIndexSubHandler : public AlterSubHandler {
                                   const ProxyState &ps,
                                   const Preamble &preamble) const
     {
-        LEX *new_lex = copy(lex);
+        LEX *const new_lex = copyWithTHD(lex);
         TableMeta const &tm = a.getTableMeta(preamble.table);
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a);

@@ -57,7 +57,7 @@ rewrite_table_list(const TABLE_LIST * const t, const Analysis &a)
             a.translateNonAliasPlainToAnonTableName(plain_name);
         return rewrite_table_list(t, anon_name);
     } else {
-        return copy(t);
+        return copyWithTHD(t);
     }
 }
 
@@ -65,7 +65,7 @@ TABLE_LIST *
 rewrite_table_list(const TABLE_LIST * const t,
                    const std::string &anon_name)
 {
-    TABLE_LIST * const new_t = copy(t);
+    TABLE_LIST *const new_t = copyWithTHD(t);
     new_t->table_name = make_thd_string(anon_name);
     new_t->table_name_length = anon_name.size();
     if (false == new_t->is_alias) {
@@ -88,7 +88,7 @@ rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
 
     TABLE_LIST * tl;
     if (if_exists && !a.nonAliasTableMetaExists(tlist.first->table_name)) {
-       tl = copy(tlist.first);
+       tl = copyWithTHD(tlist.first);
     } else {
        tl = rewrite_table_list(tlist.first, a);
     }
@@ -101,7 +101,7 @@ rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
          tbl = tbl->next_local) {
         TABLE_LIST * new_tbl;
         if (if_exists && !a.nonAliasTableMetaExists(tbl->table_name)) {
-            new_tbl = copy(tbl);
+            new_tbl = copyWithTHD(tbl);
         } else {
             new_tbl = rewrite_table_list(tbl, a);
         }
@@ -293,7 +293,8 @@ rewrite_key(const TableMeta &tm, Key *const key, const Analysis &a)
                 [o, &tm, &a, &fail] (List<Key_part_spec> out_field_list,
                                      Key_part_spec *const key_part)
                 {
-                    Key_part_spec *const new_key_part = copy(key_part);
+                    Key_part_spec *const new_key_part =
+                        copyWithTHD(key_part);
                     const std::string field_name =
                         convert_lex_str(new_key_part->field_name);
                     const FieldMeta &fm = a.getFieldMeta(tm, field_name);

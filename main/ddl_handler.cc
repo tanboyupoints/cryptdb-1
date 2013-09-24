@@ -37,8 +37,8 @@ class CreateHandler : public DDLHandler {
     {
         const std::string table =
             lex->select_lex.table_list.first->table_name;
-        LEX *new_lex = copy(lex);
-        
+        LEX *const new_lex = copyWithTHD(lex);
+
         //TODO: support for "create table like"
         if (lex->create_info.options & HA_LEX_CREATE_TABLE_LIKE) {
             cryptdb_err() << "No support for create table like yet. "
@@ -142,7 +142,7 @@ class DropHandler : public DDLHandler {
     
     LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps) const
     {
-        LEX *new_lex = copy(lex);
+        LEX *const new_lex = copyWithTHD(lex);
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a, true);
 

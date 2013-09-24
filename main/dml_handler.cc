@@ -62,7 +62,7 @@ class InsertHandler : public DMLHandler {
     virtual LEX *rewrite(Analysis &a, LEX *const lex, const ProxyState &ps)
         const
     {
-        LEX *const new_lex = copy(lex);
+        LEX *const new_lex = copyWithTHD(lex);
 
         const std::string &table =
                 lex->select_lex.table_list.first->table_name;
@@ -194,7 +194,7 @@ class UpdateHandler : public DMLHandler {
     virtual  LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
-        LEX * new_lex = copy(lex);
+        LEX *const new_lex = copyWithTHD(lex);
 
         LOG(cdb_v) << "rewriting update \n";
 
@@ -236,7 +236,7 @@ class DeleteHandler : public DMLHandler {
     virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
-        LEX * new_lex = copy(lex);
+        LEX *const new_lex = copyWithTHD(lex);
         new_lex->query_tables = rewrite_table_list(lex->query_tables, a);
         set_select_lex(new_lex,
                        rewrite_select_lex(&new_lex->select_lex, a));
@@ -254,7 +254,7 @@ class SelectHandler : public DMLHandler {
     virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
-        LEX * new_lex = copy(lex);
+        LEX *const new_lex = copyWithTHD(lex);
         new_lex->select_lex.top_join_list =
             rewrite_table_list(lex->select_lex.top_join_list, a);
         set_select_lex(new_lex,
@@ -371,7 +371,7 @@ static SQL_I_List<ORDER> *
 rewrite_order(Analysis &a, SQL_I_List<ORDER> &lst,
               const EncSet &constr, const std::string &name)
 {
-    SQL_I_List<ORDER> *new_lst = copy(&lst);
+    SQL_I_List<ORDER> *const new_lst = copyWithTHD(&lst);
     ORDER * prev = NULL;
     for (ORDER *o = lst.first; o; o = o->next) {
         Item *const i = *o->item;
@@ -400,7 +400,7 @@ rewrite_order(Analysis &a, SQL_I_List<ORDER> &lst,
 static st_select_lex *
 rewrite_filters_lex(st_select_lex * select_lex, Analysis & a)
 {
-    st_select_lex * new_select_lex = copy(select_lex);
+    st_select_lex *const new_select_lex = copyWithTHD(select_lex);
 
     new_select_lex->group_list =
         *rewrite_order(a, select_lex->group_list, EQ_EncSet, "group by");
