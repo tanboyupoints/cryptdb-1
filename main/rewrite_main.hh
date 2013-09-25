@@ -82,20 +82,6 @@ private:
     static const std::unique_ptr<SQLDispatcher> ddl_dispatcher;
 };
 
-class ScopedMySQLRes {
-public:
-    ScopedMySQLRes(MYSQL_RES *r) : r(r) {
-        if (!r) fatal() << "input result set was NULL";
-    }
-    ~ScopedMySQLRes() {
-        assert(r);
-        mysql_free_result(r);
-    }
-    MYSQL_RES *res() { return r; }
-private:
-    MYSQL_RES *r;
-};
-
 class SchemaCache;
 ResType *
 executeQuery(const ProxyState &ps, const std::string &q,

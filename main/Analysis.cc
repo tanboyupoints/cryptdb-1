@@ -533,8 +533,8 @@ bool RewriteOutput::multipleResultSets() const
 ResType *RewriteOutput::sendQuery(const std::unique_ptr<Connect> &c,
                                   const std::string &q)
 {
-    DBResult *dbres;
-    assert(c->execute(q, dbres));
+    std::unique_ptr<DBResult> dbres;
+    assert(c->execute(q, &dbres));
     ResType *res = new ResType(dbres->unpack());
 
     return res;
@@ -643,10 +643,10 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     // > This code relies on single threaded access to the database
     //   and on the fact that the database is cleaned up after
     //   every such operation.
-    DBResult *dbres;
+    std::unique_ptr<DBResult> dbres;
     const std::string select_results_q =
         " SELECT * FROM " + this->plain_table + ";";
-    ROLLBACK_AND_RFIF(e_conn->execute(select_results_q, dbres), e_conn);
+    ROLLBACK_AND_RFIF(e_conn->execute(select_results_q, &dbres), e_conn);
     const std::unique_ptr<ResType>
         interim_res(new ResType(dbres->unpack()));
     this->output_values =

@@ -7,11 +7,13 @@
 
 #include <stdexcept>
 #include <assert.h>
-#include <main/Connect.hh>
-#include <util/cryptdb_log.hh>
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <memory>
+
+#include <main/Connect.hh>
+#include <util/cryptdb_log.hh>
 
 Connect::Connect(const std::string &server, const std::string &user,
                  const std::string &passwd, const std::string &dbname,
@@ -109,24 +111,25 @@ Connect *Connect::getEmbedded(const std::string &embed_db,
 // > This is a hack that allows us to deal with the two sets which
 // are returned when CALLing a stored procedure.
 bool
-Connect::execute(const std::string &query, DBResult *&res,
+Connect::execute(const std::string &query, std::unique_ptr<DBResult> *res,
                  bool multiple_resultsets)
 {
     //silently ignore empty queries
     if (query.length() == 0) {
         LOG(warn) << "empty query";
-        res = 0;
+        *res = nullptr;
         return true;
     }
     bool success = true;
     if (mysql_query(conn, query.c_str())) {
         LOG(warn) << "mysql_query: " << mysql_error(conn);
         LOG(warn) << "on query: " << query;
-        res = 0;
+        *res = nullptr;
         success = false;
     } else {
         if (false == multiple_resultsets) {
-            res = DBResult::wrap(mysql_store_result(conn));
+            *res =
+                std::unique_ptr<DBResult>(DBResult::wrap(mysql_store_result(conn)));
         } else {
             int status;
             do {
@@ -141,7 +144,7 @@ Connect::execute(const std::string &query, DBResult *&res,
                 assert(status <= 0);
             } while (0 == status);
 
-            res = NULL;
+            *res = nullptr;
         }
     }
 
@@ -155,10 +158,8 @@ Connect::execute(const std::string &query, DBResult *&res,
 bool
 Connect::execute(const std::string &query, bool multiple_resultsets)
 {
-    DBResult *aux;
-    const bool r = execute(query, aux, multiple_resultsets);
-    if (r)
-        delete aux;
+    std::unique_ptr<DBResult> aux;
+    const bool r = execute(query, &aux, multiple_resultsets);
     return r;
 }
 
@@ -195,8 +196,7 @@ Connect::~Connect()
 }
 
 DBResult::DBResult()
-{
-}
+{}
 
 DBResult *
 DBResult::wrap(DBResult_native *const n)
@@ -217,17 +217,14 @@ getItem(char *const content, enum_field_types type, uint len)
     if (content == NULL) {
         return new Item_null();
     }
-    AssignOnce<Item *> i;
     const std::string content_str = std::string(content, len);
     if (IsMySQLTypeNumeric(type)) {
         const ulonglong val = valFromStr(content_str);
-        i = new Item_int(val);
+        return new Item_int(val);
     } else {
-        i = new Item_string(make_thd_string(content_str), len,
-                            &my_charset_bin);
+        return new Item_string(make_thd_string(content_str), len,
+                               &my_charset_bin);
     }
-
-    return i.get();
 }
 
 // > returns the data in the last server response
@@ -240,7 +237,7 @@ getItem(char *const content, enum_field_types type, uint len)
 ResType
 DBResult::unpack()
 {
-    if (n == NULL) {
+    if (nullptr == n) {
         return ResType();
     }
 

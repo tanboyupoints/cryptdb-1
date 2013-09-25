@@ -22,7 +22,7 @@ DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
 
     // Now that we know the table exists, SELECT the data we want.
     std::vector<DBMeta *> out_vec;
-    DBResult *db_res;
+    std::unique_ptr<DBResult> db_res;
     const std::string parent_id = std::to_string(this->getDatabaseID());
     const std::string serials_query = 
         " SELECT pdb." + table_name + ".serial_object,"
@@ -31,11 +31,10 @@ DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
         " FROM pdb." + table_name + 
         " WHERE pdb." + table_name + ".parent_id"
         "   = " + parent_id + ";";
-    assert(e_conn.get()->execute(serials_query, db_res));
-    ScopedMySQLRes r(db_res->n);
+    assert(e_conn.get()->execute(serials_query, &db_res));
     MYSQL_ROW row;
-    while ((row = mysql_fetch_row(r.res()))) {
-        unsigned long * const l = mysql_fetch_lengths(r.res());
+    while ((row = mysql_fetch_row(db_res->n))) {
+        unsigned long * const l = mysql_fetch_lengths(db_res->n);
         assert(l != NULL);
 
         const std::string child_serial_object(row[0], l[0]);

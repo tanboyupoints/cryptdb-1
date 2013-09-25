@@ -1186,8 +1186,7 @@ Connection::executeEDBProxy(string query) {
 
 ResType
 Connection::executeConn(std::string query) {
-    DBResult * dbres = 0;
-    auto ANON = cleanup([&dbres]() { if (dbres) delete dbres; });
+    std::unique_ptr<DBResult> dbres(nullptr);
 
     //cycle through connections of which should execute query
     conn++;
@@ -1195,9 +1194,8 @@ Connection::executeConn(std::string query) {
         conn = conn_set.begin();
     }
 
-
     //cout << query << endl;
-    if (!(*conn)->execute(query, dbres)) {
+    if (!(*conn)->execute(query, &dbres)) {
         executeFail(query);
         return ResType(false);
     }

@@ -144,22 +144,21 @@ fixDelta(const std::unique_ptr<Connect> &conn,
     const std::string query_table_name = MetaDataTables::Name::query();
 
     // Get local queries (should only be one).
-    DBResult *dbres;
+    std::unique_ptr<DBResult> dbres;
     const std::string get_local_query_query =
         " SELECT query FROM pdb." + query_table_name +
         "  WHERE delta_output_id = " + std::to_string(delta_output_id) +
         "    AND local = TRUE;";
-    RETURN_FALSE_IF_FALSE(e_conn->execute(get_local_query_query, dbres));
+    RETURN_FALSE_IF_FALSE(e_conn->execute(get_local_query_query, &dbres));
 
     // Onion adjustment queries do not have local.
-    ScopedMySQLRes local_r(dbres->n);
     const unsigned long long local_row_count =
-        mysql_num_rows(local_r.res());
+        mysql_num_rows(dbres->n);
     if (1 == local_row_count) {
         expect_ddl = true;
-        const MYSQL_ROW local_row = mysql_fetch_row(local_r.res());
+        const MYSQL_ROW local_row = mysql_fetch_row(dbres->n);
         const unsigned long *const local_l =
-            mysql_fetch_lengths(local_r.res());
+            mysql_fetch_lengths(dbres->n);
         const std::string local_query(local_row[0], local_l[0]);
         local_queries.push_back(local_query);
     } else if (0 == local_row_count) {
@@ -168,21 +167,19 @@ fixDelta(const std::unique_ptr<Connect> &conn,
         return false;
     }
 
-
     // Get remote queries (ORDER matters).
     const std::string remote_query =
         " SELECT query, ddl FROM pdb." + query_table_name +
         "  WHERE delta_output_id = " + std::to_string(delta_output_id) +
         "    AND local = FALSE;"
         "  ORDER BY ASC id";
-    RETURN_FALSE_IF_FALSE(e_conn->execute(remote_query, dbres));
+    RETURN_FALSE_IF_FALSE(e_conn->execute(remote_query, &dbres));
 
-    ScopedMySQLRes remote_r(dbres->n);
     MYSQL_ROW remote_row;
     std::list<std::string> remote_queries;
-    while ((remote_row = mysql_fetch_row(remote_r.res()))) {
+    while ((remote_row = mysql_fetch_row(dbres->n))) {
         const unsigned long *const remote_l =
-            mysql_fetch_lengths(remote_r.res());
+            mysql_fetch_lengths(dbres->n);
         const std::string remote_query(remote_row[0], remote_l[0]);
         const std::string remote_ddl(remote_row[1], remote_l[1]);
         const bool ddl = string_to_bool(remote_ddl);
@@ -207,18 +204,17 @@ fixDelta(const std::unique_ptr<Connect> &conn,
             }
         }
     } else {        // Handle one or more DML queries.
-        DBResult *dbres;
+        std::unique_ptr<DBResult> dbres;
         const std::string dml_table =
             MetaDataTables::Name::dmlCompletion();
         const std::string dml_query =
             " SELECT * FROM " + dml_table +
             "  WHERE delta_output_id = " +
             " " +    std::to_string(delta_output_id) + ";";
-        RETURN_FALSE_IF_FALSE(conn->execute(dml_query, dbres));
+        RETURN_FALSE_IF_FALSE(conn->execute(dml_query, &dbres));
 
-        ScopedMySQLRes r(dbres->n);
         const unsigned long long dml_row_count =
-            mysql_num_rows(r.res());
+            mysql_num_rows(dbres->n);
         if (0 == dml_row_count) {
             RETURN_FALSE_IF_FALSE(conn->execute("START TRANSACTION;"));
             for (auto it : remote_queries) {
@@ -263,21 +259,20 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
 {
     const std::string table_name = MetaDataTables::Name::delta();
 
-    DBResult *dbres;
+    std::unique_ptr<DBResult> dbres;
     const std::string get_deltas =
         " SELECT id FROM pdb." + table_name + ";";
-    RETURN_FALSE_IF_FALSE(e_conn->execute(get_deltas, dbres));
+    RETURN_FALSE_IF_FALSE(e_conn->execute(get_deltas, &dbres));
 
-    ScopedMySQLRes r(dbres->n);
-    const unsigned long long row_count = mysql_num_rows(r.res());
+    const unsigned long long row_count = mysql_num_rows(dbres->n);
 
     std::cerr << "There are " << row_count << " DeltaOutputz!"
               << std::endl;
     if (0 == row_count) {
         return true;
     } else if (1 == row_count) {
-        MYSQL_ROW row = mysql_fetch_row(r.res());
-        const unsigned long *const l = mysql_fetch_lengths(r.res());
+        MYSQL_ROW row = mysql_fetch_row(dbres->n);
+        const unsigned long *const l = mysql_fetch_lengths(dbres->n);
         const std::string string_delta_output_id(row[0], l[0]);
         const unsigned long delta_output_id =
             atoi(string_delta_output_id.c_str());
@@ -1248,8 +1243,8 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
 static ResType *
 mysql_noop_res(const ProxyState &ps)
 {
-    DBResult *noop_dbres;
-    assert(ps.getConn()->execute(mysql_noop(), noop_dbres));
+    std::unique_ptr<DBResult> noop_dbres;
+    assert(ps.getConn()->execute(mysql_noop(), &noop_dbres));
     return new ResType(noop_dbres->unpack());
 }
 
@@ -1276,11 +1271,11 @@ executeQuery(const ProxyState &ps, const std::string &q,
             queryPreamble(ps, q, &qr, &out_queryz, schema);
         assert(qr && PREAMBLE_STATUS::FAILURE != preamble_status);
 
-        DBResult *dbres = NULL;
+        std::unique_ptr<DBResult> dbres;
         for (auto it : out_queryz) {
             prettyPrintQuery(it);
 
-            if (!ps.getConn()->execute(it, dbres,
+            if (!ps.getConn()->execute(it, &dbres,
                                        qr->output->multipleResultSets())) {
                 qr->output->handleQueryFailure(ps.getEConn());
                 throw CryptDBError("Failed to execute query!");

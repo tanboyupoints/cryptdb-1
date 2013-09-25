@@ -7,6 +7,8 @@
 
 #include <vector>
 #include <string>
+#include <memory>
+
 #include <util/util.hh>
 #include <parser/sql_utils.hh>
 
@@ -40,7 +42,7 @@ class Connect {
                                 const std::string &dbname);
 
     // returns true if execution was ok; caller must delete DBResult
-    bool execute(const std::string &query, DBResult *&,
+    bool execute(const std::string &query, std::unique_ptr<DBResult> *res,
                  bool multiple_resultsets=false);
     bool execute(const std::string &query, bool multiple_resultsets=false);
     bool select_db(const std::string &dbname);
