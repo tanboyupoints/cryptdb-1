@@ -1150,7 +1150,8 @@ Rewriter::rewrite(const ProxyState &ps, const std::string &q,
         if (cryptdbDirective(q)) {
             output = Rewriter::handleDirective(analysis, ps, q);
         } else {
-            // FIXME: Memleak return of 'dispatchOnLex()'
+            // NOTE: Care what data you try to read from Analysis
+            // at this height.
             output = Rewriter::dispatchOnLex(analysis, ps, q);
             if (!output) {
                 output = new SimpleOutput(mysql_noop());
