@@ -608,7 +608,7 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
         " WHERE " + this->where_clause + ";";
     const std::unique_ptr<ResType>
         select_res_type(executeQuery(this->ps, select_q));
-    assert(select_res_type);
+    assert(select_res_type && select_res_type->success());
     if (select_res_type->rows.size() == 0) { // No work to be done.
         this->do_nothing = true;
         return true;

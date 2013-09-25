@@ -230,8 +230,13 @@ getItem(char *const content, enum_field_types type, uint len)
     return i.get();
 }
 
-// returns the data in the last server response
-// TODO: to optimize return pointer to avoid overcopying large result sets?
+// > returns the data in the last server response
+// > TODO: to optimize return pointer to avoid overcopying large
+//   result sets?
+// > This function must not return pointers (internal or otherwise) to
+//   objects that it owns.
+//   > ie, We must be able to delete 'this' without mangling the 'ResType'
+//     returned from this->unpack(...).
 ResType
 DBResult::unpack()
 {
@@ -240,12 +245,11 @@ DBResult::unpack()
     }
 
     const size_t rows = static_cast<size_t>(mysql_num_rows(n));
-    AssignOnce<int> cols;
-    if (rows > 0) {
-        cols = mysql_num_fields(n);
-    } else {
+    if (0 == rows) {
         return ResType();
     }
+
+    const int cols = mysql_num_fields(n);
 
     ResType res;
 
@@ -268,7 +272,7 @@ DBResult::unpack()
 
         std::vector<Item *> resrow;
 
-        for (int j = 0; j < cols.get(); j++) {
+        for (int j = 0; j < cols; j++) {
             Item *const it = getItem(row[j], res.types[j], lengths[j]);
             resrow.push_back(it);
         }

@@ -599,7 +599,7 @@ prettyPrintQuery(const std::string &query)
 }
 
 static void
-prettyPrintQueryResult(ResType res)
+prettyPrintQueryResult(const ResType &res)
 {
     std::cout << std::endl << RED_BEGIN
               << "RESULTS: " << COLOR_END << std::endl;

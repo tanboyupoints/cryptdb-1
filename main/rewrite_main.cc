@@ -1317,11 +1317,11 @@ executeQuery(const ProxyState &ps, const std::string &q,
     } catch (std::runtime_error &e) {
         std::cout << "Unexpected Error: " << e.what() << " in query "
                   << q << std::endl;
-        return NULL;
+        return new ResType(false);
     }  catch (CryptDBError &e) {
         std::cout << "Internal Error: " << e.msg << " in query " << q
                   << std::endl;
-        return NULL;
+        return new ResType(false);
     }
 }
 

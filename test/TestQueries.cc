@@ -1219,12 +1219,7 @@ Connection::executeRewriter(std::string query) {
     // If this assert fails, deteremine if one schema_cache makes sense
     // for multiple connections.
     assert(re_set.size() == 1);
-    ResType *dec_res = executeQuery(*ps, query, &this->schema_cache);
-    if (dec_res) {
-        return *dec_res;
-    } else {
-        return ResType(false);
-    }
+    return std::move(*executeQuery(*ps, query, &this->schema_cache));
 }
 
 my_ulonglong
@@ -1263,28 +1258,23 @@ Connection::executeLastEDB() {
 //----------------------------------------------------------------------
 
 static bool
-CheckAnnotatedQuery(const TestConfig &tc, std::string control_query,
-                    std::string test_query)
+CheckAnnotatedQuery(const TestConfig &tc,
+                    const std::string &control_query,
+                    const std::string &test_query)
 {
+    const std::string empty_str = "";
     std::string r;
     ntest++;
 
-    ResType control_res;
-    ResType test_res;
-
     LOG(test) << "control query: " << control_query;
-    if (control_query == "") {
-        control_res = ResType(true);
-    } else {
-        control_res = control->execute(control_query);
-    }
+    const ResType control_res =
+        (empty_str == control_query) ? ResType(true) :
+                                control->execute(control_query);
 
     LOG(test) << "test query: " << test_query;
-    if (test_query != "") {
-        test_res = test->execute(test_query);
-    } else {
-        test_res = ResType(true);
-    }
+    const ResType test_res =
+        (empty_str == test_query) ? ResType(true) :
+                                    test->execute(test_query);
 
     if (control_res.ok != test_res.ok) {
         LOG(warn) << "control " << control_res.ok

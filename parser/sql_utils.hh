@@ -15,7 +15,12 @@ void
 init_mysql(const std::string & embed_db);
 
 class ResType {
- public:
+    // There should not be multiple owners of ResType::rows pointers.
+    ResType(const ResType &) = delete;
+    const ResType &operator=(const ResType &) = delete;
+
+public:
+    ResType(ResType &&) = default;
     explicit ResType(bool okflag = true) : ok(okflag) {}
 
     bool ok;  // query executed successfully
@@ -23,6 +28,8 @@ class ResType {
     std::vector<enum_field_types> types;
     std::vector<std::vector<Item*> > rows;
     AutoInc ai;
+
+    bool success() const {return this->ok;}
 };
 
 bool isTableField(std::string token);
