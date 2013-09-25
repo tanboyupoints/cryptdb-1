@@ -332,15 +332,15 @@ process_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a)
 {
     for (;;) {
-        Item *field_item = fd_it++;
-        Item *value_item = val_it++;
+        Item *const field_item = fd_it++;
+        Item *const value_item = val_it++;
         if (!field_item) {
             assert(!value_item);
             break;
         }
         assert(value_item != NULL);
         assert(field_item->type() == Item::FIELD_ITEM);
-        Item_field *ifd = static_cast<Item_field *>(field_item);
+        Item_field *const ifd = static_cast<Item_field *>(field_item);
 
         // FIXME: Change function name.
         analyze_field_value_pair(ifd, value_item, a);
@@ -359,8 +359,9 @@ static inline void
 analyze_field_value_pair(Item_field * field, Item * val, Analysis & a) {
 
     reason r;
-    a.rewritePlans[val] = gather(val, r, a);
-    a.rewritePlans[field] = gather(field, r, a);
+    a.rewritePlans[val] = std::unique_ptr<RewritePlan>(gather(val, r, a));
+    a.rewritePlans[field] =
+        std::unique_ptr<RewritePlan>(gather(field, r, a));
 
     //TODO: an optimization could be performed here to support more updates
     // For example: SET x = x+1, x = 2 --> no need to invalidate DET and OPE
@@ -375,8 +376,8 @@ rewrite_order(Analysis &a, SQL_I_List<ORDER> &lst,
     ORDER * prev = NULL;
     for (ORDER *o = lst.first; o; o = o->next) {
         Item *const i = *o->item;
-        RewritePlan *const rp = getAssert(a.rewritePlans, i);
-        assert(rp);
+        const std::unique_ptr<RewritePlan> &rp =
+            constGetAssert(a.rewritePlans, i);
         const EncSet es = constr.intersect(rp->es_out);
         // FIXME: Add version that will take a second EncSet of what
         // we had available (ie, rp->es_out).
@@ -384,7 +385,8 @@ rewrite_order(Analysis &a, SQL_I_List<ORDER> &lst,
                                NULL, 0);
         const OLK olk = es.chooseOne();
 
-        Item *const new_item = itemTypes.do_rewrite(*o->item, olk, rp, a);
+        Item *const new_item =
+            itemTypes.do_rewrite(*o->item, olk, rp.get(), a);
         ORDER *const neworder = make_order(o, new_item);
         if (NULL == prev) {
             *new_lst = *oneElemListWithTHD(neworder);
@@ -450,8 +452,8 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
         FieldMeta &fm =
             a.getFieldMeta(ifd->table_name, ifd->field_name);
 
-        const RewritePlan *const rp =
-            getAssert(a.rewritePlans, value_item);
+        const std::unique_ptr<RewritePlan> &rp =
+            constGetAssert(a.rewritePlans, value_item);
         const EncSet needed = EncSet(a, &fm);
         const EncSet r_es = rp->es_out.intersect(needed);
         // FIXME: Add version for situations when we don't know about
@@ -485,16 +487,18 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
 
         for (auto pair : r_es.osl) {
             const OLK olk = {pair.first, pair.second.first, &fm};
-            RewritePlan *const rp_field =
-                getAssert(a.rewritePlans, field_item);
+            const std::unique_ptr<RewritePlan> &rp_field =
+                constGetAssert(a.rewritePlans, field_item);
+            // FIXME: Dangerous PTR.
             Item *const re_field =
-                itemTypes.do_rewrite(field_item, olk, rp_field, a);
+                itemTypes.do_rewrite(field_item, olk, rp_field.get(), a);
             res_items->push_back(re_field);
 
-            RewritePlan *const rp_value =
-                getAssert(a.rewritePlans, value_item);
+            const std::unique_ptr<RewritePlan> &rp_value =
+                constGetAssert(a.rewritePlans, value_item);
+            // FIXME: Dangerous PTR.
             Item *const re_value =
-                itemTypes.do_rewrite(value_item, olk, rp_value, a);
+                itemTypes.do_rewrite(value_item, olk, rp_value.get(), a);
             res_values->push_back(re_value);
         }
 
@@ -597,7 +601,8 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis &a)
             break;
         LOG(cdb_v) << "rewrite_select_lex " << *item << " with name "
                    << item->name;
-        rewrite_proj(item, getAssert(a.rewritePlans, item), a, &newList);
+        rewrite_proj(item, constGetAssert(a.rewritePlans, item).get(),
+                     a, &newList);
     }
 
     // TODO(stephentu): investigate whether or not this is a memory leak

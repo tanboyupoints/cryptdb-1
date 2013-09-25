@@ -19,6 +19,7 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+#include <assert.h>
 
 #include <sys/time.h>
 
@@ -304,14 +305,23 @@ roll(typename std::list<T>::iterator & it,  int count)
 }
 
 template<typename A, typename B>
-B getAssert(const std::map<A, B> & m, const A & x, const std::string & str = "" ) {
+const B &constGetAssert(const std::map<A, B> &m, const A &x,
+                        const std::string &str = "")
+{
     auto it = m.find(x);
-    if (it == m.end()) {
+    if (m.end() == it) {
         std::cerr << "item not present in map " << x << ". " << str
                   << std::endl;
-        assert_s(false, "");
+        assert(false);
     }
     return it->second;
+}
+
+template<typename A, typename B>
+B &getAssert(std::map<A, B> &m, const A &x,
+             const std::string &str = "")
+{
+    return const_cast<B &>(constGetAssert(m, x, str));
 }
 
 //returns true if x is in m and sets y=m[x] in that case

@@ -30,15 +30,16 @@ optimize(Item ** const i, Analysis &a) {
 Item *
 rewrite(Item *const i, const EncSet &req_enc, Analysis &a)
 {
-    RewritePlan *const rp = getAssert(a.rewritePlans, i);
-    assert(rp);
+    const std::unique_ptr<RewritePlan> &rp =
+        constGetAssert(a.rewritePlans, i);
     const EncSet solution = rp->es_out.intersect(req_enc);
     // FIXME: Use version that takes reason, expects 0 children,
     // and lets us indicate what our EncSet does have.
     TEST_NoAvailableEncSet(solution, i->type(), req_enc, rp->r.why_t,
                            NULL, 0);
 
-    return itemTypes.do_rewrite(i, solution.chooseOne(), rp, a);
+    // FIXME: Make 'rp' const.
+    return itemTypes.do_rewrite(i, solution.chooseOne(), rp.get(), a);
 }
 
 TABLE_LIST *
@@ -167,7 +168,7 @@ analyze(Item * const i, Analysis &a)
     assert(i != NULL);
     LOG(cdb_v) << "calling gather for item " << *i;
     reason r;
-    a.rewritePlans[i] = gather(i, r, a);
+    a.rewritePlans[i] = std::unique_ptr<RewritePlan>(gather(i, r, a));
 }
 
 LEX *

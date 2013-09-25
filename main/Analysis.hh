@@ -367,6 +367,12 @@ bool cleanupDeltaOutputAndQuery(const std::unique_ptr<Connect> &e_conn,
 
 class RewritePlan;
 class Analysis {
+    Analysis() = delete;
+    Analysis(const Analysis &a) = delete;
+    Analysis(Analysis &&a) = delete;
+    Analysis &operator=(const Analysis &a) = delete;
+    Analysis &operator=(Analysis &&a) = delete;
+
 public:
     Analysis(const SchemaInfo &schema)
         : pos(0), special_update(false),
@@ -375,7 +381,7 @@ public:
     unsigned int pos; // > a counter indicating how many projection
                       // fields have been analyzed so far
     std::map<FieldMeta *, salt_type>    salts;
-    std::map<Item *, RewritePlan *>     rewritePlans;
+    std::map<Item *, std::unique_ptr<RewritePlan> >     rewritePlans;
     std::map<std::string, std::string>  table_aliases;
     std::map<Item_field *, std::pair<Item_field *, OLK>> item_cache;
 

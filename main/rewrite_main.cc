@@ -747,7 +747,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
                 break;
             }
 
-            RewritePlan *const item_rp =
+            const std::unique_ptr<RewritePlan> &item_rp =
                 subquery_analysis.get()->rewritePlans[item];
             TEST_NoAvailableEncSet(item_rp->es_out, i->type(),
                                    PLAIN_EncSet, why, NULL, 0);
@@ -768,8 +768,9 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
                 reason r;
                 RewritePlan *const rp_left_expr =
                     gather(left_expr, r, *subquery_analysis.get());
+                a.rewritePlans[left_expr] =
+                    std::unique_ptr<RewritePlan>(rp_left_expr);
                 tr.add_child(r);
-                a.rewritePlans[left_expr] = rp_left_expr;
                 break;
             }
             case Item_subselect::subs_type::ALL_SUBS:
@@ -828,11 +829,11 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
                 case Item_subselect::subs_type::IN_SUBS: {
                     Item *const left_expr =
                         getLeftExpr(static_cast<Item_in_subselect *>(i));
-                    RewritePlan *const rp_left_expr =
-                        getAssert(a.rewritePlans, left_expr);
+                    const std::unique_ptr<RewritePlan> &rp_left_expr =
+                        constGetAssert(a.rewritePlans, left_expr);
                     Item *const new_left_expr =
                         itemTypes.do_rewrite(left_expr, constr,
-                                             rp_left_expr, a);
+                                             rp_left_expr.get(), a);
                     return new Item_in_subselect(new_left_expr,
                                                  new_select_lex);
                 }

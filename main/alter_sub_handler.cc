@@ -190,7 +190,7 @@ class DropIndexSubHandler : public AlterSubHandler {
         return new_lex;
     }
 
-    List<Alter_drop> rewrite(Analysis a, Alter_drop *adrop,
+    List<Alter_drop> rewrite(const Analysis &a, Alter_drop *adrop,
                              const std::string &table) const
     {
         // Rewrite the Alter_drop data structure.
