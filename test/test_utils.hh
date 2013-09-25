@@ -90,7 +90,7 @@ match(const ResType &res, const ResType &expected)
     }
     for (unsigned int i = 0; i < res.rows.size(); i++) {
         for (unsigned int j = 0; j < res.rows.at(i).size(); j++) {
-            if (ItemToString(res.rows.at(i).at(j)) != ItemToString(res.rows.at(i).at(j))) {
+            if (ItemToString(res.rows.at(i).at(j).get()) != ItemToString(res.rows.at(i).at(j).get())) {
                 return false;
             }
         }

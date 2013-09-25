@@ -92,8 +92,8 @@ static bool handle_line(ProxyState& ps, const std::string& q)
   }
 
   static SchemaCache schema_cache;
-  const ResType *const res = executeQuery(ps, q, &schema_cache);
-  return res->success();
+  const ResType &res = executeQuery(ps, q, &schema_cache);
+  return res.success();
 }
 
 int

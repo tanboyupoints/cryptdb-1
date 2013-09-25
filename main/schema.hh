@@ -68,8 +68,7 @@ public:
     friend class OnionMetaAdjustor;
     friend bool sanityCheck(FieldMeta &);
     friend Item *decrypt_item_layers(Item *const, const FieldMeta *const,
-                                     onion, uint64_t,
-                                     const std::vector<Item *> &);
+                                     onion, uint64_t);
 
 private:
     std::vector<std::unique_ptr<EncLayer>> layers; // first in list is

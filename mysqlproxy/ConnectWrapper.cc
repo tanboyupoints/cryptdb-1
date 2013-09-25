@@ -361,12 +361,12 @@ rollbackOnionAdjust(lua_State *const L)
     return 0;
 }
 
-inline std::vector<Item *>
+inline std::vector<std::shared_ptr<Item> >
 itemNullVector(unsigned int count)
 {
-    std::vector<Item *> out;
+    std::vector<std::shared_ptr<Item> > out;
     for (unsigned int i = 0; i < count; ++i) {
-        out.push_back(make_null());
+        out.push_back(std::shared_ptr<Item>(make_null()));
     }
 
     return out;
@@ -408,7 +408,8 @@ getResTypeFromLuaTable(lua_State *const L, int fields_index,
 
         /* initialize all items to NULL, since Lua skips
            nil array entries */
-        std::vector<Item *> row = itemNullVector(out_res->types.size());
+        std::vector<std::shared_ptr<Item> > row =
+            itemNullVector(out_res->types.size());
 
         lua_pushnil(L);
         while (lua_next(L, -2)) {
@@ -419,7 +420,7 @@ getResTypeFromLuaTable(lua_State *const L, int fields_index,
             const std::string data = xlua_tolstring(L, -1);
             Item *const value =
                 make_item_by_type(data, out_res->types[key]);
-            row[key] = value;
+            row[key] = std::shared_ptr<Item>(value);
 
             lua_pop(L, 1);
         }
@@ -461,13 +462,12 @@ envoi(lua_State *const L)
     ResType res;
     getResTypeFromLuaTable(L, 2, 3, &res);
     const std::unique_ptr<QueryRewrite> &qr = c_wrapper->getQueryRewrite();
-    ResType *const out_res =
-        queryEpilogue(*ps, *qr.get(), &res, c_wrapper->last_query, false);
-    assert(out_res);
+    const ResType &out_res =
+        queryEpilogue(*ps, *qr.get(), res, c_wrapper->last_query, false);
+    assert(out_res.success());
 
     c_wrapper->getSchemaCache().updateStaleness(qr->output->stalesSchema());
-
-    return returnResultSet(L, *out_res);
+    return returnResultSet(L, out_res);
 }
 
 static int
@@ -505,7 +505,7 @@ returnResultSet(lua_State *const L, const ResType &rd)
             if (NULL == rd.rows[i][j]) {
                 lua_pushnil(L);
             } else {
-                xlua_pushlstring(L, ItemToString(rd.rows[i][j]));
+                xlua_pushlstring(L, ItemToString(rd.rows[i][j].get()));
             }
             lua_rawseti(L, t_row, j+1);
         }

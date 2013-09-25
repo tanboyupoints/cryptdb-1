@@ -76,12 +76,12 @@ rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
 // semantics.
 template <typename T>
 std::string vector_join(std::vector<T> v, const std::string &delim,
-                        std::string (*finalize)(T))
+                        const std::function<std::string(T)> &finalize)
 {
     std::string accum;
     for (typename std::vector<T>::iterator it = v.begin();
          it != v.end(); ++it) {
-        std::string element = (*finalize)((T)*it);
+        const std::string &element = finalize(static_cast<T>(*it));
         accum.append(element);
         accum.append(delim);
     }
@@ -139,9 +139,9 @@ queryHandleRollback(const ProxyState &ps, const std::string &query,
 void
 prettyPrintQuery(const std::string &query);
 
-ResType *
+ResType
 queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
-              ResType *const res, const std::string &query, bool pp);
+              const ResType &res, const std::string &query, bool pp);
 
 class SchemaCache {
 public:
@@ -155,4 +155,15 @@ private:
     bool staleness;
     std::unique_ptr<const SchemaInfo> schema;
 };
+
+template <typename InType, typename InterimType, typename OutType>
+std::function<OutType(InType in)>
+fnCompose(std::function<OutType(InterimType)> outer,
+          std::function<InterimType(InType)> inner) {
+
+    return [&outer, &inner] (InType in)
+    {
+        return outer(inner(in));
+    };
+}
 

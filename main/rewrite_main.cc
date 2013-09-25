@@ -664,7 +664,7 @@ do_optimize_const_item(T *i, Analysis &a) {
 
 Item *
 decrypt_item_layers(Item *const i, const FieldMeta *const fm, onion o,
-                    uint64_t IV, const std::vector<Item *> &res)
+                    uint64_t IV)
 {
     assert(!i->is_null());
 
@@ -1176,14 +1176,14 @@ std::string ReturnMeta::stringify() {
     return res.str();
 }
 
-ResType *
+ResType
 Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
 {
     const unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
     const unsigned int cols = dbres.names.size();
 
-    ResType *const res = new ResType();
+    ResType res;
 
     // un-anonymize the names
     for (auto it = dbres.names.begin();
@@ -1192,18 +1192,18 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
         const ReturnField &rf = rmeta.rfmeta.at(index);
         if (!rf.getIsSalt()) {
             //need to return this field
-            res->names.push_back(rf.fieldCalled());
+            res.names.push_back(rf.fieldCalled());
             // switch types to original ones : TODO
 
         }
     }
 
-    const unsigned int real_cols = res->names.size();
+    const unsigned int real_cols = res.names.size();
 
     //allocate space in results for decrypted rows
-    res->rows = std::vector<std::vector<Item*> >(rows);
+    res.rows = std::vector<std::vector<std::shared_ptr<Item> > >(rows);
     for (unsigned int i = 0; i < rows; i++) {
-        res->rows[i] = std::vector<Item*>(real_cols);
+        res.rows[i] = std::vector<std::shared_ptr<Item> >(real_cols);
     }
 
     // decrypt rows
@@ -1217,21 +1217,21 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
         FieldMeta *const fm = rf.getOLK().key;
         for (unsigned int r = 0; r < rows; r++) {
             if (!fm || dbres.rows[r][c]->is_null()) {
-                res->rows[r][col_index] = dbres.rows[r][c];
+                res.rows[r][col_index] = dbres.rows[r][c];
             } else {
                 uint64_t salt = 0;
                 const int salt_pos = rf.getSaltPosition();
                 if (salt_pos >= 0) {
                     Item_int *const salt_item =
-                        static_cast<Item_int *>(dbres.rows[r][salt_pos]);
+                        static_cast<Item_int *>(dbres.rows[r][salt_pos].get());
                     assert_s(!salt_item->null_value, "salt item is null");
                     salt = salt_item->value;
                 }
 
-                res->rows[r][col_index] =
-                    decrypt_item_layers(dbres.rows[r][c], fm,
-                                        rf.getOLK().o, salt,
-                                        res->rows[r]);
+                std::shared_ptr<Item> dec_item(
+                    decrypt_item_layers(dbres.rows[r][c].get(),
+                                        fm, rf.getOLK().o, salt));
+                res.rows[r][col_index] = dec_item;
             }
         }
         col_index++;
@@ -1240,17 +1240,17 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
     return res;
 }
 
-static ResType *
+static ResType
 mysql_noop_res(const ProxyState &ps)
 {
     std::unique_ptr<DBResult> noop_dbres;
     assert(ps.getConn()->execute(mysql_noop(), &noop_dbres));
-    return new ResType(noop_dbres->unpack());
+    return ResType(noop_dbres->unpack());
 }
 
 // FIXME: DBResult and ResType memleaks.
 // FIXME: Use TELL policy.
-ResType *
+ResType
 executeQuery(const ProxyState &ps, const std::string &q,
              SchemaCache *schema_cache)
 {
@@ -1297,26 +1297,27 @@ executeQuery(const ProxyState &ps, const std::string &q,
 
         if (PREAMBLE_STATUS::ROLLBACK == preamble_status) {
             assert(queryHandleRollback(ps, q, schema));
-            return new ResType(dbres->unpack());
+            return ResType(dbres->unpack());
         }
 
         assert(PREAMBLE_STATUS::SUCCESS == preamble_status);
 
-        ResType *const res =
-            dbres ? new ResType(dbres->unpack()) : mysql_noop_res(ps);
-        ResType *const out_res =
+        const ResType &res =
+            dbres ? ResType(dbres->unpack()) : mysql_noop_res(ps);
+        assert(res.success());
+        const ResType &out_res =
             queryEpilogue(ps, *qr.get(), res, q, true);
-        assert(out_res);
+        assert(out_res.success());
 
         return out_res;
     } catch (std::runtime_error &e) {
         std::cout << "Unexpected Error: " << e.what() << " in query "
                   << q << std::endl;
-        return new ResType(false);
+        return ResType(false);
     }  catch (CryptDBError &e) {
         std::cout << "Internal Error: " << e.msg << " in query " << q
                   << std::endl;
-        return new ResType(false);
+        return ResType(false);
     }
 }
 

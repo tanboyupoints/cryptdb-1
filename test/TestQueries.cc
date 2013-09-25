@@ -1217,7 +1217,7 @@ Connection::executeRewriter(std::string query) {
     // If this assert fails, deteremine if one schema_cache makes sense
     // for multiple connections.
     assert(re_set.size() == 1);
-    return std::move(*executeQuery(*ps, query, &this->schema_cache));
+    return executeQuery(*ps, query, &this->schema_cache);
 }
 
 my_ulonglong

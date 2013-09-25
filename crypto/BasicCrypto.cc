@@ -53,6 +53,7 @@ marshallKey(const string &key)
     return res;
 }
 
+// FIXME: Memleak.
 AES_KEY *
 getKey(const string & key) {
     AES_KEY * resKey = new AES_KEY();

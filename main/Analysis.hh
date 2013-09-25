@@ -209,9 +209,6 @@ public:
     virtual RewriteOutput::Channel queryChannel() const;
     virtual bool multipleResultSets() const;
 
-    static ResType *sendQuery(const std::unique_ptr<Connect> &c,
-                              const std::string &q);
-
 protected:
     const std::string original_query;
 };

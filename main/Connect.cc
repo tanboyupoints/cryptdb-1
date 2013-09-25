@@ -267,11 +267,11 @@ DBResult::unpack()
         }
         unsigned long *const lengths = mysql_fetch_lengths(n);
 
-        std::vector<Item *> resrow;
+        std::vector<std::shared_ptr<Item> > resrow;
 
         for (int j = 0; j < cols; j++) {
-            Item *const it = getItem(row[j], res.types[j], lengths[j]);
-            resrow.push_back(it);
+            Item *const item = getItem(row[j], res.types[j], lengths[j]);
+            resrow.push_back(std::shared_ptr<Item>(item));
         }
 
         res.rows.push_back(resrow);

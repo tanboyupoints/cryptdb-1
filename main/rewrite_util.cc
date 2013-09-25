@@ -607,9 +607,9 @@ prettyPrintQueryResult(const ResType &res)
     std::cout << std::endl;
 }
 
-ResType *
+ResType
 queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
-              ResType *const res, const std::string &query, bool pp)
+              const ResType &res, const std::string &query, bool pp)
 {
     assert(qr.output->afterQuery(ps.getEConn()));
 
@@ -619,14 +619,14 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
 
     if (pp) {
         printEmbeddedState(ps);
-        prettyPrintQueryResult(*res);
+        prettyPrintQueryResult(res);
     }
 
     if (qr.output->doDecryption()) {
-        ResType *const dec_res =
-            Rewriter::decryptResults(*res, qr.rmeta);
+        const ResType &dec_res =
+            Rewriter::decryptResults(res, qr.rmeta);
         if (pp) {
-            prettyPrintQueryResult(*dec_res);
+            prettyPrintQueryResult(dec_res);
         }
 
         return dec_res;

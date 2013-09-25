@@ -530,16 +530,6 @@ bool RewriteOutput::multipleResultSets() const
     return false;
 }
 
-ResType *RewriteOutput::sendQuery(const std::unique_ptr<Connect> &c,
-                                  const std::string &q)
-{
-    std::unique_ptr<DBResult> dbres;
-    assert(c->execute(q, &dbres));
-    ResType *res = new ResType(dbres->unpack());
-
-    return res;
-}
-
 bool SimpleOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
                                const std::unique_ptr<Connect> &e_conn)
 {
@@ -606,23 +596,36 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     const std::string select_q =
         " SELECT * FROM " + this->plain_table +
         " WHERE " + this->where_clause + ";";
-    const std::unique_ptr<ResType>
-        select_res_type(executeQuery(this->ps, select_q));
-    assert(select_res_type && select_res_type->success());
-    if (select_res_type->rows.size() == 0) { // No work to be done.
+    const ResType select_res_type = executeQuery(this->ps, select_q);
+    assert(select_res_type.success());
+    if (select_res_type.rows.size() == 0) { // No work to be done.
         this->do_nothing = true;
         return true;
     }
     this->do_nothing = false;
 
-    const auto itemJoin = [](std::vector<Item*> row) {
+    const auto pullItemPtr = [](std::shared_ptr<Item> p) -> Item *
+    {
+        return p.get();
+    };
+    const std::function<std::string(std::shared_ptr<Item>)>
+        sharedItemToStringWithQuotes =
+            fnCompose<std::shared_ptr<Item>, Item *,
+                      std::string>(ItemToStringWithQuotes, pullItemPtr);
+    const auto itemJoin =
+        [&sharedItemToStringWithQuotes]
+            (std::vector<std::shared_ptr<Item> > row) -> std::string
+    {
         return "(" +
-               vector_join<Item*>(row, ",", ItemToStringWithQuotes) +
+               vector_join<std::shared_ptr<Item> >(row, ",",
+                                        sharedItemToStringWithQuotes) +
                ")";
     };
+
     const std::string values_string =
-        vector_join<std::vector<Item*>>(select_res_type->rows, ",",
-                                        itemJoin);
+        vector_join<std::vector<std::shared_ptr<Item> > >(
+                                            select_res_type.rows, ",",
+                                            itemJoin);
 
     // Do the query on the embedded database inside of a transaction
     // so that we can prevent failure artifacts from populating the
@@ -647,10 +650,10 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     const std::string select_results_q =
         " SELECT * FROM " + this->plain_table + ";";
     ROLLBACK_AND_RFIF(e_conn->execute(select_results_q, &dbres), e_conn);
-    const std::unique_ptr<ResType>
-        interim_res(new ResType(dbres->unpack()));
+    const ResType interim_res = ResType(dbres->unpack());
     this->output_values =
-        vector_join<std::vector<Item*>>(interim_res->rows, ",",
+        vector_join<std::vector<std::shared_ptr<Item> > >(
+                                        interim_res.rows, ",",
                                         itemJoin);
     // Cleanup the embedded database.
     const std::string cleanup_q =

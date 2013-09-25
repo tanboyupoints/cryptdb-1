@@ -66,7 +66,7 @@ public:
     static QueryRewrite
         rewrite(const ProxyState &ps, const std::string &q,
                 SchemaInfo const &schema);
-    static ResType *
+    static ResType
         decryptResults(const ResType &dbres, const ReturnMeta &rm);
 
 private:
@@ -83,7 +83,7 @@ private:
 };
 
 class SchemaCache;
-ResType *
+ResType
 executeQuery(const ProxyState &ps, const std::string &q,
              SchemaCache *const schema_cache=NULL);
 
