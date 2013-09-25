@@ -380,9 +380,11 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
     if (true == new_table) {
         tm->addChild(IdentityMetaKey(name), std::move(fm));
     } else {
-        a.deltas.push_back(new CreateDelta(std::move(fm), *tm,
-                                           IdentityMetaKey(name)));
-        a.deltas.push_back(new ReplaceDelta(*tm, a.getSchema()));
+        a.deltas.push_back(std::unique_ptr<Delta>(
+                                new CreateDelta(std::move(fm), *tm,
+                                                IdentityMetaKey(name))));
+        a.deltas.push_back(std::unique_ptr<Delta>(
+                                new ReplaceDelta(*tm, a.getSchema())));
     }
 
     return rewritten_cfield_list;

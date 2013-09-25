@@ -879,7 +879,7 @@ static
 bool
 handleDeltaBeforeQuery(const std::unique_ptr<Connect> &conn,
                        const std::unique_ptr<Connect> &e_conn,
-                       std::vector<Delta *> deltas,
+                       const std::vector<std::unique_ptr<Delta> > &deltas,
                        std::list<std::string> local_qz,
                        std::list<std::string> remote_qz,
                        bool remote_ddl,
@@ -893,8 +893,8 @@ handleDeltaBeforeQuery(const std::unique_ptr<Connect> &conn,
     // Write to the bleeding table, store delta and store query.
     bool b;
     assert(e_conn->execute("START TRANSACTION;"));
-    for (auto it : deltas) {
-        b = it->apply(e_conn, Delta::BLEEDING_TABLE);
+    for (auto it = deltas.begin(); it != deltas.end(); it++) {
+        b = (*it)->apply(e_conn, Delta::BLEEDING_TABLE);
         ROLLBACK_AND_RFIF(b, e_conn);
     }
 
@@ -917,7 +917,7 @@ handleDeltaBeforeQuery(const std::unique_ptr<Connect> &conn,
 static
 bool
 handleDeltaAfterQuery(const std::unique_ptr<Connect> &e_conn,
-                      std::vector<Delta *> deltas,
+                      const std::vector<std::unique_ptr<Delta> > &deltas,
                       std::list<std::string> local_qz,
                       unsigned long delta_output_id)
 {
@@ -926,8 +926,8 @@ handleDeltaAfterQuery(const std::unique_ptr<Connect> &e_conn,
     // > Write to regular table and apply original query.
     // > Remove delta and original query from embedded db.
     assert(e_conn->execute("START TRANSACTION;"));
-    for (auto it : deltas) {
-        b = it->apply(e_conn, Delta::REGULAR_TABLE);
+    for (auto it = deltas.begin(); it != deltas.end(); it++) {
+        b = (*it)->apply(e_conn, Delta::REGULAR_TABLE);
         ROLLBACK_AND_RFIF(b, e_conn);
     }
 

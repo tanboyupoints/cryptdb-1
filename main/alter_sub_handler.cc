@@ -67,7 +67,8 @@ class DropColumnSubHandler : public AlterSubHandler {
             TableMeta const &tm = a.getTableMeta(preamble.table);
             List<Alter_drop> lst = this->rewrite(fm, adrop);
             out_list.concat(&lst);
-            a.deltas.push_back(new DeleteDelta(fm, tm));
+            a.deltas.push_back(std::unique_ptr<Delta>(
+                                            new DeleteDelta(fm, tm)));
             return out_list; /* lambda */
         });
 

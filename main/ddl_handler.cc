@@ -97,9 +97,9 @@ class CreateHandler : public DDLHandler {
             // -----------------------------
             //         Update TABLE       
             // -----------------------------
-            a.deltas.push_back(new CreateDelta(std::move(tm),
-                                               a.getSchema(),
-                                               IdentityMetaKey(table)));
+            a.deltas.push_back(std::unique_ptr<Delta>(
+                            new CreateDelta(std::move(tm), a.getSchema(),
+                                            IdentityMetaKey(table))));
         } else { // Table already exists.
 
             // Make sure we aren't trying to create a table that
@@ -163,7 +163,8 @@ class DropHandler : public DDLHandler {
 
             // Remove from *Meta structures.
             TableMeta const &tm = a.getTableMeta(table);
-            a.deltas.push_back(new DeleteDelta(tm, a.getSchema()));
+            a.deltas.push_back(std::unique_ptr<Delta>(
+                                new DeleteDelta(tm, a.getSchema())));
         }
     }
 };

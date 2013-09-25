@@ -490,14 +490,15 @@ removeOnionLayer(const ProxyState &ps, const TableMeta &tm,
                  OnionMetaAdjustor *const om_adjustor,
                  SECLEVEL *const new_level,
                  const std::string &cur_db,
-                 std::vector<Delta *> *const deltas)
+                 std::vector<std::unique_ptr<Delta> > *const deltas)
 {
     // Remove the EncLayer.
     EncLayer const &back_el = om_adjustor->popBackEncLayer();
 
     // Update the Meta.
-    deltas->push_back(new DeleteDelta(back_el,
-                                      om_adjustor->getOnionMeta()));
+    deltas->push_back(std::unique_ptr<Delta>(
+                        new DeleteDelta(back_el,
+                                        om_adjustor->getOnionMeta())));
     const SECLEVEL local_new_level = om_adjustor->getSecLevel();
 
     //removes onion layer at the DB
@@ -537,7 +538,8 @@ removeOnionLayer(const ProxyState &ps, const TableMeta &tm,
  * changed schema to persistent storage.
  *
  */
-static std::pair<std::vector<Delta *>, std::list<std::string>>
+static std::pair<std::vector<std::unique_ptr<Delta> >,
+                 std::list<std::string>>
 adjustOnion(const SchemaInfo &schema, const ProxyState &ps, onion o,
             const TableMeta &tm, const FieldMeta &fm, SECLEVEL tolevel,
             const std::string &cur_db)
@@ -550,7 +552,7 @@ adjustOnion(const SchemaInfo &schema, const ProxyState &ps, onion o,
     assert(newlevel != SECLEVEL::INVALID);
 
     std::list<std::string> adjust_queries;
-    std::vector<Delta *> deltas;
+    std::vector<std::unique_ptr<Delta> > deltas;
     while (newlevel > tolevel) {
         auto query =
             removeOnionLayer(ps, tm, fm, &om_adjustor, &newlevel,
@@ -559,7 +561,7 @@ adjustOnion(const SchemaInfo &schema, const ProxyState &ps, onion o,
     }
     TEST_UnexpectedSecurityLevel(o, tolevel, newlevel);
 
-    return make_pair(deltas, adjust_queries);
+    return make_pair(std::move(deltas), adjust_queries);
 }
 //TODO: propagate these adjustments in the embedded database?
 
@@ -1022,14 +1024,17 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
             std::cout << "Adjusting onion!" << std::endl;
-            std::pair<std::vector<Delta *>, std::list<std::string>>
+            std::pair<std::vector<std::unique_ptr<Delta> >,
+                      std::list<std::string>>
                 out_data =
                     adjustOnion(a.getSchema(), ps, e.o, e.tm, e.fm,
                                 e.tolevel, ps.dbName());
-            const std::vector<Delta *> &deltas = out_data.first;
+            std::vector<std::unique_ptr<Delta> > &deltas =
+                out_data.first;
             const std::list<std::string>  &adjust_queries =
                 out_data.second;
-            return new AdjustOnionOutput(deltas, adjust_queries);
+            return new AdjustOnionOutput(std::move(deltas),
+                                         adjust_queries);
         }
 
         // Return if it's a regular DML query.
@@ -1057,7 +1062,8 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
     } else if (ddl_dispatcher->canDo(lex)) {
         const SQLHandler *const handler = ddl_dispatcher->dispatch(lex);
         LEX *const out_lex = handler->transformLex(a, lex, ps);
-        return new DDLOutput(query, lex_to_query(out_lex), a.deltas);
+        return new DDLOutput(query, lex_to_query(out_lex),
+                             std::move(a.deltas));
     } else {
         return NULL;
     }

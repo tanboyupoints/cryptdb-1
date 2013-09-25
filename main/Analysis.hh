@@ -292,8 +292,8 @@ private:
 class DeltaOutput : public RewriteOutput {
 public:
     DeltaOutput(const std::string &original_query,
-                std::vector<Delta *> deltas)
-        : RewriteOutput(original_query), deltas(deltas) {}
+                std::vector<std::unique_ptr<Delta> > &&deltas)
+        : RewriteOutput(original_query), deltas(std::move(deltas)) {}
     virtual ~DeltaOutput() = 0;
 
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
@@ -312,15 +312,16 @@ public:
                               unsigned long delta_output_id);
 
 protected:
-    const std::vector<Delta *> deltas;
+    const std::vector<std::unique_ptr<Delta> > deltas;
 };
 
 class DDLOutput : public DeltaOutput {
 public:
     DDLOutput(const std::string &original_query,
               const std::string &new_query,
-              std::vector<Delta *> deltas)
-        : DeltaOutput(original_query, deltas), new_query(new_query) {}
+              std::vector<std::unique_ptr<Delta> > &&deltas)
+        : DeltaOutput(original_query, std::move(deltas)),
+          new_query(new_query) {}
     ~DDLOutput() {;}
 
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
@@ -340,9 +341,9 @@ private:
 
 class AdjustOnionOutput : public DeltaOutput {
 public:
-    AdjustOnionOutput(std::vector<Delta *> deltas,
+    AdjustOnionOutput(std::vector<std::unique_ptr<Delta> > &&deltas,
                       std::list<std::string> adjust_queries)
-        : DeltaOutput("", deltas),
+        : DeltaOutput("", std::move(deltas)),
           adjust_queries(adjust_queries) {}
     ~AdjustOnionOutput() {;}
     ResType *doQuery(const std::unique_ptr<Connect> &conn,
@@ -428,7 +429,7 @@ public:
         getEncLayers(const OnionMeta &om);
     const SchemaInfo &getSchema() {return schema;}
 
-    std::vector<Delta *> deltas;
+    std::vector<std::unique_ptr<Delta> > deltas;
 
 private:
     const SchemaInfo &schema;
