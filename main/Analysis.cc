@@ -441,7 +441,7 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
         object.applyToChildren(localCreateHandler);
     };
 
-    helper(e_conn, *meta.get(), parent_meta, key.get(), NULL);
+    helper(e_conn, *meta.get(), parent_meta, &key, NULL);
     return true;
 }
 

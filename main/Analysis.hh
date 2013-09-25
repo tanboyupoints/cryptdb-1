@@ -127,12 +127,23 @@ protected:
 // CreateDelta calls must provide the key.  meta and
 // parent_meta have not yet been associated such that the key can be
 // functionally derived.
-class CreateDelta : public Delta {
+template <typename KeyType>
+class AbstractCreateDelta : public Delta {
 public:
-    CreateDelta(std::unique_ptr<DBMeta> meta,
+    AbstractCreateDelta(const DBMeta &parent_meta,
+                        const KeyType &key)
+        : Delta(parent_meta), key(key) {}
+
+protected:
+    const KeyType key;
+};
+
+class CreateDelta : public AbstractCreateDelta<IdentityMetaKey> {
+public:
+    CreateDelta(std::unique_ptr<DBMeta> &&meta,
                 const DBMeta &parent_meta,
-                AbstractMetaKey *const key)
-        : Delta(parent_meta), meta(std::move(meta)), key(key) {}
+                IdentityMetaKey key)
+        : AbstractCreateDelta(parent_meta, key), meta(std::move(meta)) {}
 
     bool save(const std::unique_ptr<Connect> &e_conn,
               unsigned long * const delta_output_id);
@@ -142,7 +153,6 @@ public:
 
 private:
     const std::unique_ptr<DBMeta> meta;
-    const std::unique_ptr<AbstractMetaKey> key;
 };
 
 class DerivedKeyDelta : public Delta {

@@ -381,7 +381,7 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
         tm->addChild(IdentityMetaKey(name), std::move(fm));
     } else {
         a.deltas.push_back(new CreateDelta(std::move(fm), *tm,
-                                           new IdentityMetaKey(name)));
+                                           IdentityMetaKey(name)));
         a.deltas.push_back(new ReplaceDelta(*tm, a.getSchema()));
     }
 

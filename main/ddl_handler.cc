@@ -99,7 +99,7 @@ class CreateHandler : public DDLHandler {
             // -----------------------------
             a.deltas.push_back(new CreateDelta(std::move(tm),
                                                a.getSchema(),
-                                              new IdentityMetaKey(table)));
+                                               IdentityMetaKey(table)));
         } else { // Table already exists.
 
             // Make sure we aren't trying to create a table that
