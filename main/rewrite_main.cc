@@ -803,7 +803,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
         //    General Subquery Rewrite
         // ------------------------------
         st_select_lex *const new_select_lex =
-            rewrite_select_lex(select_lex, *rp_w_analysis->a.get());
+            rewrite_select_lex(*select_lex, *rp_w_analysis->a.get());
 
         // Rewrite table names.
         new_select_lex->top_join_list =
@@ -830,12 +830,13 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
                 case Item_subselect::subs_type::EXISTS_SUBS:
                     assert(false);
                 case Item_subselect::subs_type::IN_SUBS: {
-                    Item *const left_expr =
+                    const Item *const left_expr =
                         getLeftExpr(static_cast<Item_in_subselect *>(i));
                     const std::unique_ptr<RewritePlan> &rp_left_expr =
                         constGetAssert(a.rewritePlans, left_expr);
                     Item *const new_left_expr =
-                        itemTypes.do_rewrite(left_expr, constr,
+                        itemTypes.do_rewrite(const_cast<Item *>(left_expr),
+                                             constr,
                                              rp_left_expr.get(), a);
                     return new Item_in_subselect(new_left_expr,
                                                  new_select_lex);

@@ -373,6 +373,8 @@ string_to_lex_str(const std::string &s)
 
 static std::ostream&
 operator<<(std::ostream &out, enum legacy_db_type db_type) {
+    out << "InnoDB";
+    /*
     switch (db_type) {
     case DB_TYPE_INNODB: {out << "InnoDB"; break;}
     case DB_TYPE_ISAM: {out << "ISAM"; break;}
@@ -382,6 +384,7 @@ operator<<(std::ostream &out, enum legacy_db_type db_type) {
         assert_s(false, "stringify does not know how to print db_type "
                         + strFromVal((uint)db_type));
     }
+    */
 
     return out;
 }

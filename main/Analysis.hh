@@ -393,10 +393,10 @@ public:
 
     unsigned int pos; // > a counter indicating how many projection
                       // fields have been analyzed so far
-    std::map<FieldMeta *, salt_type>    salts;
-    std::map<Item *, std::unique_ptr<RewritePlan> >     rewritePlans;
-    std::map<std::string, std::string>  table_aliases;
-    std::map<Item_field *, std::pair<Item_field *, OLK>> item_cache;
+    std::map<const FieldMeta *, const salt_type> salts;
+    std::map<const Item *, std::unique_ptr<RewritePlan> > rewritePlans;
+    std::map<const std::string, const std::string> table_aliases;
+    std::map<const Item_field *, std::pair<Item_field *, OLK>> item_cache;
 
     // information for decrypting results
     ReturnMeta rmeta;

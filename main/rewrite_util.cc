@@ -26,12 +26,11 @@ optimize(Item ** const i, Analysis &a) {
 
 // this function should be called at the root of a tree of items
 // that should be rewritten
-// @item_cache defaults to NULL
 Item *
 rewrite(Item *const i, const EncSet &req_enc, Analysis &a)
 {
     const std::unique_ptr<RewritePlan> &rp =
-        constGetAssert(a.rewritePlans, i);
+        constGetAssert(a.rewritePlans, static_cast<const Item *>(i));
     const EncSet solution = rp->es_out.intersect(req_enc);
     // FIXME: Use version that takes reason, expects 0 children,
     // and lets us indicate what our EncSet does have.

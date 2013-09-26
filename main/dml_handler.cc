@@ -22,7 +22,7 @@ static inline void
 analyze_field_value_pair(Item_field * field, Item * val, Analysis & a);
 
 static st_select_lex *
-rewrite_filters_lex(st_select_lex *select_lex, Analysis &a);
+rewrite_filters_lex(const st_select_lex &select_lex, Analysis &a);
 
 static void
 rewrite_field_value_pairs(List_iterator<Item> fd_it,
@@ -207,7 +207,7 @@ class UpdateHandler : public DMLHandler {
 
         // Rewrite filters
         set_select_lex(new_lex,
-                       rewrite_filters_lex(&new_lex->select_lex, a));
+                       rewrite_filters_lex(new_lex->select_lex, a));
 
         // Rewrite SET values
         assert(lex->select_lex.item_list.head());
@@ -239,7 +239,7 @@ class DeleteHandler : public DMLHandler {
         LEX *const new_lex = copyWithTHD(lex);
         new_lex->query_tables = rewrite_table_list(lex->query_tables, a);
         set_select_lex(new_lex,
-                       rewrite_select_lex(&new_lex->select_lex, a));
+                       rewrite_select_lex(new_lex->select_lex, a));
 
         return new_lex;
     }
@@ -258,7 +258,7 @@ class SelectHandler : public DMLHandler {
         new_lex->select_lex.top_join_list =
             rewrite_table_list(lex->select_lex.top_join_list, a);
         set_select_lex(new_lex,
-            rewrite_select_lex(&new_lex->select_lex, a));
+            rewrite_select_lex(new_lex->select_lex, a));
 
         return new_lex;
     }
@@ -368,25 +368,26 @@ analyze_field_value_pair(Item_field * field, Item * val, Analysis & a) {
     // onions because first SET does not matter
 }
 
+// FIXME: const Analysis
 static SQL_I_List<ORDER> *
-rewrite_order(Analysis &a, SQL_I_List<ORDER> &lst,
+rewrite_order(Analysis &a, const SQL_I_List<ORDER> &lst,
               const EncSet &constr, const std::string &name)
 {
     SQL_I_List<ORDER> *const new_lst = copyWithTHD(&lst);
     ORDER * prev = NULL;
     for (ORDER *o = lst.first; o; o = o->next) {
-        Item *const i = *o->item;
+        const Item &i = **o->item;
         const std::unique_ptr<RewritePlan> &rp =
-            constGetAssert(a.rewritePlans, i);
+            constGetAssert(a.rewritePlans, &i);
         const EncSet es = constr.intersect(rp->es_out);
         // FIXME: Add version that will take a second EncSet of what
         // we had available (ie, rp->es_out).
-        TEST_NoAvailableEncSet(es, i->type(), constr, rp->r.why_t,
+        TEST_NoAvailableEncSet(es, i.type(), constr, rp->r.why_t,
                             std::vector<std::shared_ptr<RewritePlan> >());
         const OLK olk = es.chooseOne();
 
         Item *const new_item =
-            itemTypes.do_rewrite(*o->item, olk, rp.get(), a);
+            itemTypes.do_rewrite(&const_cast<Item &>(i), olk, rp.get(), a);
         ORDER *const neworder = make_order(o, new_item);
         if (NULL == prev) {
             *new_lst = *oneElemListWithTHD(neworder);
@@ -400,17 +401,18 @@ rewrite_order(Analysis &a, SQL_I_List<ORDER> &lst,
 }
 
 static st_select_lex *
-rewrite_filters_lex(st_select_lex * select_lex, Analysis & a)
+rewrite_filters_lex(const st_select_lex &select_lex, Analysis & a)
 {
-    st_select_lex *const new_select_lex = copyWithTHD(select_lex);
+    st_select_lex *const new_select_lex = copyWithTHD(&select_lex);
 
+    // FIXME: Use const reference for list.
     new_select_lex->group_list =
-        *rewrite_order(a, select_lex->group_list, EQ_EncSet, "group by");
+        *rewrite_order(a, select_lex.group_list, EQ_EncSet, "group by");
     new_select_lex->order_list =
-        *rewrite_order(a, select_lex->order_list, ORD_EncSet, "order by");
+        *rewrite_order(a, select_lex.order_list, ORD_EncSet, "order by");
 
-    if (select_lex->where) {
-        set_where(new_select_lex, rewrite(select_lex->where,
+    if (select_lex.where) {
+        set_where(new_select_lex, rewrite(select_lex.where,
                                           PLAIN_EncSet, a));
     }
     //  if (select_lex->join &&
@@ -422,8 +424,8 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a)
 
     // HACK: We only care about Analysis::item_cache from HAVING.
     a.item_cache.clear();
-    if (select_lex->having) {
-        set_having(new_select_lex, rewrite(select_lex->having,
+    if (select_lex.having) {
+        set_having(new_select_lex, rewrite(select_lex.having,
                                    PLAIN_EncSet, a));
     }
 
@@ -438,8 +440,8 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
 {
     *invalids = false;
     for (;;) {
-        Item *const field_item = fd_it++;
-        Item *const value_item = val_it++;
+        const Item *const field_item = fd_it++;
+        const Item *const value_item = val_it++;
         if (!field_item) {
             assert(NULL == value_item);
             break;
@@ -448,17 +450,18 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
 
         assert(field_item->type() == Item::FIELD_ITEM);
         const Item_field *const ifd =
-            static_cast<Item_field *>(field_item);
+            static_cast<const Item_field *>(field_item);
         FieldMeta &fm =
             a.getFieldMeta(ifd->table_name, ifd->field_name);
 
-        const std::unique_ptr<RewritePlan> &rp =
+        const std::unique_ptr<RewritePlan> &rp_value =
             constGetAssert(a.rewritePlans, value_item);
         const EncSet needed = EncSet(a, &fm);
-        const EncSet r_es = rp->es_out.intersect(needed);
+        const EncSet r_es = rp_value->es_out.intersect(needed);
         // FIXME: Add version for situations when we don't know about
         // children.
-        TEST_NoAvailableEncSet(r_es, ifd->type(), needed, rp->r.why_t,
+        TEST_NoAvailableEncSet(r_es, ifd->type(), needed,
+                               rp_value->r.why_t,
                             std::vector<std::shared_ptr<RewritePlan> >());
 
         // Determine salt for field
@@ -468,7 +471,7 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
             if ((it_salt == a.salts.end()) && needsSalt(r_es)) {
                 add_salt = true;
                 const salt_type salt = randomValue();
-                a.salts[&fm] = salt;
+                a.salts.insert(std::make_pair(&fm, salt));
             }
         }
 
@@ -491,14 +494,14 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
                 constGetAssert(a.rewritePlans, field_item);
             // FIXME: Dangerous PTR.
             Item *const re_field =
-                itemTypes.do_rewrite(field_item, olk, rp_field.get(), a);
+                itemTypes.do_rewrite(const_cast<Item_field *>(ifd),
+                                     olk, rp_field.get(), a);
             res_items->push_back(re_field);
 
-            const std::unique_ptr<RewritePlan> &rp_value =
-                constGetAssert(a.rewritePlans, value_item);
             // FIXME: Dangerous PTR.
             Item *const re_value =
-                itemTypes.do_rewrite(value_item, olk, rp_value.get(), a);
+                itemTypes.do_rewrite(const_cast<Item *>(value_item), olk,
+                                     rp_value.get(), a);
             res_values->push_back(re_value);
         }
 
@@ -543,24 +546,26 @@ addSaltToReturn(ReturnMeta *const rm, int pos)
 }
 
 static void
-rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
+rewrite_proj(const Item &i, const RewritePlan &rp, Analysis &a,
              List<Item> *newList)
 {
     AssignOnce<OLK> olk;
     AssignOnce<Item *> ir;
-    if (i->type() == Item::Type::FIELD_ITEM) {
-        Item_field *const field_i = static_cast<Item_field *>(i);
-        const auto cached_rewritten_i = a.item_cache.find(field_i);
+    if (i.type() == Item::Type::FIELD_ITEM) {
+        const Item_field &field_i = static_cast<const Item_field &>(i);
+        const auto cached_rewritten_i = a.item_cache.find(&field_i);
         if (cached_rewritten_i != a.item_cache.end()) {
             ir = cached_rewritten_i->second.first;
             olk = cached_rewritten_i->second.second;
         } else {
-            ir = rewrite(i, rp->es_out, a);
-            olk = rp->es_out.chooseOne();
+            // HACK.
+            ir = rewrite(&const_cast<Item &>(i), rp.es_out, a);
+            olk = rp.es_out.chooseOne();
         }
     } else {
-        ir = rewrite(i, rp->es_out, a);
-        olk = rp->es_out.chooseOne();
+        // HACK.
+        ir = rewrite(&const_cast<Item &>(i), rp.es_out, a);
+        olk = rp.es_out.chooseOne();
     }
     assert(ir.assigned() && ir.get());
     newList->push_back(ir.get());
@@ -568,7 +573,7 @@ rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
 
     // This line implicity handles field aliasing for at least some cases.
     // As i->name can/will be the alias.
-    addToReturn(&a.rmeta, a.pos++, olk.get(), use_salt, i->name);
+    addToReturn(&a.rmeta, a.pos++, olk.get(), use_salt, i.name);
 
     if (use_salt) {
         const std::string anon_table_name =
@@ -582,26 +587,30 @@ rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
     }
 }
 
+// NOTE: select_lex should not be modified; const_cast madness ensues.
 st_select_lex *
-rewrite_select_lex(st_select_lex *select_lex, Analysis &a)
+rewrite_select_lex(const st_select_lex &select_lex, Analysis &a)
 {
     // rewrite_filters_lex must be called before rewrite_proj because
     // it is responsible for filling Analysis::item_cache which
     // rewrite_proj uses.
-    st_select_lex *new_select_lex =
+    st_select_lex *const new_select_lex =
         rewrite_filters_lex(select_lex, a);
 
-    LOG(cdb_v) << "rewrite select lex input is " << *select_lex;
-    auto item_it = List_iterator<Item>(select_lex->item_list);
+    LOG(cdb_v) << "rewrite select lex input is "
+               << const_cast<st_select_lex &>(select_lex);
+    auto item_it =
+        List_iterator<Item>(const_cast<List<Item> &>(select_lex.item_list));
 
     List<Item> newList;
     for (;;) {
-        Item * const item = item_it++;
+        const Item *const item = item_it++;
         if (!item)
             break;
-        LOG(cdb_v) << "rewrite_select_lex " << *item << " with name "
-                   << item->name;
-        rewrite_proj(item, constGetAssert(a.rewritePlans, item).get(),
+        LOG(cdb_v) << "rewrite_select_lex " << *const_cast<Item *>(item)
+                   << " with name " << item->name;
+        rewrite_proj(*item,
+                     *constGetAssert(a.rewritePlans, item).get(),
                      a, &newList);
     }
 

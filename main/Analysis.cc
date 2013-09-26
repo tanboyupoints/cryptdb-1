@@ -1066,7 +1066,7 @@ bool Analysis::addAlias(const std::string &alias,
         return false;
     }
 
-    table_aliases[alias] = table;
+    table_aliases.insert(make_pair(alias, table));
     return true;
 }
 
