@@ -359,7 +359,7 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
         [] (const std::string name, Create_field * const cf,
             const ProxyState &ps, TableMeta *const tm)
     {
-        return new FieldMeta(name, cf, ps.masterKey,
+        return new FieldMeta(name, cf, ps.getMasterKey().get(),
                              ps.defaultSecurityRating(),
                              tm->leaseIncUniq());
     };

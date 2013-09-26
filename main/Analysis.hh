@@ -69,9 +69,6 @@ public:
 
 // state maintained at the proxy
 typedef struct ProxyState {
-    // FIXME: Make private.
-    const AES_KEY * const masterKey;
-
     ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                const std::string &dbname, const std::string &master_key,
                SECURITY_RATING default_sec_rating =
@@ -83,6 +80,10 @@ typedef struct ProxyState {
         return default_sec_rating;
     }
 
+    const std::unique_ptr<AES_KEY> &getMasterKey() const
+    {
+        return masterKey;
+    }
     const std::unique_ptr<Connect> &getConn() const {return conn;}
     const std::unique_ptr<Connect> &getSideChannelConn() const
     {
@@ -93,6 +94,7 @@ typedef struct ProxyState {
     static int db_init(const std::string &embed_dir);
 
 private:
+    const std::unique_ptr<AES_KEY> masterKey;
     const int mysql_dummy;
     // connection to remote and embedded server
     const std::unique_ptr<Connect> conn;

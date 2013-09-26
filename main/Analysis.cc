@@ -313,7 +313,7 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                        const std::string &dbname,
                        const std::string &master_key,
                        SECURITY_RATING default_sec_rating)
-    : masterKey(getKey(master_key)),
+    : masterKey(std::unique_ptr<AES_KEY>(getKey(master_key))),
       mysql_dummy(ProxyState::db_init(embed_dir)), // HACK: Allows
                                                    // connections in init
                                                    // list.
@@ -347,7 +347,6 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
 
 ProxyState::~ProxyState()
 {
-    // FIXME: Why does this call break?
     // mysql_library_end();
 }
 
