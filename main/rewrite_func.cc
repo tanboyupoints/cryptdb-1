@@ -484,8 +484,7 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
                                          el.level());
             return static_cast<const HOM &>(el).sumUDF(arg0, arg1);
         } else {
-            IT * const out_i = new IT(arg0, arg1);
-            return out_i;
+            return new IT(arg0, arg1);
         }
     }
 };
@@ -514,7 +513,7 @@ class CItemMath : public CItemSubtypeFN<IT, NAME> {
                                    Analysis & a) const
     {
         TEST_BadItemArgumentCount(i->type(), 2, i->argument_count());
-        Item **args = i->arguments();
+        Item **const args = i->arguments();
 
         const RewritePlanOneOLK * const rp =
             static_cast<const RewritePlanOneOLK *>(_rp);
@@ -526,8 +525,7 @@ class CItemMath : public CItemSubtypeFN<IT, NAME> {
             itemTypes.do_rewrite(args[1], rp->olk,
                                  rp->childr_rp[1].get(), a);
 
-        Item_func *out_i = new IT(arg0, arg1);
-        return out_i;
+        return new IT(arg0, arg1);
     }
 };
 
