@@ -58,21 +58,20 @@ testNoAvailableEncSet(const std::string &file_name,
                       unsigned int line_number, const EncSet &enc_set,
                       unsigned int type, const EncSet &req_enc_set,
                       const std::string &why,
-                      const RewritePlan *const *const childr_rp,
-                      unsigned int child_count)
+                      const std::vector<std::shared_ptr<RewritePlan> >
+                        &childr_rp)
 {
     if (false == enc_set.available()) {
         throw NoAvailableEncSet(file_name, line_number, type,
-                                req_enc_set, why, childr_rp, child_count);
+                                req_enc_set, why, childr_rp);
     }
 }
 
 #define TEST_NoAvailableEncSet(enc_set, type, req_enc_set, why,     \
-                               childr_rp, child_count)              \
+                               childr_rp)                           \
 {                                                                   \
     testNoAvailableEncSet(__FILE__, __LINE__, (enc_set), (type),    \
-                          (req_enc_set), (why), (childr_rp),        \
-                          (child_count));                           \
+                          (req_enc_set), (why), (childr_rp));       \
 }
 
 inline void

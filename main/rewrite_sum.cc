@@ -43,10 +43,11 @@ rewrite_agg_args(Item_sum * oldi, const OLK & constr,
 
     std::list<Item *> res = std::list<Item *>();
     for (int j = 0; j < no_args; j++) {
-        Item * child_item = oldi->get_arg(j);
-        child_item =
-            itemTypes.do_rewrite(child_item, rp->olk, rp->childr_rp[j], a);
-        res.push_back(child_item);
+        Item *const child_item = oldi->get_arg(j);
+        Item *const out_child_item =
+            itemTypes.do_rewrite(child_item, rp->olk,
+                                 rp->childr_rp[j].get(), a);
+        res.push_back(out_child_item);
     }
 
     return res;
@@ -63,8 +64,8 @@ class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
         Item *const child = i->get_arg(0);
 
         reason r;
-        RewritePlan **const childr_rp = new RewritePlan*[arg_count];
-        childr_rp[0] = gather(child, r, a);
+        std::vector<std::shared_ptr<RewritePlan> >
+            childr_rp({std::shared_ptr<RewritePlan>(gather(child, r, a))});
         const EncSet needed = EQ_EncSet;
         const EncSet solution = childr_rp[0]->es_out.intersect(needed);
 
@@ -72,7 +73,7 @@ class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
         if (i->has_with_distinct()) {
             why += " distinct";
             TEST_NoAvailableEncSet(solution, i->type(), needed, why,
-                                   childr_rp, arg_count);
+                                   childr_rp);
         }
 
         const EncSet out_enc_set = PLAIN_EncSet;
@@ -113,18 +114,18 @@ class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
         Item *const child = i->get_arg(0);
 
         reason r;
-        RewritePlan **const child_rp = new RewritePlan*[arg_count];
-        child_rp[0] = gather(child, r, a);
+        std::vector<std::shared_ptr<RewritePlan> >
+            childr_rp({std::shared_ptr<RewritePlan>(gather(child, r, a))});
         const EncSet needed = ORD_EncSet;
-        const EncSet supported = needed.intersect(child_rp[0]->es_out);
+        const EncSet supported = needed.intersect(childr_rp[0]->es_out);
         const std::string why = "min/max";
         TEST_NoAvailableEncSet(supported, i->type(), needed, why,
-                               child_rp, arg_count);
+                               childr_rp);
         const OLK olk = supported.chooseOne();
         const EncSet out = EncSet(olk);
         tr = reason(out, why, i);
         // INVESTIGATE: Should 'out' be 'supported'?
-        return new RewritePlanOneOLK(out, olk, child_rp, tr);
+        return new RewritePlanOneOLK(out, olk, childr_rp, tr);
     }
 
     virtual Item *do_rewrite_type(Item_sum_hybrid *i, const OLK &constr,
@@ -153,8 +154,9 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
         Item *const child_item = i->get_arg(0);
 
         reason child_r;
-        RewritePlan **const childr_rp = new RewritePlan*[arg_count];
-        childr_rp[0] = gather(child_item, child_r, a);
+        std::vector<std::shared_ptr<RewritePlan> >
+            childr_rp({std::shared_ptr<RewritePlan>(gather(child_item,
+                                                           child_r, a))});
 
         if (i->has_with_distinct()) {
             UNIMPLEMENTED;
@@ -164,7 +166,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
         const EncSet solution = my_es.intersect(childr_rp[0]->es_out);
         const std::string why = "summation";
         TEST_NoAvailableEncSet(solution, i->type(), my_es, why,
-                               childr_rp, arg_count);
+                               childr_rp);
 
         const OLK olk = solution.chooseOne();
         const EncSet return_es = EncSet(olk);
@@ -246,14 +248,15 @@ static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
                                          Analysis & a) const
     {
         const std::string why = "ref_item";
-        
-        RewritePlan **childr_rp = new RewritePlan*[1];
+
         reason r;
-        childr_rp[0] = gather(*i->ref, r, a);
-        
+        std::vector<std::shared_ptr<RewritePlan> >
+            childr_rp({std::shared_ptr<RewritePlan>(gather(*i->ref, r,
+                                                           a))});
+
         const EncSet out_es = EncSet(childr_rp[0]->es_out);
         const EncSet child_es = childr_rp[0]->es_out;
- 
+
         tr = reason(out_es, why, i);
         tr.add_child(r);
 

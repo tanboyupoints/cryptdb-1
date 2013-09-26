@@ -382,7 +382,7 @@ rewrite_order(Analysis &a, SQL_I_List<ORDER> &lst,
         // FIXME: Add version that will take a second EncSet of what
         // we had available (ie, rp->es_out).
         TEST_NoAvailableEncSet(es, i->type(), constr, rp->r.why_t,
-                               NULL, 0);
+                            std::vector<std::shared_ptr<RewritePlan> >());
         const OLK olk = es.chooseOne();
 
         Item *const new_item =
@@ -459,7 +459,7 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
         // FIXME: Add version for situations when we don't know about
         // children.
         TEST_NoAvailableEncSet(r_es, ifd->type(), needed, rp->r.why_t,
-                               NULL, 0);
+                            std::vector<std::shared_ptr<RewritePlan> >());
 
         // Determine salt for field
         bool add_salt = false;

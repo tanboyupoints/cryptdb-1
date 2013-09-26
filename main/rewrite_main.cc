@@ -752,7 +752,8 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
             const std::unique_ptr<RewritePlan> &item_rp =
                 subquery_analysis.get()->rewritePlans[item];
             TEST_NoAvailableEncSet(item_rp->es_out, i->type(),
-                                   PLAIN_EncSet, why, NULL, 0);
+                                   PLAIN_EncSet, why,
+                            std::vector<std::shared_ptr<RewritePlan> >());
             item_rp->es_out = PLAIN_EncSet;
         }
 

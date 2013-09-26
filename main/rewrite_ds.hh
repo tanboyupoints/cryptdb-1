@@ -211,21 +211,23 @@ class RewritePlanOneOLK: public RewritePlan {
 public:
     const OLK olk;
     // the following store how to rewrite children
-    RewritePlan **const childr_rp;
+    std::vector<std::shared_ptr<RewritePlan> > childr_rp;
 
     RewritePlanOneOLK(const EncSet &es_out, const OLK &olk,
-                      RewritePlan **const childr_rp, reason r)
-        : RewritePlan(es_out, r), olk(olk), childr_rp(childr_rp) {}
+                      const std::vector<std::shared_ptr<RewritePlan> >
+                        &childr_rp, reason r)
+        : RewritePlan(es_out, r), olk(olk),
+          childr_rp(childr_rp) {}
 };
 
 class RewritePlanPerChildOLK : public RewritePlan {
 public:
-    const std::vector<std::pair<RewritePlan *, OLK>> child_olks;
+    const std::vector<std::pair<std::shared_ptr<RewritePlan>, OLK>>
+        child_olks;
 
     RewritePlanPerChildOLK(const EncSet &es_out,
-                           std::vector<std::pair<RewritePlan *, OLK>>
-                            child_olks,
-                           reason r)
+                const std::vector<std::pair<std::shared_ptr<RewritePlan>,
+                                          OLK>> &child_olks, reason r)
         : RewritePlan(es_out, r), child_olks(child_olks) {}
 };
 

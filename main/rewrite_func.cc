@@ -60,7 +60,8 @@ rewrite_args_FN(T *i, const OLK &constr, const RewritePlanOneOLK *rp,
     Item ** const args = out_i->arguments();
     for (uint x = 0; x < count; x++) {
         args[x] =
-            itemTypes.do_rewrite(args[x], rp->olk, rp->childr_rp[x], a);
+            itemTypes.do_rewrite(args[x], rp->olk,
+                                 rp->childr_rp[x].get(), a);
         args[x]->name = NULL; // args should never have aliases...
     }
 
@@ -83,15 +84,15 @@ typical_gather(Analysis &a, Item_func *i, const EncSet &my_es,
 
     reason r1, r2;
     Item *const *const args = i->arguments();
-    RewritePlan **const childr_rp = new RewritePlan*[2];
-    childr_rp[0] = gather(args[0], r1, a);
-    childr_rp[1] = gather(args[1], r2, a);
+    std::vector<std::shared_ptr<RewritePlan> >
+        childr_rp({std::shared_ptr<RewritePlan>(gather(args[0], r1, a)),
+                   std::shared_ptr<RewritePlan>(gather(args[1], r2, a))});
 
     const EncSet solution =
         my_es.intersect(childr_rp[0]->es_out).
               intersect(childr_rp[1]->es_out);
     TEST_NoAvailableEncSet(solution, i->type(), my_es, why,
-                           childr_rp, arg_count);
+                           childr_rp);
 
     std::function<EncSet ()> getEncSet =
         [encset_from_intersection, solution] ()
@@ -123,11 +124,12 @@ iterateGather(Item_func *i, const EncSet &out_es, EncSet child_es,
     tr = reason(out_es, why, i);
 
     const unsigned int arg_count = i->argument_count();
-    RewritePlan ** const childr_rp = new RewritePlan*[arg_count];
+    std::vector<std::shared_ptr<RewritePlan> > childr_rp(arg_count);
     Item ** const args = i->arguments();
     for (unsigned int index = 0; index < arg_count; ++index) {
         reason r;
-        childr_rp[index] = gather(args[index], r, a);
+        childr_rp[index] =
+            std::shared_ptr<RewritePlan>(gather(args[index], r, a));
         tr.add_child(r);
         child_es = child_es.intersect(childr_rp[index]->es_out);
     }
@@ -202,7 +204,7 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
             Item *const neg_i = new Item_int(-int_arg->value);
 
             return itemTypes.do_rewrite(neg_i, constr,
-                                        rp_one->childr_rp[0], a);
+                                        rp_one->childr_rp[0].get(), a);
         } else if (oPLAIN == constr.o) {
             return rewrite_args_FN(i, constr, rp_one, a);
         } else {
@@ -317,8 +319,8 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
 
         tr = reason(out_es, why, i);
 
-        std::vector<std::pair<RewritePlan *, OLK>> out_child_olks;
-        RewritePlan ** const childr_rp = new RewritePlan*[arg_count];
+        std::vector<std::pair<std::shared_ptr<RewritePlan>, OLK>>
+            out_child_olks(arg_count);
 
         auto it = List_iterator<Item>(*i->argument_list());
         unsigned int index = 0;
@@ -329,11 +331,11 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
             assert(index < arg_count);
 
             reason r;
-            childr_rp[index] = gather(argitem, r, a);
-            const OLK olk =
-                EQ_EncSet.intersect(childr_rp[index]->es_out).chooseOne();
-            out_child_olks.push_back(std::make_pair(childr_rp[index],
-                                     olk));
+            std::shared_ptr<RewritePlan>
+                temp_childrp(gather(argitem, r, a));
+            const OLK &olk =
+                EQ_EncSet.intersect(temp_childrp->es_out).chooseOne();
+            out_child_olks[index] = std::make_pair(temp_childrp, olk);
             tr.add_child(r);
             ++index;
         }
@@ -363,11 +365,13 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
             }
             assert(index < arg_count);
 
-            RewritePlan * const c_rp =
-                rp_per_child->child_olks[index].first;
-            const OLK olk = rp_per_child->child_olks[index].second;
+            const std::pair<std::shared_ptr<RewritePlan>, OLK>
+                &rp_olk = rp_per_child->child_olks[index];
+            const std::shared_ptr<RewritePlan> &c_rp =
+                rp_olk.first;
+            const OLK &olk = rp_olk.second;
             Item *const out_item =
-                itemTypes.do_rewrite(argitem, olk, c_rp, a);
+                itemTypes.do_rewrite(argitem, olk, c_rp.get(), a);
             out_item->name = NULL;
             out_list.push_back(out_item);
             ++index;
@@ -388,8 +392,9 @@ class CItemNullcheck : public CItemSubtypeFT<Item_bool_func, FT> {
         TEST_BadItemArgumentCount(i->type(), 1, i->argument_count());
 
         reason r;
-        RewritePlan ** const child_rp = new RewritePlan*[1];
-        child_rp[0] = gather(args[0], r, a);
+        std::vector<std::shared_ptr<RewritePlan> >
+            child_rp({std::shared_ptr<RewritePlan>(gather(args[0], r,
+                                                          a))});
 
         const EncSet solution = child_rp[0]->es_out;
         const EncSet out_es = PLAIN_EncSet;
@@ -465,9 +470,11 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
         LOG(cdb_v) << "Rewrite plan is " << rp << "\n";
 
         Item * const arg0 =
-            itemTypes.do_rewrite(args[0], constr, rp->childr_rp[0], a);
+            itemTypes.do_rewrite(args[0], constr,
+                                 rp->childr_rp[0].get(), a);
         Item * const arg1 =
-            itemTypes.do_rewrite(args[1], constr, rp->childr_rp[1], a);
+            itemTypes.do_rewrite(args[1], constr,
+                                 rp->childr_rp[1].get(), a);
 
         if (oAGG == constr.o) {
             OnionMeta *const om = rp->olk.key->getOnionMeta(oAGG);
@@ -513,9 +520,11 @@ class CItemMath : public CItemSubtypeFN<IT, NAME> {
             static_cast<const RewritePlanOneOLK *>(_rp);
 
         Item * const arg0 =
-            itemTypes.do_rewrite(args[0], rp->olk, rp->childr_rp[0], a);
+            itemTypes.do_rewrite(args[0], rp->olk,
+                                 rp->childr_rp[0].get(), a);
         Item * const arg1 =
-            itemTypes.do_rewrite(args[1], rp->olk, rp->childr_rp[1], a);
+            itemTypes.do_rewrite(args[1], rp->olk,
+                                 rp->childr_rp[1].get(), a);
 
         Item_func *out_i = new IT(arg0, arg1);
         return out_i;
@@ -893,9 +902,10 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
                  "ope join not yet implemented");
 
         reason r1, r2;
-        RewritePlan **const childr_rp = new RewritePlan*[2];
-        childr_rp[0] = gather(args[0], r1, a);
-        childr_rp[1] = gather(args[1], r2, a);
+        std::vector<std::shared_ptr<RewritePlan> >
+            childr_rp({
+                std::shared_ptr<RewritePlan>(gather(args[0], r1, a)),
+                std::shared_ptr<RewritePlan>(gather(args[1], r2, a))});
         const EncSet es1 = childr_rp[0]->es_out;
         const EncSet es2 = childr_rp[1]->es_out;
         const EncSet needed_es = ORD_EncSet;
@@ -904,7 +914,7 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
 
         const std::string why = "min_max func";
         TEST_NoAvailableEncSet(supported_es, i->type(), needed_es, why,
-                               childr_rp, arg_count);
+                               childr_rp);
 
         const EncSet out_es = es1.intersect(es2);
         tr = reason(out_es, why, i);
@@ -937,9 +947,11 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
         // replace with IF( cond_arg0 cond cond_arg1, args0, args1)
         Item *const *const args = i->arguments();
         Item *const cond_arg0 =
-            itemTypes.do_rewrite(args[0], rp->olk, rp->childr_rp[0], a);
+            itemTypes.do_rewrite(args[0], rp->olk,
+                                 rp->childr_rp[0].get(), a);
         Item *const cond_arg1 =
-            itemTypes.do_rewrite(args[1], rp->olk, rp->childr_rp[1], a);
+            itemTypes.do_rewrite(args[1], rp->olk,
+                                 rp->childr_rp[1].get(), a);
 
         const int cmp_sign =
             i->*rob<Item_func_min_max, int,
@@ -954,9 +966,11 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
 
         return new Item_func_if(cond.get(),
                                 itemTypes.do_rewrite(args[0], constr,
-                                                rp->childr_rp[0], a),
+                                                rp->childr_rp[0].get(),
+                                                a),
                                 itemTypes.do_rewrite(args[1], constr,
-                                                rp->childr_rp[1], a));
+                                                rp->childr_rp[1].get(),
+                                                a));
     }
 };
 
@@ -1018,15 +1032,12 @@ static class ANON : public CItemSubtypeFN<Item_func_nullif, str_nullif> {
         const
     {
         TEST_BadItemArgumentCount(i->type(), 2, i->argument_count());
-        RewritePlan ** const childr_rp = new RewritePlan*[2];
         Item ** const args = i->arguments();
-
-        const std::string why = "nullif";
-        reason r0;
-        childr_rp[0] = gather(args[0], r0, a);
-
-        reason r1;
-        childr_rp[1] = gather(args[1], r1, a);
+        reason r0, r1;
+        std::vector<std::shared_ptr<RewritePlan> >
+            childr_rp({
+                std::shared_ptr<RewritePlan>(gather(args[0], r0, a)),
+                std::shared_ptr<RewritePlan>(gather(args[1], r1, a))});
 
         const EncSet child_es =
             EQ_EncSet.intersect(childr_rp[0]->es_out)
@@ -1035,6 +1046,7 @@ static class ANON : public CItemSubtypeFN<Item_func_nullif, str_nullif> {
         // HACK.
         const EncSet out_es = EncSet(child_es.chooseOne());
 
+        const std::string why = "nullif";
         tr = reason(out_es, why, i);
         tr.add_child(r0);
         tr.add_child(r1);

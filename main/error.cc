@@ -52,9 +52,10 @@ std::string NoAvailableEncSet::to_string() const
         << "OPERATION: " << why << std::endl
         << "REQUIRED ENCSET: " << req_enc_set << std::endl
         << "***** CHILDREN REASONS *****" << std::endl;
-    for (unsigned int i = 0; i < child_count; ++i) {
-        s << "[" << std::to_string(i) << "] "
-          << childr_rp[i]->getReason() << std::endl;
+    for (auto it = childr_rp.begin(); it != childr_rp.end(); it++) {
+        s << "[" << std::to_string(std::distance(childr_rp.begin(), it))
+                 << "] "
+          << (*it)->getReason() << std::endl;
     }
 
     return s.str();
