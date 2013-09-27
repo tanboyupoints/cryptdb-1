@@ -390,27 +390,32 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
 //TODO: which encrypt/decrypt should handle null?
 // FIXME: @i should be const_cast
 Item *
-encrypt_item_layers(Item *const i, onion o, const OnionMeta &om,
+encrypt_item_layers(const Item &i, onion o, const OnionMeta &om,
                     const Analysis &a, uint64_t IV) {
-    assert(!i->is_null());
+    assert(!const_cast<Item &>(i).is_null());
 
     const auto &enc_layers = a.getEncLayers(om);
     assert_s(enc_layers.size() > 0, "onion must have at least one layer");
-    Item * enc = i;
-    Item * prev_enc = NULL;
+    const Item *enc = &i, *prev_enc = NULL;
+    Item *new_enc = NULL;
+
     for (auto it = enc_layers.begin(); it != enc_layers.end(); it++) {
         LOG(encl) << "encrypt layer "
                   << TypeText<SECLEVEL>::toText((*it)->level()) << "\n";
-        enc = (*it)->encrypt(enc, IV);
+        // FIXME: Push this cast to the cryptohandlers.
+        new_enc = (*it)->encrypt(const_cast<Item *>(enc), IV);
         //need to free space for all enc
         //except the last one
         if (prev_enc) {
             delete prev_enc;
         }
         prev_enc = enc;
+        enc = new_enc;
     }
 
-    return enc;
+    // @i is const, do we don't want the caller to modify it accidentally.
+    assert(new_enc && new_enc != &i);
+    return new_enc;
 }
 
 std::string
@@ -444,7 +449,7 @@ escapeString(const std::unique_ptr<Connect> &c,
 }
 
 void
-encrypt_item_all_onions(Item *const i, const FieldMeta &fm,
+encrypt_item_all_onions(const Item &i, const FieldMeta &fm,
                         uint64_t IV, Analysis &a, std::vector<Item*> *l)
 {
     for (auto it : fm.orderedOnionMetas()) {
@@ -455,7 +460,7 @@ encrypt_item_all_onions(Item *const i, const FieldMeta &fm,
 }
 
 void
-typical_rewrite_insert_type(Item *const i, const FieldMeta &fm,
+typical_rewrite_insert_type(const Item &i, const FieldMeta &fm,
                             Analysis &a, std::vector<Item *> *l)
 {
     const uint64_t salt = fm.has_salt ? randomValue() : 0;

@@ -177,7 +177,7 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
     do_rewrite_insert_type(const Item_func_neg &i, const FieldMeta &fm,
                            Analysis &a, std::vector<Item *> *l) const
     {
-        return typical_rewrite_insert_type(&const_cast<Item_func_neg &>(i), fm, a, l);
+        return typical_rewrite_insert_type(i, fm, a, l);
     }
 
     virtual Item *

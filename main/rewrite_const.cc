@@ -27,14 +27,14 @@
 // encrypts a constant item based on the information in a
 // FIXME: @i should be const ref.
 static Item *
-encrypt_item(Item *i, const OLK &olk, Analysis &a)
+encrypt_item(const Item &i, const OLK &olk, Analysis &a)
 {
-    assert(!i->is_null());
+    assert(!const_cast<Item &>(i).is_null());
 
     FieldMeta * const fm = olk.key;
     // HACK + BROKEN.
     if (!fm && oPLAIN == olk.o) {
-        return i;
+        return const_cast<Item &>(i).clone_item();
     }
     assert(fm);
 
@@ -69,15 +69,14 @@ static class ANON : public CItemSubtypeIT<Item_string,
                     const RewritePlan &rp, Analysis &a) const
     {
         LOG(cdb_v) << "do_rewrite_type String item " << i << std::endl;
-        return encrypt_item(&const_cast<Item_string &>(i), constr, a);
+        return encrypt_item(i, constr, a);
     }
 
     virtual void
     do_rewrite_insert_type(const Item_string &i, const FieldMeta &fm,
                            Analysis &a, std::vector<Item *> *l) const
     {
-        typical_rewrite_insert_type(&const_cast<Item_string &>(i), fm, a,
-                                    l);
+        typical_rewrite_insert_type(i, fm, a, l);
     }
 } ANON;
 
@@ -103,14 +102,14 @@ static class ANON : public CItemSubtypeIT<Item_int, Item::Type::INT_ITEM> {
     {
         LOG(cdb_v) << "do_rewrite_type " << i << std::endl;
 
-        return encrypt_item(&const_cast<Item_int &>(i), constr, a);
+        return encrypt_item(i, constr, a);
     }
 
     virtual void
     do_rewrite_insert_type(const Item_int &i, const FieldMeta &fm,
                            Analysis &a, std::vector<Item *> *l) const
     {
-        typical_rewrite_insert_type(&const_cast<Item_int &>(i), fm, a, l);
+        typical_rewrite_insert_type(i, fm, a, l);
     }
 } ANON;
 
@@ -138,7 +137,7 @@ static class ANON : public CItemSubtypeIT<Item_decimal,
     {
         LOG(cdb_v) << "do_rewrite_type " << i << std::endl;
 
-        return encrypt_item(&const_cast<Item_decimal &>(i), constr, a);
+        return encrypt_item(i, constr, a);
 /*        double n = i->val_real();
         char buf[sizeof(double) * 2];
         sprintf(buf, "%x", (unsigned int)n);
@@ -150,7 +149,6 @@ static class ANON : public CItemSubtypeIT<Item_decimal,
     do_rewrite_insert_type(const Item_decimal &i, const FieldMeta &fm,
                            Analysis &a, std::vector<Item *> *l) const
     {
-        typical_rewrite_insert_type(&const_cast<Item_decimal &>(i), fm, a,
-                                    l);
+        typical_rewrite_insert_type(i, fm, a, l);
     }
 } ANON;

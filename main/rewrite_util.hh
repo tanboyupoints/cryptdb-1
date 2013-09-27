@@ -65,7 +65,7 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
                       List<Create_field> &rewritten_cfield_list);
 
 Item *
-encrypt_item_layers(Item * const i, onion o, const OnionMeta &om,
+encrypt_item_layers(const Item &i, onion o, const OnionMeta &om,
                     const Analysis &a, uint64_t IV = 0);
 
 std::string
@@ -101,14 +101,14 @@ escapeString(const std::unique_ptr<Connect> &c,
              const std::string &escape_me);
 
 void
-encrypt_item_all_onions(Item *const i, const FieldMeta &fm,
+encrypt_item_all_onions(const Item &i, const FieldMeta &fm,
                         uint64_t IV, Analysis &a, std::vector<Item *> *l);
 
 std::vector<onion>
 getOnionIndexTypes();
 
 void
-typical_rewrite_insert_type(Item *const i, const FieldMeta &fm,
+typical_rewrite_insert_type(const Item &i, const FieldMeta &fm,
                             Analysis &a, std::vector<Item *> *l);
 
 void
