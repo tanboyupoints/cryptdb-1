@@ -182,8 +182,7 @@ Item *RiboldMYSQL::clone_item(const Item &i)
     return const_cast<Item &>(i).clone_item();
 }
 
-// FIXME: Clean this up by offering a const List_iterator.
-List<Item> *RiboldMYSQL::argument_list(const Item_cond &i)
+const List<Item> *RiboldMYSQL::argument_list(const Item_cond &i)
 {
     return const_cast<Item_cond &>(i).argument_list();
 }

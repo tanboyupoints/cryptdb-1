@@ -318,7 +318,8 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
         std::vector<std::pair<std::shared_ptr<RewritePlan>, OLK>>
             out_child_olks(arg_count);
 
-        auto it = List_iterator<Item>(*RiboldMYSQL::argument_list(i));
+        auto it =
+            RiboldMYSQL::constList_iterator<Item>(*RiboldMYSQL::argument_list(i));
         unsigned int index = 0;
         for (;;) {
             const Item * const argitem = it++;
@@ -354,7 +355,7 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
 
         const RewritePlanPerChildOLK &rp_per_child =
             static_cast<const RewritePlanPerChildOLK &>(rp);
-        auto it = List_iterator<Item>(*RiboldMYSQL::argument_list(i));
+        auto it = RiboldMYSQL::constList_iterator<Item>(*RiboldMYSQL::argument_list(i));
         List<Item> out_list;
         unsigned int index = 0;
         for (;;) {

@@ -59,7 +59,7 @@ set_having(st_select_lex *const sl, Item *const having);
 namespace RiboldMYSQL {
     bool is_null(const Item &i);
     Item *clone_item(const Item &i);
-    List<Item> *argument_list(const Item_cond &i);
+    const List<Item> *argument_list(const Item_cond &i);
     uint get_arg_count(const Item_sum &i);
     const Item *get_arg(const Item_sum &item, uint i);
     Item_subselect::subs_type substype(const Item_subselect &i);

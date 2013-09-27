@@ -93,14 +93,14 @@ operator<<(std::ostream &out, List<T> &l)
 }
 
 static inline std::ostream&
-operator<<(std::ostream &out, SELECT_LEX &select_lex)
+operator<<(std::ostream &out, const SELECT_LEX &select_lex)
 {
     // TODO(stephentu): mysql's select print is
     // missing some parts, like procedure, into outfile,
     // for update, and lock in share mode
     String s;
-    THD *t = current_thd;
-    select_lex.print(t, &s, QT_ORDINARY);
+    const_cast<SELECT_LEX &>(select_lex).print(current_thd, &s,
+                                               QT_ORDINARY);
     return out << s;
 }
 

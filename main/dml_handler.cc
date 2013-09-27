@@ -585,7 +585,6 @@ rewrite_proj(const Item &i, const RewritePlan &rp, Analysis &a,
     }
 }
 
-// NOTE: select_lex should not be modified; const_cast madness ensues.
 st_select_lex *
 rewrite_select_lex(const st_select_lex &select_lex, Analysis &a)
 {
@@ -596,7 +595,7 @@ rewrite_select_lex(const st_select_lex &select_lex, Analysis &a)
         rewrite_filters_lex(select_lex, a);
 
     LOG(cdb_v) << "rewrite select lex input is "
-               << const_cast<st_select_lex &>(select_lex);
+               << select_lex << std::endl;
     auto item_it =
         RiboldMYSQL::constList_iterator<Item>(select_lex.item_list);
 
