@@ -69,13 +69,6 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels,
         newcf = el->newCreateField(oldcf);
 
         this->layers.push_back(std::move(el));
-
-        if (oldcf != cf) {
-            delete oldcf;
-        }
-    }
-    if (newcf != cf) {
-        delete newcf;
     }
 }
 

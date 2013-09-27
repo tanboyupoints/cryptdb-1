@@ -196,10 +196,6 @@ get_create_field(const Analysis &a, Create_field * const f,
     for (auto it = enc_layers.begin(); it != enc_layers.end(); it++) {
         const Create_field * const old_cf = new_cf;
         new_cf = (*it)->newCreateField(old_cf, name);
-
-        if (old_cf != f) {
-            delete old_cf;
-        }
     }
 
     // Restore the default so we don't memleak it.
@@ -399,11 +395,6 @@ encrypt_item_layers(const Item &i, onion o, const OnionMeta &om,
                   << TypeText<SECLEVEL>::toText((*it)->level()) << "\n";
         new_enc = (*it)->encrypt(*enc, IV);
         assert(new_enc);
-        //need to free space for all enc
-        //except the last one
-        if (enc && enc != &i) {
-            delete enc;
-        }
         enc = new_enc;
     }
 

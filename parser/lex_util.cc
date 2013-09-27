@@ -84,6 +84,7 @@ init_new_ident(Item_ident *const i, const std::string &table_name = "",
         i->field_name = make_thd_string(field_name);
     }
 }
+
 Item_field *
 make_item_field(const Item_field &i, const std::string &table_name,
                 const std::string &field_name)
@@ -94,7 +95,9 @@ make_item_field(const Item_field &i, const std::string &table_name,
     assert(thd);
 
     Item_field *const i0 =
-        new Item_field(thd, &const_cast<Item_field &>(i));
+        new (current_thd->mem_root)
+            Item_field(thd, &const_cast<Item_field &>(i));
+
     init_new_ident(i0, table_name, field_name);
 
     return i0;
@@ -111,8 +114,12 @@ make_item_ref(const Item_ref &i, Item *const new_ref,
     THD *const thd = current_thd;
     assert(thd);
 
-    Item_ref *const i0 = new Item_ref(thd, &const_cast<Item_ref &>(i));
+    Item_ref *const i0 =
+        new (current_thd->mem_root)
+            Item_ref(thd, &const_cast<Item_ref &>(i));
 
+    // This should be allocated on current_thd but it causes mysql
+    // to segfault.
     i0->ref = new Item *;
     *i0->ref = new_ref;
 

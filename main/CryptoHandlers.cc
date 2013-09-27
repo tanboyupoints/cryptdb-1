@@ -404,7 +404,8 @@ RND_int::encrypt(const Item &ptext, uint64_t IV) const
     const uint64_t c = bf.encrypt(p ^ IV);
     LOG(encl) << "RND_int encrypt " << p << " IV " << IV << "-->" << c;
 
-    return new Item_int(static_cast<ulonglong>(c));
+    return new (current_thd->mem_root)
+               Item_int(static_cast<ulonglong>(c));
 }
 
 Item *
@@ -414,7 +415,8 @@ RND_int::decrypt(Item * const ctext, uint64_t IV) const
     const uint64_t p = bf.decrypt(c) ^ IV;
     LOG(encl) << "RND_int decrypt " << c << " IV " << IV << " --> " << p;
 
-    return new Item_int(static_cast<ulonglong>(p));
+    return new (current_thd->mem_root)
+               Item_int(static_cast<ulonglong>(p));
 }
 
 static udf_func u_decRNDInt = {
@@ -442,11 +444,13 @@ RND_int::decryptUDF(Item * const col, Item * const ivcol) const
 
     l.push_back(ivcol);
 
-    Item * const udfdec = new Item_func_udf_int(&u_decRNDInt, l);
+    Item *const udfdec =
+        new (current_thd->mem_root) Item_func_udf_int(&u_decRNDInt, l);
     udfdec->name = NULL; //no alias
 
     //add encompassing CAST for unsigned
-    Item * const udf = new Item_func_unsigned(udfdec);
+    Item *const udf =
+        new (current_thd->mem_root) Item_func_unsigned(udfdec);
     udf->name = NULL;
 
     return udf;
@@ -486,8 +490,9 @@ RND_str::encrypt(const Item &ptext, uint64_t IV) const
               << IV << "--->" << "len of enc " << enc.length()
               << " enc " << enc;
 
-    return new Item_string(make_thd_string(enc), enc.length(),
-                           &my_charset_bin);
+    return new (current_thd->mem_root) Item_string(make_thd_string(enc),
+                                                   enc.length(),
+                                                   &my_charset_bin);
 }
 
 Item *
@@ -500,8 +505,9 @@ RND_str::decrypt(Item * const ctext, uint64_t IV) const
               << IV << "-->" << "len of dec " << dec.length()
               << " dec: " << dec;
 
-    return new Item_string(make_thd_string(dec), dec.length(),
-                           &my_charset_bin);
+    return new (current_thd->mem_root) Item_string(make_thd_string(dec),
+                                                   dec.length(),
+                                                   &my_charset_bin);
 }
 
 
@@ -529,7 +535,8 @@ RND_str::decryptUDF(Item * const col, Item * const ivcol) const
     l.push_back(get_key_item(rawkey));
     l.push_back(ivcol);
 
-    return new Item_func_udf_str(&u_decRNDString, l);
+    return new (current_thd->mem_root) Item_func_udf_str(&u_decRNDString,
+                                                         l);
 }
 
 
@@ -718,7 +725,7 @@ DET_abstract_number::encrypt(const Item &ptext, uint64_t IV) const
 
     const ulonglong res = static_cast<ulonglong>(bf.encrypt(value+shift));
     LOG(encl) << "DET_int enc " << value << "--->" << res;
-    return new Item_int(res);
+    return new (current_thd->mem_root) Item_int(res);
 }
 
 Item *
@@ -732,12 +739,12 @@ DET_abstract_number::decrypt(Item *const ctext, uint64_t IV) const
         longlong retdec = static_cast<longlong>(bf.decrypt(value));
         retdec -= shift;
         LOG(encl) << "DET_int dec " << value << "--->" << retdec;
-        return new Item_int(retdec);
+        return new (current_thd->mem_root) Item_int(retdec);
     }
 
     const ulonglong retdec = bf.decrypt(value) - shift;
     LOG(encl) << "DET_int dec " << value << "--->" << retdec;
-    return new Item_int(retdec);
+    return new (current_thd->mem_root) Item_int(retdec);
 }
 
 Item *
@@ -749,13 +756,17 @@ DET_abstract_number::decryptUDF(Item *const col, Item *const ivcol)
 
     l.push_back(get_key_item(key));
     // Only used for signed columns, otherwise zero.
-    l.push_back(new Item_int(static_cast<ulonglong>(shift)));
+    l.push_back(new (current_thd->mem_root)
+                    Item_int(static_cast<ulonglong>(shift)));
 
-    Item *const udfdec = new Item_func_udf_int(&u_decDETInt, l);
+    Item *const udfdec = new (current_thd->mem_root)
+                             Item_func_udf_int(&u_decDETInt, l);
     udfdec->name = NULL;
 
-    Item *const udf = 0 == shift ? new Item_func_unsigned(udfdec)
-                                 : new Item_func_signed(udfdec);
+    Item *const udf = 0 == shift ? new (current_thd->mem_root)
+                                       Item_func_unsigned(udfdec)
+                                 : new (current_thd->mem_root)
+                                       Item_func_signed(udfdec);
     udf->name = NULL;
 
     return udf;
@@ -841,7 +852,7 @@ decimal_to_int(const Item_decimal &v, uint decimals,
 {
     const ulonglong res = RiboldMYSQL::val_real(v) * shift;
 
-    return new Item_int(res);
+    return new (current_thd->mem_root) Item_int(res);
 }
 
 Item *DET_abstract_decimal::encrypt(const Item &ptext, uint64_t IV) const
@@ -859,8 +870,9 @@ Item *DET_abstract_decimal::decrypt(Item *const ctext, uint64_t IV) const
         res_int(static_cast<Item_int*>(DET_abstract_number::decrypt(ctext,
                                                                     IV)));
     Item_decimal * const res =
-        new Item_decimal(res_int->value*1.0/shift, decimals,
-                         decimals);
+        new (current_thd->mem_root) Item_decimal(res_int->value*1.0/shift,
+                                                 decimals,
+                                                 decimals);
     LOG(encl) << "DET_dec dec " << res_int->value << "--->"
               << RiboldMYSQL::val_real(*res) << std::endl;
 
@@ -912,8 +924,9 @@ DET_str::encrypt(const Item &ptext, uint64_t IV) const
     LOG(encl) << " DET_str encrypt " << plain  << " IV " << IV << " ---> "
               << " enc len " << enc.length() << " enc " << enc;
 
-    return new Item_string(make_thd_string(enc), enc.length(),
-                           &my_charset_bin);
+    return new (current_thd->mem_root) Item_string(make_thd_string(enc),
+                                                   enc.length(),
+                                                   &my_charset_bin);
 }
 
 Item *
@@ -925,8 +938,9 @@ DET_str::decrypt(Item * const ctext, uint64_t IV) const
               << " enc " << enc << " IV " << IV << " ---> "
               << " dec len " << dec.length() << " dec " << dec;
 
-    return new Item_string(make_thd_string(dec), dec.length(),
-                           &my_charset_bin);
+    return new (current_thd->mem_root) Item_string(make_thd_string(dec),
+                                                   dec.length(),
+                                                   &my_charset_bin);
 }
 
 static udf_func u_decDETStr = {
@@ -951,7 +965,7 @@ DET_str::decryptUDF(Item * const col, Item * const ivcol) const
     List<Item> l;
     l.push_back(col);
     l.push_back(get_key_item(rawkey));
-    return new Item_func_udf_str(&u_decDETStr, l);
+    return new (current_thd->mem_root) Item_func_udf_str(&u_decDETStr, l);
 
 }
 
@@ -1263,8 +1277,9 @@ OPE_dec::decrypt(Item * const ctext, uint64_t IV) const
         res_int(static_cast<Item_int *>(OPE_int::decrypt(ctext, IV)));
 
     Item_decimal * const res =
-        new Item_decimal(res_int->value*1.0/shift, decimals,
-                         decimals);
+        new (current_thd->mem_root) Item_decimal(res_int->value*1.0/shift,
+                                                 decimals,
+                                                 decimals);
 
     return res;
 }
@@ -1297,7 +1312,7 @@ OPE_int::encrypt(const Item &ptext, uint64_t IV) const
     LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV
               << "--->" << enc;
 
-    return new Item_int(enc);
+    return new (current_thd->mem_root) Item_int(enc);
 }
 
 Item *
@@ -1309,7 +1324,7 @@ OPE_int::decrypt(Item * const ctext, uint64_t IV) const
     LOG(encl) << "OPE_int decrypt " << cval << " IV " << IV
               << "--->" << dec << std::endl;
 
-    return new Item_int(dec);
+    return new (current_thd->mem_root) Item_int(dec);
 }
 
 
@@ -1357,7 +1372,8 @@ OPE_str::encrypt(const Item &ptext, uint64_t IV) const
 
     const ZZ enc = ope.encrypt(to_ZZ(pv));
 
-    return new Item_int(static_cast<ulonglong>(uint64FromZZ(enc)));
+    return new (current_thd->mem_root)
+               Item_int(static_cast<ulonglong>(uint64FromZZ(enc)));
 }
 
 Item *
@@ -1427,7 +1443,7 @@ static Item *
 ZZToItemInt(const ZZ &val)
 {
     const ulonglong v = uint64FromZZ(val);
-    return new Item_int(v);
+    return new (current_thd->mem_root) Item_int(v);
 }
 
 static Item *
@@ -1435,7 +1451,8 @@ ZZToItemStr(const ZZ &val)
 {
     const std::string str = StringFromZZ(val);
     Item * const newit =
-        new Item_string(make_thd_string(str), str.length(),
+        new (current_thd->mem_root) Item_string(make_thd_string(str),
+                                                str.length(),
                         &my_charset_bin);
     newit->name = NULL; //no alias
 
@@ -1504,7 +1521,9 @@ ZZToItemDec(const ZZ &val, const ZZ &shift)
     const std::string num =
         DecStringFromZZ(val_int) + "." + DecStringFromZZ(val_dec);
     
-    return new Item_decimal(num.data(), num.length(), &my_charset_numeric);
+    return new (current_thd->mem_root) Item_decimal(num.data(),
+                                                    num.length(),
+                                                    &my_charset_numeric);
 }
 
 
@@ -1602,7 +1621,7 @@ HOM::sumUDA(Item *const expr) const
     List<Item> l;
     l.push_back(expr);
     l.push_back(ZZToItemStr(sk->hompubkey()));
-    return new Item_func_udf_str(&u_sum_a, l);
+    return new (current_thd->mem_root) Item_func_udf_str(&u_sum_a, l);
 }
 
 Item *
@@ -1613,7 +1632,7 @@ HOM::sumUDF(Item *const i1, Item *const i2) const
     l.push_back(i2);
     l.push_back(ZZToItemStr(sk->hompubkey()));
 
-    return new Item_func_udf_str(&u_sum_f, l);
+    return new (current_thd->mem_root) Item_func_udf_str(&u_sum_f, l);
 }
 
 HOM::~HOM() {

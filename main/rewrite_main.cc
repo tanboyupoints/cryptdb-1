@@ -671,7 +671,6 @@ decrypt_item_layers(Item *const i, const FieldMeta *const fm, onion o,
     assert(!i->is_null());
 
     Item *dec = i;
-    Item *prev_dec = NULL;
 
     const OnionMeta *const om = fm->getOnionMeta(o);
     assert(om);
@@ -679,11 +678,6 @@ decrypt_item_layers(Item *const i, const FieldMeta *const fm, onion o,
     for (auto it = enc_layers.rbegin(); it != enc_layers.rend(); ++it) {
         dec = (*it)->decrypt(dec, IV);
         LOG(cdb_v) << "dec okay";
-        //need to free space for all decs except last
-        if (prev_dec) {
-            delete prev_dec;
-        }
-        prev_dec = dec;
     }
 
     return dec;
