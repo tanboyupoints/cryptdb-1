@@ -396,7 +396,7 @@ encrypt_item_layers(const Item &i, onion o, const OnionMeta &om,
 
     const auto &enc_layers = a.getEncLayers(om);
     assert_s(enc_layers.size() > 0, "onion must have at least one layer");
-    const Item *enc = &i, *prev_enc = NULL;
+    const Item *enc = &i;
     Item *new_enc = NULL;
 
     for (auto it = enc_layers.begin(); it != enc_layers.end(); it++) {
@@ -406,10 +406,9 @@ encrypt_item_layers(const Item &i, onion o, const OnionMeta &om,
         new_enc = (*it)->encrypt(const_cast<Item *>(enc), IV);
         //need to free space for all enc
         //except the last one
-        if (prev_enc) {
-            delete prev_enc;
+        if (enc && enc != &i) {
+            delete enc;
         }
-        prev_enc = enc;
         enc = new_enc;
     }
 
