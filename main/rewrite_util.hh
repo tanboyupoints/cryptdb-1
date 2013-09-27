@@ -25,7 +25,7 @@ rewrite_table_list(const TABLE_LIST * const t,
                    const std::string &anon_name);
 
 SQL_I_List<TABLE_LIST>
-rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
+rewrite_table_list(const SQL_I_List<TABLE_LIST> &tlist, Analysis &a,
                    bool if_exists=false);
 
 List<TABLE_LIST>
@@ -112,7 +112,7 @@ typical_rewrite_insert_type(const Item &i, const FieldMeta &fm,
                             Analysis &a, std::vector<Item *> *l);
 
 void
-process_select_lex(st_select_lex *select_lex, Analysis &a);
+process_select_lex(const st_select_lex &select_lex, Analysis &a);
 
 void
 process_table_list(List<TABLE_LIST> *tll, Analysis &a);

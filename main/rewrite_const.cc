@@ -84,8 +84,8 @@ static class ANON : public CItemSubtypeIT<Item_int, Item::Type::INT_ITEM> {
     virtual RewritePlan *
     do_gather_type(const Item_int &i, Analysis &a) const
     {
-        LOG(cdb_v) << "CItemSubtypeIT (L966) num do_gather "
-                   << const_cast<Item_int &>(i);
+        LOG(cdb_v) << "CItemSubtypeIT (L966) num do_gather " << i
+                   << std::endl;
         const std::string why = "is an int constant";
         reason rsn(FULL_EncSet_Int, why, i);
         return new RewritePlan(FULL_EncSet_Int, rsn);

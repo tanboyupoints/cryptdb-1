@@ -16,7 +16,7 @@ process_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a);
 
 static void
-process_filters_lex(st_select_lex * select_lex, Analysis & a);
+process_filters_lex(const st_select_lex &select_lex, Analysis &a);
 
 static inline void
 analyze_field_value_pair(const Item_field &field, const Item &val,
@@ -193,7 +193,7 @@ class UpdateHandler : public DMLHandler {
             process_field_value_pairs(fd_it, val_it, a);
         }
 
-        process_filters_lex(&lex->select_lex, a);
+        process_filters_lex(lex->select_lex, a);
     }
 
     virtual  LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
@@ -280,19 +280,18 @@ class SelectHandler : public DMLHandler {
 // Helpers.
 
 static void
-process_order(Analysis & a, SQL_I_List<ORDER> & lst) {
-
-    for (ORDER *o = lst.first; o; o = o->next) {
+process_order(const SQL_I_List<ORDER> &lst, Analysis &a)
+{
+    for (const ORDER *o = lst.first; o; o = o->next) {
         analyze(**o->item, a);
     }
 }
 
-//TODO: not clear how these process_*_lex and rewrite_*_lex overlap, cleanup
 static void
-process_filters_lex(st_select_lex * select_lex, Analysis & a) {
-
-    if (select_lex->where) {
-        analyze(*select_lex->where, a);
+process_filters_lex(const st_select_lex &select_lex, Analysis &a)
+{
+    if (select_lex.where) {
+        analyze(*select_lex.where, a);
     }
 
     /*if (select_lex->join &&
@@ -300,12 +299,12 @@ process_filters_lex(st_select_lex * select_lex, Analysis & a) {
         select_lex->where != select_lex->join->conds)
         analyze(select_lex->join->conds, reason(FULL_EncSet, "join->conds", select_lex->join->conds, 0), a);*/
 
-    if (select_lex->having) {
-        analyze(*select_lex->having, a);
+    if (select_lex.having) {
+        analyze(*select_lex.having, a);
     }
 
-    process_order(a, select_lex->group_list);
-    process_order(a, select_lex->order_list);
+    process_order(select_lex.group_list, a);
+    process_order(select_lex.order_list, a);
 
 }
 
@@ -313,15 +312,15 @@ static void
 process_select_lex(LEX *lex, Analysis & a)
 {
     process_table_list(&lex->select_lex.top_join_list, a);
-    process_select_lex(&lex->select_lex, a);
+    process_select_lex(lex->select_lex, a);
 }
 
-// FIXME: @select_lex should be const.
 void
-process_select_lex(st_select_lex *const select_lex, Analysis &a)
+process_select_lex(const st_select_lex &select_lex, Analysis &a)
 {
     //select clause
-    auto item_it = List_iterator<Item>(select_lex->item_list);
+    auto item_it =
+        RiboldMYSQL::constList_iterator<Item>(select_lex.item_list);
     for (;;) {
         const Item *const item = item_it++;
         if (!item)
@@ -604,7 +603,7 @@ rewrite_select_lex(const st_select_lex &select_lex, Analysis &a)
     LOG(cdb_v) << "rewrite select lex input is "
                << const_cast<st_select_lex &>(select_lex);
     auto item_it =
-        List_iterator<Item>(const_cast<List<Item> &>(select_lex.item_list));
+        RiboldMYSQL::constList_iterator<Item>(select_lex.item_list);
 
     List<Item> newList;
     for (;;) {
@@ -673,7 +672,7 @@ process_table_joins_and_derived(List<TABLE_LIST> *tll, Analysis & a)
              // Not quite right, in terms of softness:
              // should really come from the items that eventually
              // reference columns in this derived table.
-            process_select_lex(u->first_select(), a);
+            process_select_lex(*u->first_select(), a);
         }
     }
 }

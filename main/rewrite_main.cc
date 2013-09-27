@@ -736,17 +736,18 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
         // Gather subquery.
         std::unique_ptr<Analysis>
             subquery_analysis(new Analysis(a.getSchema()));
-        st_select_lex *const select_lex =
-            const_cast<Item_subselect &>(i).get_select_lex();
-        process_table_list(&select_lex->top_join_list,
+        const st_select_lex *const select_lex =
+            RiboldMYSQL::get_select_lex(i);
+        process_table_list(const_cast<List<TABLE_LIST> *>(&select_lex->top_join_list),
                            *subquery_analysis);
-        process_select_lex(select_lex, *subquery_analysis.get());
+        process_select_lex(*select_lex, *subquery_analysis);
 
         // HACK: Forces the subquery to use PLAINVAL for it's
         // projections.
-        auto item_it = List_iterator<Item>(select_lex->item_list);
+        auto item_it =
+            RiboldMYSQL::constList_iterator<Item>(select_lex->item_list);
         for (;;) {
-            Item *const item = item_it++;
+            const Item *const item = item_it++;
             if (!item) {
                 break;
             }
@@ -800,9 +801,8 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
     {
         const RewritePlanWithAnalysis &rp_w_analysis =
             static_cast<const RewritePlanWithAnalysis &>(rp);
-        // FIXME: const?
-        st_select_lex *const select_lex =
-            const_cast<Item_subselect &>(i).get_select_lex();
+        const st_select_lex *const select_lex =
+            RiboldMYSQL::get_select_lex(i);
 
         // ------------------------------
         //    General Subquery Rewrite
@@ -823,7 +823,8 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
         //   general solution seems difficuly.
         // > set_select_lex() attemps to rectify this problem in other
         //   cases
-        memcpy(select_lex, new_select_lex, sizeof(st_select_lex));
+        memcpy(const_cast<st_select_lex *>(select_lex), new_select_lex,
+               sizeof(st_select_lex));
 
         // ------------------------------
         //   Specific Subquery Rewrite

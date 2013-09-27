@@ -77,7 +77,7 @@ rewrite_table_list(const TABLE_LIST * const t,
 // @if_exists: defaults to false; it is necessary to facilitate
 //   'DROP TABLE IF EXISTS'
 SQL_I_List<TABLE_LIST>
-rewrite_table_list(SQL_I_List<TABLE_LIST> tlist, Analysis &a,
+rewrite_table_list(const SQL_I_List<TABLE_LIST> &tlist, Analysis &a,
                    bool if_exists)
 {
     if (!tlist.elements) {
@@ -163,8 +163,7 @@ gather(const Item &i, Analysis &a)
 void
 analyze(const Item &i, Analysis &a)
 {
-    LOG(cdb_v) << "calling gather for item "
-               << const_cast<Item &>(i) << std::endl;
+    LOG(cdb_v) << "calling gather for item " << i << std::endl;
     a.rewritePlans[&i] = std::unique_ptr<RewritePlan>(gather(i, a));
 }
 
@@ -388,7 +387,6 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
 }
 
 //TODO: which encrypt/decrypt should handle null?
-// FIXME: @i should be const_cast
 Item *
 encrypt_item_layers(const Item &i, onion o, const OnionMeta &om,
                     const Analysis &a, uint64_t IV) {

@@ -43,8 +43,7 @@ rewrite_agg_args(const Item_sum &oldi, const OLK &constr,
 
     std::list<Item *> res = std::list<Item *>();
     for (int j = 0; j < no_args; j++) {
-        const Item *const child_item =
-            const_cast<Item_sum &>(oldi).get_arg(j);
+        const Item *const child_item = RiboldMYSQL::get_arg(oldi, j);
         Item *const out_child_item =
             itemTypes.do_rewrite(*child_item, rp.olk,
                                  *rp.childr_rp[j].get(), a);
@@ -63,7 +62,7 @@ class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
         const unsigned int arg_count =
             RiboldMYSQL::get_arg_count(i);
         TEST_BadItemArgumentCount(i.type(), 1, arg_count);
-        Item *const child = const_cast<Item_sum_count &>(i).get_arg(0);
+        const Item *const child = RiboldMYSQL::get_arg(i, 0);
 
         std::vector<std::shared_ptr<RewritePlan> >
             childr_rp({std::shared_ptr<RewritePlan>(gather(*child, a))});
@@ -110,7 +109,7 @@ class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
     {
         const unsigned int arg_count = RiboldMYSQL::get_arg_count(i);
         TEST_BadItemArgumentCount(i.type(), 1, arg_count);
-        Item *const child = const_cast<Item_sum_hybrid &>(i).get_arg(0);
+        const Item *const child = RiboldMYSQL::get_arg(i, 0);
 
         std::vector<std::shared_ptr<RewritePlan> >
             childr_rp({std::shared_ptr<RewritePlan>(gather(*child, a))});
@@ -151,8 +150,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
 
         const unsigned int arg_count = RiboldMYSQL::get_arg_count(i);
         TEST_BadItemArgumentCount(i.type(), 1, arg_count);
-        const Item *const child_item =
-            const_cast<Item_sum_sum &>(i).get_arg(0);
+        const Item *const child_item = RiboldMYSQL::get_arg(i, 0);
 
         std::vector<std::shared_ptr<RewritePlan> >
             childr_rp({std::shared_ptr<RewritePlan>(gather(*child_item,
@@ -196,9 +194,10 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
         } else {
             TEST_UnexpectedSecurityLevel(constr.o, SECLEVEL::PLAINVAL,
                                          constr.l);
-            Item_sum_sum *const out_i =
-                new Item_sum_sum(const_cast<Item_sum_sum &>(i).get_arg(0), i.has_with_distinct());
-            return out_i;
+
+            Item *const new_arg =
+                RiboldMYSQL::clone_item(*RiboldMYSQL::get_arg(i, 0));
+            return new Item_sum_sum(new_arg, i.has_with_distinct());
         }
     }
 };
@@ -274,8 +273,7 @@ static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
         const std::string anon_field = om.getAnonOnionName();
 
         Item *const new_ref = itemTypes.do_rewrite(**i.ref, constr, rp, a);
-        return make_item(&const_cast<Item_ref &>(i), new_ref,
-                         anon_table, anon_field);
+        return make_item(i, new_ref, anon_table, anon_field);
     }
 } ANON;
 

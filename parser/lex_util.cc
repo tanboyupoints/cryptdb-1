@@ -38,18 +38,18 @@ make_item(const Item_field &i, const std::string &table_name,
 }
 
 Item_ref *
-make_item(Item_ref *const i, Item *const new_ref,
+make_item(const Item_ref &i, Item *const new_ref,
           const std::string &table_name,
           const std::string &field_name)
 {
-    assert(i->type() == Item::Type::REF_ITEM);
+    assert(i.type() == Item::Type::REF_ITEM);
     assert(field_name.size() > 0 && table_name.size() > 0);
 
     THD *const thd = current_thd;
     assert(thd);
 
     // bootstrap i0 from t
-    Item_ref *const i0 = new Item_ref(thd, i);
+    Item_ref *const i0 = new Item_ref(thd, &const_cast<Item_ref &>(i));
 
     i0->ref = new Item *;
     *i0->ref = new_ref;
@@ -193,7 +193,18 @@ uint RiboldMYSQL::get_arg_count(const Item_sum &i)
     return const_cast<Item_sum &>(i).get_arg_count();
 }
 
+const Item *RiboldMYSQL::get_arg(const Item_sum &item, uint i)
+{
+    return const_cast<Item_sum &>(item).get_arg(i);
+}
+
 Item_subselect::subs_type RiboldMYSQL::substype(const Item_subselect &i)
 {
     return const_cast<Item_subselect &>(i).substype();
+}
+
+const st_select_lex *
+RiboldMYSQL::get_select_lex(const Item_subselect &i)
+{
+    return const_cast<Item_subselect &>(i).get_select_lex();
 }

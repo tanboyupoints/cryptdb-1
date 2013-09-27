@@ -33,7 +33,7 @@ T *copyWithTHD(const T *const x) {
 Item_field *make_item(const Item_field &t,
                       const std::string &table_name = "",
                       const std::string &field_name = "");
-Item_ref *make_item(Item_ref *const t, Item *const new_ref,
+Item_ref *make_item(const Item_ref &t, Item *const new_ref,
                     const std::string &table_name = "",
                     const std::string &field_name = "");
 Item_string *make_item(Item_string *const i);
@@ -61,7 +61,22 @@ namespace RiboldMYSQL {
     Item *clone_item(const Item &i);
     List<Item> *argument_list(const Item_cond &i);
     uint get_arg_count(const Item_sum &i);
+    const Item *get_arg(const Item_sum &item, uint i);
     Item_subselect::subs_type substype(const Item_subselect &i);
+    const st_select_lex *get_select_lex(const Item_subselect &i);
+
+    template <typename T>
+    class constList_iterator {
+        List_iterator<T> iter;
+    public:
+        constList_iterator(const List<T> &list)
+            : iter(List_iterator<T>(const_cast<List<T> &>(list))) {}
+        const T* operator++(int)
+        {
+            const T *const t = iter++;
+            return t;
+        }
+    };
 };
 
 // Creates a SQL_I_List that contains one element
