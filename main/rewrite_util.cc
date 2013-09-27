@@ -392,7 +392,7 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
 Item *
 encrypt_item_layers(const Item &i, onion o, const OnionMeta &om,
                     const Analysis &a, uint64_t IV) {
-    assert(!const_cast<Item &>(i).is_null());
+    assert(!RiboldMYSQL::is_null(i));
 
     const auto &enc_layers = a.getEncLayers(om);
     assert_s(enc_layers.size() > 0, "onion must have at least one layer");

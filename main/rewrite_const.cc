@@ -29,12 +29,12 @@
 static Item *
 encrypt_item(const Item &i, const OLK &olk, Analysis &a)
 {
-    assert(!const_cast<Item &>(i).is_null());
+    assert(!RiboldMYSQL::is_null(i));
 
     FieldMeta * const fm = olk.key;
     // HACK + BROKEN.
     if (!fm && oPLAIN == olk.o) {
-        return const_cast<Item &>(i).clone_item();
+        return RiboldMYSQL::clone_item(i);
     }
     assert(fm);
 

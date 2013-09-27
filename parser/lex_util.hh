@@ -30,7 +30,7 @@ T *copyWithTHD(const T *const x) {
 
 /* Makes a new item based on
  * information from an old item */
-Item_field *make_item(Item_field *const t,
+Item_field *make_item(const Item_field &t,
                       const std::string &table_name = "",
                       const std::string &field_name = "");
 Item_ref *make_item(Item_ref *const t, Item *const new_ref,
@@ -56,6 +56,13 @@ set_where(st_select_lex *const sl, Item *const where);
 void
 set_having(st_select_lex *const sl, Item *const having);
 
+namespace RiboldMYSQL {
+    bool is_null(const Item &i);
+    Item *clone_item(const Item &i);
+    List<Item> *argument_list(const Item_cond &i);
+    uint get_arg_count(const Item_sum &i);
+    Item_subselect::subs_type substype(const Item_subselect &i);
+};
 
 // Creates a SQL_I_List that contains one element
 template <typename T>
@@ -140,3 +147,4 @@ filterList(List_iterator<Type> it, std::function<bool(Type *)> op)
 
     return new_list;
 }
+

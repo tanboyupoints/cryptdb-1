@@ -243,8 +243,7 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
     virtual RewritePlan *
     do_gather_type(const Item_func &i, Analysis &a) const
     {
-        LOG(cdb_v) << "CItemCompare (L1139) do_gather func "
-                   << const_cast<Item_func &>(i);
+        LOG(cdb_v) << "CItemCompare (L1139) do_gather func " << i;
 
         std::string why;
 
@@ -308,7 +307,7 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
     do_gather_type(const Item_cond &i, Analysis &a) const
     {
         const unsigned int arg_count =
-            const_cast<Item_cond &>(i).argument_list()->elements;
+            RiboldMYSQL::argument_list(i)->elements;
         // > Multiple ANDs in a query are represented with a single AND
         //   in the LEX.
         // TEST_BadItemArgumentCount(i->type(), 2, arg_count);
@@ -319,11 +318,10 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
         std::vector<std::pair<std::shared_ptr<RewritePlan>, OLK>>
             out_child_olks(arg_count);
 
-        auto it =
-            List_iterator<Item>(*const_cast<Item_cond &>(i).argument_list());
+        auto it = List_iterator<Item>(*RiboldMYSQL::argument_list(i));
         unsigned int index = 0;
         for (;;) {
-            Item * const argitem = it++;
+            const Item * const argitem = it++;
             if (!argitem)
                 break;
             assert(index < arg_count);
@@ -352,12 +350,11 @@ class CItemCond : public CItemSubtypeFT<Item_cond, FT> {
                     const RewritePlan &rp, Analysis &a) const
     {
         const unsigned int arg_count =
-            const_cast<Item_cond &>(i).argument_list()->elements;
+            RiboldMYSQL::argument_list(i)->elements;
 
         const RewritePlanPerChildOLK &rp_per_child =
             static_cast<const RewritePlanPerChildOLK &>(rp);
-        auto it =
-            List_iterator<Item>(*const_cast<Item_cond &>(i).argument_list());
+        auto it = List_iterator<Item>(*RiboldMYSQL::argument_list(i));
         List<Item> out_list;
         unsigned int index = 0;
         for (;;) {
@@ -908,8 +905,7 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
     virtual RewritePlan *
     do_gather_type(const Item_func_min_max &i, Analysis &a) const
     {
-        const unsigned int arg_count =
-            const_cast<Item_func_min_max &>(i).argument_count();
+        const unsigned int arg_count = i.argument_count();
         TEST_BadItemArgumentCount(i.type(), 2, arg_count);
 
         Item *const *const args = i.arguments();

@@ -762,7 +762,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
         const EncSet out_es = PLAIN_EncSet;
         const reason rsn = reason(out_es, why, i);
 
-        switch (const_cast<Item_subselect &>(i).substype()) {
+        switch (RiboldMYSQL::substype(i)) {
             case Item_subselect::subs_type::SINGLEROW_SUBS:
                 break;
             case Item_subselect::subs_type::EXISTS_SUBS:
@@ -829,7 +829,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
         //   Specific Subquery Rewrite
         // ------------------------------
         {
-            switch (const_cast<Item_subselect &>(i).substype()) {
+            switch (RiboldMYSQL::substype(i)) {
                 case Item_subselect::subs_type::SINGLEROW_SUBS:
                     return new Item_singlerow_subselect(new_select_lex);
                 case Item_subselect::subs_type::EXISTS_SUBS:

@@ -101,12 +101,12 @@ class InsertHandler : public DMLHandler {
             // Collect the implicit defaults.
             std::vector<FieldMeta *> field_implicit_defaults =
                 vectorDifference(tm.defaultedFieldMetas(), fmVec);
-            Item_field *const seed_item_field =
+            const Item_field *const seed_item_field =
                 static_cast<Item_field *>(new_lex->field_list.head());
             for (auto implicit_it : field_implicit_defaults) {
                 // Get default fields.
                 const Item_field *const item_field =
-                    make_item(seed_item_field, table, implicit_it->fname);
+                    make_item(*seed_item_field, table, implicit_it->fname);
                 rewriteInsertHelper(*item_field, *implicit_it, a,
                                     &newList);
 
@@ -514,14 +514,15 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
         if (add_salt) {
             const salt_type salt = a.salts[&fm];
             assert(res_items->elements != 0);
-            Item_field * const rew_fd =
+            const Item_field * const rew_fd =
                 static_cast<Item_field *>(res_items->head());
             assert(rew_fd);
             const std::string anon_table_name = rew_fd->table_name;
             const std::string anon_field_name = fm.getSaltName();
-            res_items->push_back(make_item(rew_fd, anon_table_name,
+            res_items->push_back(make_item(*rew_fd, anon_table_name,
                                            anon_field_name));
-            res_values->push_back(new Item_int((ulonglong)salt));
+            res_values->push_back(
+                    new Item_int(static_cast<ulonglong>(salt)));
         }
     }
 }
@@ -583,7 +584,7 @@ rewrite_proj(const Item &i, const RewritePlan &rp, Analysis &a,
             static_cast<Item_field *>(ir.get())->table_name;
         const std::string anon_field_name = olk.get().key->getSaltName();
         Item_field *const ir_field =
-            make_item(static_cast<Item_field *>(ir.get()),
+            make_item(*static_cast<Item_field *>(ir.get()),
                       anon_table_name, anon_field_name);
         newList->push_back(ir_field);
         addSaltToReturn(&a.rmeta, a.pos++);

@@ -36,9 +36,9 @@ rewrite_agg_args(const Item_sum &oldi, const OLK &constr,
 {
     if (no_args >= 0) {
         TEST_BadItemArgumentCount(oldi.type(), no_args,
-                                  const_cast<Item_sum &>(oldi).get_arg_count());
+                                  RiboldMYSQL::get_arg_count(oldi));
     } else {
-        no_args = const_cast<Item_sum &>(oldi).get_arg_count();
+        no_args = RiboldMYSQL::get_arg_count(oldi);
     }
 
     std::list<Item *> res = std::list<Item *>();
@@ -61,7 +61,7 @@ class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
     do_gather_type(const Item_sum_count &i, Analysis &a) const
     {
         const unsigned int arg_count =
-            const_cast<Item_sum_count &>(i).get_arg_count();
+            RiboldMYSQL::get_arg_count(i);
         TEST_BadItemArgumentCount(i.type(), 1, arg_count);
         Item *const child = const_cast<Item_sum_count &>(i).get_arg(0);
 
@@ -108,8 +108,7 @@ class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
     virtual RewritePlan *
     do_gather_type(const Item_sum_hybrid &i, Analysis &a) const
     {
-        const unsigned int arg_count =
-            const_cast<Item_sum_hybrid &>(i).get_arg_count();
+        const unsigned int arg_count = RiboldMYSQL::get_arg_count(i);
         TEST_BadItemArgumentCount(i.type(), 1, arg_count);
         Item *const child = const_cast<Item_sum_hybrid &>(i).get_arg(0);
 
@@ -150,8 +149,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
     {
         LOG(cdb_v) << "gather Item_sum_sum " << i << std::endl;
 
-        const unsigned int arg_count =
-            const_cast<Item_sum_sum &>(i).get_arg_count();
+        const unsigned int arg_count = RiboldMYSQL::get_arg_count(i);
         TEST_BadItemArgumentCount(i.type(), 1, arg_count);
         const Item *const child_item =
             const_cast<Item_sum_sum &>(i).get_arg(0);
@@ -294,7 +292,7 @@ static class ANON : public CItemSubtypeIT<Item_null, Item::Type::NULL_ITEM> {
     do_rewrite_type(const Item_null &i, const OLK &constr,
                     const RewritePlan &rp, Analysis &a) const
     {
-        return &const_cast<Item_null &>(i);
+        return RiboldMYSQL::clone_item(i);
     }
 
     virtual void
@@ -302,7 +300,7 @@ static class ANON : public CItemSubtypeIT<Item_null, Item::Type::NULL_ITEM> {
                            Analysis &a, std::vector<Item *> *l) const
     {
         for (uint j = 0; j < fm.children.size(); ++j) {
-            l->push_back(make_item(&const_cast<Item_null &>(i)));
+            l->push_back(RiboldMYSQL::clone_item(i));
         }
         if (fm.has_salt) {
             const ulonglong salt = randomValue();

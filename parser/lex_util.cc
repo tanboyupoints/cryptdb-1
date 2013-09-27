@@ -21,16 +21,17 @@ init_new_ident(Item_ident *const i, const std::string &table_name = "",
 }
 
 Item_field *
-make_item(Item_field *const i, const std::string &table_name,
+make_item(const Item_field &i, const std::string &table_name,
           const std::string &field_name)
 {
-    assert(i->type() == Item::Type::FIELD_ITEM);
+    assert(i.type() == Item::Type::FIELD_ITEM);
 
     THD *const thd = current_thd;
     assert(thd);
 
     // bootstrap i0 from t
-    Item_field *const i0 = new Item_field(thd, i);
+    Item_field *const i0 =
+        new Item_field(thd, &const_cast<Item_field &>(i));
     init_new_ident(i0, table_name, field_name);
 
     return i0;
@@ -169,4 +170,30 @@ set_having(st_select_lex *const sl, Item *const having)
     if (sl->join) {
         sl->join->having = having;
     }
+}
+
+bool RiboldMYSQL::is_null(const Item &i)
+{
+    return const_cast<Item &>(i).is_null();
+}
+
+Item *RiboldMYSQL::clone_item(const Item &i)
+{
+    return const_cast<Item &>(i).clone_item();
+}
+
+// FIXME: Clean this up by offering a const List_iterator.
+List<Item> *RiboldMYSQL::argument_list(const Item_cond &i)
+{
+    return const_cast<Item_cond &>(i).argument_list();
+}
+
+uint RiboldMYSQL::get_arg_count(const Item_sum &i)
+{
+    return const_cast<Item_sum &>(i).get_arg_count();
+}
+
+Item_subselect::subs_type RiboldMYSQL::substype(const Item_subselect &i)
+{
+    return const_cast<Item_subselect &>(i).substype();
 }
