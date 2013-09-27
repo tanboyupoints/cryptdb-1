@@ -505,7 +505,7 @@ returnResultSet(lua_State *const L, const ResType &rd)
             if (NULL == rd.rows[i][j]) {
                 lua_pushnil(L);
             } else {
-                xlua_pushlstring(L, ItemToString(rd.rows[i][j].get()));
+                xlua_pushlstring(L, ItemToString(*rd.rows[i][j]));
             }
             lua_rawseti(L, t_row, j+1);
         }

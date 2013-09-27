@@ -62,11 +62,11 @@ public:
         newCreateField(const Create_field * const cf,
                        const std::string &anonname = "") const = 0;
 
-    virtual Item * encrypt(Item * const ptext, uint64_t IV) const = 0;
-    virtual Item * decrypt(Item * const ctext, uint64_t IV) const = 0;
+    virtual Item *encrypt(const Item &ptext, uint64_t IV) const = 0;
+    virtual Item *decrypt(Item * const ctext, uint64_t IV) const = 0;
 
     // returns the decryptUDF to remove the onion layer
-    virtual Item * decryptUDF(Item * const col, Item * const ivcol = NULL)
+    virtual Item *decryptUDF(Item * const col, Item * const ivcol = NULL)
         const
     {
         thrower() << "decryptUDF not supported";
@@ -101,7 +101,7 @@ public:
         const;
 
     //TODO needs multi encrypt and decrypt
-    Item * encrypt(Item * const p, uint64_t IV) const;
+    Item *encrypt(const Item &p, uint64_t IV) const;
     Item * decrypt(Item * const c, uint64_t IV) const;
 
     //expr is the expression (e.g. a field) over which to sum
@@ -130,7 +130,7 @@ public:
                                   const std::string &anonname = "")
         const;
 
-    Item * encrypt(Item * const ptext, uint64_t IV) const;
+    Item *encrypt(const Item &ptext, uint64_t IV) const;
     Item * decrypt(Item * const ctext, uint64_t IV) const
         __attribute__((noreturn));
 
@@ -169,7 +169,7 @@ public:
     virtual Create_field *newCreateField(const Create_field * const cf,
                                          const std::string &anonname = "")
         const;
-    Item *encrypt(Item * const ptext, uint64_t IV) const;
+    Item *encrypt(const Item &ptext, uint64_t IV) const;
     Item *decrypt(Item * const ctext, uint64_t IV) const;
     Item *decryptUDF(Item * const col, Item * const ivcol = NULL)
         const __attribute__((noreturn));

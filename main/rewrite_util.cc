@@ -397,8 +397,8 @@ encrypt_item_layers(const Item &i, onion o, const OnionMeta &om,
     for (auto it = enc_layers.begin(); it != enc_layers.end(); it++) {
         LOG(encl) << "encrypt layer "
                   << TypeText<SECLEVEL>::toText((*it)->level()) << "\n";
-        // FIXME: Push this cast to the cryptohandlers.
-        new_enc = (*it)->encrypt(const_cast<Item *>(enc), IV);
+        new_enc = (*it)->encrypt(*enc, IV);
+        assert(new_enc);
         //need to free space for all enc
         //except the last one
         if (enc && enc != &i) {

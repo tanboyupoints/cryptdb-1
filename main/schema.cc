@@ -416,7 +416,7 @@ std::string FieldMeta::determineDefaultValue(bool has_default,
     }
 
     if (cf->def) {
-        return ItemToString(cf->def);
+        return ItemToString(*cf->def);
     } else {
         if (true == IsMySQLTypeNumeric(cf->sql_type)) {
             return zero_string;

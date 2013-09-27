@@ -30,18 +30,19 @@ T *copyWithTHD(const T *const x) {
 
 /* Makes a new item based on
  * information from an old item */
-Item_field *make_item(const Item_field &t,
-                      const std::string &table_name = "",
-                      const std::string &field_name = "");
-Item_ref *make_item(const Item_ref &t, Item *const new_ref,
-                    const std::string &table_name = "",
-                    const std::string &field_name = "");
-Item_string *make_item(Item_string *const i);
-Item_int *make_item(Item_int *const i);
-Item_null *make_item(Item_null *const i);
-Item_func *make_item(Item_func *const i);
-Item_decimal *make_item(Item_decimal *const i);
-Item *clone_item(Item *const i);
+Item_string *dup_item(const Item_string &i);
+Item_int *dup_item(const Item_int &i);
+Item_null *dup_item(const Item_null &i);
+Item_func *dup_item(const Item_func &i);
+Item_decimal *dup_item(const Item_decimal &i);
+Item *dup_item(const Item &i);
+
+Item_field *make_item_field(const Item_field &t,
+                            const std::string &table_name = "",
+                            const std::string &field_name = "");
+Item_ref *make_item_ref(const Item_ref &t, Item *const new_ref,
+                        const std::string &table_name = "",
+                        const std::string &field_name = "");
 Item_string *make_item_string(const std::string &s);
 ORDER *make_order(const ORDER *const old_order, Item *const i);
 
@@ -64,6 +65,9 @@ namespace RiboldMYSQL {
     const Item *get_arg(const Item_sum &item, uint i);
     Item_subselect::subs_type substype(const Item_subselect &i);
     const st_select_lex *get_select_lex(const Item_subselect &i);
+    std::string val_str(const Item &i, bool *is_null);
+    ulonglong val_uint(const Item &i);
+    double val_real(const Item &i);
 
     template <typename T>
     class constList_iterator {

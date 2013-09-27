@@ -596,13 +596,13 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     }
     this->do_nothing = false;
 
-    const auto pullItemPtr = [](std::shared_ptr<Item> p) -> Item *
+    const auto pullItemPtr = [](std::shared_ptr<Item> p) -> const Item &
     {
-        return p.get();
+        return *p;
     };
     const std::function<std::string(std::shared_ptr<Item>)>
         sharedItemToStringWithQuotes =
-            fnCompose<std::shared_ptr<Item>, Item *,
+            fnCompose<std::shared_ptr<Item>, const Item &,
                       std::string>(ItemToStringWithQuotes, pullItemPtr);
     const auto itemJoin =
         [&sharedItemToStringWithQuotes]

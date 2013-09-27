@@ -111,7 +111,7 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         const std::string anon_field_name = om.getAnonOnionName();
 
         Item_field * const res =
-            make_item(i, anon_table_name, anon_field_name);
+            make_item_field(i, anon_table_name, anon_field_name);
         // This information is only relevant if it comes from a
         // HAVING clause.
         // FIXME: Enforce this semantically.
@@ -149,13 +149,14 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         for (auto it : fm.orderedOnionMetas()) {
             const std::string anon_field_name =
                 it.second->getAnonOnionName();
-            new_field = make_item(i, anon_table_name, anon_field_name);
+            new_field =
+                make_item_field(i, anon_table_name, anon_field_name);
             l->push_back(new_field);
         }
         if (fm.has_salt) {
             assert(new_field); // need an anonymized field as template to
                                // create salt item
-            l->push_back(make_item(*new_field, anon_table_name,
+            l->push_back(make_item_field(*new_field, anon_table_name,
                                   fm.getSaltName()));
         }
     }

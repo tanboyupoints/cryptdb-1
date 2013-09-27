@@ -1,4 +1,5 @@
 #include <parser/sql_utils.hh>
+#include <parser/lex_util.hh>
 
 
 
@@ -68,36 +69,30 @@ make_thd_string(const string &s, size_t *lenp)
 }
 
 string
-ItemToString(Item * i) {
-    assert(i);
-    String s;
-    String *s0 = i->val_str(&s);
-    AssignOnce<std::string> ret;
-    if (NULL == s0) {
-        assert(i->is_null());
-        ret = std::string("NULL");
-    } else {
-        ret = string(s0->ptr(), s0->length());
+ItemToString(const Item &i) {
+    if (RiboldMYSQL::is_null(i)) {
+        return std::string("NULL");
     }
-    return ret.get();
+
+    bool is_null;
+    const std::string &s0 = RiboldMYSQL::val_str(i, &is_null);
+    assert(false == is_null);
+
+    return s0;
 }
 
 string
-ItemToStringWithQuotes(Item * i) {
-    assert(i);
-    String s;
-    String *s0 = i->val_str(&s);
-    AssignOnce<std::string> ret;
-    if (NULL == s0) {
-        assert(i->is_null());
-        ret = std::string("NULL");
-    } else {
-        const std::string out = std::string(s0->ptr(), s0->length());
-        if (i->type() == Item::Type::STRING_ITEM) {
-            ret = "\"" + out + "\"";
-        } else {
-            ret = out;
-        }
+ItemToStringWithQuotes(const Item &i) {
+    if (RiboldMYSQL::is_null(i)) {
+        return std::string("NULL");
     }
-    return ret.get();
+
+    bool is_null;
+    const std::string &s0 = RiboldMYSQL::val_str(i, &is_null);
+    assert(false == is_null);
+    if (i.type() != Item::Type::STRING_ITEM) {
+        return s0;
+    }
+
+    return "\"" + s0 + "\"";
 }
