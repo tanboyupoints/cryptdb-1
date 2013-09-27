@@ -30,23 +30,24 @@
 // no_args specifies a certain number of arguments that I must have
 // if negative, i can have any no. of arguments
 static std::list<Item *>
-rewrite_agg_args(Item_sum * oldi, const OLK & constr,
-                 const RewritePlanOneOLK * rp, Analysis & a,
+rewrite_agg_args(const Item_sum &oldi, const OLK &constr,
+                 const RewritePlanOneOLK &rp, Analysis &a,
                  int no_args = -1)
 {
     if (no_args >= 0) {
-        TEST_BadItemArgumentCount(oldi->type(), no_args,
-                                  oldi->get_arg_count());
+        TEST_BadItemArgumentCount(oldi.type(), no_args,
+                                  const_cast<Item_sum &>(oldi).get_arg_count());
     } else {
-        no_args = oldi->get_arg_count();
+        no_args = const_cast<Item_sum &>(oldi).get_arg_count();
     }
 
     std::list<Item *> res = std::list<Item *>();
     for (int j = 0; j < no_args; j++) {
-        Item *const child_item = oldi->get_arg(j);
+        const Item *const child_item =
+            const_cast<Item_sum &>(oldi).get_arg(j);
         Item *const out_child_item =
-            itemTypes.do_rewrite(child_item, rp->olk,
-                                 rp->childr_rp[j].get(), a);
+            itemTypes.do_rewrite(*child_item, rp.olk,
+                                 *rp.childr_rp[j].get(), a);
         res.push_back(out_child_item);
     }
 
@@ -56,45 +57,43 @@ rewrite_agg_args(Item_sum * oldi, const OLK & constr,
 
 template<Item_sum::Sumfunctype SFT>
 class CItemCount : public CItemSubtypeST<Item_sum_count, SFT> {
-    virtual RewritePlan * do_gather_type(Item_sum_count *i, reason &tr,
-                                         Analysis & a) const
+    virtual RewritePlan *
+    do_gather_type(const Item_sum_count &i, Analysis &a) const
     {
-        const unsigned int arg_count = i->get_arg_count();
-        TEST_BadItemArgumentCount(i->type(), 1, arg_count);
-        Item *const child = i->get_arg(0);
+        const unsigned int arg_count =
+            const_cast<Item_sum_count &>(i).get_arg_count();
+        TEST_BadItemArgumentCount(i.type(), 1, arg_count);
+        Item *const child = const_cast<Item_sum_count &>(i).get_arg(0);
 
-        reason r;
         std::vector<std::shared_ptr<RewritePlan> >
-            childr_rp({std::shared_ptr<RewritePlan>(gather(child, r, a))});
+            childr_rp({std::shared_ptr<RewritePlan>(gather(*child, a))});
         const EncSet needed = EQ_EncSet;
         const EncSet solution = childr_rp[0]->es_out.intersect(needed);
 
         std::string why = "count";
-        if (i->has_with_distinct()) {
+        if (i.has_with_distinct()) {
             why += " distinct";
-            TEST_NoAvailableEncSet(solution, i->type(), needed, why,
+            TEST_NoAvailableEncSet(solution, i.type(), needed, why,
                                    childr_rp);
         }
 
         const EncSet out_enc_set = PLAIN_EncSet;
-        tr = reason(out_enc_set, why, i);
-        tr.add_child(r);
+        const reason rsn(out_enc_set, why, i);
 
         return new RewritePlanOneOLK(out_enc_set, solution.chooseOne(),
-                                     childr_rp, tr);
+                                     childr_rp, rsn);
     }
 
-    virtual Item * do_rewrite_type(Item_sum_count *i,
-                                   const OLK & constr,
-                                   const RewritePlan * rp,
-                                   Analysis & a) const
+    virtual Item *
+    do_rewrite_type(const Item_sum_count &i, const OLK &constr,
+                    const RewritePlan &rp, Analysis &a) const
     {
         std::list<Item *> args =
             rewrite_agg_args(i, constr,
-                             static_cast<const RewritePlanOneOLK *>(rp),
+                             static_cast<const RewritePlanOneOLK &>(rp),
                              a, 1);
         auto out_item = new Item_sum_count(args.front());
-        out_item->set_distinct(i->has_with_distinct());
+        out_item->set_distinct(i.has_with_distinct());
         return out_item;
     }
 };
@@ -106,35 +105,36 @@ static CItemCount<Item_sum::Sumfunctype::COUNT_DISTINCT_FUNC> ANON;
 
 template<Item_sum::Sumfunctype SFT, class IT>
 class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
-    virtual RewritePlan * do_gather_type(Item_sum_hybrid *i, reason &tr,
-                                         Analysis &a) const
+    virtual RewritePlan *
+    do_gather_type(const Item_sum_hybrid &i, Analysis &a) const
     {
-        const unsigned int arg_count = i->get_arg_count();
-        TEST_BadItemArgumentCount(i->type(), 1, arg_count);
-        Item *const child = i->get_arg(0);
+        const unsigned int arg_count =
+            const_cast<Item_sum_hybrid &>(i).get_arg_count();
+        TEST_BadItemArgumentCount(i.type(), 1, arg_count);
+        Item *const child = const_cast<Item_sum_hybrid &>(i).get_arg(0);
 
-        reason r;
         std::vector<std::shared_ptr<RewritePlan> >
-            childr_rp({std::shared_ptr<RewritePlan>(gather(child, r, a))});
+            childr_rp({std::shared_ptr<RewritePlan>(gather(*child, a))});
         const EncSet needed = ORD_EncSet;
         const EncSet supported = needed.intersect(childr_rp[0]->es_out);
         const std::string why = "min/max";
-        TEST_NoAvailableEncSet(supported, i->type(), needed, why,
+        TEST_NoAvailableEncSet(supported, i.type(), needed, why,
                                childr_rp);
         const OLK olk = supported.chooseOne();
         const EncSet out = EncSet(olk);
-        tr = reason(out, why, i);
+        const reason rsn(out, why, i);
+
         // INVESTIGATE: Should 'out' be 'supported'?
-        return new RewritePlanOneOLK(out, olk, childr_rp, tr);
+        return new RewritePlanOneOLK(out, olk, childr_rp, rsn);
     }
 
-    virtual Item *do_rewrite_type(Item_sum_hybrid *i, const OLK &constr,
-                                  const RewritePlan *rp, Analysis &a)
-        const
+    virtual Item *
+    do_rewrite_type(const Item_sum_hybrid &i, const OLK &constr,
+                    const RewritePlan &rp, Analysis &a) const
     {
         std::list<Item *> args =
             rewrite_agg_args(i, constr,
-                             static_cast<const RewritePlanOneOLK *>(rp),
+                             static_cast<const RewritePlanOneOLK &>(rp),
                              a, 1);
         return new IT(args.front());
     }
@@ -145,46 +145,48 @@ static CItemChooseOrder<Item_sum::Sumfunctype::MAX_FUNC, Item_sum_max> ANON;
 
 template<Item_sum::Sumfunctype SFT>
 class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
-    virtual RewritePlan * do_gather_type(Item_sum_sum *i, reason &tr,
-                                         Analysis &a) const
+    virtual RewritePlan *
+    do_gather_type(const Item_sum_sum &i, Analysis &a) const
     {
-        LOG(cdb_v) << "gather Item_sum_sum " << *i;
-        const unsigned int arg_count = i->get_arg_count();
-        TEST_BadItemArgumentCount(i->type(), 1, arg_count);
-        Item *const child_item = i->get_arg(0);
+        LOG(cdb_v) << "gather Item_sum_sum "
+                   << const_cast<Item_sum_sum &>(i);
+        const unsigned int arg_count =
+            const_cast<Item_sum_sum &>(i).get_arg_count();
+        TEST_BadItemArgumentCount(i.type(), 1, arg_count);
+        const Item *const child_item =
+            const_cast<Item_sum_sum &>(i).get_arg(0);
 
-        reason child_r;
         std::vector<std::shared_ptr<RewritePlan> >
-            childr_rp({std::shared_ptr<RewritePlan>(gather(child_item,
-                                                           child_r, a))});
+            childr_rp({std::shared_ptr<RewritePlan>(gather(*child_item,
+                                                           a))});
 
-        if (i->has_with_distinct()) {
+        if (i.has_with_distinct()) {
             UNIMPLEMENTED;
         }
 
         const EncSet my_es = ADD_EncSet;
         const EncSet solution = my_es.intersect(childr_rp[0]->es_out);
         const std::string why = "summation";
-        TEST_NoAvailableEncSet(solution, i->type(), my_es, why,
+        TEST_NoAvailableEncSet(solution, i.type(), my_es, why,
                                childr_rp);
 
         const OLK olk = solution.chooseOne();
         const EncSet return_es = EncSet(olk);
-        tr = reason(return_es, why, i);
+        const reason rsn(return_es, why, i);
 
-        return new RewritePlanOneOLK(return_es, olk, childr_rp, tr);
+        return new RewritePlanOneOLK(return_es, olk, childr_rp, rsn);
     }
 
-    virtual Item * do_rewrite_type(Item_sum_sum *i,
-                                   const OLK &constr,
-                                   const RewritePlan *rp,
-                                   Analysis &a) const
+    virtual Item *
+    do_rewrite_type(const Item_sum_sum &i, const OLK &constr,
+                    const RewritePlan &rp, Analysis &a) const
     {
-        LOG(cdb_v) << "Item_sum_sum rewrite " << *i;
+        LOG(cdb_v) << "Item_sum_sum rewrite "
+                   << const_cast<Item_sum_sum &>(i);
 
         std::list<Item *> args =
             rewrite_agg_args(i, constr,
-                             static_cast<const RewritePlanOneOLK *>(rp),
+                             static_cast<const RewritePlanOneOLK &>(rp),
                              a, 1);
 
         if (oAGG == constr.o) {
@@ -198,7 +200,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
             TEST_UnexpectedSecurityLevel(constr.o, SECLEVEL::PLAINVAL,
                                          constr.l);
             Item_sum_sum *const out_i =
-                new Item_sum_sum(i->get_arg(0), i->has_with_distinct());
+                new Item_sum_sum(const_cast<Item_sum_sum &>(i).get_arg(0), i.has_with_distinct());
             return out_i;
         }
     }
@@ -212,8 +214,8 @@ static CItemSum<Item_sum::Sumfunctype::AVG_FUNC> ANON;
 static CItemSum<Item_sum::Sumfunctype::AVG_DISTINCT_FUNC> ANON;
 
 static class ANON : public CItemSubtypeST<Item_sum_bit, Item_sum::Sumfunctype::SUM_BIT_FUNC> {
-    virtual RewritePlan * do_gather_type(Item_sum_bit *i, reason &tr,
-                                         Analysis & a) const
+    virtual RewritePlan *
+    do_gather_type(const Item_sum_bit &i, Analysis &a) const
     {
         /* LOG(cdb_v) << "do_a_t Item_sum_bit reason " << tr;
             analyze(i->get_arg(0), reason(EMPTY_EncSet, "bitagg", i, &tr, false), a);
@@ -224,8 +226,8 @@ static class ANON : public CItemSubtypeST<Item_sum_bit, Item_sum::Sumfunctype::S
 } ANON;
 
 static class ANON : public CItemSubtypeST<Item_func_group_concat, Item_sum::Sumfunctype::GROUP_CONCAT_FUNC> {
-    virtual RewritePlan * do_gather_type(Item_func_group_concat *i,
-                                         reason &tr, Analysis & a) const
+    virtual RewritePlan *
+    do_gather_type(const Item_func_group_concat &i, Analysis &a) const
     {
         /*  LOG(cdb_v) << "do_a_t Item_func_group reason " << tr;
             uint arg_count_field = i->*rob<Item_func_group_concat, uint,
@@ -244,75 +246,68 @@ static class ANON : public CItemSubtypeST<Item_func_group_concat, Item_sum::Sumf
 } ANON;
 
 static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
-    virtual RewritePlan * do_gather_type(Item_ref *i, reason &tr,
-                                         Analysis & a) const
+    virtual RewritePlan *
+    do_gather_type(const Item_ref &i, Analysis &a) const
     {
-        const std::string why = "ref_item";
-
-        reason r;
         std::vector<std::shared_ptr<RewritePlan> >
-            childr_rp({std::shared_ptr<RewritePlan>(gather(*i->ref, r,
-                                                           a))});
+            childr_rp({std::shared_ptr<RewritePlan>(gather(**i.ref, a))});
 
         const EncSet out_es = EncSet(childr_rp[0]->es_out);
         const EncSet child_es = childr_rp[0]->es_out;
 
-        tr = reason(out_es, why, i);
-        tr.add_child(r);
+        const std::string why = "ref_item";
+        reason rsn(out_es, why, i);
 
         return new RewritePlanOneOLK(out_es, child_es.chooseOne(),
-                                     childr_rp, tr);
+                                     childr_rp, rsn);
     }
-
-    virtual Item * do_rewrite_type(Item_ref *i, const OLK & constr,
-                                   const RewritePlan * rp,
-                                   Analysis & a) const
+    virtual Item *
+    do_rewrite_type(const Item_ref &i, const OLK &constr,
+                    const RewritePlan &rp, Analysis &a) const
     {
         // HACK.
         const std::string plain_table =
-            static_cast<Item_field *>(*i->ref)->table_name;
+            static_cast<Item_field *>(*i.ref)->table_name;
         const std::string anon_table =
             a.getAnonTableName(plain_table);
 
-        const std::string plain_field = i->field_name;
+        const std::string plain_field = i.field_name;
         OnionMeta const &om =
             a.getOnionMeta(plain_table, plain_field, constr.o);
         const std::string anon_field = om.getAnonOnionName();
 
-        Item *new_ref = itemTypes.do_rewrite(*i->ref, constr, rp, a);
-        Item_ref *out_i = make_item(i, new_ref, anon_table, anon_field);
-
-        return out_i;
+        Item *const new_ref = itemTypes.do_rewrite(**i.ref, constr, rp, a);
+        return make_item(&const_cast<Item_ref &>(i), new_ref,
+                         anon_table, anon_field);
     }
 } ANON;
 
 static class ANON : public CItemSubtypeIT<Item_null, Item::Type::NULL_ITEM> {
-    virtual RewritePlan * do_gather_type(Item_null *i, reason &tr,
-                                         Analysis & a) const
+    virtual RewritePlan *
+    do_gather_type(const Item_null &i, Analysis &a) const
     {
-        tr = reason(FULL_EncSet, "is a constant", i);
-        return new RewritePlan(FULL_EncSet, tr);
+        const std::string why = "is null";
+        reason rsn(FULL_EncSet, why, i);
+        return new RewritePlan(FULL_EncSet, rsn);
     }
 
-    virtual Item * do_rewrite_type(Item_null *i,
-                                   const OLK & constr,
-                                   const RewritePlan * rp,
-                                   Analysis & a) const
+    virtual Item *
+    do_rewrite_type(const Item_null &i, const OLK &constr,
+                    const RewritePlan &rp, Analysis &a) const
     {
-        return i;
-        // return encrypt_item(i, constr, a);
+        return &const_cast<Item_null &>(i);
     }
 
-    virtual void do_rewrite_insert_type(Item_null *i, Analysis & a,
-                                        std::vector<Item *> &l,
-                                        FieldMeta *fm) const
+    virtual void
+    do_rewrite_insert_type(const Item_null &i, const FieldMeta &fm,
+                           Analysis &a, std::vector<Item *> *l) const
     {
-        for (uint j = 0; j < fm->children.size(); ++j) {
-            l.push_back(make_item(i));
+        for (uint j = 0; j < fm.children.size(); ++j) {
+            l->push_back(make_item(&const_cast<Item_null &>(i)));
         }
-        if (fm->has_salt) {
-            ulonglong salt = randomValue();
-            l.push_back(new Item_int((ulonglong) salt));
+        if (fm.has_salt) {
+            const ulonglong salt = randomValue();
+            l->push_back(new Item_int(static_cast<ulonglong>(salt)));
         }
     }
 } ANON;

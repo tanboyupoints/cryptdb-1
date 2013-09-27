@@ -227,16 +227,10 @@ needsSalt(EncSet es)
 std::ostream&
 operator<<(std::ostream &out, const reason &r)
 {
-    out << r.why_t_item << " PRODUCES encset " << r.encset << "\n" \
-        << " BECAUSE " << r.why_t << "\n";
+    out << &const_cast<Item &>(r.item) << " PRODUCES encset "
+        << r.encset << std::endl
+        << " BECAUSE " << r.why << std::endl;
 
-    if (r.childr->size()) {
-        out << " AND CHILDREN: {" << "\n";
-        for (reason ch : *r.childr) {
-            out << ch;
-        }
-        out << "} \n";
-    }
     return out;
 }
 

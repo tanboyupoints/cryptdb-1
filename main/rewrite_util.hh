@@ -15,7 +15,7 @@ const std::string GREEN_BEGIN = "\033[1;92m";
 const std::string COLOR_END = "\033[0m";
 
 Item *
-rewrite(Item * const i, const EncSet &req_enc, Analysis &a);
+rewrite(const Item &i, const EncSet &req_enc, Analysis &a);
 
 TABLE_LIST *
 rewrite_table_list(const TABLE_LIST * const t, const Analysis &a);
@@ -32,10 +32,10 @@ List<TABLE_LIST>
 rewrite_table_list(List<TABLE_LIST> tll, Analysis &a);
 
 RewritePlan *
-gather(Item * const i, reason &tr, Analysis &a);
+gather(const Item &i, Analysis &a);
 
 void
-analyze(Item * const i, Analysis &a);
+analyze(const Item &i, Analysis &a);
 
 void
 optimize(Item ** const i, Analysis &a);
@@ -101,16 +101,15 @@ escapeString(const std::unique_ptr<Connect> &c,
              const std::string &escape_me);
 
 void
-encrypt_item_all_onions(Item *i, FieldMeta *fm,
-                        uint64_t IV, std::vector<Item*> &l,
-                        Analysis &a);
+encrypt_item_all_onions(Item *const i, const FieldMeta &fm,
+                        uint64_t IV, Analysis &a, std::vector<Item *> *l);
 
 std::vector<onion>
 getOnionIndexTypes();
 
 void
-typical_rewrite_insert_type(Item *const i, Analysis &a,
-                            std::vector<Item *> &l, FieldMeta *const fm);
+typical_rewrite_insert_type(Item *const i, const FieldMeta &fm,
+                            Analysis &a, std::vector<Item *> *l);
 
 void
 process_select_lex(st_select_lex *select_lex, Analysis &a);

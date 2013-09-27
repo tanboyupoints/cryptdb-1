@@ -59,42 +59,46 @@ deductPlainTableName(const std::string &field_name,
 }
 
 class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
+    virtual RewritePlan *
+    do_gather_type(const Item_field &i, Analysis &a) const
+    {
+        LOG(cdb_v) << "FIELD_ITEM do_gather "
+                   << &const_cast<Item_field &>(i);
 
-    virtual RewritePlan * do_gather_type(Item_field *i, reason &tr, Analysis & a) const {
-        LOG(cdb_v) << "FIELD_ITEM do_gather " << *i;
-
-        const std::string fieldname = i->field_name;
+        const std::string fieldname = i.field_name;
         const std::string table =
-            i->table_name ? i->table_name :
-                            deductPlainTableName(i->field_name,
-                                                 i->context, a);
+            i.table_name ? i.table_name :
+                            deductPlainTableName(i.field_name,
+                                                 i.context, a);
  
         FieldMeta &fm = a.getFieldMeta(table, fieldname);
         const EncSet es = EncSet(a, &fm);
 
-        tr = reason(es, "is a field", i);
+        const std::string why = "is a field";
+        reason rsn(es, why, i);
 
-        return new RewritePlan(es, tr);
+        return new RewritePlan(es, rsn);
     }
 
     virtual Item *
-    do_rewrite_type(Item_field *i, const OLK &constr,
-                    const RewritePlan *rp, Analysis &a)
+    do_rewrite_type(const Item_field &i, const OLK &constr,
+                    const RewritePlan &rp, Analysis &a)
         const
     {
-        LOG(cdb_v) << "do_rewrite_type FIELD_ITEM " << *i;
+        LOG(cdb_v) << "do_rewrite_type FIELD_ITEM "
+                   << &const_cast<Item_field &>(i);
 
         const std::string plain_table_name =
-            i->table_name ? i->table_name :
-                            deductPlainTableName(i->field_name,
-                                                 i->context, a);
+            i.table_name ? i.table_name :
+                            deductPlainTableName(i.field_name,
+                                                 i.context, a);
         const FieldMeta &fm =
-            a.getFieldMeta(plain_table_name, i->field_name);
+            a.getFieldMeta(plain_table_name, i.field_name);
         //assert(constr.key == fm);
 
         //check if we need onion adjustment
         const OnionMeta &om =
-            a.getOnionMeta(plain_table_name, i->field_name,
+            a.getOnionMeta(plain_table_name, i.field_name,
                            constr.o);
         const SECLEVEL onion_level = a.getOnionLevel(om);
         assert(onion_level != SECLEVEL::INVALID);
@@ -109,11 +113,12 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         const std::string anon_field_name = om.getAnonOnionName();
 
         Item_field * const res =
-            make_item(i, anon_table_name, anon_field_name);
+            make_item(&const_cast<Item_field &>(i), anon_table_name,
+                      anon_field_name);
         // This information is only relevant if it comes from a
         // HAVING clause.
         // FIXME: Enforce this semantically.
-        a.item_cache[i] = std::make_pair(res, constr);
+        a.item_cache[&i] = std::make_pair(res, constr);
 
         return res;
     }
@@ -137,26 +142,26 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 */
 
     virtual void
-    do_rewrite_insert_type(Item_field *i, Analysis & a,
-                           std::vector<Item *> &l, FieldMeta *fm) const
+    do_rewrite_insert_type(const Item_field &i, const FieldMeta &fm,
+                           Analysis &a, std::vector<Item *> *l) const
     {
-        assert(NULL == fm);
-        fm = &a.getFieldMeta(i->table_name, i->field_name);
         const std::string anon_table_name =
-            a.getAnonTableName(i->table_name);
+            a.getAnonTableName(i.table_name);
 
         Item_field * new_field = NULL;
-        for (auto it : fm->orderedOnionMetas()) {
+        for (auto it : fm.orderedOnionMetas()) {
             const std::string anon_field_name =
                 it.second->getAnonOnionName();
-            new_field = make_item(i, anon_table_name, anon_field_name);
-            l.push_back(new_field);
+            new_field =
+                make_item(&const_cast<Item_field &>(i), anon_table_name,
+                          anon_field_name);
+            l->push_back(new_field);
         }
-        if (fm->has_salt) {
+        if (fm.has_salt) {
             assert(new_field); // need an anonymized field as template to
                                // create salt item
-            l.push_back(make_item(new_field, anon_table_name,
-                                  fm->getSaltName()));
+            l->push_back(make_item(new_field, anon_table_name,
+                                  fm.getSaltName()));
         }
     }
 } ANON;

@@ -714,10 +714,10 @@ intersect(const EncSet & es, FieldMeta * fm) {
  */
 static void optimize_select_lex(st_select_lex *select_lex, Analysis & a);
 
-static Item *getLeftExpr(Item_in_subselect *const i)
+static Item *getLeftExpr(const Item_in_subselect &i)
 {
     Item *const left_expr =
-        i->*rob<Item_in_subselect, Item*,
+        i.*rob<Item_in_subselect, Item*,
                 &Item_in_subselect::left_expr>::ptr();
     assert(left_expr);
 
@@ -726,16 +726,18 @@ static Item *getLeftExpr(Item_in_subselect *const i)
 }
 
 // HACK: Forces query down to PLAINVAL.
-static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_ITEM> {
-    virtual RewritePlan *do_gather_type(Item_subselect *i, reason &tr,
-                                        Analysis &a) const
+static class ANON : public CItemSubtypeIT<Item_subselect,
+                                          Item::Type::SUBSELECT_ITEM> {
+    virtual RewritePlan *
+    do_gather_type(const Item_subselect &i, Analysis &a) const
     {
         const std::string why = "subselect";
 
         // Gather subquery.
         std::unique_ptr<Analysis>
             subquery_analysis(new Analysis(a.getSchema()));
-        st_select_lex *const select_lex = i->get_select_lex();
+        st_select_lex *const select_lex =
+            const_cast<Item_subselect &>(i).get_select_lex();
         process_table_list(&select_lex->top_join_list,
                            *subquery_analysis);
         process_select_lex(select_lex, *subquery_analysis.get());
@@ -751,29 +753,27 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
 
             const std::unique_ptr<RewritePlan> &item_rp =
                 subquery_analysis.get()->rewritePlans[item];
-            TEST_NoAvailableEncSet(item_rp->es_out, i->type(),
+            TEST_NoAvailableEncSet(item_rp->es_out, i.type(),
                                    PLAIN_EncSet, why,
                             std::vector<std::shared_ptr<RewritePlan> >());
             item_rp->es_out = PLAIN_EncSet;
         }
 
         const EncSet out_es = PLAIN_EncSet;
-        tr = reason(out_es, why, i);
+        const reason rsn = reason(out_es, why, i);
 
-        switch (i->substype()) {
+        switch (const_cast<Item_subselect &>(i).substype()) {
             case Item_subselect::subs_type::SINGLEROW_SUBS:
                 break;
             case Item_subselect::subs_type::EXISTS_SUBS:
                 assert(false);
             case Item_subselect::subs_type::IN_SUBS: {
-                Item *const left_expr = 
-                    getLeftExpr(static_cast<Item_in_subselect *>(i));
-                reason r;
+                const Item *const left_expr =
+                    getLeftExpr(static_cast<const Item_in_subselect &>(i));
                 RewritePlan *const rp_left_expr =
-                    gather(left_expr, r, *subquery_analysis.get());
+                    gather(*left_expr, *subquery_analysis.get());
                 a.rewritePlans[left_expr] =
                     std::unique_ptr<RewritePlan>(rp_left_expr);
-                tr.add_child(r);
                 break;
             }
             case Item_subselect::subs_type::ALL_SUBS:
@@ -784,31 +784,36 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
                 throw CryptDBError("Unknown subquery type!");
         }
 
-        return new RewritePlanWithAnalysis(out_es, tr,
+        return new RewritePlanWithAnalysis(out_es, rsn,
                                            std::move(subquery_analysis));
     }
+
     virtual Item * do_optimize_type(Item_subselect *i, Analysis & a) const {
         optimize_select_lex(i->get_select_lex(), a);
         return i;
     }
-    virtual Item *do_rewrite_type(Item_subselect *i, const OLK &constr,
-                                  const RewritePlan *rp, Analysis &a)
+
+    virtual Item *
+    do_rewrite_type(const Item_subselect &i, const OLK &constr,
+                    const RewritePlan &rp, Analysis &a)
         const
     {
-        const RewritePlanWithAnalysis *const rp_w_analysis =
-            static_cast<const RewritePlanWithAnalysis *>(rp);
-        st_select_lex *const select_lex = i->get_select_lex();
+        const RewritePlanWithAnalysis &rp_w_analysis =
+            static_cast<const RewritePlanWithAnalysis &>(rp);
+        // FIXME: const?
+        st_select_lex *const select_lex =
+            const_cast<Item_subselect &>(i).get_select_lex();
 
         // ------------------------------
         //    General Subquery Rewrite
         // ------------------------------
         st_select_lex *const new_select_lex =
-            rewrite_select_lex(*select_lex, *rp_w_analysis->a.get());
+            rewrite_select_lex(*select_lex, *rp_w_analysis.a.get());
 
         // Rewrite table names.
         new_select_lex->top_join_list =
             rewrite_table_list(select_lex->top_join_list,
-                               *rp_w_analysis->a.get());
+                               *rp_w_analysis.a.get());
 
         // Rewrite SELECT params.
         // HACK: The engine inside of the Item_subselect _can_ have a
@@ -824,20 +829,19 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
         //   Specific Subquery Rewrite
         // ------------------------------
         {
-            switch (i->substype()) {
+            switch (const_cast<Item_subselect &>(i).substype()) {
                 case Item_subselect::subs_type::SINGLEROW_SUBS:
                     return new Item_singlerow_subselect(new_select_lex);
                 case Item_subselect::subs_type::EXISTS_SUBS:
                     assert(false);
                 case Item_subselect::subs_type::IN_SUBS: {
                     const Item *const left_expr =
-                        getLeftExpr(static_cast<Item_in_subselect *>(i));
+                        getLeftExpr(static_cast<const Item_in_subselect &>(i));
                     const std::unique_ptr<RewritePlan> &rp_left_expr =
                         constGetAssert(a.rewritePlans, left_expr);
                     Item *const new_left_expr =
-                        itemTypes.do_rewrite(const_cast<Item *>(left_expr),
-                                             constr,
-                                             rp_left_expr.get(), a);
+                        itemTypes.do_rewrite(*left_expr, constr,
+                                             *rp_left_expr.get(), a);
                     return new Item_in_subselect(new_left_expr,
                                                  new_select_lex);
                 }
@@ -854,7 +858,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
 
 // NOTE: Shouldn't be needed unless we allow mysql to rewrite subqueries.
 static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
-    virtual RewritePlan *do_gather_type(Item_cache *i, reason &tr,
+    virtual RewritePlan *do_gather_type(const Item_cache &i,
                                         Analysis &a) const
     {
         UNIMPLEMENTED;
@@ -893,13 +897,15 @@ static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
         return NULL;
         */
     }
+
     virtual Item * do_optimize_type(Item_cache *i, Analysis & a) const
     {
         // TODO(stephentu): figure out how to use rob here
         return i;
     }
-    virtual Item *do_rewrite_type(Item_cache *i, const OLK &constr,
-                                  const RewritePlan *rp, Analysis &a)
+
+    virtual Item *do_rewrite_type(const Item_cache &i, const OLK &constr,
+                                  const RewritePlan &rp, Analysis &a)
         const
     {
         UNIMPLEMENTED;
@@ -963,8 +969,8 @@ optimize_table_list(List<TABLE_LIST> *tll, Analysis &a)
 }
 
 static bool
-noRewrite(const LEX *const lex) {
-    switch (lex->sql_command) {
+noRewrite(const LEX &lex) {
+    switch (lex.sql_command) {
     case SQLCOM_SHOW_DATABASES:
     case SQLCOM_SET_OPTION:
     case SQLCOM_BEGIN:
@@ -1015,7 +1021,7 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
     LOG(cdb_v) << "pre-analyze " << *lex;
 
     // optimization: do not process queries that we will not rewrite
-    if (noRewrite(lex)) {
+    if (noRewrite(*lex)) {
         return new SimpleOutput(query);
     } else if (dml_dispatcher->canDo(lex)) {
         const SQLHandler *const handler = dml_dispatcher->dispatch(lex);

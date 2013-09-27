@@ -27,18 +27,17 @@ optimize(Item ** const i, Analysis &a) {
 // this function should be called at the root of a tree of items
 // that should be rewritten
 Item *
-rewrite(Item *const i, const EncSet &req_enc, Analysis &a)
+rewrite(const Item &i, const EncSet &req_enc, Analysis &a)
 {
     const std::unique_ptr<RewritePlan> &rp =
-        constGetAssert(a.rewritePlans, static_cast<const Item *>(i));
+        constGetAssert(a.rewritePlans, &i);
     const EncSet solution = rp->es_out.intersect(req_enc);
     // FIXME: Use version that takes reason, expects 0 children,
     // and lets us indicate what our EncSet does have.
-    TEST_NoAvailableEncSet(solution, i->type(), req_enc, rp->r.why_t,
+    TEST_NoAvailableEncSet(solution, i.type(), req_enc, rp->r.why,
                            std::vector<std::shared_ptr<RewritePlan> >());
 
-    // FIXME: Make 'rp' const.
-    return itemTypes.do_rewrite(i, solution.chooseOne(), rp.get(), a);
+    return itemTypes.do_rewrite(i, solution.chooseOne(), *rp.get(), a);
 }
 
 TABLE_LIST *
@@ -136,7 +135,7 @@ rewrite_table_list(List<TABLE_LIST> tll, Analysis &a)
         }
 
         if (t->on_expr) {
-            new_t->on_expr = rewrite(t->on_expr, PLAIN_EncSet, a);
+            new_t->on_expr = rewrite(*t->on_expr, PLAIN_EncSet, a);
         }
 
 	/* TODO: derived tables
@@ -154,33 +153,32 @@ rewrite_table_list(List<TABLE_LIST> tll, Analysis &a)
  * Helper functions to look up via directory & invoke method.
  */
 RewritePlan *
-gather(Item * const i, reason &tr, Analysis &a)
+gather(const Item &i, Analysis &a)
 {
-    return itemTypes.do_gather(i, tr, a);
+    return itemTypes.do_gather(i, a);
 }
 
 //TODO: need to check somewhere that plain is returned
 //TODO: Put in gather helpers file.
 void
-analyze(Item * const i, Analysis &a)
+analyze(const Item &i, Analysis &a)
 {
-    assert(i != NULL);
-    LOG(cdb_v) << "calling gather for item " << *i;
-    reason r;
-    a.rewritePlans[i] = std::unique_ptr<RewritePlan>(gather(i, r, a));
+    LOG(cdb_v) << "calling gather for item "
+               << const_cast<Item &>(i) << std::endl;
+    a.rewritePlans[&i] = std::unique_ptr<RewritePlan>(gather(i, a));
 }
 
 LEX *
 begin_transaction_lex(const std::string &dbname) {
     static const std::string query = "START TRANSACTION;";
-    query_parse *begin_parse = new query_parse(dbname, query);
+    query_parse *const begin_parse = new query_parse(dbname, query);
     return begin_parse->lex();
 }
 
 LEX *
 commit_transaction_lex(const std::string &dbname) {
     static const std::string query = "COMMIT;";
-    query_parse *commit_parse = new query_parse(dbname, query);
+    query_parse *const commit_parse = new query_parse(dbname, query);
     return commit_parse->lex();
 }
 
@@ -390,8 +388,9 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
 }
 
 //TODO: which encrypt/decrypt should handle null?
+// FIXME: @i should be const_cast
 Item *
-encrypt_item_layers(Item * const i, onion o, const OnionMeta &om,
+encrypt_item_layers(Item *const i, onion o, const OnionMeta &om,
                     const Analysis &a, uint64_t IV) {
     assert(!i->is_null());
 
@@ -445,27 +444,26 @@ escapeString(const std::unique_ptr<Connect> &c,
 }
 
 void
-encrypt_item_all_onions(Item *i, FieldMeta *fm,
-                        uint64_t IV, std::vector<Item*> &l,
-                        Analysis &a)
+encrypt_item_all_onions(Item *const i, const FieldMeta &fm,
+                        uint64_t IV, Analysis &a, std::vector<Item*> *l)
 {
-    for (auto it : fm->orderedOnionMetas()) {
+    for (auto it : fm.orderedOnionMetas()) {
         const onion o = it.first->getValue();
         OnionMeta * const om = it.second;
-        l.push_back(encrypt_item_layers(i, o, *om, a, IV));
+        l->push_back(encrypt_item_layers(i, o, *om, a, IV));
     }
 }
 
 void
-typical_rewrite_insert_type(Item *const i, Analysis &a,
-                            std::vector<Item *> &l, FieldMeta *const fm)
+typical_rewrite_insert_type(Item *const i, const FieldMeta &fm,
+                            Analysis &a, std::vector<Item *> *l)
 {
-    const uint64_t salt = fm->has_salt ? randomValue() : 0;
+    const uint64_t salt = fm.has_salt ? randomValue() : 0;
 
-    encrypt_item_all_onions(i, fm, salt, l, a);
+    encrypt_item_all_onions(i, fm, salt, a, l);
 
-    if (fm->has_salt) {
-        l.push_back(new Item_int(static_cast<ulonglong>(salt)));
+    if (fm.has_salt) {
+        l->push_back(new Item_int(static_cast<ulonglong>(salt)));
     }
 }
 
