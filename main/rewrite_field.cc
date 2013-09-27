@@ -62,8 +62,7 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     virtual RewritePlan *
     do_gather_type(const Item_field &i, Analysis &a) const
     {
-        LOG(cdb_v) << "FIELD_ITEM do_gather "
-                   << &const_cast<Item_field &>(i);
+        LOG(cdb_v) << "FIELD_ITEM do_gather " << i << std::endl;
 
         const std::string fieldname = i.field_name;
         const std::string table =
@@ -85,8 +84,7 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
                     const RewritePlan &rp, Analysis &a)
         const
     {
-        LOG(cdb_v) << "do_rewrite_type FIELD_ITEM "
-                   << &const_cast<Item_field &>(i);
+        LOG(cdb_v) << "do_rewrite_type FIELD_ITEM " << i << std::endl;
 
         const std::string plain_table_name =
             i.table_name ? i.table_name :

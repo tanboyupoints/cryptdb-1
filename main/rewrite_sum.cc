@@ -148,8 +148,8 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
     virtual RewritePlan *
     do_gather_type(const Item_sum_sum &i, Analysis &a) const
     {
-        LOG(cdb_v) << "gather Item_sum_sum "
-                   << const_cast<Item_sum_sum &>(i);
+        LOG(cdb_v) << "gather Item_sum_sum " << i << std::endl;
+
         const unsigned int arg_count =
             const_cast<Item_sum_sum &>(i).get_arg_count();
         TEST_BadItemArgumentCount(i.type(), 1, arg_count);
@@ -181,8 +181,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
     do_rewrite_type(const Item_sum_sum &i, const OLK &constr,
                     const RewritePlan &rp, Analysis &a) const
     {
-        LOG(cdb_v) << "Item_sum_sum rewrite "
-                   << const_cast<Item_sum_sum &>(i);
+        LOG(cdb_v) << "Item_sum_sum rewrite " << i << std::endl;
 
         std::list<Item *> args =
             rewrite_agg_args(i, constr,

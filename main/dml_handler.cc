@@ -610,8 +610,8 @@ rewrite_select_lex(const st_select_lex &select_lex, Analysis &a)
         const Item *const item = item_it++;
         if (!item)
             break;
-        LOG(cdb_v) << "rewrite_select_lex " << *const_cast<Item *>(item)
-                   << " with name " << item->name;
+        LOG(cdb_v) << "rewrite_select_lex " << *item << " with name "
+                   << item->name << std::endl;
         rewrite_proj(*item,
                      *constGetAssert(a.rewritePlans, item).get(),
                      a, &newList);

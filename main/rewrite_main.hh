@@ -212,7 +212,7 @@ protected:
         auto x = types.find(t);
         if (x == types.end()) {
             thrower() << "missing " << errname << " " << t << " in "
-                      << const_cast<Item &>(i) << std::endl;
+                      << i << std::endl;
         }
         return *x->second;
     }

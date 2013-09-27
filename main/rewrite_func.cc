@@ -285,9 +285,8 @@ class CItemCompare : public CItemSubtypeFT<Item_func, FT> {
                     const RewritePlan &rp, Analysis &a)
         const
     {
-        LOG(cdb_v) << "do_rewrite_type Item_func "
-                   << const_cast<Item_func &>(i) << " constr "
-                   << EncSet(constr);
+        LOG(cdb_v) << "do_rewrite_type Item_func " << i << " constr "
+                   << EncSet(constr) << std::endl;
         TEST_BadItemArgumentCount(i.type(), 2, i.argument_count());
         return rewrite_args_FN(i, constr,
                                static_cast<const RewritePlanOneOLK &>(rp),
@@ -465,7 +464,7 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
                     const RewritePlan &_rp, Analysis &a) const
     {
         LOG(cdb_v) << "do_rewrite_type Item_func_additive_op"
-                   << const_cast<IT &>(i) << std::endl;
+                   << i << std::endl;
 
         //rewrite children
         TEST_BadItemArgumentCount(i.type(), 2, i.argument_count());
@@ -830,7 +829,7 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
 static class ANON : public CItemSubtypeFT<Item_func, Item_func::Functype::FUNC_SP> {
     void error(const Item_func &i) const __attribute__((noreturn)) {
         thrower() << "unsupported stored procedure call "
-                  << const_cast<Item_func &>(i);
+                  << i << std::endl;
     }
     virtual RewritePlan *
     do_gather_type(const Item_func &i, Analysis &a) const

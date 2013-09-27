@@ -22,10 +22,10 @@ operator<<(std::ostream &out, String &s)
 }
 
 static inline std::ostream&
-operator<<(std::ostream &out, Item &i)
+operator<<(std::ostream &out, const Item &i)
 {
     String s;
-    i.print(&s, QT_ORDINARY);
+    const_cast<Item &>(i).print(&s, QT_ORDINARY);
 
     return out << s;
 }
