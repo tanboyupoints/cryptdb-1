@@ -1023,11 +1023,11 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
     if (noRewrite(*lex)) {
         return new SimpleOutput(query);
     } else if (dml_dispatcher->canDo(lex)) {
-        const SQLHandler *const handler = dml_dispatcher->dispatch(lex);
+        const SQLHandler &handler = dml_dispatcher->dispatch(lex);
         AssignOnce<LEX *> out_lex;
 
         try {
-            out_lex = handler->transformLex(a, lex, ps);
+            out_lex = handler.transformLex(a, lex, ps);
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
             std::cout << "Adjusting onion!" << std::endl;
@@ -1067,8 +1067,8 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
                                  plain_table, crypted_table,
                                  where_clause, ps);
     } else if (ddl_dispatcher->canDo(lex)) {
-        const SQLHandler *const handler = ddl_dispatcher->dispatch(lex);
-        LEX *const out_lex = handler->transformLex(a, lex, ps);
+        const SQLHandler &handler = ddl_dispatcher->dispatch(lex);
+        LEX *const out_lex = handler.transformLex(a, lex, ps);
         return new DDLOutput(query, lex_to_query(out_lex),
                              std::move(a.deltas));
     } else {

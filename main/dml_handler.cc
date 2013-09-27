@@ -283,7 +283,7 @@ static void
 process_order(const SQL_I_List<ORDER> &lst, Analysis &a)
 {
     for (const ORDER *o = lst.first; o; o = o->next) {
-        analyze(**o->item, a);
+        gatherAndAddAnalysisRewritePlan(**o->item, a);
     }
 }
 
@@ -291,7 +291,7 @@ static void
 process_filters_lex(const st_select_lex &select_lex, Analysis &a)
 {
     if (select_lex.where) {
-        analyze(*select_lex.where, a);
+        gatherAndAddAnalysisRewritePlan(*select_lex.where, a);
     }
 
     /*if (select_lex->join &&
@@ -300,12 +300,11 @@ process_filters_lex(const st_select_lex &select_lex, Analysis &a)
         analyze(select_lex->join->conds, reason(FULL_EncSet, "join->conds", select_lex->join->conds, 0), a);*/
 
     if (select_lex.having) {
-        analyze(*select_lex.having, a);
+        gatherAndAddAnalysisRewritePlan(*select_lex.having, a);
     }
 
     process_order(select_lex.group_list, a);
     process_order(select_lex.order_list, a);
-
 }
 
 void
@@ -321,7 +320,7 @@ process_select_lex(const st_select_lex &select_lex, Analysis &a)
         if (!item)
             break;
 
-        analyze(*item, a);
+        gatherAndAddAnalysisRewritePlan(*item, a);
     }
 
     process_filters_lex(select_lex, a);
@@ -654,7 +653,7 @@ process_table_joins_and_derived(const List<TABLE_LIST> &tll,
         }
 
         if (t->on_expr) {
-            analyze(*t->on_expr, a);
+            gatherAndAddAnalysisRewritePlan(*t->on_expr, a);
         }
 
         //std::string db(t->db, t->db_length);

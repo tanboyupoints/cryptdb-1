@@ -149,33 +149,30 @@ rewrite_table_list(List<TABLE_LIST> tll, Analysis &a)
     return *new_tll;
 }
 
-/*
- * Helper functions to look up via directory & invoke method.
- */
 RewritePlan *
 gather(const Item &i, Analysis &a)
 {
     return itemTypes.do_gather(i, a);
 }
 
-//TODO: need to check somewhere that plain is returned
-//TODO: Put in gather helpers file.
 void
-analyze(const Item &i, Analysis &a)
+gatherAndAddAnalysisRewritePlan(const Item &i, Analysis &a)
 {
     LOG(cdb_v) << "calling gather for item " << i << std::endl;
     a.rewritePlans[&i] = std::unique_ptr<RewritePlan>(gather(i, a));
 }
 
 LEX *
-begin_transaction_lex(const std::string &dbname) {
+begin_transaction_lex(const std::string &dbname)
+{
     static const std::string query = "START TRANSACTION;";
     query_parse *const begin_parse = new query_parse(dbname, query);
     return begin_parse->lex();
 }
 
 LEX *
-commit_transaction_lex(const std::string &dbname) {
+commit_transaction_lex(const std::string &dbname)
+{
     static const std::string query = "COMMIT;";
     query_parse *const commit_parse = new query_parse(dbname, query);
     return commit_parse->lex();

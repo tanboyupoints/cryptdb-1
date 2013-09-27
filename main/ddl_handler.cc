@@ -18,10 +18,9 @@ class AlterHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
                                   const ProxyState &ps) const
     {
-        const AlterSubHandler *handler;
         assert(sub_dispatcher->canDo(lex));
-        assert(handler = sub_dispatcher->dispatch(lex));
-        return handler->transformLex(a, lex, ps);
+        const AlterSubHandler &handler = sub_dispatcher->dispatch(lex);
+        return handler.transformLex(a, lex, ps);
     }
 
     const std::unique_ptr<AlterDispatcher> sub_dispatcher;

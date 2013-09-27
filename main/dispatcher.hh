@@ -14,6 +14,10 @@ public:
     virtual ~Dispatcher() {}
 
     bool addHandler(long long cmd, FetchMe *h) {
+        if (NULL == h) {
+            return false;
+        }
+
         auto it = handlers.find(cmd);
         if (handlers.end() != it) {
             return false;
@@ -27,13 +31,12 @@ public:
         return handlers.end() != handlers.find(extract(lex));
     }
 
-    const FetchMe *dispatch(Input lex) const {
+    const FetchMe &dispatch(Input lex) const {
         auto it = handlers.find(extract(lex));
-        if (handlers.end() == it) {
-            return NULL;
-        }
+        assert(handlers.end() != it);
 
-        return it->second.get();
+        assert(it->second);
+        return *it->second;
     }
 
     std::map<long long, std::unique_ptr<FetchMe>> handlers;
