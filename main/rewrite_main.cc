@@ -738,8 +738,6 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
             subquery_analysis(new Analysis(a.getSchema()));
         const st_select_lex *const select_lex =
             RiboldMYSQL::get_select_lex(i);
-        process_table_list(const_cast<List<TABLE_LIST> *>(&select_lex->top_join_list),
-                           *subquery_analysis);
         process_select_lex(*select_lex, *subquery_analysis);
 
         // HACK: Forces the subquery to use PLAINVAL for it's

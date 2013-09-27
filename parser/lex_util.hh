@@ -73,8 +73,7 @@ namespace RiboldMYSQL {
             : iter(List_iterator<T>(const_cast<List<T> &>(list))) {}
         const T* operator++(int)
         {
-            const T *const t = iter++;
-            return t;
+            return iter++;
         }
     };
 };

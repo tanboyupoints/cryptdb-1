@@ -9,9 +9,6 @@ extern CItemTypesDir itemTypes;
 
 // Prototypes.
 static void
-process_select_lex(LEX *lex, Analysis & a);
-
-static void
 process_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a);
 
@@ -46,9 +43,10 @@ void rewriteInsertHelper(const Item &i, const FieldMeta &fm, Analysis &a,
 }
 
 class InsertHandler : public DMLHandler {
-    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps) const
+    virtual void gather(Analysis &a, LEX *const lex,
+                        const ProxyState &ps) const
     {
-        process_select_lex(lex, a);
+        process_select_lex(lex->select_lex, a);
 
         // -----------------------
         // ON DUPLICATE KEY UPDATE
@@ -183,7 +181,7 @@ class UpdateHandler : public DMLHandler {
     virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
-        process_table_list(&lex->select_lex.top_join_list, a);
+        process_table_list(lex->select_lex.top_join_list, a);
 
         if (lex->select_lex.item_list.head()) {
             assert(lex->value_list.head());
@@ -233,11 +231,12 @@ class UpdateHandler : public DMLHandler {
 };
 
 class DeleteHandler : public DMLHandler {
-    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps)
+    virtual void gather(Analysis &a, LEX *const lex, const ProxyState &ps)
         const
     {
-        process_select_lex(lex, a);
+        process_select_lex(lex->select_lex, a);
     }
+
     virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
@@ -251,11 +250,12 @@ class DeleteHandler : public DMLHandler {
 };
 
 class SelectHandler : public DMLHandler {
-    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps)
+    virtual void gather(Analysis &a, LEX *const lex, const ProxyState &ps)
         const
     {
-        process_select_lex(lex, a);
+        process_select_lex(lex->select_lex, a);
     }
+
     virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
@@ -308,16 +308,11 @@ process_filters_lex(const st_select_lex &select_lex, Analysis &a)
 
 }
 
-static void
-process_select_lex(LEX *lex, Analysis & a)
-{
-    process_table_list(&lex->select_lex.top_join_list, a);
-    process_select_lex(lex->select_lex, a);
-}
-
 void
 process_select_lex(const st_select_lex &select_lex, Analysis &a)
 {
+    process_table_list(select_lex.top_join_list, a);
+
     //select clause
     auto item_it =
         RiboldMYSQL::constList_iterator<Item>(select_lex.item_list);
@@ -624,11 +619,11 @@ rewrite_select_lex(const st_select_lex &select_lex, Analysis &a)
 }
 
 static void
-process_table_aliases(List<TABLE_LIST> *tll, Analysis & a)
+process_table_aliases(const List<TABLE_LIST> &tll, Analysis & a)
 {
-    List_iterator<TABLE_LIST> join_it(*tll);
+    RiboldMYSQL::constList_iterator<TABLE_LIST> join_it(tll);
     for (;;) {
-        TABLE_LIST *t = join_it++;
+        const TABLE_LIST *const t = join_it++;
         if (!t)
             break;
 
@@ -637,24 +632,25 @@ process_table_aliases(List<TABLE_LIST> *tll, Analysis & a)
         }
 
         if (t->nested_join) {
-            process_table_aliases(&t->nested_join->join_list, a);
+            process_table_aliases(t->nested_join->join_list, a);
             return;
         }
     }
 }
 
 static void
-process_table_joins_and_derived(List<TABLE_LIST> *tll, Analysis & a)
+process_table_joins_and_derived(const List<TABLE_LIST> &tll,
+                                Analysis &a)
 {
-    List_iterator<TABLE_LIST> join_it(*tll);
+    RiboldMYSQL::constList_iterator<TABLE_LIST> join_it(tll);
     for (;;) {
-        TABLE_LIST *t = join_it++;
+        const TABLE_LIST *const t = join_it++;
         if (!t) {
             break;
         }
 
         if (t->nested_join) {
-            process_table_joins_and_derived(&t->nested_join->join_list, a);
+            process_table_joins_and_derived(t->nested_join->join_list, a);
             return;
         }
 
@@ -668,17 +664,18 @@ process_table_joins_and_derived(List<TABLE_LIST> *tll, Analysis & a)
 
         // Handles SUBSELECTs in table clause.
         if (t->derived) {
-            st_select_lex_unit *u = t->derived;
-             // Not quite right, in terms of softness:
-             // should really come from the items that eventually
-             // reference columns in this derived table.
+            // FIXME: Should be const.
+            st_select_lex_unit *const u = t->derived;
+            // Not quite right, in terms of softness:
+            // should really come from the items that eventually
+            // reference columns in this derived table.
             process_select_lex(*u->first_select(), a);
         }
     }
 }
 
 void
-process_table_list(List<TABLE_LIST> *tll, Analysis & a)
+process_table_list(const List<TABLE_LIST> &tll, Analysis & a)
 {
     /*
      * later, need to rewrite different joins, e.g.

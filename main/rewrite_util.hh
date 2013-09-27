@@ -115,7 +115,7 @@ void
 process_select_lex(const st_select_lex &select_lex, Analysis &a);
 
 void
-process_table_list(List<TABLE_LIST> *tll, Analysis &a);
+process_table_list(const List<TABLE_LIST> &tll, Analysis &a);
 
 st_select_lex *
 rewrite_select_lex(const st_select_lex &select_lex, Analysis &a);
