@@ -58,7 +58,6 @@ public:
         return TypeText<_type>::instance->getText(e);
     }
 
-    // TODO(burrows): Add case insensitive lookup.
     static _type toType(std::string t) {
         return TypeText<_type>::instance->getEnum(t);
     }
