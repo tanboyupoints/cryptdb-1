@@ -223,7 +223,6 @@ std::string StringFromZZFast(const ZZ& x) {
 
 void ZZFromStringFast(ZZ& x, const std::string& s) {
     assert(s.size() % sizeof(mp_limb_t) == 0);
-    // FIXME: const_cast
     _ntl_gcopy_mp(
         const_cast<mp_limb_t *>(reinterpret_cast<const mp_limb_t *>(s.data())),
         s.size() / sizeof(mp_limb_t),
