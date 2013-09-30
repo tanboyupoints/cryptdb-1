@@ -71,18 +71,16 @@ dup_item(const Item &i)
 }
 
 static void
-init_new_ident(Item_ident *const i, const std::string &table_name = "",
-               const std::string &field_name = "")
+init_new_ident(Item_ident *const i, const std::string &table_name,
+               const std::string &field_name)
 {
+    assert(!table_name.empty() && !field_name.empty());
+
     // clear out alias
     i->name = NULL;
 
-    if (!table_name.empty()) {
-        i->table_name = make_thd_string(table_name);
-    }
-    if (!field_name.empty()) {
-        i->field_name = make_thd_string(field_name);
-    }
+    i->table_name = make_thd_string(table_name);
+    i->field_name = make_thd_string(field_name);
 }
 
 Item_field *
@@ -91,12 +89,11 @@ make_item_field(const Item_field &i, const std::string &table_name,
 {
     assert(i.type() == Item::Type::FIELD_ITEM);
 
-    THD *const thd = current_thd;
-    assert(thd);
+    assert(current_thd);
 
     Item_field *const i0 =
         new (current_thd->mem_root)
-            Item_field(thd, &const_cast<Item_field &>(i));
+            Item_field(current_thd, &const_cast<Item_field &>(i));
 
     init_new_ident(i0, table_name, field_name);
 
@@ -111,16 +108,15 @@ make_item_ref(const Item_ref &i, Item *const new_ref,
     assert(i.type() == Item::Type::REF_ITEM);
     assert(field_name.size() > 0 && table_name.size() > 0);
 
-    THD *const thd = current_thd;
-    assert(thd);
+    assert(current_thd);
 
     Item_ref *const i0 =
         new (current_thd->mem_root)
-            Item_ref(thd, &const_cast<Item_ref &>(i));
+            Item_ref(current_thd, &const_cast<Item_ref &>(i));
 
-    // This should be allocated on current_thd but it causes mysql
-    // to segfault.
-    i0->ref = new Item *;
+    // Don't try to use overloaded new here because we are allocating
+    // a pointer and C++ will resolve the global placement new.
+    i0->ref = static_cast<Item **>(current_thd->alloc(sizeof(Item **)));
     *i0->ref = new_ref;
 
     init_new_ident(i0, table_name, field_name);
