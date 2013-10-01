@@ -69,8 +69,7 @@ EncSet::intersect(const EncSet & es2) const
                 // HACK: To determine if the keys are the same.
                 if ((om->hasEncLayer(sl) && om2->hasEncLayer(sl)
                      && om->getLayer(sl)->doSerialize() ==
-                        om2->getLayer(sl)->doSerialize())
-                    || (SECLEVEL::HOM == sl && oAGG == o)) {
+                        om2->getLayer(sl)->doSerialize())) {
                     m[o] = LevelFieldPair(sl, fm);
                 }
             }

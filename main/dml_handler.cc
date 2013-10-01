@@ -458,6 +458,13 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
             constGetAssert(a.rewritePlans, value_item);
         const EncSet needed = EncSet(a, &fm);
         const EncSet r_es = rp_value->es_out.intersect(needed);
+
+        // Does r_es support all onions on field?
+        *invalids = *invalids || invalidates(fm, r_es);
+        if (true == *invalids) {
+            continue;
+        }
+
         // FIXME: Add version for situations when we don't know about
         // children.
         TEST_NoAvailableEncSet(r_es, ifd->type(), needed,
@@ -473,19 +480,6 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
                 const salt_type salt = randomValue();
                 a.salts.insert(std::make_pair(&fm, salt));
             }
-        }
-
-        // Does r_es support all onions on field?
-        *invalids = *invalids || invalidates(fm, r_es);
-        if (true == *invalids) {
-            // Is the HOM onion available? If so we will try to handle
-            // higher up.
-            auto hom = r_es.osl.find(oAGG);
-            if (hom != r_es.osl.end()) {
-                continue;
-            }
-
-            // We will have to go to PLAIN for this query.
         }
 
         for (auto pair : r_es.osl) {

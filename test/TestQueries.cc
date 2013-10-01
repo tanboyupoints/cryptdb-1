@@ -1394,7 +1394,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 426/460
+    //      TOTAL RESULT: 428/460
     // ###############################
 
     std::vector<Score> scores;
@@ -1408,7 +1408,7 @@ RunTest(const TestConfig &tc) {
     // Pass 20/20
     scores.push_back(CheckQueryList(tc, Insert));
 
-    // Pass 23/23
+    // Pass 22/23
     scores.push_back(CheckQueryList(tc, Join));
 
     // Pass 21/21
@@ -1432,7 +1432,7 @@ RunTest(const TestConfig &tc) {
     // Pass 19/19
     scores.push_back(CheckQueryList(tc, Null));
 
-    // Pass 19/21
+    // Pass 21/21
     ProxyState *const ps = test->getProxyState();
     if (ps->defaultSecurityRating() == SECURITY_RATING::BEST_EFFORT) {
         scores.push_back(CheckQueryList(tc, BestEffort));
