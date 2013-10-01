@@ -421,7 +421,7 @@ decrypt_text_det(PG_FUNCTION_ARGS)
     const std::string value =
         decrypt_AES_CMC(std::string(eValueBytes,
                                     static_cast<unsigned int>(eValueLen)),
-                        aesKey.get(), false);
+                        aesKey.get(), true);
 
 #if MYSQL_S
     char *const res = new char[value.length()];

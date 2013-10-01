@@ -130,17 +130,6 @@ static QueryList Join = QueryList("SingleJoin",
     { "CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)",
       "CREATE TABLE test_join2 (id integer, books integer, name text)",
       "", "", "", "", "" },
-#if 0
-     // Fail
-     "CRYPTDB test_join1.age ENC",
-     "CRYPTDB test_join1.salary ENC",
-     "CRYPTDB test_join1.address ENC",
-     "CREATE TABLE test_join2 (id integer, books integer, name text)",
-     "CRYPTDB test_join2.books ENC",
-     "CRYPTDB test_join2.name ENC" },
-#endif
-
-
     { "CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)",
      "CREATE TABLE test_join2 (id integer, books integer, name text)",
       "", "", "", "", "" },
@@ -157,14 +146,11 @@ static QueryList Join = QueryList("SingleJoin",
       Query("SELECT address FROM test_join1, test_join2 WHERE test_join1.id=test_join2.id", false),
       Query("SELECT test_join1.id, test_join2.id, age, books, test_join2.name FROM test_join1, test_join2 WHERE test_join1.id = test_join2.id", false),
       Query("SELECT test_join1.name, age, salary, test_join2.name, books FROM test_join1, test_join2 WHERE test_join1.age=test_join2.books", false),
-      //we don't support things that join unecrypted columns to encrypted columns
-      // Query("SELECT * FROM test_join1, test_join2 WHERE test_join1.name=test_join2.name", false),
+      Query("SELECT * FROM test_join1, test_join2 WHERE test_join1.name=test_join2.name", false),
       Query("SELECT * FROM test_join1, test_join2 WHERE test_join1.address=test_join2.name", false),
-            //TODO: new parser still has issues with AS type things
-      // Query("SELECT address FROM test_join1 AS a, test_join2 WHERE a.id=test_join2.id", false),
-            //TODO: new parser throws an error for the implicit AS
-      // Query("SELECT a.id, b.id, age, books, b.name FROM test_join1 a, test_join2 AS b WHERE a.id=b.id", false),
-      // Query("SELECT test_join1.name, age, salary, b.name, books FROM test_join1, test_join2 b WHERE test_join1.age = b.books", false),
+      Query("SELECT address FROM test_join1 AS a, test_join2 WHERE a.id=test_join2.id", false),
+      Query("SELECT a.id, b.id, age, books, b.name FROM test_join1 a, test_join2 AS b WHERE a.id=b.id", false),
+      Query("SELECT test_join1.name, age, salary, b.name, books FROM test_join1, test_join2 b WHERE test_join1.age = b.books", false),
             },
     { "DROP TABLE test_join1",
       "DROP TABLE test_join2" },
@@ -1408,7 +1394,7 @@ RunTest(const TestConfig &tc) {
     // Pass 20/20
     scores.push_back(CheckQueryList(tc, Insert));
 
-    // Pass 22/23
+    // Pass 27/27
     scores.push_back(CheckQueryList(tc, Join));
 
     // Pass 21/21
