@@ -1026,6 +1026,13 @@ static QueryList Deadlocks = QueryList("Deadlocks",
       Query("START TRANSACTION", false),
       Query("UPDATE deadlock SET x = x + 1, y = y + 2", false),
       Query("SELECT * FROM deadlock WHERE x < 10", false),
+      // HACK: We can't properly test the deadlock resolution. We have
+      // to issue a ROLLBACK here to make the control server rollback
+      // because the deadlock already forced the cryptdb server to do
+      // so.
+      // > This test really only tells us if our stored procedure
+      // for HOM UPDATE incorrectly commits to early.
+      Query("ROLLBACK", false),
       Query("SELECT * FROM deadlock WHERE x < 10", false)},
     { "DROP TABLE deadlock"},
     { "DROP TABLE deadlock"},
@@ -1387,7 +1394,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 424/459
+    //      TOTAL RESULT: 426/460
     // ###############################
 
     std::vector<Score> scores;
@@ -1449,7 +1456,7 @@ RunTest(const TestConfig &tc) {
     // Pass 25/25
     scores.push_back(CheckQueryList(tc, Transactions));
 
-    // Pass 8/10
+    // Pass 10/11
     // NOTE: Should fail one test.
     scores.push_back(CheckQueryList(tc, Deadlocks));
 
