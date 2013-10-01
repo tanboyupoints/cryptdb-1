@@ -586,6 +586,8 @@ agg_deinit(UDF_INIT *const initid)
     delete as;
 }
 
+// When we want to add by zero for HOM values we can multiply our value
+// by 1.
 void
 agg_clear(UDF_INIT *const initid, char *const is_null, char *const error)
 {
@@ -612,8 +614,12 @@ agg_add(UDF_INIT *const initid, UDF_ARGS *const args, char *const is_null,
     }
 
     ZZ e;
-    ZZFromBytes(e, reinterpret_cast<const uint8_t *>(args->args[0]),
-                args->lengths[0]);
+    if (NULL == args->args[0]) {
+        e = to_ZZ(1);
+    } else {
+        ZZFromBytes(e, reinterpret_cast<const uint8_t *>(args->args[0]),
+                    args->lengths[0]);
+    }
 
     //cerr << "element to add " << e << "\n";
     MulMod(as->sum, as->sum, e, as->n2);

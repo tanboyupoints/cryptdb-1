@@ -1387,7 +1387,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 450/451
+    //      TOTAL RESULT: 424/459
     // ###############################
 
     std::vector<Score> scores;
@@ -1395,7 +1395,7 @@ RunTest(const TestConfig &tc) {
     // Pass 54/54
     scores.push_back(CheckQueryList(tc, Select));
 
-    // Pass 26/26
+    // Pass 24/31
     scores.push_back(CheckQueryList(tc, HOM));
 
     // Pass 20/20
@@ -1407,7 +1407,7 @@ RunTest(const TestConfig &tc) {
     // Pass 21/21
     scores.push_back(CheckQueryList(tc, Basic));
 
-    // Pass 34/34
+    // Pass 22/37
     scores.push_back(CheckQueryList(tc, Update));
 
     // Pass 28/28
@@ -1425,7 +1425,7 @@ RunTest(const TestConfig &tc) {
     // Pass 19/19
     scores.push_back(CheckQueryList(tc, Null));
 
-    // Pass 21/21
+    // Pass 19/21
     ProxyState *const ps = test->getProxyState();
     if (ps->defaultSecurityRating() == SECURITY_RATING::BEST_EFFORT) {
         scores.push_back(CheckQueryList(tc, BestEffort));
@@ -1434,13 +1434,13 @@ RunTest(const TestConfig &tc) {
     // Pass 16/16
     scores.push_back(CheckQueryList(tc, Auto));
 
-    // Pass 16/16
+    // Pass 14/16
     scores.push_back(CheckQueryList(tc, Negative));
 
     // Pass 21/21
     scores.push_back(CheckQueryList(tc, DefaultValue));
 
-    // Pass 19/19
+    // Pass 13/19
     scores.push_back(CheckQueryList(tc, Decimal));
 
     // Pass 20/20
@@ -1449,7 +1449,7 @@ RunTest(const TestConfig &tc) {
     // Pass 25/25
     scores.push_back(CheckQueryList(tc, Transactions));
 
-    // Pass 9/10
+    // Pass 8/10
     // NOTE: Should fail one test.
     scores.push_back(CheckQueryList(tc, Deadlocks));
 
