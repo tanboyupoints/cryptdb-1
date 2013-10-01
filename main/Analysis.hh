@@ -262,12 +262,11 @@ private:
 class SpecialUpdate : public RewriteOutput {
 public:
     SpecialUpdate(const std::string &original_query,
-                  const std::string &new_query,
                   const std::string &plain_table,
                   const std::string &crypted_table,
                   const std::string &where_clause,
                   const ProxyState &ps)
-    : RewriteOutput(original_query), new_query(new_query),
+    : RewriteOutput(original_query),
       plain_table(plain_table), crypted_table(crypted_table),
       where_clause(where_clause), ps(ps) {}
     ~SpecialUpdate() {;}
@@ -281,7 +280,6 @@ public:
     bool multipleResultSets() const;
 
 private:
-    const std::string new_query;
     const std::string plain_table;
     const std::string crypted_table;
     const std::string where_clause;

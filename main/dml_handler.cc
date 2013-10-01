@@ -22,11 +22,10 @@ analyze_field_value_pair(const Item_field &field, const Item &val,
 static st_select_lex *
 rewrite_filters_lex(const st_select_lex &select_lex, Analysis &a);
 
-static void
+static bool
 rewrite_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a,
-                          bool *invalids, List<Item> *res_items,
-                          List<Item> *res_values);
+                          List<Item> *res_items, List<Item> *res_values);
 
 static bool
 invalidates(const FieldMeta &fm, const EncSet & es);
@@ -165,10 +164,9 @@ class InsertHandler : public DMLHandler {
         {
             auto fd_it = List_iterator<Item>(lex->update_list);
             auto val_it = List_iterator<Item>(lex->value_list);
-            bool invalids;
             List<Item> res_items, res_values;
-            rewrite_field_value_pairs(fd_it, val_it, a, &invalids,
-                                      &res_items, &res_values);
+            assert(rewrite_field_value_pairs(fd_it, val_it, a, &res_items,
+                                             &res_values));
             //TODO: cleanup old item and value list
             new_lex->update_list = res_items;
             new_lex->value_list = res_values;
@@ -219,11 +217,10 @@ class UpdateHandler : public DMLHandler {
 
         auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
         auto val_it = List_iterator<Item>(lex->value_list);
-        bool invalids;
         List<Item> res_items, res_values;
-        rewrite_field_value_pairs(fd_it, val_it, a, &invalids,
-                                  &res_items, &res_values);
-        a.special_update = invalids;
+        a.special_update =
+            false == rewrite_field_value_pairs(fd_it, val_it, a, 
+                                               &res_items, &res_values);
         //TODO: cleanup old item and value list
         new_lex->select_lex.item_list = res_items;
         new_lex->value_list = res_values;
@@ -432,13 +429,11 @@ rewrite_filters_lex(const st_select_lex &select_lex, Analysis & a)
     return new_select_lex;
 }
 
-static void
+static bool
 rewrite_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a,
-                          bool *invalids, List<Item> *res_items,
-                          List<Item> *res_values)
+                          List<Item> *res_items, List<Item> *res_values)
 {
-    *invalids = false;
     for (;;) {
         const Item *const field_item = fd_it++;
         const Item *const value_item = val_it++;
@@ -460,9 +455,8 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
         const EncSet r_es = rp_value->es_out.intersect(needed);
 
         // Does r_es support all onions on field?
-        *invalids = *invalids || invalidates(fm, r_es);
-        if (true == *invalids) {
-            continue;
+        if (invalidates(fm, r_es)) {
+            return false;
         }
 
         // FIXME: Add version for situations when we don't know about
@@ -513,6 +507,8 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
                     new Item_int(static_cast<ulonglong>(salt)));
         }
     }
+
+    return true;
 }
 
 static void

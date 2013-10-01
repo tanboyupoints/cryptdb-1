@@ -1002,8 +1002,7 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
 {
     std::unique_ptr<query_parse> p;
     try {
-        p =
-            std::unique_ptr<query_parse>(new query_parse(ps.dbName(),
+        p = std::unique_ptr<query_parse>(new query_parse(ps.dbName(),
                                                          query));
     } catch (std::runtime_error &e) {
         std::cerr << "Bad Query: " << query << std::endl;
@@ -1057,8 +1056,7 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
             where_clause = " TRUE ";
         }
 
-        return new SpecialUpdate(query, lex_to_query(out_lex.get()),
-                                 plain_table, crypted_table,
+        return new SpecialUpdate(query,  plain_table, crypted_table,
                                  where_clause, ps);
     } else if (ddl_dispatcher->canDo(lex)) {
         const SQLHandler &handler = ddl_dispatcher->dispatch(lex);
