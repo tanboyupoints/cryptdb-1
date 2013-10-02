@@ -124,6 +124,14 @@ make_item_ref(const Item_ref &i, Item *const new_ref,
     return i0;
 }
 
+Item_insert_value *
+make_item_insert_value(const Item_insert_value &i,
+                       Item_field *const field)
+{
+    assert(isItem_insert_value(i));
+    return new (current_thd->mem_root)
+               Item_insert_value(i.context, field);
+}
 
 Item_string *
 make_item_string(const std::string &s)
@@ -148,6 +156,18 @@ make_order(const ORDER *const old_order, Item *const i)
     return new_order;
 }
 
+bool
+isItem_insert_value(const Item &i)
+{
+    if (i.type() != Item::Type::FIELD_ITEM) {
+        return false;
+    }
+
+    const Item_field &i_field =
+        static_cast<const Item_field &>(i);
+
+    return i_field.is_insert_value();
+}
 
 void
 set_select_lex(LEX *const lex, SELECT_LEX *const select_lex)

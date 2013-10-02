@@ -91,7 +91,7 @@ class DropColumnSubHandler : public AlterSubHandler {
         }
 
         // Rewrite the salt column.
-        if (fm.has_salt) {
+        if (fm.getHasSalt()) {
             Alter_drop * const new_adrop = adrop->clone(thd->mem_root);
             new_adrop->name =
                 thd->strdup(fm.getSaltName().c_str());

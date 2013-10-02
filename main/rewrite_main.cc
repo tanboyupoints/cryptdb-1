@@ -85,7 +85,7 @@ sanityCheck(FieldMeta &fm)
          it++) {
         OnionMeta *const om = (*it).second.get();
         const onion o = (*it).first.getValue();
-        const std::vector<SECLEVEL> &secs = fm.onion_layout.at(o);
+        const std::vector<SECLEVEL> &secs = fm.getOnionLayout().at(o);
         for (size_t i = 0; i < om->layers.size(); ++i) {
             std::unique_ptr<EncLayer> const &layer = om->layers[i];
             assert(layer.get()->level() == secs[i]);

@@ -228,7 +228,7 @@ rewrite_create_field(const FieldMeta * const fm,
     }
 
     // create salt column
-    if (fm->has_salt) {
+    if (fm->getHasSalt()) {
         THD * const thd         = current_thd;
         Create_field * const f0 = f->clone(thd->mem_root);
         f0->field_name          = thd->strdup(fm->getSaltName().c_str());
@@ -448,11 +448,11 @@ void
 typical_rewrite_insert_type(const Item &i, const FieldMeta &fm,
                             Analysis &a, std::vector<Item *> *l)
 {
-    const uint64_t salt = fm.has_salt ? randomValue() : 0;
+    const uint64_t salt = fm.getHasSalt() ? randomValue() : 0;
 
     encrypt_item_all_onions(i, fm, salt, a, l);
 
-    if (fm.has_salt) {
+    if (fm.getHasSalt()) {
         l->push_back(new Item_int(static_cast<ulonglong>(salt)));
     }
 }

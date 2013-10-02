@@ -117,6 +117,14 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
         // FIXME: Enforce this semantically.
         a.item_cache[&i] = std::make_pair(res, constr);
 
+        // This rewrite may be inside of an ON DUPLICATE KEY UPDATE...
+        // where there query is using the VALUES(...) function.
+        if (isItem_insert_value(i)) {
+            const Item_insert_value &insert_i =
+                static_cast<const Item_insert_value &>(i);
+            return make_item_insert_value(insert_i, res);
+        }
+
         return res;
     }
 /*
@@ -153,7 +161,7 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
                 make_item_field(i, anon_table_name, anon_field_name);
             l->push_back(new_field);
         }
-        if (fm.has_salt) {
+        if (fm.getHasSalt()) {
             assert(new_field); // need an anonymized field as template to
                                // create salt item
             l->push_back(make_item_field(*new_field, anon_table_name,

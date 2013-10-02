@@ -207,7 +207,7 @@ needsSalt(SECLEVEL l)
 bool
 needsSalt(OLK olk)
 {
-    return olk.key && olk.key->has_salt && needsSalt(olk.l);
+    return olk.key && olk.key->getHasSalt() && needsSalt(olk.l);
 }
 
 bool

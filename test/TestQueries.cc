@@ -185,11 +185,6 @@ static QueryList Update = QueryList("SingleUpdate",
       Query("INSERT INTO test_update VALUES (4, 10, 0, 'London', 'Edmund')", false),
       Query("INSERT INTO test_update VALUES (5, 30, 100000, '221B Baker Street', 'Sherlock Holmes')", false),
       Query("INSERT INTO test_update VALUES (6, 11, 0 , 'hi', 'no one')", false),
-      // WARN: The next two queries should remain the first two
-      // non-insert queries in order to test salt preservation.
-      Query("UPDATE test_update SET salary = salary, id = id", false),
-      Query("SELECT * FROM test_update", false),
-
       Query("UPDATE test_update SET salary=0", false),
       Query("SELECT * FROM test_update", false),
       Query("UPDATE test_update SET age=21 WHERE id = 6", false),
@@ -235,7 +230,6 @@ static QueryList HOM = QueryList("HOMAdd",
       Query("INSERT INTO test_HOM VALUES (12, NULL, NULL, 'nucwinter', 'gasmask++')", false),
       Query("SELECT * FROM test_HOM", false),
       Query("SELECT SUM(age) FROM test_HOM", false),
-      Query("UPDATE test_HOM SET age = age", false),
       Query("SELECT * FROM test_HOM", false),
       Query("SELECT SUM(age) FROM test_HOM", false),
       Query("UPDATE test_HOM SET age = age + 1", false),
@@ -632,20 +626,26 @@ static QueryList UserGroupForum = QueryList("UserGroupForum",
       "" } );
 
 static QueryList Auto = QueryList("AutoInc",
-    { "CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext text)",
+    { "CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)",
       "", "", "", "", "", ""},
-    { "CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext text)",
+    { "CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)",
       "", "", "", "", "", ""},
-    { "CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext text)",
+    { "CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)",
       "", "", "", "", "", ""},
-    { Query("INSERT INTO msgs (msgtext) VALUES ('hello world')", false),
-      Query("INSERT INTO msgs (msgtext) VALUES ('hello world2')", false),
-      Query("INSERT INTO msgs (msgtext) VALUES ('hello world3')", false),
+    { Query("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world', 100)", false),
+      Query("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world2', 21)", false),
+      Query("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world3', 10909)", false),
       Query("SELECT msgtext FROM msgs WHERE msgid=1", false),
       Query("SELECT msgtext FROM msgs WHERE msgid=2", false),
       Query("SELECT msgtext FROM msgs WHERE msgid=3", false),
-      Query("INSERT INTO msgs VALUES (9, 'message for alice from bob')", false),
-      Query("INSERT INTO msgs VALUES (9, 'whatever') ON DUPLICATE KEY UPDATE msgid = msgid + 10", false)},
+      Query("INSERT INTO msgs VALUES (9, 105, 'message for alice from bob')", false),
+      Query("INSERT INTO msgs VALUES (9, 201, 'whatever') ON DUPLICATE KEY UPDATE msgid = msgid + 10", false),
+      Query("SELECT * FROM msgs", false),
+      Query("INSERT INTO msgs VALUES (1, 9001, 'lights are on') ON DUPLICATE KEY UPDATE msgid = zooanimals + 99, zooanimals=VALUES(zooanimals)", false),
+      Query("SELECT * FROM msgs", false),
+      Query("INSERT INTO msgs VALUES (2, 1998, 'stacksondeck') ON DUPLICATE KEY UPDATE zooanimals = VALUES(zooanimals), msgtext = VALUES(msgtext)", false),
+      Query("SELECT * FROM msgs", false),
+      },
     { "DROP TABLE msgs"},
     { "DROP TABLE msgs"},
     { "DROP TABLE msgs"});
@@ -993,7 +993,7 @@ static QueryList Transactions = QueryList("Transactions",
       Query("ROLLBACK", false),
       Query("SELECT * FROM trans", false),
       Query("START TRANSACTION", false),
-      Query("UPDATE trans SET a = c, b = a + 1", false),
+      Query("UPDATE trans SET a = c + 1, b = a + 1", false),
       Query("COMMIT", false),
       Query("ROLLBACK", false),
       Query("SELECT * FROM trans", false)},
@@ -1381,7 +1381,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 440/446
+    //      TOTAL RESULT: 442/448
     // ###############################
 
     std::vector<Score> scores;
@@ -1389,7 +1389,7 @@ RunTest(const TestConfig &tc) {
     // Pass 54/54
     scores.push_back(CheckQueryList(tc, Select));
 
-    // Pass 31/32
+    // Pass 30/31
     scores.push_back(CheckQueryList(tc, HOM));
 
     // Pass 20/20
@@ -1401,7 +1401,7 @@ RunTest(const TestConfig &tc) {
     // Pass 21/21
     scores.push_back(CheckQueryList(tc, Basic));
 
-    // Pass 35/37
+    // Pass 33/35
     scores.push_back(CheckQueryList(tc, Update));
 
     // Pass 28/28
@@ -1425,7 +1425,7 @@ RunTest(const TestConfig &tc) {
         scores.push_back(CheckQueryList(tc, BestEffort));
     }
 
-    // Pass 16/16
+    // Pass 21/21
     scores.push_back(CheckQueryList(tc, Auto));
 
     // Pass 14/16
@@ -1434,7 +1434,7 @@ RunTest(const TestConfig &tc) {
     // Pass 21/21
     scores.push_back(CheckQueryList(tc, DefaultValue));
 
-    // Pass 13/19
+    // Pass ?/?
     // scores.push_back(CheckQueryList(tc, Decimal));
 
     // Pass 20/20

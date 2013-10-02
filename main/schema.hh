@@ -89,8 +89,6 @@ typedef class FieldMeta : public MappedDBMeta<OnionMeta, OnionMetaKey> {
 public:
     const std::string fname;
     const std::string salt_name;
-    const onionlayout onion_layout;
-    const bool has_salt; //whether this field has its own salt
 
     // New.
     FieldMeta(const std::string &name, Create_field * const field,
@@ -131,9 +129,13 @@ public:
     bool hasOnion(onion o) const;
     bool hasDefault() const {return has_default;}
     std::string defaultValue() const {return default_value;}
+    const onionlayout &getOnionLayout() const {return onion_layout;}
+    bool getHasSalt() const {return has_salt;}
 
 private:
     constexpr static const char *type_name = "fieldMeta";
+    const onionlayout onion_layout;
+    const bool has_salt; //whether this field has its own salt
     const SECURITY_RATING sec_rating;
     unsigned long uniq_count;
     unsigned long counter;

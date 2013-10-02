@@ -221,8 +221,9 @@ static bool
 init_onions_layout(const AES_KEY *const m_key,
                    FieldMeta *const fm, Create_field *const cf)
 {
-    if (fm->has_salt != (static_cast<bool>(m_key)
-                         && PLAIN_ONION_LAYOUT != fm->onion_layout)) {
+    const onionlayout onion_layout = fm->getOnionLayout();
+    if (fm->getHasSalt() != (static_cast<bool>(m_key)
+                             && PLAIN_ONION_LAYOUT != onion_layout)) {
         return false;
     }
 
@@ -230,7 +231,7 @@ init_onions_layout(const AES_KEY *const m_key,
         return false;
     }
 
-    for (auto it: fm->onion_layout) {
+    for (auto it: onion_layout) {
         const onion o = it.first;
         const std::vector<SECLEVEL> levels = it.second;
         // A new OnionMeta will only occur with a new FieldMeta so

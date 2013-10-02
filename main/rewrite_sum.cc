@@ -300,7 +300,7 @@ static class ANON : public CItemSubtypeIT<Item_null, Item::Type::NULL_ITEM> {
         for (uint j = 0; j < fm.children.size(); ++j) {
             l->push_back(RiboldMYSQL::clone_item(i));
         }
-        if (fm.has_salt) {
+        if (fm.getHasSalt()) {
             const ulonglong salt = randomValue();
             l->push_back(new Item_int(static_cast<ulonglong>(salt)));
         }

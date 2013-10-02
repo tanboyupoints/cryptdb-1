@@ -25,7 +25,8 @@ rewrite_filters_lex(const st_select_lex &select_lex, Analysis &a);
 static bool
 rewrite_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a,
-                          List<Item> *res_items, List<Item> *res_values);
+                          List<Item> *const res_items,
+                          List<Item> *const res_values);
 
 static bool
 invalidates(const FieldMeta &fm, const EncSet & es);
@@ -432,7 +433,8 @@ rewrite_filters_lex(const st_select_lex &select_lex, Analysis & a)
 static bool
 rewrite_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a,
-                          List<Item> *res_items, List<Item> *res_values)
+                          List<Item> *const res_items,
+                          List<Item> *const res_values)
 {
     for (;;) {
         const Item *const field_item = fd_it++;
@@ -454,8 +456,26 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
         const EncSet needed = EncSet(a, &fm);
         const EncSet r_es = rp_value->es_out.intersect(needed);
 
-        // Does r_es support all onions on field?
-        if (invalidates(fm, r_es)) {
+        if ((value_item->type() == Item::Type::FIELD_ITEM)
+            && (false == isItem_insert_value(*value_item))) {
+
+            TEST_TextMessageError(false,
+                                  "CryptDB does not support queries of the"
+                                  " form"
+                                  " UPDATE t SET <fieldA> = <fieldB>;"
+                                  " where 'A' may or may not equal 'B'.");
+        }
+
+        // > We support two cases.
+        //   I) The EncSet (@r_es) can update all onions on the FieldMeta
+        //      (@fm).
+        //   II) Wordpress requires a specific use case.
+        //       > INSERT INTO t (x, y, z) VALUES (1, 2, 3)
+        //            ON DUPLICATE KEY UPDATE x = VALUES(x),
+        //                                    y = VALUES(y)
+        if (invalidates(fm, r_es)
+            && (false == isItem_insert_value(*value_item))) {
+
             return false;
         }
 
@@ -467,17 +487,14 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
 
         // Determine salt for field
         bool add_salt = false;
-        if (fm.has_salt) {
-            // NOTE: There may be more exceptions.
-            if (value_item->type() == Item::Type::FIELD_ITEM) {
-                add_salt = false;
-            } else {
-                const auto it_salt = a.salts.find(&fm);
-                if ((it_salt == a.salts.end()) && needsSalt(r_es)) {
-                    add_salt = true;
-                    const salt_type salt = randomValue();
-                    a.salts.insert(std::make_pair(&fm, salt));
-                }
+        if (fm.getHasSalt()) {
+            // Search for a salt first as a previous iteration may have
+            // already referenced this @fm.
+            const auto it_salt = a.salts.find(&fm);
+            if ((it_salt == a.salts.end()) && needsSalt(r_es)) {
+                add_salt = true;
+                const salt_type salt = randomValue();
+                a.salts.insert(std::make_pair(&fm, salt));
             }
         }
 
@@ -499,7 +516,6 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
 
         // Add the salt field
         if (add_salt) {
-            const salt_type salt = a.salts[&fm];
             assert(res_items->elements != 0);
             const Item_field * const rew_fd =
                 static_cast<Item_field *>(res_items->head());
@@ -508,8 +524,20 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
             const std::string anon_field_name = fm.getSaltName();
             res_items->push_back(make_item_field(*rew_fd, anon_table_name,
                                                  anon_field_name));
-            res_values->push_back(
-                    new Item_int(static_cast<ulonglong>(salt)));
+            if (isItem_insert_value(*value_item)) {
+                const Item_insert_value *const insert_value_item =
+                    static_cast<const Item_insert_value *>(value_item);
+                Item_field *const res_field =
+                    make_item_field(*rew_fd, anon_table_name,
+                                    fm.getSaltName());
+                Item_insert_value *const res_insert_value =
+                    make_item_insert_value(*insert_value_item, res_field);
+                res_values->push_back(res_insert_value);
+            } else {
+                const salt_type salt = a.salts[&fm];
+                res_values->push_back(
+                        new Item_int(static_cast<ulonglong>(salt)));
+            }
         }
     }
 

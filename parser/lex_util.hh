@@ -44,8 +44,12 @@ Item_ref *make_item_ref(const Item_ref &t, Item *const new_ref,
                         const std::string &table_name = "",
                         const std::string &field_name = "");
 Item_string *make_item_string(const std::string &s);
+Item_insert_value *make_item_insert_value(const Item_insert_value &i,
+                                          Item_field *const field);
 ORDER *make_order(const ORDER *const old_order, Item *const i);
 
+bool
+isItem_insert_value(const Item &i);
 
 // sets the select_lex in a lex
 void
