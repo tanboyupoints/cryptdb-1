@@ -1389,7 +1389,7 @@ RunTest(const TestConfig &tc) {
     // Pass 54/54
     scores.push_back(CheckQueryList(tc, Select));
 
-    // Pass 24/31
+    // Pass 31/32
     scores.push_back(CheckQueryList(tc, HOM));
 
     // Pass 20/20
@@ -1401,7 +1401,7 @@ RunTest(const TestConfig &tc) {
     // Pass 21/21
     scores.push_back(CheckQueryList(tc, Basic));
 
-    // Pass 22/37
+    // Pass 35/37
     scores.push_back(CheckQueryList(tc, Update));
 
     // Pass 28/28
