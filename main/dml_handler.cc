@@ -468,11 +468,16 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
         // Determine salt for field
         bool add_salt = false;
         if (fm.has_salt) {
-            const auto it_salt = a.salts.find(&fm);
-            if ((it_salt == a.salts.end()) && needsSalt(r_es)) {
-                add_salt = true;
-                const salt_type salt = randomValue();
-                a.salts.insert(std::make_pair(&fm, salt));
+            // NOTE: There may be more exceptions.
+            if (value_item->type() == Item::Type::FIELD_ITEM) {
+                add_salt = false;
+            } else {
+                const auto it_salt = a.salts.find(&fm);
+                if ((it_salt == a.salts.end()) && needsSalt(r_es)) {
+                    add_salt = true;
+                    const salt_type salt = randomValue();
+                    a.salts.insert(std::make_pair(&fm, salt));
+                }
             }
         }
 
