@@ -85,6 +85,7 @@ EOM$
     > cp -R /path/to/cryptdb/parser/mysql_mods/* .
     > rm sql/sql_yacc.{cc,h}
     > cat /path/to/cryptdb/doc/subquery_patch | patch -p0
+    > cat /path/to/cryptdb/doc/item_insert_value_patch | patch -p0
     > mkdir build
     > cd build
     > cmake -DWITH_EMBEDDED_SERVER=on ..
