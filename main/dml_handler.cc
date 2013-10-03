@@ -460,10 +460,15 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
         FieldMeta &fm =
             a.getFieldMeta(ifd->table_name, ifd->field_name);
 
+        const std::unique_ptr<RewritePlan> &rp_field =
+            constGetAssert(a.rewritePlans, field_item);
         const std::unique_ptr<RewritePlan> &rp_value =
             constGetAssert(a.rewritePlans, value_item);
+
         const EncSet needed = EncSet(a, &fm);
-        const EncSet r_es = rp_value->es_out.intersect(needed);
+        const EncSet r_es =
+            rp_value->es_out.intersect(needed)
+                            .intersect(rp_field->es_out);
 
         const SIMPLE_UPDATE_TYPE update_type =
             determineUpdateType(*value_item, fm, r_es);
@@ -748,7 +753,6 @@ handleUpdateType(SIMPLE_UPDATE_TYPE update_type, const EncSet &es,
             doPairRewrite(fm, es, field_item, value_item, res_fields,
                           res_values, a);
 
-            // Add the salt field
             if (add_salt) {
                 addSalt(fm, field_item, res_fields, res_values, a,
                         [&fm, &a] (const Item_field &)
@@ -796,6 +800,7 @@ handleUpdateType(SIMPLE_UPDATE_TYPE update_type, const EncSet &es,
 
     return;
 }
+
 // FIXME: Add test to make sure handlers added successfully.
 SQLDispatcher *buildDMLDispatcher()
 {
