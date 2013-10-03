@@ -169,14 +169,6 @@ static QueryList Update = QueryList("SingleUpdate",
         "",
         "",
         ""},
-#if 0
-        // Query Fail
-      "CRYPTDB test_update.age ENC",
-      "CRYPTDB test_update.salary ENC",
-      "CRYPTDB test_update.address ENC",
-      "CRYPTDB test_update.name ENC" },
-#endif
-
     { "CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)",
       "", "", "", "" },
     { Query("INSERT INTO test_update VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')", false),
@@ -185,6 +177,11 @@ static QueryList Update = QueryList("SingleUpdate",
       Query("INSERT INTO test_update VALUES (4, 10, 0, 'London', 'Edmund')", false),
       Query("INSERT INTO test_update VALUES (5, 30, 100000, '221B Baker Street', 'Sherlock Holmes')", false),
       Query("INSERT INTO test_update VALUES (6, 11, 0 , 'hi', 'no one')", false),
+      Query("SELECT * FROM test_update", false),
+      Query("UPDATE test_update SET age = age, address = name", false),
+      Query("SELECT * FROM test_update", false),
+      Query("UPDATE test_update SET name = address", false),
+      Query("SELECT * FROM test_update", false),
       Query("UPDATE test_update SET salary=0", false),
       Query("SELECT * FROM test_update", false),
       Query("UPDATE test_update SET age=21 WHERE id = 6", false),
@@ -638,6 +635,12 @@ static QueryList Auto = QueryList("AutoInc",
       Query("SELECT msgtext FROM msgs WHERE msgid=1", false),
       Query("SELECT msgtext FROM msgs WHERE msgid=2", false),
       Query("SELECT msgtext FROM msgs WHERE msgid=3", false),
+      Query("INSERT INTO msgs VALUES (3, 2012, 'sandman') ON DUPLICATE KEY UPDATE zooanimals = VALUES(zooanimals), zooanimals = 22", false),
+      Query("SELECT * FROM msgs", false),
+      Query("SELECT SUM(zooanimals) FROM msgs", false),
+      Query("INSERT INTO msgs VALUES (3, 777, 'golfpants') ON DUPLICATE KEY UPDATE zooanimals = 16, zooanimals = VALUES(zooanimals)", false),
+      Query("SELECT * FROM msgs", false),
+      Query("SELECT SUM(zooanimals) FROM msgs", false),
       Query("INSERT INTO msgs VALUES (9, 105, 'message for alice from bob')", false),
       Query("INSERT INTO msgs VALUES (9, 201, 'whatever') ON DUPLICATE KEY UPDATE msgid = msgid + 10", false),
       Query("SELECT * FROM msgs", false),
@@ -645,6 +648,7 @@ static QueryList Auto = QueryList("AutoInc",
       Query("SELECT * FROM msgs", false),
       Query("INSERT INTO msgs VALUES (2, 1998, 'stacksondeck') ON DUPLICATE KEY UPDATE zooanimals = VALUES(zooanimals), msgtext = VALUES(msgtext)", false),
       Query("SELECT * FROM msgs", false),
+      Query("SELECT SUM(zooanimals) FROM msgs", false),
       },
     { "DROP TABLE msgs"},
     { "DROP TABLE msgs"},
@@ -1381,7 +1385,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 442/448
+    //      TOTAL RESULT: 456/460
     // ###############################
 
     std::vector<Score> scores;
@@ -1401,7 +1405,7 @@ RunTest(const TestConfig &tc) {
     // Pass 21/21
     scores.push_back(CheckQueryList(tc, Basic));
 
-    // Pass 33/35
+    // Pass 40/40
     scores.push_back(CheckQueryList(tc, Update));
 
     // Pass 28/28
@@ -1425,7 +1429,7 @@ RunTest(const TestConfig &tc) {
         scores.push_back(CheckQueryList(tc, BestEffort));
     }
 
-    // Pass 21/21
+    // Pass 25/25
     scores.push_back(CheckQueryList(tc, Auto));
 
     // Pass 14/16

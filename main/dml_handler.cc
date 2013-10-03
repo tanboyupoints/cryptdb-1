@@ -25,11 +25,22 @@ rewrite_filters_lex(const st_select_lex &select_lex, Analysis &a);
 static bool
 rewrite_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a,
-                          List<Item> *const res_items,
+                          List<Item> *const res_fields,
                           List<Item> *const res_values);
 
-static bool
-invalidates(const FieldMeta &fm, const EncSet & es);
+enum class
+SIMPLE_UPDATE_TYPE {UNSUPPORTED, ON_DUPLICATE_VALUE,
+                    SAME_VALUE, NEW_VALUE};
+
+SIMPLE_UPDATE_TYPE
+determineUpdateType(const Item &value_item, const FieldMeta &fm,
+                    const EncSet &es);
+
+void
+handleUpdateType(SIMPLE_UPDATE_TYPE update_type, const EncSet &es,
+                 const Item_field &field_item, const Item &value_item,
+                 List<Item> *const res_fields,
+                 List<Item> *const res_values, Analysis &a);
 
 template <typename ContainerType>
 void rewriteInsertHelper(const Item &i, const FieldMeta &fm, Analysis &a,
@@ -165,11 +176,10 @@ class InsertHandler : public DMLHandler {
         {
             auto fd_it = List_iterator<Item>(lex->update_list);
             auto val_it = List_iterator<Item>(lex->value_list);
-            List<Item> res_items, res_values;
-            assert(rewrite_field_value_pairs(fd_it, val_it, a, &res_items,
+            List<Item> res_fields, res_values;
+            assert(rewrite_field_value_pairs(fd_it, val_it, a, &res_fields,
                                              &res_values));
-            //TODO: cleanup old item and value list
-            new_lex->update_list = res_items;
+            new_lex->update_list = res_fields;
             new_lex->value_list = res_values;
         }
 
@@ -218,12 +228,11 @@ class UpdateHandler : public DMLHandler {
 
         auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
         auto val_it = List_iterator<Item>(lex->value_list);
-        List<Item> res_items, res_values;
+        List<Item> res_fields, res_values;
         a.special_update =
             false == rewrite_field_value_pairs(fd_it, val_it, a, 
-                                               &res_items, &res_values);
-        //TODO: cleanup old item and value list
-        new_lex->select_lex.item_list = res_items;
+                                               &res_fields, &res_values);
+        new_lex->select_lex.item_list = res_fields;
         new_lex->value_list = res_values;
         return new_lex;
     }
@@ -433,7 +442,7 @@ rewrite_filters_lex(const st_select_lex &select_lex, Analysis & a)
 static bool
 rewrite_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a,
-                          List<Item> *const res_items,
+                          List<Item> *const res_fields,
                           List<Item> *const res_values)
 {
     for (;;) {
@@ -456,89 +465,14 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
         const EncSet needed = EncSet(a, &fm);
         const EncSet r_es = rp_value->es_out.intersect(needed);
 
-        if ((value_item->type() == Item::Type::FIELD_ITEM)
-            && (false == isItem_insert_value(*value_item))) {
-
-            TEST_TextMessageError(false,
-                                  "CryptDB does not support queries of the"
-                                  " form"
-                                  " UPDATE t SET <fieldA> = <fieldB>;"
-                                  " where 'A' may or may not equal 'B'.");
-        }
-
-        // > We support two cases.
-        //   I) The EncSet (@r_es) can update all onions on the FieldMeta
-        //      (@fm).
-        //   II) Wordpress requires a specific use case.
-        //       > INSERT INTO t (x, y, z) VALUES (1, 2, 3)
-        //            ON DUPLICATE KEY UPDATE x = VALUES(x),
-        //                                    y = VALUES(y)
-        if (invalidates(fm, r_es)
-            && (false == isItem_insert_value(*value_item))) {
-
+        const SIMPLE_UPDATE_TYPE update_type =
+            determineUpdateType(*value_item, fm, r_es);
+        if (SIMPLE_UPDATE_TYPE::UNSUPPORTED == update_type) {
             return false;
         }
 
-        // FIXME: Add version for situations when we don't know about
-        // children.
-        TEST_NoAvailableEncSet(r_es, ifd->type(), needed,
-                               rp_value->r.why,
-                            std::vector<std::shared_ptr<RewritePlan> >());
-
-        // Determine salt for field
-        bool add_salt = false;
-        if (fm.getHasSalt()) {
-            // Search for a salt first as a previous iteration may have
-            // already referenced this @fm.
-            const auto it_salt = a.salts.find(&fm);
-            if ((it_salt == a.salts.end()) && needsSalt(r_es)) {
-                add_salt = true;
-                const salt_type salt = randomValue();
-                a.salts.insert(std::make_pair(&fm, salt));
-            }
-        }
-
-        for (auto pair : r_es.osl) {
-            const OLK olk = {pair.first, pair.second.first, &fm};
-            const std::unique_ptr<RewritePlan> &rp_field =
-                constGetAssert(a.rewritePlans, field_item);
-            // FIXME: Dangerous PTR.
-            Item *const re_field =
-                itemTypes.do_rewrite(*ifd, olk, *rp_field.get(), a);
-            res_items->push_back(re_field);
-
-            // FIXME: Dangerous PTR.
-            Item *const re_value =
-                itemTypes.do_rewrite(*value_item, olk,
-                                     *rp_value.get(), a);
-            res_values->push_back(re_value);
-        }
-
-        // Add the salt field
-        if (add_salt) {
-            assert(res_items->elements != 0);
-            const Item_field * const rew_fd =
-                static_cast<Item_field *>(res_items->head());
-            assert(rew_fd);
-            const std::string anon_table_name = rew_fd->table_name;
-            const std::string anon_field_name = fm.getSaltName();
-            res_items->push_back(make_item_field(*rew_fd, anon_table_name,
-                                                 anon_field_name));
-            if (isItem_insert_value(*value_item)) {
-                const Item_insert_value *const insert_value_item =
-                    static_cast<const Item_insert_value *>(value_item);
-                Item_field *const res_field =
-                    make_item_field(*rew_fd, anon_table_name,
-                                    fm.getSaltName());
-                Item_insert_value *const res_insert_value =
-                    make_item_insert_value(*insert_value_item, res_field);
-                res_values->push_back(res_insert_value);
-            } else {
-                const salt_type salt = a.salts[&fm];
-                res_values->push_back(
-                        new Item_int(static_cast<ulonglong>(salt)));
-            }
-        }
+        handleUpdateType(update_type, r_es, *ifd, *value_item,
+                         res_fields, res_values, a);
     }
 
     return true;
@@ -708,7 +642,8 @@ process_table_list(const List<TABLE_LIST> &tll, Analysis & a)
     process_table_joins_and_derived(tll, a);
 }
 
-bool invalidates(const FieldMeta &fm, const EncSet & es)
+static bool
+invalidates(const FieldMeta &fm, const EncSet & es)
 {
     for (auto om_it = fm.children.begin(); om_it != fm.children.end();
          om_it++) {
@@ -721,6 +656,146 @@ bool invalidates(const FieldMeta &fm, const EncSet & es)
     return false;
 }
 
+SIMPLE_UPDATE_TYPE
+determineUpdateType(const Item &value_item, const FieldMeta &fm,
+                    const EncSet &es)
+{
+    if (invalidates(fm, es)) {
+        return SIMPLE_UPDATE_TYPE::UNSUPPORTED;
+    }
+
+    if (value_item.type() == Item::Type::FIELD_ITEM) {
+        if (true == isItem_insert_value(value_item)) {
+            return SIMPLE_UPDATE_TYPE::ON_DUPLICATE_VALUE;
+        } else {
+            const std::string &item_field_name =
+                static_cast<const Item_field &>(value_item).field_name;
+            assert(equalsIgnoreCase(fm.fname, item_field_name));
+            return SIMPLE_UPDATE_TYPE::SAME_VALUE;
+        }
+    }
+
+    return SIMPLE_UPDATE_TYPE::NEW_VALUE;
+}
+
+static void
+doPairRewrite(FieldMeta &fm, const EncSet &es,
+              const Item_field &field_item, const Item &value_item,
+              List<Item> *const res_fields, List<Item> *const res_values,
+              Analysis &a)
+{
+    const std::unique_ptr<RewritePlan> &field_rp =
+        constGetAssert(a.rewritePlans,
+                       &static_cast<const Item &>(field_item));
+    const std::unique_ptr<RewritePlan> &value_rp =
+        constGetAssert(a.rewritePlans, &value_item);
+
+    for (auto pair : es.osl) {
+        const OLK olk = {pair.first, pair.second.first, &fm};
+
+        Item *const re_field =
+            itemTypes.do_rewrite(field_item, olk, *field_rp, a);
+        res_fields->push_back(re_field);
+
+        Item *const re_value =
+            itemTypes.do_rewrite(value_item, olk, *value_rp, a);
+        res_values->push_back(re_value);
+    }
+}
+
+static void
+addSalt(FieldMeta &fm, const Item_field &field_item,
+        List<Item> *const res_fields, List<Item> *const res_values,
+        Analysis &a,
+        std::function<Item *(const Item_field &rew_fd)> getSaltValue)
+{
+    assert(res_fields->elements != 0);
+    const Item_field * const rew_fd =
+        static_cast<Item_field *>(res_fields->head());
+    assert(rew_fd);
+    const std::string anon_table_name =
+        a.getAnonTableName(field_item.table_name);
+    const std::string anon_field_name = fm.getSaltName();
+    res_fields->push_back(make_item_field(*rew_fd,
+                                          anon_table_name,
+                                          anon_field_name));
+    res_values->push_back(getSaltValue(*rew_fd));
+}
+
+void
+handleUpdateType(SIMPLE_UPDATE_TYPE update_type, const EncSet &es,
+                 const Item_field &field_item, const Item &value_item,
+                 List<Item> *const res_fields,
+                 List<Item> *const res_values, Analysis &a)
+{
+    FieldMeta &fm =
+        a.getFieldMeta(field_item.table_name, field_item.field_name);
+
+    switch (update_type) {
+        case SIMPLE_UPDATE_TYPE::NEW_VALUE: {
+            bool add_salt = false;
+            if (fm.getHasSalt()) {
+                // Search for a salt first as a previous iteration may 
+                // have already referenced this @fm.
+                const auto it_salt = a.salts.find(&fm);
+                if ((it_salt == a.salts.end()) && needsSalt(es)) {
+                    add_salt = true;
+                    const salt_type salt = randomValue();
+                    a.salts.insert(std::make_pair(&fm, salt));
+                }
+            }
+
+            doPairRewrite(fm, es, field_item, value_item, res_fields,
+                          res_values, a);
+
+            // Add the salt field
+            if (add_salt) {
+                addSalt(fm, field_item, res_fields, res_values, a,
+                        [&fm, &a] (const Item_field &)
+                {
+                    const salt_type salt = a.salts[&fm];
+                    return new (current_thd->mem_root)
+                               Item_int(static_cast<ulonglong>(salt));
+                });
+            }
+            break;
+        }
+        case SIMPLE_UPDATE_TYPE::SAME_VALUE: {
+            doPairRewrite(fm, es, field_item, value_item, res_fields,
+                          res_values, a);
+            break;
+        }
+        case SIMPLE_UPDATE_TYPE::ON_DUPLICATE_VALUE: {
+            doPairRewrite(fm, es, field_item, value_item, res_fields,
+                          res_values, a);
+            if (fm.getHasSalt()) {
+                addSalt(fm, field_item, res_fields, res_values, a,
+                        [&value_item, &fm, &a]
+                        (const Item_field &rew_fd)
+                {
+                    const Item_insert_value &insert_value_item =
+                       static_cast<const Item_insert_value &>(value_item);
+                    const std::string anon_table_name =
+                        rew_fd.table_name;
+                    Item_field *const res_field =
+                        make_item_field(rew_fd, anon_table_name,
+                                        fm.getSaltName());
+                    return make_item_insert_value(insert_value_item,
+                                                  res_field);
+                });
+            }
+            break;
+        }
+
+        case SIMPLE_UPDATE_TYPE::UNSUPPORTED:
+        default :
+            TEST_TextMessageError(false,
+                                  "UNSUPPORTED or UNRECOGNIZED"
+                                  " SIMPLE_UPDATE_TYPE!");
+    }
+
+    return;
+}
 // FIXME: Add test to make sure handlers added successfully.
 SQLDispatcher *buildDMLDispatcher()
 {
