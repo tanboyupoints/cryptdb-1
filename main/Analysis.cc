@@ -9,10 +9,8 @@
 
 // FIXME: Wrong interfaces.
 EncSet::EncSet(Analysis &a, FieldMeta * const fm) {
-    // FIXME: Safe to throw exception in constructor?
-    if (0 == fm->children.size()) {
-        throw CryptDBError("FieldMeta has no children!");
-    }
+    TEST_TextMessageError(0 != fm->children.size(),
+                         "FieldMeta has no children!");
 
     osl.clear();
     for (auto pair = fm->children.begin(); pair != fm->children.end();
@@ -358,7 +356,7 @@ std::string Delta::tableNameFromType(TableType table_type) const
             return MetaDataTables::Name::bleedingMetaObject();
         }
         default: {
-            throw CryptDBError("Unrecognized table type!");
+            FAIL_TextMessageError("Unrecognized table type!");
         }
     }
 }
@@ -844,12 +842,11 @@ revertAndCleanupEmbedded(const std::unique_ptr<Connect> &e_conn,
 {
     assert(e_conn->execute("START TRANSACTION;"));
 
-    if (!setBleedingTableToRegularTable(e_conn)) {
-        throw CryptDBError("bleedingTable=regularTable failed!");
-    }
-    if (!cleanupDeltaOutputAndQuery(e_conn, delta_output_id)) {
-        throw CryptDBError("cleaning up delta failed!");
-    }
+    TEST_TextMessageError(setBleedingTableToRegularTable(e_conn),
+                          "bleedingTable=regularTable failed!");
+    TEST_TextMessageError(cleanupDeltaOutputAndQuery(e_conn,
+                                                     delta_output_id),
+                          "cleaning up delta failed!");
 
     assert(e_conn->execute("COMMIT;"));
 
@@ -1041,8 +1038,8 @@ bool AdjustOnionOutput::queryAgain() const
 
 bool AdjustOnionOutput::doDecryption() const
 {
-    throw CryptDBError("AdjustOnionOutput doesn't understand"
-                       " decryption!");
+    FAIL_TextMessageError("AdjustOnionOutput doesn't understand"
+                          " decryption!");
 }
 
 enum RewriteOutput::Channel AdjustOnionOutput::queryChannel() const

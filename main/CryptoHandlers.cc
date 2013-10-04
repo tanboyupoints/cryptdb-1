@@ -163,7 +163,7 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * const cf,
         case SECLEVEL::PLAINVAL: {return new PlainText();}
         default:{}
     }
-    throw CryptDBError("unknown or unimplemented security level \n");
+    FAIL_TextMessageError("unknown or unimplemented security level");
 }
 
 EncLayer *
@@ -197,7 +197,7 @@ EncLayerFactory::deserializeLayer(unsigned int id,
 
         default:{}
     }
-    throw CryptDBError("unknown or unimplemented security level \n");
+    FAIL_TextMessageError("unknown or unimplemented security level");
 }
 
 /*
@@ -687,7 +687,7 @@ DETFactory::deserialize(unsigned int id, const SerialLayer &sl)
     } else if ("DET_str" == sl.name) {
         return new DET_str(id, sl.layer_info);
     } else {
-        throw CryptDBError("Unknown type for DET deserialization!");
+        FAIL_TextMessageError("Unknown type for DET deserialization!");
     }
 }
 
@@ -813,7 +813,7 @@ DET_abstract_integer::getShift(const Create_field * const cf)
             case MYSQL_TYPE_LONGLONG:
                 return 0x8000000000000000;
             default:
-                throw CryptDBError("unknown int type!");
+                FAIL_TextMessageError("unknown int type!");
         }
     }
 }
@@ -1041,7 +1041,7 @@ DETJOINFactory::deserialize(unsigned int id, const SerialLayer &sl)
     } else if ("DETJOIN_str" == sl.name) {
         return new DETJOIN_str(id, sl.layer_info);
     } else {
-        throw CryptDBError("DETJOINFactory does not recognize type!");
+        FAIL_TextMessageError("DETJOINFactory does not recognize type!");
     }
 }
 
@@ -1105,8 +1105,9 @@ OPE_tinyint::encrypt(const Item &ptext, uint64_t IV) const
     const ulonglong val = RiboldMYSQL::val_uint(ptext);
 
     static const ulonglong tiny_max = 0xff;
-    if (tiny_max < val)
-        throw CryptDBError("Backend storage unit it not TINYINT, won't floor. ");
+    TEST_TextMessageError(tiny_max > val,
+                          "Backend storage unit it not TINYINT,"
+                          " won't floor. ");
 
     LOG(encl) << "OPE_tinyint encrypt " << val << " IV " << IV << "--->";
     return OPE_int::encrypt(ptext, static_cast<const ulong>(val));
@@ -1146,8 +1147,9 @@ OPE_mediumint::encrypt(const Item &ptext, uint64_t IV) const
     const ulonglong val = RiboldMYSQL::val_uint(ptext);
 
     static const ulonglong medium_max = 0xffffff;
-    if (medium_max < val)
-        throw CryptDBError("Backend storage unit it not MEDIUMINT, won't floor. ");
+    TEST_TextMessageError(medium_max > val,
+                          "Backend storage unit it not MEDIUMINT,"
+                          " won't floor. ");
 
     LOG(encl) << "OPE_mediumint encrypt " << val << " IV " << IV << "--->";
     return OPE_int::encrypt(ptext, static_cast<const ulong>(val));
@@ -1827,7 +1829,7 @@ PlainText::decrypt(Item *const ctext, uint64_t IV) const
 Item *
 PlainText::decryptUDF(Item * const col, Item * const ivcol) const
 {
-    throw CryptDBError("Can't decrypt from PLAIN");
+    FAIL_TextMessageError("No PLAIN decryption UDF");
 }
 
 std::string

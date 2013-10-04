@@ -89,6 +89,11 @@ testTextMessageError(const std::string &file_name,
     testTextMessageError(__FILE__, __LINE__, (test), (message));    \
 }                                                                   \
 
+#define FAIL_TextMessageError(message)                              \
+{                                                                   \
+    throw TextMessageError(__FILE__, __LINE__, (message));          \
+}
+
 inline void
 testIdentifierNotFound(const std::string &file_name,
                        unsigned int line_number, bool test,

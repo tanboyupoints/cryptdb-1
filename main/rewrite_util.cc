@@ -412,9 +412,8 @@ rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
     assert(false == qr.output->queryAgain());
 
     std::list<std::string> out_queryz;
-    if (!qr.output->getQuery(&out_queryz, schema)) {
-        throw CryptDBError("Failed to retrieve query!");
-    }
+    TEST_TextMessageError(qr.output->getQuery(&out_queryz, schema),
+                          "Failed to retrieve query!");
     assert(out_queryz.size() == 1);
 
     return out_queryz.back();

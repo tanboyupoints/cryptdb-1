@@ -8,12 +8,12 @@
 class EncSet;
 class RewritePlan;
 
-class AbstractCryptDBError {
+class AbstractException {
 public:
-    AbstractCryptDBError(const std::string &file_name,
-                         unsigned int line_number)
+    AbstractException(const std::string &file_name,
+                      unsigned int line_number)
         : file_name(file_name), line_number(line_number) {}
-    virtual ~AbstractCryptDBError() {}
+    virtual ~AbstractException() {}
 
     virtual std::string to_string() const = 0;
     std::string getFileName() const {return file_name;}
@@ -25,13 +25,13 @@ private:
 };
 
 std::ostream &operator<<(std::ostream &out,
-                         const AbstractCryptDBError &abstract_error);
+                         const AbstractException &abstract_error);
 
-class BadItemArgumentCount : public AbstractCryptDBError {
+class BadItemArgumentCount : public AbstractException {
 public:
     BadItemArgumentCount(const std::string &file_name, int line_number,
                          unsigned int type, int expected, int actual)
-        : AbstractCryptDBError(file_name, line_number), type(type),
+        : AbstractException(file_name, line_number), type(type),
           expected(expected), actual(actual) {}
     ~BadItemArgumentCount() {}
 
@@ -46,11 +46,11 @@ private:
     const int actual;
 };
 
-class UnexpectedSecurityLevel : public AbstractCryptDBError {
+class UnexpectedSecurityLevel : public AbstractException {
 public:
     UnexpectedSecurityLevel(const std::string &file_name, int line_number,
                             onion o, SECLEVEL expected, SECLEVEL actual)
-        : AbstractCryptDBError(file_name, line_number), o(o),
+        : AbstractException(file_name, line_number), o(o),
           expected(expected), actual(actual) {}
     ~UnexpectedSecurityLevel() {}
 
@@ -63,14 +63,14 @@ private:
     const SECLEVEL actual;
 };
 
-class NoAvailableEncSet : public AbstractCryptDBError {
+class NoAvailableEncSet : public AbstractException {
 public:
     NoAvailableEncSet(const std::string &file_name, int line_number,
                       unsigned int type, const EncSet &req_enc_set,
                       const std::string &why,
                       const std::vector<std::shared_ptr<RewritePlan> >
                         &childr_rp)
-        : AbstractCryptDBError(file_name, line_number), type(type),
+        : AbstractException(file_name, line_number), type(type),
           req_enc_set(req_enc_set), why(why), childr_rp(childr_rp) {}
     ~NoAvailableEncSet() {}
 
@@ -85,11 +85,11 @@ private:
     const std::vector<std::shared_ptr<RewritePlan> > childr_rp;
 };
 
-class TextMessageError : public AbstractCryptDBError {
+class TextMessageError : public AbstractException {
 public:
     TextMessageError(const std::string &file_name, int line_number,
                      const std::string &message)
-        : AbstractCryptDBError(file_name, line_number),
+        : AbstractException(file_name, line_number),
           message(message) {}
     ~TextMessageError() {}
 
@@ -100,11 +100,11 @@ private:
     const std::string message;
 };
 
-class IdentifierNotFound : public AbstractCryptDBError {
+class IdentifierNotFound : public AbstractException {
 public:
     IdentifierNotFound(const std::string &file_name, int line_number,
                        const std::string &identifier_name)
-        : AbstractCryptDBError(file_name, line_number),
+        : AbstractException(file_name, line_number),
           identifier_name(identifier_name) {}
     ~IdentifierNotFound() {}
 

@@ -183,9 +183,8 @@ fixDelta(const std::unique_ptr<Connect> &conn,
         const std::string remote_query(remote_row[0], remote_l[0]);
         const std::string remote_ddl(remote_row[1], remote_l[1]);
         const bool ddl = string_to_bool(remote_ddl);
-        if (ddl != expect_ddl) {
-            throw CryptDBError("Expectations of DDLness are unmatched!");
-        }
+        TEST_TextMessageError(ddl == expect_ddl,
+                              "Expectations of DDLness are unmatched!");
 
         remote_queries.push_back(remote_query);
     }
@@ -224,7 +223,7 @@ fixDelta(const std::unique_ptr<Connect> &conn,
                                                     delta_output_id));
             RETURN_FALSE_IF_FALSE(conn->execute("COMMIT"));
         } else if (1 < dml_row_count) {
-            throw CryptDBError("Too many DML table results!");
+            FAIL_TextMessageError("Too many DML table results!");
         }
     }
 
@@ -789,7 +788,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
             case Item_subselect::subs_type::ANY_SUBS:
                 assert(false);
             default:
-                throw CryptDBError("Unknown subquery type!");
+                FAIL_TextMessageError("Unknown subquery type!");
         }
 
         return new RewritePlanWithAnalysis(out_es, rsn,
@@ -858,7 +857,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
                 case Item_subselect::subs_type::ANY_SUBS:
                     assert(false);
                 default:
-                    throw CryptDBError("Unknown subquery type!");
+                    FAIL_TextMessageError("Unknown subquery type!");
             }
         }
     }
@@ -1126,13 +1125,13 @@ Rewriter::handleDirective(Analysis &a, const ProxyState &ps,
         a.getFieldMeta(data.table_name, data.field_name);
     const SECURITY_RATING current_rating = fm.getSecurityRating();
     if (current_rating < data.sec_rating) {
-        throw CryptDBError("cryptdb does not support going to a more "
-                           "secure rating!");
+        FAIL_TextMessageError("cryptdb does not support going to a more"
+                              " secure rating!");
     } else if (current_rating == data.sec_rating) {
         return new SimpleOutput(mysql_noop());
     } else {
         // Actually do things.
-        throw CryptDBError("implement handleDirective!");
+        FAIL_TextMessageError("implement handleDirective!");
     }
 }
 
@@ -1176,7 +1175,7 @@ Rewriter::rewrite(const ProxyState &ps, const std::string &q,
                 output = new SimpleOutput(mysql_noop());
             }
         }
-    } catch (AbstractCryptDBError &e) {
+    } catch (AbstractException &e) {
         std::cout << e << std::endl;
         output = new SimpleOutput(mysql_noop());
     }
@@ -1305,7 +1304,7 @@ executeQuery(const ProxyState &ps, const std::string &q,
             if (!ps.getConn()->execute(it, &dbres,
                                        qr->output->multipleResultSets())) {
                 qr->output->handleQueryFailure(ps.getEConn());
-                throw CryptDBError("Failed to execute query!");
+                FAIL_TextMessageError("Failed to execute query!");
             }
 
             // XOR: Either we have one result set, or we were expecting

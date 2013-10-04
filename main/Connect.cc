@@ -13,6 +13,7 @@
 #include <memory>
 
 #include <main/Connect.hh>
+#include <main/macro_util.hh>
 #include <util/cryptdb_log.hh>
 
 Connect::Connect(const std::string &server, const std::string &user,
@@ -25,9 +26,8 @@ Connect::Connect(const std::string &server, const std::string &user,
     if (dbname.size() == 0) {
         LOG(warn) << "database name not set";
     } else {
-        if (!select_db(dbname)) {
-            throw CryptDBError("cannot select dbname " + dbname);
-        }
+        TEST_TextMessageError(select_db(dbname),
+                              "cannot select dbname " + dbname);
     }
 }
 

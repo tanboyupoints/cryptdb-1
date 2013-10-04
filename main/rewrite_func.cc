@@ -164,7 +164,7 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
 
             return iterateGather(i, out_es, child_es, why, a);
         } else {
-            throw CryptDBError("Unsupported NEG!");
+            FAIL_TextMessageError("Unsupported NEG!");
         }
     }
 
@@ -190,9 +190,8 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
 
         if (oDET == constr.o) {
             const Item *const arg = i.arguments()[0];
-            if (arg->type() != Item::Type::INT_ITEM) {
-                throw CryptDBError("Must use Integer type with NEG!");
-            }
+            TEST_TextMessageError(arg->type() == Item::Type::INT_ITEM,
+                                  "Must use Integer type with NEG!");
             const Item_int *const int_arg =
                 static_cast<const Item_int * >(arg);
 
@@ -204,7 +203,7 @@ static class ANON : public CItemSubtypeFT<Item_func_neg, Item_func::Functype::NE
         } else if (oPLAIN == constr.o) {
             return rewrite_args_FN(i, constr, rp_one, a);
         } else {
-            throw CryptDBError("Bad onion for NEG!");
+            FAIL_TextMessageError("Bad onion for NEG!");
         }
     }
 } ANON;
@@ -1149,8 +1148,7 @@ static class ANON : public CItemSubtypeFN<Item_in_optimizer,
     virtual RewritePlan *
     do_gather_type(const Item_in_optimizer &i, Analysis &a) const
     {
-        throw CryptDBError("Shouldn't be Item_in_optimizer items!");
-        return NULL;
+        UNIMPLEMENTED;
 
         /*
         LOG(cdb_v) << "CItemSubtypeFN (L1107) do_gather " << *i;

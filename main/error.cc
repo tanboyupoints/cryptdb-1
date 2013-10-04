@@ -6,13 +6,13 @@
 #include <util/enum_text.hh>
 
 std::ostream &operator<<(std::ostream &out,
-                         const AbstractCryptDBError &abstract_error)
+                         const AbstractException &abstract_error)
 {
     out << abstract_error.to_string();
     return out;
 }
 
-std::string AbstractCryptDBError::to_string() const
+std::string AbstractException::to_string() const
 {
     return "FILE: " + file_name + "\n"
            "LINE: " + std::to_string(line_number) + "\n";
@@ -22,7 +22,7 @@ std::string AbstractCryptDBError::to_string() const
 std::string BadItemArgumentCount::to_string() const
 {
     return "Item has bad argument count\n" +
-           AbstractCryptDBError::to_string() +
+           AbstractException::to_string() +
            // FIXME: Use TypeText.
            "ITEM TYPE: " + std::to_string(type) + "\n" +
            "EXPECTED COUNT: " + std::to_string(expected) + "\n" +
@@ -33,7 +33,7 @@ std::string BadItemArgumentCount::to_string() const
 std::string UnexpectedSecurityLevel::to_string() const
 {
     return "Unexpected security level for onion\n" +
-           AbstractCryptDBError::to_string() +
+           AbstractException::to_string() +
            "ONION TYPE: " + TypeText<onion>::toText(o) + "\n" +
            "EXPECTED LEVEL: " + TypeText<SECLEVEL>::toText(expected)+"\n" +
            "ACTUAL LEVEL: " + TypeText<SECLEVEL>::toText(actual) + "\n";
@@ -46,7 +46,7 @@ std::string NoAvailableEncSet::to_string() const
     std::stringstream s;
     s <<
         "Current crypto schemes do not support this query" << std::endl
-        << AbstractCryptDBError::to_string()
+        << AbstractException::to_string()
         // << "ITEM TYPE " + TypeText<>::toText();
         << "ITEM TYPE: " << std::to_string(type) << std::endl
         << "OPERATION: " << why << std::endl
@@ -64,7 +64,7 @@ std::string NoAvailableEncSet::to_string() const
 std::string TextMessageError::to_string() const
 {
     return "Error: " + message + "\n"
-           + AbstractCryptDBError::to_string();
+           + AbstractException::to_string();
 }
 
 std::string

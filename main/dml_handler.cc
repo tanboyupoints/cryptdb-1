@@ -487,9 +487,10 @@ static void
 addToReturn(ReturnMeta *const rm, int pos, const OLK &constr,
             bool has_salt, const std::string &name)
 {
-    if (static_cast<unsigned int>(pos) != rm->rfmeta.size()) {
-        throw CryptDBError("ReturnMeta has badly ordered ReturnFields!");
-    }
+    const bool test = static_cast<unsigned int>(pos) == rm->rfmeta.size();
+    TEST_TextMessageError(test, "ReturnMeta has badly ordered"
+                                " ReturnFields!");
+
     const int salt_pos = has_salt ? pos + 1 : -1;
     std::pair<int, ReturnField>
         pair(pos, ReturnField(false, name, constr, salt_pos));
@@ -499,9 +500,10 @@ addToReturn(ReturnMeta *const rm, int pos, const OLK &constr,
 static void
 addSaltToReturn(ReturnMeta *const rm, int pos)
 {
-    if (static_cast<unsigned int>(pos) != rm->rfmeta.size()) {
-        throw CryptDBError("ReturnMeta has badly ordered ReturnFields!");
-    }
+    const bool test = static_cast<unsigned int>(pos) == rm->rfmeta.size();
+    TEST_TextMessageError(test, "ReturnMeta has badly ordered"
+                                " ReturnFields!");
+
     std::pair<int, ReturnField>
         pair(pos, ReturnField(true, "", OLK::invalidOLK(), -1));
     rm->rfmeta.insert(pair);

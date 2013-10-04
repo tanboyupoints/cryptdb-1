@@ -153,9 +153,8 @@ UIntMetaKey const &OnionMeta::getKey(const DBMeta &child) const
 
 EncLayer *OnionMeta::getLayerBack() const
 {
-    if (layers.size() == 0) {
-        throw CryptDBError("Tried getting EncLayer when there are none!");
-    }
+    TEST_TextMessageError(layers.size() != 0,
+                          "Tried getting EncLayer when there are none!");
 
     return layers.back().get();
 }
@@ -173,9 +172,8 @@ bool OnionMeta::hasEncLayer(const SECLEVEL &sl) const
 
 EncLayer *OnionMeta::getLayer(const SECLEVEL &sl) const
 {
-    if (layers.size() == 0) {
-        throw CryptDBError("No EncLayerz!");
-    }
+    TEST_TextMessageError(layers.size() != 0,
+                          "Tried getting EncLayer when there are none!");
 
     AssignOnce<EncLayer *> out;
     for (auto it = layers.begin(); it != layers.end(); it++) {
@@ -360,9 +358,8 @@ onionlayout FieldMeta::determineOnionLayout(const AES_KEY *const m_key,
         return PLAIN_ONION_LAYOUT;
     }
 
-    if (!m_key) {
-        throw CryptDBError("Should be using SECURITY_RATING::PLAIN!");
-    }
+    TEST_TextMessageError(m_key,
+                          "Should be using SECURITY_RATING::PLAIN!");
 
     if (encryptionNotSupported(f)) {
         TEST_TextMessageError(SECURITY_RATING::SENSITIVE != sec_rating,
@@ -389,7 +386,8 @@ onionlayout FieldMeta::determineOnionLayout(const AES_KEY *const m_key,
             return BEST_EFFORT_STR_ONION_LAYOUT;
         }
     } else {
-        throw CryptDBError("Bad SECURITY_RATING in determineOnionLayout!");
+        FAIL_TextMessageError("Bad SECURITY_RATING in"
+                              " determineOnionLayout(...)!");
     }
 }
 

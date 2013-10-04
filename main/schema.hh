@@ -7,6 +7,7 @@
 #include <main/CryptoHandlers.hh>
 #include <main/Translator.hh>
 #include <main/dbobject.hh>
+#include <main/macro_util.hh>
 #include <string>
 #include <map>
 #include <list>
@@ -210,7 +211,7 @@ private:
 
     std::string serialize(const DBObject &parent) const
     {
-        throw CryptDBError("SchemaInfo can not be serialized!");
+        FAIL_TextMessageError("SchemaInfo can not be serialized!");
     }
 } SchemaInfo;
 
