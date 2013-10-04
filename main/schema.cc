@@ -505,17 +505,3 @@ std::string TableMeta::getAnonIndexName(const std::string &index_name,
     return std::string("index_") + std::to_string(hsh);
 }
 
-FieldMeta *
-SchemaInfo::getFieldMeta(const std::string &table,
-                         const std::string &field) const
-{
-    TableMeta *const tm = getChild(IdentityMetaKey(table));
-    if (NULL == tm) {
-        return NULL;
-    }
-
-    FieldMeta *const fm = tm->getChild(IdentityMetaKey(field));
-
-    return fm;
-}
-

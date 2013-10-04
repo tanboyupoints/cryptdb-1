@@ -205,15 +205,9 @@ public:
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
 
-    friend class Analysis;
-
 private:
     constexpr static const char *type_name = "schemaInfo";
 
-    // These functions do not support Aliasing, use Analysis::getTableMeta
-    // and Analysis::getFieldMeta.
-    FieldMeta * getFieldMeta(const std::string &table,
-                             const std::string &field) const;
     std::string serialize(const DBObject &parent) const
     {
         throw CryptDBError("SchemaInfo can not be serialized!");

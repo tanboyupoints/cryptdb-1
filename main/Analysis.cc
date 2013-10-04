@@ -1081,9 +1081,8 @@ OnionMeta &Analysis::getOnionMeta(const FieldMeta &fm,
 FieldMeta &Analysis::getFieldMeta(const std::string &table,
                                   const std::string &field) const
 {
-    const std::string real_table_name = unAliasTable(table);
     FieldMeta * const fm =
-        this->schema.getFieldMeta(real_table_name, field);
+        this->getTableMeta(table).getChild(IdentityMetaKey(field));
     assert(fm);
     return *fm;
 }
