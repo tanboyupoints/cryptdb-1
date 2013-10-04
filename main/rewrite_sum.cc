@@ -17,10 +17,10 @@
 
 #include <main/rewrite_main.hh>
 #include <main/rewrite_util.hh>
-#include <main/enum_text.hh>
 #include <main/CryptoHandlers.hh>
 #include <main/macro_util.hh>
 #include <util/cryptdb_log.hh>
+#include <util/enum_text.hh>
 #include <parser/lex_util.hh>
 
 // gives names to classes and objects we don't care to know the name of 

@@ -1,11 +1,11 @@
 #include <memory>
 
 #include <main/rewrite_util.hh>
-#include <main/enum_text.hh>
 #include <main/rewrite_main.hh>
 #include <main/macro_util.hh>
 #include <parser/lex_util.hh>
 #include <parser/stringify.hh>
+#include <util/enum_text.hh>
 
 extern CItemTypesDir itemTypes;
 

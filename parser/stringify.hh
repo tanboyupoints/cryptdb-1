@@ -6,6 +6,8 @@
 #include <iostream>
 #include <functional>
 
+#include <util/enum_text.hh>
+
 template<class T>
 std::string stringify_ptr(T * x) {
     if (x == NULL ) {
@@ -551,6 +553,38 @@ prefix_add_index(Key key)
                << ")";
     return key_output.str();
 }
+
+static std::string
+enableOrDisableKeysOutput(const LEX &lex)
+{
+    auto key_status = lex.alter_info.keys_onoff;
+    const std::string &out =
+        TypeText<enum_enable_or_disable>::toText(key_status) +
+        " KEYS";
+
+    return out;
+}
+
+/*
+static std::string
+prettyLockType(enum thr_lock_type lock_type)
+{
+    switch (lock_type) {
+        case TL_READ:
+        case TL_READ_NO_INSERT:
+            return "READ";
+        case TL_WRITE:
+        case TL_WRITE_DEFAULT:
+            return "WRITE";
+        default:
+            // FIXME: Use TEST_TextMessageError
+            std::cerr << "Unsupported lock type: " << lock_type
+                      << std::endl;
+            assert(false);
+    }
+}
+*/
+
 static inline std::ostream&
 operator<<(std::ostream &out, LEX &lex)
 {
@@ -818,10 +852,21 @@ operator<<(std::ostream &out, LEX &lex)
         } else if (lex.alter_info.flags & ALTER_DROP_INDEX) {
             out << " " << ListJoin<Alter_drop>(lex.alter_info.drop_list,
                                                ",", prefix_drop_index);
+        } else if (lex.alter_info.flags & ALTER_KEYS_ONOFF) {
+            out << " " << enableOrDisableKeysOutput(lex);
         } else {
             throw CryptDBError("Unsupported ALTER in stringify");
         }
 
+        break;
+
+    case SQLCOM_LOCK_TABLES:
+        // HACK: prettyLockType(...) should be used.
+        out << "do 0";
+        break;
+
+    case SQLCOM_UNLOCK_TABLES:
+        out << " UNLOCK TABLES";
         break;
 
     case SQLCOM_SET_OPTION:

@@ -3,7 +3,7 @@
 #include <functional>
 #include <memory>
 
-#include <main/enum_text.hh>
+#include <util/enum_text.hh>
 #include <main/serializers.hh>
 
 // FIXME: Maybe should inherit from DBObject.

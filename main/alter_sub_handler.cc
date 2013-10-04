@@ -1,8 +1,8 @@
 #include <main/alter_sub_handler.hh>
 #include <main/rewrite_util.hh>
-#include <main/enum_text.hh>
-#include <parser/lex_util.hh>
 #include <main/dispatcher.hh>
+#include <parser/lex_util.hh>
+#include <util/enum_text.hh>
 
 class AddColumnSubHandler : public AlterSubHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
@@ -211,6 +211,19 @@ class DropIndexSubHandler : public AlterSubHandler {
     }
 };
 
+class DisableOrEnableKeys : public AlterSubHandler {
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
+                                  const ProxyState &ps,
+                                  const Preamble &preamble) const
+    {
+        LEX *const new_lex = copyWithTHD(lex);
+        new_lex->select_lex.table_list =
+            rewrite_table_list(lex->select_lex.table_list, a);
+
+        return new_lex;
+    }
+};
+
 LEX *AlterSubHandler::transformLex(Analysis &a, LEX *lex,
                                    const ProxyState &ps) const
 {
@@ -240,6 +253,9 @@ AlterDispatcher *buildAlterSubDispatcher() {
 
     h = new DropIndexSubHandler();
     dispatcher->addHandler(ALTER_DROP_INDEX, h);
+
+    h = new DisableOrEnableKeys();
+    dispatcher->addHandler(ALTER_KEYS_ONOFF, h);
 
     return dispatcher;
 }

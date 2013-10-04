@@ -1,12 +1,11 @@
 #pragma once
 
 #include <util/onions.hh>
-
+#include <util/enum_text.hh>
 #include <parser/embedmysql.hh>
 #include <parser/stringify.hh>
 #include <main/CryptoHandlers.hh>
 #include <main/Translator.hh>
-#include <main/enum_text.hh>
 #include <main/dbobject.hh>
 #include <string>
 #include <map>

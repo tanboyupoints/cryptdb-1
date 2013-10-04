@@ -1,9 +1,9 @@
 #include <sstream>
 
-#include <main/enum_text.hh>
 #include <main/rewrite_ds.hh>
 #include <main/error.hh>
 #include <util/onions.hh>
+#include <util/enum_text.hh>
 
 std::ostream &operator<<(std::ostream &out,
                          const AbstractCryptDBError &abstract_error)

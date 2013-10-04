@@ -15,9 +15,9 @@
 #include <main/rewrite_main.hh>
 #include <main/rewrite_util.hh>
 #include <util/cryptdb_log.hh>
+#include <util/enum_text.hh>
 #include <main/CryptoHandlers.hh>
 #include <parser/lex_util.hh>
-#include <main/enum_text.hh>
 #include <main/sql_handler.hh>
 #include <main/dml_handler.hh>
 #include <main/ddl_handler.hh>
@@ -418,6 +418,21 @@ buildTypeTextTranslator()
     RETURN_FALSE_IF_FALSE(mysql_item_strings.size() ==
                             mysql_item_types.size());
     translatorHelper(mysql_item_strings, mysql_item_types);
+
+    // ALTER TABLE [table] DISABLE/ENABLE KEYS
+    const std::vector<std::string> disable_enable_keys_strings
+    {
+        "DISABLE", "ENABLE", "LEAVE_AS_IS"
+    };
+    const std::vector<enum enum_enable_or_disable>
+        disable_enable_keys_types
+    {
+        DISABLE, ENABLE, LEAVE_AS_IS
+    };
+    RETURN_FALSE_IF_FALSE(disable_enable_keys_strings.size() ==
+                            disable_enable_keys_types.size());
+    translatorHelper(disable_enable_keys_strings,
+                     disable_enable_keys_types);
 
     // Onion Layouts.
     const std::vector<std::string> onion_layout_strings
@@ -971,6 +986,7 @@ noRewrite(const LEX &lex) {
     case SQLCOM_COMMIT:
     case SQLCOM_SHOW_TABLES:
     case SQLCOM_SHOW_VARIABLES:
+    case SQLCOM_UNLOCK_TABLES:
         return true;
     case SQLCOM_SELECT: {
 
@@ -1061,7 +1077,11 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
     } else if (ddl_dispatcher->canDo(lex)) {
         const SQLHandler &handler = ddl_dispatcher->dispatch(lex);
         LEX *const out_lex = handler.transformLex(a, lex, ps);
-        return new DDLOutput(query, lex_to_query(out_lex),
+        // HACK.
+        const std::string &original_query =
+            lex->sql_command != SQLCOM_LOCK_TABLES ? query : "do 0";
+
+        return new DDLOutput(original_query, lex_to_query(out_lex),
                              std::move(a.deltas));
     } else {
         return NULL;

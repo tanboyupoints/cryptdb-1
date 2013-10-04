@@ -177,6 +177,18 @@ class ChangeDBHandler : public DDLHandler {
     }
 };
 
+class LockTablesHandler : public DDLHandler {
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
+                                  const ProxyState &ps) const
+    {
+        LEX *const new_lex = copyWithTHD(lex);
+        new_lex->select_lex.table_list =
+            rewrite_table_list(lex->select_lex.table_list, a);
+
+        return new_lex;
+    }
+};
+
 LEX *DDLHandler::transformLex(Analysis &a, LEX *lex,
                               const ProxyState &ps) const
 {
@@ -200,6 +212,9 @@ SQLDispatcher *buildDDLDispatcher()
 
     h = new ChangeDBHandler();
     dispatcher->addHandler(SQLCOM_CHANGE_DB, h);
+
+    h = new LockTablesHandler();
+    dispatcher->addHandler(SQLCOM_LOCK_TABLES, h);
 
     return dispatcher;
 }
