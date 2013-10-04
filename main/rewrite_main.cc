@@ -1020,8 +1020,7 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         p = std::unique_ptr<query_parse>(new query_parse(ps.dbName(),
                                                          query));
     } catch (std::runtime_error &e) {
-        std::cerr << "Bad Query: " << query << std::endl;
-        return new SimpleOutput(mysql_noop());
+        FAIL_TextMessageError("Bad Query: " + query);
     }
     LEX *const lex = p.get()->lex();
 
@@ -1164,20 +1163,15 @@ Rewriter::rewrite(const ProxyState &ps, const std::string &q,
     Analysis analysis(schema);
 
     RewriteOutput *output;
-    try {
-        if (cryptdbDirective(q)) {
-            output = Rewriter::handleDirective(analysis, ps, q);
-        } else {
-            // NOTE: Care what data you try to read from Analysis
-            // at this height.
-            output = Rewriter::dispatchOnLex(analysis, ps, q);
-            if (!output) {
-                output = new SimpleOutput(mysql_noop());
-            }
+    if (cryptdbDirective(q)) {
+        output = Rewriter::handleDirective(analysis, ps, q);
+    } else {
+        // NOTE: Care what data you try to read from Analysis
+        // at this height.
+        output = Rewriter::dispatchOnLex(analysis, ps, q);
+        if (!output) {
+            output = new SimpleOutput(mysql_noop());
         }
-    } catch (AbstractException &e) {
-        std::cout << e << std::endl;
-        output = new SimpleOutput(mysql_noop());
     }
 
     return QueryRewrite(true, analysis.rmeta, output);
@@ -1287,64 +1281,54 @@ executeQuery(const ProxyState &ps, const std::string &q,
         schema_cache = &temp_schema_cache;
     }
 
-    try {
-        std::unique_ptr<QueryRewrite> qr;
-        // out_queryz: queries intended to be run against remote server.
-        std::list<std::string> out_queryz;
-        SchemaInfo const &schema =
-            schema_cache->getSchema(ps.getConn(), ps.getEConn());
-        PREAMBLE_STATUS const preamble_status =
-            queryPreamble(ps, q, &qr, &out_queryz, schema);
-        assert(qr && PREAMBLE_STATUS::FAILURE != preamble_status);
+    std::unique_ptr<QueryRewrite> qr;
+    // out_queryz: queries intended to be run against remote server.
+    std::list<std::string> out_queryz;
+    SchemaInfo const &schema =
+        schema_cache->getSchema(ps.getConn(), ps.getEConn());
+    PREAMBLE_STATUS const preamble_status =
+        queryPreamble(ps, q, &qr, &out_queryz, schema);
+    assert(qr && PREAMBLE_STATUS::FAILURE != preamble_status);
 
-        std::unique_ptr<DBResult> dbres;
-        for (auto it : out_queryz) {
-            prettyPrintQuery(it);
+    std::unique_ptr<DBResult> dbres;
+    for (auto it : out_queryz) {
+        prettyPrintQuery(it);
 
-            if (!ps.getConn()->execute(it, &dbres,
-                                       qr->output->multipleResultSets())) {
-                qr->output->handleQueryFailure(ps.getEConn());
-                FAIL_TextMessageError("Failed to execute query!");
-            }
-
-            // XOR: Either we have one result set, or we were expecting
-            // multiple result sets and we threw them all away.
-            assert(!!dbres != !!qr->output->multipleResultSets());
+        if (!ps.getConn()->execute(it, &dbres,
+                                   qr->output->multipleResultSets())) {
+            qr->output->handleQueryFailure(ps.getEConn());
+            FAIL_TextMessageError("Failed to execute query!");
         }
 
-        // ----------------------------------
-        //       Post Query Processing
-        // ----------------------------------
-        // > Handle schema cacheing immediately after executing a query.
-        //   + Updating the cache here is 'aggresive' in the case
-        //     where we are doing an onion adjustment ROLLBACK
-        //     and queryHandleRollback fails.
-        schema_cache->updateStaleness(qr->output->stalesSchema());
-
-        if (PREAMBLE_STATUS::ROLLBACK == preamble_status) {
-            assert(queryHandleRollback(ps, q, schema));
-            return ResType(dbres->unpack());
-        }
-
-        assert(PREAMBLE_STATUS::SUCCESS == preamble_status);
-
-        const ResType &res =
-            dbres ? ResType(dbres->unpack()) : mysql_noop_res(ps);
-        assert(res.success());
-        const ResType &out_res =
-            queryEpilogue(ps, *qr.get(), res, q, true);
-        assert(out_res.success());
-
-        return out_res;
-    } catch (std::runtime_error &e) {
-        std::cout << "Unexpected Error: " << e.what() << " in query "
-                  << q << std::endl;
-        return ResType(false);
-    }  catch (CryptDBError &e) {
-        std::cout << "Internal Error: " << e.msg << " in query " << q
-                  << std::endl;
-        return ResType(false);
+        // XOR: Either we have one result set, or we were expecting
+        // multiple result sets and we threw them all away.
+        assert(!!dbres != !!qr->output->multipleResultSets());
     }
+
+    // ----------------------------------
+    //       Post Query Processing
+    // ----------------------------------
+    // > Handle schema cacheing immediately after executing a query.
+    //   + Updating the cache here is 'aggresive' in the case
+    //     where we are doing an onion adjustment ROLLBACK
+    //     and queryHandleRollback fails.
+    schema_cache->updateStaleness(qr->output->stalesSchema());
+
+    if (PREAMBLE_STATUS::ROLLBACK == preamble_status) {
+        assert(queryHandleRollback(ps, q, schema));
+        return ResType(dbres->unpack());
+    }
+
+    assert(PREAMBLE_STATUS::SUCCESS == preamble_status);
+
+    const ResType &res =
+        dbres ? ResType(dbres->unpack()) : mysql_noop_res(ps);
+    assert(res.success());
+    const ResType &out_res =
+        queryEpilogue(ps, *qr.get(), res, q, true);
+    assert(out_res.success());
+
+    return out_res;
 }
 
 void

@@ -91,9 +91,20 @@ static bool handle_line(ProxyState& ps, const std::string& q)
     return true;
   }
 
-  static SchemaCache schema_cache;
-  const ResType &res = executeQuery(ps, q, &schema_cache);
-  return res.success();
+  try {
+      static SchemaCache schema_cache;
+      const ResType &res = executeQuery(ps, q, &schema_cache);
+      return res.success();
+  } catch (const AbstractException &e) {
+      std::cout << e << std::endl;
+      return true;
+  }  catch (const CryptDBError &e) {
+      std::cout << "Low level error: " << e.msg << std::endl;
+      return true;
+  } catch (const std::runtime_error &e) {
+      std::cout << "Unexpected Error: " << e.what() << std::endl;
+      return false;
+  }
 }
 
 int

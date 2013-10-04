@@ -65,12 +65,12 @@ function read_query_real(packet)
     print("read_query: " .. query)
 
     if string.byte(packet) == proxy.COM_QUERY then
-        do_rollback, new_queries =
+        status, error_msg, do_rollback, new_queries =
             CryptDB.rewrite(proxy.connection.client.src.name, query)
 
-        if not new_queries then
+        if false == status then
             proxy.response.type = proxy.MYSQLD_PACKET_ERR
-            proxy.response.errmsg = "query failed"
+            proxy.response.errmsg = error_msg
             return proxy.PROXY_SEND_RESULT
         end
 
@@ -81,7 +81,7 @@ function read_query_real(packet)
 
         dprint(" ")
         for i, v in pairs(new_queries) do
-            dprint("rewritten query[" .. i .. "]: " .. v)
+            print("rewritten query[" .. i .. "]: " .. v)
             local result_key
             if i == table.maxn(new_queries) then
                 if true == do_rollback then
@@ -115,9 +115,11 @@ function read_query_result_real(inj)
 
         proxy.response.type = proxy.MYSQLD_PACKET_ERR
         proxy.response.errmsg = "Proxy did ROLLBACK"
-        -- ER_LOCK_DEADLOCK::error = 1213
+        -- FIXME: The proxy is overwriting these values.
+        -- ER_LOCK_DEADLOCK
+        -- > error    = 1213
+        -- > sqlstate = 40001
         proxy.response.errcode = 1213
-        -- ER_LOCK_DEADLOCK::sqlstate = 40001
         proxy.response.sqlstate = 40001
         return proxy.PROXY_SEND_RESULT
     elseif inj.id == RES_DECRYPT then
@@ -152,20 +154,21 @@ function read_query_result_real(inj)
             end
 
             -- Handle the backend of the query.
-            dfields, drows =
+            status, error_msg, dfields, drows =
                 CryptDB.envoi(client, fields, rows)
 
-            if dfields and drows then
-                proxy.response.type = proxy.MYSQLD_PACKET_OK
-                proxy.response.affected_rows = resultset.affected_rows
-                proxy.response.insert_id = resultset.insert_id
-                if table.maxn(dfields) > 0 then
-                    proxy.response.resultset = { fields = dfields,
-                                                 rows = drows }
-                end
-            else
+            if false == status then
                 proxy.response.type = proxy.MYSQLD_PACKET_ERR
-                proxy.response.errmsg = "could not decrypt result"
+                proxy.response.errmsg = error_msg
+                return proxy.PROXY_SEND_RESULT
+            end
+
+            proxy.response.type = proxy.MYSQLD_PACKET_OK
+            proxy.response.affected_rows = resultset.affected_rows
+            proxy.response.insert_id = resultset.insert_id
+            if table.maxn(dfields) > 0 then
+                proxy.response.resultset = { fields = dfields,
+                                             rows = drows }
             end
         end
 

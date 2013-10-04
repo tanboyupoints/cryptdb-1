@@ -245,7 +245,6 @@ disconnect(lua_State *const L)
     return 0;
 }
 
-// FIXME: Use TELL policy.
 static int
 rewrite(lua_State *const L)
 {
@@ -282,11 +281,19 @@ rewrite(lua_State *const L)
             assert(preamble_status.get() != PREAMBLE_STATUS::FAILURE);
 
             c_wrapper->setQueryRewrite(qr.release());
-        } catch (CryptDBError &e) {
+        } catch (const AbstractException &e) {
+            lua_pushboolean(L, false);              // status
+            xlua_pushlstring(L, e.to_string());     // error message
+            lua_pushnil(L);                         // rollback?
+            lua_pushnil(L);                         // new queries
+            return 4;
+        } catch (const CryptDBError &e) {
             LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
-            lua_pushboolean(L, false);
-            lua_pushnil(L);
-            return 2;
+            lua_pushboolean(L, false);              // status
+            xlua_pushlstring(L, e.msg);             // error message
+            lua_pushnil(L);                         // rollback?
+            lua_pushnil(L);                         // new queries
+            return 4;
         }
     }
 
@@ -297,7 +304,11 @@ rewrite(lua_State *const L)
     assert(PREAMBLE_STATUS::SUCCESS == preamble_status.get() ||
            (PREAMBLE_STATUS::ROLLBACK == preamble_status.get() &&
             new_queries.size() == 1));
-    lua_pushboolean(L, PREAMBLE_STATUS::ROLLBACK == preamble_status.get());
+
+    lua_pushboolean(L, true);                       // status
+    lua_pushnil(L);                                 // error message
+    lua_pushboolean(L,                              // rollback?
+                    PREAMBLE_STATUS::ROLLBACK == preamble_status.get());
 
     // NOTE: Potentially out of int range.
     assert(new_queries.size() < INT_MAX);
@@ -305,12 +316,12 @@ rewrite(lua_State *const L)
     const int top = lua_gettop(L);
     int index = 1;
     for (auto it : new_queries) {
-        xlua_pushlstring(L, it);
+        xlua_pushlstring(L, it);                    // new queries
         lua_rawseti(L, top, index);
         index++;
     }
 
-    return 2;
+    return 4;
 }
 
 static int
@@ -462,17 +473,43 @@ envoi(lua_State *const L)
     ResType res;
     getResTypeFromLuaTable(L, 2, 3, &res);
     const std::unique_ptr<QueryRewrite> &qr = c_wrapper->getQueryRewrite();
-    const ResType &out_res =
-        queryEpilogue(*ps, *qr.get(), res, c_wrapper->last_query, false);
-    assert(out_res.success());
+    try {
+        const ResType &out_res =
+            queryEpilogue(*ps, *qr.get(), res, c_wrapper->last_query,
+                          false);
+        if (false == out_res.success()) {
+            lua_pushboolean(L, false);          // status
+            xlua_pushlstring(L,                 // error message
+                     "queryEpilogue failed");
+            lua_pushnil(L);                     // plaintext fields
+            lua_pushnil(L);                     // plaintext rows
+            return 4;
+        }
 
-    c_wrapper->getSchemaCache().updateStaleness(qr->output->stalesSchema());
-    return returnResultSet(L, out_res);
+        const bool stales = qr->output->stalesSchema();
+        c_wrapper->getSchemaCache().updateStaleness(stales);
+        return returnResultSet(L, out_res);
+    } catch (const AbstractException &e) {
+        lua_pushboolean(L, false);              // status
+        xlua_pushlstring(L, e.to_string());     // error message
+        lua_pushnil(L);                         // plaintext fields
+        lua_pushnil(L);                         // plaintext rows
+        return 4;
+    } catch (const CryptDBError &e) {
+        lua_pushboolean(L, false);              // status
+        xlua_pushlstring(L, e.msg);             // error message
+        lua_pushnil(L);                         // plaintext fields
+        lua_pushnil(L);                         // plaintext rows
+        return 4;
+    }
 }
 
 static int
 returnResultSet(lua_State *const L, const ResType &rd)
 {
+    lua_pushboolean(L, true);                   // status
+    lua_pushnil(L);                             // error message
+
     /* return decrypted result set */
     lua_createtable(L, (int)rd.names.size(), 0);
     int const t_fields = lua_gettop(L);
@@ -481,7 +518,7 @@ returnResultSet(lua_State *const L, const ResType &rd)
         int const t_field = lua_gettop(L);
 
         /* set name for field */
-        xlua_pushlstring(L, rd.names[i]);
+        xlua_pushlstring(L, rd.names[i]);       // plaintext fields
         lua_setfield(L, t_field, "name");
 
 /*
@@ -503,9 +540,10 @@ returnResultSet(lua_State *const L, const ResType &rd)
 
         for (uint j = 0; j < rd.rows[i].size(); j++) {
             if (NULL == rd.rows[i][j]) {
-                lua_pushnil(L);
+                lua_pushnil(L);                 // plaintext rows
             } else {
-                xlua_pushlstring(L, ItemToString(*rd.rows[i][j]));
+                xlua_pushlstring(L,             // plaintext rows
+                                 ItemToString(*rd.rows[i][j]));
             }
             lua_rawseti(L, t_row, j+1);
         }
@@ -513,7 +551,7 @@ returnResultSet(lua_State *const L, const ResType &rd)
         lua_rawseti(L, t_rows, i+1);
     }
 
-    return 2;
+    return 4;
 }
 
 static const struct luaL_reg
