@@ -11,7 +11,6 @@ class AddColumnSubHandler : public AlterSubHandler {
     {
         LEX *const new_lex = copyWithTHD(lex);
 
-        // FIXME: This TableMeta should be const.
         TableMeta &tm = a.getTableMeta(preamble.table);
         // -----------------------------
         //         Rewrite TABLE
