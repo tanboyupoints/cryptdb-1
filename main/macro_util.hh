@@ -89,3 +89,19 @@ testTextMessageError(const std::string &file_name,
     testTextMessageError(__FILE__, __LINE__, (test), (message));    \
 }                                                                   \
 
+inline void
+testIdentifierNotFound(const std::string &file_name,
+                       unsigned int line_number, bool test,
+                       const std::string &identifier_name)
+{
+    if (false == test) {
+        throw IdentifierNotFound(file_name, line_number,
+                                 identifier_name);
+    }
+}
+
+#define TEST_IdentifierNotFound(test, identifier_name)                 \
+{                                                                      \
+    testIdentifierNotFound(__FILE__, __LINE__, (test),                 \
+                          (identifier_name));                          \
+}

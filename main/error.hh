@@ -99,3 +99,18 @@ public:
 private:
     const std::string message;
 };
+
+class IdentifierNotFound : public AbstractCryptDBError {
+public:
+    IdentifierNotFound(const std::string &file_name, int line_number,
+                       const std::string &identifier_name)
+        : AbstractCryptDBError(file_name, line_number),
+          identifier_name(identifier_name) {}
+    ~IdentifierNotFound() {}
+
+    std::string to_string() const;
+
+private:
+    const std::string identifier_name;
+};
+

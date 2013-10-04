@@ -1073,7 +1073,7 @@ OnionMeta &Analysis::getOnionMeta(const FieldMeta &fm,
                                   onion o) const
 {
     OnionMeta *const om = fm.getOnionMeta(o);
-    assert(om);
+    TEST_IdentifierNotFound(om, TypeText<onion>::toText(o));
 
     return *om;
 }
@@ -1083,7 +1083,8 @@ FieldMeta &Analysis::getFieldMeta(const std::string &table,
 {
     FieldMeta * const fm =
         this->getTableMeta(table).getChild(IdentityMetaKey(field));
-    assert(fm);
+    TEST_IdentifierNotFound(fm, field);
+
     return *fm;
 }
 
@@ -1091,7 +1092,8 @@ FieldMeta &Analysis::getFieldMeta(const TableMeta &tm,
                                   const std::string &field) const
 {
     FieldMeta *const fm = tm.getChild(IdentityMetaKey(field));
-    assert(fm);
+    TEST_IdentifierNotFound(fm, field);
+
     return *fm;
 }
 
@@ -1099,7 +1101,8 @@ TableMeta &Analysis::getTableMeta(const std::string &table) const
 {
     TableMeta *const tm =
         this->schema.getChild(IdentityMetaKey(unAliasTable(table)));
-    assert(tm);
+    TEST_IdentifierNotFound(tm, table);
+
     return *tm;
 }
 
@@ -1127,7 +1130,7 @@ Analysis::translateNonAliasPlainToAnonTableName(const std::string &table)
     const
 {
     TableMeta *const tm = this->schema.getChild(IdentityMetaKey(table));
-    assert(tm);
+    TEST_IdentifierNotFound(tm, table);
 
     return tm->getAnonTableName();
 }

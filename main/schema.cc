@@ -75,7 +75,7 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels,
 std::unique_ptr<OnionMeta>
 OnionMeta::deserialize(unsigned int id, const std::string &serial)
 {
-    assert(id);
+    assert(id != 0);
     const auto vec = unserialize_string(serial); 
 
     const std::string onionname = vec[0];

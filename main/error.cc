@@ -66,3 +66,9 @@ std::string TextMessageError::to_string() const
     return "Error: " + message + "\n"
            + AbstractCryptDBError::to_string();
 }
+
+std::string
+IdentifierNotFound::to_string() const
+{
+    return "Identifier not found: '" + this->identifier_name + "'\n";
+}
