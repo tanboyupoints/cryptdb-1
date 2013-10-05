@@ -378,11 +378,6 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
         "SET session innodb_lock_wait_timeout = " +
         std::to_string(onion_adjust_timeout);
     assert(side_channel_conn->execute(set_timeout_query));
-
-    // HACK: This is necessary as above functions use a USE statement.
-    // ie, loadUDFs.
-    assert(conn->execute("USE cryptdbtest;"));
-    assert(e_conn->execute("USE cryptdbtest;"));
 }
 
 ProxyState::~ProxyState()
