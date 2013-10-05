@@ -146,7 +146,7 @@ fixDelta(const std::unique_ptr<Connect> &conn,
     // Get local queries (should only be one).
     std::unique_ptr<DBResult> dbres;
     const std::string get_local_query_query =
-        " SELECT query FROM pdb." + query_table_name +
+        " SELECT query FROM " + query_table_name +
         "  WHERE delta_output_id = " + std::to_string(delta_output_id) +
         "    AND local = TRUE;";
     RETURN_FALSE_IF_FALSE(e_conn->execute(get_local_query_query, &dbres));
@@ -169,7 +169,7 @@ fixDelta(const std::unique_ptr<Connect> &conn,
 
     // Get remote queries (ORDER matters).
     const std::string remote_query =
-        " SELECT query, ddl FROM pdb." + query_table_name +
+        " SELECT query, ddl FROM " + query_table_name +
         "  WHERE delta_output_id = " + std::to_string(delta_output_id) +
         "    AND local = FALSE;"
         "  ORDER BY ASC id";
@@ -260,7 +260,7 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
 
     std::unique_ptr<DBResult> dbres;
     const std::string get_deltas =
-        " SELECT id FROM pdb." + table_name + ";";
+        " SELECT id FROM " + table_name + ";";
     RETURN_FALSE_IF_FALSE(e_conn->execute(get_deltas, &dbres));
 
     const unsigned long long row_count = mysql_num_rows(dbres->n);
@@ -1268,8 +1268,6 @@ mysql_noop_res(const ProxyState &ps)
     return ResType(noop_dbres->unpack());
 }
 
-// FIXME: DBResult and ResType memleaks.
-// FIXME: Use TELL policy.
 ResType
 executeQuery(const ProxyState &ps, const std::string &q,
              SchemaCache *schema_cache)

@@ -260,6 +260,33 @@ operator<<(std::ostream &out, const RewritePlan * const rp)
     return out;
 }
 
+// This function should not be used after intitialization.
+static bool
+getCurrentDatabase(Connect *const c, std::string *const out_db)
+{
+    const std::string query = "SELECT DATABASE();";
+    std::unique_ptr<DBResult> db_res;
+    RFIF(c->execute(query, &db_res));
+    assert(1 == mysql_num_rows(db_res->n));
+
+    MYSQL_ROW row = mysql_fetch_row(db_res->n);
+    unsigned long *const l = mysql_fetch_lengths(db_res->n);
+    assert(l != NULL);
+
+    *out_db = std::string(row[0], l[0]);
+    return true;
+}
+
+// This function should not be used after intitialization.
+static bool
+setCurrentDatabase(Connect *const c, const std::string &db)
+{
+    const std::string query = "USE " + db + ";";
+    RFIF(c->execute(query));
+
+    return true;
+}
+
 static void
 dropAll(const std::unique_ptr<Connect> &conn)
 {
@@ -290,13 +317,32 @@ createAll(const std::unique_ptr<Connect> &conn)
 
 static void
 loadUDFs(const std::unique_ptr<Connect> &conn) {
-    //need a database for the UDFs
-    assert_s(conn.get()->execute("DROP DATABASE IF EXISTS cryptdb_udf"), "cannot drop db for udfs even with 'if exists'");
-    assert_s(conn.get()->execute("CREATE DATABASE cryptdb_udf;"), "cannot create db for udfs");
-    assert_s(conn.get()->execute("USE cryptdb_udf;"), "cannot use db");
+    const std::string udf_db = "cryptdb_udf";
+    assert_s(conn.get()->execute("DROP DATABASE IF EXISTS " + udf_db), "cannot drop db for udfs even with 'if exists'");
+    assert_s(conn.get()->execute("CREATE DATABASE " + udf_db), "cannot create db for udfs");
+
+    std::string saved_db;
+    assert(getCurrentDatabase(conn.get(), &saved_db));
+    assert(setCurrentDatabase(conn.get(), udf_db));
     dropAll(conn);
     createAll(conn);
+    assert(setCurrentDatabase(conn.get(), saved_db));
+
     LOG(cdb_v) << "Loaded CryptDB's UDFs.";
+}
+
+static bool
+synchronizeDatabases(Connect *const conn, Connect *const e_conn)
+{
+    std::string current_db;
+    if (getCurrentDatabase(conn, &current_db)) {
+        RFIF(setCurrentDatabase(e_conn, current_db));
+        return true;
+    }
+
+    RFIF(setCurrentDatabase(conn, MetaDataTables::Name::purgatoryDB()));
+    RFIF(setCurrentDatabase(e_conn, MetaDataTables::Name::purgatoryDB()));
+    return true;
 }
 
 ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
@@ -314,8 +360,12 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
       default_sec_rating(default_sec_rating)
 {
     assert(conn && e_conn);
+    TEST_TextMessageError(synchronizeDatabases(conn.get(), e_conn.get()),
+                          "Failed to synchronize embedded and remote"
+                          " databases!");
 
-    assert(MetaDataTables::initialize(conn, e_conn));
+    // FIXME: Get real prefix.
+    assert(MetaDataTables::initialize(conn, e_conn, "use_real_prefix"));
 
     loadUDFs(conn);
 
@@ -412,7 +462,7 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
             escapeString(e_conn, child_serial);
 
         const std::string query =
-            " INSERT INTO pdb." + table_name + 
+            " INSERT INTO " + table_name + 
             "    (serial_object, serial_key, parent_id) VALUES (" 
             " '" + esc_child_serial + "',"
             " '" + esc_serial_key + "',"
@@ -448,7 +498,7 @@ bool ReplaceDelta::apply(const std::unique_ptr<Connect> &e_conn,
     const std::string esc_serial_key = escapeString(e_conn, serial_key);
 
     const std::string query = 
-        " UPDATE pdb." + table_name +
+        " UPDATE " + table_name +
         "    SET serial_object = '" + esc_child_serial + "', "
         "        serial_key = '" + esc_serial_key + "'"
         "  WHERE id = " + std::to_string(child_id) + ";";
@@ -471,11 +521,11 @@ bool DeleteDelta::apply(const std::unique_ptr<Connect> &e_conn,
         const unsigned int parent_id = parent.getDatabaseID();
 
         const std::string query =
-            " DELETE pdb." + table_name + " "
-            "   FROM pdb." + table_name + 
-            "  WHERE pdb." + table_name + ".id" +
+            " DELETE " + table_name + " "
+            "   FROM " + table_name + 
+            "  WHERE " + table_name + ".id" +
             "      = "     + std::to_string(object_id) + 
-            "    AND pdb." + table_name + ".parent_id" +
+            "    AND " + table_name + ".parent_id" +
             "      = "     + std::to_string(parent_id) + ";";
 
         assert(e_c->execute(query));
@@ -721,9 +771,9 @@ bool DeltaOutput::stalesSchema() const
 bool DeltaOutput::save(const std::unique_ptr<Connect> &e_conn,
                        unsigned long * const delta_output_id)
 {
-    const std::string table_name = "DeltaOutput";
+    const std::string table_name = MetaDataTables::Name::delta();
     const std::string query =
-        " INSERT INTO pdb." + table_name +
+        " INSERT INTO " + table_name +
         "    () VALUES ();";
     assert(e_conn->execute(query));
 
@@ -735,11 +785,11 @@ bool DeltaOutput::save(const std::unique_ptr<Connect> &e_conn,
 bool DeltaOutput::destroyRecord(const std::unique_ptr<Connect> &e_conn,
                                 unsigned long delta_output_id)
 {
-    const std::string table_name = "DeltaOutput";
+    const std::string table_name = MetaDataTables::Name::delta();
     const std::string delete_query =
-        " DELETE pdb." + table_name +
-        "   FROM pdb." + table_name +
-        "  WHERE pdb." + table_name + ".id" +
+        " DELETE " + table_name +
+        "   FROM " + table_name +
+        "  WHERE " + table_name + ".id" +
         "      = "     + std::to_string(delta_output_id) + ";";
     assert(e_conn->execute(delete_query));
 
@@ -752,7 +802,7 @@ static bool saveQuery(const std::unique_ptr<Connect> &e_conn,
 {
     const std::string table_name = MetaDataTables::Name::query();
     const std::string insert_query =
-        " INSERT INTO pdb." + table_name +
+        " INSERT INTO " + table_name +
         "   (query, delta_output_id, local, ddl) VALUES ("
         " '" + escapeString(e_conn, query) + "', "
         " "  + std::to_string(delta_output_id) + ","
@@ -768,9 +818,9 @@ static bool destroyQueryRecord(const std::unique_ptr<Connect> &e_conn,
 {
     const std::string table_name = MetaDataTables::Name::query();
     const std::string delete_query =
-        " DELETE pdb." + table_name +
-        "   FROM pdb." + table_name +
-        "  WHERE pdb." + table_name + ".delta_output_id"
+        " DELETE " + table_name +
+        "   FROM " + table_name +
+        "  WHERE " + table_name + ".delta_output_id"
         "      = "     + std::to_string(delta_output_id) + ";";
     assert(e_conn->execute(delete_query));
 
@@ -819,20 +869,16 @@ tableCopy(const std::unique_ptr<Connect> &c, const std::string &src,
 bool
 setRegularTableToBleedingTable(const std::unique_ptr<Connect> &e_conn)
 {
-    const std::string src =
-        "pdb." + MetaDataTables::Name::bleedingMetaObject();
-    const std::string dest =
-        "pdb." + MetaDataTables::Name::metaObject();
+    const std::string src = MetaDataTables::Name::bleedingMetaObject();
+    const std::string dest = MetaDataTables::Name::metaObject();
     return tableCopy(e_conn, src, dest);
 }
 
 static bool
 setBleedingTableToRegularTable(const std::unique_ptr<Connect> &e_conn)
 {
-    const std::string src =
-        "pdb." + MetaDataTables::Name::metaObject();
-    const std::string dest =
-        "pdb." + MetaDataTables::Name::bleedingMetaObject();
+    const std::string src = MetaDataTables::Name::metaObject();
+    const std::string dest = MetaDataTables::Name::bleedingMetaObject();
     return tableCopy(e_conn, src, dest);
 }
 

@@ -25,11 +25,11 @@ DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
     std::unique_ptr<DBResult> db_res;
     const std::string parent_id = std::to_string(this->getDatabaseID());
     const std::string serials_query = 
-        " SELECT pdb." + table_name + ".serial_object,"
-        "        pdb." + table_name + ".serial_key,"
-        "        pdb." + table_name + ".id"
-        " FROM pdb." + table_name + 
-        " WHERE pdb." + table_name + ".parent_id"
+        " SELECT " + table_name + ".serial_object,"
+        "        " + table_name + ".serial_key,"
+        "        " + table_name + ".id"
+        " FROM " + table_name + 
+        " WHERE " + table_name + ".parent_id"
         "   = " + parent_id + ";";
     assert(e_conn.get()->execute(serials_query, &db_res));
     MYSQL_ROW row;

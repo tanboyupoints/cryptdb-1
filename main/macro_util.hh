@@ -10,6 +10,8 @@
     }                                       \
 }
 
+#define RFIF RETURN_FALSE_IF_FALSE
+
 #define ROLLBACK_AND_RFIF(status, conn)                 \
 {                                                       \
     if (!(status)) {                                    \
