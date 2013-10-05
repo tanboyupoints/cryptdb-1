@@ -413,6 +413,7 @@ public:
                             const std::string &field) const;
     TableMeta &getTableMeta(const std::string &db,
                             const std::string &table) const;
+    DatabaseMeta &getDatabaseMeta(const std::string &db) const;
     bool tableMetaExists(const std::string &db,
                          const std::string &table) const;
     bool nonAliasTableMetaExists(const std::string &db,
@@ -441,15 +442,17 @@ public:
     void setDatabaseName(const std::string &db) {db_name = db;}
     std::string getDatabaseName() const {return db_name.get();}
     void clearDatabaseName() {db_name.clear();}
+    bool saneDatabaseName() const;
 
 private:
     const SchemaInfo &schema;
     CarefulClear<std::string> db_name;
 
-    DatabaseMeta &getDatabaseMeta(const std::string &db) const;
     bool isAlias(const std::string &db,
                  const std::string &table) const;
     std::string unAliasTable(const std::string &db,
                              const std::string &table) const;
 };
 
+bool
+lowLevelGetCurrentDatabase(Connect *const c, std::string *const out_db);

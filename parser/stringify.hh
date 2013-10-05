@@ -795,8 +795,26 @@ operator<<(std::ostream &out, LEX &lex)
         }
         break;
 
+    case SQLCOM_CREATE_DB:
+        out << "create database ";
+        if (lex.create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS) {
+            out << "if not exists ";
+        }
+
+        out << convert_lex_str(lex.name);
+        break;
+
     case SQLCOM_CHANGE_DB:
         out << "USE " << lex.select_lex.db;
+        break;
+
+    case SQLCOM_DROP_DB:
+        out << "drop database ";
+        if (lex.drop_if_exists) {
+            out << "if exists ";
+        }
+
+        out << convert_lex_str(lex.name);
         break;
 
     case SQLCOM_BEGIN:

@@ -29,6 +29,8 @@ optimize(Item ** const i, Analysis &a) {
 Item *
 rewrite(const Item &i, const EncSet &req_enc, Analysis &a)
 {
+    assert(a.saneDatabaseName());
+
     const std::unique_ptr<RewritePlan> &rp =
         constGetAssert(a.rewritePlans, &i);
     const EncSet solution = rp->es_out.intersect(req_enc);
@@ -157,6 +159,8 @@ rewrite_table_list(List<TABLE_LIST> tll, Analysis &a)
 RewritePlan *
 gather(const Item &i, Analysis &a)
 {
+    assert(a.saneDatabaseName());
+
     return itemTypes.do_gather(i, a);
 }
 
@@ -378,7 +382,8 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
                                 new CreateDelta(std::move(fm), *tm,
                                                 IdentityMetaKey(name))));
         a.deltas.push_back(std::unique_ptr<Delta>(
-                                new ReplaceDelta(*tm, a.getSchema())));
+               new ReplaceDelta(*tm,
+                                a.getDatabaseMeta(a.getDatabaseName()))));
     }
 
     return rewritten_cfield_list;

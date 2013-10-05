@@ -427,7 +427,7 @@ std::unique_ptr<TableMeta>
 TableMeta::deserialize(unsigned int id, const std::string &serial)
 {
     const auto vec = unserialize_string(serial);
-    
+
     const std::string anon_table_name = vec[0];
     const bool hasSensitive = string_to_bool(vec[1]);
     const bool has_salt = string_to_bool(vec[2]);
@@ -447,7 +447,7 @@ std::string TableMeta::serialize(const DBObject &parent) const
         serialize_string(bool_to_string(has_salt)) +
         serialize_string(salt_name) +
         serialize_string(std::to_string(counter));
-    
+
     return serial;
 }
 

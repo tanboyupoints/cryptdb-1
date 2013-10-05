@@ -16,8 +16,9 @@ static void
 process_filters_lex(const st_select_lex &select_lex, Analysis &a);
 
 static inline void
-analyze_field_value_pair(const Item_field &field, const Item &val,
-                         Analysis &a);
+gatherAndAddAnalysisRewritePlanForFieldValuePair(const Item_field &field,
+                                                 const Item &val,
+                                                 Analysis &a);
 
 static st_select_lex *
 rewrite_filters_lex(const st_select_lex &select_lex, Analysis &a);
@@ -353,8 +354,8 @@ process_field_value_pairs(List_iterator<Item> fd_it,
         const Item_field *const ifd =
             static_cast<const Item_field *>(field_item);
 
-        // FIXME: Change function name.
-        analyze_field_value_pair(*ifd, *value_item, a);
+        gatherAndAddAnalysisRewritePlanForFieldValuePair(*ifd,
+                                                         *value_item, a);
     }
 }
 
@@ -367,8 +368,9 @@ process_field_value_pairs(List_iterator<Item> fd_it,
 //analyzes an expression of the form field = val expression from
 // an UPDATE
 static inline void
-analyze_field_value_pair(const Item_field &field, const Item &val,
-                         Analysis &a)
+gatherAndAddAnalysisRewritePlanForFieldValuePair(const Item_field &field,
+                                                 const Item &val,
+                                                 Analysis &a)
 {
     a.rewritePlans[&val] = std::unique_ptr<RewritePlan>(gather(val, a));
     a.rewritePlans[&field] =

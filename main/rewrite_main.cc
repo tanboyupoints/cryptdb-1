@@ -1024,6 +1024,14 @@ RewriteOutput *
 Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
                         const std::string &query)
 {
+    // TODO: If we need to support queries with multiple databases
+    // move pattern down.
+    std::string default_db;
+    TEST_TextMessageError(lowLevelGetCurrentDatabase(ps.getConn().get(),
+                                                     &default_db),
+                          "Failed retrieving database for query parse!");
+    a.setDatabaseName(default_db);
+
     std::unique_ptr<query_parse> p;
     try {
         p = std::unique_ptr<query_parse>(

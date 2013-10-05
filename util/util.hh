@@ -537,6 +537,8 @@ public:
         }
         value = new_value;
         is_set = true;
+
+        return *this;
     }
 
     void clear() {
@@ -546,6 +548,8 @@ public:
 
         is_set = false;
     }
+
+    bool isSet() const {return is_set;}
 
 private:
     T value;

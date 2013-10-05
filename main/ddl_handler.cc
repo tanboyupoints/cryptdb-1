@@ -1,5 +1,4 @@
 #include <main/ddl_handler.hh>
-
 #include <main/rewrite_util.hh>
 #include <main/rewrite_main.hh>
 #include <main/alter_sub_handler.hh>
@@ -78,7 +77,8 @@ class CreateTableHandler : public DDLHandler {
             //         Update TABLE       
             // -----------------------------
             a.deltas.push_back(std::unique_ptr<Delta>(
-                            new CreateDelta(std::move(tm), a.getSchema(),
+                            new CreateDelta(std::move(tm),
+                                            a.getDatabaseMeta(db_name),
                                             IdentityMetaKey(table))));
         } else { // Table already exists.
 
@@ -157,8 +157,8 @@ class DropTableHandler : public DDLHandler {
         for (; tbl; tbl = tbl->next_local) {
             char* table  = tbl->table_name;
 
+            TEST_DatabaseDiscrepancy(tbl->db, a.getDatabaseName());
             if (lex->drop_if_exists) {
-                TEST_DatabaseDiscrepancy(tbl->db, a.getDatabaseName());
                 if (false == a.tableMetaExists(tbl->db, table)) {
                     continue;
                 }
@@ -167,7 +167,8 @@ class DropTableHandler : public DDLHandler {
             // Remove from *Meta structures.
             TableMeta const &tm = a.getTableMeta(tbl->db, table);
             a.deltas.push_back(std::unique_ptr<Delta>(
-                                new DeleteDelta(tm, a.getSchema())));
+                            new DeleteDelta(tm,
+                                            a.getDatabaseMeta(tbl->db))));
         }
     }
 };
@@ -176,17 +177,22 @@ class CreateDBHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
                                   const ProxyState &ps) const
     {
-        FAIL_TextMessageError("cryptdb does not support creating db!");
+        const std::string dbname =
+            convert_lex_str(lex->name);
+        std::unique_ptr<DatabaseMeta> dm(new DatabaseMeta());
+        a.deltas.push_back(std::unique_ptr<Delta>(
+                    new CreateDelta(std::move(dm), a.getSchema(),
+                                    IdentityMetaKey(dbname))));
+
+        return copyWithTHD(lex);
     }
 };
 
-// TODO: Implement.
 class ChangeDBHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
                                   const ProxyState &ps) const
     {
-        FAIL_TextMessageError("cryptdb does not support changing"
-                              " the db!");
+        return copyWithTHD(lex);
     }
 };
 
@@ -194,10 +200,15 @@ class DropDBHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
                                   const ProxyState &ps) const
     {
-        FAIL_TextMessageError("cryptdb does not support dropping db!");
+        const std::string dbname =
+            convert_lex_str(lex->name);
+        DatabaseMeta &dm = a.getDatabaseMeta(dbname);
+        a.deltas.push_back(std::unique_ptr<Delta>(
+                                    new DeleteDelta(dm, a.getSchema())));
+
+        return copyWithTHD(lex);
     }
 };
-
 
 class LockTablesHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,

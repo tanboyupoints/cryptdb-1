@@ -261,8 +261,8 @@ operator<<(std::ostream &out, const RewritePlan * const rp)
 }
 
 // This function should not be used after intitialization.
-static bool
-getCurrentDatabase(Connect *const c, std::string *const out_db)
+bool
+lowLevelGetCurrentDatabase(Connect *const c, std::string *const out_db)
 {
     const std::string query = "SELECT DATABASE();";
     std::unique_ptr<DBResult> db_res;
@@ -284,7 +284,7 @@ getCurrentDatabase(Connect *const c, std::string *const out_db)
 
 // This function should not be used after intitialization.
 static bool
-setCurrentDatabase(Connect *const c, const std::string &db)
+lowLevelSetCurrentDatabase(Connect *const c, const std::string &db)
 {
     const std::string query = "USE " + db + ";";
     RFIF(c->execute(query));
@@ -327,11 +327,11 @@ loadUDFs(const std::unique_ptr<Connect> &conn) {
     assert_s(conn.get()->execute("CREATE DATABASE " + udf_db), "cannot create db for udfs");
 
     std::string saved_db;
-    assert(getCurrentDatabase(conn.get(), &saved_db));
-    assert(setCurrentDatabase(conn.get(), udf_db));
+    assert(lowLevelGetCurrentDatabase(conn.get(), &saved_db));
+    assert(lowLevelSetCurrentDatabase(conn.get(), udf_db));
     dropAll(conn);
     createAll(conn);
-    assert(setCurrentDatabase(conn.get(), saved_db));
+    assert(lowLevelSetCurrentDatabase(conn.get(), saved_db));
 
     LOG(cdb_v) << "Loaded CryptDB's UDFs.";
 }
@@ -340,13 +340,15 @@ static bool
 synchronizeDatabases(Connect *const conn, Connect *const e_conn)
 {
     std::string current_db;
-    if (getCurrentDatabase(conn, &current_db)) {
-        RFIF(setCurrentDatabase(e_conn, current_db));
+    if (lowLevelGetCurrentDatabase(conn, &current_db)) {
+        RFIF(lowLevelSetCurrentDatabase(e_conn, current_db));
         return true;
     }
 
-    RFIF(setCurrentDatabase(conn, MetaDataTables::Name::purgatoryDB()));
-    RFIF(setCurrentDatabase(e_conn, MetaDataTables::Name::purgatoryDB()));
+    RFIF(lowLevelSetCurrentDatabase(conn,
+                                    MetaDataTables::Name::purgatoryDB()));
+    RFIF(lowLevelSetCurrentDatabase(e_conn,
+                                    MetaDataTables::Name::purgatoryDB()));
     return true;
 }
 
@@ -1168,6 +1170,15 @@ TableMeta &Analysis::getTableMeta(const std::string &db,
     return *tm;
 }
 
+DatabaseMeta &
+Analysis::getDatabaseMeta(const std::string &db) const
+{
+    DatabaseMeta *const dm = this->schema.getChild(IdentityMetaKey(db));
+    TEST_IdentifierNotFound(dm, db);
+
+    return *dm;
+}
+
 bool Analysis::tableMetaExists(const std::string &db,
                                const std::string &table) const
 {
@@ -1220,13 +1231,9 @@ std::string Analysis::getAnonIndexName(const TableMeta &tm,
     return tm.getAnonIndexName(index_name, o);
 }
 
-DatabaseMeta &
-Analysis::getDatabaseMeta(const std::string &db) const
+bool Analysis::saneDatabaseName() const
 {
-    DatabaseMeta *const dm = this->schema.getChild(IdentityMetaKey(db));
-    TEST_IdentifierNotFound(dm, db);
-
-    return *dm;
+    return db_name.isSet() && db_name.get().size() > 0;
 }
 
 bool Analysis::isAlias(const std::string &db,
