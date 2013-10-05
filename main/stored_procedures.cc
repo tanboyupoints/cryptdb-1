@@ -7,11 +7,16 @@
 static bool
 addStoredProcedures(const std::unique_ptr<Connect> &conn)
 {
+    const std::string current_transaction_id =
+        MetaDataTables::Internal::remoteDB() + ".currentTransactionID";
+    const std::string hom_addition_transaction =
+        MetaDataTables::Internal::remoteDB() + ".homAdditionTransaction";
+
     const std::vector<std::string> add_procs({
         // ---------------------------------------
         //   def currentTransactionID(id)
         // ---------------------------------------
-        " CREATE PROCEDURE cryptdbtest.currentTransactionID"
+        " CREATE PROCEDURE " + current_transaction_id +
         "   (OUT out_id VARCHAR(20))"
         " BEGIN"
         "   SELECT trx_id INTO out_id FROM INFORMATION_SCHEMA.INNODB_TRX"
@@ -47,7 +52,7 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
             homAdditionTransction(). This should lead to consistent,
             expected behavior provided (*) is correct rationale.
         */
-        " CREATE PROCEDURE cryptdbtest.homAdditionTransaction"
+        " CREATE PROCEDURE " + hom_addition_transaction +
         "       (IN delete_query VARCHAR(50000),"
         "        IN insert_query VARCHAR(50000))"
         " BEGIN"
@@ -89,11 +94,16 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
 static bool
 dropStoredProcedures(const std::unique_ptr<Connect> &conn)
 {
+    const std::string current_transaction_id =
+        MetaDataTables::Internal::remoteDB() + ".currentTransactionID";
+    const std::string hom_addition_transaction =
+        MetaDataTables::Internal::remoteDB() + ".homAdditionTransaction";
+
     const std::vector<std::string>
-        drop_procs({"DROP PROCEDURE IF EXISTS"
-                    "   cryptdbtest.currentTransactionID;",
-                    "DROP PROCEDURE IF EXISTS"
-                    "   cryptdbtest.homAdditionTransaction;"});
+        drop_procs({"DROP PROCEDURE IF EXISTS " +
+                        current_transaction_id,
+                    "DROP PROCEDURE IF EXISTS " +
+                        hom_addition_transaction });
 
     for (auto it : drop_procs) {
         RETURN_FALSE_IF_FALSE(conn->execute(it));

@@ -729,7 +729,9 @@ bool SpecialUpdate::getQuery(std::list<std::string> * const queryz,
     const std::string re_insert =
         rewriteAndGetSingleQuery(ps, insert_q, schema);
 
-    queryz->push_back(" CALL homAdditionTransaction ("
+    const std::string hom_addition_transaction =
+        MetaDataTables::Internal::remoteDB() + ".homAdditionTransaction";
+    queryz->push_back(" CALL " + hom_addition_transaction + " ("
                       " '" + escapeString(ps.getConn(), re_delete) + "', "
                       " '" + escapeString(ps.getConn(),
                                           re_insert) + "');");
