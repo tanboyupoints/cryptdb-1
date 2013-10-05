@@ -516,6 +516,42 @@ private:
     mutable bool available;
 };
 
+template <typename T>
+class CarefulClear {
+public:
+    CarefulClear(T value) : value(value), is_set(true) {}
+    CarefulClear() : is_set(false) {}
+
+    T get() const {
+        if (false == is_set) {
+            throw CryptDBError("CarefulClear : must set (=) before get");
+        }
+
+        return value;
+    }
+
+    const CarefulClear &operator=(T new_value)
+    {
+        if (true == is_set) {
+            throw CryptDBError("CarefulClear : must clear before set (=)");
+        }
+        value = new_value;
+        is_set = true;
+    }
+
+    void clear() {
+        if (false == is_set) {
+            throw CryptDBError("CarefulClear : already cleared");
+        }
+
+        is_set = false;
+    }
+
+private:
+    T value;
+    bool is_set;
+};
+
 // Taken from jsmith @ cplusplus.com
 template <typename T>
 std::vector<T> vectorDifference(const std::vector<T> &model,

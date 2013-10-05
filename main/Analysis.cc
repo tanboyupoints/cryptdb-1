@@ -274,6 +274,11 @@ getCurrentDatabase(Connect *const c, std::string *const out_db)
     assert(l != NULL);
 
     *out_db = std::string(row[0], l[0]);
+    if (out_db->size() == 0) {
+        assert(0 == l[0] && NULL == row[0]);
+        return false;
+    }
+
     return true;
 }
 
@@ -346,27 +351,29 @@ synchronizeDatabases(Connect *const conn, Connect *const e_conn)
 }
 
 ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
-                       const std::string &dbname,
                        const std::string &master_key,
                        SECURITY_RATING default_sec_rating)
     : masterKey(std::unique_ptr<AES_KEY>(getKey(master_key))),
       mysql_dummy(ProxyState::db_init(embed_dir)), // HACK: Allows
                                                    // connections in init
                                                    // list.
-      conn(new Connect(ci.server, ci.user, ci.passwd, dbname, ci.port)),
+      conn(new Connect(ci.server, ci.user, ci.passwd, ci.port)),
       side_channel_conn(new Connect(ci.server, ci.user, ci.passwd,
-                                    dbname, ci.port)),
-      e_conn(Connect::getEmbedded(embed_dir, dbname)), dbname(dbname),
+                                    ci.port)),
+      e_conn(Connect::getEmbedded(embed_dir)), 
       default_sec_rating(default_sec_rating)
 {
     assert(conn && e_conn);
+
+    // Must be done before database synchronization.
+    // FIXME: Get real prefix.
+    assert(MetaDataTables::initialize(conn, e_conn, "use_real_prefix"));
+
     TEST_TextMessageError(synchronizeDatabases(conn.get(), e_conn.get()),
                           "Failed to synchronize embedded and remote"
                           " databases!");
 
-    // FIXME: Get real prefix.
-    assert(MetaDataTables::initialize(conn, e_conn, "use_real_prefix"));
-
+    
     loadUDFs(conn);
 
     assert(loadStoredProcedures(conn));
@@ -1091,22 +1098,33 @@ enum RewriteOutput::Channel AdjustOnionOutput::queryChannel() const
 }
 
 bool Analysis::addAlias(const std::string &alias,
+                        const std::string &db,
                         const std::string &table)
 {
-    auto alias_pair = table_aliases.find(alias);
-    if (table_aliases.end() != alias_pair) {
+    auto db_alias_pair = table_aliases.find(db);
+    if (table_aliases.end() == db_alias_pair) {
+        table_aliases.insert(
+           make_pair(db,
+                     std::map<const std::string, const std::string>()));
+    }
+
+    std::map<const std::string, const std::string> &
+        per_db_table_aliases = table_aliases[db];
+    auto alias_pair = per_db_table_aliases.find(alias);
+    if (per_db_table_aliases.end() != alias_pair) {
         return false;
     }
 
-    table_aliases.insert(make_pair(alias, table));
+    per_db_table_aliases.insert(make_pair(alias, table));
     return true;
 }
 
-OnionMeta &Analysis::getOnionMeta(const std::string &table,
+OnionMeta &Analysis::getOnionMeta(const std::string &db,
+                                  const std::string &table,
                                   const std::string &field,
                                   onion o) const
 {
-    return this->getOnionMeta(this->getFieldMeta(table, field), o);
+    return this->getOnionMeta(this->getFieldMeta(db, table, field), o);
 }
 
 OnionMeta &Analysis::getOnionMeta(const FieldMeta &fm,
@@ -1118,11 +1136,12 @@ OnionMeta &Analysis::getOnionMeta(const FieldMeta &fm,
     return *om;
 }
 
-FieldMeta &Analysis::getFieldMeta(const std::string &table,
+FieldMeta &Analysis::getFieldMeta(const std::string &db,
+                                  const std::string &table,
                                   const std::string &field) const
 {
     FieldMeta * const fm =
-        this->getTableMeta(table).getChild(IdentityMetaKey(field));
+        this->getTableMeta(db, table).getChild(IdentityMetaKey(field));
     TEST_IdentifierNotFound(fm, field);
 
     return *fm;
@@ -1137,50 +1156,60 @@ FieldMeta &Analysis::getFieldMeta(const TableMeta &tm,
     return *fm;
 }
 
-TableMeta &Analysis::getTableMeta(const std::string &table) const
+TableMeta &Analysis::getTableMeta(const std::string &db,
+                                  const std::string &table) const
 {
+    const DatabaseMeta &dm = this->getDatabaseMeta(db);
+
     TableMeta *const tm =
-        this->schema.getChild(IdentityMetaKey(unAliasTable(table)));
+        dm.getChild(IdentityMetaKey(unAliasTable(db, table)));
     TEST_IdentifierNotFound(tm, table);
 
     return *tm;
 }
 
-bool Analysis::tableMetaExists(const std::string &table) const
+bool Analysis::tableMetaExists(const std::string &db,
+                               const std::string &table) const
 {
-    return this->nonAliasTableMetaExists(unAliasTable(table));
+    return this->nonAliasTableMetaExists(db, unAliasTable(db, table));
 }
 
-bool Analysis::nonAliasTableMetaExists(const std::string &table) const
+bool Analysis::nonAliasTableMetaExists(const std::string &db,
+                                       const std::string &table) const
 {
-    return this->schema.childExists(IdentityMetaKey(table));
+    const DatabaseMeta &dm = this->getDatabaseMeta(db);
+    return dm.childExists(IdentityMetaKey(table));
 }
 
-std::string Analysis::getAnonTableName(const std::string &table) const
+std::string Analysis::getAnonTableName(const std::string &db,
+                                       const std::string &table) const
 {
-    if (this->isAlias(table)) {
+    if (this->isAlias(db, table)) {
         return table;
     }
 
-    return this->getTableMeta(table).getAnonTableName();
+    return this->getTableMeta(db, table).getAnonTableName();
 }
 
 std::string
-Analysis::translateNonAliasPlainToAnonTableName(const std::string &table)
+Analysis::translateNonAliasPlainToAnonTableName(const std::string &db,
+                                                const std::string &table)
     const
 {
-    TableMeta *const tm = this->schema.getChild(IdentityMetaKey(table));
+    TableMeta *const tm =
+        this->getDatabaseMeta(db).getChild(IdentityMetaKey(table));
     TEST_IdentifierNotFound(tm, table);
 
     return tm->getAnonTableName();
 }
 
-std::string Analysis::getAnonIndexName(const std::string &table,
+std::string Analysis::getAnonIndexName(const std::string &db,
+                                       const std::string &table,
                                        const std::string &index_name,
                                        onion o)
     const
 {
-    return this->getTableMeta(table).getAnonIndexName(index_name, o);
+    return this->getTableMeta(db, table).getAnonIndexName(index_name, o);
 }
 
 std::string Analysis::getAnonIndexName(const TableMeta &tm,
@@ -1191,19 +1220,41 @@ std::string Analysis::getAnonIndexName(const TableMeta &tm,
     return tm.getAnonIndexName(index_name, o);
 }
 
-bool Analysis::isAlias(const std::string &table) const
+DatabaseMeta &
+Analysis::getDatabaseMeta(const std::string &db) const
 {
-    return table_aliases.end() != table_aliases.find(table);
+    DatabaseMeta *const dm = this->schema.getChild(IdentityMetaKey(db));
+    TEST_IdentifierNotFound(dm, db);
+
+    return *dm;
 }
 
-std::string Analysis::unAliasTable(const std::string &table) const
+bool Analysis::isAlias(const std::string &db,
+                       const std::string &table) const
 {
-    auto alias_pair = table_aliases.find(table);
-    if (table_aliases.end() != alias_pair) {
-        return alias_pair->second;
-    } else {
+    auto db_alias_pair = table_aliases.find(db);
+    if (table_aliases.end() == db_alias_pair) {
+        return false;
+    }
+
+    return db_alias_pair->second.end() != db_alias_pair->second.find(table);
+}
+
+std::string Analysis::unAliasTable(const std::string &db,
+                                   const std::string &table) const
+{
+    auto db_alias_pair = table_aliases.find(db);
+    if (table_aliases.end() == db_alias_pair) {
         return table;
     }
+
+    auto alias_pair = db_alias_pair->second.find(table);
+    if (db_alias_pair->second.end() == alias_pair) {
+        return table;
+    }
+    
+    // We've found an alias!
+    return alias_pair->second;
 }
 
 EncLayer &Analysis::getBackEncLayer(const OnionMeta &om)

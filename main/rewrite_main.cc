@@ -105,11 +105,21 @@ sanityCheck(TableMeta &tm)
 }
 
 static bool
+sanityCheck(DatabaseMeta &dm)
+{
+    for (auto it = dm.children.begin(); it != dm.children.end(); it++) {
+        const std::unique_ptr<TableMeta> &tm = (*it).second;
+        assert(sanityCheck(*tm.get()));
+    }
+    return true;
+}
+
+static bool
 sanityCheck(SchemaInfo &schema)
 {
     for (auto it = schema.children.begin(); it != schema.children.end();
          it++) {
-        const std::unique_ptr<TableMeta> &tm = (*it).second;
+        const std::unique_ptr<DatabaseMeta> &tm = (*it).second;
         assert(sanityCheck(*tm.get()));
     }
     return true;
@@ -499,11 +509,10 @@ buildTypeTextTranslatorHack()
 
 //l gets updated to the new level
 static std::string
-removeOnionLayer(const ProxyState &ps, const TableMeta &tm,
+removeOnionLayer(const Analysis &a, const TableMeta &tm,
                  const FieldMeta &fm,
                  OnionMetaAdjustor *const om_adjustor,
                  SECLEVEL *const new_level,
-                 const std::string &cur_db,
                  std::vector<std::unique_ptr<Delta> > *const deltas)
 {
     // Remove the EncLayer.
@@ -516,20 +525,21 @@ removeOnionLayer(const ProxyState &ps, const TableMeta &tm,
     const SECLEVEL local_new_level = om_adjustor->getSecLevel();
 
     //removes onion layer at the DB
+    const std::string dbname = a.getDatabaseName();
     const std::string anon_table_name = tm.getAnonTableName();
     Item_field *const salt =
-        new Item_field(NULL, ps.dbName().c_str(), anon_table_name.c_str(),
+        new Item_field(NULL, dbname.c_str(), anon_table_name.c_str(),
                        fm.getSaltName().c_str());
 
     const std::string fieldanon = om_adjustor->getAnonOnionName();
     Item_field *const field =
-        new Item_field(NULL, ps.dbName().c_str(), anon_table_name.c_str(),
+        new Item_field(NULL, dbname.c_str(), anon_table_name.c_str(),
                        fieldanon.c_str());
 
     Item *const decUDF = back_el.decryptUDF(field, salt);
 
     std::stringstream query;
-    query << " UPDATE " << cur_db << "." << anon_table_name
+    query << " UPDATE " << dbname << "." << anon_table_name
           << "    SET " << fieldanon  << " = " << *decUDF
           << ";";
 
@@ -554,9 +564,8 @@ removeOnionLayer(const ProxyState &ps, const TableMeta &tm,
  */
 static std::pair<std::vector<std::unique_ptr<Delta> >,
                  std::list<std::string>>
-adjustOnion(const SchemaInfo &schema, const ProxyState &ps, onion o,
-            const TableMeta &tm, const FieldMeta &fm, SECLEVEL tolevel,
-            const std::string &cur_db)
+adjustOnion(const Analysis &a, onion o, const TableMeta &tm,
+            const FieldMeta &fm, SECLEVEL tolevel)
 {
     std::cout << "onion: " << TypeText<onion>::toText(o) << std::endl;
     // Make a copy of the onion meta for the purpose of making
@@ -569,8 +578,8 @@ adjustOnion(const SchemaInfo &schema, const ProxyState &ps, onion o,
     std::vector<std::unique_ptr<Delta> > deltas;
     while (newlevel > tolevel) {
         auto query =
-            removeOnionLayer(ps, tm, fm, &om_adjustor, &newlevel,
-                             cur_db, &deltas);
+            removeOnionLayer(a, tm, fm, &om_adjustor, &newlevel,
+                             &deltas);
         adjust_queries.push_back(query);
     }
     TEST_UnexpectedSecurityLevel(o, tolevel, newlevel);
@@ -1017,8 +1026,8 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
 {
     std::unique_ptr<query_parse> p;
     try {
-        p = std::unique_ptr<query_parse>(new query_parse(ps.dbName(),
-                                                         query));
+        p = std::unique_ptr<query_parse>(
+                new query_parse(a.getDatabaseName(), query));
     } catch (std::runtime_error &e) {
         FAIL_TextMessageError("Bad Query: " + query);
     }
@@ -1040,9 +1049,7 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
             std::cout << "Adjusting onion!" << std::endl;
             std::pair<std::vector<std::unique_ptr<Delta> >,
                       std::list<std::string>>
-                out_data =
-                    adjustOnion(a.getSchema(), ps, e.o, e.tm, e.fm,
-                                e.tolevel, ps.dbName());
+                out_data = adjustOnion(a, e.o, e.tm, e.fm, e.tolevel);
             std::vector<std::unique_ptr<Delta> > &deltas =
                 out_data.first;
             const std::list<std::string>  &adjust_queries =
@@ -1121,7 +1128,8 @@ Rewriter::handleDirective(Analysis &a, const ProxyState &ps,
 {
     DirectiveData data(query);
     const FieldMeta &fm =
-        a.getFieldMeta(data.table_name, data.field_name);
+        a.getFieldMeta(a.getDatabaseName(), data.table_name,
+                       data.field_name);
     const SECURITY_RATING current_rating = fm.getSecurityRating();
     if (current_rating < data.sec_rating) {
         FAIL_TextMessageError("cryptdb does not support going to a more"

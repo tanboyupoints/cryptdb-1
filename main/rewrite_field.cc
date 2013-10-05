@@ -47,7 +47,10 @@ deductPlainTableName(const std::string &field_name,
     const TABLE_LIST *current_table =
         context->first_name_resolution_table;
     do {
-        const TableMeta &tm = a.getTableMeta(current_table->table_name);
+        TEST_DatabaseDiscrepancy(current_table->db, a.getDatabaseName());
+        const TableMeta &tm =
+            a.getTableMeta(current_table->db,
+                           current_table->table_name);
         if (tm.childExists(IdentityMetaKey(field_name))) {
             return std::string(current_table->table_name);
         }
@@ -70,7 +73,8 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
                             deductPlainTableName(i.field_name,
                                                  i.context, a);
  
-        FieldMeta &fm = a.getFieldMeta(table, fieldname);
+        FieldMeta &fm =
+            a.getFieldMeta(a.getDatabaseName(), table, fieldname);
         const EncSet es = EncSet(a, &fm);
 
         const std::string why = "is a field";
@@ -86,28 +90,30 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
     {
         LOG(cdb_v) << "do_rewrite_type FIELD_ITEM " << i << std::endl;
 
+        const std::string &db_name = a.getDatabaseName();
         const std::string plain_table_name =
             i.table_name ? i.table_name :
                             deductPlainTableName(i.field_name,
                                                  i.context, a);
         const FieldMeta &fm =
-            a.getFieldMeta(plain_table_name, i.field_name);
+            a.getFieldMeta(db_name, plain_table_name, i.field_name);
         //assert(constr.key == fm);
 
         //check if we need onion adjustment
         const OnionMeta &om =
-            a.getOnionMeta(plain_table_name, i.field_name,
+            a.getOnionMeta(db_name, plain_table_name, i.field_name,
                            constr.o);
         const SECLEVEL onion_level = a.getOnionLevel(om);
         assert(onion_level != SECLEVEL::INVALID);
         if (constr.l < onion_level) {
             //need adjustment, throw exception
-            const TableMeta &tm = a.getTableMeta(plain_table_name);
+            const TableMeta &tm =
+                a.getTableMeta(db_name, plain_table_name);
             throw OnionAdjustExcept(tm, fm, constr.o, constr.l);
         }
 
         const std::string anon_table_name =
-            a.getAnonTableName(plain_table_name);
+            a.getAnonTableName(db_name, plain_table_name);
         const std::string anon_field_name = om.getAnonOnionName();
 
         Item_field * const res =
@@ -151,7 +157,7 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
                            Analysis &a, std::vector<Item *> *l) const
     {
         const std::string anon_table_name =
-            a.getAnonTableName(i.table_name);
+            a.getAnonTableName(a.getDatabaseName(), i.table_name);
 
         Item_field *new_field = NULL;
         for (auto it : fm.orderedOnionMetas()) {

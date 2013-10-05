@@ -17,24 +17,15 @@
 #include <util/cryptdb_log.hh>
 
 Connect::Connect(const std::string &server, const std::string &user,
-                 const std::string &passwd, const std::string &dbname,
-                 uint port)
+                 const std::string &passwd, uint port)
     : conn(nullptr), close_on_destroy(true)
 {
-    do_connect(server, user, passwd, dbname, port);
-
-    if (dbname.size() == 0) {
-        LOG(warn) << "database name not set";
-    } else {
-        TEST_TextMessageError(select_db(dbname),
-                              "cannot select dbname " + dbname);
-    }
+    do_connect(server, user, passwd, port);
 }
 
 void
 Connect::do_connect(const std::string &server, const std::string &user,
-                    const std::string &passwd, const std::string &dbname,
-                    uint port)
+                    const std::string &passwd, uint port)
 {
     const char *dummy_argv[] = {
         "progname",
@@ -61,27 +52,15 @@ Connect::do_connect(const std::string &server, const std::string &user,
                             passwd.c_str(), 0, port, 0,
                             CLIENT_MULTI_STATEMENTS)) {
         LOG(warn) << "connecting to server " << server
-                  << " db " << dbname
                   << " user " << user
                   << " pwd " << passwd
                   << " port " << port;
         LOG(warn) << "mysql_real_connect: " << mysql_error(conn);
         throw std::runtime_error("cannot connect");
     }
-
-    // We create the database here because the database will
-    // not exist if it is our first time connecting to it.
-    assert(execute("CREATE DATABASE IF NOT EXISTS " + dbname + ";"));
 }
 
-bool
-Connect::select_db(const std::string &dbname)
-{
-    return mysql_select_db(conn, dbname.c_str()) ? false : true;
-}
-
-Connect *Connect::getEmbedded(const std::string &embed_db,
-                              const std::string &dbname)
+Connect *Connect::getEmbedded(const std::string &embed_db)
 {
     init_mysql(embed_db);
 
@@ -98,11 +77,6 @@ Connect *Connect::getEmbedded(const std::string &embed_db,
 
     Connect *const conn = new Connect(m);
     conn->close_on_destroy = true;
-
-    // We build the database here instead of initially connecting to it
-    // because it may be our first time accessing that database and 
-    // it will not exist yet.
-    assert(conn->execute("CREATE DATABASE IF NOT EXISTS " + dbname + ";"));
 
     return conn;
 }

@@ -51,8 +51,9 @@ rewrite_table_list(const TABLE_LIST * const t, const Analysis &a)
         // Don't use Analysis::getAnonTableName(...) as it respects
         // aliases and if a table has been aliased with 'plain_name'
         // it will give us the wrong name.
+        TEST_DatabaseDiscrepancy(t->db, a.getDatabaseName());
         const std::string anon_name =
-            a.translateNonAliasPlainToAnonTableName(plain_name);
+            a.translateNonAliasPlainToAnonTableName(t->db, plain_name);
         return rewrite_table_list(t, anon_name);
     } else {
         return copyWithTHD(t);
@@ -85,7 +86,9 @@ rewrite_table_list(const SQL_I_List<TABLE_LIST> &tlist, Analysis &a,
     }
 
     TABLE_LIST * tl;
-    if (if_exists && !a.nonAliasTableMetaExists(tlist.first->table_name)) {
+    TEST_DatabaseDiscrepancy(tlist.first->db, a.getDatabaseName());
+    if (if_exists && !a.nonAliasTableMetaExists(tlist.first->db,
+                                                tlist.first->table_name)) {
        tl = copyWithTHD(tlist.first);
     } else {
        tl = rewrite_table_list(tlist.first, a);
@@ -98,7 +101,9 @@ rewrite_table_list(const SQL_I_List<TABLE_LIST> &tlist, Analysis &a,
     for (TABLE_LIST *tbl = tlist.first->next_local; tbl;
          tbl = tbl->next_local) {
         TABLE_LIST * new_tbl;
-        if (if_exists && !a.nonAliasTableMetaExists(tbl->table_name)) {
+        TEST_DatabaseDiscrepancy(tbl->db, a.getDatabaseName());
+        if (if_exists && !a.nonAliasTableMetaExists(tbl->db,
+                                                    tbl->table_name)) {
             new_tbl = copyWithTHD(tbl);
         } else {
             new_tbl = rewrite_table_list(tbl, a);

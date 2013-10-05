@@ -70,11 +70,10 @@ public:
 // state maintained at the proxy
 typedef struct ProxyState {
     ProxyState(ConnectionInfo ci, const std::string &embed_dir,
-               const std::string &dbname, const std::string &master_key,
+               const std::string &master_key,
                SECURITY_RATING default_sec_rating =
                 SECURITY_RATING::BEST_EFFORT);
     ~ProxyState();
-    std::string dbName() const {return dbname;}
     SECURITY_RATING defaultSecurityRating() const
     {
         return default_sec_rating;
@@ -100,8 +99,6 @@ private:
     const std::unique_ptr<Connect> conn;
     const std::unique_ptr<Connect> side_channel_conn;
     const std::unique_ptr<Connect> e_conn;
-    // FIXME: Remove once cryptdb supports multiple databases.
-    const std::string dbname;
     const SECURITY_RATING default_sec_rating;
 } ProxyState;
 
@@ -393,7 +390,8 @@ public:
                       // fields have been analyzed so far
     std::map<const FieldMeta *, const salt_type> salts;
     std::map<const Item *, std::unique_ptr<RewritePlan> > rewritePlans;
-    std::map<const std::string, const std::string> table_aliases;
+    std::map<std::string, std::map<const std::string, const std::string>>
+        table_aliases;
     std::map<const Item_field *, std::pair<Item_field *, OLK>> item_cache;
 
     // information for decrypting results
@@ -402,22 +400,31 @@ public:
     bool special_update;
 
     // These functions are prefered to their lower level counterparts.
-    bool addAlias(const std::string &alias, const std::string &table);
-    OnionMeta &getOnionMeta(const std::string &table,
+    bool addAlias(const std::string &alias, const std::string &db,
+                  const std::string &table);
+    OnionMeta &getOnionMeta(const std::string &db,
+                            const std::string &table,
                             const std::string &field, onion o) const;
     OnionMeta &getOnionMeta(const FieldMeta &fm, onion o) const;
-    FieldMeta &getFieldMeta(const std::string &table,
+    FieldMeta &getFieldMeta(const std::string &db,
+                            const std::string &table,
                             const std::string &field) const;
     FieldMeta &getFieldMeta(const TableMeta &tm,
                             const std::string &field) const;
-    TableMeta &getTableMeta(const std::string &table) const;
-    bool tableMetaExists(const std::string &table) const;
-    bool nonAliasTableMetaExists(const std::string &table) const;
-    std::string getAnonTableName(const std::string &table) const;
+    TableMeta &getTableMeta(const std::string &db,
+                            const std::string &table) const;
+    bool tableMetaExists(const std::string &db,
+                         const std::string &table) const;
+    bool nonAliasTableMetaExists(const std::string &db,
+                                 const std::string &table) const;
+    std::string getAnonTableName(const std::string &db,
+                                 const std::string &table) const;
     std::string
-        translateNonAliasPlainToAnonTableName(const std::string &table)
+        translateNonAliasPlainToAnonTableName(const std::string &db,
+                                              const std::string &table)
         const;
-    std::string getAnonIndexName(const std::string &table,
+    std::string getAnonIndexName(const std::string &db,
+                                 const std::string &table,
                                  const std::string &index_name,
                                  onion o) const;
     std::string getAnonIndexName(const TableMeta &tm,
@@ -431,9 +438,18 @@ public:
 
     std::vector<std::unique_ptr<Delta> > deltas;
 
+    void setDatabaseName(const std::string &db) {db_name = db;}
+    std::string getDatabaseName() const {return db_name.get();}
+    void clearDatabaseName() {db_name.clear();}
+
 private:
     const SchemaInfo &schema;
-    bool isAlias(const std::string &table) const;
-    std::string unAliasTable(const std::string &table) const;
+    CarefulClear<std::string> db_name;
+
+    DatabaseMeta &getDatabaseMeta(const std::string &db) const;
+    bool isAlias(const std::string &db,
+                 const std::string &table) const;
+    std::string unAliasTable(const std::string &db,
+                             const std::string &table) const;
 };
 

@@ -96,6 +96,12 @@ testTextMessageError(const std::string &file_name,
     throw TextMessageError(__FILE__, __LINE__, (message));          \
 }
 
+#define TEST_DatabaseDiscrepancy(db_a, db_b)                        \
+{                                                                   \
+    TEST_TextMessageError((db_a) == (db_b),                         \
+                          "Database discrepancy!");                 \
+}
+
 inline void
 testIdentifierNotFound(const std::string &file_name,
                        unsigned int line_number, bool test,
@@ -107,8 +113,8 @@ testIdentifierNotFound(const std::string &file_name,
     }
 }
 
-#define TEST_IdentifierNotFound(test, identifier_name)                 \
-{                                                                      \
-    testIdentifierNotFound(__FILE__, __LINE__, (test),                 \
-                          (identifier_name));                          \
+#define TEST_IdentifierNotFound(test, identifier_name)              \
+{                                                                   \
+    testIdentifierNotFound(__FILE__, __LINE__, (test),              \
+                          (identifier_name));                       \
 }

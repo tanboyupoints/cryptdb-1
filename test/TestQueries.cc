@@ -1108,7 +1108,8 @@ Connection::start() {
         //plain -- new connection straight to the DB
         case UNENCRYPTED:
             {
-                Connect * c = new Connect(tc.host, tc.user, tc.pass, tc.db, tc.port);
+                Connect *const c =
+                    new Connect(tc.host, tc.user, tc.pass, tc.port);
                 conn_set.insert(c);
                 this->conn = conn_set.begin();
                 break;
@@ -1122,9 +1123,8 @@ Connection::start() {
             {
                 ConnectionInfo ci(tc.host, tc.user, tc.pass);
                 const std::string master_key = "2392834";
-                ProxyState *ps =
-                    new ProxyState(ci, tc.shadowdb_dir, tc.db,
-                                   master_key);
+                ProxyState *const ps =
+                    new ProxyState(ci, tc.shadowdb_dir, master_key);
                 re_set.insert(ps);
                 this->re_it = re_set.begin();
             }

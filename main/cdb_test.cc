@@ -121,7 +121,7 @@ main(int ac, char **av)
 
     ConnectionInfo ci("localhost", "root", "letmein");
     const std::string master_key = "2392834";
-    ProxyState ps(ci, av[1], "cryptdbtest", master_key);
+    ProxyState ps(ci, av[1], master_key);
 
     const std::string prompt = BOLD_BEGIN + "CryptDB=#" + COLOR_END + " ";
 

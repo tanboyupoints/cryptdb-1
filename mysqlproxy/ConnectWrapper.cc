@@ -155,11 +155,11 @@ connect(lua_State *const L)
         const char * ev = getenv("ENC_BY_DEFAULT");
         if (ev && equalsIgnoreCase(false_str, ev)) {
             std::cerr << "\n\n enc by default false " << "\n\n";
-            ps = new ProxyState(ci, embed_dir, dbname, mkey,
+            ps = new ProxyState(ci, embed_dir, mkey,
                                 SECURITY_RATING::PLAIN);
         } else {
             std::cerr << "\n\nenc by default true" << "\n\n";
-            ps = new ProxyState(ci, embed_dir, dbname, mkey,
+            ps = new ProxyState(ci, embed_dir, mkey,
                                 SECURITY_RATING::BEST_EFFORT);
         }
 

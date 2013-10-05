@@ -195,10 +195,30 @@ private:
                                  onion o) const;
 } TableMeta;
 
+class DatabaseMeta : public MappedDBMeta<TableMeta, IdentityMetaKey> {
+public:
+    // New DatabaseMeta.
+    DatabaseMeta() : MappedDBMeta(0) {}
+    // Restore.
+    static std::unique_ptr<DatabaseMeta>
+        deserialize(unsigned int id, const std::string &serial);
+    DatabaseMeta(unsigned int id) : MappedDBMeta(id) {}
+
+    ~DatabaseMeta() {}
+
+    std::string serialize(const DBObject &parent) const;
+    // FIXME: rtti
+    std::string typeName() const {return type_name;}
+    static std::string instanceTypeName() {return type_name;}
+
+private:
+    constexpr static const char *type_name = "databaseMeta";
+};
 
 // AWARE: Table/Field aliases __WILL NOT__ be looked up when calling from
 // this level or below. Use Analysis::* if you need aliasing.
-typedef class SchemaInfo : public MappedDBMeta<TableMeta, IdentityMetaKey> {
+typedef class SchemaInfo : public MappedDBMeta<DatabaseMeta,
+                                               IdentityMetaKey> {
 public:
     SchemaInfo() : MappedDBMeta(0) {}
     ~SchemaInfo() {}

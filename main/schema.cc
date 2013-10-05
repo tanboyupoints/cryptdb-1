@@ -87,7 +87,7 @@ OnionMeta::deserialize(unsigned int id, const std::string &serial)
 
 std::string OnionMeta::serialize(const DBObject &parent) const
 {
-    const std::string serial =
+    const std::string &serial =
         serialize_string(this->onionname) +
         serialize_string(std::to_string(this->uniq_count));
 
@@ -266,7 +266,7 @@ FieldMeta::FieldMeta(const std::string &name, Create_field * const field,
 
 std::string FieldMeta::serialize(const DBObject &parent) const
 {
-    const std::string serialized_salt_name =
+    const std::string &serialized_salt_name =
         true == this->has_salt ? serialize_string(getSaltName())
                                : serialize_string("");
     const std::string serial =
@@ -441,7 +441,7 @@ TableMeta::deserialize(unsigned int id, const std::string &serial)
 
 std::string TableMeta::serialize(const DBObject &parent) const
 {
-    std::string serial = 
+    const std::string &serial = 
         serialize_string(getAnonTableName()) +
         serialize_string(bool_to_string(hasSensitive)) +
         serialize_string(bool_to_string(has_salt)) +
@@ -503,3 +503,17 @@ std::string TableMeta::getAnonIndexName(const std::string &index_name,
     return std::string("index_") + std::to_string(hsh);
 }
 
+std::unique_ptr<DatabaseMeta>
+DatabaseMeta::deserialize(unsigned int id, const std::string &serial)
+{
+    return std::unique_ptr<DatabaseMeta>(new DatabaseMeta(id));
+}
+
+std::string
+DatabaseMeta::serialize(const DBObject &parent) const
+{
+    const std::string &serial =
+        "Serialize to associate database name with DatabaseMeta";
+
+    return serial;
+}

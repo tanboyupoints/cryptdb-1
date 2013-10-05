@@ -75,8 +75,11 @@ class InsertHandler : public DMLHandler {
         LEX *const new_lex = copyWithTHD(lex);
 
         const std::string &table =
-                lex->select_lex.table_list.first->table_name;
-        const TableMeta &tm = a.getTableMeta(table);
+            lex->select_lex.table_list.first->table_name;
+        const std::string &db_name =
+            lex->select_lex.table_list.first->db;
+        TEST_DatabaseDiscrepancy(db_name, a.getDatabaseName());
+        const TableMeta &tm = a.getTableMeta(db_name, table);
 
         //rewrite table name
         new_lex->select_lex.table_list.first =
@@ -101,7 +104,7 @@ class InsertHandler : public DMLHandler {
                 const Item_field *const ifd =
                     static_cast<const Item_field *>(i);
                 FieldMeta &fm =
-                    a.getFieldMeta(ifd->table_name,
+                    a.getFieldMeta(db_name, ifd->table_name,
                                    ifd->field_name);
                 fmVec.push_back(&fm);
                 rewriteInsertHelper(*i, fm, a, &newList);
@@ -458,7 +461,8 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
         const Item_field *const ifd =
             static_cast<const Item_field *>(field_item);
         FieldMeta &fm =
-            a.getFieldMeta(ifd->table_name, ifd->field_name);
+            a.getFieldMeta(a.getDatabaseName(), ifd->table_name,
+                           ifd->field_name);
 
         const std::unique_ptr<RewritePlan> &rp_field =
             constGetAssert(a.rewritePlans, field_item);
@@ -582,7 +586,7 @@ rewrite_select_lex(const st_select_lex &select_lex, Analysis &a)
 }
 
 static void
-process_table_aliases(const List<TABLE_LIST> &tll, Analysis & a)
+process_table_aliases(const List<TABLE_LIST> &tll, Analysis &a)
 {
     RiboldMYSQL::constList_iterator<TABLE_LIST> join_it(tll);
     for (;;) {
@@ -591,7 +595,9 @@ process_table_aliases(const List<TABLE_LIST> &tll, Analysis & a)
             break;
 
         if (t->is_alias) {
-            assert(a.addAlias(t->alias, t->table_name));
+            TEST_TextMessageError(t->db == a.getDatabaseName(),
+                                  "Database discrepancry!");
+            assert(a.addAlias(t->alias, t->db, t->table_name));
         }
 
         if (t->nested_join) {
@@ -721,7 +727,7 @@ addSalt(FieldMeta &fm, const Item_field &field_item,
         static_cast<Item_field *>(res_fields->head());
     assert(rew_fd);
     const std::string anon_table_name =
-        a.getAnonTableName(field_item.table_name);
+        a.getAnonTableName(a.getDatabaseName(), field_item.table_name);
     const std::string anon_field_name = fm.getSaltName();
     res_fields->push_back(make_item_field(*rew_fd,
                                           anon_table_name,
@@ -736,7 +742,8 @@ handleUpdateType(SIMPLE_UPDATE_TYPE update_type, const EncSet &es,
                  List<Item> *const res_values, Analysis &a)
 {
     FieldMeta &fm =
-        a.getFieldMeta(field_item.table_name, field_item.field_name);
+        a.getFieldMeta(a.getDatabaseName(), field_item.table_name,
+                       field_item.field_name);
 
     switch (update_type) {
         case SIMPLE_UPDATE_TYPE::NEW_VALUE: {

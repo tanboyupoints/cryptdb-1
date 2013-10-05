@@ -261,15 +261,16 @@ static class ANON : public CItemSubtypeIT<Item_ref, Item::Type::REF_ITEM> {
     do_rewrite_type(const Item_ref &i, const OLK &constr,
                     const RewritePlan &rp, Analysis &a) const
     {
+        const std::string &db_name = a.getDatabaseName();
         // HACK.
         const std::string plain_table =
             static_cast<Item_field *>(*i.ref)->table_name;
         const std::string anon_table =
-            a.getAnonTableName(plain_table);
+            a.getAnonTableName(db_name, plain_table);
 
         const std::string plain_field = i.field_name;
         OnionMeta const &om =
-            a.getOnionMeta(plain_table, plain_field, constr.o);
+            a.getOnionMeta(db_name, plain_table, plain_field, constr.o);
         const std::string anon_field = om.getAnonOnionName();
 
         Item *const new_ref = itemTypes.do_rewrite(**i.ref, constr, rp, a);

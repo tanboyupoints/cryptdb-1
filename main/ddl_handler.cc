@@ -7,32 +7,13 @@
 #include <main/macro_util.hh>
 #include <parser/lex_util.hh>
 
-// > TODO: mysql permits a single ALTER TABLE command to invoke _multiple_
-//   and _different_ subcommands.
-//   ie, ALTER TABLE t ADD COLUMN x integer, ADD INDEX i (z);
-//   Currently we do not support mixed operations.
-//   > Must guarentee that rewrite_table_list is only called one time.
-//   > If we drop Keys and Columns in the same query the order is probably
-//     going to get changed.
-class AlterHandler : public DDLHandler {
+class CreateTableHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
                                   const ProxyState &ps) const
     {
-        assert(sub_dispatcher->canDo(lex));
-        const AlterSubHandler &handler = sub_dispatcher->dispatch(lex);
-        return handler.transformLex(a, lex, ps);
-    }
-
-    const std::unique_ptr<AlterDispatcher> sub_dispatcher;
-
-public:
-    AlterHandler() : sub_dispatcher(buildAlterSubDispatcher()) {}
-};
-
-class CreateHandler : public DDLHandler {
-    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps) const
-    {
+        const std::string db_name =
+            lex->select_lex.table_list.first->db;
+        TEST_DatabaseDiscrepancy(db_name, a.getDatabaseName());
         const std::string table =
             lex->select_lex.table_list.first->table_name;
         LEX *const new_lex = copyWithTHD(lex);
@@ -45,7 +26,7 @@ class CreateHandler : public DDLHandler {
 
         // Create the table regardless of 'IF NOT EXISTS' if the table
         // doesn't exist.
-        if (false == a.tableMetaExists(table)) {
+        if (false == a.tableMetaExists(db_name, table)) {
             // TODO: Use appropriate values for has_sensitive and has_salt.
             std::unique_ptr<TableMeta> tm(new TableMeta(true, true));
 
@@ -129,7 +110,29 @@ class CreateHandler : public DDLHandler {
     }
 };
 
-class DropHandler : public DDLHandler {
+// > TODO: mysql permits a single ALTER TABLE command to invoke _multiple_
+//   and _different_ subcommands.
+//   ie, ALTER TABLE t ADD COLUMN x integer, ADD INDEX i (z);
+//   Currently we do not support mixed operations.
+//   > Must guarentee that rewrite_table_list is only called one time.
+//   > If we drop Keys and Columns in the same query the order is probably
+//     going to get changed.
+class AlterTableHandler : public DDLHandler {
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
+                                  const ProxyState &ps) const
+    {
+        assert(sub_dispatcher->canDo(lex));
+        const AlterSubHandler &handler = sub_dispatcher->dispatch(lex);
+        return handler.transformLex(a, lex, ps);
+    }
+
+    const std::unique_ptr<AlterDispatcher> sub_dispatcher;
+
+public:
+    AlterTableHandler() : sub_dispatcher(buildAlterSubDispatcher()) {}
+};
+
+class DropTableHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
                                   const ProxyState &ps) const
     {
@@ -155,28 +158,46 @@ class DropHandler : public DDLHandler {
             char* table  = tbl->table_name;
 
             if (lex->drop_if_exists) {
-                if (false == a.tableMetaExists(table)) {
+                TEST_DatabaseDiscrepancy(tbl->db, a.getDatabaseName());
+                if (false == a.tableMetaExists(tbl->db, table)) {
                     continue;
                 }
             }
 
             // Remove from *Meta structures.
-            TableMeta const &tm = a.getTableMeta(table);
+            TableMeta const &tm = a.getTableMeta(tbl->db, table);
             a.deltas.push_back(std::unique_ptr<Delta>(
                                 new DeleteDelta(tm, a.getSchema())));
         }
     }
 };
 
+class CreateDBHandler : public DDLHandler {
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
+                                  const ProxyState &ps) const
+    {
+        FAIL_TextMessageError("cryptdb does not support creating db!");
+    }
+};
+
 // TODO: Implement.
 class ChangeDBHandler : public DDLHandler {
-    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
                                   const ProxyState &ps) const
     {
         FAIL_TextMessageError("cryptdb does not support changing"
                               " the db!");
     }
 };
+
+class DropDBHandler : public DDLHandler {
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
+                                  const ProxyState &ps) const
+    {
+        FAIL_TextMessageError("cryptdb does not support dropping db!");
+    }
+};
+
 
 class LockTablesHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
@@ -202,17 +223,23 @@ SQLDispatcher *buildDDLDispatcher()
     DDLHandler *h;
     SQLDispatcher *dispatcher = new SQLDispatcher();
 
-    h = new AlterHandler();
+    h = new CreateTableHandler();
+    dispatcher->addHandler(SQLCOM_CREATE_TABLE, h);
+
+    h = new AlterTableHandler();
     dispatcher->addHandler(SQLCOM_ALTER_TABLE, h);
 
-    h = new CreateHandler();
-    dispatcher->addHandler(SQLCOM_CREATE_TABLE, h);
-    
-    h = new DropHandler();
+    h = new DropTableHandler();
     dispatcher->addHandler(SQLCOM_DROP_TABLE, h);
+
+    h = new CreateDBHandler();
+    dispatcher->addHandler(SQLCOM_CREATE_DB, h);
 
     h = new ChangeDBHandler();
     dispatcher->addHandler(SQLCOM_CHANGE_DB, h);
+
+    h = new DropDBHandler();
+    dispatcher->addHandler(SQLCOM_DROP_DB, h);
 
     h = new LockTablesHandler();
     dispatcher->addHandler(SQLCOM_LOCK_TABLES, h);
