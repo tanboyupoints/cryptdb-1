@@ -753,6 +753,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
         // Gather subquery.
         std::unique_ptr<Analysis>
             subquery_analysis(new Analysis(a.getSchema()));
+        subquery_analysis->setDatabaseName(a.getDatabaseName());
         const st_select_lex *const select_lex =
             RiboldMYSQL::get_select_lex(i);
         process_select_lex(*select_lex, *subquery_analysis);
@@ -1286,7 +1287,7 @@ mysql_noop_res(const ProxyState &ps)
 
 ResType
 executeQuery(const ProxyState &ps, const std::string &q,
-             SchemaCache *schema_cache)
+             SchemaCache *schema_cache, bool pp)
 {
     // Allows us to use default value of NULL for schema_cache in places
     // where cacheing the schema offers little advantage.
@@ -1306,7 +1307,9 @@ executeQuery(const ProxyState &ps, const std::string &q,
 
     std::unique_ptr<DBResult> dbres;
     for (auto it : out_queryz) {
-        prettyPrintQuery(it);
+        if (true == pp) {
+            prettyPrintQuery(it);
+        }
 
         if (!ps.getConn()->execute(it, &dbres,
                                    qr->output->multipleResultSets())) {
@@ -1339,7 +1342,7 @@ executeQuery(const ProxyState &ps, const std::string &q,
         dbres ? ResType(dbres->unpack()) : mysql_noop_res(ps);
     assert(res.success());
     const ResType &out_res =
-        queryEpilogue(ps, *qr.get(), res, q, true);
+        queryEpilogue(ps, *qr.get(), res, q, pp);
     assert(out_res.success());
 
     return out_res;

@@ -85,7 +85,7 @@ private:
 class SchemaCache;
 ResType
 executeQuery(const ProxyState &ps, const std::string &q,
-             SchemaCache *const schema_cache=NULL);
+             SchemaCache *const schema_cache=NULL, bool pp=true);
 
 #define UNIMPLEMENTED \
         throw std::runtime_error(std::string("Unimplemented: ") + \

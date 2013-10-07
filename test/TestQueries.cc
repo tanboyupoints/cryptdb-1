@@ -1537,9 +1537,13 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
 
     Connection test_(tc, test_type);
     test = &test_;
+    test->execute("CREATE DATABASE IF NOT EXISTS " + tc.db + ";");
+    test->execute("USE " + tc.db + ";");
 
     Connection control_(control_tc, control_type);
     control = &control_;
+    control->execute("CREATE DATABASE IF NOT EXISTS " + control_tc.db + ";");
+    control->execute("USE " + control_tc.db + ";");
 
     enum { nrounds = 1 };
     for (uint i = 0; i < nrounds; i++)

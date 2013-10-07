@@ -64,7 +64,12 @@ function read_query_real(packet)
     local query = string.sub(packet, 2)
     print("read_query: " .. query)
 
-    if string.byte(packet) == proxy.COM_QUERY then
+    if string.byte(packet) == proxy.COM_INIT_DB then
+        query = "USE " .. query
+    end
+
+    if string.byte(packet) == proxy.COM_INIT_DB or
+       string.byte(packet) == proxy.COM_QUERY then
         status, error_msg, do_rollback, new_queries =
             CryptDB.rewrite(proxy.connection.client.src.name, query)
 

@@ -613,7 +613,7 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
     assert(qr.output->afterQuery(ps.getEConn()));
 
     if (qr.output->queryAgain()) {
-        return executeQuery(ps, query);
+        return executeQuery(ps, query, NULL, pp);
     }
 
     if (pp) {
