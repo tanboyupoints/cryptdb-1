@@ -1028,7 +1028,10 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
     // TODO: If we need to support queries with multiple databases
     // move pattern down.
     std::string default_db;
-    TEST_TextMessageError(lowLevelGetCurrentDatabase(ps.getConn().get(),
+    // BUG/HACK: This should be able to get the database name from the
+    // remote connection; but the USE statement isn't functional
+    // with the proxy.
+    TEST_TextMessageError(lowLevelGetCurrentDatabase(ps.getEConn().get(),
                                                      &default_db),
                           "Failed retrieving database for query parse!");
     a.setDatabaseName(default_db);
