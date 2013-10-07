@@ -368,8 +368,10 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
     assert(conn && e_conn);
 
     // Must be done before database synchronization.
-    // FIXME: Get real prefix.
-    assert(MetaDataTables::initialize(conn, e_conn, "use_real_prefix"));
+    const std::string &prefix = 
+        getenv("CRYPTDB_NAME") ? getenv("CRYPTDB_NAME")
+                               : "generic_prefix_";
+    assert(MetaDataTables::initialize(conn, e_conn, prefix));
 
     TEST_TextMessageError(synchronizeDatabases(conn.get(), e_conn.get()),
                           "Failed to synchronize embedded and remote"
