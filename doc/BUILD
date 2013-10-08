@@ -103,7 +103,6 @@ EOM$
 #########################################
 
     > cd /path/to/cryptdb
-    > cp conf/config.mk.sample conf/config.mk
     > Open conf/config.mk in your vimitor and set the MYSRC path.
     > make
     > sudo make install
