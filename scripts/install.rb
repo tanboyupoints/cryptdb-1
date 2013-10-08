@@ -65,6 +65,8 @@ def fn(cdb_path, in_make_v=nil, in_gcc_v=nil)
     proxy_tar_path = File.join(bins_path, PROXY_NAME) + TAR_GZ
     cryptdb_shell.pretty_execute("tar zxf #{proxy_tar_path}") 
 
+    # automake compatibility fix
+    # https://www.flameeyes.eu/autotools-mythbuster/forwardporting/automake.html
     mp_shell = ShellDoer.new(proxy_path)
     config_path = File.join(proxy_path, "configure.in")
     if version_gte?(automake_version, "1.12") 
@@ -150,11 +152,11 @@ def no_version_fail(name)
 end
 
 def first_line_version(text)
-    /([0-9]+\.[0-9]+\.?[0-9]*)/.match(text.split("\n").first)[0]
+    /([0-9]+\.[0-9]+(?:\.[0-9]+)?)/.match(text.split("\n").first)[0]
 end
 
 def parse_version(v)
-    data = /([0-9]+)\.([0-9]+)\.?([0-9]*)/.match(v)
+    data = /([0-9]+)\.([0-9]+)(?:\.([0-9]+))?/.match(v)
     if data.nil?
         return nil
     else
