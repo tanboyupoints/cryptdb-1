@@ -117,7 +117,7 @@ def fn(cdb_path, in_make_v=nil, in_gcc_v=nil)
     Dir.mkdir(mysql_build_path) if false == File.exists?(mysql_build_path)
 
     mysql_shell = ShellDoer.new(mysql_build_path)
-    mysql_shell.pretty_execute("cmake -DWITH_EMBEDDED_SERVER=on ..")
+    mysql_shell.pretty_execute("cmake -DWITH_EMBEDDED_SERVER=on -DENABLE_DTRACE=off ..")
     mysql_shell.pretty_execute("make")
 
     #############################
