@@ -125,16 +125,6 @@ def fn(cdb_path, in_make_v=nil, in_gcc_v=nil)
     #############################
     p_puts "Building cryptdb..."
 
-    dirty_cryptdb_config_path = File.join(cryptdb_path, "conf",
-                                          "config.mk.dirty")
-    dirty_conf = File.read(dirty_cryptdb_config_path)
-    clean_cryptdb_config_path = File.join(cryptdb_path, "conf",
-                                          "config.mk")
-    File.open(clean_cryptdb_config_path, "w") do |f|
-        f.write(dirty_conf.sub(/\*PUT_MYSQL_SRC_BUILD_PATH_HERE\*/,
-                               mysql_path))
-    end
-
     cryptdb_shell.pretty_execute("make MYSRC=#{mysql_path}")
     cryptdb_shell.pretty_execute("sudo make install MYSRC=#{mysql_path}")
     cryptdb_shell.pretty_execute("sudo rm -rf #{SHADOW_PATH}")
