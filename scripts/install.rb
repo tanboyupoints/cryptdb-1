@@ -158,16 +158,16 @@ end
 def parse_version(v)
     data = /([0-9]+)\.([0-9]+)(?:\.([0-9]+))?/.match(v)
     if data.nil?
-        return nil
+        return []
     else
         return [data[1].to_i, data[2].to_i,
-                data[3].empty? ? 0 : data[3].to_i]
+                data[3].nil? ? 0 : data[3].to_i]
     end
 end
 
 # is 'version_a' >= 'version_b'
 def version_gte?(v_a, v_b)
-    parse_version(v_a).zip(parse_version(v_b)).inject(0) do |acc, (a, b)|
+    parse_version(v_a).zip(parse_version(v_b)).inject(nil) do |acc, (a, b)|
         if a > b then
             break true
         elsif a < b then
