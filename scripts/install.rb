@@ -69,7 +69,7 @@ def fn(cdb_path, in_make_v=nil, in_gcc_v=nil)
     # https://www.flameeyes.eu/autotools-mythbuster/forwardporting/automake.html
     mp_shell = ShellDoer.new(proxy_path)
     config_path = File.join(proxy_path, "configure.in")
-    if version_gte?(automake_version, "1.12") 
+    if Version.new(automake_version) >= Version.new("1.12")
         big = File.join(proxy_path, "big_configure.in")
         FileUtils.copy(big, config_path)
     else
@@ -100,7 +100,7 @@ def fn(cdb_path, in_make_v=nil, in_gcc_v=nil)
         fail no_version_fail("gcc")
     end
 
-    if !version_gte?(gcc_version, "4.6")
+    if Version.new(gcc_version) < Version.new("4.6")
         fail("update your gcc version to >= 4.6 before installing!")
     end
 
@@ -155,31 +155,64 @@ def first_line_version(text)
     /([0-9]+\.[0-9]+(?:\.[0-9]+)?)/.match(text.split("\n").first)[0]
 end
 
-def parse_version(v)
-    data = /([0-9]+)\.([0-9]+)(?:\.([0-9]+))?/.match(v)
-    if data.nil?
-        return []
-    else
-        return [data[1].to_i, data[2].to_i,
-                data[3].nil? ? 0 : data[3].to_i]
-    end
-end
-
-# is 'version_a' >= 'version_b'
-def version_gte?(v_a, v_b)
-    parse_version(v_a).zip(parse_version(v_b)).inject(nil) do |acc, (a, b)|
-        if a > b then
-            break true
-        elsif a < b then
-            break false
-        else
-            true
+# > Version numbers must have at least 1 number.
+# > Only numbers and 'dot' are valid.
+class Version < Array
+    def initialize(s)
+        if s.empty?
+            fail "empty strings are not version numbers!"
         end
+
+        parsed = parse_version(s)
+        if parsed.empty?
+            fail "unable to parse '#{s}' as version number"
+        end
+        super(parsed)
+    end
+
+    def >=(v2)
+        fail "versions only compare with versions" if !v2.is_a?(Version)
+        m = [self.size, v2.size].max
+        (pad(self, m) <=> pad(v2, m)) >= 0
+    end
+
+    def <(v2)
+        fail "versions only compare with versions" if !v2.is_a?(Version)
+        m = [self.size, v2.size].max
+        (pad(self, m) <=> pad(v2, m)) < 0
+    end
+
+    private
+    def pad(a, size)
+        return a if size < a.size
+        a + [0] * (size - a.size)
+    end
+
+    def parse_version(v)
+        v.scan(/([0-9]+)\.?/).map(&:first).map(&:to_i)
     end
 end
 
 def p_puts(output_me)
     puts output_me.cyan.bold
+end
+
+def test_version
+    pairs = [["1.1",        "1.3"],
+             ["1.5",        "2.5"],
+             ["1.12.2",     "2.3"],
+             ["5",          "8.9"],
+             ["1.0.0.1",    "1.1"],
+             ["3.4.5",      "4.5.2"],
+             ["2.0",        "5.1.0.0"],
+             ["0.1", "0.1.0.0.2"],
+             ["0", "0.1"]]
+
+    pairs.inject(true) do |acc, (low, high)|
+        Version.new(low) < Version.new(high) &&
+        Version.new(high) >= Version.new(low) &&
+        acc
+    end
 end
 
 #############################
