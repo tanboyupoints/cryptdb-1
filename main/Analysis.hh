@@ -212,7 +212,7 @@ public:
     // This ASK code is a symptom of returning the rewritten query
     // to the proxy which then issues the query. A more TELL policy
     // would likely lead to cleaner execution of queries.
-    virtual bool queryAgain() const;
+    virtual bool queryAgain(const std::unique_ptr<Connect> &conn) const;
     virtual bool doDecryption() const;
     virtual bool stalesSchema() const;
     virtual RewriteOutput::Channel queryChannel() const;
@@ -338,10 +338,13 @@ private:
 
 class AdjustOnionOutput : public DeltaOutput {
 public:
-    AdjustOnionOutput(std::vector<std::unique_ptr<Delta> > &&deltas,
-                      std::list<std::string> adjust_queries)
-        : DeltaOutput("", std::move(deltas)),
-          adjust_queries(adjust_queries) {}
+    AdjustOnionOutput(const std::string &original_query,
+                      std::vector<std::unique_ptr<Delta> > &&deltas,
+                      std::list<std::string> adjust_queries,
+                      std::function<std::string(const std::string &)>
+                        hackEscape)
+        : DeltaOutput(original_query, std::move(deltas)),
+          adjust_queries(adjust_queries), hackEscape(hackEscape) {}
     ~AdjustOnionOutput() {;}
     ResType *doQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
@@ -353,7 +356,7 @@ public:
     bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     // FIXME: final.
-    bool queryAgain() const;
+    bool queryAgain(const std::unique_ptr<Connect> &conn) const;
     // FIXME: final.
     bool doDecryption() const __attribute__((noreturn));
     // FIXME: final.
@@ -361,10 +364,16 @@ public:
 
 private:
     const std::list<std::string> adjust_queries;
-    AssignOnce<unsigned long> delta_output_id;
+    AssignOnce<unsigned long> embedded_completion_id;
 
     const std::list<std::string> remote_qz() const;
     const std::list<std::string> local_qz() const;
+
+    // We don't want to pass a connection parameter to getQuery as it
+    // creates a misleading interface; but string escaping requires a
+    // connection.
+    // > hackEscape is the compromise.
+    const std::function<std::string(const std::string &)> hackEscape;
 };
 
 bool saveDMLCompletion(const std::unique_ptr<Connect> &conn,

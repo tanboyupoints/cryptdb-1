@@ -8,13 +8,17 @@ static bool
 addStoredProcedures(const std::unique_ptr<Connect> &conn)
 {
     const std::string current_transaction_id =
-        MetaDataTables::Internal::remoteDB() + ".currentTransactionID";
+        MetaData::Proc::currentTransactionID();
     const std::string hom_addition_transaction =
-        MetaDataTables::Internal::remoteDB() + ".homAdditionTransaction";
+        MetaData::Proc::homAdditionTransaction();
+    const std::string adjust_onion =
+        MetaData::Proc::adjustOnion();
+    const std::string remote_completion_table =
+        MetaData::Table::remoteQueryCompletion();
 
     const std::vector<std::string> add_procs({
         // ---------------------------------------
-        //   def currentTransactionID(id)
+        //      def currentTransactionID(id)
         // ---------------------------------------
         " CREATE PROCEDURE " + current_transaction_id +
         "   (OUT out_id VARCHAR(20))"
@@ -57,12 +61,10 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
         "        IN insert_query VARCHAR(50000))"
         " BEGIN"
         "   DECLARE old_transaction_id VARCHAR(20);"
-        "   DECLARE where_clause VARCHAR(255);"
 
-        "   CALL currentTransactionID(@old_transaction_id);"
+        "   CALL " + current_transaction_id + " (@old_transaction_id);"
 
-            // Start a transaction if necessary and record it's origin"
-            // (this proc or the user)"
+            // Start a transaction if necessary.
         "   IF @old_transaction_id IS NULL THEN"
         "       START TRANSACTION;"
         "   END IF;"
@@ -81,8 +83,54 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
         "   IF @old_transaction_id IS NULL THEN"
         "       COMMIT;"
         "   END IF;"
-        " END"});
+        " END",
 
+        // ---------------------------------------
+        //         def adjustOnion(id)
+        // ---------------------------------------
+        // NOTE: If we need N queries, we will have to use an additional
+        // table + cursors.
+        " CREATE PROCEDURE " + adjust_onion +
+        "       (IN embedded_completion_id INTEGER,"
+        "        IN adjust_query0 VARCHAR(500),"
+        "        IN adjust_query1 VARCHAR(500))"
+        " BEGIN"
+        "   DECLARE old_transaction_id VARCHAR(20);"
+        "   DECLARE reissue BOOLEAN;"
+
+            // Are we in a transaction?
+        "   CALL " + current_transaction_id + "(@old_transaction_id);"
+
+            // if not, we will want to reissue the original query
+        "   IF @old_transaction_id IS NULL THEN"
+        "       SET @reissue = TRUE;"
+        "   ELSE"
+        "       SET @reissue = FALSE;"
+        "   END IF;"
+
+            // cancel pending transaction
+        "   ROLLBACK;"
+
+            // start a new one for this proc call
+        "   START TRANSACTION;"
+
+            // first onion adjustment
+        "   SET @query = adjust_query0;"
+        "   PREPARE aq0 FROM @query;"
+        "   EXECUTE aq0;"
+
+            // (possibly) second onion adjustment
+        "   SET @query = adjust_query1;"
+        "   PREPARE aq1 FROM @query;"
+        "   EXECUTE aq1;"
+
+            // update metadata used for recovery
+        "   INSERT INTO " + remote_completion_table +
+        "       (complete, embedded_completion_id,  reissue) VALUES"
+        "       (TRUE,     embedded_completion_id, @reissue);"
+
+        "   COMMIT;"
+        " END"});
 
     for (auto it : add_procs) {
         RETURN_FALSE_IF_FALSE(conn->execute(it));
@@ -95,15 +143,19 @@ static bool
 dropStoredProcedures(const std::unique_ptr<Connect> &conn)
 {
     const std::string current_transaction_id =
-        MetaDataTables::Internal::remoteDB() + ".currentTransactionID";
+        MetaData::Proc::currentTransactionID();
     const std::string hom_addition_transaction =
-        MetaDataTables::Internal::remoteDB() + ".homAdditionTransaction";
+        MetaData::Proc::homAdditionTransaction();
+    const std::string adjust_onion =
+        MetaData::Proc::adjustOnion();
 
     const std::vector<std::string>
         drop_procs({"DROP PROCEDURE IF EXISTS " +
                         current_transaction_id,
                     "DROP PROCEDURE IF EXISTS " +
-                        hom_addition_transaction });
+                        hom_addition_transaction,
+                    "DROP PROCEDURE IF EXISTS " +
+                        adjust_onion});
 
     for (auto it : drop_procs) {
         RETURN_FALSE_IF_FALSE(conn->execute(it));

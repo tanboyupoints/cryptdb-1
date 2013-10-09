@@ -18,7 +18,7 @@ DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
                                                const std::string &)>
                             deserialHandler)
 {
-    const std::string table_name = MetaDataTables::Name::metaObject();
+    const std::string table_name = MetaData::Table::metaObject();
 
     // Now that we know the table exists, SELECT the data we want.
     std::vector<DBMeta *> out_vec;

@@ -419,7 +419,7 @@ rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
 {
     const QueryRewrite qr(Rewriter::rewrite(ps, q, schema));
     assert(false == qr.output->stalesSchema());
-    assert(false == qr.output->queryAgain());
+    assert(false == qr.output->queryAgain(ps.getConn()));
 
     std::list<std::string> out_queryz;
     TEST_TextMessageError(qr.output->getQuery(&out_queryz, schema),
@@ -612,7 +612,7 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
 {
     assert(qr.output->afterQuery(ps.getEConn()));
 
-    if (qr.output->queryAgain()) {
+    if (qr.output->queryAgain(ps.getConn())) {
         return executeQuery(ps, query, NULL, pp);
     }
 

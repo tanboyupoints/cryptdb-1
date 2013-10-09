@@ -5,39 +5,87 @@
 #include <main/Connect.hh>
 #include <main/macro_util.hh>
 
-std::string MetaDataTables::Name::delta()
+std::string
+MetaData::Table::delta()
 {
-    return Internal::embeddedDB() + "." + Internal::getPrefix() +
-           "DeltaOutput";
+    return DB::embeddedDB() + "." + Internal::getPrefix() + "DeltaOutput";
 }
 
-std::string MetaDataTables::Name::query()
+std::string
+MetaData::Table::query()
 {
-    return Internal::embeddedDB() + "." + Internal::getPrefix() +
-           "Query";
+    return DB::embeddedDB() + "." + Internal::getPrefix() + "Query";
 }
 
-std::string MetaDataTables::Name::dmlCompletion()
+std::string
+MetaData::Table::dmlCompletion()
 {
-    return Internal::remoteDB() + "." + Internal::getPrefix() +
+    return DB::remoteDB() + "." + Internal::getPrefix() +
            "DMLCompletion";
 }
 
-std::string MetaDataTables::Name::metaObject()
+std::string
+MetaData::Table::metaObject()
 {
-    return Internal::embeddedDB() + "." + Internal::getPrefix() +
-           "MetaObject";
+    return DB::embeddedDB() + "." + Internal::getPrefix() + "MetaObject";
 }
 
-std::string MetaDataTables::Name::bleedingMetaObject()
+std::string
+MetaData::Table::bleedingMetaObject()
 {
-    return Internal::embeddedDB() + "." + Internal::getPrefix() +
+    return DB::embeddedDB() + "." + Internal::getPrefix() +
            "BleedingMetaObject";
 }
 
-std::string MetaDataTables::Name::purgatoryDB()
+std::string
+MetaData::Table::embeddedQueryCompletion()
+{
+    return DB::embeddedDB() + "." + Internal::getPrefix() +
+           "embeddedQueryCompletion";
+}
+std::string
+MetaData::Table::remoteQueryCompletion()
+{
+    return DB::remoteDB() + "." + Internal::getPrefix() +
+           "remoteQueryCompletion";
+}
+
+std::string
+MetaData::Proc::currentTransactionID()
+{
+    return DB::remoteDB() + "." + Internal::getPrefix() +
+           "currentTransactionID";
+}
+
+std::string
+MetaData::Proc::homAdditionTransaction()
+{
+    return DB::remoteDB() + "." + Internal::getPrefix() +
+           "homAdditionTransaction";
+}
+
+std::string
+MetaData::Proc::adjustOnion()
+{
+    return DB::remoteDB() + "." + Internal::getPrefix() + "adjustOnion";
+}
+std::string
+MetaData::DB::purgatory()
 {
     return "purgatory";
+}
+std::string
+MetaData::DB::embeddedDB()
+{
+    static const std::string name = "pdb";
+    return name;
+}
+
+std::string
+MetaData::DB::remoteDB()
+{
+    static const std::string name = "remote_db";
+    return name;
 }
 
 bool static
@@ -52,9 +100,10 @@ hasWhitespace(const std::string &s)
     return false;
 }
 
-bool MetaDataTables::initialize(const std::unique_ptr<Connect> &conn,
-                                const std::unique_ptr<Connect> &e_conn,
-                                const std::string &prefix)
+bool
+MetaData::initialize(const std::unique_ptr<Connect> &conn,
+                     const std::unique_ptr<Connect> &e_conn,
+                     const std::string &prefix)
 {
     // HACK: prevents multiple initialization
     static bool initialized = false;
@@ -66,97 +115,109 @@ bool MetaDataTables::initialize(const std::unique_ptr<Connect> &conn,
     if (hasWhitespace(prefix)) {
         return false;
     }
-    MetaDataTables::Internal::initPrefix(prefix);
+    MetaData::Internal::initPrefix(prefix);
 
     // Embedded database.
     const std::string create_db =
-        " CREATE DATABASE IF NOT EXISTS " + Internal::embeddedDB() + ";";
-    RETURN_FALSE_IF_FALSE(e_conn.get()->execute(create_db));
+        " CREATE DATABASE IF NOT EXISTS " + DB::embeddedDB()+";";
+    RETURN_FALSE_IF_FALSE(e_conn->execute(create_db));
 
+    // FIXME: Remove deprecated.
     const std::string create_delta_table =
-        " CREATE TABLE IF NOT EXISTS " + Name::delta() +
+        " CREATE TABLE IF NOT EXISTS " + Table::delta() +
         "    (remote_complete BOOLEAN NOT NULL,"
         "     id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
-    RETURN_FALSE_IF_FALSE(e_conn.get()->execute(create_delta_table));
+    RETURN_FALSE_IF_FALSE(e_conn->execute(create_delta_table));
 
+    // FIXME: Remove deprecated.
     const std::string create_query_table =
-        " CREATE TABLE IF NOT EXISTS " + Name::query() +
+        " CREATE TABLE IF NOT EXISTS " + Table::query() +
         "   (query VARCHAR(500) NOT NULL,"
         "    delta_output_id BIGINT NOT NULL,"
         "    local BOOLEAN NOT NULL,"
         "    ddl BOOLEAN NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
-    RETURN_FALSE_IF_FALSE(e_conn.get()->execute(create_query_table));
+    RETURN_FALSE_IF_FALSE(e_conn->execute(create_query_table));
 
     const std::string create_meta_table =
-        " CREATE TABLE IF NOT EXISTS " + Name::metaObject() +
+        " CREATE TABLE IF NOT EXISTS " + Table::metaObject() +
         "   (serial_object VARBINARY(500) NOT NULL,"
         "    serial_key VARBINARY(500) NOT NULL,"
         "    parent_id BIGINT NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
-    RETURN_FALSE_IF_FALSE(e_conn.get()->execute(create_meta_table));
+    RETURN_FALSE_IF_FALSE(e_conn->execute(create_meta_table));
 
     const std::string create_bleeding_table =
-        " CREATE TABLE IF NOT EXISTS " + Name::bleedingMetaObject() +
+        " CREATE TABLE IF NOT EXISTS " + Table::bleedingMetaObject() +
         "   (serial_object VARBINARY(500) NOT NULL,"
         "    serial_key VARBINARY(500) NOT NULL,"
         "    parent_id BIGINT NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
-    RETURN_FALSE_IF_FALSE(e_conn.get()->execute(create_bleeding_table));
+    RETURN_FALSE_IF_FALSE(e_conn->execute(create_bleeding_table));
+
+    const std::string create_embedded_completion =
+        " CREATE TABLE IF NOT EXISTS " + Table::embeddedQueryCompletion() +
+        "   (begin BOOLEAN NOT NULL,"
+        "    complete BOOLEAN NOT NULL,"
+        "    original_query VARCHAR(500) NOT NULL,"
+        "    aborted BOOLEAN NOT NULL,"
+        "    id SERIAL PRIMARY KEY)"
+        " ENGINE=InnoDB;";
+    RETURN_FALSE_IF_FALSE(e_conn->execute(create_embedded_completion));
 
     // Remote database.
     const std::string create_remote_db =
-        " CREATE DATABASE IF NOT EXISTS " + Internal::remoteDB() + ";";
-    RETURN_FALSE_IF_FALSE(conn.get()->execute(create_remote_db));
+        " CREATE DATABASE IF NOT EXISTS " + DB::remoteDB() + ";";
+    RETURN_FALSE_IF_FALSE(conn->execute(create_remote_db));
 
+    // FIXME: Remove deprecated.
     const std::string create_dml_table =
-        " CREATE TABLE IF NOT EXISTS " + Name::dmlCompletion() +
+        " CREATE TABLE IF NOT EXISTS " + Table::dmlCompletion() +
         "   (delta_output_id BIGINT NOT NULL,"
         "    id SERIAL)"
         " ENGINE=InnoDB;";
-    RETURN_FALSE_IF_FALSE(conn.get()->execute(create_dml_table));
+    RETURN_FALSE_IF_FALSE(conn->execute(create_dml_table));
+
+    const std::string create_remote_completion =
+        " CREATE TABLE IF NOT EXISTS " + Table::remoteQueryCompletion() +
+        "   (complete BOOLEAN NOT NULL,"
+        "    embedded_completion_id INTEGER NOT NULL,"
+        "    reissue BOOLEAN NOT NULL,"
+        "    id SERIAL PRIMARY KEY)"
+        " ENGINE=InnoDB;";
+    RETURN_FALSE_IF_FALSE(conn->execute(create_remote_completion));
 
     // Initialize synchronization database.
     const std::string create_purgatory_db =
-        " CREATE DATABASE IF NOT EXISTS " + Name::purgatoryDB() + ";";
-    RETURN_FALSE_IF_FALSE(conn.get()->execute(create_purgatory_db));
-    RETURN_FALSE_IF_FALSE(e_conn.get()->execute(create_purgatory_db));
+        " CREATE DATABASE IF NOT EXISTS " + DB::purgatory() + ";";
+    RETURN_FALSE_IF_FALSE(conn->execute(create_purgatory_db));
+    RETURN_FALSE_IF_FALSE(e_conn->execute(create_purgatory_db));
 
     initialized = true;
     return true;
 }
 
 void
-MetaDataTables::Internal::initPrefix(const std::string &s)
+MetaData::Internal::initPrefix(const std::string &s)
 {
     lowLevelPrefix(s.c_str());
 }
 
 const std::string &
-MetaDataTables::Internal::getPrefix()
+MetaData::Internal::getPrefix()
 {
     return lowLevelPrefix(NULL);
 }
 
 const std::string &
-MetaDataTables::Internal::lowLevelPrefix(const char *const p)
+MetaData::Internal::lowLevelPrefix(const char *const p)
 {
     static const std::string prefix = (assert(p), p);
     return prefix;
 }
 
-const std::string &MetaDataTables::Internal::embeddedDB()
-{
-    static const std::string name = "pdb";
-    return name;
-}
 
-const std::string &MetaDataTables::Internal::remoteDB()
-{
-    static const std::string name = "remote_db";
-    return name;
-}

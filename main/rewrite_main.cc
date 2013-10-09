@@ -151,7 +151,7 @@ fixDelta(const std::unique_ptr<Connect> &conn,
     std::list<std::string> local_queries;
     bool expect_ddl;
 
-    const std::string query_table_name = MetaDataTables::Name::query();
+    const std::string query_table_name = MetaData::Table::query();
 
     // Get local queries (should only be one).
     std::unique_ptr<DBResult> dbres;
@@ -215,7 +215,7 @@ fixDelta(const std::unique_ptr<Connect> &conn,
     } else {        // Handle one or more DML queries.
         std::unique_ptr<DBResult> dbres;
         const std::string dml_table =
-            MetaDataTables::Name::dmlCompletion();
+            MetaData::Table::dmlCompletion();
         const std::string dml_query =
             " SELECT * FROM " + dml_table +
             "  WHERE delta_output_id = " +
@@ -266,7 +266,7 @@ static bool
 deltaSanityCheck(const std::unique_ptr<Connect> &conn,
                  const std::unique_ptr<Connect> &e_conn)
 {
-    const std::string table_name = MetaDataTables::Name::delta();
+    const std::string table_name = MetaData::Table::delta();
 
     std::unique_ptr<DBResult> dbres;
     const std::string get_deltas =
@@ -1067,8 +1067,13 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
                 out_data.first;
             const std::list<std::string>  &adjust_queries =
                 out_data.second;
-            return new AdjustOnionOutput(std::move(deltas),
-                                         adjust_queries);
+            std::function<std::string(const std::string &)>
+                hackEscape = [&ps](const std::string &s)
+            {
+                return escapeString(ps.getConn(), s);
+            };
+            return new AdjustOnionOutput(query, std::move(deltas),
+                                         adjust_queries, hackEscape);
         }
 
         // Return if it's a regular DML query.
