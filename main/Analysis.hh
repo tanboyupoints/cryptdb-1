@@ -84,10 +84,6 @@ typedef struct ProxyState {
         return masterKey;
     }
     const std::unique_ptr<Connect> &getConn() const {return conn;}
-    const std::unique_ptr<Connect> &getSideChannelConn() const
-    {
-        return side_channel_conn;
-    }
     const std::unique_ptr<Connect> &getEConn() const {return e_conn;}
 
     static int db_init(const std::string &embed_dir);
@@ -97,7 +93,6 @@ private:
     const int mysql_dummy;
     // connection to remote and embedded server
     const std::unique_ptr<Connect> conn;
-    const std::unique_ptr<Connect> side_channel_conn;
     const std::unique_ptr<Connect> e_conn;
     const SECURITY_RATING default_sec_rating;
 } ProxyState;
@@ -195,8 +190,6 @@ class Rewriter;
 
 class RewriteOutput {
 public:
-    enum class Channel {REGULAR, SIDE};
-
     RewriteOutput(const std::string &original_query)
         : original_query(original_query) {}
     virtual ~RewriteOutput() = 0;
@@ -215,7 +208,6 @@ public:
     virtual bool queryAgain(const std::unique_ptr<Connect> &conn) const;
     virtual bool doDecryption() const;
     virtual bool stalesSchema() const;
-    virtual RewriteOutput::Channel queryChannel() const;
     virtual bool multipleResultSets() const;
 
 protected:
@@ -358,9 +350,7 @@ public:
     // FIXME: final.
     bool queryAgain(const std::unique_ptr<Connect> &conn) const;
     // FIXME: final.
-    bool doDecryption() const __attribute__((noreturn));
-    // FIXME: final.
-    RewriteOutput::Channel queryChannel() const;
+    bool doDecryption() const;
 
 private:
     const std::list<std::string> adjust_queries;

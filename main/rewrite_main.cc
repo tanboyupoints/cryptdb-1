@@ -130,6 +130,7 @@ sanityCheck(SchemaInfo &schema)
     > ER_DUP_KEY
     > ER_KEY_DOES_NOT_EXIST
 */
+/*
 static bool
 recoverableDeltaError(unsigned int err)
 {
@@ -261,11 +262,14 @@ fixDelta(const std::unique_ptr<Connect> &conn,
 
     return true;
 }
+*/
 
 static bool
 deltaSanityCheck(const std::unique_ptr<Connect> &conn,
                  const std::unique_ptr<Connect> &e_conn)
 {
+    return true;
+    /*
     const std::string table_name = MetaData::Table::delta();
 
     std::unique_ptr<DBResult> dbres;
@@ -289,6 +293,7 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
     } else {
         return false;
     }
+    */
 }
 
 // This function will not build all of our tables when it is run

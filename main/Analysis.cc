@@ -360,8 +360,6 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                                                    // connections in init
                                                    // list.
       conn(new Connect(ci.server, ci.user, ci.passwd, ci.port)),
-      side_channel_conn(new Connect(ci.server, ci.user, ci.passwd,
-                                    ci.port)),
       e_conn(Connect::getEmbedded(embed_dir)), 
       default_sec_rating(default_sec_rating)
 {
@@ -381,14 +379,6 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
     loadUDFs(conn);
 
     assert(loadStoredProcedures(conn));
-
-    // The side channel should timeout quickly so that we can reissue
-    // onion adjustment from a deadlock.
-    const unsigned int onion_adjust_timeout = 5;
-    const std::string set_timeout_query =
-        "SET session innodb_lock_wait_timeout = " +
-        std::to_string(onion_adjust_timeout);
-    assert(side_channel_conn->execute(set_timeout_query));
 }
 
 ProxyState::~ProxyState()
@@ -564,11 +554,6 @@ bool RewriteOutput::doDecryption() const
 bool RewriteOutput::stalesSchema() const
 {
     return false;
-}
-
-enum RewriteOutput::Channel RewriteOutput::queryChannel() const
-{
-    return Channel::REGULAR;
 }
 
 bool RewriteOutput::multipleResultSets() const
@@ -1068,6 +1053,14 @@ bool AdjustOnionOutput::getQuery(std::list<std::string> * const queryz,
         r_qz.push_back(mysql_noop());
     }
 
+    // This query is necessary to propagate a transaction into
+    // INFORMATION_SCHEMA.
+    // > This allows consistent behavior even when adjustment is first
+    // query in transaction.
+    const std::string &innodb_table =
+        MetaData::Table::remoteQueryCompletion();
+    queryz->push_back("SELECT NULL FROM " + innodb_table + ";");
+
     const std::string q_remote =
         " CALL " + MetaData::Proc::adjustOnion() + " ("
         "   "  + std::to_string(this->embedded_completion_id.get()) + ","
@@ -1096,6 +1089,7 @@ bool AdjustOnionOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
         "    SET complete = TRUE"
         "  WHERE id=" +
                  std::to_string(this->embedded_completion_id.get()) + ";";
+    assert(e_conn->execute(q_update));
 
     bool b = true;
     assert(deltas.size() > 0);
@@ -1139,15 +1133,10 @@ bool AdjustOnionOutput::queryAgain(const std::unique_ptr<Connect> &conn)
     return string_to_bool(std::string(row[0], l[0]));
 }
 
+// FIXME: Give the user some indication that a ROLLBACK happened.
 bool AdjustOnionOutput::doDecryption() const
 {
-    FAIL_TextMessageError("AdjustOnionOutput doesn't understand"
-                          " decryption!");
-}
-
-enum RewriteOutput::Channel AdjustOnionOutput::queryChannel() const
-{
-    return Channel::SIDE;
+    return false;
 }
 
 bool Analysis::addAlias(const std::string &alias,

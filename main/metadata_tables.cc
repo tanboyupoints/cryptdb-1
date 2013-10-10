@@ -72,7 +72,8 @@ MetaData::Proc::adjustOnion()
 std::string
 MetaData::DB::purgatory()
 {
-    return "purgatory";
+    static const std::string name = "purgatory";
+    return name;
 }
 std::string
 MetaData::DB::embeddedDB()

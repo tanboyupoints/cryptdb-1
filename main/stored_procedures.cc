@@ -62,10 +62,10 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
         " BEGIN"
         "   DECLARE old_transaction_id VARCHAR(20);"
 
-        "   CALL " + current_transaction_id + " (@old_transaction_id);"
+        "   CALL " + current_transaction_id + " (old_transaction_id);"
 
             // Start a transaction if necessary.
-        "   IF @old_transaction_id IS NULL THEN"
+        "   IF old_transaction_id IS NULL THEN"
         "       START TRANSACTION;"
         "   END IF;"
 
@@ -80,7 +80,7 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
         "   EXECUTE iq;"
 
             // Close our transaction if we started one.
-        "   IF @old_transaction_id IS NULL THEN"
+        "   IF old_transaction_id IS NULL THEN"
         "       COMMIT;"
         "   END IF;"
         " END",
@@ -91,21 +91,21 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
         // NOTE: If we need N queries, we will have to use an additional
         // table + cursors.
         " CREATE PROCEDURE " + adjust_onion +
-        "       (IN embedded_completion_id INTEGER,"
-        "        IN adjust_query0 VARCHAR(500),"
-        "        IN adjust_query1 VARCHAR(500))"
+        "       (IN completion_id INTEGER,"
+        "        IN adjust_query0 VARBINARY(500),"
+        "        IN adjust_query1 VARBINARY(500))"
         " BEGIN"
         "   DECLARE old_transaction_id VARCHAR(20);"
-        "   DECLARE reissue BOOLEAN;"
+        "   DECLARE b_reissue BOOLEAN;"
 
             // Are we in a transaction?
-        "   CALL " + current_transaction_id + "(@old_transaction_id);"
+        "   CALL " + current_transaction_id + "(old_transaction_id);"
 
             // if not, we will want to reissue the original query
-        "   IF @old_transaction_id IS NULL THEN"
-        "       SET @reissue = TRUE;"
+        "   IF old_transaction_id IS NULL THEN"
+        "       SET b_reissue = TRUE;"
         "   ELSE"
-        "       SET @reissue = FALSE;"
+        "       SET b_reissue = FALSE;"
         "   END IF;"
 
             // cancel pending transaction
@@ -126,8 +126,8 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
 
             // update metadata used for recovery
         "   INSERT INTO " + remote_completion_table +
-        "       (complete, embedded_completion_id,  reissue) VALUES"
-        "       (TRUE,     embedded_completion_id, @reissue);"
+        "       (complete, embedded_completion_id, reissue) VALUES"
+        "       (TRUE,     completion_id,          b_reissue);"
 
         "   COMMIT;"
         " END"});

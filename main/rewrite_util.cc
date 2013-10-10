@@ -488,61 +488,6 @@ queryPreamble(const ProxyState &ps, const std::string &q,
         return PREAMBLE_STATUS::FAILURE;
     }
 
-    MaxOneReadPerAssign<bool> did_rollback(false);
-    switch ((*qr)->output->queryChannel()) {
-        // Must detect the side channel deadlock and reissue the side
-        // query before the transaction it is deadlocking with.
-        case RewriteOutput::Channel::SIDE: {
-            unsigned int const max_attempts = 5;
-            for (unsigned int attempts = 0; attempts < max_attempts;
-                 ++attempts) {
-                MaxOneReadPerAssign<bool> side_channel_success(true);
-                for (auto it : *out_queryz) {
-                    if (!ps.getSideChannelConn()->execute(it)) {
-                        unsigned int const err =
-                            ps.getSideChannelConn()->get_mysql_errno();
-                        // Force the regular mysql connection to ROLLBACK
-                        // and retry onion adjustment if we timed out.
-                        if (ER_LOCK_WAIT_TIMEOUT == err) {
-                            assert(false == did_rollback.get());
-                            // > Possibly violates
-                            //   innodb_rollback_on_timeout=FALSE (default)
-                            // > Doesn't work for proxy.
-                            assert(ps.getSideChannelConn()->execute("ROLLBACK;"));
-                            assert((*qr)->output->handleQueryFailure(ps.getEConn()));
-                            did_rollback = true;
-                            goto side_channel_epilogue;
-                        }
-
-                        (*qr)->output->handleQueryFailure(ps.getEConn());
-                        return PREAMBLE_STATUS::FAILURE;
-                    }
-                }
-                break;
-            }
-
-side_channel_epilogue:
-            out_queryz->clear();
-            // HACK: The caller will use the metadata
-            // associated with AdjustOnionOutput.
-            // > Considering that the metadata will tell us to
-            // issue the query again, all is well. But if such
-            // weren't the case we _could_ get a mismatch
-            // between the metadata and the noop query.
-            if (true == did_rollback.get()) {
-                out_queryz->push_back("ROLLBACK");
-                return PREAMBLE_STATUS::ROLLBACK;
-            }
-            
-            out_queryz->push_back(mysql_noop());
-            break;
-        }
-        case RewriteOutput::Channel::REGULAR:
-            break;
-        default:
-            return PREAMBLE_STATUS::FAILURE;
-    }
-
     return PREAMBLE_STATUS::SUCCESS;
 }
 
