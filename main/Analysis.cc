@@ -761,87 +761,55 @@ bool DeltaOutput::stalesSchema() const
 {
     return true;
 }
-
-bool DeltaOutput::save(const std::unique_ptr<Connect> &e_conn,
-                       unsigned long * const delta_output_id)
+bool
+DeltaOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
+                         const std::unique_ptr<Connect> &e_conn)
 {
-    const std::string table_name = MetaData::Table::delta();
-    const std::string query =
-        " INSERT INTO " + table_name +
-        "    () VALUES ();";
-    assert(e_conn->execute(query));
+    assert(e_conn->execute("START TRANSACTION;"));
 
-    *delta_output_id = e_conn->last_insert_id();
+    const std::string &q_completion =
+        " INSERT INTO " + MetaData::Table::embeddedQueryCompletion() +
+        "   (begin, complete, original_query, aborted) VALUES"
+        "   (TRUE,  FALSE,"
+        "    '" + escapeString(conn, this->original_query) + "', FALSE);";
+    e_conn->execute(q_completion);
+    this->embedded_completion_id = e_conn->last_insert_id();
 
+    for (auto it = deltas.begin(); it != deltas.end(); it++) {
+        const bool b = (*it)->apply(e_conn, Delta::BLEEDING_TABLE);
+        ROLLBACK_AND_RFIF(b, e_conn);
+    }
+
+    assert(e_conn->execute("COMMIT;"));
     return true;
-}
-
-bool DeltaOutput::destroyRecord(const std::unique_ptr<Connect> &e_conn,
-                                unsigned long delta_output_id)
-{
-    const std::string table_name = MetaData::Table::delta();
-    const std::string delete_query =
-        " DELETE " + table_name +
-        "   FROM " + table_name +
-        "  WHERE " + table_name + ".id" +
-        "      = "     + std::to_string(delta_output_id) + ";";
-    assert(e_conn->execute(delete_query));
-
-    return true;
-}
-
-static bool saveQuery(const std::unique_ptr<Connect> &e_conn,
-                      const std::string &query,
-                      unsigned long delta_output_id, bool local, bool ddl)
-{
-    const std::string table_name = MetaData::Table::query();
-    const std::string insert_query =
-        " INSERT INTO " + table_name +
-        "   (query, delta_output_id, local, ddl) VALUES ("
-        " '" + escapeString(e_conn, query) + "', "
-        " "  + std::to_string(delta_output_id) + ","
-        " "  + bool_to_string(local) + ","
-        " "  + bool_to_string(ddl) + ");";
-    assert(e_conn->execute(insert_query));
-
-    return true;
-}
-
-static bool destroyQueryRecord(const std::unique_ptr<Connect> &e_conn,
-                               unsigned long delta_output_id)
-{
-    const std::string table_name = MetaData::Table::query();
-    const std::string delete_query =
-        " DELETE " + table_name +
-        "   FROM " + table_name +
-        "  WHERE " + table_name + ".delta_output_id"
-        "      = "     + std::to_string(delta_output_id) + ";";
-    assert(e_conn->execute(delete_query));
-
-    return true;
-}
-
-static
-std::string
-dmlCompletionQuery(unsigned long delta_output_id)
-{
-    const std::string dml_table =
-        MetaData::Table::dmlCompletion();
-    const std::string dml_insert_query =
-        " INSERT INTO " + dml_table +
-        "   (delta_output_id) VALUES ("
-        " " + std::to_string(delta_output_id) + ");";
-
-    return dml_insert_query;
 }
 
 bool
-saveDMLCompletion(const std::unique_ptr<Connect> &conn,
-                  unsigned long delta_output_id)
+DeltaOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
 {
-    assert(conn->execute(dmlCompletionQuery(delta_output_id)));
+    assert(e_conn->execute("START TRANSACTION;"));
+
+    const std::string q_update =
+        " UPDATE " + MetaData::Table::embeddedQueryCompletion() +
+        "    SET complete = TRUE"
+        "  WHERE id=" +
+                 std::to_string(this->embedded_completion_id.get()) + ";";
+    assert(e_conn->execute(q_update));
+
+    for (auto it = deltas.begin(); it != deltas.end(); it++) {
+        const bool b = (*it)->apply(e_conn, Delta::REGULAR_TABLE);
+        ROLLBACK_AND_RFIF(b, e_conn);
+    }
+
+    assert(e_conn->execute("COMMIT;"));
 
     return true;
+}
+
+unsigned long
+DeltaOutput::getEmbeddedCompletionID() const
+{
+    return this->embedded_completion_id.get();
 }
 
 static bool
@@ -868,6 +836,7 @@ setRegularTableToBleedingTable(const std::unique_ptr<Connect> &e_conn)
     return tableCopy(e_conn, src, dest);
 }
 
+/*
 static bool
 setBleedingTableToRegularTable(const std::unique_ptr<Connect> &e_conn)
 {
@@ -875,7 +844,9 @@ setBleedingTableToRegularTable(const std::unique_ptr<Connect> &e_conn)
     const std::string dest = MetaData::Table::bleedingMetaObject();
     return tableCopy(e_conn, src, dest);
 }
+*/
 
+/*
 static bool
 revertAndCleanupEmbedded(const std::unique_ptr<Connect> &e_conn,
                          unsigned long delta_output_id)
@@ -892,105 +863,22 @@ revertAndCleanupEmbedded(const std::unique_ptr<Connect> &e_conn,
 
     return true;
 }
+*/
 
 bool
-cleanupDeltaOutputAndQuery(const std::unique_ptr<Connect> &e_conn,
-                           unsigned long delta_output_id)
-{
-    assert(DeltaOutput::destroyRecord(e_conn, delta_output_id));
-    assert(destroyQueryRecord(e_conn, delta_output_id));
-
-    return true;
-}
-
-static
-bool
-handleDeltaBeforeQuery(const std::unique_ptr<Connect> &conn,
-                       const std::unique_ptr<Connect> &e_conn,
-                       const std::vector<std::unique_ptr<Delta> > &deltas,
-                       std::list<std::string> local_qz,
-                       std::list<std::string> remote_qz,
-                       bool remote_ddl,
-                       unsigned long * const delta_output_id)
-{
-    if (remote_ddl) {
-        assert(remote_qz.size() == 1);
-    }
-    assert(local_qz.size() == 0 || local_qz.size() == 1);
-
-    // Write to the bleeding table, store delta and store query.
-    bool b;
-    assert(e_conn->execute("START TRANSACTION;"));
-    for (auto it = deltas.begin(); it != deltas.end(); it++) {
-        b = (*it)->apply(e_conn, Delta::BLEEDING_TABLE);
-        ROLLBACK_AND_RFIF(b, e_conn);
-    }
-
-    b = DeltaOutput::save(e_conn, delta_output_id);
-    ROLLBACK_AND_RFIF(b, e_conn);
-
-    for (auto it : local_qz) {
-        b = saveQuery(e_conn, it, *delta_output_id, true, false);
-        ROLLBACK_AND_RFIF(b, e_conn);
-    }
-    for (auto it : remote_qz) {
-        b = saveQuery(e_conn, it, *delta_output_id, false, remote_ddl);
-        ROLLBACK_AND_RFIF(b, e_conn);
-    }
-    assert(e_conn->execute("COMMIT;"));
-
-    return true;
-}
-
-static
-bool
-handleDeltaAfterQuery(const std::unique_ptr<Connect> &e_conn,
-                      const std::vector<std::unique_ptr<Delta> > &deltas,
-                      std::list<std::string> local_qz,
-                      unsigned long delta_output_id)
-{
-    bool b;
-
-    // > Write to regular table and apply original query.
-    // > Remove delta and original query from embedded db.
-    assert(e_conn->execute("START TRANSACTION;"));
-    for (auto it = deltas.begin(); it != deltas.end(); it++) {
-        b = (*it)->apply(e_conn, Delta::REGULAR_TABLE);
-        ROLLBACK_AND_RFIF(b, e_conn);
-    }
-
-    b = cleanupDeltaOutputAndQuery(e_conn, delta_output_id);
-    ROLLBACK_AND_RFIF(b, e_conn);
-
-    assert(e_conn->execute("COMMIT;"));
-
-    // FIXME: local_qz can have DDL.
-    // > This can be fixed with a bleeding table.
-    assert(local_qz.size() <= 1);
-    for (auto it : local_qz) {
-        assert(e_conn->execute(it));
-    }
-
-    return true;
-}
-
-bool DDLOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
-                            const std::unique_ptr<Connect> &e_conn)
-{
-    unsigned long delta_id;
-    bool b = handleDeltaBeforeQuery(conn, e_conn, deltas, local_qz(),
-                                    remote_qz(), true, &delta_id);
-    this->delta_output_id = delta_id;
-
-    return b;
-}
-
-bool DDLOutput::getQuery(std::list<std::string> * const queryz,
-                         SchemaInfo const &) const
+DDLOutput::getQuery(std::list<std::string> * const queryz,
+                    SchemaInfo const &) const
 {
     queryz->clear();
 
     assert(remote_qz().size() == 1);
+    const std::string &remote_completion =
+        " INSERT INTO " + MetaData::Table::remoteQueryCompletion() +
+        "   (complete, embedded_completion_id, reissue) VALUES"
+        "   (TRUE, " +
+             std::to_string(this->getEmbeddedCompletionID()) +
+        "    , FALSE)";
+    queryz->push_back(remote_completion);
     queryz->push_back(remote_qz().back());
 
     return true;
@@ -998,14 +886,17 @@ bool DDLOutput::getQuery(std::list<std::string> * const queryz,
 
 bool DDLOutput::handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const
 {
-    assert(revertAndCleanupEmbedded(e_conn, this->delta_output_id.get()));
     return true;
 }
 
-bool DDLOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
+bool
+DDLOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
 {
-    return handleDeltaAfterQuery(e_conn, deltas, local_qz(),
-                                 this->delta_output_id.get());
+    // Update embedded database.
+    // > This is a DDL query so do not put in transaction.
+    assert(e_conn->execute(this->original_query));
+
+    return DeltaOutput::afterQuery(e_conn);
 }
 
 const std::list<std::string> DDLOutput::remote_qz() const
@@ -1018,28 +909,12 @@ const std::list<std::string> DDLOutput::local_qz() const
     return std::list<std::string>({original_query});
 }
 
-bool AdjustOnionOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
-                                    const std::unique_ptr<Connect> &e_conn)
+bool
+AdjustOnionOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
+                               const std::unique_ptr<Connect> &e_conn)
 {
-    assert(e_conn->execute("START TRANSACTION;"));
-
-    const std::string q_completion =
-        " INSERT INTO " + MetaData::Table::embeddedQueryCompletion() +
-        "   (begin, complete, original_query, aborted) VALUES"
-        "   (TRUE,  FALSE,"
-        "    '" + escapeString(conn, original_query) + "', FALSE);";
-    e_conn->execute(q_completion);
-    this->embedded_completion_id = e_conn->last_insert_id();
-
-    bool b = true;
     assert(deltas.size() > 0);
-    for (auto it = deltas.begin(); it != deltas.end(); it++) {
-        b = (*it)->apply(e_conn, Delta::BLEEDING_TABLE);
-        ROLLBACK_AND_RFIF(b, e_conn);
-    }
-
-    assert(e_conn->execute("COMMIT;"));
-    return b;
+    return DeltaOutput::beforeQuery(conn, e_conn);
 }
 
 bool AdjustOnionOutput::getQuery(std::list<std::string> * const queryz,
@@ -1063,7 +938,7 @@ bool AdjustOnionOutput::getQuery(std::list<std::string> * const queryz,
 
     const std::string q_remote =
         " CALL " + MetaData::Proc::adjustOnion() + " ("
-        "   "  + std::to_string(this->embedded_completion_id.get()) + ","
+        "   "  + std::to_string(this->getEmbeddedCompletionID()) + ","
         "   '" + hackEscape(r_qz.front()) + "', "
         "   '" + hackEscape(r_qz.back()) + "');";
 
@@ -1080,27 +955,12 @@ AdjustOnionOutput::handleQueryFailure(const std::unique_ptr<Connect>
     return true;
 }
 
-bool AdjustOnionOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
+bool
+AdjustOnionOutput::afterQuery(const std::unique_ptr<Connect> &e_conn)
+    const
 {
-    assert(e_conn->execute("START TRANSACTION;"));
-
-    const std::string q_update =
-        " UPDATE " + MetaData::Table::embeddedQueryCompletion() +
-        "    SET complete = TRUE"
-        "  WHERE id=" +
-                 std::to_string(this->embedded_completion_id.get()) + ";";
-    assert(e_conn->execute(q_update));
-
-    bool b = true;
     assert(deltas.size() > 0);
-    for (auto it = deltas.begin(); it != deltas.end(); it++) {
-        b = (*it)->apply(e_conn, Delta::REGULAR_TABLE);
-        ROLLBACK_AND_RFIF(b, e_conn);
-    }
-
-    assert(e_conn->execute("COMMIT;"));
-
-    return b;
+    return DeltaOutput::afterQuery(e_conn);
 }
 
 const std::list<std::string> AdjustOnionOutput::remote_qz() const
@@ -1120,7 +980,7 @@ bool AdjustOnionOutput::queryAgain(const std::unique_ptr<Connect> &conn)
         " SELECT reissue "
         "   FROM " + MetaData::Table::remoteQueryCompletion() +
         "  WHERE embedded_completion_id = " +
-                 std::to_string(this->embedded_completion_id.get()) + ";";
+                 std::to_string(this->getEmbeddedCompletionID()) + ";";
 
     std::unique_ptr<DBResult> db_res;
     conn->execute(q, &db_res);

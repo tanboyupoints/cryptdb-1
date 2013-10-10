@@ -6,25 +6,6 @@
 #include <main/macro_util.hh>
 
 std::string
-MetaData::Table::delta()
-{
-    return DB::embeddedDB() + "." + Internal::getPrefix() + "DeltaOutput";
-}
-
-std::string
-MetaData::Table::query()
-{
-    return DB::embeddedDB() + "." + Internal::getPrefix() + "Query";
-}
-
-std::string
-MetaData::Table::dmlCompletion()
-{
-    return DB::remoteDB() + "." + Internal::getPrefix() +
-           "DMLCompletion";
-}
-
-std::string
 MetaData::Table::metaObject()
 {
     return DB::embeddedDB() + "." + Internal::getPrefix() + "MetaObject";
@@ -69,6 +50,7 @@ MetaData::Proc::adjustOnion()
 {
     return DB::remoteDB() + "." + Internal::getPrefix() + "adjustOnion";
 }
+
 std::string
 MetaData::DB::purgatory()
 {
@@ -78,7 +60,7 @@ MetaData::DB::purgatory()
 std::string
 MetaData::DB::embeddedDB()
 {
-    static const std::string name = "pdb";
+    static const std::string name = "embedded_db";
     return name;
 }
 
@@ -120,27 +102,8 @@ MetaData::initialize(const std::unique_ptr<Connect> &conn,
 
     // Embedded database.
     const std::string create_db =
-        " CREATE DATABASE IF NOT EXISTS " + DB::embeddedDB()+";";
+        " CREATE DATABASE IF NOT EXISTS " + DB::embeddedDB() + ";";
     RETURN_FALSE_IF_FALSE(e_conn->execute(create_db));
-
-    // FIXME: Remove deprecated.
-    const std::string create_delta_table =
-        " CREATE TABLE IF NOT EXISTS " + Table::delta() +
-        "    (remote_complete BOOLEAN NOT NULL,"
-        "     id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-    RETURN_FALSE_IF_FALSE(e_conn->execute(create_delta_table));
-
-    // FIXME: Remove deprecated.
-    const std::string create_query_table =
-        " CREATE TABLE IF NOT EXISTS " + Table::query() +
-        "   (query VARCHAR(500) NOT NULL,"
-        "    delta_output_id BIGINT NOT NULL,"
-        "    local BOOLEAN NOT NULL,"
-        "    ddl BOOLEAN NOT NULL,"
-        "    id SERIAL PRIMARY KEY)"
-        " ENGINE=InnoDB;";
-    RETURN_FALSE_IF_FALSE(e_conn->execute(create_query_table));
 
     const std::string create_meta_table =
         " CREATE TABLE IF NOT EXISTS " + Table::metaObject() +
@@ -175,14 +138,6 @@ MetaData::initialize(const std::unique_ptr<Connect> &conn,
         " CREATE DATABASE IF NOT EXISTS " + DB::remoteDB() + ";";
     RETURN_FALSE_IF_FALSE(conn->execute(create_remote_db));
 
-    // FIXME: Remove deprecated.
-    const std::string create_dml_table =
-        " CREATE TABLE IF NOT EXISTS " + Table::dmlCompletion() +
-        "   (delta_output_id BIGINT NOT NULL,"
-        "    id SERIAL)"
-        " ENGINE=InnoDB;";
-    RETURN_FALSE_IF_FALSE(conn->execute(create_dml_table));
-
     const std::string create_remote_completion =
         " CREATE TABLE IF NOT EXISTS " + Table::remoteQueryCompletion() +
         "   (complete BOOLEAN NOT NULL,"
@@ -192,7 +147,7 @@ MetaData::initialize(const std::unique_ptr<Connect> &conn,
         " ENGINE=InnoDB;";
     RETURN_FALSE_IF_FALSE(conn->execute(create_remote_completion));
 
-    // Initialize synchronization database.
+    // Synchronization database.
     const std::string create_purgatory_db =
         " CREATE DATABASE IF NOT EXISTS " + DB::purgatory() + ";";
     RETURN_FALSE_IF_FALSE(conn->execute(create_purgatory_db));
@@ -220,5 +175,4 @@ MetaData::Internal::lowLevelPrefix(const char *const p)
     static const std::string prefix = (assert(p), p);
     return prefix;
 }
-
 

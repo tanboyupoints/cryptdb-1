@@ -11,9 +11,6 @@ namespace MetaData {
                     const std::string &prefix);
 
     namespace Table {
-        std::string delta();
-        std::string query();
-        std::string dmlCompletion();
         std::string metaObject();
         std::string bleedingMetaObject();
         std::string embeddedQueryCompletion();

@@ -286,22 +286,22 @@ public:
     virtual ~DeltaOutput() = 0;
 
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
-                     const std::unique_ptr<Connect> &e_conn) = 0;
+                     const std::unique_ptr<Connect> &e_conn);
     virtual bool getQuery(std::list<std::string> * const queryz,
                           SchemaInfo const &schema) const = 0;
     virtual bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
         const = 0;
-    bool afterQuery(const std::unique_ptr<Connect> &e_conn) const = 0;
+    bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     // FIXME: final.
     bool stalesSchema() const;
 
-    static bool save(const std::unique_ptr<Connect> &e_conn,
-                     unsigned long * const delta_output_id);
-    static bool destroyRecord(const std::unique_ptr<Connect> &e_conn,
-                              unsigned long delta_output_id);
-
 protected:
     const std::vector<std::unique_ptr<Delta> > deltas;
+
+    unsigned long getEmbeddedCompletionID() const;
+
+private:
+    AssignOnce<unsigned long> embedded_completion_id;
 };
 
 class DDLOutput : public DeltaOutput {
@@ -313,8 +313,6 @@ public:
           new_query(new_query) {}
     ~DDLOutput() {;}
 
-    bool beforeQuery(const std::unique_ptr<Connect> &conn,
-                     const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
     bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
@@ -322,7 +320,6 @@ public:
 
 private:
     const std::string new_query;
-    AssignOnce<unsigned long> delta_output_id;
 
     const std::list<std::string> remote_qz() const;
     const std::list<std::string> local_qz() const;
@@ -338,9 +335,6 @@ public:
         : DeltaOutput(original_query, std::move(deltas)),
           adjust_queries(adjust_queries), hackEscape(hackEscape) {}
     ~AdjustOnionOutput() {;}
-    ResType *doQuery(const std::unique_ptr<Connect> &conn,
-                     const std::unique_ptr<Connect> &e_conn);
-
     bool beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz,
@@ -354,7 +348,6 @@ public:
 
 private:
     const std::list<std::string> adjust_queries;
-    AssignOnce<unsigned long> embedded_completion_id;
 
     const std::list<std::string> remote_qz() const;
     const std::list<std::string> local_qz() const;
@@ -366,11 +359,7 @@ private:
     const std::function<std::string(const std::string &)> hackEscape;
 };
 
-bool saveDMLCompletion(const std::unique_ptr<Connect> &conn,
-                       unsigned long delta_output_id);
 bool setRegularTableToBleedingTable(const std::unique_ptr<Connect> &e_conn);
-bool cleanupDeltaOutputAndQuery(const std::unique_ptr<Connect> &e_conn,
-                                unsigned long delta_output_id);
 
 class RewritePlan;
 class Analysis {
