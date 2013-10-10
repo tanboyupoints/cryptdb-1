@@ -281,6 +281,11 @@ rewrite(lua_State *const L)
             assert(preamble_status.get() != PREAMBLE_STATUS::FAILURE);
 
             c_wrapper->setQueryRewrite(qr.release());
+        } catch (const SynchronizationException &e) {
+            // FIXME: Healthier error handling once recovery
+            // re-implemented.
+            std::cerr << e << std::endl;
+            exit(0);
         } catch (const AbstractException &e) {
             lua_pushboolean(L, false);              // status
             xlua_pushlstring(L, e.to_string());     // error message
@@ -489,6 +494,11 @@ envoi(lua_State *const L)
         const bool stales = qr->output->stalesSchema();
         c_wrapper->getSchemaCache().updateStaleness(stales);
         return returnResultSet(L, out_res);
+    } catch (const SynchronizationException &e) {
+        // FIXME: Healthier error handling once recovery
+        // re-implemented.
+        std::cerr << e << std::endl;
+        exit(0);
     } catch (const AbstractException &e) {
         lua_pushboolean(L, false);              // status
         xlua_pushlstring(L, e.to_string());     // error message

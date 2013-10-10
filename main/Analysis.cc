@@ -765,43 +765,45 @@ bool
 DeltaOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
                          const std::unique_ptr<Connect> &e_conn)
 {
-    assert(e_conn->execute("START TRANSACTION;"));
+    TEST_Sync(e_conn->execute("START TRANSACTION;"),
+              "failed to start transaction");
 
     const std::string &q_completion =
         " INSERT INTO " + MetaData::Table::embeddedQueryCompletion() +
         "   (begin, complete, original_query, aborted) VALUES"
         "   (TRUE,  FALSE,"
         "    '" + escapeString(conn, this->original_query) + "', FALSE);";
-    e_conn->execute(q_completion);
+    SYNC_IF_FALSE(e_conn->execute(q_completion), e_conn);
     this->embedded_completion_id = e_conn->last_insert_id();
 
     for (auto it = deltas.begin(); it != deltas.end(); it++) {
         const bool b = (*it)->apply(e_conn, Delta::BLEEDING_TABLE);
-        ROLLBACK_AND_RFIF(b, e_conn);
+        SYNC_IF_FALSE(b, e_conn);
     }
 
-    assert(e_conn->execute("COMMIT;"));
+    SYNC_IF_FALSE(e_conn->execute("COMMIT;"), e_conn);
     return true;
 }
 
 bool
 DeltaOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
 {
-    assert(e_conn->execute("START TRANSACTION;"));
+    TEST_Sync(e_conn->execute("START TRANSACTION;"),
+              "failed to start transaction");
 
     const std::string q_update =
         " UPDATE " + MetaData::Table::embeddedQueryCompletion() +
         "    SET complete = TRUE"
         "  WHERE id=" +
                  std::to_string(this->embedded_completion_id.get()) + ";";
-    assert(e_conn->execute(q_update));
+    SYNC_IF_FALSE(e_conn->execute(q_update), e_conn);
 
     for (auto it = deltas.begin(); it != deltas.end(); it++) {
         const bool b = (*it)->apply(e_conn, Delta::REGULAR_TABLE);
-        ROLLBACK_AND_RFIF(b, e_conn);
+        SYNC_IF_FALSE(b, e_conn);
     }
 
-    assert(e_conn->execute("COMMIT;"));
+    SYNC_IF_FALSE(e_conn->execute("COMMIT;"), e_conn);
 
     return true;
 }

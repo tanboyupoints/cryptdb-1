@@ -95,6 +95,9 @@ static bool handle_line(ProxyState& ps, const std::string& q, bool pp=true)
       static SchemaCache schema_cache;
       const ResType &res = executeQuery(ps, q, &schema_cache, pp);
       return res.success();
+  } catch (const SynchronizationException &e) {
+      std::cout << e << std::endl;
+      return false;
   } catch (const AbstractException &e) {
       std::cout << e << std::endl;
       return true;

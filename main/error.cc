@@ -70,5 +70,21 @@ std::string TextMessageError::to_string() const
 std::string
 IdentifierNotFound::to_string() const
 {
-    return "Identifier not found: '" + this->identifier_name + "'\n";
+    return "Identifier not found: '" + this->identifier_name + "'\n"
+           + AbstractException::to_string();
 }
+
+std::string
+SynchronizationException::to_string() const
+{
+    return "** Synchronization Failure **\n"
+           + error.to_string();
+}
+
+std::ostream &operator<<(std::ostream &out,
+                         const SynchronizationException &error)
+{
+    out << error.to_string();
+    return out;
+}
+

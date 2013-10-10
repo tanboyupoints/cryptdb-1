@@ -20,6 +20,15 @@
     }                                                   \
 }                                                       \
 
+// FIXME: 'assert' is incorrect handling.
+#define SYNC_IF_FALSE(status, conn)                     \
+{                                                       \
+    if (!(status)) {                                    \
+        assert((conn)->execute("ROLLBACK;"));           \
+        TEST_Sync(status, "query failed");              \
+    }                                                   \
+}
+
 inline void
 testBadItemArgumentCount(const std::string &file_name,
                          unsigned int line_number, int type, int expected,
@@ -118,3 +127,20 @@ testIdentifierNotFound(const std::string &file_name,
     testIdentifierNotFound(__FILE__, __LINE__, (test),              \
                           (identifier_name));                       \
 }
+
+inline void
+testSynch(const std::string &file_name, unsigned int line_number,
+          bool test, const std::string &identifier_name)
+{
+    if (false == test) {
+        throw SynchronizationException(file_name, line_number,
+                                       identifier_name);
+    }
+}
+
+
+#define TEST_Sync(test, identifier_name)                            \
+{                                                                   \
+    testSynch(__FILE__, __LINE__, (test), (identifier_name));       \
+}
+
