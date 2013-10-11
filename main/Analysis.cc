@@ -621,8 +621,6 @@ SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
         " SELECT * FROM " + this->plain_table +
         " WHERE " + this->where_clause + ";";
     const EpilogueResult epi_result = executeQuery(this->ps, select_q);
-    // FIXME: Support SpecialUpdate from within transaction.
-    // > QueryAction::ROLLBACK
     assert(QueryAction::VANILLA == epi_result.action);
     const ResType select_res_type = epi_result.res_type;
     assert(select_res_type.success());
