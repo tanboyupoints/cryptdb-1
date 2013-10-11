@@ -129,6 +129,25 @@ testIdentifierNotFound(const std::string &file_name,
 }
 
 inline void
+testDatabaseNotFound(const std::string &file_name,
+                       unsigned int line_number, bool test,
+                       const std::string &identifier_name)
+{
+    const std::string msg =
+        identifier_name.size() == 0 ? "must select a database"
+                                    : "database '" + identifier_name +
+                                      "' not found";
+    if (false == test) {
+        throw TextMessageError(file_name, line_number,
+                               msg);
+    }
+}
+#define TEST_DatabaseNotFound(test, identifier_name)                \
+{                                                                   \
+    testDatabaseNotFound(__FILE__, __LINE__, (test),                \
+                          (identifier_name));                       \
+}
+inline void
 testSync(const std::string &file_name, unsigned int line_number,
          bool test, const std::string &identifier_name)
 {

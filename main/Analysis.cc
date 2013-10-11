@@ -1059,7 +1059,7 @@ DatabaseMeta &
 Analysis::getDatabaseMeta(const std::string &db) const
 {
     DatabaseMeta *const dm = this->schema.getChild(IdentityMetaKey(db));
-    TEST_IdentifierNotFound(dm, db);
+    TEST_DatabaseNotFound(dm, db);
 
     return *dm;
 }
