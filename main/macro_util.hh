@@ -129,8 +129,8 @@ testIdentifierNotFound(const std::string &file_name,
 }
 
 inline void
-testSynch(const std::string &file_name, unsigned int line_number,
-          bool test, const std::string &identifier_name)
+testSync(const std::string &file_name, unsigned int line_number,
+         bool test, const std::string &identifier_name)
 {
     if (false == test) {
         throw SynchronizationException(file_name, line_number,
@@ -141,6 +141,11 @@ testSynch(const std::string &file_name, unsigned int line_number,
 
 #define TEST_Sync(test, identifier_name)                            \
 {                                                                   \
-    testSynch(__FILE__, __LINE__, (test), (identifier_name));       \
+    testSync(__FILE__, __LINE__, (test), (identifier_name));        \
+}
+
+#define FAIL_Sync(identifier_name)                                  \
+{                                                                   \
+    testSync(__FILE__, __LINE__, false, (identifier_name));         \
 }
 

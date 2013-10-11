@@ -540,12 +540,6 @@ bool DeleteDelta::apply(const std::unique_ptr<Connect> &e_conn,
 RewriteOutput::~RewriteOutput()
 {;}
 
-bool RewriteOutput::queryAgain(const std::unique_ptr<Connect> &conn)
-    const
-{
-    return false;
-}
-
 bool RewriteOutput::doDecryption() const
 {
     return true;
@@ -561,6 +555,12 @@ bool RewriteOutput::multipleResultSets() const
     return false;
 }
 
+QueryAction
+RewriteOutput::queryAction(const std::unique_ptr<Connect> &conn) const
+{
+    return QueryAction::VANILLA;
+}
+
 bool SimpleOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
                                const std::unique_ptr<Connect> &e_conn)
 {
@@ -573,13 +573,6 @@ bool SimpleOutput::getQuery(std::list<std::string> *const queryz,
     queryz->clear();
     queryz->push_back(original_query);
 
-    return true;
-}
-
-bool
-SimpleOutput::handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
-    const
-{
     return true;
 }
 
@@ -606,12 +599,6 @@ bool DMLOutput::getQuery(std::list<std::string> * const queryz,
     queryz->clear();
     queryz->push_back(new_query);
 
-    return true;
-}
-
-bool DMLOutput::handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
-    const
-{
     return true;
 }
 
@@ -736,13 +723,6 @@ bool SpecialUpdate::getQuery(std::list<std::string> * const queryz,
     return true;
 }
 
-bool
-SpecialUpdate::handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
-    const
-{
-    return true;
-}
-
 bool SpecialUpdate::afterQuery(const std::unique_ptr<Connect> &e_conn)
     const
 {
@@ -761,6 +741,7 @@ bool DeltaOutput::stalesSchema() const
 {
     return true;
 }
+
 bool
 DeltaOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
                          const std::unique_ptr<Connect> &e_conn)
@@ -782,6 +763,7 @@ DeltaOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
     }
 
     SYNC_IF_FALSE(e_conn->execute("COMMIT;"), e_conn);
+
     return true;
 }
 
@@ -886,11 +868,6 @@ DDLOutput::getQuery(std::list<std::string> * const queryz,
     return true;
 }
 
-bool DDLOutput::handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const
-{
-    return true;
-}
-
 bool
 DDLOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
 {
@@ -948,15 +925,6 @@ bool AdjustOnionOutput::getQuery(std::list<std::string> * const queryz,
     return true;
 }
 
-// FIXME: If we want the proxy to do something besides dieing when
-// a query misfires; implement here.
-bool
-AdjustOnionOutput::handleQueryFailure(const std::unique_ptr<Connect>
-                                         &e_conn)  const
-{
-    return true;
-}
-
 bool
 AdjustOnionOutput::afterQuery(const std::unique_ptr<Connect> &e_conn)
     const
@@ -975,7 +943,8 @@ const std::list<std::string> AdjustOnionOutput::local_qz() const
     return std::list<std::string>();
 }
 
-bool AdjustOnionOutput::queryAgain(const std::unique_ptr<Connect> &conn)
+QueryAction
+AdjustOnionOutput::queryAction(const std::unique_ptr<Connect> &conn)
     const
 {
     const std::string q =
@@ -992,10 +961,11 @@ bool AdjustOnionOutput::queryAgain(const std::unique_ptr<Connect> &conn)
     unsigned long *const l = mysql_fetch_lengths(db_res->n);
     assert(l != NULL);
 
-    return string_to_bool(std::string(row[0], l[0]));
+    const bool reissue = string_to_bool(std::string(row[0], l[0]));
+
+    return reissue ? QueryAction::AGAIN : QueryAction::ROLLBACK;
 }
 
-// FIXME: Give the user some indication that a ROLLBACK happened.
 bool AdjustOnionOutput::doDecryption() const
 {
     return false;

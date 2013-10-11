@@ -123,9 +123,7 @@ rewrite_select_lex(const st_select_lex &select_lex, Analysis &a);
 std::string
 mysql_noop();
 
-enum class PREAMBLE_STATUS {SUCCESS, FAILURE, ROLLBACK};
-
-PREAMBLE_STATUS
+void
 queryPreamble(const ProxyState &ps, const std::string &q,
               std::unique_ptr<QueryRewrite> *qr,
               std::list<std::string> *const out_queryz,
@@ -138,7 +136,16 @@ queryHandleRollback(const ProxyState &ps, const std::string &query,
 void
 prettyPrintQuery(const std::string &query);
 
-ResType
+class EpilogueResult {
+public:
+    EpilogueResult(QueryAction action, const ResType &res_type)
+        : action(action), res_type(res_type) {}
+
+    const QueryAction action;
+    const ResType res_type;
+};
+
+EpilogueResult
 queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
               const ResType &res, const std::string &query, bool pp);
 

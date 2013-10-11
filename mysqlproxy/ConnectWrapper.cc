@@ -262,7 +262,6 @@ rewrite(lua_State *const L)
     const std::string query_data = xlua_tolstring(L, 3);
 
     std::list<std::string> new_queries;
-    AssignOnce<PREAMBLE_STATUS> preamble_status;
 
     c_wrapper->last_query = query;
     t.lap_ms();
@@ -275,30 +274,26 @@ rewrite(lua_State *const L)
                 schema_cache.getSchema(ps->getConn(), ps->getEConn());
 
             std::unique_ptr<QueryRewrite> qr;
-            preamble_status =
-                queryPreamble(*ps, query, &qr, &new_queries, schema);
+            queryPreamble(*ps, query, &qr, &new_queries, schema);
             assert(qr);
-            assert(preamble_status.get() != PREAMBLE_STATUS::FAILURE);
 
             c_wrapper->setQueryRewrite(qr.release());
         } catch (const SynchronizationException &e) {
-            // FIXME: Healthier error handling once recovery
-            // re-implemented.
-            std::cerr << e << std::endl;
-            exit(0);
+            lua_pushboolean(L, false);              // status
+            xlua_pushlstring(L, e.to_string());     // error message
+            lua_pushnil(L);                         // new queries
+            return 3;
         } catch (const AbstractException &e) {
             lua_pushboolean(L, false);              // status
             xlua_pushlstring(L, e.to_string());     // error message
-            lua_pushnil(L);                         // rollback?
             lua_pushnil(L);                         // new queries
-            return 4;
+            return 3;
         } catch (const CryptDBError &e) {
             LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
             lua_pushboolean(L, false);              // status
             xlua_pushlstring(L, e.msg);             // error message
-            lua_pushnil(L);                         // rollback?
             lua_pushnil(L);                         // new queries
-            return 4;
+            return 3;
         }
     }
 
@@ -306,14 +301,8 @@ rewrite(lua_State *const L)
         *(c_wrapper->PLAIN_LOG) << query << "\n";
     }
 
-    assert(PREAMBLE_STATUS::SUCCESS == preamble_status.get() ||
-           (PREAMBLE_STATUS::ROLLBACK == preamble_status.get() &&
-            new_queries.size() == 1));
-
     lua_pushboolean(L, true);                       // status
     lua_pushnil(L);                                 // error message
-    lua_pushboolean(L,                              // rollback?
-                    PREAMBLE_STATUS::ROLLBACK == preamble_status.get());
 
     // NOTE: Potentially out of int range.
     assert(new_queries.size() < INT_MAX);
@@ -326,55 +315,7 @@ rewrite(lua_State *const L)
         index++;
     }
 
-    return 4;
-}
-
-static int
-queryFailure(lua_State *const L)
-{
-    ANON_REGION(__func__, &perf_cg);
-    scoped_lock l(&big_lock);
-    assert(0 == mysql_thread_init());
-
-    const std::string client = xlua_tolstring(L, 1);
-    if (clients.find(client) == clients.end()) {
-        throw CryptDBError("Failed to properly handle failed query!");
-    }
-
-    assert(EXECUTE_QUERIES);
-
-    assert(ps);
-
-    const std::unique_ptr<QueryRewrite> &qr =
-        clients[client]->getQueryRewrite();
-    assert(qr->output->handleQueryFailure(ps->getEConn()));
-
-    return 0;
-}
-
-static int
-rollbackOnionAdjust(lua_State *const L)
-{
-    ANON_REGION(__func__, &perf_cg);
-    scoped_lock l(&big_lock);
-    assert(0 == mysql_thread_init());
-
-    const std::string client = xlua_tolstring(L, 1);
-    if (clients.find(client) == clients.end()) {
-        return 0;
-    }
-    WrapperState *const c_wrapper = clients[client];
-
-    assert(ps);
-
-    SchemaCache &schema_cache = c_wrapper->getSchemaCache();
-    const SchemaInfo &schema =
-        schema_cache.getSchema(ps->getConn(), ps->getEConn());
-    assert(queryHandleRollback(*ps, c_wrapper->last_query, schema));
-
-    const std::unique_ptr<QueryRewrite> &qr = c_wrapper->getQueryRewrite();
-    schema_cache.updateStaleness(qr->output->stalesSchema());
-    return 0;
+    return 3;
 }
 
 inline std::vector<std::shared_ptr<Item> >
@@ -479,38 +420,43 @@ envoi(lua_State *const L)
     getResTypeFromLuaTable(L, 2, 3, &res);
     const std::unique_ptr<QueryRewrite> &qr = c_wrapper->getQueryRewrite();
     try {
-        const ResType &out_res =
+        const EpilogueResult &epi_result =
             queryEpilogue(*ps, *qr.get(), res, c_wrapper->last_query,
                           false);
-        if (false == out_res.success()) {
-            lua_pushboolean(L, false);          // status
-            xlua_pushlstring(L,                 // error message
-                     "queryEpilogue failed");
-            lua_pushnil(L);                     // plaintext fields
-            lua_pushnil(L);                     // plaintext rows
-            return 4;
-        }
-
         const bool stales = qr->output->stalesSchema();
         c_wrapper->getSchemaCache().updateStaleness(stales);
-        return returnResultSet(L, out_res);
+        if (QueryAction::ROLLBACK == epi_result.action) {
+            lua_pushboolean(L, true);           // success
+            lua_pushboolean(L, true);           // rollback
+            lua_pushnil(L);                     // error message
+            lua_pushnil(L);                     // plaintext fields
+            lua_pushnil(L);                     // plaintext rows
+            return 5;
+        }
+
+        assert(QueryAction::VANILLA == epi_result.action);
+        return returnResultSet(L, epi_result.res_type);
     } catch (const SynchronizationException &e) {
-        // FIXME: Healthier error handling once recovery
-        // re-implemented.
-        std::cerr << e << std::endl;
-        exit(0);
-    } catch (const AbstractException &e) {
         lua_pushboolean(L, false);              // status
+        lua_pushboolean(L, false);              // rollback
         xlua_pushlstring(L, e.to_string());     // error message
         lua_pushnil(L);                         // plaintext fields
         lua_pushnil(L);                         // plaintext rows
-        return 4;
+        return 5;
+    } catch (const AbstractException &e) {
+        lua_pushboolean(L, false);              // status
+        lua_pushboolean(L, false);              // rollback
+        xlua_pushlstring(L, e.to_string());     // error message
+        lua_pushnil(L);                         // plaintext fields
+        lua_pushnil(L);                         // plaintext rows
+        return 5;
     } catch (const CryptDBError &e) {
         lua_pushboolean(L, false);              // status
+        lua_pushboolean(L, false);              // rollback
         xlua_pushlstring(L, e.msg);             // error message
         lua_pushnil(L);                         // plaintext fields
         lua_pushnil(L);                         // plaintext rows
-        return 4;
+        return 5;
     }
 }
 
@@ -518,6 +464,7 @@ static int
 returnResultSet(lua_State *const L, const ResType &rd)
 {
     lua_pushboolean(L, true);                   // status
+    lua_pushboolean(L, false);                  // rollback
     lua_pushnil(L);                             // error message
 
     /* return decrypted result set */
@@ -561,7 +508,7 @@ returnResultSet(lua_State *const L, const ResType &rd)
         lua_rawseti(L, t_rows, i+1);
     }
 
-    return 4;
+    return 5;
 }
 
 static const struct luaL_reg
@@ -571,8 +518,6 @@ cryptdb_lib[] = {
     F(disconnect),
     F(rewrite),
     F(envoi),
-    F(rollbackOnionAdjust),
-    F(queryFailure),
     { 0, 0 },
 };
 

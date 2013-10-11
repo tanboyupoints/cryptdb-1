@@ -188,6 +188,7 @@ public:
 
 class Rewriter;
 
+enum class QueryAction {VANILLA, AGAIN, ROLLBACK};
 class RewriteOutput {
 public:
     RewriteOutput(const std::string &original_query)
@@ -198,17 +199,16 @@ public:
                              const std::unique_ptr<Connect> &e_conn) = 0;
     virtual bool getQuery(std::list<std::string> *const queryz,
                           SchemaInfo const &schema) const = 0;
-    virtual bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
-        const = 0;
     virtual bool afterQuery(const std::unique_ptr<Connect> &e_conn)
         const = 0;
     // This ASK code is a symptom of returning the rewritten query
     // to the proxy which then issues the query. A more TELL policy
     // would likely lead to cleaner execution of queries.
-    virtual bool queryAgain(const std::unique_ptr<Connect> &conn) const;
     virtual bool doDecryption() const;
     virtual bool stalesSchema() const;
     virtual bool multipleResultSets() const;
+    virtual QueryAction queryAction(const std::unique_ptr<Connect> &conn)
+        const;
 
 protected:
     const std::string original_query;
@@ -224,7 +224,6 @@ public:
                      const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
-    bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     bool doDecryption() const;
 };
@@ -240,7 +239,6 @@ public:
                      const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
-    bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
 
 private:
@@ -264,7 +262,6 @@ public:
                      const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
-    bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     bool multipleResultSets() const;
 
@@ -289,8 +286,6 @@ public:
                      const std::unique_ptr<Connect> &e_conn);
     virtual bool getQuery(std::list<std::string> * const queryz,
                           SchemaInfo const &schema) const = 0;
-    virtual bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn)
-        const = 0;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     // FIXME: final.
     bool stalesSchema() const;
@@ -315,7 +310,6 @@ public:
 
     bool getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
-    bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
 
 private:
@@ -325,6 +319,7 @@ private:
     const std::list<std::string> local_qz() const;
 };
 
+// FIXME: final funcs.
 class AdjustOnionOutput : public DeltaOutput {
 public:
     AdjustOnionOutput(const std::string &original_query,
@@ -339,11 +334,8 @@ public:
                      const std::unique_ptr<Connect> &e_conn);
     bool getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
-    bool handleQueryFailure(const std::unique_ptr<Connect> &e_conn) const;
     bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
-    // FIXME: final.
-    bool queryAgain(const std::unique_ptr<Connect> &conn) const;
-    // FIXME: final.
+    QueryAction queryAction(const std::unique_ptr<Connect> &conn) const;
     bool doDecryption() const;
 
 private:

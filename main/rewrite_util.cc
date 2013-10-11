@@ -419,7 +419,7 @@ rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
 {
     const QueryRewrite qr(Rewriter::rewrite(ps, q, schema));
     assert(false == qr.output->stalesSchema());
-    assert(false == qr.output->queryAgain(ps.getConn()));
+    assert(QueryAction::VANILLA == qr.output->queryAction(ps.getConn()));
 
     std::list<std::string> out_queryz;
     TEST_TextMessageError(qr.output->getQuery(&out_queryz, schema),
@@ -472,7 +472,7 @@ mysql_noop()
     return "do 0;";
 }
 
-PREAMBLE_STATUS
+void
 queryPreamble(const ProxyState &ps, const std::string &q,
               std::unique_ptr<QueryRewrite> *const qr,
               std::list<std::string> *const out_queryz,
@@ -481,33 +481,11 @@ queryPreamble(const ProxyState &ps, const std::string &q,
     *qr = std::unique_ptr<QueryRewrite>(
             new QueryRewrite(Rewriter::rewrite(ps, q, schema)));
 
+    // FIXME: Remove asserts.
     assert((*qr)->output->beforeQuery(ps.getConn(), ps.getEConn()));
+    assert((*qr)->output->getQuery(out_queryz, schema));
 
-    if (!(*qr)->output->getQuery(out_queryz, schema)) {
-        (*qr)->output->handleQueryFailure(ps.getEConn());
-        return PREAMBLE_STATUS::FAILURE;
-    }
-
-    return PREAMBLE_STATUS::SUCCESS;
-}
-
-bool
-queryHandleRollback(const ProxyState &ps, const std::string &query,
-                    SchemaInfo const &schema)
-{
-    std::unique_ptr<QueryRewrite> qr;
-    std::list<std::string> out_queryz;
-    PREAMBLE_STATUS const preamble_status =
-        queryPreamble(ps, query, &qr, &out_queryz, schema);
-    assert(qr);
-    if (PREAMBLE_STATUS::FAILURE == preamble_status) {
-        return false;
-    }
-
-    assert(PREAMBLE_STATUS::SUCCESS == preamble_status);
-    assert(qr->output->afterQuery(ps.getEConn()));
-
-    return true;
+    return;
 }
 
 /*
@@ -551,14 +529,18 @@ prettyPrintQueryResult(const ResType &res)
     std::cout << std::endl;
 }
 
-ResType
+EpilogueResult
 queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
               const ResType &res, const std::string &query, bool pp)
 {
+    // FIXME: Remove assert.
     assert(qr.output->afterQuery(ps.getEConn()));
 
-    if (qr.output->queryAgain(ps.getConn())) {
-        return executeQuery(ps, query, NULL, pp);
+    // FIXME: executeQuery return EpilogueResult
+    const QueryAction action = qr.output->queryAction(ps.getConn());
+    if (QueryAction::AGAIN == action) {
+        const ResType &again_res = executeQuery(ps, query, NULL, pp);
+        return EpilogueResult(QueryAction::VANILLA, again_res);
     }
 
     if (pp) {
@@ -569,14 +551,15 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
     if (qr.output->doDecryption()) {
         const ResType &dec_res =
             Rewriter::decryptResults(res, qr.rmeta);
+        assert(dec_res.success());
         if (pp) {
             prettyPrintQueryResult(dec_res);
         }
 
-        return dec_res;
+        return EpilogueResult(action, dec_res);
     }
 
-    return res;
+    return EpilogueResult(action, res);
 }
 
 const SchemaInfo &

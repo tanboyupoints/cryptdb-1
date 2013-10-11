@@ -1315,9 +1315,8 @@ executeQuery(const ProxyState &ps, const std::string &q,
     std::list<std::string> out_queryz;
     SchemaInfo const &schema =
         schema_cache->getSchema(ps.getConn(), ps.getEConn());
-    PREAMBLE_STATUS const preamble_status =
-        queryPreamble(ps, q, &qr, &out_queryz, schema);
-    assert(qr && PREAMBLE_STATUS::FAILURE != preamble_status);
+    queryPreamble(ps, q, &qr, &out_queryz, schema);
+    assert(qr);
 
     std::unique_ptr<DBResult> dbres;
     for (auto it : out_queryz) {
@@ -1325,12 +1324,9 @@ executeQuery(const ProxyState &ps, const std::string &q,
             prettyPrintQuery(it);
         }
 
-        if (!ps.getConn()->execute(it, &dbres,
-                                   qr->output->multipleResultSets())) {
-            qr->output->handleQueryFailure(ps.getEConn());
-            FAIL_TextMessageError("Failed to execute query!");
-        }
-
+        TEST_Sync(ps.getConn()->execute(it, &dbres,
+                                    qr->output->multipleResultSets()),
+                  "failed to execute query!");
         // XOR: Either we have one result set, or we were expecting
         // multiple result sets and we threw them all away.
         assert(!!dbres != !!qr->output->multipleResultSets());
@@ -1340,26 +1336,16 @@ executeQuery(const ProxyState &ps, const std::string &q,
     //       Post Query Processing
     // ----------------------------------
     // > Handle schema cacheing immediately after executing a query.
-    //   + Updating the cache here is 'aggresive' in the case
-    //     where we are doing an onion adjustment ROLLBACK
-    //     and queryHandleRollback fails.
     schema_cache->updateStaleness(qr->output->stalesSchema());
-
-    if (PREAMBLE_STATUS::ROLLBACK == preamble_status) {
-        assert(queryHandleRollback(ps, q, schema));
-        return ResType(dbres->unpack());
-    }
-
-    assert(PREAMBLE_STATUS::SUCCESS == preamble_status);
 
     const ResType &res =
         dbres ? ResType(dbres->unpack()) : mysql_noop_res(ps);
     assert(res.success());
-    const ResType &out_res =
+    const EpilogueResult epi_result =
         queryEpilogue(ps, *qr.get(), res, q, pp);
-    assert(out_res.success());
+    assert(epi_result.res_type.success());
 
-    return out_res;
+    return epi_result.res_type;
 }
 
 void
