@@ -57,8 +57,8 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
             expected behavior provided (*) is correct rationale.
         */
         " CREATE PROCEDURE " + hom_addition_transaction +
-        "       (IN delete_query VARCHAR(50000),"
-        "        IN insert_query VARCHAR(50000))"
+        "       (IN delete_query VARBINARY(50000),"
+        "        IN insert_query VARBINARY(50000))"
         " BEGIN"
         "   DECLARE old_transaction_id VARCHAR(20);"
 
