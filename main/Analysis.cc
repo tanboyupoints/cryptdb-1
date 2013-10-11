@@ -780,12 +780,6 @@ DeltaOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
 
     SYNC_IF_FALSE(e_conn->execute("COMMIT;"), e_conn);
 
-    /*
-    if (this->getCompletionType() == CompletionType::AdjustOnionCompletion) {
-        throw CryptDBError("testing recovery!");
-    }
-    */
-
     return;
 }
 
@@ -857,14 +851,21 @@ DDLOutput::getQuery(std::list<std::string> * const queryz,
     queryz->clear();
 
     assert(remote_qz().size() == 1);
-    const std::string &remote_completion =
+    const std::string &remote_begin =
         " INSERT INTO " + MetaData::Table::remoteQueryCompletion() +
-        "   (complete, embedded_completion_id, reissue) VALUES"
-        "   (TRUE, " +
+        "   (begin, complete, embedded_completion_id, reissue) VALUES"
+        "   (TRUE,  FALSE," +
              std::to_string(this->getEmbeddedCompletionID()) +
-        "    , FALSE)";
-    queryz->push_back(remote_completion);
+        "    , FALSE);";
+    const std::string &remote_complete =
+        " UPDATE " + MetaData::Table::remoteQueryCompletion() +
+        "    SET complete = TRUE"
+        "  WHERE embedded_completion_id = " +
+             std::to_string(this->getEmbeddedCompletionID()) + ";";
+
+    queryz->push_back(remote_begin);
     queryz->push_back(remote_qz().back());
+    queryz->push_back(remote_complete);
 
     return;
 }

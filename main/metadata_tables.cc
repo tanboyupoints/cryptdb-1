@@ -141,7 +141,8 @@ MetaData::initialize(const std::unique_ptr<Connect> &conn,
 
     const std::string create_remote_completion =
         " CREATE TABLE IF NOT EXISTS " + Table::remoteQueryCompletion() +
-        "   (complete BOOLEAN NOT NULL,"
+        "   (begin BOOLEAN NOT NULL,"
+        "    complete BOOLEAN NOT NULL,"
         "    embedded_completion_id INTEGER NOT NULL,"
         "    reissue BOOLEAN NOT NULL,"
         "    id SERIAL PRIMARY KEY)"

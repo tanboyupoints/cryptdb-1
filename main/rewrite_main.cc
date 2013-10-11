@@ -125,40 +125,32 @@ sanityCheck(SchemaInfo &schema)
     return true;
 }
 
-/*
-    Other interesting error codes
-    > ER_DUP_KEY
-    > ER_KEY_DOES_NOT_EXIST
-*/
-static bool
-recoverableDeltaError(unsigned int err)
-{
-    const bool ret =
-        ER_TABLE_EXISTS_ERROR == err ||     // Table already exists.
-        ER_DUP_FIELDNAME == err ||          // Column already exists.
-        ER_DUP_KEYNAME == err ||            // Key already exists.
-        ER_BAD_TABLE_ERROR == err ||        // Table doesn't exist.
-        ER_CANT_DROP_FIELD_OR_KEY == err;   // Key/Col doesn't exist.
-
-    return ret;
-}
-
 struct RecoveryDetails {
     const bool embedded_begin;
     const bool embedded_complete;
-    const bool existed_remote_complete;
+    const bool existed_remote;
+    const bool remote_begin;
     const bool remote_complete;
     const std::string query;
 
     RecoveryDetails(bool embedded_begin, bool embedded_complete,
-                    bool existed_remote_complete, bool remote_complete,
-                    const std::string query)
+                    bool existed_remote, bool remote_begin,
+                    bool remote_complete, const std::string query)
         : embedded_begin(embedded_begin),
           embedded_complete(embedded_complete),
-          existed_remote_complete(existed_remote_complete),
+          existed_remote(existed_remote), remote_begin(remote_begin),
           remote_complete(remote_complete), query(query) {}
 };
 
+static bool
+false_if_false(bool test, const std::string &new_value)
+{
+    if (false == test) {
+        return test;
+    }
+
+    return string_to_bool(new_value);
+}
 static bool
 collectRecoveryDetails(const std::unique_ptr<Connect> &conn,
                        const std::unique_ptr<Connect> &e_conn,
@@ -186,7 +178,7 @@ collectRecoveryDetails(const std::unique_ptr<Connect> &conn,
     const std::string string_embedded_query(embedded_row[2], l[2]);
 
     const std::string remote_completion_q =
-        " SELECT complete FROM " + remote_completion_table +
+        " SELECT begin, complete FROM " + remote_completion_table +
         "  WHERE embedded_completion_id = " +
                  std::to_string(unfinished_id) + ";";
     RETURN_FALSE_IF_FALSE(conn->execute(remote_completion_q, &dbres));
@@ -195,29 +187,70 @@ collectRecoveryDetails(const std::unique_ptr<Connect> &conn,
     const MYSQL_ROW remote_row = mysql_fetch_row(dbres->n);
     assert(!!remote_row == !!remote_row_count);
 
-    std::string string_remote_complete;
-    const bool existed_remote_complete = !!remote_row;
-    if (existed_remote_complete) {
+    std::string string_remote_begin, string_remote_complete;
+    const bool existed_remote = !!remote_row;
+    if (existed_remote) {
         const unsigned long *const l = mysql_fetch_lengths(dbres->n);
-        string_remote_complete = std::string(remote_row[0], l[0]);
-        assert(string_to_bool(string_remote_complete) == true);
+        string_remote_begin    = std::string(remote_row[0], l[0]);
+        string_remote_complete = std::string(remote_row[1], l[1]);
+        assert(string_to_bool(string_remote_begin) == true);
     }
 
     const bool embedded_begin = string_to_bool(string_embedded_begin);
     const bool embedded_complete =
         string_to_bool(string_embedded_complete);
+    const bool remote_begin =
+        false_if_false(existed_remote, string_remote_begin);
     const bool remote_complete =
-        existed_remote_complete ?
-                          string_to_bool(string_remote_complete)
-                        : false;
+        false_if_false(existed_remote, string_remote_complete);
 
     assert(true == embedded_begin);
 
     *details =
         std::unique_ptr<RecoveryDetails>(
             new RecoveryDetails(embedded_begin, embedded_complete,
-                                existed_remote_complete, remote_complete,
-                                string_embedded_query));
+                                existed_remote, remote_begin,
+                                remote_complete, string_embedded_query));
+
+    return true;
+}
+
+static bool
+abortQuery(const std::unique_ptr<Connect> &e_conn,
+           unsigned long unfinished_id)
+{
+    const std::string embedded_completion_table =
+        MetaData::Table::embeddedQueryCompletion();
+
+    const std::string update_aborted =
+        " UPDATE " + embedded_completion_table +
+        "    SET aborted = TRUE"
+        "  WHERE id = " + std::to_string(unfinished_id) + ";";
+
+    RETURN_FALSE_IF_FALSE(e_conn->execute("START TRANSACTION"));
+    ROLLBACK_AND_RFIF(setBleedingTableToRegularTable(e_conn), e_conn);
+    ROLLBACK_AND_RFIF(e_conn->execute(update_aborted), e_conn);
+    ROLLBACK_AND_RFIF(e_conn->execute("COMMIT"), e_conn);
+
+    return true;
+}
+
+static bool
+finishQuery(const std::unique_ptr<Connect> &e_conn,
+            unsigned long unfinished_id)
+{
+    const std::string embedded_completion_table =
+        MetaData::Table::embeddedQueryCompletion();
+
+    const std::string update_completed =
+        " UPDATE " + embedded_completion_table +
+        "    SET complete = TRUE"
+        "  WHERE id = " + std::to_string(unfinished_id) + ";";
+
+    RETURN_FALSE_IF_FALSE(e_conn->execute("START TRANSACTION"));
+    ROLLBACK_AND_RFIF(setRegularTableToBleedingTable(e_conn), e_conn);
+    ROLLBACK_AND_RFIF(e_conn->execute(update_completed), e_conn);
+    ROLLBACK_AND_RFIF(e_conn->execute("COMMIT"), e_conn);
 
     return true;
 }
@@ -227,47 +260,49 @@ fixAdjustOnion(const std::unique_ptr<Connect> &conn,
                const std::unique_ptr<Connect> &e_conn,
                unsigned long unfinished_id)
 {
-    const std::string embedded_completion_table =
-        MetaData::Table::embeddedQueryCompletion();
-
     std::unique_ptr<RecoveryDetails> details;
     RETURN_FALSE_IF_FALSE(collectRecoveryDetails(conn, e_conn,
                                                  unfinished_id,
                                                  &details));
+    assert(details->remote_begin == details->remote_complete);
 
-    // failure after initial location queries and before remote queries
-    if (false == details->remote_complete) {
-        const std::string update_aborted =
-            " UPDATE " + embedded_completion_table +
-            "    SET aborted = TRUE;";
-
-        assert(false == details->embedded_complete);
-        RETURN_FALSE_IF_FALSE(e_conn->execute("START TRANSACTION"));
-        ROLLBACK_AND_RFIF(setBleedingTableToRegularTable(e_conn),
-                          e_conn);
-        ROLLBACK_AND_RFIF(e_conn->execute(update_aborted), e_conn);
-        ROLLBACK_AND_RFIF(e_conn->execute("COMMIT"), e_conn);
-
-        return true;
+    // failure after initial embedded queries and before remote queries
+    if (false == details->remote_begin) {
+        assert(false == details->embedded_complete
+               && false == details->existed_remote
+               && false == details->remote_complete);
+        return abortQuery(e_conn, unfinished_id);
     }
+
+    assert(true == details->remote_complete);
 
     // failure after remote queries
-    assert(false == details->embedded_complete);
     {
-        const std::string update_completed =
-            " UPDATE " + embedded_completion_table +
-            "    SET complete = TRUE;";
-
         assert(false == details->embedded_complete);
-        RETURN_FALSE_IF_FALSE(e_conn->execute("START TRANSACTION"));
-        ROLLBACK_AND_RFIF(setRegularTableToBleedingTable(e_conn),
-                          e_conn);
-        ROLLBACK_AND_RFIF(e_conn->execute(update_completed), e_conn);
-        ROLLBACK_AND_RFIF(e_conn->execute("COMMIT"), e_conn);
 
-        return true;
+        return finishQuery(e_conn, unfinished_id);
     }
 
+}
+
+/*
+    Other interesting error codes
+    > ER_DUP_KEY
+    > ER_KEY_DOES_NOT_EXIST
+*/
+static bool
+recoverableDeltaError(unsigned int err)
+{
+    const bool ret =
+        ER_DB_CREATE_EXISTS == err ||       // Database already exists.
+        ER_TABLE_EXISTS_ERROR == err ||     // Table already exists.
+        ER_DUP_FIELDNAME == err ||          // Column already exists.
+        ER_DUP_KEYNAME == err ||            // Key already exists.
+        ER_DB_DROP_EXISTS == err ||         // Database doesn't exist.
+        ER_BAD_TABLE_ERROR == err ||        // Table doesn't exist.
+        ER_CANT_DROP_FIELD_OR_KEY == err;   // Key/Col doesn't exist.
+
+    return ret;
 }
 
 static bool
@@ -275,8 +310,47 @@ fixDDL(const std::unique_ptr<Connect> &conn,
        const std::unique_ptr<Connect> &e_conn,
        unsigned long unfinished_id)
 {
-    recoverableDeltaError(0);
-    return true;
+    std::unique_ptr<RecoveryDetails> details;
+    RETURN_FALSE_IF_FALSE(collectRecoveryDetails(conn, e_conn,
+                                                 unfinished_id,
+                                                 &details));
+    assert(true == details->embedded_begin
+           && false == details->embedded_complete);
+
+    // failure after initial embedded queries and before remote queries
+    if (false == details->remote_begin) {
+        assert(false == details->embedded_complete
+               && false == details->existed_remote
+               && false == details->remote_complete);
+        return abortQuery(e_conn, unfinished_id);
+    }
+
+    // --------------------------------------------------
+    //  After this point we must run to completion as we
+    //        _may_ have made a DDL modification
+    //  -------------------------------------------------
+
+    // failure before remote queries complete
+    if (false == details->remote_complete) {
+        // reissue the DDL query against the remote database.
+        if (false == conn->execute(details->query)) {
+            const unsigned int err = conn->get_mysql_errno();
+            RETURN_FALSE_IF_FALSE(recoverableDeltaError(err));
+        }
+    }
+
+    // failure after remote queries completed
+    {
+        assert(false == details->embedded_complete);
+
+        // reissue the DDL query against the embedded database
+        if (false == e_conn->execute(details->query)) {
+            const unsigned int err = e_conn->get_mysql_errno();
+            RETURN_FALSE_IF_FALSE(recoverableDeltaError(err));
+        }
+
+        return finishQuery(e_conn, unfinished_id);
+    }
 }
 
 static bool

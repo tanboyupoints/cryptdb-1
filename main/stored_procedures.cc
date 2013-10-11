@@ -126,8 +126,8 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
 
             // update metadata used for recovery
         "   INSERT INTO " + remote_completion_table +
-        "       (complete, embedded_completion_id, reissue) VALUES"
-        "       (TRUE,     completion_id,          b_reissue);"
+        "       (begin, complete, embedded_completion_id, reissue) VALUES"
+        "       (TRUE,  TRUE,     completion_id,          b_reissue);"
 
         "   COMMIT;"
         " END"});
