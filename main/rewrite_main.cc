@@ -1037,10 +1037,9 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
     // proxy doesn't use the remote connection in proxy state to
     // execute it's queries; so it follows that the remote connection
     // will have a garbage (likely the initial) default database.
-    TEST_TextMessageError(lowLevelGetCurrentDatabase(ps.getEConn().get(),
-                                                     &default_db),
-                          "Failed retrieving database for query parse!");
+    lowLevelGetCurrentDatabase(ps.getEConn().get(), &default_db);
     a.setDatabaseName(default_db);
+    const OnUnscope clear_database([&a] () {a.clearDatabaseName();});
 
     std::unique_ptr<query_parse> p;
     try {

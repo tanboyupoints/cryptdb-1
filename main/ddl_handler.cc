@@ -179,10 +179,17 @@ class CreateDBHandler : public DDLHandler {
     {
         const std::string dbname =
             convert_lex_str(lex->name);
-        std::unique_ptr<DatabaseMeta> dm(new DatabaseMeta());
-        a.deltas.push_back(std::unique_ptr<Delta>(
-                    new CreateDelta(std::move(dm), a.getSchema(),
-                                    IdentityMetaKey(dbname))));
+        if (false == a.databaseMetaExists(dbname)) {
+            std::unique_ptr<DatabaseMeta> dm(new DatabaseMeta());
+            a.deltas.push_back(std::unique_ptr<Delta>(
+                        new CreateDelta(std::move(dm), a.getSchema(),
+                                        IdentityMetaKey(dbname))));
+        } else {
+            const bool test =
+                lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS;
+            TEST_TextMessageError(test,
+                                "Database " + dbname + " already exists!");
+        }
 
         return copyWithTHD(lex);
     }

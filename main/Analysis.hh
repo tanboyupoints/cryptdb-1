@@ -398,6 +398,7 @@ public:
                          const std::string &table) const;
     bool nonAliasTableMetaExists(const std::string &db,
                                  const std::string &table) const;
+    bool databaseMetaExists(const std::string &db) const;
     std::string getAnonTableName(const std::string &db,
                                  const std::string &table) const;
     std::string

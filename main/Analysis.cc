@@ -261,6 +261,8 @@ operator<<(std::ostream &out, const RewritePlan * const rp)
 }
 
 // This function should not be used after intitialization.
+// true  : valid database name
+// false : no database name retrieved
 bool
 lowLevelGetCurrentDatabase(Connect *const c, std::string *const out_db)
 {
@@ -269,8 +271,8 @@ lowLevelGetCurrentDatabase(Connect *const c, std::string *const out_db)
     RFIF(c->execute(query, &db_res));
     assert(1 == mysql_num_rows(db_res->n));
 
-    MYSQL_ROW row = mysql_fetch_row(db_res->n);
-    unsigned long *const l = mysql_fetch_lengths(db_res->n);
+    const MYSQL_ROW row = mysql_fetch_row(db_res->n);
+    const unsigned long *const l = mysql_fetch_lengths(db_res->n);
     assert(l != NULL);
 
     *out_db = std::string(row[0], l[0]);
@@ -1075,6 +1077,12 @@ bool Analysis::nonAliasTableMetaExists(const std::string &db,
     return dm.childExists(IdentityMetaKey(table));
 }
 
+bool
+Analysis::databaseMetaExists(const std::string &db) const
+{
+    return this->schema.childExists(IdentityMetaKey(db));
+}
+
 std::string Analysis::getAnonTableName(const std::string &db,
                                        const std::string &table) const
 {
@@ -1116,7 +1124,7 @@ std::string Analysis::getAnonIndexName(const TableMeta &tm,
 
 bool Analysis::saneDatabaseName() const
 {
-    return db_name.isSet() && db_name.get().size() > 0;
+    return db_name.isSet();
 }
 
 bool Analysis::isAlias(const std::string &db,

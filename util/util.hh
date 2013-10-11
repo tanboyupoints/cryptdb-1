@@ -556,6 +556,22 @@ private:
     bool is_set;
 };
 
+class OnUnscope {
+    OnUnscope() = delete;
+    OnUnscope(const OnUnscope &a) = delete;
+    OnUnscope(OnUnscope &&a) = delete;
+    OnUnscope &operator=(const OnUnscope &a) = delete;
+    OnUnscope &operator=(OnUnscope &&a) = delete;
+
+public:
+    OnUnscope(std::function<void(void)> fn) : fn(fn) {}
+    ~OnUnscope() {fn();}
+
+private:
+    const std::function<void(void)> fn;
+};
+
+
 // Taken from jsmith @ cplusplus.com
 template <typename T>
 std::vector<T> vectorDifference(const std::vector<T> &model,
