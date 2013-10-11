@@ -310,6 +310,9 @@ fixDDL(const std::unique_ptr<Connect> &conn,
        const std::unique_ptr<Connect> &e_conn,
        unsigned long unfinished_id)
 {
+    const std::string remote_completion_table =
+        MetaData::Table::remoteQueryCompletion();
+
     std::unique_ptr<RecoveryDetails> details;
     RETURN_FALSE_IF_FALSE(collectRecoveryDetails(conn, e_conn,
                                                  unfinished_id,
@@ -337,6 +340,13 @@ fixDDL(const std::unique_ptr<Connect> &conn,
             const unsigned int err = conn->get_mysql_errno();
             RETURN_FALSE_IF_FALSE(recoverableDeltaError(err));
         }
+
+        const std::string update_remote_complete =
+            "UPDATE " + remote_completion_table +
+            "   SET complete = TRUE"
+            " WHERE embedded_completion_id = " +
+                    std::to_string(unfinished_id) + ";";
+        RETURN_FALSE_IF_FALSE(conn->execute(update_remote_complete));
     }
 
     // failure after remote queries completed
