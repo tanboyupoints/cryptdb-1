@@ -195,11 +195,11 @@ public:
         : original_query(original_query) {}
     virtual ~RewriteOutput() = 0;
 
-    virtual bool beforeQuery(const std::unique_ptr<Connect> &conn,
+    virtual void beforeQuery(const std::unique_ptr<Connect> &conn,
                              const std::unique_ptr<Connect> &e_conn) = 0;
-    virtual bool getQuery(std::list<std::string> *const queryz,
+    virtual void getQuery(std::list<std::string> *const queryz,
                           SchemaInfo const &schema) const = 0;
-    virtual bool afterQuery(const std::unique_ptr<Connect> &e_conn)
+    virtual void afterQuery(const std::unique_ptr<Connect> &e_conn)
         const = 0;
     // This ASK code is a symptom of returning the rewritten query
     // to the proxy which then issues the query. A more TELL policy
@@ -220,11 +220,11 @@ public:
         : RewriteOutput(original_query) {}
     ~SimpleOutput() {;}
 
-    bool beforeQuery(const std::unique_ptr<Connect> &conn,
+    void beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
-    bool getQuery(std::list<std::string> * const queryz,
+    void getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
-    bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+    void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     bool doDecryption() const;
 };
 
@@ -235,11 +235,11 @@ public:
         : RewriteOutput(original_query), new_query(new_query) {}
     ~DMLOutput() {;}
 
-    bool beforeQuery(const std::unique_ptr<Connect> &conn,
+    void beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
-    bool getQuery(std::list<std::string> * const queryz,
+    void getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
-    bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+    void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
 
 private:
     const std::string new_query;
@@ -258,11 +258,11 @@ public:
       where_clause(where_clause), ps(ps) {}
     ~SpecialUpdate() {;}
 
-    bool beforeQuery(const std::unique_ptr<Connect> &conn,
+    void beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
-    bool getQuery(std::list<std::string> * const queryz,
+    void getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
-    bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+    void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     bool multipleResultSets() const;
 
 private:
@@ -282,11 +282,11 @@ public:
         : RewriteOutput(original_query), deltas(std::move(deltas)) {}
     virtual ~DeltaOutput() = 0;
 
-    bool beforeQuery(const std::unique_ptr<Connect> &conn,
+    void beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
-    virtual bool getQuery(std::list<std::string> * const queryz,
+    virtual void getQuery(std::list<std::string> * const queryz,
                           SchemaInfo const &schema) const = 0;
-    bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+    void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     // FIXME: final.
     bool stalesSchema() const;
 
@@ -308,9 +308,9 @@ public:
           new_query(new_query) {}
     ~DDLOutput() {;}
 
-    bool getQuery(std::list<std::string> * const queryz,
+    void getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
-    bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+    void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
 
 private:
     const std::string new_query;
@@ -330,11 +330,11 @@ public:
         : DeltaOutput(original_query, std::move(deltas)),
           adjust_queries(adjust_queries), hackEscape(hackEscape) {}
     ~AdjustOnionOutput() {;}
-    bool beforeQuery(const std::unique_ptr<Connect> &conn,
+    void beforeQuery(const std::unique_ptr<Connect> &conn,
                      const std::unique_ptr<Connect> &e_conn);
-    bool getQuery(std::list<std::string> * const queryz,
+    void getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
-    bool afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+    void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     QueryAction queryAction(const std::unique_ptr<Connect> &conn) const;
     bool doDecryption() const;
 

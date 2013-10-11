@@ -1299,7 +1299,7 @@ mysql_noop_res(const ProxyState &ps)
     return ResType(noop_dbres->unpack());
 }
 
-ResType
+EpilogueResult
 executeQuery(const ProxyState &ps, const std::string &q,
              SchemaCache *schema_cache, bool pp)
 {
@@ -1345,7 +1345,7 @@ executeQuery(const ProxyState &ps, const std::string &q,
         queryEpilogue(ps, *qr.get(), res, q, pp);
     assert(epi_result.res_type.success());
 
-    return epi_result.res_type;
+    return epi_result;
 }
 
 void

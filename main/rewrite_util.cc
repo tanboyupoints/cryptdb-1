@@ -422,8 +422,7 @@ rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
     assert(QueryAction::VANILLA == qr.output->queryAction(ps.getConn()));
 
     std::list<std::string> out_queryz;
-    TEST_TextMessageError(qr.output->getQuery(&out_queryz, schema),
-                          "Failed to retrieve query!");
+    qr.output->getQuery(&out_queryz, schema);
     assert(out_queryz.size() == 1);
 
     return out_queryz.back();
@@ -481,9 +480,8 @@ queryPreamble(const ProxyState &ps, const std::string &q,
     *qr = std::unique_ptr<QueryRewrite>(
             new QueryRewrite(Rewriter::rewrite(ps, q, schema)));
 
-    // FIXME: Remove asserts.
-    assert((*qr)->output->beforeQuery(ps.getConn(), ps.getEConn()));
-    assert((*qr)->output->getQuery(out_queryz, schema));
+    (*qr)->output->beforeQuery(ps.getConn(), ps.getEConn());
+    (*qr)->output->getQuery(out_queryz, schema);
 
     return;
 }
@@ -533,14 +531,11 @@ EpilogueResult
 queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
               const ResType &res, const std::string &query, bool pp)
 {
-    // FIXME: Remove assert.
-    assert(qr.output->afterQuery(ps.getEConn()));
+    qr.output->afterQuery(ps.getEConn());
 
-    // FIXME: executeQuery return EpilogueResult
     const QueryAction action = qr.output->queryAction(ps.getConn());
     if (QueryAction::AGAIN == action) {
-        const ResType &again_res = executeQuery(ps, query, NULL, pp);
-        return EpilogueResult(QueryAction::VANILLA, again_res);
+        return executeQuery(ps, query, NULL, pp);
     }
 
     if (pp) {

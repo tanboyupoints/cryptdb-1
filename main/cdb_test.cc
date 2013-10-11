@@ -93,8 +93,13 @@ static bool handle_line(ProxyState& ps, const std::string& q, bool pp=true)
 
   try {
       static SchemaCache schema_cache;
-      const ResType &res = executeQuery(ps, q, &schema_cache, pp);
-      return res.success();
+      const EpilogueResult &epi_result =
+          executeQuery(ps, q, &schema_cache, pp);
+      if (QueryAction::ROLLBACK == epi_result.action) {
+          std::cout << GREEN_BEGIN << "ROLLBACK issued!" << COLOR_END
+                    << std::endl;
+      }
+      return epi_result.res_type.success();
   } catch (const SynchronizationException &e) {
       std::cout << e << std::endl;
       return false;

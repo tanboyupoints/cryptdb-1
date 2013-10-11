@@ -561,25 +561,27 @@ RewriteOutput::queryAction(const std::unique_ptr<Connect> &conn) const
     return QueryAction::VANILLA;
 }
 
-bool SimpleOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
-                               const std::unique_ptr<Connect> &e_conn)
+void
+SimpleOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
+                          const std::unique_ptr<Connect> &e_conn)
 {
-    return true;
+    return;
 }
 
-bool SimpleOutput::getQuery(std::list<std::string> *const queryz,
-                            SchemaInfo const &) const
+void
+SimpleOutput::getQuery(std::list<std::string> *const queryz,
+                       SchemaInfo const &) const
 {
     queryz->clear();
     queryz->push_back(original_query);
 
-    return true;
+    return;
 }
 
-bool SimpleOutput::afterQuery(const std::unique_ptr<Connect> &e_conn)
-    const
+void
+SimpleOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
 {
-    return true;
+    return;
 }
 
 bool SimpleOutput::doDecryption() const
@@ -587,38 +589,46 @@ bool SimpleOutput::doDecryption() const
     return false;
 }
 
-bool DMLOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
-                            const std::unique_ptr<Connect> &e_conn)
+void
+DMLOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
+                       const std::unique_ptr<Connect> &e_conn)
 {
-    return true;
+    return;
 }
 
-bool DMLOutput::getQuery(std::list<std::string> * const queryz,
-                         SchemaInfo const &) const
+void
+DMLOutput::getQuery(std::list<std::string> * const queryz,
+                    SchemaInfo const &) const
 {
     queryz->clear();
     queryz->push_back(new_query);
 
-    return true;
+    return;
 }
 
-bool DMLOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
+void
+DMLOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
 {
-    return true;
+    return;
 }
 
-bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
-                                const std::unique_ptr<Connect> &e_conn)
+void
+SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
+                           const std::unique_ptr<Connect> &e_conn)
 {
     // Retrieve rows from database.
     const std::string select_q =
         " SELECT * FROM " + this->plain_table +
         " WHERE " + this->where_clause + ";";
-    const ResType select_res_type = executeQuery(this->ps, select_q);
+    const EpilogueResult epi_result = executeQuery(this->ps, select_q);
+    // FIXME: Support SpecialUpdate from within transaction.
+    // > QueryAction::ROLLBACK
+    assert(QueryAction::VANILLA == epi_result.action);
+    const ResType select_res_type = epi_result.res_type;
     assert(select_res_type.success());
     if (select_res_type.rows.size() == 0) { // No work to be done.
         this->do_nothing = true;
-        return true;
+        return;
     }
     this->do_nothing = false;
 
@@ -648,17 +658,18 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     // Do the query on the embedded database inside of a transaction
     // so that we can prevent failure artifacts from populating the
     // embedded dabase.
-    RETURN_FALSE_IF_FALSE(e_conn->execute("START TRANSACTION;"));
+    TEST_Sync(e_conn->execute("START TRANSACTION;"),
+              "failed to start transaction");
 
     // Push the plaintext rows to the embedded database.
     const std::string push_q =
         " INSERT INTO " + this->plain_table +
         " VALUES " + values_string + ";";
-    ROLLBACK_AND_RFIF(e_conn->execute(push_q), e_conn);
+    (e_conn->execute(push_q), e_conn);
 
     // Run the original (unmodified) query on the data in the embedded
     // database.
-    ROLLBACK_AND_RFIF(e_conn->execute(this->original_query), e_conn);
+    SYNC_IF_FALSE(e_conn->execute(this->original_query), e_conn);
 
     // > Collect the results from the embedded database.
     // > This code relies on single threaded access to the database
@@ -667,7 +678,7 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     std::unique_ptr<DBResult> dbres;
     const std::string select_results_q =
         " SELECT * FROM " + this->plain_table + ";";
-    ROLLBACK_AND_RFIF(e_conn->execute(select_results_q, &dbres), e_conn);
+    SYNC_IF_FALSE(e_conn->execute(select_results_q, &dbres), e_conn);
     const ResType interim_res = ResType(dbres->unpack());
     this->output_values =
         vector_join<std::vector<std::shared_ptr<Item> > >(
@@ -676,15 +687,16 @@ bool SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     // Cleanup the embedded database.
     const std::string cleanup_q =
         "DELETE FROM " + this->plain_table + ";";
-    ROLLBACK_AND_RFIF(e_conn->execute(cleanup_q), e_conn);
+    SYNC_IF_FALSE(e_conn->execute(cleanup_q), e_conn);
 
-    ROLLBACK_AND_RFIF(e_conn->execute("COMMIT;"), e_conn);
+    SYNC_IF_FALSE(e_conn->execute("COMMIT;"), e_conn);
 
-    return true;
+    return;
 }
 
-bool SpecialUpdate::getQuery(std::list<std::string> * const queryz,
-                             SchemaInfo const &schema) const
+void
+SpecialUpdate::getQuery(std::list<std::string> * const queryz,
+                        SchemaInfo const &schema) const
 {
     assert(queryz);
 
@@ -692,7 +704,7 @@ bool SpecialUpdate::getQuery(std::list<std::string> * const queryz,
 
     if (true == this->do_nothing.get()) {
         queryz->push_back(mysql_noop());
-        return true;
+        return;
     }
 
     // This query is necessary to propagate a transaction into
@@ -720,16 +732,17 @@ bool SpecialUpdate::getQuery(std::list<std::string> * const queryz,
                       " '" + escapeString(ps.getConn(),
                                           re_insert) + "');");
 
-    return true;
+    return;
 }
 
-bool SpecialUpdate::afterQuery(const std::unique_ptr<Connect> &e_conn)
-    const
+void
+SpecialUpdate::afterQuery(const std::unique_ptr<Connect> &e_conn) const
 {
-    return true;
+    return;
 }
 
-bool SpecialUpdate::multipleResultSets() const
+bool
+SpecialUpdate::multipleResultSets() const
 {
     return true;
 }
@@ -742,7 +755,7 @@ bool DeltaOutput::stalesSchema() const
     return true;
 }
 
-bool
+void
 DeltaOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
                          const std::unique_ptr<Connect> &e_conn)
 {
@@ -764,10 +777,10 @@ DeltaOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
 
     SYNC_IF_FALSE(e_conn->execute("COMMIT;"), e_conn);
 
-    return true;
+    return;
 }
 
-bool
+void
 DeltaOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
 {
     TEST_Sync(e_conn->execute("START TRANSACTION;"),
@@ -787,7 +800,7 @@ DeltaOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
 
     SYNC_IF_FALSE(e_conn->execute("COMMIT;"), e_conn);
 
-    return true;
+    return;
 }
 
 unsigned long
@@ -849,7 +862,7 @@ revertAndCleanupEmbedded(const std::unique_ptr<Connect> &e_conn,
 }
 */
 
-bool
+void
 DDLOutput::getQuery(std::list<std::string> * const queryz,
                     SchemaInfo const &) const
 {
@@ -865,10 +878,10 @@ DDLOutput::getQuery(std::list<std::string> * const queryz,
     queryz->push_back(remote_completion);
     queryz->push_back(remote_qz().back());
 
-    return true;
+    return;
 }
 
-bool
+void
 DDLOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
 {
     // Update embedded database.
@@ -888,7 +901,7 @@ const std::list<std::string> DDLOutput::local_qz() const
     return std::list<std::string>({original_query});
 }
 
-bool
+void
 AdjustOnionOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
                                const std::unique_ptr<Connect> &e_conn)
 {
@@ -896,9 +909,9 @@ AdjustOnionOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
     return DeltaOutput::beforeQuery(conn, e_conn);
 }
 
-bool AdjustOnionOutput::getQuery(std::list<std::string> * const queryz,
-                                 SchemaInfo const &)
-    const
+void
+AdjustOnionOutput::getQuery(std::list<std::string> * const queryz,
+                            SchemaInfo const &) const
 {
     std::list<std::string> r_qz = remote_qz();
     assert(r_qz.size() == 1 || r_qz.size() == 2);
@@ -922,10 +935,10 @@ bool AdjustOnionOutput::getQuery(std::list<std::string> * const queryz,
         "   '" + hackEscape(r_qz.back()) + "');";
 
     queryz->push_back(q_remote);
-    return true;
+    return;
 }
 
-bool
+void
 AdjustOnionOutput::afterQuery(const std::unique_ptr<Connect> &e_conn)
     const
 {

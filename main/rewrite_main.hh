@@ -83,7 +83,8 @@ private:
 };
 
 class SchemaCache;
-ResType
+class EpilogueResult;
+EpilogueResult
 executeQuery(const ProxyState &ps, const std::string &q,
              SchemaCache *const schema_cache=NULL, bool pp=true);
 
