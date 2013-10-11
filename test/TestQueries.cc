@@ -1000,6 +1000,19 @@ static QueryList Transactions = QueryList("Transactions",
       Query("UPDATE trans SET a = c + 1, b = a + 1", false),
       Query("COMMIT", false),
       Query("ROLLBACK", false),
+      Query("SELECT * FROM trans", false),
+
+      Query("START TRANSACTION", false),
+      Query("UPDATE trans SET a = a + 1, c = 50 WHERE a < 50000", false),
+      // commit required for control database
+      Query("COMMIT", false),
+      Query("SELECT * FROM trans", false),
+
+      Query("START TRANSACTION", false),
+      Query("INSERT INTO trans VALUES (1, 50, 150)", false),
+      Query("UPDATE trans SET b = b + 10 WHERE c = 50", false),
+      // commit required for control database.
+      Query("COMMIT", false),
       Query("SELECT * FROM trans", false)},
     { "DROP TABLE trans"},
     { "DROP TABLE trans"},
@@ -1361,7 +1374,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 446/449
+    //      TOTAL RESULT: 453/458
     // ###############################
 
     std::vector<Score> scores;
@@ -1420,7 +1433,8 @@ RunTest(const TestConfig &tc) {
     // Pass 20/20
     scores.push_back(CheckQueryList(tc, NonStrictMode));
 
-    // Pass 25/25
+    // Pass 32/34
+    // NOTE: two queries should fail
     scores.push_back(CheckQueryList(tc, Transactions));
 
     // Pass 14/14
