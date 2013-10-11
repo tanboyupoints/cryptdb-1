@@ -91,8 +91,8 @@ static bool handle_line(ProxyState& ps, const std::string& q, bool pp=true)
     return true;
   }
 
+  static SchemaCache schema_cache;
   try {
-      static SchemaCache schema_cache;
       const EpilogueResult &epi_result =
           executeQuery(ps, q, &schema_cache, pp);
       if (QueryAction::ROLLBACK == epi_result.action) {
@@ -105,12 +105,15 @@ static bool handle_line(ProxyState& ps, const std::string& q, bool pp=true)
       return false;
   } catch (const AbstractException &e) {
       std::cout << e << std::endl;
+      schema_cache = SchemaCache();
       return true;
   }  catch (const CryptDBError &e) {
       std::cout << "Low level error: " << e.msg << std::endl;
+      schema_cache = SchemaCache();
       return true;
   } catch (const std::runtime_error &e) {
       std::cout << "Unexpected Error: " << e.what() << std::endl;
+      schema_cache = SchemaCache();
       return false;
   }
 }

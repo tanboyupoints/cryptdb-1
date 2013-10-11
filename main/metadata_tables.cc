@@ -129,6 +129,7 @@ MetaData::initialize(const std::unique_ptr<Connect> &conn,
         "    complete BOOLEAN NOT NULL,"
         "    original_query VARCHAR(500) NOT NULL,"
         "    aborted BOOLEAN NOT NULL,"
+        "    type VARCHAR(100) NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
     RETURN_FALSE_IF_FALSE(e_conn->execute(create_embedded_completion));

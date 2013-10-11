@@ -130,7 +130,6 @@ sanityCheck(SchemaInfo &schema)
     > ER_DUP_KEY
     > ER_KEY_DOES_NOT_EXIST
 */
-/*
 static bool
 recoverableDeltaError(unsigned int err)
 {
@@ -144,156 +143,183 @@ recoverableDeltaError(unsigned int err)
     return ret;
 }
 
+struct RecoveryDetails {
+    const bool embedded_begin;
+    const bool embedded_complete;
+    const bool existed_remote_complete;
+    const bool remote_complete;
+    const std::string query;
+
+    RecoveryDetails(bool embedded_begin, bool embedded_complete,
+                    bool existed_remote_complete, bool remote_complete,
+                    const std::string query)
+        : embedded_begin(embedded_begin),
+          embedded_complete(embedded_complete),
+          existed_remote_complete(existed_remote_complete),
+          remote_complete(remote_complete), query(query) {}
+};
+
 static bool
-fixDelta(const std::unique_ptr<Connect> &conn,
-         const std::unique_ptr<Connect> &e_conn,
-         unsigned long delta_output_id)
+collectRecoveryDetails(const std::unique_ptr<Connect> &conn,
+                       const std::unique_ptr<Connect> &e_conn,
+                       unsigned long unfinished_id,
+                       std::unique_ptr<RecoveryDetails> *details)
 {
-    std::list<std::string> local_queries;
-    bool expect_ddl;
+    const std::string embedded_completion_table =
+        MetaData::Table::embeddedQueryCompletion();
+    const std::string remote_completion_table =
+        MetaData::Table::remoteQueryCompletion();
 
-    const std::string query_table_name = MetaData::Table::query();
-
-    // Get local queries (should only be one).
+    // collect completion data
     std::unique_ptr<DBResult> dbres;
-    const std::string get_local_query_query =
-        " SELECT query FROM " + query_table_name +
-        "  WHERE delta_output_id = " + std::to_string(delta_output_id) +
-        "    AND local = TRUE;";
-    RETURN_FALSE_IF_FALSE(e_conn->execute(get_local_query_query, &dbres));
+    const std::string embedded_completion_q =
+        " SELECT begin, complete, original_query FROM " +
+            embedded_completion_table +
+        "  WHERE id = " + std::to_string(unfinished_id) + ";";
+    RETURN_FALSE_IF_FALSE(e_conn->execute(embedded_completion_q, &dbres));
+    assert(mysql_num_rows(dbres->n) == 1);
 
-    // Onion adjustment queries do not have local.
-    const unsigned long long local_row_count =
-        mysql_num_rows(dbres->n);
-    if (1 == local_row_count) {
-        expect_ddl = true;
-        const MYSQL_ROW local_row = mysql_fetch_row(dbres->n);
-        const unsigned long *const local_l =
-            mysql_fetch_lengths(dbres->n);
-        const std::string local_query(local_row[0], local_l[0]);
-        local_queries.push_back(local_query);
-    } else if (0 == local_row_count) {
-        expect_ddl = false;
-    } else {
-        return false;
+    const MYSQL_ROW embedded_row = mysql_fetch_row(dbres->n);
+    const unsigned long *const l = mysql_fetch_lengths(dbres->n);
+    const std::string string_embedded_begin(embedded_row[0], l[0]);
+    const std::string string_embedded_complete(embedded_row[1], l[1]);
+    const std::string string_embedded_query(embedded_row[2], l[2]);
+
+    const std::string remote_completion_q =
+        " SELECT complete FROM " + remote_completion_table +
+        "  WHERE embedded_completion_id = " +
+                 std::to_string(unfinished_id) + ";";
+    RETURN_FALSE_IF_FALSE(conn->execute(remote_completion_q, &dbres));
+
+    const unsigned long remote_row_count = mysql_num_rows(dbres->n);
+    const MYSQL_ROW remote_row = mysql_fetch_row(dbres->n);
+    assert(!!remote_row == !!remote_row_count);
+
+    std::string string_remote_complete;
+    const bool existed_remote_complete = !!remote_row;
+    if (existed_remote_complete) {
+        const unsigned long *const l = mysql_fetch_lengths(dbres->n);
+        string_remote_complete = std::string(remote_row[0], l[0]);
+        assert(string_to_bool(string_remote_complete) == true);
     }
 
-    // Get remote queries (ORDER matters).
-    const std::string remote_query =
-        " SELECT query, ddl FROM " + query_table_name +
-        "  WHERE delta_output_id = " + std::to_string(delta_output_id) +
-        "    AND local = FALSE;"
-        "  ORDER BY ASC id";
-    RETURN_FALSE_IF_FALSE(e_conn->execute(remote_query, &dbres));
+    const bool embedded_begin = string_to_bool(string_embedded_begin);
+    const bool embedded_complete =
+        string_to_bool(string_embedded_complete);
+    const bool remote_complete =
+        existed_remote_complete ?
+                          string_to_bool(string_remote_complete)
+                        : false;
 
-    MYSQL_ROW remote_row;
-    std::list<std::string> remote_queries;
-    while ((remote_row = mysql_fetch_row(dbres->n))) {
-        const unsigned long *const remote_l =
-            mysql_fetch_lengths(dbres->n);
-        const std::string remote_query(remote_row[0], remote_l[0]);
-        const std::string remote_ddl(remote_row[1], remote_l[1]);
-        const bool ddl = string_to_bool(remote_ddl);
-        TEST_TextMessageError(ddl == expect_ddl,
-                              "Expectations of DDLness are unmatched!");
+    assert(true == embedded_begin);
 
-        remote_queries.push_back(remote_query);
-    }
-
-    // Do sanity check.
-    RETURN_FALSE_IF_FALSE((expect_ddl && remote_queries.size() == 1 &&
-                           local_queries.size() == 1) ||
-                          (!expect_ddl && remote_queries.size() >= 1 &&
-                           local_queries.size() == 0));
-
-    if (expect_ddl) {  // Handle single DDL query.
-        if (false == conn->execute(remote_queries.back())) {
-            unsigned int const err = conn->get_mysql_errno();
-            if (false == recoverableDeltaError(err)) {
-                return false;
-            }
-        }
-    } else {        // Handle one or more DML queries.
-        std::unique_ptr<DBResult> dbres;
-        const std::string dml_table =
-            MetaData::Table::dmlCompletion();
-        const std::string dml_query =
-            " SELECT * FROM " + dml_table +
-            "  WHERE delta_output_id = " +
-            " " +    std::to_string(delta_output_id) + ";";
-        RETURN_FALSE_IF_FALSE(conn->execute(dml_query, &dbres));
-
-        const unsigned long long dml_row_count =
-            mysql_num_rows(dbres->n);
-        if (0 == dml_row_count) {
-            RETURN_FALSE_IF_FALSE(conn->execute("START TRANSACTION;"));
-            for (auto it : remote_queries) {
-                RETURN_FALSE_IF_FALSE(conn->execute(it));
-            }
-            RETURN_FALSE_IF_FALSE(saveDMLCompletion(conn,
-                                                    delta_output_id));
-            RETURN_FALSE_IF_FALSE(conn->execute("COMMIT"));
-        } else if (1 < dml_row_count) {
-            FAIL_TextMessageError("Too many DML table results!");
-        }
-    }
-
-    // Cleanup database and do local query.
-    {
-        RETURN_FALSE_IF_FALSE(e_conn->execute("START TRANSACTION;"));
-        if (false == setRegularTableToBleedingTable(e_conn)) {
-            e_conn->execute("ROLLBACK;");
-            return false;
-        }
-
-        if (false == cleanupDeltaOutputAndQuery(e_conn,delta_output_id)) {
-            e_conn->execute("ROLLBACK;");
-            return false;
-        }
-        RETURN_FALSE_IF_FALSE(e_conn->execute("COMMIT;"));
-    }
-
-    // FIXME: local_query can be DDL.
-    // > This can be fixed with a bleeding table.
-    RETURN_FALSE_IF_FALSE(local_queries.size() <= 1);
-    for (auto it : local_queries) {
-        RETURN_FALSE_IF_FALSE(e_conn->execute(it));
-    }
+    *details =
+        std::unique_ptr<RecoveryDetails>(
+            new RecoveryDetails(embedded_begin, embedded_complete,
+                                existed_remote_complete, remote_complete,
+                                string_embedded_query));
 
     return true;
 }
-*/
+
+static bool
+fixAdjustOnion(const std::unique_ptr<Connect> &conn,
+               const std::unique_ptr<Connect> &e_conn,
+               unsigned long unfinished_id)
+{
+    const std::string embedded_completion_table =
+        MetaData::Table::embeddedQueryCompletion();
+
+    std::unique_ptr<RecoveryDetails> details;
+    RETURN_FALSE_IF_FALSE(collectRecoveryDetails(conn, e_conn,
+                                                 unfinished_id,
+                                                 &details));
+
+    // failure after initial location queries and before remote queries
+    if (false == details->remote_complete) {
+        const std::string update_aborted =
+            " UPDATE " + embedded_completion_table +
+            "    SET aborted = TRUE;";
+
+        assert(false == details->embedded_complete);
+        RETURN_FALSE_IF_FALSE(e_conn->execute("START TRANSACTION"));
+        ROLLBACK_AND_RFIF(setBleedingTableToRegularTable(e_conn),
+                          e_conn);
+        ROLLBACK_AND_RFIF(e_conn->execute(update_aborted), e_conn);
+        ROLLBACK_AND_RFIF(e_conn->execute("COMMIT"), e_conn);
+
+        return true;
+    }
+
+    // failure after remote queries
+    assert(false == details->embedded_complete);
+    {
+        const std::string update_completed =
+            " UPDATE " + embedded_completion_table +
+            "    SET complete = TRUE;";
+
+        assert(false == details->embedded_complete);
+        RETURN_FALSE_IF_FALSE(e_conn->execute("START TRANSACTION"));
+        ROLLBACK_AND_RFIF(setRegularTableToBleedingTable(e_conn),
+                          e_conn);
+        ROLLBACK_AND_RFIF(e_conn->execute(update_completed), e_conn);
+        ROLLBACK_AND_RFIF(e_conn->execute("COMMIT"), e_conn);
+
+        return true;
+    }
+
+}
+
+static bool
+fixDDL(const std::unique_ptr<Connect> &conn,
+       const std::unique_ptr<Connect> &e_conn,
+       unsigned long unfinished_id)
+{
+    recoverableDeltaError(0);
+    return true;
+}
 
 static bool
 deltaSanityCheck(const std::unique_ptr<Connect> &conn,
                  const std::unique_ptr<Connect> &e_conn)
 {
-    return true;
-    /*
-    const std::string table_name = MetaData::Table::delta();
-
+    const std::string embedded_completion =
+        MetaData::Table::embeddedQueryCompletion();
     std::unique_ptr<DBResult> dbres;
-    const std::string get_deltas =
-        " SELECT id FROM " + table_name + ";";
-    RETURN_FALSE_IF_FALSE(e_conn->execute(get_deltas, &dbres));
+    const std::string unfinished_deltas =
+        " SELECT id, type FROM " + embedded_completion +
+        "  WHERE (begin = FALSE OR complete = FALSE)"
+        "    AND aborted != TRUE;";
+    RETURN_FALSE_IF_FALSE(e_conn->execute(unfinished_deltas, &dbres));
+    const unsigned long long unfinished_count = mysql_num_rows(dbres->n);
+    std::cerr << GREEN_BEGIN << "there are " << unfinished_count
+              << " unfinished deltas" << COLOR_END << std::endl;
 
-    const unsigned long long row_count = mysql_num_rows(dbres->n);
-
-    std::cerr << "There are " << row_count << " DeltaOutputz!"
-              << std::endl;
-    if (0 == row_count) {
+    if (0 == unfinished_count) {
         return true;
-    } else if (1 == row_count) {
-        MYSQL_ROW row = mysql_fetch_row(dbres->n);
-        const unsigned long *const l = mysql_fetch_lengths(dbres->n);
-        const std::string string_delta_output_id(row[0], l[0]);
-        const unsigned long delta_output_id =
-            atoi(string_delta_output_id.c_str());
-        return fixDelta(conn, e_conn, delta_output_id);
-    } else {
+    } else if (1 < unfinished_count) {
         return false;
     }
-    */
+
+    const MYSQL_ROW row = mysql_fetch_row(dbres->n);
+    const unsigned long *const l = mysql_fetch_lengths(dbres->n);
+    const std::string string_unfinished_id(row[0], l[0]);
+    const std::string string_unfinished_type(row[1], l[1]);
+
+    const unsigned long unfinished_id =
+        atoi(string_unfinished_id.c_str());
+    const CompletionType type =
+        TypeText<CompletionType>::toType(string_unfinished_type);
+
+    switch (type) {
+        case CompletionType::AdjustOnionCompletion:
+            return fixAdjustOnion(conn, e_conn, unfinished_id);
+        case CompletionType::DDLCompletion:
+            return fixDDL(conn, e_conn, unfinished_id);
+        default:
+            std::cerr << "unknown completion type" << std::endl;
+            return false;
+    }
 }
 
 // This function will not build all of our tables when it is run
@@ -497,6 +523,20 @@ buildTypeTextTranslator()
     RETURN_FALSE_IF_FALSE(security_rating_strings.size()
                             == security_rating_types.size());
     translatorHelper(security_rating_strings, security_rating_types);
+
+    // Query Completions.
+    const std::vector<std::string> completion_strings
+    {
+        "DDLCompletion", "AdjustOnionCompletion"
+    };
+    const std::vector<CompletionType> completion_types
+    {
+        CompletionType::DDLCompletion,
+        CompletionType::AdjustOnionCompletion
+    };
+    RETURN_FALSE_IF_FALSE(completion_strings.size()
+                            == completion_types.size());
+    translatorHelper(completion_strings, completion_types);
 
     return true;
 }

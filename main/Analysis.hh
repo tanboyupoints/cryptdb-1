@@ -275,6 +275,8 @@ private:
     AssignOnce<bool> do_nothing;
 };
 
+enum class CompletionType {DDLCompletion, AdjustOnionCompletion};
+
 class DeltaOutput : public RewriteOutput {
 public:
     DeltaOutput(const std::string &original_query,
@@ -294,6 +296,7 @@ protected:
     const std::vector<std::unique_ptr<Delta> > deltas;
 
     unsigned long getEmbeddedCompletionID() const;
+    virtual CompletionType getCompletionType() const = 0;
 
 private:
     AssignOnce<unsigned long> embedded_completion_id;
@@ -311,6 +314,9 @@ public:
     void getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
     void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+
+protected:
+    CompletionType getCompletionType() const;
 
 private:
     const std::string new_query;
@@ -338,6 +344,9 @@ public:
     QueryAction queryAction(const std::unique_ptr<Connect> &conn) const;
     bool doDecryption() const;
 
+protected:
+    CompletionType getCompletionType() const;
+
 private:
     const std::list<std::string> adjust_queries;
 
@@ -352,6 +361,7 @@ private:
 };
 
 bool setRegularTableToBleedingTable(const std::unique_ptr<Connect> &e_conn);
+bool setBleedingTableToRegularTable(const std::unique_ptr<Connect> &e_conn);
 
 class RewritePlan;
 class Analysis {

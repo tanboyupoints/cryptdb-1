@@ -762,11 +762,14 @@ DeltaOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
     TEST_Sync(e_conn->execute("START TRANSACTION;"),
               "failed to start transaction");
 
+    const CompletionType &completion_type = this->getCompletionType();
     const std::string &q_completion =
         " INSERT INTO " + MetaData::Table::embeddedQueryCompletion() +
-        "   (begin, complete, original_query, aborted) VALUES"
+        "   (begin, complete, original_query, aborted, type) VALUES"
         "   (TRUE,  FALSE,"
-        "    '" + escapeString(conn, this->original_query) + "', FALSE);";
+        "    '" + escapeString(conn, this->original_query) + "', FALSE,"
+        "    '" + TypeText<CompletionType>::toText(completion_type)
+            + "');";
     SYNC_IF_FALSE(e_conn->execute(q_completion), e_conn);
     this->embedded_completion_id = e_conn->last_insert_id();
 
@@ -776,6 +779,12 @@ DeltaOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
     }
 
     SYNC_IF_FALSE(e_conn->execute("COMMIT;"), e_conn);
+
+    /*
+    if (this->getCompletionType() == CompletionType::AdjustOnionCompletion) {
+        throw CryptDBError("testing recovery!");
+    }
+    */
 
     return;
 }
@@ -833,34 +842,13 @@ setRegularTableToBleedingTable(const std::unique_ptr<Connect> &e_conn)
     return tableCopy(e_conn, src, dest);
 }
 
-/*
-static bool
+bool
 setBleedingTableToRegularTable(const std::unique_ptr<Connect> &e_conn)
 {
     const std::string src = MetaData::Table::metaObject();
     const std::string dest = MetaData::Table::bleedingMetaObject();
     return tableCopy(e_conn, src, dest);
 }
-*/
-
-/*
-static bool
-revertAndCleanupEmbedded(const std::unique_ptr<Connect> &e_conn,
-                         unsigned long delta_output_id)
-{
-    assert(e_conn->execute("START TRANSACTION;"));
-
-    TEST_TextMessageError(setBleedingTableToRegularTable(e_conn),
-                          "bleedingTable=regularTable failed!");
-    TEST_TextMessageError(cleanupDeltaOutputAndQuery(e_conn,
-                                                     delta_output_id),
-                          "cleaning up delta failed!");
-
-    assert(e_conn->execute("COMMIT;"));
-
-    return true;
-}
-*/
 
 void
 DDLOutput::getQuery(std::list<std::string> * const queryz,
@@ -899,6 +887,11 @@ const std::list<std::string> DDLOutput::remote_qz() const
 const std::list<std::string> DDLOutput::local_qz() const
 {
     return std::list<std::string>({original_query});
+}
+
+CompletionType DDLOutput::getCompletionType() const
+{
+    return CompletionType::DDLCompletion;
 }
 
 void
@@ -982,6 +975,11 @@ AdjustOnionOutput::queryAction(const std::unique_ptr<Connect> &conn)
 bool AdjustOnionOutput::doDecryption() const
 {
     return false;
+}
+
+CompletionType AdjustOnionOutput::getCompletionType() const
+{
+    return CompletionType::AdjustOnionCompletion;
 }
 
 bool Analysis::addAlias(const std::string &alias,
