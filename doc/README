@@ -51,8 +51,8 @@ Convention : When this document uses syntax like
 
         > Connect to CryptDB: (where root/letmein are username/password)
             mysql -u root -pletmein -h 127.0.0.1 -P 3307 cryptdbtest
-        > Type queries that will execute on encrypted data at the DB
-          server!
+        > CREATE a database; USE it; Then type queries that will execute
+          on encrypted data at the DB server!
 
     III. Tests
         > To Start:
@@ -99,6 +99,8 @@ Convention : When this document uses syntax like
 #########################################
 #########################################
 
+    > "purgatory" : If you see errors related to "purgatory"; you probably
+       need to 'USE' a database.
     > For example queries, take a look at our tests test/TestQueries.cc
     > The benchmarks in the CryptDB paper are based on an older version of
       CryptDB and likely do not reflect current performance.  It is our
