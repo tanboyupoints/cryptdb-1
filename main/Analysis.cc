@@ -409,20 +409,17 @@ std::string Delta::tableNameFromType(TableType table_type) const
     }
 }
 
-// TODO: Remove asserts.
 // Recursive.
 bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
                         TableType table_type)
 {
     const std::string table_name = tableNameFromType(table_type);
-    std::function<void(const std::unique_ptr<Connect> &e_conn,
-                       const DBMeta &, const DBMeta &,
+    std::function<bool(const DBMeta &, const DBMeta &,
                        const AbstractMetaKey * const,
                        const unsigned int * const)> helper =
-        [&helper, table_name] (const std::unique_ptr<Connect> &e_conn,
-                               const DBMeta &object,
-                               const DBMeta &parent,
-                               const AbstractMetaKey * const k,
+        [&e_conn, &helper, table_name] (const DBMeta &object,
+                                        const DBMeta &parent,
+                                        const AbstractMetaKey * const k,
                                const unsigned int * const ptr_parent_id)
     {
         const std::string child_serial = object.serialize(parent);
@@ -465,21 +462,22 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
             " '" + esc_child_serial + "',"
             " '" + esc_serial_key + "',"
             " " + std::to_string(parent_id) + ");";
-        assert(e_conn->execute(query));
+        RETURN_FALSE_IF_FALSE(e_conn->execute(query));
 
         const unsigned int object_id = e_conn->last_insert_id();
 
-        std::function<void(const DBMeta &)> localCreateHandler =
-            [&e_conn, &object, object_id, &helper]
+        // FIXME: reduceOnChildren
+        std::function<bool(const DBMeta &)> localCreateHandler =
+            [&object, object_id, &helper]
                 (const DBMeta &child)
             {
-                helper(e_conn, child, object, NULL, &object_id);
+                return helper(child, object, NULL, &object_id);
             };
         object.applyToChildren(localCreateHandler);
+        return true;
     };
 
-    helper(e_conn, *meta.get(), parent_meta, &key, NULL);
-    return true;
+    return helper(*meta.get(), parent_meta, &key, NULL);
 }
 
 bool ReplaceDelta::apply(const std::unique_ptr<Connect> &e_conn,
@@ -500,8 +498,7 @@ bool ReplaceDelta::apply(const std::unique_ptr<Connect> &e_conn,
         "    SET serial_object = '" + esc_child_serial + "', "
         "        serial_key = '" + esc_serial_key + "'"
         "  WHERE id = " + std::to_string(child_id) + ";";
-
-    assert(e_conn->execute(query));
+    RETURN_FALSE_IF_FALSE(e_conn->execute(query));
 
     return true;
 }
@@ -511,7 +508,7 @@ bool DeleteDelta::apply(const std::unique_ptr<Connect> &e_conn,
 {
     const std::string table_name = tableNameFromType(table_type);
     Connect * const e_c = e_conn.get();
-    std::function<void(const DBMeta &, const DBMeta &)> helper =
+    std::function<bool(const DBMeta &, const DBMeta &)> helper =
         [&e_c, &helper, table_name](const DBMeta &object,
                                     const DBMeta &parent)
     {
@@ -525,14 +522,15 @@ bool DeleteDelta::apply(const std::unique_ptr<Connect> &e_conn,
             "      = "     + std::to_string(object_id) + 
             "    AND " + table_name + ".parent_id" +
             "      = "     + std::to_string(parent_id) + ";";
+        RETURN_FALSE_IF_FALSE(e_c->execute(query));
 
-        assert(e_c->execute(query));
-
-        std::function<void(const DBMeta &)> localDestroyHandler =
-            [&e_c, &object, &helper] (const DBMeta &child) {
-                helper(child, object);
+        // FIXME: reduceOnChildren
+        std::function<bool(const DBMeta &)> localDestroyHandler =
+            [&object, &helper] (const DBMeta &child) {
+                return helper(child, object);
             };
         object.applyToChildren(localDestroyHandler);
+        return true;
     };
 
     helper(meta, parent_meta); 
@@ -875,7 +873,8 @@ DDLOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
 {
     // Update embedded database.
     // > This is a DDL query so do not put in transaction.
-    assert(e_conn->execute(this->original_query));
+    TEST_Sync(e_conn->execute(this->original_query),
+              "Failed to execute DDL query against embedded database!");
 
     return DeltaOutput::afterQuery(e_conn);
 }
