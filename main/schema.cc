@@ -31,7 +31,8 @@ DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
         " FROM " + table_name + 
         " WHERE " + table_name + ".parent_id"
         "   = " + parent_id + ";";
-    assert(e_conn.get()->execute(serials_query, &db_res));
+    // FIXME: Throw exception.
+    assert(e_conn->execute(serials_query, &db_res));
     MYSQL_ROW row;
     while ((row = mysql_fetch_row(db_res->n))) {
         unsigned long * const l = mysql_fetch_lengths(db_res->n);
@@ -261,7 +262,8 @@ FieldMeta::FieldMeta(const std::string &name, Create_field * const field,
       has_default(determineHasDefault(field)),
       default_value(determineDefaultValue(has_default, field))
 {
-    assert(init_onions_layout(m_key, this, field));
+    TEST_TextMessageError(init_onions_layout(m_key, this, field),
+                          "Failed to build onions for new FieldMeta!");
 }
 
 std::string FieldMeta::serialize(const DBObject &parent) const

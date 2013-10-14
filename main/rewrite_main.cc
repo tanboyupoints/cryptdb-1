@@ -88,7 +88,7 @@ sanityCheck(FieldMeta &fm)
         const std::vector<SECLEVEL> &secs = fm.getOnionLayout().at(o);
         for (size_t i = 0; i < om->layers.size(); ++i) {
             std::unique_ptr<EncLayer> const &layer = om->layers[i];
-            assert(layer.get()->level() == secs[i]);
+            assert(layer->level() == secs[i]);
         }
     }
     return true;
@@ -898,7 +898,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
             }
 
             const std::unique_ptr<RewritePlan> &item_rp =
-                subquery_analysis.get()->rewritePlans[item];
+                subquery_analysis->rewritePlans[item];
             TEST_NoAvailableEncSet(item_rp->es_out, i.type(),
                                    PLAIN_EncSet, why,
                             std::vector<std::shared_ptr<RewritePlan> >());
@@ -1172,7 +1172,7 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
     } catch (std::runtime_error &e) {
         FAIL_TextMessageError("Bad Query: " + query);
     }
-    LEX *const lex = p.get()->lex();
+    LEX *const lex = p->lex();
 
     LOG(cdb_v) << "pre-analyze " << *lex;
 

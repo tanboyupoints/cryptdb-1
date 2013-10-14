@@ -318,15 +318,15 @@ createAll(const std::unique_ptr<Connect> &conn)
             default:            thrower() << "unknown return " << u->returns;
         }
         ss << " SONAME 'edb.so';";
-        assert_s(conn.get()->execute(ss.str()), ss.str());
+        assert_s(conn->execute(ss.str()), ss.str());
     }
 }
 
 static void
 loadUDFs(const std::unique_ptr<Connect> &conn) {
     const std::string udf_db = "cryptdb_udf";
-    assert_s(conn.get()->execute("DROP DATABASE IF EXISTS " + udf_db), "cannot drop db for udfs even with 'if exists'");
-    assert_s(conn.get()->execute("CREATE DATABASE " + udf_db), "cannot create db for udfs");
+    assert_s(conn->execute("DROP DATABASE IF EXISTS " + udf_db), "cannot drop db for udfs even with 'if exists'");
+    assert_s(conn->execute("CREATE DATABASE " + udf_db), "cannot create db for udfs");
 
     std::string saved_db;
     assert(lowLevelGetCurrentDatabase(conn.get(), &saved_db));
@@ -663,7 +663,7 @@ SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     const std::string push_q =
         " INSERT INTO " + this->plain_table +
         " VALUES " + values_string + ";";
-    (e_conn->execute(push_q), e_conn);
+    SYNC_IF_FALSE(e_conn->execute(push_q), e_conn);
 
     // Run the original (unmodified) query on the data in the embedded
     // database.
@@ -816,12 +816,12 @@ tableCopy(const std::unique_ptr<Connect> &c, const std::string &src,
 {
     const std::string delete_query =
         " DELETE FROM " + dest + ";";
-    assert(c->execute(delete_query));
+    RETURN_FALSE_IF_FALSE(c->execute(delete_query));
 
     const std::string insert_query =
         " INSERT " + dest +
         "   SELECT * FROM " + src + ";";
-    assert(c->execute(insert_query));
+    RETURN_FALSE_IF_FALSE(c->execute(insert_query));
 
     return true;
 }
@@ -960,7 +960,8 @@ AdjustOnionOutput::queryAction(const std::unique_ptr<Connect> &conn)
                  std::to_string(this->getEmbeddedCompletionID()) + ";";
 
     std::unique_ptr<DBResult> db_res;
-    conn->execute(q, &db_res);
+    // FIXME: Throw exception.
+    assert(conn->execute(q, &db_res));
     assert(1 == mysql_num_rows(db_res->n));
 
     MYSQL_ROW row = mysql_fetch_row(db_res->n);
