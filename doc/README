@@ -41,18 +41,19 @@ Convention : When this document uses syntax like
         > Type SQL queries that will be encrypted.
 
     II. Proxy
-        > To Start: 
-            export EDBDIR=./cryptdb/obj
-            mysql-proxy --plugins=proxy --event-threads=4 \
-                        --max-open-files=1024 \
-                        --proxy-lua-script=$EDBDIR/../mysqlproxy/wrapper.lua \
-                        --proxy-address=127.0.0.1:3307 \
-                        --proxy-backend-addresses=localhost:3306
+        A) To Start: 
+             > export EDBDIR=/path/to/cryptdb/obj
+             > /path/to/cryptdb/bins/proxy-bin/bin/mysql-proxy         \
+                         --plugins=proxy --event-threads=4             \
+                         --max-open-files=1024                         \
+                         --proxy-lua-script=$EDBDIR/../mysqlproxy/wrapper.lua \
+                         --proxy-address=127.0.0.1:3307                \
+                         --proxy-backend-addresses=localhost:3306
 
-        > Connect to CryptDB: (where root/letmein are username/password)
-            mysql -u root -pletmein -h 127.0.0.1 -P 3307 cryptdbtest
-        > CREATE a database; USE it; Then type queries that will execute
-          on encrypted data at the DB server!
+        B) Connect to CryptDB: (where root/letmein are username/password)
+           mysql -u root -pletmein -h 127.0.0.1 -P 3307
+        C) CREATE a database; USE it; Then type queries that will execute
+           on encrypted data at the DB server!
 
     III. Tests
         > To Start:

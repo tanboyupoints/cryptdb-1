@@ -82,8 +82,9 @@ def fn(cdb_path, in_make_v=nil, in_gcc_v=nil)
         FileUtils.copy(little, config_path)
     end
 
+    proxy_install_path = File.join(bins_path, "proxy-bin")
     mp_shell.>("./autogen.sh")
-    mp_shell.>("./configure --enable-maintainer-mode --with-lua=lua5.1")
+    mp_shell.>("./configure --enable-maintainer-mode --with-lua=lua5.1 --prefix=\"#{proxy_install_path}\"")
     mp_shell.>("make")
     mp_shell.>("make install")
     File.delete(config_path)
@@ -249,7 +250,7 @@ end
 
 def root?
     if 0 != Process.uid
-        fail "root required to install dependencies and mysql-proxy".red.bold
+        fail "root required to install dependencies".red.bold
     end
 end
 
