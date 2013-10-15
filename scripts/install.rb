@@ -250,7 +250,7 @@ end
 
 def root?
     if 0 != Process.uid
-        fail "root required to install dependencies".red.bold
+        fail "root required to install dependencies and UDFs".red.bold
     end
 end
 

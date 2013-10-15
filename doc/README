@@ -18,7 +18,7 @@ Convention : When this document uses syntax like
         + <path-to-cryptdb> should just be '.' if you are in the cryptdb
           directory
         + the script will likely require root privileges in order to
-          install dependencies and mysql-proxy.
+          install dependencies and UDFs.
     * Username/Password
         By default cryptdb uses 'root' for the username and 'letmein'
         for the password. You can change this by modifying the source.
