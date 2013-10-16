@@ -18,8 +18,8 @@ class WrapperState {
 
 public:
     std::string last_query;
+    std::string default_db;
     std::ofstream * PLAIN_LOG;
-    std::string cur_db;
 
     WrapperState() {}
     ~WrapperState() {}
@@ -259,7 +259,8 @@ rewrite(lua_State *const L)
     WrapperState *const c_wrapper = clients[client];
 
     const std::string query = xlua_tolstring(L, 2);
-    const std::string query_data = xlua_tolstring(L, 3);
+    const unsigned long long _thread_id =
+        strtoull(xlua_tolstring(L, 3).c_str(), NULL, 10);
 
     std::list<std::string> new_queries;
 
@@ -274,7 +275,12 @@ rewrite(lua_State *const L)
                 schema_cache.getSchema(ps->getConn(), ps->getEConn());
 
             std::unique_ptr<QueryRewrite> qr;
-            queryPreamble(*ps, query, &qr, &new_queries, schema);
+            TEST_TextMessageError(retrieveDefaultDatabase(_thread_id,
+                                                          ps->getConn(),
+                                            &c_wrapper->default_db),
+                            "proxy failed to retrieve default database!");
+            queryPreamble(*ps, query, &qr, &new_queries, schema,
+                          c_wrapper->default_db);
             assert(qr);
 
             c_wrapper->setQueryRewrite(qr.release());
@@ -422,7 +428,7 @@ envoi(lua_State *const L)
     try {
         const EpilogueResult &epi_result =
             queryEpilogue(*ps, *qr.get(), res, c_wrapper->last_query,
-                          false);
+                          c_wrapper->default_db, false);
         const bool stales = qr->output->stalesSchema();
         c_wrapper->getSchemaCache().updateStaleness(stales);
         if (QueryAction::ROLLBACK == epi_result.action) {

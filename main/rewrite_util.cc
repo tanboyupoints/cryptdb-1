@@ -29,8 +29,6 @@ optimize(Item ** const i, Analysis &a) {
 Item *
 rewrite(const Item &i, const EncSet &req_enc, Analysis &a)
 {
-    assert(a.saneDatabaseName());
-
     const std::unique_ptr<RewritePlan> &rp =
         constGetAssert(a.rewritePlans, &i);
     const EncSet solution = rp->es_out.intersect(req_enc);
@@ -159,8 +157,6 @@ rewrite_table_list(List<TABLE_LIST> tll, Analysis &a)
 RewritePlan *
 gather(const Item &i, Analysis &a)
 {
-    assert(a.saneDatabaseName());
-
     return itemTypes.do_gather(i, a);
 }
 
@@ -415,9 +411,10 @@ encrypt_item_layers(const Item &i, onion o, const OnionMeta &om,
 
 std::string
 rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
-                         SchemaInfo const &schema)
+                         SchemaInfo const &schema,
+                         const std::string &default_db)
 {
-    const QueryRewrite qr(Rewriter::rewrite(ps, q, schema));
+    const QueryRewrite qr(Rewriter::rewrite(ps, q, schema, default_db));
     assert(false == qr.output->stalesSchema());
     assert(QueryAction::VANILLA == qr.output->queryAction(ps.getConn()));
 
@@ -471,14 +468,76 @@ mysql_noop()
     return "do 0;";
 }
 
+/*
+ * connection ids can be longer than 32 bits
+ * http://dev.mysql.com/doc/refman/5.1/en/mysql-thread-id.html
+ */
+static bool
+getConnectionID(const std::unique_ptr<Connect> &c,
+                unsigned long long *const connection_id)
+{
+    std::unique_ptr<DBResult> dbres;
+    const std::string &query = " SELECT CONNECTION_ID();";
+    RETURN_FALSE_IF_FALSE(c->execute(query, &dbres));
+    RETURN_FALSE_IF_FALSE(mysql_num_rows(dbres->n) == 1);
+
+    const MYSQL_ROW row = mysql_fetch_row(dbres->n);
+    const unsigned long *const l = mysql_fetch_lengths(dbres->n);
+    *connection_id =
+        strtoull(std::string(row[0], l[0]).c_str(), NULL, 10);
+    return true;
+}
+
+
+std::string
+getDefaultDatabaseForConnection(const std::unique_ptr<Connect> &c)
+{
+    unsigned long long thread_id;
+    TEST_TextMessageError(getConnectionID(c, &thread_id),
+                          "failed to get connection id!");
+    std::string out_name;
+    TEST_TextMessageError(retrieveDefaultDatabase(thread_id, c, &out_name),
+                          "failed to retrieve default database!");
+
+    return out_name;
+}
+
+bool
+retrieveDefaultDatabase(unsigned long long thread_id,
+                        const std::unique_ptr<Connect> &c,
+                        std::string *const out_name)
+{
+    out_name->clear();
+
+    std::unique_ptr<DBResult> dbres;
+    const std::string &query =
+        " SELECT db FROM INFORMATION_SCHEMA.PROCESSLIST"
+        "  WHERE id = " + std::to_string(thread_id) + ";";
+    RETURN_FALSE_IF_FALSE(c->execute(query, &dbres));
+    RETURN_FALSE_IF_FALSE(mysql_num_rows(dbres->n) == 1);
+
+    const MYSQL_ROW row = mysql_fetch_row(dbres->n);
+    const unsigned long *const l = mysql_fetch_lengths(dbres->n);
+    *out_name = std::string(row[0], l[0]);
+    return true;
+}
+
 void
 queryPreamble(const ProxyState &ps, const std::string &q,
               std::unique_ptr<QueryRewrite> *const qr,
               std::list<std::string> *const out_queryz,
-              SchemaInfo const &schema)
+              SchemaInfo const &schema,
+              const std::string &default_db)
 {
+    // We want the embedded database to reflect the metadata for the
+    // current remote connection.
+    // FIXME: Handle errors.
+    if (default_db.size() > 0) {
+        lowLevelSetCurrentDatabase(ps.getEConn().get(), default_db);
+    }
     *qr = std::unique_ptr<QueryRewrite>(
-            new QueryRewrite(Rewriter::rewrite(ps, q, schema)));
+            new QueryRewrite(Rewriter::rewrite(ps, q, schema,
+                                               default_db)));
 
     (*qr)->output->beforeQuery(ps.getConn(), ps.getEConn());
     (*qr)->output->getQuery(out_queryz, schema);
@@ -529,13 +588,14 @@ prettyPrintQueryResult(const ResType &res)
 
 EpilogueResult
 queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
-              const ResType &res, const std::string &query, bool pp)
+              const ResType &res, const std::string &query,
+              const std::string &default_db, bool pp)
 {
     qr.output->afterQuery(ps.getEConn());
 
     const QueryAction action = qr.output->queryAction(ps.getConn());
     if (QueryAction::AGAIN == action) {
-        return executeQuery(ps, query, NULL, pp);
+        return executeQuery(ps, query, default_db, NULL, pp);
     }
 
     if (pp) {
@@ -573,4 +633,5 @@ void SchemaCache::updateStaleness(bool staleness)
 {
     this->staleness = staleness;
 }
+
 

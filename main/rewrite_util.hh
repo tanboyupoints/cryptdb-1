@@ -70,7 +70,8 @@ encrypt_item_layers(const Item &i, onion o, const OnionMeta &om,
 
 std::string
 rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
-                         SchemaInfo const &schema);
+                         SchemaInfo const &schema,
+                         const std::string &default_db);
 
 // FIXME(burrows): Generalize to support any container with next AND end
 // semantics.
@@ -123,11 +124,20 @@ rewrite_select_lex(const st_select_lex &select_lex, Analysis &a);
 std::string
 mysql_noop();
 
+std::string
+getDefaultDatabaseForConnection(const std::unique_ptr<Connect> &c);
+
+bool
+retrieveDefaultDatabase(unsigned long long thread_id,
+                        const std::unique_ptr<Connect> &c,
+                        std::string *const out_name);
+
 void
 queryPreamble(const ProxyState &ps, const std::string &q,
               std::unique_ptr<QueryRewrite> *qr,
               std::list<std::string> *const out_queryz,
-              SchemaInfo const &schema);
+              SchemaInfo const &schema,
+              const std::string &default_db);
 
 bool
 queryHandleRollback(const ProxyState &ps, const std::string &query,
@@ -147,7 +157,8 @@ public:
 
 EpilogueResult
 queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
-              const ResType &res, const std::string &query, bool pp);
+              const ResType &res, const std::string &query,
+              const std::string &default_db, bool pp);
 
 class SchemaCache {
 public:

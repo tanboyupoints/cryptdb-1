@@ -252,10 +252,11 @@ public:
                   const std::string &plain_table,
                   const std::string &crypted_table,
                   const std::string &where_clause,
+                  const std::string &default_db,
                   const ProxyState &ps)
     : RewriteOutput(original_query),
       plain_table(plain_table), crypted_table(crypted_table),
-      where_clause(where_clause), ps(ps) {}
+      where_clause(where_clause), default_db(default_db), ps(ps) {}
     ~SpecialUpdate() {;}
 
     void beforeQuery(const std::unique_ptr<Connect> &conn,
@@ -269,6 +270,7 @@ private:
     const std::string plain_table;
     const std::string crypted_table;
     const std::string where_clause;
+    const std::string default_db;
     const ProxyState &ps;
 
     AssignOnce<std::string> output_values;
@@ -372,8 +374,8 @@ class Analysis {
     Analysis &operator=(Analysis &&a) = delete;
 
 public:
-    Analysis(const SchemaInfo &schema)
-        : pos(0), special_update(false),
+    Analysis(const std::string &default_db, const SchemaInfo &schema)
+        : pos(0), special_update(false), db_name(default_db),
           schema(schema) {}
 
     unsigned int pos; // > a counter indicating how many projection
@@ -430,14 +432,11 @@ public:
 
     std::vector<std::unique_ptr<Delta> > deltas;
 
-    void setDatabaseName(const std::string &db) {db_name = db;}
-    std::string getDatabaseName() const {return db_name.get();}
-    void clearDatabaseName() {db_name.clear();}
-    bool saneDatabaseName() const;
+    std::string getDatabaseName() const {return db_name;}
 
 private:
+    const std::string db_name;
     const SchemaInfo &schema;
-    CarefulClear<std::string> db_name;
 
     bool isAlias(const std::string &db,
                  const std::string &table) const;
@@ -447,3 +446,6 @@ private:
 
 bool
 lowLevelGetCurrentDatabase(Connect *const c, std::string *const out_db);
+
+bool
+lowLevelSetCurrentDatabase(Connect *const c, const std::string &db);

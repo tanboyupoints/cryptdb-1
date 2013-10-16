@@ -93,8 +93,10 @@ static bool handle_line(ProxyState& ps, const std::string& q, bool pp=true)
 
   static SchemaCache schema_cache;
   try {
+      const std::string &default_db =
+          getDefaultDatabaseForConnection(ps.getConn());
       const EpilogueResult &epi_result =
-          executeQuery(ps, q, &schema_cache, pp);
+          executeQuery(ps, q, default_db, &schema_cache, pp);
       if (QueryAction::ROLLBACK == epi_result.action) {
           std::cout << GREEN_BEGIN << "ROLLBACK issued!" << COLOR_END
                     << std::endl;

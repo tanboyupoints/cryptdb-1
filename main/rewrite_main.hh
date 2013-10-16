@@ -65,7 +65,7 @@ public:
 
     static QueryRewrite
         rewrite(const ProxyState &ps, const std::string &q,
-                SchemaInfo const &schema);
+                SchemaInfo const &schema, const std::string &default_db);
     static ResType
         decryptResults(const ResType &dbres, const ReturnMeta &rm);
 
@@ -86,6 +86,7 @@ class SchemaCache;
 class EpilogueResult;
 EpilogueResult
 executeQuery(const ProxyState &ps, const std::string &q,
+             const std::string &default_db,
              SchemaCache *const schema_cache=NULL, bool pp=true);
 
 #define UNIMPLEMENTED \

@@ -1209,11 +1209,15 @@ Connection::executeRewriter(std::string query) {
     }
 
     //cout << query << endl;
-    ProxyState *ps = *re_it;
+    ProxyState *const ps = *re_it;
     // If this assert fails, deteremine if one schema_cache makes sense
     // for multiple connections.
     assert(re_set.size() == 1);
-    return executeQuery(*ps, query, &this->schema_cache).res_type;
+    const std::string &default_db =
+        getDefaultDatabaseForConnection(ps->getConn());
+
+    return executeQuery(*ps, query, default_db,
+                        &this->schema_cache).res_type;
 }
 
 my_ulonglong

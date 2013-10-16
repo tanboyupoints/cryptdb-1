@@ -881,8 +881,8 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
 
         // Gather subquery.
         std::unique_ptr<Analysis>
-            subquery_analysis(new Analysis(a.getSchema()));
-        subquery_analysis->setDatabaseName(a.getDatabaseName());
+            subquery_analysis(new Analysis(a.getDatabaseName(),
+                                           a.getSchema()));
         const st_select_lex *const select_lex =
             RiboldMYSQL::get_select_lex(i);
         process_select_lex(*select_lex, *subquery_analysis);
@@ -1150,27 +1150,18 @@ const std::unique_ptr<SQLDispatcher> Rewriter::dml_dispatcher =
 const std::unique_ptr<SQLDispatcher> Rewriter::ddl_dispatcher =
     std::unique_ptr<SQLDispatcher>(buildDDLDispatcher());
 
+// NOTE : This will probably choke on multidatabase queries.
 RewriteOutput *
 Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
                         const std::string &query)
 {
-    // TODO: If we need to support queries with multiple databases
-    // move pattern down.
-    std::string default_db;
-    // Get the current database from the embedded database becase the
-    // proxy doesn't use the remote connection in proxy state to
-    // execute it's queries; so it follows that the remote connection
-    // will have a garbage (likely the initial) default database.
-    lowLevelGetCurrentDatabase(ps.getEConn().get(), &default_db);
-    a.setDatabaseName(default_db);
-    const OnUnscope clear_database([&a] () {a.clearDatabaseName();});
-
     std::unique_ptr<query_parse> p;
     try {
         p = std::unique_ptr<query_parse>(
                 new query_parse(a.getDatabaseName(), query));
     } catch (std::runtime_error &e) {
-        FAIL_TextMessageError("Bad Query: " + query);
+        FAIL_TextMessageError("Bad Query: " + query + "\n"
+                              "Error Data: " + e.what());
     }
     LEX *const lex = p->lex();
 
@@ -1224,7 +1215,7 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         }
 
         return new SpecialUpdate(query,  plain_table, crypted_table,
-                                 where_clause, ps);
+                                 where_clause, a.getDatabaseName(), ps);
     } else if (ddl_dispatcher->canDo(lex)) {
         const SQLHandler &handler = ddl_dispatcher->dispatch(lex);
         LEX *const out_lex = handler.transformLex(a, lex, ps);
@@ -1308,13 +1299,14 @@ cryptdbDirective(const std::string &query)
 
 QueryRewrite
 Rewriter::rewrite(const ProxyState &ps, const std::string &q,
-                  SchemaInfo const &schema)
+                  SchemaInfo const &schema,
+                  const std::string &default_db)
 {
     LOG(cdb_v) << "q " << q;
     assert(0 == mysql_thread_init());
     //assert(0 == create_embedded_thd(0));
 
-    Analysis analysis(schema);
+    Analysis analysis(default_db, schema);
 
     RewriteOutput *output;
     if (cryptdbDirective(q)) {
@@ -1424,6 +1416,7 @@ mysql_noop_res(const ProxyState &ps)
 
 EpilogueResult
 executeQuery(const ProxyState &ps, const std::string &q,
+             const std::string &default_db,
              SchemaCache *schema_cache, bool pp)
 {
     // Allows us to use default value of NULL for schema_cache in places
@@ -1438,7 +1431,7 @@ executeQuery(const ProxyState &ps, const std::string &q,
     std::list<std::string> out_queryz;
     SchemaInfo const &schema =
         schema_cache->getSchema(ps.getConn(), ps.getEConn());
-    queryPreamble(ps, q, &qr, &out_queryz, schema);
+    queryPreamble(ps, q, &qr, &out_queryz, schema, default_db);
     assert(qr);
 
     std::unique_ptr<DBResult> dbres;
@@ -1465,7 +1458,7 @@ executeQuery(const ProxyState &ps, const std::string &q,
         dbres ? ResType(dbres->unpack()) : mysql_noop_res(ps);
     assert(res.success());
     const EpilogueResult epi_result =
-        queryEpilogue(ps, *qr.get(), res, q, pp);
+        queryEpilogue(ps, *qr.get(), res, q, default_db, pp);
     assert(epi_result.res_type.success());
 
     return epi_result;

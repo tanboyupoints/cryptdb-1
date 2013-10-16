@@ -285,7 +285,7 @@ lowLevelGetCurrentDatabase(Connect *const c, std::string *const out_db)
 }
 
 // This function should not be used after intitialization.
-static bool
+bool
 lowLevelSetCurrentDatabase(Connect *const c, const std::string &db)
 {
     const std::string query = "USE " + db + ";";
@@ -620,7 +620,8 @@ SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     const std::string select_q =
         " SELECT * FROM " + this->plain_table +
         " WHERE " + this->where_clause + ";";
-    const EpilogueResult epi_result = executeQuery(this->ps, select_q);
+    const EpilogueResult epi_result =
+        executeQuery(this->ps, select_q, this->default_db);
     assert(QueryAction::VANILLA == epi_result.action);
     const ResType select_res_type = epi_result.res_type;
     assert(select_res_type.success());
@@ -714,14 +715,14 @@ SpecialUpdate::getQuery(std::list<std::string> * const queryz,
         " DELETE FROM " + this->plain_table +
         " WHERE " + this->where_clause + ";";
     const std::string re_delete =
-        rewriteAndGetSingleQuery(ps, delete_q, schema);
+        rewriteAndGetSingleQuery(ps, delete_q, schema, this->default_db);
 
     // > Add each row from the embedded database to the data database.
     const std::string insert_q =
         " INSERT INTO " + this->plain_table +
         " VALUES " + this->output_values.get() + ";";
     const std::string re_insert =
-        rewriteAndGetSingleQuery(ps, insert_q, schema);
+        rewriteAndGetSingleQuery(ps, insert_q, schema, this->default_db);
 
     const std::string hom_addition_transaction =
         MetaData::Proc::homAdditionTransaction();
@@ -1119,11 +1120,6 @@ std::string Analysis::getAnonIndexName(const TableMeta &tm,
     const
 {
     return tm.getAnonIndexName(index_name, o);
-}
-
-bool Analysis::saneDatabaseName() const
-{
-    return db_name.isSet();
 }
 
 bool Analysis::isAlias(const std::string &db,
