@@ -260,11 +260,9 @@ operator<<(std::ostream &out, const RewritePlan * const rp)
     return out;
 }
 
-// This function should not be used after intitialization.
-// true  : valid database name
-// false : no database name retrieved
 bool
-lowLevelGetCurrentDatabase(Connect *const c, std::string *const out_db)
+lowLevelGetCurrentDatabase(const std::unique_ptr<Connect> &c,
+                           std::string *const out_db)
 {
     const std::string query = "SELECT DATABASE();";
     std::unique_ptr<DBResult> db_res;
@@ -278,16 +276,26 @@ lowLevelGetCurrentDatabase(Connect *const c, std::string *const out_db)
     *out_db = std::string(row[0], l[0]);
     if (out_db->size() == 0) {
         assert(0 == l[0] && NULL == row[0]);
-        return false;
+        return true;
     }
 
     return true;
 }
 
-// This function should not be used after intitialization.
 bool
-lowLevelSetCurrentDatabase(Connect *const c, const std::string &db)
+lowLevelSetCurrentDatabase(const std::unique_ptr<Connect> &c,
+                           const std::string &db)
 {
+    // Use HACK to get this connection to use NULL as default DB.
+    if (db.size() == 0) {
+        const std::string random_name = getpRandomName();
+        RFIF(c->execute("CREATE DATABASE " + random_name + ";"));
+        RFIF(c->execute("USE " + random_name + ";"));
+        RFIF(c->execute("DROP DATABASE " + random_name + ";"));
+
+        return true;
+    }
+
     const std::string query = "USE " + db + ";";
     RFIF(c->execute(query));
 
@@ -329,28 +337,23 @@ loadUDFs(const std::unique_ptr<Connect> &conn) {
     assert_s(conn->execute("CREATE DATABASE " + udf_db), "cannot create db for udfs");
 
     std::string saved_db;
-    assert(lowLevelGetCurrentDatabase(conn.get(), &saved_db));
-    assert(lowLevelSetCurrentDatabase(conn.get(), udf_db));
+    assert(lowLevelGetCurrentDatabase(conn, &saved_db));
+    assert(lowLevelSetCurrentDatabase(conn, udf_db));
     dropAll(conn);
     createAll(conn);
-    assert(lowLevelSetCurrentDatabase(conn.get(), saved_db));
+    assert(lowLevelSetCurrentDatabase(conn, saved_db));
 
     LOG(cdb_v) << "Loaded CryptDB's UDFs.";
 }
 
 static bool
-synchronizeDatabases(Connect *const conn, Connect *const e_conn)
+synchronizeDatabases(const std::unique_ptr<Connect> &conn,
+                     const std::unique_ptr<Connect> &e_conn)
 {
     std::string current_db;
-    if (lowLevelGetCurrentDatabase(conn, &current_db)) {
-        RFIF(lowLevelSetCurrentDatabase(e_conn, current_db));
-        return true;
-    }
+    RFIF(lowLevelGetCurrentDatabase(conn, &current_db));
+    RFIF(lowLevelSetCurrentDatabase(e_conn, current_db));
 
-    RFIF(lowLevelSetCurrentDatabase(conn,
-                                    MetaData::DB::purgatory()));
-    RFIF(lowLevelSetCurrentDatabase(e_conn,
-                                    MetaData::DB::purgatory()));
     return true;
 }
 
@@ -367,17 +370,15 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
 {
     assert(conn && e_conn);
 
-    // Must be done before database synchronization.
     const std::string &prefix = 
         getenv("CRYPTDB_NAME") ? getenv("CRYPTDB_NAME")
                                : "generic_prefix_";
     assert(MetaData::initialize(conn, e_conn, prefix));
 
-    TEST_TextMessageError(synchronizeDatabases(conn.get(), e_conn.get()),
+    TEST_TextMessageError(synchronizeDatabases(conn, e_conn),
                           "Failed to synchronize embedded and remote"
                           " databases!");
 
-    
     loadUDFs(conn);
 
     assert(loadStoredProcedures(conn));

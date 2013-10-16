@@ -52,12 +52,6 @@ MetaData::Proc::adjustOnion()
 }
 
 std::string
-MetaData::DB::purgatory()
-{
-    static const std::string name = "purgatory";
-    return name;
-}
-std::string
 MetaData::DB::embeddedDB()
 {
     static const std::string name = "embedded_db";
@@ -148,12 +142,6 @@ MetaData::initialize(const std::unique_ptr<Connect> &conn,
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
     RETURN_FALSE_IF_FALSE(conn->execute(create_remote_completion));
-
-    // Synchronization database.
-    const std::string create_purgatory_db =
-        " CREATE DATABASE IF NOT EXISTS " + DB::purgatory() + ";";
-    RETURN_FALSE_IF_FALSE(conn->execute(create_purgatory_db));
-    RETURN_FALSE_IF_FALSE(e_conn->execute(create_purgatory_db));
 
     initialized = true;
     return true;

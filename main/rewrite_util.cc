@@ -531,10 +531,9 @@ queryPreamble(const ProxyState &ps, const std::string &q,
 {
     // We want the embedded database to reflect the metadata for the
     // current remote connection.
-    // FIXME: Handle errors.
-    if (default_db.size() > 0) {
-        lowLevelSetCurrentDatabase(ps.getEConn().get(), default_db);
-    }
+    TEST_TextMessageError(lowLevelSetCurrentDatabase(ps.getEConn(),
+                                                     default_db),
+                          "Failed to set default embedded database!");
     *qr = std::unique_ptr<QueryRewrite>(
             new QueryRewrite(Rewriter::rewrite(ps, q, schema,
                                                default_db)));

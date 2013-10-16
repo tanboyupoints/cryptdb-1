@@ -445,7 +445,9 @@ private:
 };
 
 bool
-lowLevelGetCurrentDatabase(Connect *const c, std::string *const out_db);
+lowLevelGetCurrentDatabase(const std::unique_ptr<Connect> &c,
+                           std::string *const out_db);
 
 bool
-lowLevelSetCurrentDatabase(Connect *const c, const std::string &db);
+lowLevelSetCurrentDatabase(const std::unique_ptr<Connect> &c,
+                           const std::string &db);

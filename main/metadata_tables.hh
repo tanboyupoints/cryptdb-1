@@ -24,7 +24,6 @@ namespace MetaData {
     };
 
     namespace DB {
-        std::string purgatory();
         std::string embeddedDB();
         std::string remoteDB();
     };
