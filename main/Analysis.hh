@@ -209,6 +209,7 @@ public:
     virtual bool multipleResultSets() const;
     virtual QueryAction queryAction(const std::unique_ptr<Connect> &conn)
         const;
+    virtual bool usesEmbeddedDB() const;
 
 protected:
     const std::string original_query;
@@ -265,6 +266,7 @@ public:
                   SchemaInfo const &schema) const;
     void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     bool multipleResultSets() const;
+    bool usesEmbeddedDB() const;
 
 private:
     const std::string plain_table;
@@ -291,8 +293,8 @@ public:
     virtual void getQuery(std::list<std::string> * const queryz,
                           SchemaInfo const &schema) const = 0;
     void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
-    // FIXME: final.
     bool stalesSchema() const;
+    bool usesEmbeddedDB() const;
 
 protected:
     const std::vector<std::unique_ptr<Delta> > deltas;
@@ -327,7 +329,6 @@ private:
     const std::list<std::string> local_qz() const;
 };
 
-// FIXME: final funcs.
 class AdjustOnionOutput : public DeltaOutput {
 public:
     AdjustOnionOutput(const std::string &original_query,

@@ -562,6 +562,12 @@ RewriteOutput::queryAction(const std::unique_ptr<Connect> &conn) const
     return QueryAction::VANILLA;
 }
 
+bool
+RewriteOutput::usesEmbeddedDB() const
+{
+    return false;
+}
+
 void
 SimpleOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
                           const std::unique_ptr<Connect> &e_conn)
@@ -747,6 +753,12 @@ SpecialUpdate::multipleResultSets() const
     return true;
 }
 
+bool
+SpecialUpdate::usesEmbeddedDB() const
+{
+    return true;
+}
+
 DeltaOutput::~DeltaOutput()
 {;}
 
@@ -804,6 +816,12 @@ DeltaOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
     SYNC_IF_FALSE(e_conn->execute("COMMIT;"), e_conn);
 
     return;
+}
+
+bool
+DeltaOutput::usesEmbeddedDB() const
+{
+    return true;
 }
 
 unsigned long

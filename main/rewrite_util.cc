@@ -529,14 +529,18 @@ queryPreamble(const ProxyState &ps, const std::string &q,
               SchemaInfo const &schema,
               const std::string &default_db)
 {
-    // We want the embedded database to reflect the metadata for the
-    // current remote connection.
-    TEST_TextMessageError(lowLevelSetCurrentDatabase(ps.getEConn(),
-                                                     default_db),
-                          "Failed to set default embedded database!");
     *qr = std::unique_ptr<QueryRewrite>(
             new QueryRewrite(Rewriter::rewrite(ps, q, schema,
                                                default_db)));
+
+    // ASK bites again...
+    // We want the embedded database to reflect the metadata for the
+    // current remote connection.
+    if ((*qr)->output->usesEmbeddedDB()) {
+        TEST_TextMessageError(lowLevelSetCurrentDatabase(ps.getEConn(),
+                                                         default_db),
+                              "Failed to set default embedded database!");
+    }
 
     (*qr)->output->beforeQuery(ps.getConn(), ps.getEConn());
     (*qr)->output->getQuery(out_queryz, schema);
