@@ -104,7 +104,7 @@ static bool handle_line(ProxyState& ps, const std::string& q, bool pp=true)
       return epi_result.res_type.success();
   } catch (const SynchronizationException &e) {
       std::cout << e << std::endl;
-      return false;
+      return true;
   } catch (const AbstractException &e) {
       std::cout << e << std::endl;
       schema_cache = SchemaCache();

@@ -305,6 +305,55 @@ recoverableDeltaError(unsigned int err)
     return ret;
 }
 
+// we use a whitelist to determine if a query initially failed at the
+// remote server. we could potentially use a blacklist; if the query
+// fails, but not for one of these reasons, we can be reasonably
+// sure that it did not succeed initially. such a blacklist would likely
+// include errors related to 'bad connection state'.  if a query fails
+// for connectivity reasons during recovery, we still don't know anything
+// about why it failed initially; or even if it succeeded initially.
+//
+// the whitelist should essentially be composed of errors that won't
+// be caught by query_parse(...) and will result in the query failing
+// to execute remotely.
+static bool
+queryInitiallyFailedErrors(unsigned int err)
+{
+    // FIXME: Add more queries to the whitelist as we observe failures.
+    const bool ret =
+        ER_INVALID_DEFAULT == err;
+
+    return ret;
+}
+
+// 'bad_query' is a sanity checking mechanism; if the query is bad
+// against the remote database, it should also be bad against the embedded
+// database.
+static bool
+retryQuery(const std::unique_ptr<Connect> &c, const std::string &query,
+           bool *const bad_query)
+{
+    assert(bad_query);
+
+    *bad_query = false;
+
+    if (false == c->execute(query)) {
+        const unsigned int err = c->get_mysql_errno();
+        // if the error is not recoverable, we must determine if
+        // the query failed initially for the same error.
+        if (false == recoverableDeltaError(err)) {
+            *bad_query = queryInitiallyFailedErrors(err);
+            RETURN_FALSE_IF_FALSE(*bad_query);
+
+            // We could abort the query here because we know that
+            // the query is bad and can't be processed by the remote
+            // or embedded server.
+        }
+    }
+
+    return true;
+}
+
 static bool
 fixDDL(const std::unique_ptr<Connect> &conn,
        const std::unique_ptr<Connect> &e_conn,
@@ -333,13 +382,15 @@ fixDDL(const std::unique_ptr<Connect> &conn,
     //        _may_ have made a DDL modification
     //  -------------------------------------------------
 
+    // ugly sanity checking device
+    AssignOnce<bool> remote_bad_query;
     // failure before remote queries complete
     if (false == details->remote_complete) {
+        bool rbq;
         // reissue the DDL query against the remote database.
-        if (false == conn->execute(details->query)) {
-            const unsigned int err = conn->get_mysql_errno();
-            RETURN_FALSE_IF_FALSE(recoverableDeltaError(err));
-        }
+        RETURN_FALSE_IF_FALSE(retryQuery(conn, details->query,
+                                         &rbq));
+        remote_bad_query = rbq;
 
         const std::string update_remote_complete =
             "UPDATE " + remote_completion_table +
@@ -354,10 +405,11 @@ fixDDL(const std::unique_ptr<Connect> &conn,
         assert(false == details->embedded_complete);
 
         // reissue the DDL query against the embedded database
-        if (false == e_conn->execute(details->query)) {
-            const unsigned int err = e_conn->get_mysql_errno();
-            RETURN_FALSE_IF_FALSE(recoverableDeltaError(err));
-        }
+        bool embedded_bad_query;
+        RETURN_FALSE_IF_FALSE(retryQuery(e_conn, details->query,
+                                         &embedded_bad_query));
+        assert(false == remote_bad_query.assigned()
+               || embedded_bad_query == remote_bad_query.get());
 
         return finishQuery(e_conn, unfinished_id);
     }
