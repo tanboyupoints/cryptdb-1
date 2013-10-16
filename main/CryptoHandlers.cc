@@ -240,6 +240,7 @@ type_len_for_AES_str(enum enum_field_types type, int len, bool pad)
         case MYSQL_TYPE_BLOB:
             break;
         case MYSQL_TYPE_VARCHAR:
+        case MYSQL_TYPE_STRING:
         case MYSQL_TYPE_TIMESTAMP:
         case MYSQL_TYPE_DATE:
         case MYSQL_TYPE_NEWDATE:
