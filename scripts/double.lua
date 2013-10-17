@@ -75,8 +75,8 @@ function read_query_result(inj)
 
         out_status = "error"
     elseif "number" == type(cursor) then
-        -- WARN: this is always going to give the wrong result
-        -- for UPDATE.
+        -- WARN: this is always going to give a nonsensical result
+        -- for UPDATE and DDL queries.
         out_status = get_match_text(cursor == inj.resultset.affected_rows)
     else
         -- do the naive comparison while gathering the results,
@@ -85,11 +85,10 @@ function read_query_result(inj)
         local cryptdb_fields = cursor:getcolnames()
         local regular_fields = {}
         for i = 1, #inj.resultset.fields do
-            regular_fields[i] = inj.resultset.fields[i]
+            regular_fields[i] = inj.resultset.fields[i].name
         end
 
-        -- FIXME: Does this comparison do as desired?
-        if cryptdb_fields ~= regular_fields then
+        if false == table_test(cryptdb_fields, regular_fields) then
             out_status = get_match_text(false)
         else
             local cryptdb_results = {}
@@ -97,32 +96,36 @@ function read_query_result(inj)
 
             local index = 1
             -- HACK/CARE: double iteration.
+            matched = true
             for regular_row in inj.resultset.rows do
                 -- will be nil after last
                 local cryptdb_row = cursor:fetch(cryptdb_results, "n")
-                -- FIXME: This comparison is suspect as well.
-                if nil == cryptdb_row or cryptdb_row ~= regular_row then
-                    io.write(create_log_entry(client_name, query,
-                                              cryptdb_error, regular_error,
-                                              get_match_text(false)))
-                    io.flush()
-                    return proxy.PROXY_SEND_RESULT
+                if nil == cryptdb_row or
+                   false == table_test(cryptdb_row, regular_row) then
+
+                    matched = false
+                    break
                 end
 
                 regular_results[index] = regular_row
                 index = index + 1
             end
 
+            -- did cryptdb have more rows than the regular database?
             local after_row = cursor:fetch(cryptdb_results, "n")
-            if nil ~= after_row then
-                -- cryptdb had more rows than the regular database
+            if true == matched and after_row then
                 out_status = get_match_text(false)
             else
-                -- no errors, same fields, same number of rows, but
-                -- rows in different orders; do the slow unordered
-                -- comparison
-                local test = slow_test(regular_results, cryptdb_results)
-                out_status = get_match_text(test)
+                -- match + same number of rows
+                if true == matched then
+                    out_status = get_match_text(true)
+                else
+                    -- no errors, same fields, same number of rows, but
+                    -- rows in different orders; do the slow unordered
+                    -- comparison
+                    local test = slow_test(regular_results,cryptdb_results)
+                    out_status = get_match_text(test)
+                end
             end
         end
     end
@@ -136,10 +139,10 @@ end
 
 function create_log_entry(client, query, cryptdb_error, regular_error,
                           status)
-    return client .. "," .. query .. "," .. os.date("%c") .. "," .. ppbool(cryptdb_error) .. "," .. ppbool(regular_error) .. "," .. status .. "\n"
+    return client .. "," .. csv_escape(query) .. "," .. os.date("%c") .. "," .. ppbool(cryptdb_error) .. "," .. ppbool(regular_error) .. "," .. status .. "\n"
 end
 
-function naive_test(results_a, results_b)
+function table_test(results_a, results_b)
     if table.getn(results_a) ~= table.getn(results_b) then
         return false
     end
@@ -195,3 +198,8 @@ function table_length(t)
     return count
 end
 
+-- FIXME: Implement this if it actually matters; will make code slower.
+-- VAPORWARE
+function csv_escape(string)
+    return string
+end
