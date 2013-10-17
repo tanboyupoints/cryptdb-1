@@ -312,25 +312,39 @@ recoverableDeltaError(unsigned int err)
     return ret;
 }
 
-// we use a whitelist to determine if a query initially failed at the
-// remote server. we could potentially use a blacklist; if the query
-// fails, but not for one of these reasons, we can be reasonably
-// sure that it did not succeed initially. such a blacklist would likely
-// include errors related to 'bad connection state'.  if a query fails
-// for connectivity reasons during recovery, we still don't know anything
-// about why it failed initially; or even if it succeeded initially.
+// we use a blacklist to determine if the query is bad and thus failed at
+// the remote server. if the query fails, but not for one of these
+// reasons, we can be reasonably sure that it did not succeed initially.
+// the blacklist include errors related to 'bad mysq/connection state'.
+// if a query fails for connectivity reasons during recovery, we still
+// don't know anything about why it failed initially; or even if it
+// succeeded initially.
 //
-// the whitelist should essentially be composed of errors that won't
-// be caught by query_parse(...) and will result in the query failing
-// to execute remotely.
+// essentially the blacklist is all errors that could be thrown against
+// a 'good' query.
+//
+// blacklist taken from here:
+//  http://dev.mysql.com/doc/refman/5.0/en/mysql-stat.html
+//
+// we could potentially use a whitelist which would contain errors that
+// won't be caught by query_parse(...) and will result in the query
+// failing to execute remotely.
 static bool
 queryInitiallyFailedErrors(unsigned int err)
 {
-    // FIXME: Add more queries to the whitelist as we observe failures.
-    const bool ret =
-        ER_INVALID_DEFAULT == err;
+    // lifted from mysql-src/includes/errmsg.h
+    unsigned long cr_unknown_error        = 2000,
+                  cr_server_gone_error    = 2006,
+                  cr_server_lost          = 2013,
+                  cr_commands_out_of_sync = 2014;
 
-    return ret;
+    const bool ret =
+        cr_unknown_error == err ||
+        cr_server_gone_error == err ||
+        cr_server_lost == err ||
+        cr_commands_out_of_sync == err;
+
+    return !ret;
 }
 
 // 'bad_query' is a sanity checking mechanism; if the query is bad
