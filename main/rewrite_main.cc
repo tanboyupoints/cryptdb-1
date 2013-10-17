@@ -132,14 +132,17 @@ struct RecoveryDetails {
     const bool remote_begin;
     const bool remote_complete;
     const std::string query;
+    const std::string default_db;
 
     RecoveryDetails(bool embedded_begin, bool embedded_complete,
                     bool existed_remote, bool remote_begin,
-                    bool remote_complete, const std::string query)
+                    bool remote_complete, const std::string &query,
+                    const std::string &default_db)
         : embedded_begin(embedded_begin),
           embedded_complete(embedded_complete),
           existed_remote(existed_remote), remote_begin(remote_begin),
-          remote_complete(remote_complete), query(query) {}
+          remote_complete(remote_complete), query(query),
+          default_db(default_db) {}
 };
 
 static bool
@@ -165,7 +168,7 @@ collectRecoveryDetails(const std::unique_ptr<Connect> &conn,
     // collect completion data
     std::unique_ptr<DBResult> dbres;
     const std::string embedded_completion_q =
-        " SELECT begin, complete, original_query FROM " +
+        " SELECT begin, complete, original_query, default_db FROM " +
             embedded_completion_table +
         "  WHERE id = " + std::to_string(unfinished_id) + ";";
     RETURN_FALSE_IF_FALSE(e_conn->execute(embedded_completion_q, &dbres));
@@ -176,6 +179,7 @@ collectRecoveryDetails(const std::unique_ptr<Connect> &conn,
     const std::string string_embedded_begin(embedded_row[0], l[0]);
     const std::string string_embedded_complete(embedded_row[1], l[1]);
     const std::string string_embedded_query(embedded_row[2], l[2]);
+    const std::string string_embedded_default_db(embedded_row[3], l[3]);
 
     const std::string remote_completion_q =
         " SELECT begin, complete FROM " + remote_completion_table +
@@ -210,7 +214,8 @@ collectRecoveryDetails(const std::unique_ptr<Connect> &conn,
         std::unique_ptr<RecoveryDetails>(
             new RecoveryDetails(embedded_begin, embedded_complete,
                                 existed_remote, remote_begin,
-                                remote_complete, string_embedded_query));
+                                remote_complete, string_embedded_query,
+                                string_embedded_default_db));
 
     return true;
 }
@@ -265,6 +270,8 @@ fixAdjustOnion(const std::unique_ptr<Connect> &conn,
                                                  unfinished_id,
                                                  &details));
     assert(details->remote_begin == details->remote_complete);
+
+    lowLevelSetCurrentDatabase(e_conn, details->default_db);
 
     // failure after initial embedded queries and before remote queries
     if (false == details->remote_begin) {
@@ -368,6 +375,9 @@ fixDDL(const std::unique_ptr<Connect> &conn,
                                                  &details));
     assert(true == details->embedded_begin
            && false == details->embedded_complete);
+
+    lowLevelSetCurrentDatabase(e_conn, details->default_db);
+    lowLevelSetCurrentDatabase(conn, details->default_db);
 
     // failure after initial embedded queries and before remote queries
     if (false == details->remote_begin) {

@@ -774,12 +774,16 @@ DeltaOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
     TEST_Sync(e_conn->execute("START TRANSACTION;"),
               "failed to start transaction");
 
+    // We must save the current default database because recovery
+    // may be happening after a restart in which case such state
+    // was lost.
     const CompletionType &completion_type = this->getCompletionType();
     const std::string &q_completion =
         " INSERT INTO " + MetaData::Table::embeddedQueryCompletion() +
-        "   (begin, complete, original_query, aborted, type) VALUES"
-        "   (TRUE,  FALSE,"
-        "    '" + escapeString(conn, this->original_query) + "', FALSE,"
+        "   (begin, complete, original_query, default_db, aborted, type)"
+        "   VALUES (TRUE,  FALSE,"
+        "    '" + escapeString(conn, this->original_query) + "',"
+        "    (SELECT DATABASE()),  FALSE,"
         "    '" + TypeText<CompletionType>::toText(completion_type)
             + "');";
     SYNC_IF_FALSE(e_conn->execute(q_completion), e_conn);

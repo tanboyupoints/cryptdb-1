@@ -122,6 +122,7 @@ MetaData::initialize(const std::unique_ptr<Connect> &conn,
         "   (begin BOOLEAN NOT NULL,"
         "    complete BOOLEAN NOT NULL,"
         "    original_query VARCHAR(500) NOT NULL,"
+        "    default_db VARCHAR(500),"      // default database is NULLable
         "    aborted BOOLEAN NOT NULL,"
         "    type VARCHAR(100) NOT NULL,"
         "    id SERIAL PRIMARY KEY)"
