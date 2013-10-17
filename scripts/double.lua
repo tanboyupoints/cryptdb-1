@@ -1,3 +1,7 @@
+-- This code is ugly; but it is largely an attempt to deal with disparate
+-- datastructures that are essentially isomorphic with a minimal amount
+-- of looping.
+
 package.cpath = package.cpath .. ";/usr/local/lib/lua/5.1/?.so"
 local luasql = assert(require("luasql.mysql"))
 local proto = assert(require("mysql.proto"))
@@ -57,7 +61,7 @@ function read_query_result(inj)
     -- > somemtimes this is a cursor (ie SELECT), sometimes it's nil (query
     --   error), sometimes it's number of rows affected by command
     local out_status = nil
-    cursor = assert(cryptdb_connection:execute(query))
+    cursor = cryptdb_connection:execute(query)
     local cryptdb_error = not cursor
     local regular_error
     if proxy.MYSQLD_PACKET_ERR == inj.resultset.query_status then
@@ -66,13 +70,15 @@ function read_query_result(inj)
         regular_error = false
     end
 
-    if cryptdb_error or regular_error then
+    if regular_error then
         proxy.response.type = proxy.MYSQLD_PACKET_ERR
         local err = proto.from_err_packet(inj.resultset.raw)
         proxy.response.errmsg = err.msg
         proxy.response.errcode = err.errcode
         proxy.response.sqlstate = err.sqlstate
 
+        out_status = "error"
+    elseif cryptdb_error then
         out_status = "error"
     elseif "number" == type(cursor) then
         -- WARN: this is always going to give a nonsensical result
@@ -84,11 +90,14 @@ function read_query_result(inj)
 
         local cryptdb_fields = cursor:getcolnames()
         local regular_fields = {}
+        local regular_field_names = {}
         for i = 1, #inj.resultset.fields do
-            regular_fields[i] = inj.resultset.fields[i].name
+            regular_field_names[i] = inj.resultset.fields[i].name
+            regular_fields[i] = {type = inj.resultset.fields[i].type,
+                                 name = inj.resultset.fields[i].name}
         end
 
-        if false == table_test(cryptdb_fields, regular_fields) then
+        if false == table_test(cryptdb_fields, regular_field_names) then
             out_status = get_match_text(false)
         else
             local cryptdb_results = {}
@@ -118,6 +127,8 @@ function read_query_result(inj)
             else
                 -- match + same number of rows
                 if true == matched then
+                    proxy.response.resultset = {fields = regular_fields,
+                                                rows   = regular_results}
                     out_status = get_match_text(true)
                 else
                     -- no errors, same fields, same number of rows, but
@@ -159,10 +170,10 @@ end
 -- FIXME: Can get 2x speed up by removing matched elements from the inner
 -- lookup array.
 function slow_test(results_a, results_b)
-    for a in results_a do
+    for a_index = 1, #results_a do
         local matched = false
-        for b in results_b do
-            if a == b then
+        for b_index = 1, #results_b do
+            if results_a[a_index] == results_b[b_index] then
                 matched = true
                 break
             end
