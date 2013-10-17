@@ -2,6 +2,9 @@
 -- datastructures that are essentially isomorphic with a minimal amount
 -- of looping.
 
+-- wordpress testing hack
+local new_session = true
+
 package.cpath = package.cpath .. ";/usr/local/lib/lua/5.1/?.so"
 local luasql = assert(require("luasql.mysql"))
 local proto = assert(require("mysql.proto"))
@@ -39,7 +42,16 @@ function read_query(packet)
     end
     packet = string.char(proxy.COM_QUERY) .. query
 
+    -- HACK: that turns off strict mode for wordpress because
+    -- the testing database runs in strict mode.
     proxy.queries:append(42, packet, {resultset_is_needed = true})
+    if true == new_session then
+        mode = "SET @@session.sql_mode := ''"
+        proxy.queries:append(1337, string.char(proxy.COM_QUERY) .. mode,
+                             {resultset_is_needed = true})
+        new_session = false
+    end
+
     return proxy.PROXY_SEND_QUERY
 end
 
@@ -47,15 +59,11 @@ function read_query_result(inj)
     local client_name = proxy.connection.client.src.name
     local query = string.sub(inj.query, 2)
 
-    proxy.response.type          = proxy.MYSQLD_PACKET_OK
-    proxy.response.affected_rows = inj.resultset.affected_rows
-    proxy.response.insert_id     = inj.resultset.insert_id
-
     if nil == cryptdb_connection then
         io.write(create_log_entry(client_name, query, false, false,
                                   "no cryptb connection"))
         io.flush()
-        return proxy.PROXY_SEND_RESULT
+        return
     end
 
     -- > somemtimes this is a cursor (ie SELECT), sometimes it's nil (query
@@ -63,80 +71,59 @@ function read_query_result(inj)
     local out_status = nil
     cursor = cryptdb_connection:execute(query)
     local cryptdb_error = not cursor
-    local regular_error
-    if proxy.MYSQLD_PACKET_ERR == inj.resultset.query_status then
-        regular_error = true
-    else
-        regular_error = false
-    end
+    local regular_error =  proxy.MYSQLD_PACKET_ERR ==
+                                inj.resultset.query_status
 
-    if regular_error then
-        proxy.response.type = proxy.MYSQLD_PACKET_ERR
-        local err = proto.from_err_packet(inj.resultset.raw)
-        proxy.response.errmsg = err.msg
-        proxy.response.errcode = err.errcode
-        proxy.response.sqlstate = err.sqlstate
-
-        out_status = "error"
-    elseif cryptdb_error then
+    if regular_error or cryptdb_error then
         out_status = "error"
     elseif "number" == type(cursor) then
         -- WARN: this is always going to give a nonsensical result
         -- for UPDATE and DDL queries.
         out_status = get_match_text(cursor == inj.resultset.affected_rows)
     else
-        -- do the naive comparison while gathering the results,
-        -- then if it fails, do the slow comparison
-
-        local cryptdb_fields = cursor:getcolnames()
-        local regular_fields = {}
-        local regular_field_names = {}
-        for i = 1, #inj.resultset.fields do
-            regular_field_names[i] = inj.resultset.fields[i].name
-            regular_fields[i] = {type = inj.resultset.fields[i].type,
-                                 name = inj.resultset.fields[i].name}
-        end
-
-        if false == table_test(cryptdb_fields, regular_field_names) then
+        -- compare field names size
+        -- > can get false match where fields with different names have
+        --   same elements
+        if (#cursor:getcolnames() ~= #inj.resultset.fields) then
             out_status = get_match_text(false)
         else
+            -- do the naive comparison while gathering the results,
+            -- then if it fails, do the slow comparison
             local cryptdb_results = {}
             local regular_results = {}
 
+            -- HACK/CARE: double iteration
             local index = 1
-            -- HACK/CARE: double iteration.
-            matched = true
+            local no_match = false
+            local no_fast_match = false
             for regular_row in inj.resultset.rows do
-                -- will be nil after last
-                local cryptdb_row = cursor:fetch(cryptdb_results, "n")
-                if nil == cryptdb_row or
-                   false == table_test(cryptdb_row, regular_row) then
-
-                    matched = false
+                -- will only be nil after last (not strictly true)
+                local cryptdb_row = cursor:fetch({}, "n")
+                if nil == cryptdb_row then
+                    no_match = true
+                    no_fast_match = true
                     break
+                elseif false == no_fast_match then
+                    -- don't do table_test if we already know we dont have
+                    -- a fast match
+                    if false == table_test(cryptdb_row, regular_row) then
+                        no_fast_match = true
+                    end
                 end
 
                 regular_results[index] = regular_row
+                cryptdb_results[index] = cryptdb_row
                 index = index + 1
             end
 
-            -- did cryptdb have more rows than the regular database?
-            local after_row = cursor:fetch(cryptdb_results, "n")
-            if true == matched and after_row then
+            if true == no_match then
                 out_status = get_match_text(false)
+            elseif false == no_fast_match then
+                out_status = get_match_text(true)
             else
-                -- match + same number of rows
-                if true == matched then
-                    proxy.response.resultset = {fields = regular_fields,
-                                                rows   = regular_results}
-                    out_status = get_match_text(true)
-                else
-                    -- no errors, same fields, same number of rows, but
-                    -- rows in different orders; do the slow unordered
-                    -- comparison
-                    local test = slow_test(regular_results,cryptdb_results)
-                    out_status = get_match_text(test)
-                end
+                -- do slow, unordered matching
+                local test = slow_test(regular_results, cryptdb_results)
+                out_status = get_match_text(test)
             end
         end
     end
@@ -144,8 +131,6 @@ function read_query_result(inj)
     io.write(create_log_entry(client_name, query, cryptdb_error,
                               regular_error, out_status))
     io.flush()
-
-    return proxy.PROXY_SEND_RESULT
 end
 
 function create_log_entry(client, query, cryptdb_error, regular_error,
@@ -170,10 +155,14 @@ end
 -- FIXME: Can get 2x speed up by removing matched elements from the inner
 -- lookup array.
 function slow_test(results_a, results_b)
+    if table.getn(results_a) ~= table.getn(results_b) then
+        return false
+    end
+
     for a_index = 1, #results_a do
         local matched = false
         for b_index = 1, #results_b do
-            if results_a[a_index] == results_b[b_index] then
+            if table_test(results_a[a_index], results_b[b_index]) then
                 matched = true
                 break
             end
@@ -201,12 +190,6 @@ function ppbool(b)
     else
         return "false"
     end
-end
-
-function table_length(t)
-    local count = 0
-    for _ in paris(t) do count = count + 1 end
-    return count
 end
 
 -- FIXME: Implement this if it actually matters; will make code slower.
