@@ -6,32 +6,38 @@
 local new_session = true
 
 package.cpath = package.cpath .. ";/usr/local/lib/lua/5.1/?.so"
-local luasql = assert(require("luasql.mysql"))
-local proto = assert(require("mysql.proto"))
+package.path  = package.path .. ";/usr/local/share/lua/5.1/?.lua"
 
-local LOG_FILE = "logs/double.log"
-local env = nil
-local cryptdb_connection = nil
+local luasql = assert(require("luasql.mysql"))
+local proto  = assert(require("mysql.proto"))
+local lanes  = assert(require("lanes"))
+if require("lanes").configure then
+    lanes.configure()
+end
+local linda  = lanes.linda()
+
+local LOG_FILE_PATH      = "logs/double.log"
+local cryptdb_lane       = nil
+local log_file_h         = nil
+
+-- we don't want crosstalk between different instances of 'double'
+local RESULTS_QUEUE      = "results_" .. math.random(10000)
+local QUERY_QUEUE        = "query_" .. math.random(10000)
 
 function connect_server()
     print("Double Connection.")
-    -- initialize cryptdb connection
-    env = luasql.mysql()
-    if env then
-        cryptdb_connection = env:connect("", "root", "letmein", "127.0.0.1", 3307)
-    end
+    -- initialize pre-emptive thread
+    local cryptdb_lane_gen =
+        lanes.gen("*", {required = {'luasql.mysql',}}, exec_q)
+    cryptdb_lane = cryptdb_lane_gen()
 
     -- open log file
-    io.output(LOG_FILE)
+    log_file_h = io.open(LOG_FILE_PATH, "a")
 end
 
 function disconnect_client()
-    if cryptdb_connection then
-        cryptdb_connection:close()
-    end
-
-    if env then
-        env:close()
+    if log_file_h then
+        log_file_h:close()
     end
 end
 
@@ -52,6 +58,12 @@ function read_query(packet)
         new_session = false
     end
 
+    -- Clear the queues
+    linda:set(QUERY_QUEUE)
+    linda:set(RESULTS_QUEUE)
+
+    -- Send the new query
+    linda:send(QUERY_QUEUE, query)
     return proxy.PROXY_SEND_QUERY
 end
 
@@ -59,79 +71,118 @@ function read_query_result(inj)
     local client_name = proxy.connection.client.src.name
     local query = string.sub(inj.query, 2)
 
-    if nil == cryptdb_connection then
-        io.write(create_log_entry(client_name, query, false, false,
-                                  "no cryptb connection"))
-        io.flush()
-        return
-    end
-
-    -- > somemtimes this is a cursor (ie SELECT), sometimes it's nil (query
-    --   error), sometimes it's number of rows affected by command
     local out_status = nil
-    cursor = cryptdb_connection:execute(query)
-    local cryptdb_error = not cursor
+
+    -- > somemtimes this is a table (ie SELECT), sometimes it's nil (query
+    --   error), sometimes it's number of rows affected by command
+    key, cryptdb_results = linda:receive(5.0, RESULTS_QUEUE)
+    local cryptdb_error = not cryptdb_results
     local regular_error =  proxy.MYSQLD_PACKET_ERR ==
                                 inj.resultset.query_status
 
     if regular_error or cryptdb_error then
         out_status = "error"
-    elseif "number" == type(cursor) then
+    elseif "string" == type(cryptdb_results) then
+        out_status = cryptdb_results
+    elseif "number" == type(cryptdb_results) then
         -- WARN: this is always going to give a nonsensical result
         -- for UPDATE and DDL queries.
-        out_status = get_match_text(cursor == inj.resultset.affected_rows)
+        out_status =
+            get_match_text(cryptdb_results == inj.resultset.affected_rows)
     else
-        -- compare field names size
-        -- > can get false match where fields with different names have
-        --   same elements
-        if (#cursor:getcolnames() ~= #inj.resultset.fields) then
-            out_status = get_match_text(false)
-        else
-            -- do the naive comparison while gathering the results,
-            -- then if it fails, do the slow comparison
-            local cryptdb_results = {}
-            local regular_results = {}
+        -- do the naive comparison while gathering regular results,
+        -- then if it fails, do the slow comparison
+        local regular_results = {}
 
-            -- HACK/CARE: double iteration
-            local index = 1
-            local no_match = false
-            local no_fast_match = false
-            for regular_row in inj.resultset.rows do
-                -- will only be nil after last (not strictly true)
-                local cryptdb_row = cursor:fetch({}, "n")
-                if nil == cryptdb_row then
-                    no_match = true
+        -- HACK/CARE: double iteration
+        local index = 1
+        local no_fast_match = false
+        for regular_row in inj.resultset.rows do
+            if false == no_fast_match then
+                -- don't do table_test if we already know we dont have
+                -- a fast match
+                if false == table_test(cryptdb_results[index], regular_row) then
                     no_fast_match = true
-                    break
-                elseif false == no_fast_match then
-                    -- don't do table_test if we already know we dont have
-                    -- a fast match
-                    if false == table_test(cryptdb_row, regular_row) then
-                        no_fast_match = true
-                    end
                 end
-
-                regular_results[index] = regular_row
-                cryptdb_results[index] = cryptdb_row
-                index = index + 1
             end
 
-            if true == no_match then
-                out_status = get_match_text(false)
-            elseif false == no_fast_match then
-                out_status = get_match_text(true)
-            else
-                -- do slow, unordered matching
-                local test = slow_test(regular_results, cryptdb_results)
-                out_status = get_match_text(test)
-            end
+            regular_results[index] = regular_row
+            index = index + 1
+        end
+
+        if #regular_results ~= #cryptdb_results then
+            out_status = get_match_text(false)
+        elseif false == no_fast_match then
+            out_status = get_match_text(true)
+        else
+            -- do slow, unordered matching
+            local test = slow_test(regular_results, cryptdb_results)
+            out_status = get_match_text(test)
         end
     end
 
-    io.write(create_log_entry(client_name, query, cryptdb_error,
-                              regular_error, out_status))
-    io.flush()
+    log_file_h:write(create_log_entry(client_name, query, cryptdb_error,
+                                      regular_error, out_status))
+    log_file_h:flush()
 end
+
+-- never returns (sends messages)
+function exec_q()
+    -- init
+    init = function ()
+        local luasql = require("luasql.mysql")
+        if nil == luasql then
+            return nil
+        end
+
+        local env = luasql.mysql()
+        if nil == env then
+            return nil
+        end
+
+        return env:connect("", "root", "letmein", "127.0.0.1", 3306)
+    end
+
+    local c = init()
+    -- failure loop
+    if nil == c then
+        while true do
+            local _ = linda:receive(1.0, QUERY_QUEUE)
+            linda:send(RESULTS_QUEUE, "failed to connect to cryptdb")
+        end
+    end
+
+    -- query/parse loop
+    while true do
+        -- get query
+        local key, query = linda:receive(1.0, QUERY_QUEUE)
+
+        if nil ~= query then
+            -- do query
+            local cursor = c:execute(query)
+
+            -- gather results
+            local result = {}
+            if nil == cursor then
+                result = nil
+            elseif "number" == type(cursor) then
+                result = cursor
+            else
+                local row = cursor:fetch({}, "n")
+                local index = 1
+                while row do
+                    result[index] = row
+                    row = cursor:fetch({}, "n")
+
+                    index = index + 1
+                end
+            end
+
+            linda:send(RESULTS_QUEUE, result)
+        end
+    end
+end
+
 
 function create_log_entry(client, query, cryptdb_error, regular_error,
                           status)
@@ -139,6 +190,10 @@ function create_log_entry(client, query, cryptdb_error, regular_error,
 end
 
 function table_test(results_a, results_b)
+    if type(results_a) == "nil" or type(results_b) == "nil" then
+        return false
+    end
+
     if table.getn(results_a) ~= table.getn(results_b) then
         return false
     end
