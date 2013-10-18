@@ -1236,7 +1236,7 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         p = std::unique_ptr<query_parse>(
                 new query_parse(a.getDatabaseName(), query));
     } catch (std::runtime_error &e) {
-        FAIL_TextMessageError("Bad Query: " + query + "\n"
+        FAIL_TextMessageError("Bad Query: [" + query + "]\t"
                               "Error Data: " + e.what());
     }
     LEX *const lex = p->lex();
