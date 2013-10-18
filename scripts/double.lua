@@ -8,6 +8,11 @@ local new_session = true
 package.cpath = package.cpath .. ";/usr/local/lib/lua/5.1/?.so"
 package.path  = package.path .. ";/usr/local/share/lua/5.1/?.lua"
 
+local CRYPTDB_DIR = os.getenv("EDBDIR")
+local get_locklib =
+    assert(package.loadlib(CRYPTDB_DIR .. "/obj/scripts/locklib.so",
+                           "luaopen_locklib"))
+get_locklib()
 local luasql = assert(require("luasql.mysql"))
 local proto  = assert(require("mysql.proto"))
 local lanes  = assert(require("lanes"))
@@ -16,7 +21,8 @@ if require("lanes").configure then
 end
 local linda  = lanes.linda()
 
-local LOG_FILE_PATH      = "logs/double.log"
+local LOCK_FILE          = "cdb.lock"
+local LOG_FILE_PATH      = CRYPTDB_DIR .. "/logs/double.log"
 local cryptdb_lane       = nil
 local log_file_h         = nil
 
@@ -32,7 +38,7 @@ function connect_server()
     cryptdb_lane = cryptdb_lane_gen()
 
     -- open log file
-    log_file_h = io.open(LOG_FILE_PATH, "a")
+    log_file_h = assert(io.open(LOG_FILE_PATH, "a"))
 end
 
 function disconnect_client()
@@ -58,6 +64,10 @@ function read_query(packet)
         new_session = false
     end
 
+    -- acquire lock
+    status, lock_fd = locklib.acquire_lock(LOCK_FILE)
+    assert(status)
+
     -- Clear the queues
     linda:set(QUERY_QUEUE)
     linda:set(RESULTS_QUEUE)
@@ -75,7 +85,7 @@ function read_query_result(inj)
 
     -- > somemtimes this is a table (ie SELECT), sometimes it's nil (query
     --   error), sometimes it's number of rows affected by command
-    key, cryptdb_results = linda:receive(5.0, RESULTS_QUEUE)
+    key, cryptdb_results = linda:receive(7.0, RESULTS_QUEUE)
     local cryptdb_error = not cryptdb_results
     local regular_error =  proxy.MYSQLD_PACKET_ERR ==
                                 inj.resultset.query_status
@@ -124,6 +134,9 @@ function read_query_result(inj)
     log_file_h:write(create_log_entry(client_name, query, cryptdb_error,
                                       regular_error, out_status))
     log_file_h:flush()
+
+    -- release lock
+    locklib.release_lock(lock_fd)
 end
 
 -- never returns (sends messages)
@@ -140,7 +153,7 @@ function exec_q()
             return nil
         end
 
-        return env:connect("", "root", "letmein", "127.0.0.1", 3306)
+        return env:connect("", "root", "letmein", "127.0.0.1", 3307)
     end
 
     local c = init()
