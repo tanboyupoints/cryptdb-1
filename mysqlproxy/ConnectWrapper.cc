@@ -163,6 +163,13 @@ connect(lua_State *const L)
                                 SECURITY_RATING::BEST_EFFORT);
         }
 
+        // Client starts off stale.
+        // > Must be done after ProxyState::ProxyState because we need
+        //   the metatables.
+        TEST_TextMessageError(initial_staleness(ps->getEConn()),
+                              "failed to set initial staleness");
+
+
         //may need to do training
         ev = getenv("TRAIN_QUERY");
         if (ev) {
@@ -218,8 +225,6 @@ connect(lua_State *const L)
         }
     }
 
-
-
     return 0;
 }
 
@@ -237,6 +242,8 @@ disconnect(lua_State *const L)
 
     LOG(wrapper) << "disconnect " << client;
 
+    TEST_TextMessageError(cleanup_staleness(ps->getEConn()),
+                          "failed to cleanup staleness!");
     auto ws = clients[client];
     clients[client] = NULL;
     delete ws;
@@ -271,15 +278,12 @@ rewrite(lua_State *const L)
             assert(ps);
 
             SchemaCache &schema_cache = c_wrapper->getSchemaCache();
-            SchemaInfo const &schema =
-                schema_cache.getSchema(ps->getConn(), ps->getEConn());
-
             std::unique_ptr<QueryRewrite> qr;
             TEST_TextMessageError(retrieveDefaultDatabase(_thread_id,
                                                           ps->getConn(),
                                             &c_wrapper->default_db),
                             "proxy failed to retrieve default database!");
-            queryPreamble(*ps, query, &qr, &new_queries, schema,
+            queryPreamble(*ps, query, &qr, &new_queries, &schema_cache,
                           c_wrapper->default_db);
             assert(qr);
 
@@ -428,9 +432,8 @@ envoi(lua_State *const L)
     try {
         const EpilogueResult &epi_result =
             queryEpilogue(*ps, *qr.get(), res, c_wrapper->last_query,
-                          c_wrapper->default_db, false);
-        const bool stales = qr->output->stalesSchema();
-        c_wrapper->getSchemaCache().updateStaleness(stales);
+                          c_wrapper->default_db,
+                          &c_wrapper->getSchemaCache(), false);
         if (QueryAction::ROLLBACK == epi_result.action) {
             lua_pushboolean(L, true);           // success
             lua_pushboolean(L, true);           // rollback

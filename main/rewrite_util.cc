@@ -3,6 +3,7 @@
 #include <main/rewrite_util.hh>
 #include <main/rewrite_main.hh>
 #include <main/macro_util.hh>
+#include <main/metadata_tables.hh>
 #include <parser/lex_util.hh>
 #include <parser/stringify.hh>
 #include <util/enum_text.hh>
@@ -526,12 +527,21 @@ void
 queryPreamble(const ProxyState &ps, const std::string &q,
               std::unique_ptr<QueryRewrite> *const qr,
               std::list<std::string> *const out_queryz,
-              SchemaInfo const &schema,
+              SchemaCache *const schema_cache,
               const std::string &default_db)
 {
+    const SchemaInfo &schema =
+        schema_cache->getSchema(ps.getConn(), ps.getEConn());
+
     *qr = std::unique_ptr<QueryRewrite>(
             new QueryRewrite(Rewriter::rewrite(ps, q, schema,
                                                default_db)));
+
+    // We handle before any queries because a failed query
+    // may stale the database during recovery and then
+    // we'd have to handle there as well.
+    schema_cache->updateStaleness(ps.getEConn(),
+                                  (*qr)->output->stalesSchema());
 
     // ASK bites again...
     // We want the embedded database to reflect the metadata for the
@@ -592,13 +602,14 @@ prettyPrintQueryResult(const ResType &res)
 EpilogueResult
 queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
               const ResType &res, const std::string &query,
-              const std::string &default_db, bool pp)
+              const std::string &default_db,
+              SchemaCache *const schema_cache, bool pp)
 {
     qr.output->afterQuery(ps.getEConn());
 
     const QueryAction action = qr.output->queryAction(ps.getConn());
     if (QueryAction::AGAIN == action) {
-        return executeQuery(ps, query, default_db, NULL, pp);
+        return executeQuery(ps, query, default_db, schema_cache, pp);
     }
 
     if (pp) {
@@ -624,19 +635,83 @@ const SchemaInfo &
 SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
                        const std::unique_ptr<Connect> &e_conn)
 {
-    /*
-    if (true == staleness) {
+    const std::string &query =
+        " SELECT stale FROM " + MetaData::Table::staleness() +
+        "  WHERE thread_id = (SELECT CONNECTION_ID());";
+    std::unique_ptr<DBResult> db_res;
+    TEST_TextMessageError(e_conn->execute(query, &db_res),
+                          "failed to get schema!");
+    assert(1 == mysql_num_rows(db_res->n));
+
+    const MYSQL_ROW row = mysql_fetch_row(db_res->n);
+    const unsigned long *const l = mysql_fetch_lengths(db_res->n);
+    assert(l != NULL);
+
+    const bool stale = string_to_bool(std::string(row[0], l[0]));
+
+    // HACK (!this->schema) : Nested calls to executeQuery are being
+    // made without a SchemaCache (ie in SpecialUpdate). So they
+    // get to this point; dont have a query; but then the database may
+    // say that they are not stale, so this HACK.
+    // > We could make executeQuery write 'stale' into the database when
+    // it doesn't get a cache.
+    // > Write a seperate version of executeQuery that takes a SchemaInfo
+    // instead of a SchemaCache and can only do operations that don't
+    // change the schema.
+    // This hack also solves another issue where a bad query will reset the
+    // SchemaCache (in the shell); but the metadata implies that there
+    // should be a cached schema to use.
+    if (true == stale || !this->schema) {
         this->schema.reset(loadSchemaInfo(conn, e_conn));
     }
-    */
-    this->schema.reset(loadSchemaInfo(conn, e_conn));
-    assert(this->schema);
 
+    assert(this->schema);
     return *this->schema.get();
 }
 
-void SchemaCache::updateStaleness(bool staleness)
+void
+SchemaCache::updateStaleness(const std::unique_ptr<Connect> &e_conn,
+                             bool staleness)
 {
-    this->staleness = staleness;
+    AssignOnce<std::string> query;
+    if (true == staleness) {
+        // Make everyone stale.
+        query =
+            " UPDATE " + MetaData::Table::staleness() +
+            "    SET stale = " + bool_to_string(staleness) + ";";
+    } else {
+        // We are no longer stale.
+        query =
+            " UPDATE " + MetaData::Table::staleness() +
+            "    SET stale = " + bool_to_string(staleness) +
+            "  WHERE thread_id = (SELECT CONNECTION_ID());";
+    }
+
+    TEST_TextMessageError(e_conn->execute(query.get()),
+                          "failed to update staleness");
 }
 
+bool
+initial_staleness(const std::unique_ptr<Connect> &e_conn)
+{
+    RETURN_FALSE_IF_FALSE(cleanup_staleness(e_conn));
+
+    const std::string seed_staleness =
+        " INSERT INTO " + MetaData::Table::staleness() +
+        "   (thread_id, stale) VALUES " +
+        "   ((SELECT CONNECTION_ID()), TRUE);";
+    RETURN_FALSE_IF_FALSE(e_conn->execute(seed_staleness));
+
+    return true;
+}
+
+bool
+cleanup_staleness(const std::unique_ptr<Connect> &e_conn)
+{
+    const std::string remove_staleness =
+        " DELETE FROM " + MetaData::Table::staleness() +
+        "       WHERE thread_id = (SELECT CONNECTION_ID());";
+    RETURN_FALSE_IF_FALSE(e_conn->execute(remove_staleness));
+
+    return true;
+}

@@ -1505,9 +1505,7 @@ executeQuery(const ProxyState &ps, const std::string &q,
     std::unique_ptr<QueryRewrite> qr;
     // out_queryz: queries intended to be run against remote server.
     std::list<std::string> out_queryz;
-    SchemaInfo const &schema =
-        schema_cache->getSchema(ps.getConn(), ps.getEConn());
-    queryPreamble(ps, q, &qr, &out_queryz, schema, default_db);
+    queryPreamble(ps, q, &qr, &out_queryz, schema_cache, default_db);
     assert(qr);
 
     std::unique_ptr<DBResult> dbres;
@@ -1527,14 +1525,12 @@ executeQuery(const ProxyState &ps, const std::string &q,
     // ----------------------------------
     //       Post Query Processing
     // ----------------------------------
-    // > Handle schema cacheing immediately after executing a query.
-    schema_cache->updateStaleness(qr->output->stalesSchema());
-
     const ResType &res =
         dbres ? ResType(dbres->unpack()) : mysql_noop_res(ps);
     assert(res.success());
     const EpilogueResult epi_result =
-        queryEpilogue(ps, *qr.get(), res, q, default_db, pp);
+        queryEpilogue(ps, *qr.get(), res, q, default_db, schema_cache,
+                      pp);
     assert(epi_result.res_type.success());
 
     return epi_result;

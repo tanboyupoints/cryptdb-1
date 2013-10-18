@@ -1114,6 +1114,7 @@ Connection::start() {
                 const std::string master_key = "2392834";
                 ProxyState *const ps =
                     new ProxyState(ci, tc.shadowdb_dir, master_key);
+                assert(initial_staleness(ps->getEConn()));
                 re_set.insert(ps);
                 this->re_it = re_set.begin();
             }

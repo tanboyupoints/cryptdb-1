@@ -136,7 +136,7 @@ void
 queryPreamble(const ProxyState &ps, const std::string &q,
               std::unique_ptr<QueryRewrite> *qr,
               std::list<std::string> *const out_queryz,
-              SchemaInfo const &schema,
+              SchemaCache *const schema,
               const std::string &default_db);
 
 bool
@@ -158,20 +158,26 @@ public:
 EpilogueResult
 queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
               const ResType &res, const std::string &query,
-              const std::string &default_db, bool pp);
+              const std::string &default_db,
+              SchemaCache *const schema_cache, bool pp);
 
 class SchemaCache {
 public:
-    SchemaCache() : staleness(true) {}
+    SchemaCache() {}
 
     const SchemaInfo &getSchema(const std::unique_ptr<Connect> &conn,
                                 const std::unique_ptr<Connect> &e_conn);
-    void updateStaleness(bool staleness);
+    void updateStaleness(const std::unique_ptr<Connect> &e_conn,
+                         bool staleness);
 
 private:
-    bool staleness;
     std::unique_ptr<const SchemaInfo> schema;
 };
+bool
+initial_staleness(const std::unique_ptr<Connect> &e_conn);
+
+bool
+cleanup_staleness(const std::unique_ptr<Connect> &e_conn);
 
 template <typename InType, typename InterimType, typename OutType>
 std::function<OutType(InType in)>

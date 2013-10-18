@@ -24,6 +24,14 @@ MetaData::Table::embeddedQueryCompletion()
     return DB::embeddedDB() + "." + Internal::getPrefix() +
            "embeddedQueryCompletion";
 }
+
+std::string
+MetaData::Table::staleness()
+{
+    return DB::embeddedDB() + "." + Internal::getPrefix() +
+           "staleness";
+}
+
 std::string
 MetaData::Table::remoteQueryCompletion()
 {
@@ -128,6 +136,13 @@ MetaData::initialize(const std::unique_ptr<Connect> &conn,
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
     RETURN_FALSE_IF_FALSE(e_conn->execute(create_embedded_completion));
+
+    const std::string create_staleness =
+        " CREATE TABLE IF NOT EXISTS " + Table::staleness() +
+        "   (thread_id BIGINT NOT NULL,"
+        "    stale BOOLEAN NOT NULL) "
+        " ENGINE=InnoDB;";
+    RETURN_FALSE_IF_FALSE(e_conn->execute(create_staleness));
 
     // Remote database.
     const std::string create_remote_db =
