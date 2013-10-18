@@ -66,7 +66,9 @@ function read_query(packet)
 
     -- acquire lock
     status, lock_fd = locklib.acquire_lock(LOCK_FILE)
-    assert(status)
+    if false == status then
+        lock_fd = nil
+    end
 
     -- Clear the queues
     linda:set(QUERY_QUEUE)
@@ -82,6 +84,13 @@ function read_query_result(inj)
     local query = string.sub(inj.query, 2)
 
     local out_status = nil
+
+    if nil == lock_fd then
+        log_file_h:write(create_log_entry(client_name, query, false,
+                                         false, "lock acquisition failed"))
+        log_file_h:flush()
+        return
+    end
 
     -- > somemtimes this is a table (ie SELECT), sometimes it's nil (query
     --   error), sometimes it's number of rows affected by command
@@ -136,7 +145,9 @@ function read_query_result(inj)
     log_file_h:flush()
 
     -- release lock
+    assert(lock_fd)
     locklib.release_lock(lock_fd)
+    lock_fd = nil
 end
 
 -- never returns (sends messages)
