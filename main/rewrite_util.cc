@@ -624,9 +624,12 @@ const SchemaInfo &
 SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
                        const std::unique_ptr<Connect> &e_conn)
 {
+    /*
     if (true == staleness) {
         this->schema.reset(loadSchemaInfo(conn, e_conn));
     }
+    */
+    this->schema.reset(loadSchemaInfo(conn, e_conn));
     assert(this->schema);
 
     return *this->schema.get();
@@ -636,5 +639,4 @@ void SchemaCache::updateStaleness(bool staleness)
 {
     this->staleness = staleness;
 }
-
 

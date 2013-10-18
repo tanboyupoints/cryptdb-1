@@ -1,3 +1,5 @@
+// gcc -shared -fpic locklib.c -o ../obj/scripts/locklib.so --llua5.1
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
