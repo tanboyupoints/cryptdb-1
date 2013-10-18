@@ -658,9 +658,6 @@ SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
     // > Write a seperate version of executeQuery that takes a SchemaInfo
     // instead of a SchemaCache and can only do operations that don't
     // change the schema.
-    // This hack also solves another issue where a bad query will reset the
-    // SchemaCache (in the shell); but the metadata implies that there
-    // should be a cached schema to use.
     if (true == stale || !this->schema) {
         this->schema.reset(loadSchemaInfo(conn, e_conn));
     }
@@ -673,22 +670,36 @@ void
 SchemaCache::updateStaleness(const std::unique_ptr<Connect> &e_conn,
                              bool staleness)
 {
-    AssignOnce<std::string> query;
     if (true == staleness) {
         // Make everyone stale.
-        query =
-            " UPDATE " + MetaData::Table::staleness() +
-            "    SET stale = " + bool_to_string(staleness) + ";";
+        lowLevelAllStale(e_conn);
     } else {
         // We are no longer stale.
-        query =
-            " UPDATE " + MetaData::Table::staleness() +
-            "    SET stale = " + bool_to_string(staleness) +
-            "  WHERE thread_id = (SELECT CONNECTION_ID());";
+        lowLevelCurrentUnstale(e_conn);
     }
+}
 
-    TEST_TextMessageError(e_conn->execute(query.get()),
-                          "failed to update staleness");
+void
+lowLevelAllStale(const std::unique_ptr<Connect> &e_conn)
+{
+    const std::string &query =
+        " UPDATE " + MetaData::Table::staleness() +
+        "    SET stale = TRUE;";
+
+    TEST_TextMessageError(e_conn->execute(query),
+                          "failed to all stale!");
+}
+
+void
+lowLevelCurrentUnstale(const std::unique_ptr<Connect> &e_conn)
+{
+    const std::string &query =
+        " UPDATE " + MetaData::Table::staleness() +
+        "    SET stale = FALSE"
+        "  WHERE thread_id = (SELECT CONNECTION_ID());";
+
+    TEST_TextMessageError(e_conn->execute(query),
+                          "failed to unstale current!");
 }
 
 bool

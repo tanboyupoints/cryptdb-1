@@ -375,6 +375,9 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                                : "generic_prefix_";
     assert(MetaData::initialize(conn, e_conn, prefix));
 
+    TEST_TextMessageError(initial_staleness(e_conn),
+                          "failed to set initial staleness");
+
     TEST_TextMessageError(synchronizeDatabases(conn, e_conn),
                           "Failed to synchronize embedded and remote"
                           " databases!");

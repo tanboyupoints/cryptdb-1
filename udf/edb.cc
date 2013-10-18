@@ -229,7 +229,7 @@ decrypt_int_sem(PG_FUNCTION_ARGS)
         char *const keyBytes = getba(args, 1, keyLen);
         const std::string key = std::string(keyBytes, keyLen);
 
-        uint64_t salt = getui(args, 2);
+        const uint64_t salt = getui(args, 2);
 
         blowfish bf(key);
         value = bf.decrypt(eValue) ^ salt;

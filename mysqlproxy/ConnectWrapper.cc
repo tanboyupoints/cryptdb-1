@@ -163,13 +163,6 @@ connect(lua_State *const L)
                                 SECURITY_RATING::BEST_EFFORT);
         }
 
-        // Client starts off stale.
-        // > Must be done after ProxyState::ProxyState because we need
-        //   the metatables.
-        TEST_TextMessageError(initial_staleness(ps->getEConn()),
-                              "failed to set initial staleness");
-
-
         //may need to do training
         ev = getenv("TRAIN_QUERY");
         if (ev) {

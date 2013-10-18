@@ -473,8 +473,10 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
 
     switch (type) {
         case CompletionType::AdjustOnionCompletion:
+            lowLevelAllStale(e_conn);
             return fixAdjustOnion(conn, e_conn, unfinished_id);
         case CompletionType::DDLCompletion:
+            lowLevelAllStale(e_conn);
             return fixDDL(conn, e_conn, unfinished_id);
         default:
             std::cerr << "unknown completion type" << std::endl;

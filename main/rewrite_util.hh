@@ -161,6 +161,10 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
               const std::string &default_db,
               SchemaCache *const schema_cache, bool pp);
 
+void lowLevelAllStale(const std::unique_ptr<Connect> &e_conn);
+
+void lowLevelCurrentUnstale(const std::unique_ptr<Connect> &e_conn);
+
 class SchemaCache {
 public:
     SchemaCache() {}
