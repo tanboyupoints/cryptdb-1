@@ -18,59 +18,59 @@ TestNotConsider::~TestNotConsider() {
 }
 
 std::vector<Query> CreateSingle = {
-    Query("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext enc text)",true),
-    Query("CREATE TABLE privmsg (msgid enc integer, recid enc integer, senderid enc integer)",true),
-    Query("CREATE TABLE uncrypt (id integer, t text)",true),
-    Query("CREATE TABLE forum (forumid integer AUTO_INCREMENT PRIMARY KEY, title enc text)",true),
-    Query("CREATE TABLE post (postid integer AUTO_INCREMENT PRIMARY KEY, forumid enc integer, posttext enc text, author enc integer)",true),
-    Query("CREATE TABLE u (userid enc integer, username enc text)",true),
-    Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u (username enc text, psswd enc text)",true)
+    Query("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext enc text)"),
+    Query("CREATE TABLE privmsg (msgid enc integer, recid enc integer, senderid enc integer)"),
+    Query("CREATE TABLE uncrypt (id integer, t text)"),
+    Query("CREATE TABLE forum (forumid integer AUTO_INCREMENT PRIMARY KEY, title enc text)"),
+    Query("CREATE TABLE post (postid integer AUTO_INCREMENT PRIMARY KEY, forumid enc integer, posttext enc text, author enc integer)"),
+    Query("CREATE TABLE u (userid enc integer, username enc text)"),
+    Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u (username enc text, psswd enc text)")
 };
 
 std::vector<Query> CreateMulti = {
-    Query("CREATE TABLE msgs (msgid equals privmsg.msgid integer AUTO_INCREMENT PRIMARY KEY , msgtext encfor msgid text)",true),
-    Query("CREATE TABLE privmsg (msgid integer, recid equals u.userid speaks_for msgid integer, senderid speaks_for msgid integer)",true),
-    Query("CREATE TABLE uncrypt (id integer, t text)",true),
-    Query("CREATE TABLE forum (forumid integer AUTO_INCREMENT PRIMARY KEY, title text)",true),
-    Query("CREATE TABLE post (postid integer AUTO_INCREMENT PRIMARY KEY, forumid equals forum.forumid integer, posttext encfor forumid text, author equals u.userid speaks_for forumid integer)",true),
-    Query("CREATE TABLE u (userid equals privmsg.senderid integer, username givespsswd userid text)",true),
-    Query("COMMIT ANNOTATIONS",true)
+    Query("CREATE TABLE msgs (msgid equals privmsg.msgid integer AUTO_INCREMENT PRIMARY KEY , msgtext encfor msgid text)"),
+    Query("CREATE TABLE privmsg (msgid integer, recid equals u.userid speaks_for msgid integer, senderid speaks_for msgid integer)"),
+    Query("CREATE TABLE uncrypt (id integer, t text)"),
+    Query("CREATE TABLE forum (forumid integer AUTO_INCREMENT PRIMARY KEY, title text)"),
+    Query("CREATE TABLE post (postid integer AUTO_INCREMENT PRIMARY KEY, forumid equals forum.forumid integer, posttext encfor forumid text, author equals u.userid speaks_for forumid integer)"),
+    Query("CREATE TABLE u (userid equals privmsg.senderid integer, username givespsswd userid text)"),
+    Query("COMMIT ANNOTATIONS")
 };
 
 std::vector<Query> QueryList = {
-    Query("INSERT INTO uncrypt VALUES (1, 'first')", false),
-    Query("INSERT INTO uncrypt (title) VALUES ('second')", false),
-    Query("INSERT INTO msgs VALUES (1, 'texty text text')", true),
-    Query("INSERT INTO post (forumid, posttext, author) VALUES (1, 'words', 1)", true),
-    Query("INSERT INTO u (1, 'alice')", true),
-    Query("INSERT INTO "+PWD_TABLE_PREFIX+"u ('alice', 'secretA')", true),
+    Query("INSERT INTO uncrypt VALUES (1, 'first')"),
+    Query("INSERT INTO uncrypt (title) VALUES ('second')"),
+    Query("INSERT INTO msgs VALUES (1, 'texty text text')"),
+    Query("INSERT INTO post (forumid, posttext, author) VALUES (1, 'words', 1)"),
+    Query("INSERT INTO u (1, 'alice')"),
+    Query("INSERT INTO "+PWD_TABLE_PREFIX+"u ('alice', 'secretA')"),
 
-    Query("SELECT * FROM uncrypt", false),
-    Query("SELECT * FROM msgs", true),
-    Query("SELECT postid FROM post", true),
-    Query("SELECT posttext FROM post", true),
-    Query("SELECT recid FROM privmsg WHERE msgid = 1",true),
-    Query("SELECT postid FROM post WHERE forumid = 1",true),
-    Query("SELECT postid FROM post WHERE posttext LIKE '%ee%'",true),
+    Query("SELECT * FROM uncrypt"),
+    Query("SELECT * FROM msgs"),
+    Query("SELECT postid FROM post"),
+    Query("SELECT posttext FROM post"),
+    Query("SELECT recid FROM privmsg WHERE msgid = 1"),
+    Query("SELECT postid FROM post WHERE forumid = 1"),
+    Query("SELECT postid FROM post WHERE posttext LIKE '%ee%'"),
 
-    Query("SELECT * FROM uncrypt, post", true),
-    Query("SELECT postid FROM forum, post WHERE forum.formid = post.forumid",true),
+    Query("SELECT * FROM uncrypt, post"),
+    Query("SELECT postid FROM forum, post WHERE forum.formid = post.forumid"),
 
-    Query("UPDATE uncrypt SET t = 'weeeeeee' WHERE id = 3",false),
-    Query("UPDATE privmsg SET msgid = 4",true),
+    Query("UPDATE uncrypt SET t = 'weeeeeee' WHERE id = 3"),
+    Query("UPDATE privmsg SET msgid = 4"),
 
-    Query("DELETE FROM uncrypt", false),
-    Query("DELETE FROM post WHERE postid = 5", true),
-    Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'", true)
+    Query("DELETE FROM uncrypt"),
+    Query("DELETE FROM post WHERE postid = 5"),
+    Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'")
 };
 
 std::vector<Query> Drop = {
-    Query("DROP TABLE msgs", true),
-    Query("DROP TABLE privmsg", true),
-    Query("DROP TABLE uncrypt", true),
-    Query("DROP TABLE forum",true),
-    Query("DROP TABLE post",true),
-    Query("DROP TABLE u",true)
+    Query("DROP TABLE msgs"),
+    Query("DROP TABLE privmsg"),
+    Query("DROP TABLE uncrypt"),
+    Query("DROP TABLE forum"),
+    Query("DROP TABLE post"),
+    Query("DROP TABLE u")
 };
 
 static void
