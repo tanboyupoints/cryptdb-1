@@ -80,6 +80,8 @@ Check(const TestConfig &tc, const std::vector<Query> &queries,
     for (auto q = queries.begin(); q != queries.end(); q++) {
         ntest++;
         command com = getCommand(q->query);
+	// NOTE(abw333): this code is currently not in use and it does not work.
+        // contact me if this becomes a problem.
         if (cl->considerQuery(com, q->query) == q->test_res) {
             npass++;
         } else {
