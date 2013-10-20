@@ -26,13 +26,19 @@ static Connection * control;
 static Connection * test;
 
 static QueryList Insert = QueryList("SingleInsert",
-    { "CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)",
-        "", "", "" },
-    { "CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)",
-        "", "", ""},
-                                    // TODO parser currently has no KEY functionality (broken?)
-    { "CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text, PRIMARY KEY (id))",
-      "", "", "" },
+    { Query("CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)"),
+      Query(""),
+      Query(""),
+      Query("") },
+    { Query("CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)"),
+      Query(""),
+      Query(""),
+      Query("")},
+    // TODO parser currently has no KEY functionality (broken?)
+    { Query("CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text, PRIMARY KEY (id))"),
+      Query(""),
+      Query(""),
+      Query("") },
     { Query("INSERT INTO test_insert VALUES (1, 21, 100, '24 Rosedale, Toronto, ONT', 'Pat Carlson')"),
       Query("SELECT * FROM test_insert"),
       Query("INSERT INTO test_insert (id, age, salary, address, name) VALUES (2, 23, 101, '25 Rosedale, Toronto, ONT', 'Pat Carlson2')"),
@@ -54,19 +60,24 @@ static QueryList Insert = QueryList("SingleInsert",
       Query("SELECT name FROM test_insert WHERE id=10"),
       Query("INSERT INTO test_insert (name, address, id, age) VALUES ('Peter Pan', 'first star to the right and straight on till morning', 42, 10)"),
       Query("SELECT name, address, age FROM test_insert WHERE id=42") },
-    { "DROP TABLE test_insert" },
-    { "DROP TABLE test_insert" },
-    { "DROP TABLE test_insert" } );
+    { Query("DROP TABLE test_insert") },
+    { Query("DROP TABLE test_insert") },
+    { Query("DROP TABLE test_insert") } );
 
 //migrated from TestSinglePrinc TestSelect
 static QueryList Select = QueryList("SingleSelect",
-    { "CREATE TABLE IF NOT EXISTS test_select (id integer, age integer, salary integer, address text, name text)",
-      "", "", "" },
-    { "CREATE TABLE IF NOT EXISTS test_select (id integer, age integer, salary integer, address text, name text)",
-      "", "", ""},
-
-    { "CREATE TABLE test_select (id integer, age integer, salary integer, address text, name text)",
-      "", "", "" },
+    { Query("CREATE TABLE IF NOT EXISTS test_select (id integer, age integer, salary integer, address text, name text)"),
+      Query(""),
+      Query(""),
+      Query("") },
+    { Query("CREATE TABLE IF NOT EXISTS test_select (id integer, age integer, salary integer, address text, name text)"),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE test_select (id integer, age integer, salary integer, address text, name text)"),
+      Query(""),
+      Query(""),
+      Query("") },
     { Query("INSERT INTO test_select VALUES (1, 10, 0, 'first star to the right and straight on till morning', 'Peter Pan')"),
       Query("INSERT INTO test_select VALUES (2, 16, 1000, 'Green Gables', 'Anne Shirley')"),
       Query("INSERT INTO test_select VALUES (3, 8, 0, 'London', 'Lucy')"),
@@ -118,21 +129,33 @@ static QueryList Select = QueryList("SingleSelect",
       Query("SELECT * FROM test_select WHERE id IN (SELECT id FROM test_select)"),
       Query("SELECT * FROM test_select WHERE id IN (SELECT 1 FROM test_select)")
       },
-    { "DROP TABLE test_select" },
-    { "DROP TABLE test_select" },
-    { "DROP TABLE test_select" } );
+    { Query("DROP TABLE test_select") },
+    { Query("DROP TABLE test_select") },
+    { Query("DROP TABLE test_select") } );
 
 //migrated from TestSinglePrinc TestJoin
 static QueryList Join = QueryList("SingleJoin",
-    { "CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)",
-      "CREATE TABLE test_join2 (id integer, books integer, name text)",
-      "", "", "", "", "" },
-    { "CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)",
-      "CREATE TABLE test_join2 (id integer, books integer, name text)",
-      "", "", "", "", "" },
-    { "CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)",
-     "CREATE TABLE test_join2 (id integer, books integer, name text)",
-      "", "", "", "", "" },
+    { Query("CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)"),
+      Query("CREATE TABLE test_join2 (id integer, books integer, name text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("") },
+    { Query("CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)"),
+      Query("CREATE TABLE test_join2 (id integer, books integer, name text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("") },
+    { Query("CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)"),
+      Query("CREATE TABLE test_join2 (id integer, books integer, name text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("") },
     { Query("INSERT INTO test_join1 VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')"),
       Query("INSERT INTO test_join1 VALUES (2, 16, 1000, 'Green Gables', 'Anne Shirley')"),
       Query("INSERT INTO test_join1 VALUES (3, 8, 0, 'London', 'Lucy')"),
@@ -152,25 +175,30 @@ static QueryList Join = QueryList("SingleJoin",
       Query("SELECT a.id, b.id, age, books, b.name FROM test_join1 a, test_join2 AS b WHERE a.id=b.id"),
       Query("SELECT test_join1.name, age, salary, b.name, books FROM test_join1, test_join2 b WHERE test_join1.age = b.books"),
             },
-    { "DROP TABLE test_join1",
-      "DROP TABLE test_join2" },
-    { "DROP TABLE test_join1",
-      "DROP TABLE test_join2" },
-    { "DROP TABLE test_join1",
-      "DROP TABLE test_join2" } );
+    { Query("DROP TABLE test_join1"),
+      Query("DROP TABLE test_join2") },
+    { Query("DROP TABLE test_join1"),
+      Query("DROP TABLE test_join2") },
+    { Query("DROP TABLE test_join1"),
+      Query("DROP TABLE test_join2") } );
 
 //migrated from TestSinglePrinc TestUpdate
 static QueryList Update = QueryList("SingleUpdate",
-    { "CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)",
-      "", "", "", "" },
-    { "CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)",
-
-        "",
-        "",
-        "",
-        ""},
-    { "CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)",
-      "", "", "", "" },
+    { Query("CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("") },
+    { Query("CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("") },
     { Query("INSERT INTO test_update VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')"),
       Query("INSERT INTO test_update VALUES (2, 16, 1000, 'Green Gables', 'Anne Shirley')"),
       Query("INSERT INTO test_update VALUES (3, 8, 0, 'London', 'Lucy')"),
@@ -205,17 +233,27 @@ static QueryList Update = QueryList("SingleUpdate",
       Query("SELECT * FROM test_update WHERE address < 'fml'"),
       Query("UPDATE test_update SET address = 'Neverland' WHERE id=1"),
       Query("SELECT * FROM test_update") },
-    { "DROP TABLE test_update" },
-    { "DROP TABLE test_update" },
-    { "DROP TABLE test_update" } );
+    { Query("DROP TABLE test_update") },
+    { Query("DROP TABLE test_update") },
+    { Query("DROP TABLE test_update") } );
 
 
 static QueryList HOM = QueryList("HOMAdd",
-
-    { "CREATE TABLE test_HOM (id integer, age integer, salary integer, address text, name text)", "","","",""},
-    { "CREATE TABLE test_HOM (id integer, age integer, salary integer, address text, name text)", "","","","" },
-    { "CREATE TABLE test_HOM (id integer, age integer, salary integer, address text, name text)", "","","",""},
-
+    { Query("CREATE TABLE test_HOM (id integer, age integer, salary integer, address text, name text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE test_HOM (id integer, age integer, salary integer, address text, name text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("") },
+    { Query("CREATE TABLE test_HOM (id integer, age integer, salary integer, address text, name text)"), 
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
     { Query("INSERT INTO test_HOM VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')"),
       Query("INSERT INTO test_HOM VALUES (2, 16, 1000, 'Green Gables', 'Anne Shirley')"),
       Query("INSERT INTO test_HOM VALUES (3, 8, 0, 'London', 'Lucy')"),
@@ -243,31 +281,36 @@ static QueryList HOM = QueryList("HOMAdd",
       Query("SELECT COUNT(*) FROM test_HOM WHERE age <= 100"),
       Query("SELECT COUNT(*) FROM test_HOM WHERE age >= 100"),
       Query("SELECT COUNT(*) FROM test_HOM WHERE age = 100") },
-    { "DROP TABLE test_HOM " },
-    { "DROP TABLE test_HOM" },
-    { "DROP TABLE test_HOM" } );
+    { Query("DROP TABLE test_HOM") },
+    { Query("DROP TABLE test_HOM") },
+    { Query("DROP TABLE test_HOM") } );
 
 //migrated from TestDelete
 static QueryList Delete = QueryList("SingleDelete",
-    { "CREATE TABLE test_delete (id integer, age integer, salary integer, address text, name text)",
-      "", "", "", "" },
-    { "CREATE TABLE test_delete (id integer, age integer, salary integer, address text, name text)",
-
-      "",
-      "",
-      "",
-      ""},
+    { Query("CREATE TABLE test_delete (id integer, age integer, salary integer, address text, name text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("") },
+    { Query("CREATE TABLE test_delete (id integer, age integer, salary integer, address text, name text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
     
 #if 0
       // Query Fail
-        "CRYPTDB test_delete.age ENC",
-      "CRYPTDB test_delete.salary ENC",
-      "CRYPTDB test_delete.address ENC",
-      "CRYPTDB test_delete.name ENC" },
+      Query("CRYPTDB test_delete.age ENC"),
+      Query("CRYPTDB test_delete.salary ENC"),
+      Query("CRYPTDB test_delete.address ENC"),
+      Query("CRYPTDB test_delete.name ENC") },
 #endif
 
-    { "CREATE TABLE test_delete (id integer, age integer, salary integer, address text, name text)",
-      "", "", "", "" },
+    { Query("CREATE TABLE test_delete (id integer, age integer, salary integer, address text, name text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("") },
     { Query("INSERT INTO test_delete VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')"),
       Query("INSERT INTO test_delete VALUES (2, 16, 1000, 'Green Gables', 'Anne Shirley')"),
       Query("INSERT INTO test_delete VALUES (3, 8, 0, 'London', 'Lucy')"),
@@ -290,20 +333,21 @@ static QueryList Delete = QueryList("SingleDelete",
       Query("SELECT * FROM test_delete"),
       Query("DELETE FROM test_delete"),
       Query("SELECT * FROM test_delete") },
-    { "DROP TABLE test_delete" },
-    { "DROP TABLE test_delete" },
-    { "DROP TABLE test_delete" } );
+    { Query("DROP TABLE test_delete") },
+    { Query("DROP TABLE test_delete") },
+    { Query("DROP TABLE test_delete") } );
 
 /*
 //migrated from TestSearch
 static QueryList Search = QueryList("SingleSearch",
-    { "CREATE TABLE test_search (id integer, searchable text)", "" },
-    { "CREATE TABLE test_search (id integer, searchable text)", "" },
-
-      // Query Fail
-      //"CRYPTDB test_search.seachable ENC" },
-    { "CREATE TABLE test_search (id integer, searchable text)", "" },
-
+    { Query("CREATE TABLE test_search (id integer, searchable text)"),
+      Query("") },
+    { Query("CREATE TABLE test_search (id integer, searchable text)"),
+      Query("") },
+    // Query Fail
+    //Query("CRYPTDB test_search.seachable ENC") },
+    { Query("CREATE TABLE test_search (id integer, searchable text)"),
+      Query("") },
     { Query("INSERT INTO test_search VALUES (1, 'short text')"),
       Query("INSERT INTO test_search VALUES (2, 'Text with CAPITALIZATION')"),
       Query("INSERT INTO test_search VALUES (3, '')"),
@@ -317,27 +361,33 @@ static QueryList Search = QueryList("SingleSearch",
       Query("SELECT * FROM test_search WHERE searchable < 'slow'"),
       Query("UPDATE test_search SET searchable='text that is new' WHERE id=1"),
       Query("SELECT * FROM test_search WHERE searchable < 'slow'") },
-    { "DROP TABLE test_search" },
-    { "DROP TABLE test_search" },
-    { "DROP TABLE test_search" } );
+    { Query("DROP TABLE test_search") },
+    { Query("DROP TABLE test_search") },
+    { Query("DROP TABLE test_search") } );
 */
 
 static QueryList Basic = QueryList("MultiBasic",
-    { "","",
-      "CREATE TABLE t1 (id integer, post text, age bigint)",
-      "","",
-      "CREATE TABLE u_basic (id integer, username text)",
-      "CREATE TABLE "+PWD_TABLE_PREFIX+"u_basic (username text, psswd text)" },
-    { "","",
-      "CREATE TABLE t1 (id integer, post text, age bigint)",
-      "","",
-      "CREATE TABLE u_basic (id integer, username text)",
-      "CREATE TABLE "+PWD_TABLE_PREFIX+"u_basic (username text, psswd text)" },
-    { "CRYPTDB PRINCTYPE id", "CRYPTDB PRINCTYPE uname EXTERNAL",
-      "CREATE TABLE t1 (id integer, post text, age bigint)",
-      "CRYPTDB t1.post ENCFOR t1.id id det", "CRYPTDB t1.age ENCFOR t1.id id ope",
-      "CREATE TABLE u_basic (id integer, username text)",
-      "CRYPTDB u_basic.username uname SPEAKSFOR u_basic.id id" },
+    { Query(""),
+      Query(""),
+      Query("CREATE TABLE t1 (id integer, post text, age bigint)"),
+      Query(""),
+      Query(""),
+      Query("CREATE TABLE u_basic (id integer, username text)"),
+      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_basic (username text, psswd text)") },
+    { Query(""),
+      Query(""),
+      Query("CREATE TABLE t1 (id integer, post text, age bigint)"),
+      Query(""),
+      Query(""),
+      Query("CREATE TABLE u_basic (id integer, username text)"),
+      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_basic (username text, psswd text)") },
+    { Query("CRYPTDB PRINCTYPE id"),
+      Query("CRYPTDB PRINCTYPE uname EXTERNAL"),
+      Query("CREATE TABLE t1 (id integer, post text, age bigint)"),
+      Query("CRYPTDB t1.post ENCFOR t1.id id det"),
+      Query("CRYPTDB t1.age ENCFOR t1.id id ope"),
+      Query("CREATE TABLE u_basic (id integer, username text)"),
+      Query("CRYPTDB u_basic.username uname SPEAKSFOR u_basic.id id") },
     { 
     
         //Query Fail
@@ -360,38 +410,48 @@ static QueryList Basic = QueryList("MultiBasic",
       Query("SELECT * FROM u_basic"),
       Query("INSERT INTO t1 VALUES (2, 'raluca has text here', 5)"),
       Query("SELECT * FROM t1") },
-    { "DROP TABLE u_basic",
-      "DROP TABLE t1",
-      "DROP TABLE "+PWD_TABLE_PREFIX+"u_basic" },
-    { "DROP TABLE u_basic",
-      "DROP TABLE t1",
-      "DROP TABLE "+PWD_TABLE_PREFIX+"u_basic" },
-    { "DROP TABLE u_basic",
-      "DROP TABLE t1",
-      "" } );
+    { Query("DROP TABLE u_basic"),
+      Query("DROP TABLE t1"),
+      Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_basic") },
+    { Query("DROP TABLE u_basic"),
+      Query("DROP TABLE t1"),
+      Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_basic") },
+    { Query("DROP TABLE u_basic"),
+      Query("DROP TABLE t1"),
+      Query("") } );
 
 //migrated from PrivMessages
 static QueryList PrivMessages = QueryList("MultiPrivMessages",
-    { "CREATE TABLE msgs (msgid integer, msgtext text)",
-      "CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)",
-      "CREATE TABLE u_mess (userid integer, username text)",
-      "CREATE TABLE "+PWD_TABLE_PREFIX+"u_mess (username text, psswd text)",
-      "", "", "", "", "", ""},
-    { "CREATE TABLE msgs (msgid integer, msgtext text)",
-      "CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)",
-      "CREATE TABLE u_mess (userid integer, username text)",
-      "CREATE TABLE "+PWD_TABLE_PREFIX+"u_mess (username text, psswd text)",
-      "", "", "", "", "", ""},
-    { "CRYPTDB PRINCTYPE msgid",
-      "CRYPTDB PRINCTYPE userid",
-      "CRYPTDB PRINCTYPE username EXTERNAL",
-      "CREATE TABLE msgs (msgid integer, msgtext text)",
-      "CRYPTDB msgs.msgtext ENCFOR msgs.msgid msgid",
-      "CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)",
-      "CRYPTDB privmsg.recid userid SPEAKSFOR privmsg.msgid msgid",
-      "CRYPTDB privmsg.senderid userid SPEAKSFOR privmsg.msgid msgid",
-      "CREATE TABLE u_mess (userid integer, username text)",
-      "CRYPTDB u_mess.username username SPEAKSFOR u_mess.userid userid" },
+    { Query("CREATE TABLE msgs (msgid integer, msgtext text)"),
+      Query("CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)"),
+      Query("CREATE TABLE u_mess (userid integer, username text)"),
+      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_mess (username text, psswd text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE msgs (msgid integer, msgtext text)"),
+      Query("CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)"),
+      Query("CREATE TABLE u_mess (userid integer, username text)"),
+      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_mess (username text, psswd text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CRYPTDB PRINCTYPE msgid"),
+      Query("CRYPTDB PRINCTYPE userid"),
+      Query("CRYPTDB PRINCTYPE username EXTERNAL"),
+      Query("CREATE TABLE msgs (msgid integer, msgtext text)"),
+      Query("CRYPTDB msgs.msgtext ENCFOR msgs.msgid msgid"),
+      Query("CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)"),
+      Query("CRYPTDB privmsg.recid userid SPEAKSFOR privmsg.msgid msgid"),
+      Query("CRYPTDB privmsg.senderid userid SPEAKSFOR privmsg.msgid msgid"),
+      Query("CREATE TABLE u_mess (userid integer, username text)"),
+      Query("CRYPTDB u_mess.username username SPEAKSFOR u_mess.userid userid") },
     { 
     
     // Query Fail
@@ -410,45 +470,57 @@ static QueryList PrivMessages = QueryList("MultiPrivMessages",
       // Why broken?
       // Query("SELECT msgtext FROM msgs, privmsg, u_mess WHERE username = 'alice' AND userid = recid AND msgs.msgid = privmsg.msgid")
     },
-    { "DROP TABLE msgs",
-      "DROP TABLE privmsg",
-      "DROP TABLE u_mess",
-      "DROP TABLE "+PWD_TABLE_PREFIX+"u_mess" },
-    { "DROP TABLE msgs",
-      "DROP TABLE privmsg",
-      "DROP TABLE u_mess",
-      "DROP TABLE "+PWD_TABLE_PREFIX+"u_mess" },
-    { "DROP TABLE msgs",
-      "DROP TABLE privmsg",
-      "DROP TABLE u_mess",
-      "" } );
+    { Query("DROP TABLE msgs"),
+      Query("DROP TABLE privmsg"),
+      Query("DROP TABLE u_mess"),
+      Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_mess") },
+    { Query("DROP TABLE msgs"),
+      Query("DROP TABLE privmsg"),
+      Query("DROP TABLE u_mess"),
+      Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_mess") },
+    { Query("DROP TABLE msgs"),
+      Query("DROP TABLE privmsg"),
+      Query("DROP TABLE u_mess"),
+      Query("") } );
 
 //migrated from UserGroupForum
 static QueryList UserGroupForum = QueryList("UserGroupForum",
-    { "CREATE TABLE u (userid integer, username text)",
-      "CREATE TABLE usergroup (userid integer, groupid integer)",
-      "CREATE TABLE groupforum (forumid integer, groupid integer, optionid integer)",
-      "CREATE TABLE forum (forumid integer, forumtext text)",
-      "CREATE TABLE "+PWD_TABLE_PREFIX+"u (username text, psswd text)",
-      "", "", "", "", "", "", ""},
-    { "CREATE TABLE u (userid integer, username text)",
-      "CREATE TABLE usergroup (userid integer, groupid integer)",
-      "CREATE TABLE groupforum (forumid integer, groupid integer, optionid integer)",
-      "CREATE TABLE forum (forumid integer, forumtext text)",
-      "CREATE TABLE "+PWD_TABLE_PREFIX+"u (username text, psswd text)",
-      "", "", "", "", "", "", ""},
-    { "CRYPTDB PRINCTYPE uname EXTERNAL",
-      "CRYPTDB PRINCTYPE uid",
-      "CRYPTDB PRINCTYPE gid",
-      "CRYPTDB PRINCTYPE fid",
-      "CREATE TABLE u (userid integer, username text)",
-      "CRYPTDB u.username uname SPEAKSFOR u.userid uid",
-      "CREATE TABLE usergroup (userid integer, groupid integer)",
-      "CRYPTDB usergroup.userid uid SPEAKSFOR usergroup.groupid gid",
-      "CREATE TABLE groupforum (forumid integer, groupid integer, optionid integer)",
-      "CRYPTDB groupforum.groupid gid SPEAKSFOR groupforum.forumid fid IF test(groupforum.optionid) integer",
-      "CREATE TABLE forum (forumid integer, forumtext text)",
-      "CRYPTDB forum.forumtext ENCFOR forum.forumid fid det" },
+    { Query("CREATE TABLE u (userid integer, username text)"),
+      Query("CREATE TABLE usergroup (userid integer, groupid integer)"),
+      Query("CREATE TABLE groupforum (forumid integer, groupid integer, optionid integer)"),
+      Query("CREATE TABLE forum (forumid integer, forumtext text)"),
+      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u (username text, psswd text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE u (userid integer, username text)"),
+      Query("CREATE TABLE usergroup (userid integer, groupid integer)"),
+      Query("CREATE TABLE groupforum (forumid integer, groupid integer, optionid integer)"),
+      Query("CREATE TABLE forum (forumid integer, forumtext text)"),
+      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u (username text, psswd text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CRYPTDB PRINCTYPE uname EXTERNAL"),
+      Query("CRYPTDB PRINCTYPE uid"),
+      Query("CRYPTDB PRINCTYPE gid"),
+      Query("CRYPTDB PRINCTYPE fid"),
+      Query("CREATE TABLE u (userid integer, username text)"),
+      Query("CRYPTDB u.username uname SPEAKSFOR u.userid uid"),
+      Query("CREATE TABLE usergroup (userid integer, groupid integer)"),
+      Query("CRYPTDB usergroup.userid uid SPEAKSFOR usergroup.groupid gid"),
+      Query("CREATE TABLE groupforum (forumid integer, groupid integer, optionid integer)"),
+      Query("CRYPTDB groupforum.groupid gid SPEAKSFOR groupforum.forumid fid IF test(groupforum.optionid) integer"),
+      Query("CREATE TABLE forum (forumid integer, forumtext text)"),
+      Query("CRYPTDB forum.forumtext ENCFOR forum.forumid fid det") },
     { 
       // Query Fail
       // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice', 'secretalice')"),
@@ -606,29 +678,44 @@ static QueryList UserGroupForum = QueryList("UserGroupForum",
     },
       // Query Fail
       // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'")},
-    { "DROP TABLE u",
-      "DROP TABLE usergroup",
-      "DROP TABLE groupforum",
-      "DROP TABLE forum",
-      "DROP TABLE "+PWD_TABLE_PREFIX+"u" },
-    { "DROP TABLE u",
-      "DROP TABLE usergroup",
-      "DROP TABLE groupforum",
-      "DROP TABLE forum",
-      "DROP TABLE "+PWD_TABLE_PREFIX+"u" },
-    { "DROP TABLE u",
-      "DROP TABLE usergroup",
-      "DROP TABLE groupforum",
-      "DROP TABLE forum",
-      "" } );
+    { Query("DROP TABLE u"),
+      Query("DROP TABLE usergroup"),
+      Query("DROP TABLE groupforum"),
+      Query("DROP TABLE forum"),
+      Query("DROP TABLE "+PWD_TABLE_PREFIX+"u") },
+    { Query("DROP TABLE u"),
+      Query("DROP TABLE usergroup"),
+      Query("DROP TABLE groupforum"),
+      Query("DROP TABLE forum"),
+      Query("DROP TABLE "+PWD_TABLE_PREFIX+"u") },
+    { Query("DROP TABLE u"),
+      Query("DROP TABLE usergroup"),
+      Query("DROP TABLE groupforum"),
+      Query("DROP TABLE forum"),
+      Query("") } );
 
 static QueryList Auto = QueryList("AutoInc",
-    { "CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)",
-      "", "", "", "", "", ""},
-    { "CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)",
-      "", "", "", "", "", ""},
-    { "CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)",
-      "", "", "", "", "", ""},
+    { Query("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
     { Query("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world', 100)"),
       Query("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world2', 21)"),
       Query("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world3', 10909)"),
@@ -650,9 +737,9 @@ static QueryList Auto = QueryList("AutoInc",
       Query("SELECT * FROM msgs"),
       Query("SELECT SUM(zooanimals) FROM msgs"),
       },
-    { "DROP TABLE msgs"},
-    { "DROP TABLE msgs"},
-    { "DROP TABLE msgs"});
+    { Query("DROP TABLE msgs")},
+    { Query("DROP TABLE msgs")},
+    { Query("DROP TABLE msgs")});
 
 /*
  * Add additional tests once functional.
@@ -660,12 +747,27 @@ static QueryList Auto = QueryList("AutoInc",
  * > OPE
  */
 static QueryList Negative = QueryList("Negative",
-    { "CREATE TABLE negs (a integer, b integer, c integer)",
-      "", "", "", "", "", ""},
-    { "CREATE TABLE negs (a integer, b integer, c integer)",
-      "", "", "", "", "", ""},
-    { "CREATE TABLE negs (a integer, b integer, c integer)",
-      "", "", "", "", "", ""},
+    { Query("CREATE TABLE negs (a integer, b integer, c integer)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE negs (a integer, b integer, c integer)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE negs (a integer, b integer, c integer)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
     { Query("INSERT INTO negs (a, b, c) VALUES (10, -20, -100)"),
       Query("INSERT INTO negs (a, b, c) VALUES (-100, 50, -12)"),
       Query("INSERT INTO negs (a, b, c) VALUES (-8, -50, -18)"),
@@ -675,105 +777,110 @@ static QueryList Negative = QueryList("Negative",
       Query("INSERT INTO negs (c) VALUES (-1009)"),
       Query("INSERT INTO negs (c) VALUES (1009)"),
       Query("SELECT * FROM negs WHERE c = -1009")},
-    { "DROP TABLE negs"},
-    { "DROP TABLE negs"},
-    { "DROP TABLE negs"});
+    { Query("DROP TABLE negs")},
+    { Query("DROP TABLE negs")},
+    { Query("DROP TABLE negs")});
 
 static QueryList Null = QueryList("Null",
-    { "CREATE TABLE test_null (uid integer, age integer, address text)",
-      "CREATE TABLE u_null (uid integer, username text)",
-      "CREATE TABLE "+PWD_TABLE_PREFIX+"u_null (username text, password text)",
-      "", "" },
-    { "CREATE TABLE test_null (uid integer, age integer, address text)",
-      
-        "",
-        "",
-
-        // Query Fail
-        //"CRYPTDB test_null.age ENC",
-      //"CRYPTDB test_null.address ENC",
-
-      "CREATE TABLE u_null (uid integer, username text)",
-      "CREATE TABLE "+PWD_TABLE_PREFIX+"u_null (username text, password text)"},
-    //can only handle NULL's on non-principal fields
-    { "",
-      "",
-
-    // Query Fail
-    //{ "CRYPTDB PRINCTYPE uid",
-    //  "CRYPTDB PRINCTYPE username",
-
-      "CREATE TABLE test_null (uid integer, age integer, address text)",
-      "CREATE TABLE u_null (uid equals test_null.uid integer, username givespsswd uid text)",
-      "" },
-      
+    { Query("CREATE TABLE test_null (uid integer, age integer, address text)"),
+      Query("CREATE TABLE u_null (uid integer, username text)"),
+      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_null (username text, password text)"),
+      Query(""),
+      Query("") },
+    { Query("CREATE TABLE test_null (uid integer, age integer, address text)"),
+      Query(""),
+      Query(""),
       // Query Fail
-      //"CRYPTDB u_null.username username SPEAKSFOR u_null.uid uid" },
-    
+      //Query("CRYPTDB test_null.age ENC"),
+      //Query("CRYPTDB test_null.address ENC"),
+      Query("CREATE TABLE u_null (uid integer, username text)"),
+      Query("CREATE TABLE " + PWD_TABLE_PREFIX + "u_null (username text, password text)")},
+    //can only handle NULL's on non-principal fields
+    { Query(""),
+      Query(""),
+      // Query Fail
+      //{ Query("CRYPTDB PRINCTYPE uid"),
+      //  Query("CRYPTDB PRINCTYPE username"),
+      Query("CREATE TABLE test_null (uid integer, age integer, address text)"),
+      Query("CREATE TABLE u_null (uid equals test_null.uid integer, username givespsswd uid text)"),
+      Query("") },
+      // Query Fail
+      //Query("CRYPTDB u_null.username username SPEAKSFOR u_null.uid uid") },
       { 
-          // Query Fail
-          //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_null (username, password) VALUES ('alice', 'secretA')"),
-      Query("INSERT INTO u_null VALUES (1, 'alice')"),
-      Query("INSERT INTO test_null (uid, age) VALUES (1, 20)"),
-      Query("SELECT * FROM test_null"),
-      Query("INSERT INTO test_null (uid, address) VALUES (1, 'somewhere over the rainbow')"),
-      Query("SELECT * FROM test_null"),
-      Query("INSERT INTO test_null (uid, age) VALUES (1, NULL)"),
-      Query("SELECT * FROM test_null"),
-      Query("INSERT INTO test_null (uid, address) VALUES (1, NULL)"),
-      Query("SELECT * FROM test_null"),
-      Query("INSERT INTO test_null VALUES (1, 25, 'Australia')"),
-      Query("SELECT * FROM test_null") },
-    { "DROP TABLE test_null",
-      "DROP TABLE u_null",
-      "DROP TABLE "+PWD_TABLE_PREFIX+"u_null" },
-    { "DROP TABLE test_null",
-      "DROP TABLE u_null",
-      "DROP TABLE "+PWD_TABLE_PREFIX+"u_null" },
-    { "DROP TABLE test_null",
-      "DROP TABLE u_null",
-      "" } );
+        // Query Fail
+        //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_null (username, password) VALUES ('alice', 'secretA')"),
+        Query("INSERT INTO u_null VALUES (1, 'alice')"),
+        Query("INSERT INTO test_null (uid, age) VALUES (1, 20)"),
+        Query("SELECT * FROM test_null"),
+        Query("INSERT INTO test_null (uid, address) VALUES (1, 'somewhere over the rainbow')"),
+        Query("SELECT * FROM test_null"),
+        Query("INSERT INTO test_null (uid, age) VALUES (1, NULL)"),
+        Query("SELECT * FROM test_null"),
+        Query("INSERT INTO test_null (uid, address) VALUES (1, NULL)"),
+        Query("SELECT * FROM test_null"),
+        Query("INSERT INTO test_null VALUES (1, 25, 'Australia')"),
+        Query("SELECT * FROM test_null") },
+    { Query("DROP TABLE test_null"),
+      Query("DROP TABLE u_null"),
+      Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_null") },
+    { Query("DROP TABLE test_null"),
+      Query("DROP TABLE u_null"),
+      Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_null") },
+    { Query("DROP TABLE test_null"),
+      Query("DROP TABLE u_null"),
+      Query("") } );
 
 static QueryList ManyConnections = QueryList("Multiple connections",
-    { "CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext text)",
-      "CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)",
-      "CREATE TABLE forum (forumid integer AUTO_INCREMENT PRIMARY KEY, title text)",
-      "CREATE TABLE post (postid integer AUTO_INCREMENT PRIMARY KEY, forumid integer, posttext text, author integer)",
-      "CREATE TABLE u_conn (userid integer, username text)",
-      "CREATE TABLE "+PWD_TABLE_PREFIX+"u_conn (username text, psswd text)",
-      "", "", "", "", "", "", "", "", "", ""},
-    { "CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext text)",
-      "CRYPTDB msgs.msgtext ENC",
-      "CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)",
-      "CRYPTDB privmsg.recid ENC",
-      "CRYPTDB privmsg.senderid ENC",
-      "CREATE TABLE forum (forumid integer AUTO_INCREMENT PRIMARY KEY, title text)",
-      "CRYPTDB forum.title ENC",
-      "CREATE TABLE post (postid integer AUTO_INCREMENT PRIMARY KEY, forumid integer, posttext text, author integer)",
-      "CRYPTDB post.posttext ENC",
-      "CREATE TABLE u_conn (userid enc integer, username enc text)",
-      "CRYPTDB u_conn.userid ENC",
-      "CRYPTDB u_conn.username ENC",
-      "CREATE TABLE "+PWD_TABLE_PREFIX+"u_conn (username text, psswd text)",
-      "", "", ""},
-    { "CRYPTDB PRINCTYPE username EXTERNAL",
-      "CRYPTDB PRINCTYPE mid",
-      "CRYPTDB PRINCTYPE uid",
-      "CRYPTDB PRINCTYPE fid",
-      "CRYPTDB PRINCTYPE pid",
-      "CREATE TABLE msgs (msgid integer AUTO_INCREMENT PRIMARY KEY , msgtext text)",
-      "CRYPTDB msgs.msgtext ENCFOR msgs.msgid mid",
-      "CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)",
-      "CRYPTDB privmsg.recid uid SPEAKSFOR privmsg.msgid mid",
-      "CRYPTDB privmsg.senderid uid SPEAKSFOR privmsg.msgid mid",
+    { Query("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext text)"),
+      Query("CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)"),
+      Query("CREATE TABLE forum (forumid integer AUTO_INCREMENT PRIMARY KEY, title text)"),
+      Query("CREATE TABLE post (postid integer AUTO_INCREMENT PRIMARY KEY, forumid integer, posttext text, author integer)"),
+      Query("CREATE TABLE u_conn (userid integer, username text)"),
+      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_conn (username text, psswd text)"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext text)"),
+      Query("CRYPTDB msgs.msgtext ENC"),
+      Query("CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)"),
+      Query("CRYPTDB privmsg.recid ENC"),
+      Query("CRYPTDB privmsg.senderid ENC"),
+      Query("CREATE TABLE forum (forumid integer AUTO_INCREMENT PRIMARY KEY, title text)"),
+      Query("CRYPTDB forum.title ENC"),
+      Query("CREATE TABLE post (postid integer AUTO_INCREMENT PRIMARY KEY, forumid integer, posttext text, author integer)"),
+      Query("CRYPTDB post.posttext ENC"),
+      Query("CREATE TABLE u_conn (userid enc integer, username enc text)"),
+      Query("CRYPTDB u_conn.userid ENC"),
+      Query("CRYPTDB u_conn.username ENC"),
+      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_conn (username text, psswd text)"),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CRYPTDB PRINCTYPE username EXTERNAL"),
+      Query("CRYPTDB PRINCTYPE mid"),
+      Query("CRYPTDB PRINCTYPE uid"),
+      Query("CRYPTDB PRINCTYPE fid"),
+      Query("CRYPTDB PRINCTYPE pid"),
+      Query("CREATE TABLE msgs (msgid integer AUTO_INCREMENT PRIMARY KEY , msgtext text)"),
+      Query("CRYPTDB msgs.msgtext ENCFOR msgs.msgid mid"),
+      Query("CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)"),
+      Query("CRYPTDB privmsg.recid uid SPEAKSFOR privmsg.msgid mid"),
+      Query("CRYPTDB privmsg.senderid uid SPEAKSFOR privmsg.msgid mid"),
       //NOTE (cat_red) this table is not currently in the access graph
       //  is there any reason is *should* be?
-      "CREATE TABLE forum (forumid integer AUTO_INCREMENT PRIMARY KEY, title text)",
-      "CREATE TABLE post (postid integer AUTO_INCREMENT PRIMARY KEY, forumid integer, posttext text, author integer)",
-      "CRYPTDB post.posttext ENCFOR post.forumid fid",
-      "CRYPTDB post.author uid SPEAKSFOR post.forumid fid",
-      "CREATE TABLE u_conn (userid integer, username text)",
-      "CRYPTDB u_conn.username SPEAKSFOR u_conn.userid uid" },
+      Query("CREATE TABLE forum (forumid integer AUTO_INCREMENT PRIMARY KEY, title text)"),
+      Query("CREATE TABLE post (postid integer AUTO_INCREMENT PRIMARY KEY, forumid integer, posttext text, author integer)"),
+      Query("CRYPTDB post.posttext ENCFOR post.forumid fid"),
+      Query("CRYPTDB post.author uid SPEAKSFOR post.forumid fid"),
+      Query("CREATE TABLE u_conn (userid integer, username text)"),
+      Query("CRYPTDB u_conn.username SPEAKSFOR u_conn.userid uid") },
     { Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_conn (username, psswd) VALUES ('alice','secretA')"),
       Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_conn (username, psswd) VALUES ('bob','secretB')"),
       Query("INSERT INTO u_conn VALUES (1, 'alice')"),
@@ -809,32 +916,38 @@ static QueryList ManyConnections = QueryList("Multiple connections",
       Query("INSERT INTO msgs VALUES (9, 'message for alice from bob')"),
             //Query("SELECT LAST_INSERT_ID()"),
       Query("SELECT msgtext FROM msgs, privmsg, u_conn WHERE username = 'alice' AND userid = recid AND msgs.msgid = privmsg.msgid") },
-    { "DROP TABLE msgs",
-      "DROP TABLE privmsg",
-      "DROP TABLE forum",
-      "DROP TABLE post",
-      "DROP TABLE u_conn",
-      "DROP TABLE "+PWD_TABLE_PREFIX+"u_conn" },
-    { "DROP TABLE msgs",
-      "DROP TABLE privmsg",
-      "DROP TABLE forum",
-      "DROP TABLE post",
-      "DROP TABLE u_conn",
-      "DROP TABLE "+PWD_TABLE_PREFIX+"u_conn" },
-    { "DROP TABLE msgs",
-      "DROP TABLE privmsg",
-      "DROP TABLE forum",
-      "DROP TABLE post",
-      "DROP TABLE u_conn",
-      ""} );
+    { Query("DROP TABLE msgs"),
+      Query("DROP TABLE privmsg"),
+      Query("DROP TABLE forum"),
+      Query("DROP TABLE post"),
+      Query("DROP TABLE u_conn"),
+      Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_conn") },
+    { Query("DROP TABLE msgs"),
+      Query("DROP TABLE privmsg"),
+      Query("DROP TABLE forum"),
+      Query("DROP TABLE post"),
+      Query("DROP TABLE u_conn"),
+      Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_conn") },
+    { Query("DROP TABLE msgs"),
+      Query("DROP TABLE privmsg"),
+      Query("DROP TABLE forum"),
+      Query("DROP TABLE post"),
+      Query("DROP TABLE u_conn"),
+      Query("")} );
 
 static QueryList BestEffort = QueryList("BestEffort",
-    { "CREATE TABLE t (x integer, y integer)",
-      "", "", ""},
-    { "CREATE TABLE t (x integer, y integer)",
-      "", "", ""},
-    { "CREATE TABLE t (x integer, y integer)",
-      "", "", ""},
+    { Query("CREATE TABLE t (x integer, y integer)"),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE t (x integer, y integer)"),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE t (x integer, y integer)"),
+      Query(""),
+      Query(""),
+      Query("")},
     { Query("INSERT INTO t VALUES (1, 100)"),
       Query("INSERT INTO t VALUES (22, 413)"),
       Query("INSERT INTO t VALUES (1001, 15)"),
@@ -852,36 +965,39 @@ static QueryList BestEffort = QueryList("BestEffort",
       Query("SELECT x, y FROM t WHERE x = 1 AND y < 200"), 
       Query("SELECT x, y FROM t WHERE x AND y = 15"), 
       Query("SELECT 10, x+y FROM t WHERE x") },
-    { "DROP TABLE t"},
-    { "DROP TABLE t"},
-    { "DROP TABLE t"});
+    { Query("DROP TABLE t")},
+    { Query("DROP TABLE t")},
+    { Query("DROP TABLE t")});
 
 // We do not support queries like this.
 // > INSERT INTO t () VALUES ();
 // > INSERT INTO t VALUES (DEFAULT);
 // > INSERT INTO t VALUES (DEFAULT(x));
 static QueryList DefaultValue = QueryList("DefaultValue",
-    { "CREATE TABLE def_0 (x INTEGER NOT NULL DEFAULT 10,"
+    { Query("CREATE TABLE def_0 (x INTEGER NOT NULL DEFAULT 10,"
       "                    y VARCHAR(100) NOT NULL DEFAULT 'purpflowers',"
-      "                    z INTEGER)",
-      "CREATE TABLE def_1 (a INTEGER NOT NULL DEFAULT '100',"
+      "                    z INTEGER)"),
+      Query("CREATE TABLE def_1 (a INTEGER NOT NULL DEFAULT '100',"
       "                    b INTEGER,"
-      "                    c VARCHAR(100))",
-      "", ""},
-    { "CREATE TABLE def_0 (x INTEGER NOT NULL DEFAULT 10,"
+      "                    c VARCHAR(100))"),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE def_0 (x INTEGER NOT NULL DEFAULT 10,"
       "                    y VARCHAR(100) NOT NULL DEFAULT 'purpflowers',"
-      "                    z INTEGER)",
-      "CREATE TABLE def_1 (a INTEGER NOT NULL DEFAULT '100',"
+      "                    z INTEGER)"),
+      Query("CREATE TABLE def_1 (a INTEGER NOT NULL DEFAULT '100',"
       "                    b INTEGER,"
-      "                    c VARCHAR(100))",
-      "", ""},
-    { "CREATE TABLE def_0 (x INTEGER NOT NULL DEFAULT 10,"
+      "                    c VARCHAR(100))"),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE def_0 (x INTEGER NOT NULL DEFAULT 10,"
       "                    y VARCHAR(100) NOT NULL DEFAULT 'purpflowers',"
-      "                    z INTEGER)",
-      "CREATE TABLE def_1 (a INTEGER NOT NULL DEFAULT '100',"
+      "                    z INTEGER)"),
+      Query("CREATE TABLE def_1 (a INTEGER NOT NULL DEFAULT '100',"
       "                    b INTEGER,"
-      "                    c VARCHAR(100))",
-      "", ""},
+      "                    c VARCHAR(100))"),
+      Query(""),
+      Query("")},
     { Query("INSERT INTO def_0 VALUES (100, 'singsongs', 500),"
             "                         (220, 'heyfriend', 15)"),
       Query("INSERT INTO def_0 (z) VALUES (500), (220), (32)"),
@@ -899,27 +1015,30 @@ static QueryList DefaultValue = QueryList("DefaultValue",
       Query("INSERT INTO def_0 (z) VALUES (450), (200), (300)"),
       Query("SELECT * FROM def_0 WHERE y = 'purpflowers'"),
       Query("SELECT * FROM def_0, def_1")},
-    { "DROP TABLE def_0",
-      "DROP TABLE def_1"},
-    { "DROP TABLE def_0",
-      "DROP TABLE def_1"},
-    { "DROP TABLE def_0",
-      "DROP TABLE def_1"});
+    { Query("DROP TABLE def_0"),
+      Query("DROP TABLE def_1")},
+    { Query("DROP TABLE def_0"),
+      Query("DROP TABLE def_1")},
+    { Query("DROP TABLE def_0"),
+      Query("DROP TABLE def_1")});
 
 
 static QueryList Decimal = QueryList("Decimal",
-    { "CREATE TABLE dec_0 (x DECIMAL(10, 5),"
-      "                    y DECIMAL(10, 5) NOT NULL DEFAULT 12.125)",
-      "CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))",
-      "", ""},
-    { "CREATE TABLE dec_0 (x DECIMAL(10, 5),"
-      "                    y DECIMAL(10, 5) NOT NULL DEFAULT 12.125)",
-      "CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))",
-      "", ""},
-    { "CREATE TABLE dec_0 (x DECIMAL(10, 5),"
-      "                    y DECIMAL(10, 5) NOT NULL DEFAULT 12.125)",
-      "CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))",
-      "", ""},
+    { Query("CREATE TABLE dec_0 (x DECIMAL(10, 5),"
+      "                    y DECIMAL(10, 5) NOT NULL DEFAULT 12.125)"),
+      Query("CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))"),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE dec_0 (x DECIMAL(10, 5),"
+      "                    y DECIMAL(10, 5) NOT NULL DEFAULT 12.125)"),
+      Query("CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))"),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE dec_0 (x DECIMAL(10, 5),"
+      "                    y DECIMAL(10, 5) NOT NULL DEFAULT 12.125)"),
+      Query("CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))"),
+      Query(""),
+      Query("")},
     { Query("INSERT INTO dec_0 VALUES (50, 100.5)"),
       Query("INSERT INTO dec_0 VALUES (20.50, 1000.5)"),
       Query("INSERT INTO dec_0 VALUES (50, 100.59)"),
@@ -936,26 +1055,32 @@ static QueryList Decimal = QueryList("Decimal",
       // Query("SELECT * FROM dec_1 WHERE a = 5 AND b = -49.2"),
       Query("SELECT * FROM dec_1"),
       Query("SELECT * FROM dec_0, dec_1 WHERE dec_0.y = dec_1.b")},
-    { "DROP TABLE dec_0",
-      "DROP TABLE dec_1"},
-    { "DROP TABLE dec_0",
-      "DROP TABLE dec_1"},
-    { "DROP TABLE dec_0",
-      "DROP TABLE dec_1"});
+    { Query("DROP TABLE dec_0"),
+      Query("DROP TABLE dec_1")},
+    { Query("DROP TABLE dec_0"),
+      Query("DROP TABLE dec_1")},
+    { Query("DROP TABLE dec_0"),
+      Query("DROP TABLE dec_1")});
 
 static QueryList NonStrictMode = QueryList("NonStrictMode",
-    { "CREATE TABLE not_strict (x INTEGER NOT NULL,"
+    { Query("CREATE TABLE not_strict (x INTEGER NOT NULL,"
       "                         y INTEGER NOT NULL DEFAULT 100,"
-      "                         z VARCHAR(100) NOT NULL)",
-      "", "", ""},
-    { "CREATE TABLE not_strict (x INTEGER NOT NULL,"
+      "                         z VARCHAR(100) NOT NULL)"),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE not_strict (x INTEGER NOT NULL,"
       "                         y INTEGER NOT NULL DEFAULT 100,"
-      "                         z VARCHAR(100) NOT NULL)",
-      "", "", ""},
-    { "CREATE TABLE not_strict (x INTEGER NOT NULL,"
+      "                         z VARCHAR(100) NOT NULL)"),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE not_strict (x INTEGER NOT NULL,"
       "                         y INTEGER NOT NULL DEFAULT 100,"
-      "                         z VARCHAR(100) NOT NULL)",
-      "", "", ""},
+      "                         z VARCHAR(100) NOT NULL)"),
+      Query(""),
+      Query(""),
+      Query("")},
     { Query("INSERT INTO not_strict VALUES (150, 230, 'flowers')"),
       Query("INSERT INTO not_strict VALUES (850, 930, 'rainbow')"),
       Query("INSERT INTO not_strict (y) VALUES (11930)"),
@@ -971,17 +1096,26 @@ static QueryList NonStrictMode = QueryList("NonStrictMode",
       Query("SELECT * FROM not_strict WHERE z = ''"),
       Query("SELECT * FROM not_strict WHERE x < 110"),
       Query("SELECT * FROM not_strict")},
-    { "DROP TABLE not_strict"},
-    { "DROP TABLE not_strict"},
-    { "DROP TABLE not_strict"});
+    { Query("DROP TABLE not_strict")},
+    { Query("DROP TABLE not_strict")},
+    { Query("DROP TABLE not_strict")});
 
 static QueryList Transactions = QueryList("Transactions",
-    { "CREATE TABLE trans (a integer, b integer, c integer)ENGINE=InnoDB",
-      "", "", "", ""},
-    { "CREATE TABLE trans (a integer, b integer, c integer)ENGINE=InnoDB",
-      "", "", "", ""},
-    { "CREATE TABLE trans (a integer, b integer, c integer)ENGINE=InnoDB",
-      "", "", "", ""},
+    { Query("CREATE TABLE trans (a integer, b integer, c integer)ENGINE=InnoDB"),
+      Query(""),
+      Query(""), 
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE trans (a integer, b integer, c integer)ENGINE=InnoDB"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
+    { Query("CREATE TABLE trans (a integer, b integer, c integer)ENGINE=InnoDB"),
+      Query(""),
+      Query(""),
+      Query(""),
+      Query("")},
     { Query("INSERT INTO trans VALUES (1, 2, 3)"),
       Query("INSERT INTO trans VALUES (33, 22, 11)"),
       Query("SELECT * FROM trans"),
@@ -1014,23 +1148,23 @@ static QueryList Transactions = QueryList("Transactions",
       // commit required for control database.
       Query("COMMIT"),
       Query("SELECT * FROM trans")},
-    { "DROP TABLE trans"},
-    { "DROP TABLE trans"},
-    { "DROP TABLE trans"});
+    { Query("DROP TABLE trans")},
+    { Query("DROP TABLE trans")},
+    { Query("DROP TABLE trans")});
 
 static QueryList TableAliases = QueryList("TableAliases",
-    { "CREATE TABLE star (a integer, b integer, c integer)",
-      "CREATE TABLE mercury (a integer, b integer, c integer)",
-      "CREATE TABLE moon (x integer, y integer, z integer)",
-      ""},
-    { "CREATE TABLE star (a integer, b integer, c integer)",
-      "CREATE TABLE mercury (a integer, b integer, c integer)",
-      "CREATE TABLE moon (x integer, y integer, z integer)",
-      ""},
-    { "CREATE TABLE star (a integer, b integer, c integer)",
-      "CREATE TABLE mercury (a integer, b integer, c integer)",
-      "CREATE TABLE moon (x integer, y integer, z integer)",
-      ""},
+    { Query("CREATE TABLE star (a integer, b integer, c integer)"),
+      Query("CREATE TABLE mercury (a integer, b integer, c integer)"),
+      Query("CREATE TABLE moon (x integer, y integer, z integer)"),
+      Query("")},
+    { Query("CREATE TABLE star (a integer, b integer, c integer)"),
+      Query("CREATE TABLE mercury (a integer, b integer, c integer)"),
+      Query("CREATE TABLE moon (x integer, y integer, z integer)"),
+      Query("")},
+    { Query("CREATE TABLE star (a integer, b integer, c integer)"),
+      Query("CREATE TABLE mercury (a integer, b integer, c integer)"),
+      Query("CREATE TABLE moon (x integer, y integer, z integer)"),
+      Query("")},
     { Query("INSERT INTO star VALUES (55, 66, 77), (99, 22, 109)"),
       Query("INSERT INTO mercury VALUES (55, 18, 17), (16, 15, 14)"),
       Query("INSERT INTO moon VALUES (55, 18, 1), (22, 22, 444)"),
@@ -1045,15 +1179,15 @@ static QueryList TableAliases = QueryList("TableAliases",
             " INNER JOIN mercury AS e ON (mercury.a = e.a)"
             " WHERE mercury.b <> 18 AND mercury.b <> 15")
     },
-    { "DROP TABLE star",
-      "DROP TABLE mercury",
-      "DROP TABLE moon"},
-    { "DROP TABLE star",
-      "DROP TABLE mercury",
-      "DROP TABLE moon"},
-    { "DROP TABLE star",
-      "DROP TABLE mercury",
-      "DROP TABLE moon"});
+    { Query("DROP TABLE star"),
+      Query("DROP TABLE mercury"),
+      Query("DROP TABLE moon")},
+    { Query("DROP TABLE star"),
+      Query("DROP TABLE mercury"),
+      Query("DROP TABLE moon")},
+    { Query("DROP TABLE star"),
+      Query("DROP TABLE mercury"),
+      Query("DROP TABLE moon")});
 
 
 
@@ -1147,7 +1281,7 @@ Connection::stop() {
 }
 
 ResType
-Connection::execute(std::string query) {
+Connection::execute(const Query &query) {
     switch (type) {
     case PROXYSINGLE:
         return executeRewriter(query);
@@ -1165,9 +1299,9 @@ Connection::execute(std::string query) {
 }
 
 void
-Connection::executeFail(std::string query) {
+Connection::executeFail(const Query &query) {
     //cerr << type << " " << query << endl;
-    LOG(test) << "Query: " << query << " could not execute" << std::endl;
+    LOG(test) << "Query: " << query.query << " could not execute" << std::endl;
 }
 
 /*ResType
@@ -1180,7 +1314,7 @@ Connection::executeEDBProxy(string query) {
     }*/
 
 ResType
-Connection::executeConn(std::string query) {
+Connection::executeConn(const Query &query) {
     std::unique_ptr<DBResult> dbres(nullptr);
 
     //cycle through connections of which should execute query
@@ -1190,7 +1324,7 @@ Connection::executeConn(std::string query) {
     }
 
     //cout << query << endl;
-    if (!(*conn)->execute(query, &dbres)) {
+    if (!(*conn)->execute(query.query, &dbres)) {
         executeFail(query);
         return ResType(false);
     }
@@ -1198,7 +1332,7 @@ Connection::executeConn(std::string query) {
 }
 
 ResType
-Connection::executeRewriter(std::string query) {
+Connection::executeRewriter(const Query &query) {
     //translate the query
     //
     //
@@ -1215,7 +1349,7 @@ Connection::executeRewriter(std::string query) {
     const std::string &default_db =
         getDefaultDatabaseForConnection(ps->getConn());
 
-    return executeQuery(*ps, query, default_db,
+    return executeQuery(*ps, query.query, default_db,
                         &this->schema_cache).res_type;
 }
 
@@ -1256,34 +1390,34 @@ Connection::executeLastEDB() {
 
 static bool
 CheckAnnotatedQuery(const TestConfig &tc,
-                    const std::string &control_query,
-                    const std::string &test_query)
+                    const Query &control_query,
+                    const Query &test_query)
 {
     const std::string empty_str = "";
     std::string r;
     ntest++;
 
-    LOG(test) << "control query: " << control_query;
+    LOG(test) << "control query: " << control_query.query;
     const ResType control_res =
-        (empty_str == control_query) ? ResType(true) :
+        (empty_str == control_query.query) ? ResType(true) :
                                 control->execute(control_query);
 
-    LOG(test) << "test query: " << test_query;
+    LOG(test) << "test query: " << test_query.query;
     const ResType test_res =
-        (empty_str == test_query) ? ResType(true) :
+        (empty_str == test_query.query) ? ResType(true) :
                                     test->execute(test_query);
 
     if (control_res.ok != test_res.ok) {
         LOG(warn) << "control " << control_res.ok
             << ", test " << test_res.ok
             << ", and true is " << true
-            << " for query: " << test_query;
+            << " for query: " << test_query.query;
 
         if (tc.stop_if_fail)
             thrower() << "stop on failure";
         return false;
     } else if (!match(test_res, control_res)) {
-        LOG(warn) << "result mismatch for query: " << test_query;
+        LOG(warn) << "result mismatch for query: " << test_query.query;
         LOG(warn) << "control is:";
         printRes(control_res);
         LOG(warn) << "test is:";
@@ -1301,10 +1435,10 @@ CheckAnnotatedQuery(const TestConfig &tc,
 }
 
 static bool
-CheckQuery(const TestConfig &tc, std::string query) {
+CheckQuery(const TestConfig &tc, const Query &query) {
     std::cerr << "--------------------------------------------------------------------------------" << "\n";
     //TODO: should be case insensitive
-    if (query == "SELECT LAST_INSERT_ID()") {
+    if (query.query == "SELECT LAST_INSERT_ID()") {
         ntest++;
         switch(test_type) {
             case UNENCRYPTED:
@@ -1345,8 +1479,8 @@ static Score
 CheckQueryList(const TestConfig &tc, const QueryList &queries) {
     Score score(queries.name);
     for (unsigned int i = 0; i < queries.create.size(); i++) {
-        std::string control_query = queries.create.choose(control_type)[i];
-        std::string test_query = queries.create.choose(test_type)[i]; 
+        Query control_query = queries.create.choose(control_type)[i];
+        Query test_query = queries.create.choose(test_type)[i]; 
         score.mark(CheckAnnotatedQuery(tc, control_query, test_query));
     }
 
@@ -1357,7 +1491,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
         case PROXYPLAIN:
            // break;
         case PROXYSINGLE:
-            score.mark(CheckQuery(tc, q->query));
+            score.mark(CheckQuery(tc, *q));
             break;
 
         default:
@@ -1366,8 +1500,8 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
     }
 
     for (unsigned int i = 0; i < queries.drop.size(); i++) {
-        std::string control_query = queries.drop.choose(control_type)[i];
-        std::string test_query = queries.drop.choose(test_type)[i];
+        Query control_query = queries.drop.choose(control_type)[i];
+        Query test_query = queries.drop.choose(test_type)[i];
         score.mark(CheckAnnotatedQuery(tc, control_query, test_query));
     }
 
