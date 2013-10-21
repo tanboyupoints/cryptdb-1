@@ -31,6 +31,11 @@
 #include <util/cleanup.hh>
 #include <util/rob.hh>
 
+extern std::string global_crash_point;
+
+void
+crashTest(std::string current_point);
+
 class FieldReturned {
 public:
     bool encrypted;

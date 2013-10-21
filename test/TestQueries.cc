@@ -1397,6 +1397,22 @@ CheckAnnotatedQuery(const TestConfig &tc,
     std::string r;
     ntest++;
 
+    if (test_query.crash_point != empty_str) {
+        global_crash_point = test_query.crash_point;
+
+        try {
+	    if (test_query.query != empty_str) {
+	        test->execute(test_query);
+            }
+        } catch (const std::runtime_error &e) {
+	    if (strcmp(e.what(), "crash test exception") != 0) {
+	        throw;
+            }
+        }
+
+	global_crash_point = empty_str;
+    }
+
     LOG(test) << "control query: " << control_query.query;
     const ResType control_res =
         (empty_str == control_query.query) ? ResType(true) :

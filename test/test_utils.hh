@@ -53,9 +53,16 @@ class TestConfig {
 
 struct Query {
     std::string query;
+    std::string crash_point;
 
     Query(std::string q) {
         query = q;
+	crash_point = "";
+    }
+
+    Query(std::string q, std::string cp) {
+        query = q;
+        crash_point = cp;
     }
 };
 

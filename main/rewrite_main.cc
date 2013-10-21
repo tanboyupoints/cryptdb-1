@@ -52,6 +52,15 @@ stringToItemField(const std::string &field,
 }
 */
 
+std::string global_crash_point = "";
+
+void
+crashTest(std::string current_point) {
+    if (current_point == global_crash_point) {
+      throw std::runtime_error("crash test exception");
+    }
+}
+
 static inline std::string
 extract_fieldname(Item_field *const i)
 {
