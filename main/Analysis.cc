@@ -627,6 +627,8 @@ SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     const EpilogueResult epi_result =
         executeQuery(this->ps, select_q, this->default_db,
                      schema_cache.get());
+    TEST_Sync(schema_cache->cleanupStaleness(e_conn),
+              "failed to cleanup schema cache after nested query!");
     assert(QueryAction::VANILLA == epi_result.action);
     const ResType select_res_type = epi_result.res_type;
     assert(select_res_type.success());

@@ -609,7 +609,11 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
     const QueryAction action = qr.output->queryAction(ps.getConn());
     if (QueryAction::AGAIN == action) {
         std::unique_ptr<SchemaCache> schema_cache(new SchemaCache());
-        return executeQuery(ps, query, default_db, schema_cache.get(), pp);
+        const EpilogueResult &epi_res =
+            executeQuery(ps, query, default_db, schema_cache.get(), pp);
+        TEST_Sync(schema_cache->cleanupStaleness(ps.getEConn()),
+                  "failed to cleanup cache after requery!");
+        return epi_res;
     }
 
     if (pp) {
@@ -655,10 +659,12 @@ SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
                        const std::unique_ptr<Connect> &e_conn)
 {
     if (true == this->no_loads) {
-        // FIXME: Shouldn't be necessary, and could mask bugs.
+        // Use this cleanup if we can't maintain consistent states.
+        /*
         TEST_TextMessageError(cleanupStaleness(e_conn),
                               "Failed to cleanup staleness for first"
                               " usage!");
+        */
         TEST_TextMessageError(initialStaleness(e_conn),
                               "Failed to initialize staleness for first"
                               " usage!");
