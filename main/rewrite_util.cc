@@ -602,14 +602,14 @@ prettyPrintQueryResult(const ResType &res)
 EpilogueResult
 queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
               const ResType &res, const std::string &query,
-              const std::string &default_db,
-              SchemaCache *const schema_cache, bool pp)
+              const std::string &default_db, bool pp)
 {
     qr.output->afterQuery(ps.getEConn());
 
     const QueryAction action = qr.output->queryAction(ps.getConn());
     if (QueryAction::AGAIN == action) {
-        return executeQuery(ps, query, default_db, schema_cache, pp);
+        std::unique_ptr<SchemaCache> schema_cache(new SchemaCache());
+        return executeQuery(ps, query, default_db, schema_cache.get(), pp);
     }
 
     if (pp) {
@@ -631,13 +631,13 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
     return EpilogueResult(action, res);
 }
 
-const SchemaInfo &
-SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
-                       const std::unique_ptr<Connect> &e_conn)
+static bool
+lowLevelGetCurrentStaleness(const std::unique_ptr<Connect> &e_conn,
+                            unsigned int cache_id)
 {
     const std::string &query =
         " SELECT stale FROM " + MetaData::Table::staleness() +
-        "  WHERE thread_id = (SELECT CONNECTION_ID());";
+        "  WHERE cache_id = " + std::to_string(cache_id) + ";";
     std::unique_ptr<DBResult> db_res;
     TEST_TextMessageError(e_conn->execute(query, &db_res),
                           "failed to get schema!");
@@ -647,18 +647,26 @@ SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
     const unsigned long *const l = mysql_fetch_lengths(db_res->n);
     assert(l != NULL);
 
-    const bool stale = string_to_bool(std::string(row[0], l[0]));
+    return string_to_bool(std::string(row[0], l[0]));
+}
 
-    // HACK (!this->schema) : Nested calls to executeQuery are being
-    // made without a SchemaCache (ie in SpecialUpdate). So they
-    // get to this point; dont have a query; but then the database may
-    // say that they are not stale, so this HACK.
-    // > We could make executeQuery write 'stale' into the database when
-    // it doesn't get a cache.
-    // > Write a seperate version of executeQuery that takes a SchemaInfo
-    // instead of a SchemaCache and can only do operations that don't
-    // change the schema.
-    if (true == stale || !this->schema) {
+const SchemaInfo &
+SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
+                       const std::unique_ptr<Connect> &e_conn)
+{
+    if (true == this->no_loads) {
+        // FIXME: Shouldn't be necessary, and could mask bugs.
+        TEST_TextMessageError(cleanupStaleness(e_conn),
+                              "Failed to cleanup staleness for first"
+                              " usage!");
+        TEST_TextMessageError(initialStaleness(e_conn),
+                              "Failed to initialize staleness for first"
+                              " usage!");
+        this->no_loads = false;
+    }
+    const bool stale = lowLevelGetCurrentStaleness(e_conn, this->id);
+
+    if (true == stale) {
         this->schema.reset(loadSchemaInfo(conn, e_conn));
     }
 
@@ -666,20 +674,7 @@ SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
     return *this->schema.get();
 }
 
-void
-SchemaCache::updateStaleness(const std::unique_ptr<Connect> &e_conn,
-                             bool staleness)
-{
-    if (true == staleness) {
-        // Make everyone stale.
-        lowLevelAllStale(e_conn);
-    } else {
-        // We are no longer stale.
-        lowLevelCurrentUnstale(e_conn);
-    }
-}
-
-void
+static void
 lowLevelAllStale(const std::unique_ptr<Connect> &e_conn)
 {
     const std::string &query =
@@ -691,38 +686,62 @@ lowLevelAllStale(const std::unique_ptr<Connect> &e_conn)
 }
 
 void
-lowLevelCurrentUnstale(const std::unique_ptr<Connect> &e_conn)
+SchemaCache::updateStaleness(const std::unique_ptr<Connect> &e_conn,
+                             bool staleness)
 {
-    const std::string &query =
-        " UPDATE " + MetaData::Table::staleness() +
-        "    SET stale = FALSE"
-        "  WHERE thread_id = (SELECT CONNECTION_ID());";
-
-    TEST_TextMessageError(e_conn->execute(query),
-                          "failed to unstale current!");
+    if (true == staleness) {
+        // Make everyone stale.
+        lowLevelAllStale(e_conn);
+    } else {
+        // We are no longer stale.
+        this->lowLevelCurrentUnstale(e_conn);
+    }
 }
 
 bool
-initial_staleness(const std::unique_ptr<Connect> &e_conn)
+SchemaCache::initialStaleness(const std::unique_ptr<Connect> &e_conn)
 {
-    RETURN_FALSE_IF_FALSE(cleanup_staleness(e_conn));
-
     const std::string seed_staleness =
         " INSERT INTO " + MetaData::Table::staleness() +
-        "   (thread_id, stale) VALUES " +
-        "   ((SELECT CONNECTION_ID()), TRUE);";
+        "   (cache_id, stale) VALUES " +
+        "   (" + std::to_string(this->id) + ", TRUE);";
     RETURN_FALSE_IF_FALSE(e_conn->execute(seed_staleness));
 
     return true;
 }
 
 bool
-cleanup_staleness(const std::unique_ptr<Connect> &e_conn)
+SchemaCache::cleanupStaleness(const std::unique_ptr<Connect> &e_conn)
 {
     const std::string remove_staleness =
         " DELETE FROM " + MetaData::Table::staleness() +
-        "       WHERE thread_id = (SELECT CONNECTION_ID());";
+        "       WHERE cache_id = " + std::to_string(this->id) + ";";
     RETURN_FALSE_IF_FALSE(e_conn->execute(remove_staleness));
 
     return true;
 }
+static void
+lowLevelToggleCurrentStaleness(const std::unique_ptr<Connect> &e_conn,
+                               unsigned int cache_id, bool staleness)
+{
+    const std::string &query =
+        " UPDATE " + MetaData::Table::staleness() +
+        "    SET stale = " + bool_to_string(staleness) +
+        "  WHERE cache_id = " + std::to_string(cache_id) + ";";
+
+    TEST_TextMessageError(e_conn->execute(query),
+                          "failed to unstale current!");
+}
+
+void
+SchemaCache::lowLevelCurrentStale(const std::unique_ptr<Connect> &e_conn)
+{
+    lowLevelToggleCurrentStaleness(e_conn, this->id, true);
+}
+
+void
+SchemaCache::lowLevelCurrentUnstale(const std::unique_ptr<Connect> &e_conn)
+{
+    lowLevelToggleCurrentStaleness(e_conn, this->id, false);
+}
+

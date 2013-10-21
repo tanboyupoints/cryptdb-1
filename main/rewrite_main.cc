@@ -473,10 +473,8 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
 
     switch (type) {
         case CompletionType::AdjustOnionCompletion:
-            lowLevelAllStale(e_conn);
             return fixAdjustOnion(conn, e_conn, unfinished_id);
         case CompletionType::DDLCompletion:
-            lowLevelAllStale(e_conn);
             return fixDDL(conn, e_conn, unfinished_id);
         default:
             std::cerr << "unknown completion type" << std::endl;
@@ -1495,14 +1493,9 @@ mysql_noop_res(const ProxyState &ps)
 EpilogueResult
 executeQuery(const ProxyState &ps, const std::string &q,
              const std::string &default_db,
-             SchemaCache *schema_cache, bool pp)
+             SchemaCache *const schema_cache, bool pp)
 {
-    // Allows us to use default value of NULL for schema_cache in places
-    // where cacheing the schema offers little advantage.
-    SchemaCache temp_schema_cache;
-    if (NULL == schema_cache) {
-        schema_cache = &temp_schema_cache;
-    }
+    assert(schema_cache);
 
     std::unique_ptr<QueryRewrite> qr;
     // out_queryz: queries intended to be run against remote server.
@@ -1531,8 +1524,7 @@ executeQuery(const ProxyState &ps, const std::string &q,
         dbres ? ResType(dbres->unpack()) : mysql_noop_res(ps);
     assert(res.success());
     const EpilogueResult epi_result =
-        queryEpilogue(ps, *qr.get(), res, q, default_db, schema_cache,
-                      pp);
+        queryEpilogue(ps, *qr.get(), res, q, default_db, pp);
     assert(epi_result.res_type.success());
 
     return epi_result;

@@ -139,7 +139,7 @@ MetaData::initialize(const std::unique_ptr<Connect> &conn,
 
     const std::string create_staleness =
         " CREATE TABLE IF NOT EXISTS " + Table::staleness() +
-        "   (thread_id BIGINT NOT NULL,"
+        "   (cache_id BIGINT NOT NULL,"
         "    stale BOOLEAN NOT NULL) "
         " ENGINE=InnoDB;";
     RETURN_FALSE_IF_FALSE(e_conn->execute(create_staleness));

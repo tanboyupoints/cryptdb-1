@@ -375,9 +375,6 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                                : "generic_prefix_";
     assert(MetaData::initialize(conn, e_conn, prefix));
 
-    TEST_TextMessageError(initial_staleness(e_conn),
-                          "failed to set initial staleness");
-
     TEST_TextMessageError(synchronizeDatabases(conn, e_conn),
                           "Failed to synchronize embedded and remote"
                           " databases!");
@@ -626,8 +623,10 @@ SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     const std::string select_q =
         " SELECT * FROM " + this->plain_table +
         " WHERE " + this->where_clause + ";";
+    std::unique_ptr<SchemaCache> schema_cache(new SchemaCache());
     const EpilogueResult epi_result =
-        executeQuery(this->ps, select_q, this->default_db);
+        executeQuery(this->ps, select_q, this->default_db,
+                     schema_cache.get());
     assert(QueryAction::VANILLA == epi_result.action);
     const ResType select_res_type = epi_result.res_type;
     assert(select_res_type.success());

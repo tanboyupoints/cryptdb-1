@@ -235,10 +235,12 @@ disconnect(lua_State *const L)
 
     LOG(wrapper) << "disconnect " << client;
 
-    TEST_TextMessageError(cleanup_staleness(ps->getEConn()),
-                          "failed to cleanup staleness!");
     auto ws = clients[client];
     clients[client] = NULL;
+
+    SchemaCache &schema_cache = ws->getSchemaCache();
+    TEST_TextMessageError(schema_cache.cleanupStaleness(ps->getEConn()),
+                          "Failed to cleanup staleness!");
     delete ws;
     clients.erase(client);
 
@@ -425,8 +427,7 @@ envoi(lua_State *const L)
     try {
         const EpilogueResult &epi_result =
             queryEpilogue(*ps, *qr.get(), res, c_wrapper->last_query,
-                          c_wrapper->default_db,
-                          &c_wrapper->getSchemaCache(), false);
+                          c_wrapper->default_db, false);
         if (QueryAction::ROLLBACK == epi_result.action) {
             lua_pushboolean(L, true);           // success
             lua_pushboolean(L, true);           // rollback
