@@ -404,6 +404,7 @@ fixDDL(const std::unique_ptr<Connect> &conn,
     // --------------------------------------------------
     //  After this point we must run to completion as we
     //        _may_ have made a DDL modification
+    //  > unless we determine that it is a bad query.
     //  -------------------------------------------------
 
     // ugly sanity checking device
@@ -434,6 +435,10 @@ fixDDL(const std::unique_ptr<Connect> &conn,
                                          &embedded_bad_query));
         assert(false == remote_bad_query.assigned()
                || embedded_bad_query == remote_bad_query.get());
+
+        if (true == embedded_bad_query) {
+            return abortQuery(e_conn, unfinished_id);
+        }
 
         return finishQuery(e_conn, unfinished_id);
     }
