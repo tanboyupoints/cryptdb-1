@@ -624,6 +624,9 @@ SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
         " SELECT * FROM " + this->plain_table +
         " WHERE " + this->where_clause + ";";
     std::unique_ptr<SchemaCache> schema_cache(new SchemaCache());
+    // Onion adjustment will never occur in this nested executeQuery(...)
+    // because the WHERE clause will trigger the adjustment in 
+    // UpdateHandler when it tries to rewrite the filters.
     const EpilogueResult epi_result =
         executeQuery(this->ps, select_q, this->default_db,
                      schema_cache.get());
