@@ -53,15 +53,9 @@ class TestConfig {
 
 struct Query {
     std::string query;
-    bool test_res;
 
-    Query()
-    {
-    }
-
-    Query(std::string q, bool res) {
+    Query(std::string q) {
         query = q;
-        test_res = res;
     }
 };
 

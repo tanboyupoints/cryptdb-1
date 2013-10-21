@@ -137,6 +137,7 @@ def fn(cdb_path, in_make_v=nil, in_gcc_v=nil)
     File.open(conf_path, 'w') do |file|
         file.write(generate_config(mysql_path))
     end
+    cryptdb_shell.>("make clean")
     cryptdb_shell.>("make")
     cryptdb_shell.>("make install")
 
