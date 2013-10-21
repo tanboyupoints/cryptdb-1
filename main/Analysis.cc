@@ -470,15 +470,13 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
 
         const unsigned int object_id = e_conn->last_insert_id();
 
-        // FIXME: reduceOnChildren
         std::function<bool(const DBMeta &)> localCreateHandler =
             [&object, object_id, &helper]
                 (const DBMeta &child)
             {
                 return helper(child, object, NULL, &object_id);
             };
-        object.applyToChildren(localCreateHandler);
-        return true;
+        return object.applyToChildren(localCreateHandler);
     };
 
     return helper(*meta.get(), parent_meta, &key, NULL);
@@ -528,13 +526,11 @@ bool DeleteDelta::apply(const std::unique_ptr<Connect> &e_conn,
             "      = "     + std::to_string(parent_id) + ";";
         RETURN_FALSE_IF_FALSE(e_c->execute(query));
 
-        // FIXME: reduceOnChildren
         std::function<bool(const DBMeta &)> localDestroyHandler =
             [&object, &helper] (const DBMeta &child) {
                 return helper(child, object);
             };
-        object.applyToChildren(localDestroyHandler);
-        return true;
+        return object.applyToChildren(localDestroyHandler);
     };
 
     helper(meta, parent_meta); 

@@ -92,11 +92,16 @@ MappedDBMeta<ChildType, KeyType>::fetchChildren(const std::unique_ptr<Connect> &
 }
 
 template <typename ChildType, typename KeyType>
-void
-MappedDBMeta<ChildType, KeyType>::applyToChildren(std::function<void(const DBMeta &)> fn) const
+bool
+MappedDBMeta<ChildType, KeyType>::applyToChildren(
+                            std::function<bool(const DBMeta &)> fn) const
 {
     for (auto it = children.begin(); it != children.end(); it++) {
-        fn(*(*it).second.get());
+        if (false == fn(*(*it).second.get())) {
+            return false;
+        }
     }
+
+    return true;
 }
 
