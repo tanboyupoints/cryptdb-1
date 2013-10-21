@@ -55,12 +55,12 @@ struct Query {
     std::string query;
     std::string crash_point;
 
-    Query(std::string q) {
+    Query(const std::string &q) {
         query = q;
 	crash_point = "";
     }
 
-    Query(std::string q, std::string cp) {
+    Query(const std::string &q, const std::string &cp) {
         query = q;
         crash_point = cp;
     }
