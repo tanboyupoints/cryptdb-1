@@ -1397,8 +1397,9 @@ CheckAnnotatedQuery(const TestConfig &tc,
     std::string r;
     ntest++;
 
-    if (test_query.crash_point != empty_str) {
-        global_crash_point = test_query.crash_point;
+    std::vector<std::string> cps = test_query.crash_points;
+    for (auto cp = cps.begin(); cp != cps.end(); ++cp) {
+        global_crash_point = *cp;
 
         try {
 	    if (test_query.query != empty_str) {
@@ -1409,9 +1410,8 @@ CheckAnnotatedQuery(const TestConfig &tc,
 	        throw;
             }
         }
-
-	global_crash_point = empty_str;
     }
+    global_crash_point = empty_str;
 
     LOG(test) << "control query: " << control_query.query;
     const ResType control_res =
