@@ -55,7 +55,7 @@ public:
     static std::string instanceTypeName() {return type_name;}
     std::vector<DBMeta *>
         fetchChildren(const std::unique_ptr<Connect> &e_conn);
-    void applyToChildren(std::function<void(const DBMeta &)>) const;
+    bool applyToChildren(std::function<bool(const DBMeta &)>) const;
     UIntMetaKey const &getKey(const DBMeta &child) const;
     EncLayer *getLayerBack() const;
     EncLayer *getLayer(const SECLEVEL &sl) const;

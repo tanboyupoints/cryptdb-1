@@ -92,7 +92,7 @@ class EpilogueResult;
 EpilogueResult
 executeQuery(const ProxyState &ps, const std::string &q,
              const std::string &default_db,
-             SchemaCache *const schema_cache=NULL, bool pp=true);
+             SchemaCache *const schema_cache, bool pp=true);
 
 #define UNIMPLEMENTED \
         throw std::runtime_error(std::string("Unimplemented: ") + \

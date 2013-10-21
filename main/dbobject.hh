@@ -146,8 +146,9 @@ public:
     virtual std::string typeName() const = 0;
     virtual std::vector<DBMeta *>
         fetchChildren(const std::unique_ptr<Connect> &e_conn) = 0;
-    virtual void
-        applyToChildren(std::function<void(const DBMeta &)>)
+    // Stops processing on error.
+    virtual bool
+        applyToChildren(std::function<bool(const DBMeta &)>)
         const = 0;
     virtual AbstractMetaKey const &getKey(const DBMeta &child)
         const = 0;
@@ -172,10 +173,10 @@ public:
         return std::vector<DBMeta *>();
     }
 
-    void applyToChildren(std::function<void(const DBMeta &)>
+    bool applyToChildren(std::function<bool(const DBMeta &)>
         fn) const
     {
-        return;
+        return true;
     }
 
     AbstractMetaKey const &getKey(const DBMeta &child) const
@@ -204,7 +205,7 @@ public:
     KeyType const &getKey(const DBMeta &child) const;
     virtual std::vector<DBMeta *>
         fetchChildren(const std::unique_ptr<Connect> &e_conn);
-    void applyToChildren(std::function<void(const DBMeta &)>
+    bool applyToChildren(std::function<bool(const DBMeta &)>
         fn) const;
 
     // FIXME: Make protected.

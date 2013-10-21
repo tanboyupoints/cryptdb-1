@@ -208,7 +208,7 @@ class UpdateHandler : public DMLHandler {
         process_filters_lex(lex->select_lex, a);
     }
 
-    virtual  LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
         LEX *const new_lex = copyWithTHD(lex);
