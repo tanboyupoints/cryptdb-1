@@ -129,12 +129,17 @@ OnionMeta::fetchChildren(const std::unique_ptr<Connect> &e_conn)
     return DBMeta::doFetchChildren(e_conn, deserialHelper);
 }
 
-void OnionMeta::applyToChildren(std::function<void(const DBMeta &)>
+bool
+OnionMeta::applyToChildren(std::function<bool(const DBMeta &)>
     fn) const
 {
     for (auto it = layers.begin(); it != layers.end(); it++) {
-        fn(*(*it).get());
+        if (false == fn(*(*it).get())) {
+            return false;
+        }
     }
+
+    return true;
 }
 
 UIntMetaKey const &OnionMeta::getKey(const DBMeta &child) const
@@ -393,6 +398,8 @@ onionlayout FieldMeta::determineOnionLayout(const AES_KEY *const m_key,
     }
 }
 
+// mysql is handling default values for fields with implicit defaults that
+// allow NULL; these implicit defaults being NULL.
 bool FieldMeta::determineHasDefault(const Create_field *const cf)
 {
     return cf->def || cf->flags & NOT_NULL_FLAG;

@@ -14,7 +14,7 @@ Convention : When this document uses syntax like
 #########################################
 #########################################
     * Build CryptDB using the installation script.
-      > scripts/install <path-to-cryptdb>
+      > scripts/install.rb <path-to-cryptdb>
         + <path-to-cryptdb> should just be '.' if you are in the cryptdb
           directory
         + the script will likely require root privileges in order to
@@ -110,6 +110,7 @@ Convention : When this document uses syntax like
       database.
     > Resetting state.
         > Take a look at scripts/refresh.sh ; you probably want that.
+	  Before using it, add 'rm -r /path/to/cryptdb/shadow/*' to the file.
         > If you create a database in cryptdb and then reset
           the state without first dropping the database from _within_
           cryptdb; you will need to drop it from the regular mysql client.

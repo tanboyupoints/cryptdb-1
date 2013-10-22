@@ -89,6 +89,10 @@ class InsertHandler : public DMLHandler {
         // -------------------------
         // Fields (and default data)
         // -------------------------
+        // If the fields list doesn't exist, or is empty; the 'else' of
+        // this code block will put every field into fmVec.
+        // > INSERT INTO t VALUES (1, 2, 3);
+        // > INSERT INTO t () VALUES ();
         // FIXME: Make vector of references.
         std::vector<FieldMeta *> fmVec;
         std::vector<Item *> implicit_defaults;
@@ -112,6 +116,8 @@ class InsertHandler : public DMLHandler {
             }
 
             // Collect the implicit defaults.
+            // > Such must be done because fields that can not have NULL
+            // will be implicitly converted by mysql sans encryption.
             std::vector<FieldMeta *> field_implicit_defaults =
                 vectorDifference(tm.defaultedFieldMetas(), fmVec);
             const Item_field *const seed_item_field =
@@ -152,22 +158,31 @@ class InsertHandler : public DMLHandler {
                 if (!li) {
                     break;
                 }
-                assert(li->elements == fmVec.size());
                 List<Item> *const newList0 = new List<Item>();
-                auto it0 = List_iterator<Item>(*li);
-                auto fmVecIt = fmVec.begin();
-                for (;;) {
-                    const Item *const i = it0++;
-                    if (!i) {
-                        assert(fmVec.end() == fmVecIt);
-                        break;
+                if (li->elements != fmVec.size()) {
+                    TEST_TextMessageError(0 == li->elements
+                                         && NULL == lex->field_list.head(),
+                                          "size mismatch between fields"
+                                          " and values!");
+                    // Query such as this.
+                    // > INSERT INTO <table> () VALUES ();
+                    // > INSERT INTO <table> VALUES ();
+                } else {
+                    auto it0 = List_iterator<Item>(*li);
+                    auto fmVecIt = fmVec.begin();
+                    for (;;) {
+                        const Item *const i = it0++;
+                        if (!i) {
+                            assert(fmVec.end() == fmVecIt);
+                            break;
+                        }
+                        assert(fmVec.end() != fmVecIt);
+                        rewriteInsertHelper(*i, **fmVecIt, a, newList0);
+                        ++fmVecIt;
                     }
-                    assert(fmVec.end() != fmVecIt);
-                    rewriteInsertHelper(*i, **fmVecIt, a, newList0);
-                    ++fmVecIt;
-                }
-                for (auto def_it : implicit_defaults) {
-                    newList0->push_back(def_it);
+                    for (auto def_it : implicit_defaults) {
+                        newList0->push_back(def_it);
+                    }
                 }
                 newList.push_back(newList0);
             }
@@ -208,7 +223,7 @@ class UpdateHandler : public DMLHandler {
         process_filters_lex(lex->select_lex, a);
     }
 
-    virtual  LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
         LEX *const new_lex = copyWithTHD(lex);

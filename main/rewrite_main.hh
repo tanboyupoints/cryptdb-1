@@ -31,6 +31,11 @@
 #include <util/cleanup.hh>
 #include <util/rob.hh>
 
+extern std::string global_crash_point;
+
+void
+crashTest(const std::string &current_point);
+
 class FieldReturned {
 public:
     bool encrypted;
@@ -87,7 +92,7 @@ class EpilogueResult;
 EpilogueResult
 executeQuery(const ProxyState &ps, const std::string &q,
              const std::string &default_db,
-             SchemaCache *const schema_cache=NULL, bool pp=true);
+             SchemaCache *const schema_cache, bool pp=true);
 
 #define UNIMPLEMENTED \
         throw std::runtime_error(std::string("Unimplemented: ") + \

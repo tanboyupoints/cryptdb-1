@@ -375,9 +375,6 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
                                : "generic_prefix_";
     assert(MetaData::initialize(conn, e_conn, prefix));
 
-    TEST_TextMessageError(initial_staleness(e_conn),
-                          "failed to set initial staleness");
-
     TEST_TextMessageError(synchronizeDatabases(conn, e_conn),
                           "Failed to synchronize embedded and remote"
                           " databases!");
@@ -470,15 +467,13 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
 
         const unsigned int object_id = e_conn->last_insert_id();
 
-        // FIXME: reduceOnChildren
         std::function<bool(const DBMeta &)> localCreateHandler =
             [&object, object_id, &helper]
                 (const DBMeta &child)
             {
                 return helper(child, object, NULL, &object_id);
             };
-        object.applyToChildren(localCreateHandler);
-        return true;
+        return object.applyToChildren(localCreateHandler);
     };
 
     return helper(*meta.get(), parent_meta, &key, NULL);
@@ -528,13 +523,11 @@ bool DeleteDelta::apply(const std::unique_ptr<Connect> &e_conn,
             "      = "     + std::to_string(parent_id) + ";";
         RETURN_FALSE_IF_FALSE(e_c->execute(query));
 
-        // FIXME: reduceOnChildren
         std::function<bool(const DBMeta &)> localDestroyHandler =
             [&object, &helper] (const DBMeta &child) {
                 return helper(child, object);
             };
-        object.applyToChildren(localDestroyHandler);
-        return true;
+        return object.applyToChildren(localDestroyHandler);
     };
 
     helper(meta, parent_meta); 
@@ -630,8 +623,15 @@ SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     const std::string select_q =
         " SELECT * FROM " + this->plain_table +
         " WHERE " + this->where_clause + ";";
+    std::unique_ptr<SchemaCache> schema_cache(new SchemaCache());
+    // Onion adjustment will never occur in this nested executeQuery(...)
+    // because the WHERE clause will trigger the adjustment in 
+    // UpdateHandler when it tries to rewrite the filters.
     const EpilogueResult epi_result =
-        executeQuery(this->ps, select_q, this->default_db);
+        executeQuery(this->ps, select_q, this->default_db,
+                     schema_cache.get());
+    TEST_Sync(schema_cache->cleanupStaleness(e_conn),
+              "failed to cleanup schema cache after nested query!");
     assert(QueryAction::VANILLA == epi_result.action);
     const ResType select_res_type = epi_result.res_type;
     assert(select_res_type.success());

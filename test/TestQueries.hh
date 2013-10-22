@@ -20,17 +20,17 @@ typedef enum test_mode {
 } test_mode;
 
 struct QueryChoice {
-    const std::vector<std::string> plain;
-    const std::vector<std::string> single;
+    const std::vector<Query> plain;
+    const std::vector<Query> single;
 
-    QueryChoice(const std::vector<std::string> &plain_arg,
-                const std::vector<std::string> &single_arg)
+    QueryChoice(const std::vector<Query> &plain_arg,
+                const std::vector<Query> &single_arg)
         : plain(plain_arg), single(single_arg)
     {
         assert(plain_arg.size() == single_arg.size());
     }
 
-    const std::vector<std::string> &choose(test_mode t) const {
+    const std::vector<Query> &choose(test_mode t) const {
         switch (t) {
         case UNENCRYPTED:
         case PROXYPLAIN:
@@ -57,9 +57,11 @@ struct QueryList {
     QueryChoice drop;
 
     QueryList(std::string namearg,
-              std::vector<std::string> pc, std::vector<std::string> sc, std::vector<std::string> mc,
+              std::vector<Query> pc,
+              std::vector<Query> sc,
               std::vector<Query> c,
-              std::vector<std::string> pd, std::vector<std::string> sd, std::vector<std::string> md)
+              std::vector<Query> pd,
+              std::vector<Query> sd)
         : name(namearg),
           create(pc, sc),
           common(c),
@@ -72,7 +74,7 @@ class Connection {
     Connection(const TestConfig &tc, test_mode type);
     ~Connection();
 
-    ResType execute(std::string query);
+    ResType execute(const Query &query);
     my_ulonglong executeLast();
 
     void restart();
@@ -113,15 +115,15 @@ class Connection {
 
     SchemaCache schema_cache;
 
-    ResType executeConn(std::string query);
-    ResType executeEDBProxy(std::string query);
-    ResType executeRewriter(std::string query);
+    ResType executeConn(const Query &query);
+    ResType executeEDBProxy(const Query &query);
+    ResType executeRewriter(const Query &query);
 
     my_ulonglong executeLastConn();
     my_ulonglong executeLastEDB();
     my_ulonglong executeRewriter();
 
-    void executeFail(std::string query);
+    void executeFail(const Query &query);
 };
 
 class TestQueries {
