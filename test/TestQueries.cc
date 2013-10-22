@@ -700,7 +700,9 @@ static QueryList Null = QueryList("Null",
         // Query Fail
         //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_null (username, password) VALUES ('alice', 'secretA')"),
         Query("INSERT INTO u_null VALUES (1, 'alice')"),
-        Query("INSERT INTO u_null VALUES ()"),
+        Query("INSERT INTO u_null VALUES (), ()"),
+        Query("INSERT INTO u_null VALUES (2, 'somewhere'), (3, 'cookies')"),
+
         Query("INSERT INTO test_null (uid, age) VALUES (1, 20)"),
         Query("SELECT * FROM test_null"),
         Query("INSERT INTO test_null (uid, address) VALUES (1, 'somewhere over the rainbow')"),
@@ -729,6 +731,12 @@ static QueryList Null = QueryList("Null",
         Query("SELECT * FROM test_null, u_null"),
         Query("SELECT * FROM test_null RIGHT JOIN u_null"
               "    ON test_null.uid = u_null.uid"),
+        Query("SELECT * FROM test_null, u_null"),
+        Query("SELECT * FROM test_null RIGHT JOIN u_null"
+              "    ON test_null.address = u_null.username"),
+        Query("SELECT * FROM test_null, u_null"),
+        Query("SELECT * FROM test_null LEFT JOIN u_null"
+              "    ON u_null.username = test_null.address"),
         Query("SELECT * FROM test_null, u_null")},
     { Query("DROP TABLE test_null"),
       Query("DROP TABLE u_null"),
@@ -1196,9 +1204,9 @@ Connection::executeLast() {
         break;
     case UNENCRYPTED:
     case PROXYPLAIN:
-       // break;
+        // break;
     case PROXYSINGLE:
-		//TODO(ccarvalho) check this 
+        //TODO(ccarvalho) check this 
         break;
 
     default:
@@ -1238,12 +1246,12 @@ CheckAnnotatedQuery(const TestConfig &tc,
         global_crash_point = *cp;
 
         try {
-	    if (test_query.query != empty_str) {
-	        test->execute(test_query);
+            if (test_query.query != empty_str) {
+                test->execute(test_query);
             }
         } catch (const std::runtime_error &e) {
-	    if (strcmp(e.what(), "crash test exception") != 0) {
-	        throw;
+            if (strcmp(e.what(), "crash test exception") != 0) {
+                throw;
             }
         }
     }
@@ -1363,7 +1371,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 471/477
+    //      TOTAL RESULT: 476/481
     // ###############################
 
     std::vector<Score> scores;
@@ -1398,7 +1406,7 @@ RunTest(const TestConfig &tc) {
     // Pass 44/44
     scores.push_back(CheckQueryList(tc, UserGroupForum));
 
-    // Pass 37/37
+    // Pass 42/42
     scores.push_back(CheckQueryList(tc, Null));
 
     // Pass 21/21
@@ -1507,23 +1515,28 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
     }
 
 
-    TestConfig control_tc = TestConfig();
-    control_tc.db = control_tc.db+"_control";
+    try {
+        TestConfig control_tc = TestConfig();
+        control_tc.db = control_tc.db+"_control";
 
-    Connection test_(tc, test_type);
-    test = &test_;
-    test->execute("CREATE DATABASE IF NOT EXISTS " + tc.db + ";");
-    test->execute("USE " + tc.db + ";");
+        Connection test_(tc, test_type);
+        test = &test_;
+        test->execute("CREATE DATABASE IF NOT EXISTS " + tc.db + ";");
+        test->execute("USE " + tc.db + ";");
 
-    Connection control_(control_tc, control_type);
-    control = &control_;
-    control->execute("CREATE DATABASE IF NOT EXISTS " + control_tc.db + ";");
-    control->execute("USE " + control_tc.db + ";");
+        Connection control_(control_tc, control_type);
+        control = &control_;
+        control->execute("CREATE DATABASE IF NOT EXISTS " + control_tc.db + ";");
+        control->execute("USE " + control_tc.db + ";");
 
-    enum { nrounds = 1 };
-    for (uint i = 0; i < nrounds; i++)
-        RunTest(tc);
+        enum { nrounds = 1 };
+        for (uint i = 0; i < nrounds; i++)
+            RunTest(tc);
 
-    std::cerr << "RESULT: " << npass << "/" << ntest << std::endl;
+        std::cerr << "RESULT: " << npass << "/" << ntest << std::endl;
+    } catch (const AbstractException &e) {
+        std::cout << e << std::endl;
+        throw;
+    }
 }
 

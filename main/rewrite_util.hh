@@ -162,7 +162,7 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
 
 class SchemaCache {
 public:
-    SchemaCache() : no_loads(true), id(rand() % UINT_MAX) {}
+    SchemaCache() : no_loads(true), id(randomValue() % UINT_MAX) {}
 
     const SchemaInfo &getSchema(const std::unique_ptr<Connect> &conn,
                                 const std::unique_ptr<Connect> &e_conn);
