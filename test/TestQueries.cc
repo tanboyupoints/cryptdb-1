@@ -703,13 +703,26 @@ static QueryList Null = QueryList("Null",
         Query("INSERT INTO test_null (uid, age) VALUES (1, 20)"),
         Query("SELECT * FROM test_null"),
         Query("INSERT INTO test_null (uid, address) VALUES (1, 'somewhere over the rainbow')"),
+        Query("INSERT INTO test_null () VALUES (), ()"),
+        Query("INSERT INTO test_null VALUES (), ()"),
+        Query("INSERT INTO test_null (address, age) VALUES ('cookies', 1)"),
+        Query("INSERT INTO test_null (age, address) VALUES (1, 'two')"),
+        Query("INSERT INTO test_null (address, uid) VALUES ('three', 4)"),
         Query("SELECT * FROM test_null"),
         Query("INSERT INTO test_null (uid, age) VALUES (1, NULL)"),
         Query("SELECT * FROM test_null"),
         Query("INSERT INTO test_null (uid, address) VALUES (1, NULL)"),
         Query("SELECT * FROM test_null"),
         Query("INSERT INTO test_null VALUES (1, 25, 'Australia')"),
-        Query("SELECT * FROM test_null") },
+        Query("SELECT * FROM test_null"),
+        Query("SELECT * FROM test_null WHERE uid = 1"),
+        Query("SELECT * FROM test_null WHERE age < 50"),
+        Query("SELECT SUM(uid) FROM test_null"),
+        Query("SELECT MAX(uid) FROM test_null"),
+        Query("SELECT * FROM test_null"),
+        Query("SELECT * FROM test_null WHERE address = 'cookies'"),
+        Query("SELECT * FROM test_null WHERE address < 'amber'"),
+        Query("SELECT * FROM test_null WHERE address LIKE 'aaron'")},
     { Query("DROP TABLE test_null"),
       Query("DROP TABLE u_null"),
       Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_null") },
@@ -1343,7 +1356,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 453/458
+    //      TOTAL RESULT: 466/471
     // ###############################
 
     std::vector<Score> scores;
@@ -1378,7 +1391,7 @@ RunTest(const TestConfig &tc) {
     // Pass 44/44
     scores.push_back(CheckQueryList(tc, UserGroupForum));
 
-    // Pass 19/19
+    // Pass 32/32
     scores.push_back(CheckQueryList(tc, Null));
 
     // Pass 21/21
@@ -1387,7 +1400,7 @@ RunTest(const TestConfig &tc) {
         scores.push_back(CheckQueryList(tc, BestEffort));
     }
 
-    // Pass 25/25
+    // Pass 28/28
     scores.push_back(CheckQueryList(tc, Auto));
 
     // Pass 14/16

@@ -11,6 +11,11 @@ public:
     std::string msg;
 };
 
+class CryptoError : public CryptDBError {
+public:
+    CryptoError(const std::string &m) : CryptDBError(m) {}
+};
+
 class fatal : public std::stringstream {
  public:
     ~fatal() __attribute__((noreturn)) {

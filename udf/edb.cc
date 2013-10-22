@@ -321,19 +321,26 @@ decrypt_text_sem(UDF_INIT *const initid, UDF_ARGS *const args,
         value = "";
         *is_null = 1;
     } else {
-        uint64_t eValueLen;
-        char *const eValueBytes = getba(args, 0, eValueLen);
+        try {
+            uint64_t eValueLen;
+            char *const eValueBytes = getba(args, 0, eValueLen);
 
-        uint64_t keyLen;
-        char *const keyBytes = getba(args, 1, keyLen);
-        const std::string key = std::string(keyBytes, keyLen);
+            uint64_t keyLen;
+            char *const keyBytes = getba(args, 1, keyLen);
+            const std::string key = std::string(keyBytes, keyLen);
 
-        uint64_t salt = getui(ARGS, 2);
+            uint64_t salt = getui(ARGS, 2);
 
-        const std::unique_ptr<AES_KEY> aesKey(get_AES_dec_key(key));
-        value =
-            decrypt_SEM(reinterpret_cast<unsigned char *>(eValueBytes),
-                        eValueLen, aesKey.get(), salt);
+            const std::unique_ptr<AES_KEY> aesKey(get_AES_dec_key(key));
+            // Must be last statement; else catch could break on
+            // AssignOnce.
+            value =
+                decrypt_SEM(reinterpret_cast<unsigned char *>(eValueBytes),
+                            eValueLen, aesKey.get(), salt);
+        } catch (const CryptoError &e) {
+            std::cerr << e.msg << std::endl;
+            value = "";
+        }
     }
 
     // NOTE: This is not creating a proper C string, no guarentee of NUL
@@ -410,24 +417,37 @@ Datum
 decrypt_text_det(PG_FUNCTION_ARGS)
 #endif
 {
-    uint64_t eValueLen;
-    char *const eValueBytes = getba(args, 0, eValueLen);
+    AssignOnce<std::string> value;
+    if (NULL == args->args[0]) {
+        value = "";
+        *is_null = 1;
+    } else {
+        try {
+            uint64_t eValueLen;
+            char *const eValueBytes = getba(args, 0, eValueLen);
 
-    uint64_t keyLen;
-    char *const keyBytes = getba(args, 1, keyLen);
-    const std::string key = std::string(keyBytes, keyLen);
+            uint64_t keyLen;
+            char *const keyBytes = getba(args, 1, keyLen);
+            const std::string key = std::string(keyBytes, keyLen);
 
-    const std::unique_ptr<AES_KEY> aesKey(get_AES_dec_key(key));
-    const std::string value =
-        decrypt_AES_CMC(std::string(eValueBytes,
+            const std::unique_ptr<AES_KEY> aesKey(get_AES_dec_key(key));
+            // Must be last statement; else catch could break on
+            // AssignOnce.
+            value =
+                decrypt_AES_CMC(std::string(eValueBytes,
                                     static_cast<unsigned int>(eValueLen)),
-                        aesKey.get(), true);
+                                aesKey.get(), true);
+        } catch (const CryptoError &e) {
+            std::cerr << e.msg << std::endl;
+            value = "";
+        }
+    }
 
 #if MYSQL_S
-    char *const res = new char[value.length()];
+    char *const res = new char[value.get().length()];
     initid->ptr = res;
-    memcpy(res, value.data(), value.length());
-    *length = value.length();
+    memcpy(res, value.get().data(), value.get().length());
+    *length = value.get().length();
     return initid->ptr;
 #else
     bytea *const res = (bytea *) palloc(eValueLen+VARHDRSZ);
@@ -639,6 +659,7 @@ agg(UDF_INIT *const initid, UDF_ARGS *const args, char *const result,
 }
 
 // for update with increment
+// > UNUSED
 
 void
 func_add_set_deinit(UDF_INIT *const initid)

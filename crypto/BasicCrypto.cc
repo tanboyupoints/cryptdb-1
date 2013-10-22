@@ -99,9 +99,11 @@ get_AES_dec_key(const string &key)
 {
     //ANON_REGION(__func__, &perf_cg);
 
-    AES_KEY * aes_key = new AES_KEY();
+    AES_KEY *const aes_key = new AES_KEY();
 
-    assert(key.size() == AES_KEY_BYTES);
+    if (key.size() != AES_KEY_BYTES) {
+        throw CryptoError("AES key is the wrong size!");
+    }
 
     assert(AES_set_decrypt_key((const unsigned char*)key.c_str(), AES_KEY_BYTES*8,
                                aes_key) >= 0);
@@ -213,7 +215,9 @@ unpad(vector<unsigned char> data)
     const size_t actualLen = len - pad_count;
     //cerr << " len is " << len << " and data[len-1] " << (int)data[len-1] << "\n";
     // Padding will never be larger than a block.
-    assert((pad_count > 0) && (pad_count <= AES_BLOCK_BYTES));
+    if (false == ((pad_count > 0) && (pad_count <= AES_BLOCK_BYTES))) {
+        throw CryptoError("AES padding is wrong size!");
+    }
     // Tells us when we have a bad length.
     assert(pad_count <= len);
     vector<unsigned char> res(actualLen);
