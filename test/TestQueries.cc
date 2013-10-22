@@ -1064,31 +1064,37 @@ Connection::start() {
     std::string masterKey = BytesFromInt(mkey, AES_KEY_BYTES);
     switch (type) {
         //plain -- new connection straight to the DB
-        case UNENCRYPTED:
-            {
-                Connect *const c =
-                    new Connect(tc.host, tc.user, tc.pass, tc.port);
-                conn_set.insert(c);
-                this->conn = conn_set.begin();
-                break;
+    case UNENCRYPTED:
+    {
+	Connect *const c =
+	    new Connect(tc.host, tc.user, tc.pass, tc.port);
+	conn_set.insert(c);
+	this->conn = conn_set.begin();
+	break;
             }
-            //single -- new Rewriter
-        case SINGLE:
-            break;
-        case PROXYPLAIN:
-            //break;
-        case PROXYSINGLE:
-            {
-                ConnectionInfo ci(tc.host, tc.user, tc.pass);
-                const std::string master_key = "2392834";
-                ProxyState *const ps =
-                    new ProxyState(ci, tc.shadowdb_dir, master_key);
+    //single -- new Rewriter
+    case SINGLE:
+	break;
+    case PROXYPLAIN:
+	//break;
+    case PROXYENC:
+    {
+	//TODO:  a separate process for proxy
+	
+    }
+    case ENC:
+    {
+	ConnectionInfo ci(tc.host, tc.user, tc.pass);
+	const std::string master_key = "2392834";
+	ProxyState *const ps =
+	    new ProxyState(ci, tc.shadowdb_dir, master_key);
                 re_set.insert(ps);
                 this->re_it = re_set.begin();
-            }
-            break;
-        default:
-            assert_s(false, "invalid type passed to Connection");
+    }
+    break;
+    
+    default:
+	assert_s(false, "invalid type passed to Connection");
     }
 }
 
@@ -1097,7 +1103,7 @@ Connection::stop() {
     switch (type) {
     case PROXYPLAIN:
         //break;
-    case PROXYSINGLE:
+    case ENC:
         for (auto r = re_set.begin(); r != re_set.end(); r++) {
             delete *r;
         }
@@ -1119,7 +1125,7 @@ Connection::stop() {
 ResType
 Connection::execute(const Query &query) {
     switch (type) {
-    case PROXYSINGLE:
+    case ENC:
         return executeRewriter(query);
     case UNENCRYPTED:
     case PROXYPLAIN:
@@ -1197,7 +1203,7 @@ Connection::executeLast() {
     case UNENCRYPTED:
     case PROXYPLAIN:
        // break;
-    case PROXYSINGLE:
+    case ENC:
 		//TODO(ccarvalho) check this 
         break;
 
@@ -1296,7 +1302,7 @@ CheckQuery(const TestConfig &tc, const Query &query) {
             case UNENCRYPTED:
             case PROXYPLAIN:
                 //break;
-            case PROXYSINGLE:
+            case ENC:
                 //TODO(ccarvalho): check proxy
             default:
                 LOG(test) << "not a valid case of this test; skipped";
@@ -1342,7 +1348,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
         case SINGLE:
         case PROXYPLAIN:
            // break;
-        case PROXYSINGLE:
+        case ENC:
             score.mark(CheckQuery(tc, *q));
             break;
 
@@ -1459,8 +1465,8 @@ string_to_test_mode(const std::string &s)
         return SINGLE;
     else if (s == "proxy-plain")
         return PROXYPLAIN;
-    else if (s == "proxy-single")
-        return PROXYSINGLE;
+    else if (s == "enc")
+        return ENC;
     else
         thrower() << "unknown test mode " << s;
     return TESTINVALID;
@@ -1483,7 +1489,7 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
              << "    plain" << std::endl
              << "    single" << std::endl
              << "    proxy-plain" << std::endl
-             << "    proxy-single" << std::endl
+             << "    enc" << std::endl
              << "single make connections through EDBProxy" << std::endl
              << "proxy-* makes connections *'s encryption type through the proxy" << std::endl
              << "num_conn is the number of conns made to a single db (default 1)" << std::endl
@@ -1498,7 +1504,7 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
             break;
         case PROXYPLAIN:
            // break;
-        case PROXYSINGLE:
+        case ENC:
             //TODO(ccarvalho) check this
             break;
         default:
