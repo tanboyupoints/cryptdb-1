@@ -57,6 +57,13 @@ struct QueryList {
     QueryChoice drop;
 
     QueryList(std::string namearg,
+  	      std::vector<Query> cr,
+	      std::vector<Query> co,
+	      std::vector<Query> dr)
+      : QueryList(namearg, cr, cr, co, dr, dr)
+    {} 
+
+    QueryList(std::string namearg,
               std::vector<Query> pc,
               std::vector<Query> sc,
               std::vector<Query> c,
