@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <vector>
 #include <iomanip>
 #include <crypto/cbc.hh>
@@ -39,18 +38,18 @@ test_block_cipher(T *c, PRNG *u, const std::string &cname)
 
     c->block_encrypt(&pt[0], &ct[0]);
     c->block_decrypt(&ct[0], &pt2[0]);
-    assert(pt == pt2);
+    throw_c(pt == pt2);
 
     auto cbc_pt = u->rand_string(c->blocksize * 32);
     auto cbc_iv = u->rand_string(c->blocksize);
     string cbc_ct, cbc_pt2;
     cbc_encrypt(c, cbc_iv, cbc_pt, &cbc_ct);
     cbc_decrypt(c, cbc_iv, cbc_ct, &cbc_pt2);
-    assert(cbc_pt == cbc_pt2);
+    throw_c(cbc_pt == cbc_pt2);
 
     cmc_encrypt(c, cbc_pt, &cbc_ct);
     cmc_decrypt(c, cbc_ct, &cbc_pt2);
-    assert(cbc_pt == cbc_pt2);
+    throw_c(cbc_pt == cbc_pt2);
 
     for (int i = 0; i < 1000; i++) {
         auto cts_pt = u->rand_string(c->blocksize + (u->rand<size_t>() % 1024));
@@ -59,7 +58,7 @@ test_block_cipher(T *c, PRNG *u, const std::string &cname)
         string cts_ct, cts_pt2;
         cbc_encrypt(c, cts_iv, cts_pt, &cts_ct);
         cbc_decrypt(c, cts_iv, cts_ct, &cts_pt2);
-        assert(cts_pt == cts_pt2);
+        throw_c(cts_pt == cts_pt2);
     }
 
     enum { nperf = 1000 };
@@ -71,7 +70,7 @@ test_block_cipher(T *c, PRNG *u, const std::string &cname)
         cbc_encrypt(c, cbc_perf_iv, cbc_perf_pt, &cbc_perf_ct);
         if (i == 0) {
             cbc_decrypt(c, cbc_perf_iv, cbc_perf_ct, &cbc_perf_pt2);
-            assert(cbc_perf_pt == cbc_perf_pt2);
+            throw_c(cbc_perf_pt == cbc_perf_pt2);
         }
     }
 
@@ -83,7 +82,7 @@ test_block_cipher(T *c, PRNG *u, const std::string &cname)
         cmc_encrypt(c, cbc_perf_pt, &cbc_perf_ct);
         if (i == 0) {
             cmc_decrypt(c, cbc_perf_ct, &cbc_perf_pt2);
-            assert(cbc_perf_pt == cbc_perf_pt2);
+            throw_c(cbc_perf_pt == cbc_perf_pt2);
         }
     }
 
@@ -104,7 +103,7 @@ test_ope(int pbits, int cbits)
         ZZ pt = u.rand_zz_mod(to_ZZ(1) << pbits);
         ZZ ct = o.encrypt(pt);
         ZZ pt2 = o.decrypt(ct);
-        assert(pt2 == pt);
+        throw_c(pt2 == pt);
         // cout << pt << " -> " << o.encrypt(pt, -1) << "/" << ct << "/" << o.encrypt(pt, 1) << " -> " << pt2 << endl;
 
         RR::SetPrecision(cbits+pbits);
@@ -128,13 +127,13 @@ test_hgd()
     ZZ s;
 
     s = HGD(to_ZZ(100), to_ZZ(100), to_ZZ(100), &r);
-    assert(s > 0 && s < 100);
+    throw_c(s > 0 && s < 100);
 
     s = HGD(to_ZZ(100), to_ZZ(0), to_ZZ(100), &r);
-    assert(s == 0);
+    throw_c(s == 0);
 
     s = HGD(to_ZZ(100), to_ZZ(100), to_ZZ(0), &r);
-    assert(s == 100);
+    throw_c(s == 100);
 }
 
 static void
@@ -153,13 +152,13 @@ test_paillier()
     ZZ ct0 = p.encrypt(pt0);
     ZZ ct1 = p.encrypt(pt1);
     ZZ sum = p.add(ct0, ct1);
-    assert(pp.decrypt(ct0) == pt0);
-    assert(pp.decrypt(ct1) == pt1);
-    assert(pp.decrypt(sum) == (pt0 + pt1));
+    throw_c(pp.decrypt(ct0) == pt0);
+    throw_c(pp.decrypt(ct1) == pt1);
+    throw_c(pp.decrypt(sum) == (pt0 + pt1));
 
     ZZ v0 = u.rand_zz_mod(to_ZZ(1) << 256);
     ZZ v1 = u.rand_zz_mod(to_ZZ(1) << 256);
-    assert(pp.decrypt(p.mul(p.encrypt(v0), v1)) == v0 * v1);
+    throw_c(pp.decrypt(p.mul(p.encrypt(v0), v1)) == v0 * v1);
 
     ZZ a = p.encrypt(pt0);
     ZZ b = p.encrypt(pt1);
@@ -179,7 +178,7 @@ test_paillier()
         br.set_ctr(v);
         auto sk1 = Paillier_priv::keygen(&br);
 
-        assert(sk0 == sk1);
+        throw_c(sk0 == sk1);
     }
 }
 
@@ -212,7 +211,7 @@ test_paillier_packing()
 
         uint64_t decagg = pp.decrypt_pack<uint64_t>(agg);
         // cout << hex << "pack: " << decagg << ", " << plainagg << dec << endl;
-        assert(decagg == to_ZZ(plainagg));
+        throw_c(decagg == to_ZZ(plainagg));
     }
 
     uint32_t npack2 = p.pack2_count<uint64_t>();
@@ -241,7 +240,7 @@ test_paillier_packing()
 
         uint64_t decagg = pp.decrypt_pack2<uint64_t>(agg);
         // cout << hex << "pack2: " << decagg << ", " << plainagg << dec << endl;
-        assert(decagg == to_ZZ(plainagg));
+        throw_c(decagg == to_ZZ(plainagg));
     }
 }
 
@@ -258,12 +257,12 @@ test_montgomery()
         ZZ b = u.rand_zz_mod(m);
         ZZ ma = mm.to_mont(a);
         ZZ mb = mm.to_mont(b);
-        assert(a == mm.from_mont(ma));
-        assert(b == mm.from_mont(mb));
+        throw_c(a == mm.from_mont(ma));
+        throw_c(b == mm.from_mont(mb));
 
         ZZ ab = MulMod(a, b, m);
         ZZ mab = mm.mmul(ma, mb);
-        assert(ab == mm.from_mont(mab));
+        throw_c(ab == mm.from_mont(mab));
     }
 
     cout << "montgomery ok" << endl;
@@ -293,16 +292,16 @@ test_bn()
     bignum d(500);
 
     auto r = (a + b * c) % d;
-    assert(r == 183);
-    assert(r <= 183);
-    assert(r <= 184);
-    assert(r <  184);
-    assert(r >= 183);
-    assert(r >= 181);
-    assert(r >  181);
+    throw_c(r == 183);
+    throw_c(r <= 183);
+    throw_c(r <= 184);
+    throw_c(r <  184);
+    throw_c(r >= 183);
+    throw_c(r >= 181);
+    throw_c(r >  181);
 
     streamrng<arc4> rand("seed");
-    assert(rand.rand_bn_mod(1000) == 498);
+    throw_c(rand.rand_bn_mod(1000) == 498);
 }
 
 static void
@@ -312,16 +311,16 @@ test_ecjoin()
 
     auto p1 = e.hash("some data", "hash key");
     auto p2 = e.hash("some data", "hash key");
-    assert(p1 == p2);
+    throw_c(p1 == p2);
 
     auto p3 = e.hash("some data", "another hash key");
     auto p4 = e.hash("other data", "hash key");
-    assert(p1 != p4);
-    assert(p3 != p4);
+    throw_c(p1 != p4);
+    throw_c(p3 != p4);
 
     bignum d = e.delta("another hash key", "hash key");
     auto p5 = e.adjust(p3, d);
-    assert(p1 == p5);
+    throw_c(p1 == p5);
 }
 
 static void
@@ -330,9 +329,9 @@ test_search()
     search_priv s("my key");
 
     auto cl = s.transform({"hello", "world", "hello", "testing", "test"});
-    assert(s.match(cl, s.wordkey("hello")));
-    assert(!s.match(cl, s.wordkey("Hello")));
-    assert(s.match(cl, s.wordkey("world")));
+    throw_c(s.match(cl, s.wordkey("hello")));
+    throw_c(!s.match(cl, s.wordkey("Hello")));
+    throw_c(s.match(cl, s.wordkey("world")));
 }
 
 static void
@@ -345,11 +344,11 @@ test_skip32(void)
     uint8_t pt[4] = { 0x33, 0x22, 0x11, 0x00 };
     uint8_t ct[4];
     s.block_encrypt(pt, ct);
-    assert(ct[0] == 0x81 && ct[1] == 0x9d && ct[2] == 0x5f && ct[3] == 0x1f);
+    throw_c(ct[0] == 0x81 && ct[1] == 0x9d && ct[2] == 0x5f && ct[3] == 0x1f);
 
     uint8_t pt2[4];
     s.block_decrypt(ct, pt2);
-    assert(pt2[0] == 0x33 && pt2[1] == 0x22 && pt2[2] == 0x11 && pt2[3] == 0x00);
+    throw_c(pt2[0] == 0x33 && pt2[1] == 0x22 && pt2[2] == 0x11 && pt2[3] == 0x00);
 }
 
 static void
@@ -396,8 +395,8 @@ test_ffx()
             cout << dec << endl;
         }
 
-        assert(pt != ct);
-        assert(pt == pt2);
+        throw_c(pt != ct);
+        throw_c(pt == pt2);
     }
 
     urandom u;
@@ -462,7 +461,7 @@ test_online_ope()
         auto pt2 = ope_clnt.decrypt(ct);
         // cout << "online-ope pt2: " << pt2 << endl;
 
-        assert(pt == pt2);
+        throw_c(pt == pt2);
     }
 
     for (uint i = 0; i < 1000; i++) {
@@ -479,11 +478,11 @@ test_online_ope()
         //cout << "b=" << hex << (uint64_t) b << ", bc=" << bc << dec << endl;
 
         if (a == b)
-            assert(ac == bc);
+            throw_c(ac == bc);
         else if (a > b)
-            assert(ac > bc);
+            throw_c(ac > bc);
         else
-            assert(ac < bc);
+            throw_c(ac < bc);
     }
 }
 
@@ -520,9 +519,9 @@ test_padding()
         auto v = u.rand_string(u.rand<size_t>() % 8192);
         auto v2 = v;
         pad_blocksize(&v2, blocksize);
-        assert((v2.size() % blocksize) == 0);
+        throw_c((v2.size() % blocksize) == 0);
         unpad_blocksize(&v2, blocksize);
-        assert(v == v2);
+        throw_c(v == v2);
     }
 
     cout << "test padding ok\n";
@@ -547,13 +546,13 @@ test_gfe(size_t q)
         if (a == b)
             b++;
 
-        assert(gp.prf(make_pair(a, x))  == gp.prf(make_pair(a, x)));
-        assert(gp.prf(make_pair(a, x))  != gp.prf(make_pair(a, y)));
-        assert(gp.prf(make_pair(a, x))  != gp.prf(make_pair(b, x)));
-        assert(gp.prf(make_pair(a, x))  != gp.prf(make_pair(b, y)));
-        assert(gp.prf(make_pair(a, x))  != gp.prf(make_pair(-1, x)));
-        assert(gp.prf(make_pair(a, x))  != gp.prf(make_pair(-1, y)));
-        assert(gp.prf(make_pair(-1, x)) != gp.prf(make_pair(-1, x)));
+        throw_c(gp.prf(make_pair(a, x))  == gp.prf(make_pair(a, x)));
+        throw_c(gp.prf(make_pair(a, x))  != gp.prf(make_pair(a, y)));
+        throw_c(gp.prf(make_pair(a, x))  != gp.prf(make_pair(b, x)));
+        throw_c(gp.prf(make_pair(a, x))  != gp.prf(make_pair(b, y)));
+        throw_c(gp.prf(make_pair(a, x))  != gp.prf(make_pair(-1, x)));
+        throw_c(gp.prf(make_pair(a, x))  != gp.prf(make_pair(-1, y)));
+        throw_c(gp.prf(make_pair(-1, x)) != gp.prf(make_pair(-1, x)));
     }
 
     for (int i = 0; i < 1000; i++) {
@@ -564,16 +563,16 @@ test_gfe(size_t q)
         auto xv = gfe<T>::cover_prefixes(x);
         auto yv = gfe<T>::right_prefixes(y);
 
-        assert(xv.size() == yv.size());
+        throw_c(xv.size() == yv.size());
         int match = 0;
         for (uint i = 0; i < xv.size(); i++)
             if (xv[i] == yv[i])
                 match++;
 
         if (x > y)
-            assert(match == 1);
+            throw_c(match == 1);
         else
-            assert(match == 0);
+            throw_c(match == 0);
     }
 
     for (int i = 0; i < 100; i++) {
@@ -590,9 +589,9 @@ test_gfe(size_t q)
 
         // cout << "x " << (int)x << ", y " << (int)y << ", dp " << dp << endl;
         if (x > y)
-            assert(labs(dp - gp.e1_) < labs(dp - gp.e0_));
+            throw_c(labs(dp - gp.e1_) < labs(dp - gp.e0_));
         else
-            assert(labs(dp - gp.e0_) < labs(dp - gp.e1_));
+            throw_c(labs(dp - gp.e0_) < labs(dp - gp.e1_));
     }
 
     cout << "test_gfe size " << sizeof(T) << " q " << q << " ok\n";

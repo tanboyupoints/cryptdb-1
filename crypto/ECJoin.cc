@@ -14,7 +14,7 @@ static EC_POINT *
 my_EC_POINT_new(EC_GROUP * group) {
 
     EC_POINT* point = EC_POINT_new(group);
-    assert_s(point, "could not create point");
+    throw_c(point, "could not create point");
     return point;
 
 }
@@ -23,7 +23,7 @@ static BIGNUM *
 my_BN_new() {
 
     BIGNUM* num = BN_new();
-    assert_s(num, "could not create BIGNUM");
+    throw_c(num, "could not create BIGNUM");
     return num;
 
 }
@@ -33,7 +33,7 @@ my_BN_mod(const BIGNUM * a, const BIGNUM * n, BN_CTX * bn_ctx) {
 
     BIGNUM * res = my_BN_new();
     BN_mod(res, a, n, bn_ctx);
-    assert_s(res, "failed to compute mod");
+    throw_c(res, "failed to compute mod");
     return res;
 }
 
@@ -42,7 +42,7 @@ str2Point(const EC_GROUP * group, const string & indata) {
 
     EC_POINT * point = EC_POINT_new(group);
 
-    assert_s(EC_POINT_oct2point(group, point, (const unsigned char *)indata.data(), indata.length(), NULL),
+    throw_c(EC_POINT_oct2point(group, point, (const unsigned char *)indata.data(), indata.length(), NULL),
             "cannot convert from ciphertext to point");
 
     return point;
@@ -62,7 +62,7 @@ ECJoin::randomPoint() {
         BN_rand_range(x, order);
 
         if (EC_POINT_set_compressed_coordinates_GFp(group, point, x, 1, bn_ctx)) {
-            assert_s(EC_POINT_get_affine_coordinates_GFp(group, point, x, y, bn_ctx),"issue getting coordinates");
+            throw_c(EC_POINT_get_affine_coordinates_GFp(group, point, x, y, bn_ctx),"issue getting coordinates");
 
             if(BN_is_zero(x) || BN_is_zero(y)) {
                 found = false;
@@ -91,22 +91,22 @@ ECJoin::ECJoin()
 {
 
     group = EC_GROUP_new_by_curve_name(NID);
-    assert_s(group, "issue creating new curve");
+    throw_c(group, "issue creating new curve");
 
     bn_ctx = BN_CTX_new();
-    assert_s(bn_ctx, "failed to create big number context");
+    throw_c(bn_ctx, "failed to create big number context");
 
     order = my_BN_new();
 
-    assert_s(EC_GROUP_get_order(group, order, bn_ctx), "failed to retrieve the order");
+    throw_c(EC_GROUP_get_order(group, order, bn_ctx), "failed to retrieve the order");
 
     Infty = my_EC_POINT_new(group);
-    assert_s(EC_POINT_set_to_infinity(group, Infty), "could not create point at infinity");
+    throw_c(EC_POINT_set_to_infinity(group, Infty), "could not create point at infinity");
 
     P = randomPoint();
 
     ZeroBN = BN_new();
-    assert_s(ZeroBN != NULL, "cannot create big num");
+    throw_c(ZeroBN != NULL, "cannot create big num");
     BN_zero(ZeroBN);
 
 
@@ -116,10 +116,10 @@ static EC_POINT *
 mul(const EC_GROUP * group, const BIGNUM * ZeroBN, const EC_POINT * Point, const BIGNUM * Scalar, BN_CTX * bn_ctx) {
 
     EC_POINT * ans = EC_POINT_new(group);
-    assert_s(ans, "cannot create point ");
+    throw_c(ans, "cannot create point ");
 
     //ans = sk->kp * cbn
-    assert_s(EC_POINT_mul(group, ans, ZeroBN, Point, Scalar, bn_ctx), "issue when multiplying ec");
+    throw_c(EC_POINT_mul(group, ans, ZeroBN, Point, Scalar, bn_ctx), "issue when multiplying ec");
 
     return ans;
 }
@@ -127,7 +127,7 @@ mul(const EC_GROUP * group, const BIGNUM * ZeroBN, const EC_POINT * Point, const
 static BIGNUM *
 my_BN_bin2bn(string data) {
     BIGNUM * res = BN_bin2bn((unsigned char *) data.data(), (int) data.length(), NULL);
-    assert_s(res, "could not convert from binary to BIGNUM ");
+    throw_c(res, "could not convert from binary to BIGNUM ");
 
     return res;
 }
@@ -160,11 +160,11 @@ ECJoin::getDeltaKey(const ECJoinSK * key1, const ECJoinSK *  key2) {
     delta->ZeroBN = ZeroBN;
 
     BIGNUM * key1Inverse = BN_mod_inverse(NULL, key1->k, order, bn_ctx);
-    assert_s(key1Inverse, "could not compute inverse of key 1");
+    throw_c(key1Inverse, "could not compute inverse of key 1");
 
     delta->deltaK = BN_new();
     BN_mod_mul(delta->deltaK, key1Inverse, key2->k, order, bn_ctx);
-    assert_s(delta->deltaK, "failed to multiply");
+    throw_c(delta->deltaK, "failed to multiply");
 
     BN_free(key1Inverse);
 
@@ -200,7 +200,7 @@ ECJoin::point2Str(const EC_GROUP * group, const EC_POINT * point) {
     size_t len = 0;
     len = EC_POINT_point2oct(group, point, POINT_CONVERSION_COMPRESSED, buf, MAX_BUF, NULL);
 
-    assert_s(len, "cannot serialize EC_POINT ");
+    throw_c(len, "cannot serialize EC_POINT ");
 
     return string((char *)buf, len);
 }
@@ -258,11 +258,11 @@ ECJoin::~ECJoin()
     cerr << "is key null? " << pretty_bn2str(key1->k) << "\n";
     cerr << "comp key oder " << BN_cmp(key1->k, order) << "\n";
     BIGNUM * key1Inverse = BN_mod_inverse(NULL, key1->k, order, bn_ctx);
-    assert_s(key1Inverse, "could not compute inverse of key 1");
+    throw_c(key1Inverse, "could not compute inverse of key 1");
 
     delta->deltaK = BN_new();
     BN_mod_mul(delta->deltaK, key1Inverse, key2->k, order, bn_ctx);
-    assert_s(delta->deltaK, "failed to multiply");
+    throw_c(delta->deltaK, "failed to multiply");
 
     //delta * k1 = k2?
     cerr << "(remove this code) \n checking delta \n";
@@ -289,7 +289,7 @@ pretty_bn2str(BIGNUM * bn) {
         unsigned char * tov = new unsigned char[256];
         int len = BN_bn2bin(bn, tov);
 
-        assert_s(len, "cannot convert from bn to binary ");
+        throw_c(len, "cannot convert from bn to binary ");
 
         string res = "";
 

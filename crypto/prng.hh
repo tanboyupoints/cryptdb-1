@@ -49,7 +49,7 @@ class PRNG {
     virtual ~PRNG() {}
     virtual void rand_bytes(size_t nbytes, uint8_t *buf) = 0;
     virtual void seed_bytes(size_t nbytes, uint8_t *buf) {
-        thrower() << "seed not implemented";
+        throw_c(false, "seed not implemented");
     }
 };
 
@@ -103,7 +103,7 @@ class blockrng : public PRNG {
     }
 
     void set_ctr(const std::string &v) {
-        assert(v.size() == BlockCipher::blocksize);
+        throw_c(v.size() == BlockCipher::blocksize);
         memcpy(ctr, v.data(), BlockCipher::blocksize);
     }
 

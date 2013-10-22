@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <crypto/paillier.hh>
 #include <sstream>
 
@@ -16,7 +15,7 @@ Paillier::Paillier(const vector<ZZ> &pk)
     : n(pk[0]), g(pk[1]),
       nbits(NumBits(n)), n2(n*n)
 {
-    assert(pk.size() == 2);
+    throw_c(pk.size() == 2);
 }
 
 void
@@ -97,7 +96,7 @@ Paillier_priv::Paillier_priv(const vector<ZZ> &sk)
       hq(InvMod(Lfast(PowerMod(g % q2, fast ? a : (q-1), q2),
                       qinv, two_q, q), q))
 {
-    assert(sk.size() == 4);
+    throw_c(sk.size() == 4);
 }
 
 std::vector<NTL::ZZ>

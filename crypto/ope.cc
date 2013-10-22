@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <crypto/ope.hh>
 #include <crypto/prng.hh>
 #include <crypto/hgd.hh>
@@ -27,7 +26,7 @@ OPE::lazy_sample(const ZZ &d_lo, const ZZ &d_hi,
 {
     ZZ ndomain = d_hi - d_lo + 1;
     ZZ nrange  = r_hi - r_lo + 1;
-    assert(nrange >= ndomain);
+    throw_c(nrange >= ndomain);
 
     if (ndomain == 1)
         return ope_domain_range(d_lo, r_lo, r_hi);

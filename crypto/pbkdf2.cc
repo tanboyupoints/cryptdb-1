@@ -23,11 +23,11 @@
 #include <string.h>
 #include <limits.h>
 #include <stdlib.h>
-#include <assert.h>
 
 #include <openssl/sha.h>
 
 #include <crypto/pbkdf2.hh>
+#include <util/errstream.hh>
 
 /*
  * HMAC-SHA-1 (from RFC 2202).
@@ -141,7 +141,7 @@ pbkdf2(const string &pass, const string &salt, uint key_len, uint rounds)
     int r = pkcs5_pbkdf2(pass.c_str(), pass.length(),
                          salt.c_str(), salt.length(),
                          (uint8_t *) &key[0], key.length(), rounds);
-    assert(r == 0);
+    throw_c(r == 0);
 
     return key;
 }

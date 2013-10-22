@@ -10,7 +10,7 @@ static string
 xor_pad(const string &word_key, size_t csize)
 {
     auto v = sha256::hash(word_key);
-    assert(v.size() >= csize);
+    throw_c(v.size() >= csize);
     v.resize(csize);
     return v;
 }
@@ -19,7 +19,7 @@ bool
 search::match(const string &ctext,
               const string &word_key)
 {
-    assert(ctext.size() == csize);
+    throw_c(ctext.size() == csize);
     string cx;
 
     auto xorpad = xor_pad(word_key, csize);

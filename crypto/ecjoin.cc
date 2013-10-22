@@ -6,9 +6,9 @@
 ecjoin::ecjoin(int curve_id)
 {
     group = EC_GROUP_new_by_curve_name(curve_id);
-    assert(group);
+    throw_c(group);
 
-    assert(EC_GROUP_get_order(group, order.bn(), bignum_ctx::the_ctx()));
+    throw_c(EC_GROUP_get_order(group, order.bn(), bignum_ctx::the_ctx()));
 }
 
 ecjoin::~ecjoin()
@@ -36,7 +36,7 @@ ecjoin_priv::ecjoin_priv(const std::string &base_key, int curve_id)
             continue;
 
         bignum y;
-        assert(EC_POINT_get_affine_coordinates_GFp(group, basept.p(),
+        throw_c(EC_POINT_get_affine_coordinates_GFp(group, basept.p(),
                                                    x.bn(), y.bn(),
                                                    bignum_ctx::the_ctx()));
         if (x == 0 || y == 0)
@@ -51,7 +51,7 @@ ec_point
 ecjoin_priv::hash(const std::string &ptext, const std::string &k)
 {
     auto hash = sha1::hash(ptext);
-    assert(hash.size() >= base.blocksize);
+    throw_c(hash.size() >= base.blocksize);
     hash.resize(base.blocksize);
 
     std::string enc;

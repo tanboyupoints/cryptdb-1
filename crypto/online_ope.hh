@@ -1,9 +1,11 @@
 #pragma once
 
 #include <string>
+#include <iostream>
+
 #include <crypto/blowfish.hh>
 #include <util/static_assert.hh>
-#include <iostream>
+#include <util/errstream.hh>
 
 using namespace std;
 
@@ -101,7 +103,7 @@ class ope_client {
 	    return encrypt(pt);
         }
 
-        assert(nbits <= 63);
+        throw_c(nbits <= 63);
         return (v<<(64-nbits)) | (1ULL<<(63-nbits));
     }
 

@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <assert.h>
 #include <crypto/mont.hh>
 
 #include <gmp.h>
@@ -39,7 +38,7 @@ montgomery::mmul(const ZZ &a, const ZZ &b)
             c &= (((long)1) << thisbits) - 1;
         ab += _m * c;
 
-        // assert(trunc_long(ab, thisbits) == 0);
+        // throw_c(trunc_long(ab, thisbits) == 0);
         ab >>= thisbits;
     }
 

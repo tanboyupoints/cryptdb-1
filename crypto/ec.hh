@@ -23,8 +23,8 @@ class ec_point {
     ec_point operator*(const bignum &n) const {
         bignum zero(0);
         ec_point res(gr);
-        assert(EC_POINT_mul(gr, res.p(), zero.bn(),
-                            pt, n.bn(), bignum_ctx::the_ctx()));
+        throw_c(EC_POINT_mul(gr, res.p(), zero.bn(),
+                             pt, n.bn(), bignum_ctx::the_ctx()));
         return res;
     }
 

@@ -4,7 +4,6 @@
  *
  */
 
-#include <assert.h>
 #include <crypto/BasicCrypto.hh>
 #include <util/ctr.hh>
 #include <util/util.hh>
@@ -87,8 +86,8 @@ get_AES_enc_key(const string &key)
 
     AES_KEY * aes_key = new AES_KEY();
 
-    assert(AES_set_encrypt_key((const uint8_t*) key.c_str(), AES_KEY_BYTES*8,
-                               aes_key) >= 0);
+    throw_c(AES_set_encrypt_key((const uint8_t*) key.c_str(),
+                                AES_KEY_BYTES*8, aes_key) >= 0);
 
     return aes_key;
 }
@@ -105,8 +104,8 @@ get_AES_dec_key(const string &key)
         throw CryptoError("AES key is the wrong size!");
     }
 
-    assert(AES_set_decrypt_key((const unsigned char*)key.c_str(), AES_KEY_BYTES*8,
-                               aes_key) >= 0);
+    throw_c(AES_set_decrypt_key((const unsigned char*)key.c_str(),
+                                AES_KEY_BYTES*8, aes_key) >= 0);
 
     return aes_key;
 
@@ -183,7 +182,7 @@ static vector<unsigned char>
 pad(vector<unsigned char> data, unsigned int unit)
 {
     // pad does not work for padding unit more than 256 bytes
-    assert(unit < 256);
+    throw_c(unit < 256);
 
     size_t blocks = getBlocks(unit, data.size());
     size_t multipleLen = blocks * unit;
@@ -193,9 +192,9 @@ pad(vector<unsigned char> data, unsigned int unit)
     } else {
         padding = multipleLen - data.size();
     }
-    assert(padding > 0 && padding <= AES_BLOCK_BYTES);
+    throw_c(padding > 0 && padding <= AES_BLOCK_BYTES);
     size_t paddedLen = data.size() + padding;
-    assert((paddedLen > 0) && ((paddedLen % AES_BLOCK_BYTES) == 0));
+    throw_c((paddedLen > 0) && ((paddedLen % AES_BLOCK_BYTES) == 0));
 
     // cerr << "length of padding " << padding << " length of padded data " << paddedLen << "\n";
 
@@ -209,7 +208,7 @@ static vector<unsigned char>
 unpad(vector<unsigned char> data)
 {
     const size_t len = data.size();
-    assert((len > 0) && ((len % AES_BLOCK_BYTES) == 0));
+    throw_c((len > 0) && ((len % AES_BLOCK_BYTES) == 0));
     const size_t pad_count = static_cast<int>(data[len-1]);
     //cerr << "padding to remove " << (int)data[len-1] << "\n";
     const size_t actualLen = len - pad_count;
@@ -219,7 +218,7 @@ unpad(vector<unsigned char> data)
         throw CryptoError("AES padding is wrong size!");
     }
     // Tells us when we have a bad length.
-    assert(pad_count <= len);
+    throw_c(pad_count <= len);
     vector<unsigned char> res(actualLen);
     memcpy(&res[0], &data[0], actualLen);
     return res;
@@ -231,7 +230,7 @@ encrypt_AES_CBC(const string &ptext, const AES_KEY * enckey, string salt, bool d
 {
     //TODO: separately for numbers to avoid need for padding
 
-    assert(dopad || ((ptext.size() % AES_BLOCK_BYTES) == 0));
+    throw_c(dopad || ((ptext.size() % AES_BLOCK_BYTES) == 0));
 
     vector<unsigned char> ptext_buf;
     if (dopad) {
@@ -253,7 +252,7 @@ encrypt_AES_CBC(const string &ptext, const AES_KEY * enckey, string salt, bool d
 string
 decrypt_AES_CBC(const string &ctext, const AES_KEY * deckey, string salt, bool dounpad)
 {
-    assert((ctext.size() > 0) && ((ctext.size() % AES_BLOCK_BYTES) == 0));
+    throw_c((ctext.size() > 0) && ((ctext.size() % AES_BLOCK_BYTES) == 0));
 
     vector<unsigned char> ptext_buf(ctext.size());
     auto ivec = getIVec(salt);
@@ -278,7 +277,7 @@ reverse(const string & vec)
     size_t len = vec.length();
     size_t noBlocks = len /AES_BLOCK_BYTES;
 
-    assert(len == noBlocks * AES_BLOCK_BYTES);
+    throw_c(len == noBlocks * AES_BLOCK_BYTES);
     string rev;
     rev.resize(len);
 
@@ -385,7 +384,7 @@ marshallKey(PKCS * mkey, bool ispk)
     } else {
         key = DER_encode_RSA_public(mkey);
     }
-    assert(key.length() >= 1);  // issue with RSA pk
+    throw_c(key.length() >= 1);  // issue with RSA pk
     return key;
 }
 
@@ -418,7 +417,7 @@ encrypt(PKCS * key, const string &s)
 string
 decrypt(PKCS * key, const string &s)
 {
-    assert(s.length() == (uint)RSA_size(key));
+    throw_c(s.length() == (uint)RSA_size(key));
     string toplain;
     toplain.resize(RSA_size(key));
 

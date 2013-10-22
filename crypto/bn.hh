@@ -1,10 +1,11 @@
 #pragma once
 
-#include <assert.h>
 #include <stdexcept>
 #include <ostream>
 #include <openssl/bn.h>
 #include <openssl/crypto.h>
+
+#include <util/errstream.hh>
 
 class bignum_ctx {
  public:
@@ -34,17 +35,17 @@ class bignum {
 
     bignum(const bignum &other) {
         BN_init(&b);
-        assert(BN_copy(&b, other.bn()));
+        throw_c(BN_copy(&b, other.bn()));
     }
 
     bignum(const uint8_t *buf, size_t nbytes) {
         BN_init(&b);
-        assert(BN_bin2bn(buf, nbytes, &b));
+        throw_c(BN_bin2bn(buf, nbytes, &b));
     }
 
     bignum(const std::string &v) {
         BN_init(&b);
-        assert(BN_bin2bn((uint8_t*) v.data(), v.size(), &b));
+        throw_c(BN_bin2bn((uint8_t*) v.data(), v.size(), &b));
     }
 
     ~bignum() { BN_free(&b); }
@@ -61,7 +62,7 @@ class bignum {
 #define op(opname, func, args...)                               \
     bignum opname(const bignum &mod) {                          \
         bignum res;                                             \
-        assert(1 == func(res.bn(), &b, mod.bn(), ##args));      \
+        throw_c(1 == func(res.bn(), &b, mod.bn(), ##args));      \
         return res;                                             \
     }
 
@@ -85,7 +86,7 @@ class bignum {
 
     bignum invmod(const bignum &mod) {
         bignum r;
-        assert(BN_mod_inverse(r.bn(), &b, mod.bn(), bignum_ctx::the_ctx()));
+        throw_c(BN_mod_inverse(r.bn(), &b, mod.bn(), bignum_ctx::the_ctx()));
         return r;
     }
 

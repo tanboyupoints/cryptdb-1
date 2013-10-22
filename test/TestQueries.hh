@@ -16,7 +16,7 @@
 typedef enum test_mode {
     UNENCRYPTED, SINGLE,
     PROXYPLAIN, PROXYSINGLE,
-    TESTINVALID
+    TESTINVALID, ENC, PROXYENC
 } test_mode;
 
 struct QueryChoice {
@@ -38,6 +38,7 @@ struct QueryChoice {
 
         case SINGLE:
         case PROXYSINGLE:
+        case ENC:
             return single;
 
         default:
