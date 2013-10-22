@@ -454,6 +454,11 @@ class Timer {
 
 template <typename T>
 class AssignOnce {
+private:
+    AssignOnce(const AssignOnce &other) = delete;
+    AssignOnce(AssignOnce &&other) = delete;
+    AssignOnce &operator=(AssignOnce &&other) = delete;
+
 public:
     AssignOnce() : frozen(false) {}
     ~AssignOnce() {;}
@@ -481,8 +486,36 @@ public:
 private:
     T value;
     bool frozen;
+};
 
-    AssignOnce(const AssignOnce &other);
+template <typename T>
+class AssignFirst {
+private:
+    AssignFirst(const AssignFirst &other) = delete;
+    AssignFirst(AssignFirst &&other) = delete;
+    AssignFirst &operator=(AssignFirst &&other) = delete;
+
+public:
+    AssignFirst() : assigned(false) {}
+    ~AssignFirst() {}
+    const AssignFirst &operator=(T value) {
+        this->value = value;
+        this->assigned = true;
+
+        return *this;
+    }
+
+    const T get() const {
+        if (false == this->assigned) {
+            throw CryptDBError("First assign to AssignFirst object!");
+        }
+
+        return this->value;
+    }
+
+private:
+    T value;
+    bool assigned;
 };
 
 template <typename T>

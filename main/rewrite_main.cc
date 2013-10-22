@@ -298,7 +298,6 @@ fixAdjustOnion(const std::unique_ptr<Connect> &conn,
 
         return finishQuery(e_conn, unfinished_id);
     }
-
 }
 
 /*

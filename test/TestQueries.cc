@@ -700,6 +700,7 @@ static QueryList Null = QueryList("Null",
         // Query Fail
         //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_null (username, password) VALUES ('alice', 'secretA')"),
         Query("INSERT INTO u_null VALUES (1, 'alice')"),
+        Query("INSERT INTO u_null VALUES ()"),
         Query("INSERT INTO test_null (uid, age) VALUES (1, 20)"),
         Query("SELECT * FROM test_null"),
         Query("INSERT INTO test_null (uid, address) VALUES (1, 'somewhere over the rainbow')"),
@@ -722,7 +723,13 @@ static QueryList Null = QueryList("Null",
         Query("SELECT * FROM test_null"),
         Query("SELECT * FROM test_null WHERE address = 'cookies'"),
         Query("SELECT * FROM test_null WHERE address < 'amber'"),
-        Query("SELECT * FROM test_null WHERE address LIKE 'aaron'")},
+        Query("SELECT * FROM test_null WHERE address LIKE 'aaron'"),
+        Query("SELECT * FROM test_null LEFT JOIN u_null"
+              "    ON test_null.uid = u_null.uid"),
+        Query("SELECT * FROM test_null, u_null"),
+        Query("SELECT * FROM test_null RIGHT JOIN u_null"
+              "    ON test_null.uid = u_null.uid"),
+        Query("SELECT * FROM test_null, u_null")},
     { Query("DROP TABLE test_null"),
       Query("DROP TABLE u_null"),
       Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_null") },
@@ -1356,7 +1363,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 466/471
+    //      TOTAL RESULT: 471/477
     // ###############################
 
     std::vector<Score> scores;
@@ -1391,7 +1398,7 @@ RunTest(const TestConfig &tc) {
     // Pass 44/44
     scores.push_back(CheckQueryList(tc, UserGroupForum));
 
-    // Pass 32/32
+    // Pass 37/37
     scores.push_back(CheckQueryList(tc, Null));
 
     // Pass 21/21

@@ -316,7 +316,7 @@ decrypt_text_sem(UDF_INIT *const initid, UDF_ARGS *const args,
                  char *const result, unsigned long *const length,
                  char *const is_null, char *const error)
 {
-    AssignOnce<std::string> value;
+    AssignFirst<std::string> value;
     if (NULL == ARGS->args[0]) {
         value = "";
         *is_null = 1;
@@ -332,8 +332,6 @@ decrypt_text_sem(UDF_INIT *const initid, UDF_ARGS *const args,
             uint64_t salt = getui(ARGS, 2);
 
             const std::unique_ptr<AES_KEY> aesKey(get_AES_dec_key(key));
-            // Must be last statement; else catch could break on
-            // AssignOnce.
             value =
                 decrypt_SEM(reinterpret_cast<unsigned char *>(eValueBytes),
                             eValueLen, aesKey.get(), salt);
@@ -417,7 +415,7 @@ Datum
 decrypt_text_det(PG_FUNCTION_ARGS)
 #endif
 {
-    AssignOnce<std::string> value;
+    AssignFirst<std::string> value;
     if (NULL == args->args[0]) {
         value = "";
         *is_null = 1;
@@ -431,8 +429,6 @@ decrypt_text_det(PG_FUNCTION_ARGS)
             const std::string key = std::string(keyBytes, keyLen);
 
             const std::unique_ptr<AES_KEY> aesKey(get_AES_dec_key(key));
-            // Must be last statement; else catch could break on
-            // AssignOnce.
             value =
                 decrypt_AES_CMC(std::string(eValueBytes,
                                     static_cast<unsigned int>(eValueLen)),
