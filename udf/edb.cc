@@ -645,6 +645,7 @@ agg(UDF_INIT *const initid, UDF_ARGS *const args, char *const result,
 }
 
 // for update with increment
+// > UNUSED
 
 void
 func_add_set_deinit(UDF_INIT *const initid)
