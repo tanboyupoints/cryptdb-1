@@ -410,24 +410,30 @@ Datum
 decrypt_text_det(PG_FUNCTION_ARGS)
 #endif
 {
-    uint64_t eValueLen;
-    char *const eValueBytes = getba(args, 0, eValueLen);
+    AssignOnce<std::string> value;
+    if (NULL == args->args[0]) {
+        value = "";
+        *is_null = 1;
+    } else {
+        uint64_t eValueLen;
+        char *const eValueBytes = getba(args, 0, eValueLen);
 
-    uint64_t keyLen;
-    char *const keyBytes = getba(args, 1, keyLen);
-    const std::string key = std::string(keyBytes, keyLen);
+        uint64_t keyLen;
+        char *const keyBytes = getba(args, 1, keyLen);
+        const std::string key = std::string(keyBytes, keyLen);
 
-    const std::unique_ptr<AES_KEY> aesKey(get_AES_dec_key(key));
-    const std::string value =
-        decrypt_AES_CMC(std::string(eValueBytes,
-                                    static_cast<unsigned int>(eValueLen)),
-                        aesKey.get(), true);
+        const std::unique_ptr<AES_KEY> aesKey(get_AES_dec_key(key));
+        value =
+            decrypt_AES_CMC(std::string(eValueBytes,
+                                     static_cast<unsigned int>(eValueLen)),
+                            aesKey.get(), true);
+    }
 
 #if MYSQL_S
-    char *const res = new char[value.length()];
+    char *const res = new char[value.get().length()];
     initid->ptr = res;
-    memcpy(res, value.data(), value.length());
-    *length = value.length();
+    memcpy(res, value.get().data(), value.get().length());
+    *length = value.get().length();
     return initid->ptr;
 #else
     bytea *const res = (bytea *) palloc(eValueLen+VARHDRSZ);

@@ -398,6 +398,8 @@ onionlayout FieldMeta::determineOnionLayout(const AES_KEY *const m_key,
     }
 }
 
+// mysql is handling default values for fields with implicit defaults that
+// allow NULL; these implicit defaults being NULL.
 bool FieldMeta::determineHasDefault(const Create_field *const cf)
 {
     return cf->def || cf->flags & NOT_NULL_FLAG;
