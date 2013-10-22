@@ -218,21 +218,26 @@ Datum
 decrypt_int_sem(PG_FUNCTION_ARGS)
 #endif
 {
-    AssignOnce<uint64_t> value;
+    AssignFirst<uint64_t> value;
     if (NULL == ARGS->args[0]) {
         value = 0;
         *is_null = 1;
     } else {
-        const uint64_t eValue = getui(ARGS, 0);
+        try {
+            const uint64_t eValue = getui(ARGS, 0);
 
-        uint64_t keyLen;
-        char *const keyBytes = getba(args, 1, keyLen);
-        const std::string key = std::string(keyBytes, keyLen);
+            uint64_t keyLen;
+            char *const keyBytes = getba(args, 1, keyLen);
+            const std::string key = std::string(keyBytes, keyLen);
 
-        const uint64_t salt = getui(args, 2);
+            const uint64_t salt = getui(args, 2);
 
-        blowfish bf(key);
-        value = bf.decrypt(eValue) ^ salt;
+            blowfish bf(key);
+            value = bf.decrypt(eValue) ^ salt;
+        } catch (const CryptoError &e) {
+            std::cerr << e.msg << std::endl;
+            value = 0;
+        }
     }
 
     //cerr << "udf: encVal " << eValue << " key " << (int)key[0] << " " << (int)key[1] << " " << (int) key[3]  << " salt " << salt  << " obtains: " << value << " and cast to ulonglong " << (ulonglong) value << "\n";
@@ -264,21 +269,26 @@ Datum
 decrypt_int_det(PG_FUNCTION_ARGS)
 #endif
 {
-    AssignOnce<uint64_t> value;
+    AssignFirst<uint64_t> value;
     if (NULL == ARGS->args[0]) {
         value = 0;
         *is_null = 1;
     } else {
-        const uint64_t eValue = getui(ARGS, 0);
+        try {
+            const uint64_t eValue = getui(ARGS, 0);
 
-        uint64_t keyLen;
-        char *const keyBytes = getba(args, 1, keyLen);
-        const std::string key = std::string(keyBytes, keyLen);
+            uint64_t keyLen;
+            char *const keyBytes = getba(args, 1, keyLen);
+            const std::string key = std::string(keyBytes, keyLen);
 
-        const uint64_t shift = getui(ARGS, 2);
+            const uint64_t shift = getui(ARGS, 2);
 
-        blowfish bf(key);
-        value = bf.decrypt(eValue) - shift;
+            blowfish bf(key);
+            value = bf.decrypt(eValue) - shift;
+        } catch (const CryptoError &e) {
+            std::cerr << e.msg << std::endl;
+            value = 0;
+        }
     }
 
 
