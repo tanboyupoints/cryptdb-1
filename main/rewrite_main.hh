@@ -34,7 +34,7 @@
 extern std::string global_crash_point;
 
 void
-crashTest(std::string current_point);
+crashTest(const std::string &current_point);
 
 class FieldReturned {
 public:

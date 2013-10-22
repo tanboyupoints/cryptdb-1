@@ -53,16 +53,20 @@ class TestConfig {
 
 struct Query {
     std::string query;
-    std::string crash_point;
+    std::vector<std::string> crash_points;
 
     Query(const std::string &q) {
         query = q;
-	crash_point = "";
     }
 
     Query(const std::string &q, const std::string &cp) {
         query = q;
-        crash_point = cp;
+        crash_points.push_back(cp);
+    }
+
+    Query(const std::string &q, const std::vector<std::string> &cps) {
+        query = q;
+        crash_points = cps;
     }
 };
 
