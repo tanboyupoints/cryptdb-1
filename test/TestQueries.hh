@@ -59,11 +59,9 @@ struct QueryList {
     QueryList(std::string namearg,
               std::vector<Query> pc,
               std::vector<Query> sc,
-              std::vector<Query> mc,
               std::vector<Query> c,
               std::vector<Query> pd,
-              std::vector<Query> sd,
-              std::vector<Query> md)
+              std::vector<Query> sd)
         : name(namearg),
           create(pc, sc),
           common(c),
