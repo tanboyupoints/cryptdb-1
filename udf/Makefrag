@@ -1,6 +1,8 @@
 OBJDIRS	+= udf
 
-all:    $(OBJDIR)/udf/edb.so
+all: udf
+
+udf:    $(OBJDIR)/udf/edb.so
 
 $(OBJDIR)/udf/edb.so: $(OBJDIR)/udf/edb.o \
 		      $(OBJDIR)/libedbcrypto.so \
