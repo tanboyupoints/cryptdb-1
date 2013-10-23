@@ -8,13 +8,18 @@ CXXFLAGS := -g -O0 -fno-strict-aliasing -fno-rtti -fwrapv -fPIC \
 	    -Wno-deprecated \
 	    -Wmissing-declarations -Woverloaded-virtual  \
 	    -Wunreachable-code -D_GNU_SOURCE -std=c++0x -I$(TOP)
-LDFLAGS  := -L$(TOP)/$(OBJDIR) -Wl,-rpath=$(TOP)/$(OBJDIR) -Wl,-rpath=$(TOP)
+LDFLAGS  := -L$(TOP)/$(OBJDIR)
 # Use this flag if you need to root out undefined reference problems
 # occuring at runtime.
 # -Wl,--no-undefined
 
 ## Copy conf/config.mk.sample to conf/config.mk and adjust accordingly.
 include conf/config.mk
+
+## Use RPATH only for debug builds; set RPATH=1 in config.mk.
+ifeq ($(RPATH),1)
+LDFLAGS += -Wl,-rpath=$(TOP)/$(OBJDIR) -Wl,-rpath=$(TOP)
+endif
 
 CXXFLAGS += -I$(MYBUILD)/include \
 	    -I$(MYSRC)/include \
