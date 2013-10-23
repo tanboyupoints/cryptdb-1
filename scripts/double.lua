@@ -170,9 +170,10 @@ function exec_q()
     local c = init()
     -- failure loop
     if nil == c then
+        io.stderr:write("\nERROR: failed to connect to cryptdb\n\n")
         while true do
             local _ = linda:receive(1.0, QUERY_QUEUE)
-            linda:send(RESULTS_QUEUE, "failed to connect to cryptdb")
+            linda:send(RESULTS_QUEUE, nil)
         end
     end
 
