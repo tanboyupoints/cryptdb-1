@@ -422,7 +422,7 @@ RND_int::decrypt(Item * const ctext, uint64_t IV) const
 }
 
 static udf_func u_decRNDInt = {
-    LEXSTRING("decrypt_int_sem"),
+    LEXSTRING("cryptdb_decrypt_int_sem"),
     INT_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -515,7 +515,7 @@ RND_str::decrypt(Item * const ctext, uint64_t IV) const
 
 //TODO; make edb.cc udf naming consistent with these handlers
 static udf_func u_decRNDString = {
-    LEXSTRING("decrypt_text_sem"),
+    LEXSTRING("cryptdb_decrypt_text_sem"),
     STRING_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -611,7 +611,7 @@ public:
 };
 
 static udf_func u_decDETInt = {
-    LEXSTRING("decrypt_int_det"),
+    LEXSTRING("cryptdb_decrypt_int_det"),
     INT_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -946,7 +946,7 @@ DET_str::decrypt(Item * const ctext, uint64_t IV) const
 }
 
 static udf_func u_decDETStr = {
-    LEXSTRING("decrypt_text_det"),
+    LEXSTRING("cryptdb_decrypt_text_det"),
     STRING_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -1592,7 +1592,7 @@ HOM::decrypt(Item * const ctext, uint64_t IV) const
 }
 
 static udf_func u_sum_a = {
-    LEXSTRING("agg"),
+    LEXSTRING("cryptdb_agg"),
     STRING_RESULT,
     UDFTYPE_AGGREGATE,
     NULL,
@@ -1606,7 +1606,7 @@ static udf_func u_sum_a = {
 };
 
 static udf_func u_sum_f = {
-    LEXSTRING("func_add_set"),
+    LEXSTRING("cryptdb_func_add_set"),
     STRING_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -1750,7 +1750,7 @@ Search::decrypt(Item * const ctext, uint64_t IV) const
 }
 
 static udf_func u_search = {
-    LEXSTRING("searchSWP"),
+    LEXSTRING("cryptdb_searchSWP"),
     INT_RESULT,
     UDFTYPE_FUNCTION,
     NULL,

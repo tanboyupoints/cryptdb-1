@@ -26,71 +26,55 @@ typedef long long longlong;
 #include <mysql/mysql.h>
 #include <ctype.h>
 
-my_bool
-decrypt_int_sem_init(UDF_INIT *const initid, UDF_ARGS *const args,
-                     char *const message);
-ulonglong
-decrypt_int_sem(UDF_INIT *const initid, UDF_ARGS *const args,
-                char *const is_null, char *const error);
+my_bool   cryptdb_decrypt_int_sem_init(UDF_INIT *const initid,
+                                       UDF_ARGS *const args,
+                                       char *const message);
+ulonglong cryptdb_decrypt_int_sem(UDF_INIT *const initid,
+                                  UDF_ARGS *const args,
+                                  char *const is_null, char *const error);
 
-my_bool
-decrypt_int_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
-                     char *const message);
-ulonglong
-decrypt_int_det(UDF_INIT *const initid, UDF_ARGS *const args,
-                char *const is_null, char *const error);
+my_bool   cryptdb_decrypt_int_det_init(UDF_INIT *const initid,
+                                       UDF_ARGS *const args,
+                                       char *const message);
+ulonglong cryptdb_decrypt_int_det(UDF_INIT *const initid, UDF_ARGS *const args,
+                                  char *const is_null, char *const error);
 
-my_bool
-decrypt_text_sem_init(UDF_INIT *const initid,
-                      UDF_ARGS *const args, char *const message);
-void
-decrypt_text_sem_deinit(UDF_INIT *const initid);
-char *
-decrypt_text_sem(UDF_INIT *const initid, UDF_ARGS *const args,
-                 char *const result, unsigned long *const length,
-                 char *const is_null, char *const error);
+my_bool   cryptdb_decrypt_text_sem_init(UDF_INIT *const initid,
+                                        UDF_ARGS *const args, char *const message);
+void      cryptdb_decrypt_text_sem_deinit(UDF_INIT *const initid);
+char *    cryptdb_decrypt_text_sem(UDF_INIT *const initid, UDF_ARGS *const args,
+                                   char *const result, unsigned long *const length,
+                                   char *const is_null, char *const error);
 
-my_bool
-decrypt_text_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
-                      char *const message);
-void
-decrypt_text_det_deinit(UDF_INIT *const initid);
-char *
-decrypt_text_det(UDF_INIT *const initid, UDF_ARGS *const args,
-                 char *const result, unsigned long *const length,
-                 char *const is_null, char *const error);
+my_bool   cryptdb_decrypt_text_det_init(UDF_INIT *const initid,
+                                        UDF_ARGS *const args,
+                                        char *const message);
+void      cryptdb_decrypt_text_det_deinit(UDF_INIT *const initid);
+char *    cryptdb_decrypt_text_det(UDF_INIT *const initid, UDF_ARGS *const args,
+                                   char *const result, unsigned long *const length,
+                                   char *const is_null, char *const error);
 
-my_bool
-searchSWP_init(UDF_INIT *const initid, UDF_ARGS *const args,
-               char *const message);
-void
-searchSWP_deinit(UDF_INIT *const initid);
-ulonglong
-searchSWP(UDF_INIT *const initid, UDF_ARGS *const args,
-          char *const is_null, char *const error);
+my_bool   cryptdb_searchSWP_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                                 char *const message);
+void      cryptdb_searchSWP_deinit(UDF_INIT *const initid);
+ulonglong cryptdb_searchSWP(UDF_INIT *const initid, UDF_ARGS *const args,
+                            char *const is_null, char *const error);
 
-my_bool
-agg_init(UDF_INIT *const initid, UDF_ARGS *const args,
-         char *const message);
-void
-agg_deinit(UDF_INIT *const initid);
-void
-agg_clear(UDF_INIT *const initid, char *const is_null,
-          char *const error);
-my_bool
-agg_add(UDF_INIT *const initid, UDF_ARGS *const args,
-        char *const is_null, char *const error);
-char *
-agg(UDF_INIT *const initid, UDF_ARGS *const args,
-    char *const result, unsigned long *const length,
-    char *const is_null, char *const error);
+my_bool   cryptdb_agg_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                           char *const message);
+void      cryptdb_agg_deinit(UDF_INIT *const initid);
+void      cryptdb_agg_clear(UDF_INIT *const initid, char *const is_null,
+                            char *const error);
+my_bool   cryptdb_agg_add(UDF_INIT *const initid, UDF_ARGS *const args,
+                          char *const is_null, char *const error);
+char *    cryptdb_agg(UDF_INIT *const initid, UDF_ARGS *const args,
+                      char *const result, unsigned long *const length,
+                      char *const is_null, char *const error);
 
-void
-func_add_set_deinit(UDF_INIT *const initid);
-char *
-func_add_set(UDF_INIT *const initid, UDF_ARGS *const args,
-             char *const result, unsigned long *const length,
-             char *const is_null, char *const error);
+void      cryptdb_func_add_set_deinit(UDF_INIT *const initid);
+char *    cryptdb_func_add_set(UDF_INIT *const initid, UDF_ARGS *const args,
+                               char *const result, unsigned long *const length,
+                               char *const is_null, char *const error);
 } /* extern "C" */
 
 
@@ -163,16 +147,16 @@ getba(UDF_ARGS *const args, int i, uint64_t &len)
 }
 
 my_bool
-decrypt_int_sem_init(UDF_INIT *const initid, UDF_ARGS *const args,
-                     char *const message)
+cryptdb_decrypt_int_sem_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                             char *const message)
 {
     initid->maybe_null = 1;
     return 0;
 }
 
 ulonglong
-decrypt_int_sem(UDF_INIT *const initid, UDF_ARGS *const args,
-                char *const is_null, char *const error)
+cryptdb_decrypt_int_sem(UDF_INIT *const initid, UDF_ARGS *const args,
+                        char *const is_null, char *const error)
 {
     AssignFirst<uint64_t> value;
     if (NULL == args->args[0]) {
@@ -205,16 +189,16 @@ decrypt_int_sem(UDF_INIT *const initid, UDF_ARGS *const args,
 
 
 my_bool
-decrypt_int_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
-                     char *const message)
+cryptdb_decrypt_int_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                             char *const message)
 {
     initid->maybe_null = 1;
     return 0;
 }
 
 ulonglong
-decrypt_int_det(UDF_INIT *const initid, UDF_ARGS *const args,
-                char *const is_null, char *const error)
+cryptdb_decrypt_int_det(UDF_INIT *const initid, UDF_ARGS *const args,
+                        char *const is_null, char *const error)
 {
     AssignFirst<uint64_t> value;
     if (NULL == args->args[0]) {
@@ -245,15 +229,15 @@ decrypt_int_det(UDF_INIT *const initid, UDF_ARGS *const args,
 
 
 my_bool
-decrypt_text_sem_init(UDF_INIT *const initid, UDF_ARGS *const args,
-                      char *const message)
+cryptdb_decrypt_text_sem_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                              char *const message)
 {
     initid->maybe_null = 1;
     return 0;
 }
 
 void
-decrypt_text_sem_deinit(UDF_INIT *const initid)
+cryptdb_decrypt_text_sem_deinit(UDF_INIT *const initid)
 {
     /*
      * in mysql-server/sql/item_func.cc, udf_handler::fix_fields
@@ -264,9 +248,9 @@ decrypt_text_sem_deinit(UDF_INIT *const initid)
 }
 
 char *
-decrypt_text_sem(UDF_INIT *const initid, UDF_ARGS *const args,
-                 char *const result, unsigned long *const length,
-                 char *const is_null, char *const error)
+cryptdb_decrypt_text_sem(UDF_INIT *const initid, UDF_ARGS *const args,
+                         char *const result, unsigned long *const length,
+                         char *const is_null, char *const error)
 {
     AssignFirst<std::string> value;
     if (NULL == args->args[0]) {
@@ -305,14 +289,14 @@ decrypt_text_sem(UDF_INIT *const initid, UDF_ARGS *const args,
 
 
 my_bool
-decrypt_text_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
-                      char *const message)
+cryptdb_decrypt_text_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                              char *const message)
 {
     return 0;
 }
 
 void
-decrypt_text_det_deinit(UDF_INIT *const initid)
+cryptdb_decrypt_text_det_deinit(UDF_INIT *const initid)
 {
     /*
      * in mysql-server/sql/item_func.cc, udf_handler::fix_fields
@@ -323,9 +307,9 @@ decrypt_text_det_deinit(UDF_INIT *const initid)
 }
 
 char *
-decrypt_text_det(UDF_INIT *const initid, UDF_ARGS *const args,
-                 char *const result, unsigned long *const length,
-                 char *const is_null, char *const error)
+cryptdb_decrypt_text_det(UDF_INIT *const initid, UDF_ARGS *const args,
+                         char *const result, unsigned long *const length,
+                         char *const is_null, char *const error)
 {
     AssignFirst<std::string> value;
     if (NULL == args->args[0]) {
@@ -367,8 +351,8 @@ decrypt_text_det(UDF_INIT *const initid, UDF_ARGS *const args,
 
 
 my_bool
-searchSWP_init(UDF_INIT *const initid, UDF_ARGS *const args,
-               char *const message)
+cryptdb_searchSWP_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                       char *const message)
 {
     Token *const t = new Token();
 
@@ -387,15 +371,15 @@ searchSWP_init(UDF_INIT *const initid, UDF_ARGS *const args,
 }
 
 void
-searchSWP_deinit(UDF_INIT *const initid)
+cryptdb_searchSWP_deinit(UDF_INIT *const initid)
 {
     Token *const t = reinterpret_cast<Token *>(initid->ptr);
     delete t;
 }
 
 ulonglong
-searchSWP(UDF_INIT *const initid, UDF_ARGS *const args,
-          char *const is_null, char *const error)
+cryptdb_searchSWP(UDF_INIT *const initid, UDF_ARGS *const args,
+                  char *const is_null, char *const error)
 {
     uint64_t allciphLen;
     char *const allciph = getba(args, 0, allciphLen);
@@ -415,7 +399,8 @@ struct agg_state {
 };
 
 my_bool
-agg_init(UDF_INIT *const initid, UDF_ARGS *const args, char *const message)
+cryptdb_agg_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                 char *const message)
 {
     std::cerr << "in agg_init \n";
     agg_state *const as = new agg_state();
@@ -427,7 +412,7 @@ agg_init(UDF_INIT *const initid, UDF_ARGS *const args, char *const message)
 }
 
 void
-agg_deinit(UDF_INIT *const initid)
+cryptdb_agg_deinit(UDF_INIT *const initid)
 {
     agg_state *const as = reinterpret_cast<agg_state *>(initid->ptr);
     free(as->rbuf);
@@ -437,7 +422,7 @@ agg_deinit(UDF_INIT *const initid)
 // When we want to add by zero for HOM values we can multiply our value
 // by 1.
 void
-agg_clear(UDF_INIT *const initid, char *const is_null, char *const error)
+cryptdb_agg_clear(UDF_INIT *const initid, char *const is_null, char *const error)
 {
     agg_state *const as = reinterpret_cast<agg_state *>(initid->ptr);
     as->sum = to_ZZ(1);
@@ -446,8 +431,8 @@ agg_clear(UDF_INIT *const initid, char *const is_null, char *const error)
 
 //args will be element to add, constant N2
 my_bool
-agg_add(UDF_INIT *const initid, UDF_ARGS *const args, char *const is_null,
-        char *const error)
+cryptdb_agg_add(UDF_INIT *const initid, UDF_ARGS *const args,
+                char *const is_null, char *const error)
 {
     //cerr << "in agg_add \n";
     agg_state *const as = reinterpret_cast<agg_state *>(initid->ptr);
@@ -476,8 +461,8 @@ agg_add(UDF_INIT *const initid, UDF_ARGS *const args, char *const is_null,
 }
 
 char *
-agg(UDF_INIT *const initid, UDF_ARGS *const args, char *const result,
-    unsigned long *const length, char *const is_null, char *const error)
+cryptdb_agg(UDF_INIT *const initid, UDF_ARGS *const args, char *const result,
+            unsigned long *const length, char *const is_null, char *const error)
 {
     agg_state *const as = reinterpret_cast<agg_state *>(initid->ptr);
     BytesFromZZ(static_cast<uint8_t *>(as->rbuf), as->sum,
@@ -490,16 +475,16 @@ agg(UDF_INIT *const initid, UDF_ARGS *const args, char *const result,
 // > UNUSED
 
 void
-func_add_set_deinit(UDF_INIT *const initid)
+cryptdb_func_add_set_deinit(UDF_INIT *const initid)
 {
     if (initid->ptr)
         free(initid->ptr);
 }
 
 char *
-func_add_set(UDF_INIT *const initid, UDF_ARGS *const args,
-             char *const result, unsigned long *const length,
-             char *const is_null, char *const error)
+cryptdb_func_add_set(UDF_INIT *const initid, UDF_ARGS *const args,
+                     char *const result, unsigned long *const length,
+                     char *const is_null, char *const error)
 {
     if (initid->ptr)
         free(initid->ptr);
