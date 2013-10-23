@@ -547,7 +547,7 @@ cryptdb_version(UDF_INIT *const initid, UDF_ARGS *const args,
                 char *const result, unsigned long *const length,
                 char *const is_null, char *const error)
 {
-    std::string value(cryptdb_version_string);
+    const std::string value(cryptdb_version_string);
     char *const res = new char[value.length()];
     initid->ptr = res;
     memcpy(res, value.data(), value.length());
