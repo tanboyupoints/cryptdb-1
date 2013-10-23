@@ -48,6 +48,9 @@ doc:
 whitespace:
 	find . -name '*.cc' -o -name '*.hh' -type f -exec sed -i 's/ *$//' '{}' ';'
 
+.PHONY: always
+always:
+
 # Eliminate default suffix rules
 .SUFFIXES:
 
@@ -58,6 +61,10 @@ whitespace:
 .PRECIOUS: %.o
 
 $(OBJDIR)/%.o: %.cc
+	@mkdir -p $(@D)
+	$(CXX) -MD $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/%.o: $(OBJDIR)/%.cc
 	@mkdir -p $(@D)
 	$(CXX) -MD $(CXXFLAGS) -c $< -o $@
 

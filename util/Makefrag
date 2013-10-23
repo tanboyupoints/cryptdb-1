@@ -1,5 +1,5 @@
 OBJDIRS += util
-UTILSRC := onions.cc cryptdb_log.cc ctr.cc util.cc
+UTILSRC := onions.cc cryptdb_log.cc ctr.cc util.cc version.cc
 
 all:    $(OBJDIR)/libedbutil.so
 $(OBJDIR)/libedbutil.so: $(patsubst %.cc,$(OBJDIR)/util/%.o,$(UTILSRC))
@@ -10,5 +10,12 @@ install: install_util
 .PHONY: install_util
 install_util: $(OBJDIR)/libedbutil.so
 	install -m 644 $(OBJDIR)/libedbutil.so /usr/lib
+
+$(OBJDIR)/util/version.cc: always
+	@mkdir -p $(@D)
+	echo "#include <util/version.hh>" > $@.tmp
+	( REL="$$(git describe --always --long --dirty=+dirty)" ; \
+	  echo "const char* cryptdb_version = \"$$REL\";" >> $@.tmp )
+	cmp -s $@.tmp $@ || mv $@.tmp $@
 
 # vim: set noexpandtab:
