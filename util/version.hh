@@ -1,1 +1,1 @@
-extern const char* cryptdb_version;
+extern const char* cryptdb_version_string;

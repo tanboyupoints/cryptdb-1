@@ -15,6 +15,7 @@
 #include <crypto/paillier.hh>
 #include <util/params.hh>
 #include <util/util.hh>
+#include <util/version.hh>
 
 using namespace NTL;
 
@@ -75,6 +76,13 @@ void      cryptdb_func_add_set_deinit(UDF_INIT *const initid);
 char *    cryptdb_func_add_set(UDF_INIT *const initid, UDF_ARGS *const args,
                                char *const result, unsigned long *const length,
                                char *const is_null, char *const error);
+
+my_bool   cryptdb_version_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                               char *const message);
+void      cryptdb_version_deinit(UDF_INIT *const initid);
+char *    cryptdb_version(UDF_INIT *const initid, UDF_ARGS *const args,
+                          char *const result, unsigned long *const length,
+                          char *const is_null, char *const error);
 } /* extern "C" */
 
 
@@ -517,4 +525,33 @@ cryptdb_func_add_set(UDF_INIT *const initid, UDF_ARGS *const args,
 
     *length = static_cast<long unsigned int>(out_len.get());
     return initid->ptr;
+}
+
+my_bool
+cryptdb_version_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                     char *const message)
+{
+    initid->maybe_null = 0;
+    return 0;
+}
+
+void
+cryptdb_version_deinit(UDF_INIT *const initid)
+{
+    if (initid->ptr)
+        delete[] initid->ptr;
+}
+
+char *
+cryptdb_version(UDF_INIT *const initid, UDF_ARGS *const args,
+                char *const result, unsigned long *const length,
+                char *const is_null, char *const error)
+{
+    std::string value(cryptdb_version_string);
+    char *const res = new char[value.length()];
+    initid->ptr = res;
+    memcpy(res, value.data(), value.length());
+    *length = value.length();
+
+    return static_cast<char*>(initid->ptr);
 }

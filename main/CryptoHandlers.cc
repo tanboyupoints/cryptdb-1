@@ -1840,6 +1840,20 @@ PlainText::doSerialize() const
     return std::string("");
 }
 
+static udf_func u_cryptdb_version = {
+    LEXSTRING("cryptdb_version"),
+    STRING_RESULT,
+    UDFTYPE_FUNCTION,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0L,
+};
+
 const std::vector<udf_func*> udf_list = {
     &u_decRNDInt,
     &u_decRNDString,
@@ -1847,6 +1861,7 @@ const std::vector<udf_func*> udf_list = {
     &u_decDETStr,
     &u_sum_f,
     &u_sum_a,
-    &u_search
+    &u_search,
+    &u_cryptdb_version
 };
 
