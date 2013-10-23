@@ -21,7 +21,6 @@ public:
     std::vector<std::string> names;
     std::vector<enum_field_types> types;
     std::vector<std::vector<std::shared_ptr<Item> > > rows;
-    AutoInc ai;
 
     explicit ResType(bool okflag = true) : ok(okflag) {}
     bool success() const {return this->ok;}

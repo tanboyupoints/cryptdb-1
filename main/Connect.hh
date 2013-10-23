@@ -12,6 +12,8 @@
 #include <util/util.hh>
 #include <parser/sql_utils.hh>
 
+#include <mysql.h>
+typedef MYSQL_RES DBResult_native;
 
 extern "C" void *create_embedded_thd(int client_flag);
 

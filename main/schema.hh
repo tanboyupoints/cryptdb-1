@@ -235,3 +235,6 @@ private:
     }
 } SchemaInfo;
 
+bool
+IsMySQLTypeNumeric(enum_field_types t);
+

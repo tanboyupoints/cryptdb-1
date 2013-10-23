@@ -37,24 +37,6 @@ throw (CryptDBError)
     }
 }
 
-bool
-IsMySQLTypeNumeric(enum_field_types t) {
-    switch (t) {
-        case MYSQL_TYPE_DECIMAL:
-        case MYSQL_TYPE_TINY:
-        case MYSQL_TYPE_SHORT:
-        case MYSQL_TYPE_LONG:
-        case MYSQL_TYPE_FLOAT:
-        case MYSQL_TYPE_DOUBLE:
-        case MYSQL_TYPE_LONGLONG:
-        case MYSQL_TYPE_INT24:
-        case MYSQL_TYPE_NEWDECIMAL:
-            return true;
-        default: return false;
-    }
-}
-
-
 double
 timeInSec(struct timeval tvstart, struct timeval tvend)
 {

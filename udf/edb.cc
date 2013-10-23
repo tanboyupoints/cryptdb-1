@@ -39,7 +39,8 @@ extern "C" {
 
 typedef unsigned long long ulonglong;
 typedef long long longlong;
-#include <mysql.h>
+// Use the standard mysql dev headers.
+#include <mysql/mysql.h>
 #include <ctype.h>
 
 my_bool decrypt_int_sem_init(UDF_INIT *const initid, UDF_ARGS *const args,

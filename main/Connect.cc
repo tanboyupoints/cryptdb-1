@@ -15,6 +15,7 @@
 #include <main/Connect.hh>
 #include <main/macro_util.hh>
 #include <util/cryptdb_log.hh>
+#include <main/schema.hh>
 
 Connect::Connect(const std::string &server, const std::string &user,
                  const std::string &passwd, uint port)

@@ -1,5 +1,6 @@
 #include <main/CryptoHandlers.hh>
 #include <main/macro_util.hh>
+#include <main/schema.hh>
 #include <parser/lex_util.hh>
 #include <crypto/ope.hh>
 #include <crypto/BasicCrypto.hh>

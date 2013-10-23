@@ -81,21 +81,6 @@ const std::set<std::string> annotations =
 
 // ============= DATA STRUCTURES ===================================//
 
-#if MYSQL_S
-#include "mysql.h"
-typedef MYSQL_RES DBResult_native;
-#else
-#include "libpq-fe.h"
-typedef PGresult DBResult_native;
-#endif
-
-
-
-typedef struct AutoInc {
-    AutoInc(std::string fieldval=""):incvalue(0), field(fieldval) {}
-    my_ulonglong incvalue;
-    std::string field;
-} AutoInc;
 
 const std::string BASE_SALT_NAME = "cdb_salt";
 typedef uint64_t salt_type;
@@ -191,9 +176,6 @@ typedef struct TempMKM {
 } TMKM;
 
 //=============  Useful functions =========================//
-
-bool
-IsMySQLTypeNumeric(enum_field_types t);
 
 // extracts (nobytes) bytes from int by placing the most significant bits at
 // the end
