@@ -3,11 +3,11 @@
 #
 OBJDIRS	+= scripts
 
-all : obj/scripts/procs obj/scripts/locklib.so
+all: $(OBJDIR)/scripts/procs $(OBJDIR)/scripts/locklib.so
 
-$(OBJDIR)/scripts/procs : obj/scripts/procs.o
+$(OBJDIR)/scripts/procs: $(OBJDIR)/scripts/procs.o $(OBJDIR)/libcryptdb.so
 	$(CXX) $< -o $@ -ledbparser $(LDFLAGS) -ledbcrypto -ledbutil -lcryptdb
 
-$(OBJDIR)/scripts/locklib.so : scripts/locklib.c
+$(OBJDIR)/scripts/locklib.so: scripts/locklib.c
 	$(CXX) -shared -fpic -o $@ $^ -llua5.1
 
