@@ -15,7 +15,7 @@ $(OBJDIR)/util/version.cc: always
 	@mkdir -p $(@D)
 	echo "#include <util/version.hh>" > $@.tmp
 	( REL="$$(git describe --always --long --dirty=+dirty)" ; \
-	  echo "const char* cryptdb_version = \"$$REL\";" >> $@.tmp )
+	  echo "const char* cryptdb_version_string = \"$$REL\";" >> $@.tmp )
 	cmp -s $@.tmp $@ || mv $@.tmp $@
 
 # vim: set noexpandtab:
