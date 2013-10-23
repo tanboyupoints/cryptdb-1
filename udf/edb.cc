@@ -51,13 +51,6 @@ decrypt_text_sem(UDF_INIT *const initid, UDF_ARGS *const args,
                  char *const is_null, char *const error);
 
 my_bool
-encrypt_int_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
-                     char *const message);
-ulonglong
-encrypt_int_det(UDF_INIT *const initid, UDF_ARGS *const args,
-                char *const is_null, char *const error);
-
-my_bool
 decrypt_text_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
                       char *const message);
 void
@@ -308,31 +301,6 @@ decrypt_text_sem(UDF_INIT *const initid, UDF_ARGS *const args,
     *length = value.get().length();
 
     return static_cast<char*>(initid->ptr);
-}
-
-
-
-my_bool
-encrypt_int_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
-                     char *const message)
-{
-    return 0;
-}
-
-ulonglong
-encrypt_int_det(UDF_INIT *const initid, UDF_ARGS *const args,
-                char *const is_null, char *const error)
-{
-    const uint64_t eValue = getui(args, 0);
-
-    uint64_t keyLen;
-    char *const keyBytes = getba(args, 1, keyLen);
-    const std::string key = std::string(keyBytes, keyLen);
-
-    blowfish bf(key);
-    const uint64_t value = bf.encrypt(eValue);
-
-    return static_cast<ulonglong>(value);
 }
 
 
