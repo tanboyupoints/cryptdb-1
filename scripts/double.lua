@@ -48,15 +48,18 @@ function disconnect_client()
 end
 
 function read_query(packet)
-    local query = string.sub(packet, 2)
-    if string.byte(packet) == proxy.COM_INIT_DB then
-        query = "USE " .. query
-    end
-    packet = string.char(proxy.COM_QUERY) .. query
+    local query  = string.sub(packet, 2)
 
-    -- HACK: that turns off strict mode for wordpress because
+    -- don't acquire lock or do anything with cryptdb if the query is blank
+    -- > must be handled seperately because a blank query doesn't properly
+    -- trigger 'read_query_result(...)'
+    if 0 == string.len(query:gsub("%s+", "")) then
+        return nil
+    end
+
+    -- HACK: turns off strict mode for wordpress because
     -- the testing database runs in strict mode.
-    proxy.queries:append(42, packet, {resultset_is_needed = true})
+    -- > Don't send to CryptDB.
     if true == new_session then
         mode = "SET @@session.sql_mode := ''"
         proxy.queries:append(1337, string.char(proxy.COM_QUERY) .. mode,
@@ -64,10 +67,24 @@ function read_query(packet)
         new_session = false
     end
 
-    -- acquire lock
+    local cryptdb_query
+    -- acquire lock and build queries
     status, lock_fd = locklib.acquire_lock(LOCK_FILE)
     if false == status then
+        local do0    = "do 0"
+        local noop_q = string.char(proxy.COM_QUERY) .. do0
+
         lock_fd = nil
+        cryptdb_query = do0
+        proxy.queries:append(0xdead, noop_q, {resultset_is_needed = true})
+    else
+        if string.byte(packet) == proxy.COM_INIT_DB then
+            cryptdb_query = "USE " .. query
+        else
+            cryptdb_query = query
+        end
+
+        proxy.queries:append(42, packet, {resultset_is_needed = true})
     end
 
     -- Clear the queues
@@ -75,7 +92,7 @@ function read_query(packet)
     linda:set(RESULTS_QUEUE)
 
     -- Send the new query
-    linda:send(QUERY_QUEUE, query)
+    linda:send(QUERY_QUEUE, cryptdb_query)
     return proxy.PROXY_SEND_QUERY
 end
 
@@ -86,9 +103,13 @@ function read_query_result(inj)
     local out_status = nil
 
     if nil == lock_fd then
-        log_file_h:write(create_log_entry(client_name, query, false,
-                                         false, "lock acquisition failed"))
-        log_file_h:flush()
+        if log_file_h then
+            log_file_h:write(create_log_entry(client_name, query, false,
+                                             false,
+                                             "lock acquisition failed"))
+            log_file_h:flush()
+        end
+
         return
     end
 
@@ -108,6 +129,8 @@ function read_query_result(inj)
         -- for UPDATE and DDL queries.
         out_status =
             get_match_text(cryptdb_results == inj.resultset.affected_rows)
+    elseif nil == inj.resultset.rows then
+        out_status = "no result data from regular db"
     else
         -- do the naive comparison while gathering regular results,
         -- then if it fails, do the slow comparison
@@ -140,9 +163,12 @@ function read_query_result(inj)
         end
     end
 
-    log_file_h:write(create_log_entry(client_name, query, cryptdb_error,
-                                      regular_error, out_status))
-    log_file_h:flush()
+    if log_file_h then
+        log_file_h:write(create_log_entry(client_name, query,
+                                          cryptdb_error, regular_error,
+                                          out_status))
+        log_file_h:flush()
+    end
 
     -- release lock
     assert(lock_fd)
