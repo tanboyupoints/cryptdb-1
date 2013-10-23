@@ -68,13 +68,6 @@ decrypt_text_det(UDF_INIT *const initid, UDF_ARGS *const args,
                  char *const is_null, char *const error);
 
 my_bool
-search_init(UDF_INIT *const initid, UDF_ARGS *const args,
-            char *const message);
-ulonglong
-search(UDF_INIT *const initid, UDF_ARGS *const args,
-       char *const is_null, char *const error);
-
-my_bool
 searchSWP_init(UDF_INIT *const initid, UDF_ARGS *const args,
                char *const message);
 void
@@ -403,58 +396,6 @@ decrypt_text_det(UDF_INIT *const initid, UDF_ARGS *const args,
  * search for word which is of the form len word_body where len is
  * the length of the word body
  */
-
-
-my_bool
-search_init(UDF_INIT *const initid, UDF_ARGS *const args,
-            char *const message)
-{
-    return 0;
-}
-
-
-ulonglong
-search(UDF_INIT *const initid, UDF_ARGS *const args, char *const is_null,
-       char *const error)
-{
-    uint64_t wordLen;
-    char *word = getba(args, 0, wordLen);
-    if (wordLen != static_cast<unsigned int>(word[0])) {
-        std::cerr << "ERR: wordLen is not equal to fist byte of word!!! ";
-    }
-    word = word + 1;     // +1 skips over the length field
-    //cerr << "given expr to search for has " << wordLen << " length \n";
-
-    uint64_t fieldLen;
-    char *const field = getba(args, 1, fieldLen);
-
-    //cerr << "searching for "; myPrint((unsigned char *)word, wordLen); cerr
-    // << " in field "; myPrint((unsigned char *)field, fieldLen); cerr <<
-    // "\n";
-
-    unsigned int i = 0;
-    while (i < fieldLen) {
-        const unsigned int currLen = static_cast<unsigned int>(field[i]);
-        if (currLen != wordLen) {
-            i = i + currLen+1;
-            continue;
-        }
-
-        //need to compare
-        unsigned int j;
-        for (j = 0; j < currLen; j++) {
-            if (field[i+j+1] != word[j]) {
-                break;
-            }
-        }
-        if (j == currLen) {
-            return 1;
-        }
-        i = i + currLen + 1;
-    }
-
-    return 0;
-}
 
 
 my_bool
