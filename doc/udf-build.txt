@@ -9,6 +9,7 @@ You will need these Ubuntu packages or their <other flavor> equivalent.
 
 Make CryptDB.
 > cd /path/to/cryptdb/
+> touch conf/config.mk
 > make udf
 
 Ideally you will stop mysql here, install the UDFs then restart mysql.
