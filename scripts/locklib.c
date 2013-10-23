@@ -25,12 +25,12 @@ acquire_lock(lua_State *const L)
         fprintf(stderr, "bad fd!\n");
         return 2;
     }
-    struct flock lock = {
-        .l_type      = F_WRLCK,
-        .l_whence    = SEEK_SET,
-        .l_start     = 0,
-        .l_len       = 0
-    };
+
+    struct flock lock = {};
+    lock.l_type      = F_WRLCK;
+    lock.l_whence    = SEEK_SET;
+    lock.l_start     = 0;
+    lock.l_len       = 0;
 
     const int res = fcntl(fd, F_SETLKW, &lock);
     if (-1 == res) {
@@ -61,9 +61,10 @@ static const struct luaL_reg locklib[] = {
     {NULL, NULL}
 };
 
-int
+extern "C" int
 luaopen_locklib(lua_State *L)
 {
     luaL_openlib(L, "locklib", locklib, 0);
     return 1;
 }
+
