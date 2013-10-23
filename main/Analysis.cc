@@ -312,9 +312,10 @@ dropAll(const std::unique_ptr<Connect> &conn)
     }
 }
 
-static void
-createAll(const std::unique_ptr<Connect> &conn)
+std::vector<std::string>
+getAllUDFs()
 {
+    std::vector<std::string> udfs;
     for (const udf_func * const u: udf_list) {
         std::stringstream ss;
         ss << "CREATE ";
@@ -326,7 +327,18 @@ createAll(const std::unique_ptr<Connect> &conn)
             default:            thrower() << "unknown return " << u->returns;
         }
         ss << " SONAME 'edb.so';";
-        assert_s(conn->execute(ss.str()), ss.str());
+        udfs.push_back(ss.str());
+    }
+
+    return udfs;
+}
+
+static void
+createAll(const std::unique_ptr<Connect> &conn)
+{
+    auto udfs = getAllUDFs();
+    for (auto it : udfs) {
+        assert_s(conn->execute(it), it);
     }
 }
 

@@ -452,3 +452,7 @@ lowLevelGetCurrentDatabase(const std::unique_ptr<Connect> &c,
 bool
 lowLevelSetCurrentDatabase(const std::unique_ptr<Connect> &c,
                            const std::string &db);
+
+std::vector<std::string>
+getAllUDFs();
+

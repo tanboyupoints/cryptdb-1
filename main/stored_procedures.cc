@@ -4,8 +4,8 @@
 #include <main/macro_util.hh>
 #include <main/metadata_tables.hh>
 
-static bool
-addStoredProcedures(const std::unique_ptr<Connect> &conn)
+std::vector<std::string>
+getStoredProcedures()
 {
     const std::string current_transaction_id =
         MetaData::Proc::currentTransactionID();
@@ -20,15 +20,15 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
         // ---------------------------------------
         //      def currentTransactionID(id)
         // ---------------------------------------
-        " CREATE PROCEDURE " + current_transaction_id +
-        "   (OUT out_id VARCHAR(20))"
-        " BEGIN"
-        "   SELECT trx_id INTO out_id FROM INFORMATION_SCHEMA.INNODB_TRX"
-        "    WHERE INFORMATION_SCHEMA.INNODB_TRX.TRX_MYSQL_THREAD_ID ="
-        "          (SELECT CONNECTION_ID())"
-        "      AND INFORMATION_SCHEMA.INNODB_TRX.TRX_STATE ="
-        "          'RUNNING';"
-        " END",
+        " CREATE PROCEDURE " + current_transaction_id + "\n"
+        "   (OUT out_id VARCHAR(20))\n"
+        " BEGIN\n"
+        "   SELECT trx_id INTO out_id FROM INFORMATION_SCHEMA.INNODB_TRX\n"
+        "    WHERE INFORMATION_SCHEMA.INNODB_TRX.TRX_MYSQL_THREAD_ID =\n"
+        "          (SELECT CONNECTION_ID())\n"
+        "      AND INFORMATION_SCHEMA.INNODB_TRX.TRX_STATE =\n"
+        "          'RUNNING';\n"
+        " END\n",
 
         // ----------------------------------------------
         //   def homAdditionTransaction(delete, insert)
@@ -56,83 +56,90 @@ addStoredProcedures(const std::unique_ptr<Connect> &conn)
             homAdditionTransction(). This should lead to consistent,
             expected behavior provided (*) is correct rationale.
         */
-        " CREATE PROCEDURE " + hom_addition_transaction +
-        "       (IN delete_query VARBINARY(50000),"
-        "        IN insert_query VARBINARY(50000))"
-        " BEGIN"
-        "   DECLARE old_transaction_id VARCHAR(20);"
+        " CREATE PROCEDURE " + hom_addition_transaction + "\n"
+        "       (IN delete_query VARBINARY(50000),\n"
+        "        IN insert_query VARBINARY(50000))\n"
+        " BEGIN\n"
+        "   DECLARE old_transaction_id VARCHAR(20);\n\n"
 
-        "   CALL " + current_transaction_id + " (old_transaction_id);"
+        "   CALL " + current_transaction_id + " (old_transaction_id);\n\n"
 
             // Start a transaction if necessary.
-        "   IF old_transaction_id IS NULL THEN"
-        "       START TRANSACTION;"
-        "   END IF;"
+        "   IF old_transaction_id IS NULL THEN\n"
+        "       START TRANSACTION;\n"
+        "   END IF;\n\n"
 
             // DELETE old values pertaining to WHERE clause
-        "   SET @query = delete_query;"
-        "   PREPARE dq FROM @query;"
-        "   EXECUTE dq;"
+        "   SET @query = delete_query;\n"
+        "   PREPARE dq FROM @query;\n"
+        "   EXECUTE dq;\n\n"
 
             // INSERT new values using subquery from temp table.
-        "   SET @query = insert_query;"
-        "   PREPARE iq FROM @query;"
-        "   EXECUTE iq;"
+        "   SET @query = insert_query;\n"
+        "   PREPARE iq FROM @query;\n"
+        "   EXECUTE iq;\n\n"
 
             // Close our transaction if we started one.
-        "   IF old_transaction_id IS NULL THEN"
-        "       COMMIT;"
-        "   END IF;"
-        " END",
+        "   IF old_transaction_id IS NULL THEN\n"
+        "       COMMIT;\n\n"
+        "   END IF;\n"
+        " END\n",
 
         // ---------------------------------------
         //         def adjustOnion(id)
         // ---------------------------------------
         // NOTE: If we need N queries, we will have to use an additional
         // table + cursors.
-        " CREATE PROCEDURE " + adjust_onion +
-        "       (IN completion_id INTEGER,"
-        "        IN adjust_query0 VARBINARY(500),"
-        "        IN adjust_query1 VARBINARY(500))"
-        " BEGIN"
-        "   DECLARE old_transaction_id VARCHAR(20);"
-        "   DECLARE b_reissue BOOLEAN;"
+        " CREATE PROCEDURE " + adjust_onion + "\n"
+        "       (IN completion_id INTEGER,\n"
+        "        IN adjust_query0 VARBINARY(500),\n"
+        "        IN adjust_query1 VARBINARY(500))\n"
+        " BEGIN\n"
+        "   DECLARE old_transaction_id VARCHAR(20);\n"
+        "   DECLARE b_reissue BOOLEAN;\n\n"
 
             // Are we in a transaction?
-        "   CALL " + current_transaction_id + "(old_transaction_id);"
+        "   CALL " + current_transaction_id + "(old_transaction_id);\n\n"
 
             // if not, we will want to reissue the original query
-        "   IF old_transaction_id IS NULL THEN"
-        "       SET b_reissue = TRUE;"
-        "   ELSE"
-        "       SET b_reissue = FALSE;"
-        "   END IF;"
+        "   IF old_transaction_id IS NULL THEN\n"
+        "       SET b_reissue = TRUE;\n"
+        "   ELSE\n"
+        "       SET b_reissue = FALSE;\n"
+        "   END IF;\n\n"
 
             // cancel pending transaction
-        "   ROLLBACK;"
+        "   ROLLBACK;\n\n"
 
             // start a new one for this proc call
-        "   START TRANSACTION;"
+        "   START TRANSACTION;\n\n"
 
             // first onion adjustment
-        "   SET @query = adjust_query0;"
-        "   PREPARE aq0 FROM @query;"
-        "   EXECUTE aq0;"
+        "   SET @query = adjust_query0;\n"
+        "   PREPARE aq0 FROM @query;\n"
+        "   EXECUTE aq0;\n\n"
 
             // (possibly) second onion adjustment
-        "   SET @query = adjust_query1;"
-        "   PREPARE aq1 FROM @query;"
-        "   EXECUTE aq1;"
+        "   SET @query = adjust_query1;\n"
+        "   PREPARE aq1 FROM @query;\n"
+        "   EXECUTE aq1;\n\n"
 
             // update metadata used for recovery
-        "   INSERT INTO " + remote_completion_table +
-        "       (begin, complete, embedded_completion_id, reissue) VALUES"
-        "       (TRUE,  TRUE,     completion_id,          b_reissue);"
+        "   INSERT INTO " + remote_completion_table + "\n"
+        "      (begin, complete, embedded_completion_id, reissue) VALUES\n"
+        "       (TRUE,  TRUE,     completion_id,          b_reissue);\n\n"
 
-        "   COMMIT;"
-        " END"});
+        "   COMMIT;\n"
+        " END\n"});
 
-    for (auto it : add_procs) {
+    return add_procs;
+}
+
+static bool
+addStoredProcedures(const std::unique_ptr<Connect> &conn)
+{
+    auto procs = getStoredProcedures();
+    for (auto it : procs) {
         RETURN_FALSE_IF_FALSE(conn->execute(it));
     }
 

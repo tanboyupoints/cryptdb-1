@@ -1,0 +1,10 @@
+#
+# proc installation makefrag
+#
+OBJDIRS	+= scripts
+
+all : obj/scripts/procs
+
+$(OBJDIR)/scripts/procs : obj/scripts/procs.o
+	$(CXX) $< -o $@ -ledbparser $(LDFLAGS) -ledbcrypto -ledbutil -lcryptdb
+
