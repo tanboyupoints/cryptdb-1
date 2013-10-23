@@ -10,6 +10,7 @@ $(OBJDIR)/libexecute.so: $(PROXY_OBJS) \
 			 $(OBJDIR)/libcryptdb.so \
 			 $(OBJDIR)/libedbparser.so \
 			 $(OBJDIR)/libedbutil.so
-	$(CXX) -shared -o $@ $(PROXY_OBJS) $(LDFLAGS) -ledbcrypto -lcryptdb -ledbutil -ledbparser
+	$(CXX) -shared -o $@ $(PROXY_OBJS) $(LDFLAGS) \
+	       -ledbcrypto -lcryptdb -ledbutil -ledbparser -llua5.1
 
 # vim: set noexpandtab:

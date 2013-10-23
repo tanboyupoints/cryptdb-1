@@ -8,8 +8,7 @@ CXXFLAGS := -g -O0 -fno-strict-aliasing -fno-rtti -fwrapv -fPIC \
 	    -Wno-deprecated \
 	    -Wmissing-declarations -Woverloaded-virtual  \
 	    -Wunreachable-code -D_GNU_SOURCE -std=c++0x -I$(TOP)
-LDFLAGS	 := -lz -llua5.1 -lcrypto -lntl \
-	    -L$(TOP)/$(OBJDIR) -Wl,-rpath=$(TOP)/$(OBJDIR) -Wl,-rpath=$(TOP)
+LDFLAGS  := -L$(TOP)/$(OBJDIR) -Wl,-rpath=$(TOP)/$(OBJDIR) -Wl,-rpath=$(TOP)
 # Use this flag if you need to root out undefined reference problems
 # occuring at runtime.
 # -Wl,--no-undefined
@@ -48,6 +47,9 @@ doc:
 whitespace:
 	find . -name '*.cc' -o -name '*.hh' -type f -exec sed -i 's/ *$//' '{}' ';'
 
+.PHONY: always
+always:
+
 # Eliminate default suffix rules
 .SUFFIXES:
 
@@ -58,6 +60,10 @@ whitespace:
 .PRECIOUS: %.o
 
 $(OBJDIR)/%.o: %.cc
+	@mkdir -p $(@D)
+	$(CXX) -MD $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/%.o: $(OBJDIR)/%.cc
 	@mkdir -p $(@D)
 	$(CXX) -MD $(CXXFLAGS) -c $< -o $@
 
