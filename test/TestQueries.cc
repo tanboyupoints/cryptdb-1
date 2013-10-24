@@ -1409,15 +1409,17 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 501/506
+    //      TOTAL RESULT: 502/506
     // ###############################
 
     std::vector<Score> scores;
 
+    assert(testSlowMatch());
+
     // Pass 54/54
     scores.push_back(CheckQueryList(tc, Select));
 
-    // Pass 30/31
+    // Pass 31/31
     scores.push_back(CheckQueryList(tc, HOM));
 
     // Pass 20/20
