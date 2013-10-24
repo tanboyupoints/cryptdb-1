@@ -71,12 +71,8 @@ function read_query(packet)
     -- acquire lock and build queries
     status, lock_fd = locklib.acquire_lock(LOCK_FILE)
     if false == status then
-        local do0    = "do 0"
-        local noop_q = string.char(proxy.COM_QUERY) .. do0
-
-        lock_fd = nil
-        cryptdb_query = do0
-        proxy.queries:append(0xdead, noop_q, {resultset_is_needed = true})
+        print("Swallowed Query: [" ..  query .. "]")
+        return nil
     else
         if string.byte(packet) == proxy.COM_INIT_DB then
             cryptdb_query = "USE " .. query
