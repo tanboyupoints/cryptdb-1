@@ -14,16 +14,10 @@ Make CryptDB.
 
 Ideally you will stop mysql here, install the UDFs then restart mysql.
 
-Add the UDFs to the mysql plugin directory. Something like this will work.
+Add the UDFs to the mysql plugin directory.  Something like the following
+will work.  MYSQL_PLUGIN_DIR might be /usr/lib/mysql/plugin.
+
 > install -m 644 -g mysql -o mysql ./obj/udf/edb.so $(MYSQL_PLUGIN_DIR)
   + Change mysql account/plugin directory as necessary.
-> install -m 644 ./obj/libedbcrypto.so /usr/local/lib
-> install -m 644 ./obj/libedbutil.so /usr/local/lib
-> ldconfig
 > mysql < udf/create.sql
-
-If you are running AppArmor, you may need to tweak the AppArmor policy
-for mysqld to allow reading /usr/local/lib/libedb*.so.  (If the create
-commands produce errors about opening shared libraries, check dmesg for
-AppArmor errors.)
 

@@ -4,14 +4,18 @@ CRYPTOSRC   := BasicCrypto.cc paillier.cc urandom.cc arc4.cc hgd.cc pbkdf2.cc \
 	       prng.cc ope.cc SWPSearch.cc
 CRYPTOOBJ   := $(patsubst %.cc,$(OBJDIR)/crypto/%.o,$(CRYPTOSRC))
 
-all:    $(OBJDIR)/libedbcrypto.so
+all:	$(OBJDIR)/libedbcrypto.a $(OBJDIR)/libedbcrypto.so
+
 $(OBJDIR)/libedbcrypto.so: $(CRYPTOOBJ) $(OBJDIR)/libedbutil.so
-	$(CXX) -shared -o $@ $(CRYPTOOBJ) $(LDFLAGS) \
+	$(CXX) -shared -o $@ $(CRYPTOOBJ) $(LDFLAGS) $(LDRPATH) \
 	       -ledbutil -lcrypto -lntl
+
+$(OBJDIR)/libedbcrypto.a: $(CRYPTOOBJ)
+	$(AR) r $@ $(CRYPTOOBJ)
 
 #all:	$(OBJDIR)/crypto/x
 $(OBJDIR)/crypto/x: $(OBJDIR)/crypto/x.o $(OBJDIR)/libedbcrypto.so
-	$(CXX) $< -o $@ $(LDFLAGS) -ledbcrypto
+	$(CXX) $< -o $@ $(LDFLAGS) $(LDRPATH) -ledbcrypto
 
 install: install_crypto
 
