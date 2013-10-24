@@ -1037,6 +1037,38 @@ static QueryList TableAliases = QueryList("TableAliases",
       Query("DROP TABLE mercury"),
       Query("DROP TABLE moon")});
 
+static QueryList DDL = QueryList("DDL",
+    { Query("CREATE TABLE ddl_test (a integer, b integer, c integer)")},
+    { Query("CREATE TABLE ddl_test (a integer, b integer, c integer)")},
+    { Query("INSERT INTO ddl_test VALUES (1, 2, 3)"),
+      Query("SELECT * FROM ddl_test"),
+      Query("ALTER TABLE ddl_test DROP COLUMN a"),
+      Query("SELECT * FROM ddl_test"),
+      Query("ALTER TABLE ddl_test ADD COLUMN a integer"),
+      Query("SELECT * FROM ddl_test"),
+      Query("INSERT INTO ddl_test VALUES (3, 4, 5), (5, 6, 7),(7, 8, 9)"),
+      Query("SELECT * FROM ddl_test"),
+      Query("ALTER TABLE ddl_test DROP COLUMN b, DROP COLUMN c"),
+      Query("SELECT * FROM ddl_test"),
+      Query("ALTER TABLE ddl_test ADD COLUMN b integer, DROP COLUMN a,"
+            "                     ADD COLUMN c integer"),
+      Query("INSERT INTO ddl_test VALUES (15, '1212'), (20, '7676')"),
+      Query("SELECT * FROM ddl_test"),
+      Query("DELETE FROM ddl_test"),
+      Query("INSERT INTO ddl_test VALUES (12, 15), (44, 14), (19, 5)"),
+      Query("ALTER TABLE ddl_test ADD PRIMARY KEY(b)"),
+      Query("SELECT * FROM ddl_test"),
+      Query("ALTER TABLE ddl_test DROP PRIMARY KEY,"
+            "                     ADD PRIMARY KEY(b)"),
+      Query("SELECT * FROM ddl_test"),
+      Query("ALTER TABLE ddl_test ADD INDEX j(b), ADD INDEX k(b, c)"),
+      Query("SELECT * FROM ddl_test"),
+      Query("ALTER TABLE ddl_test DROP INDEX j, DROP INDEX k,"
+            "                     ADD INDEX j(b), ADD INDEX k(b, c)"),
+      Query("SELECT * FROM ddl_test")},
+    { Query("DROP TABLE ddl_test")},
+    { Query("DROP TABLE ddl_test")});
+
 //-----------------------------------------------------------------------
 
 Connection::Connection(const TestConfig &input_tc, test_mode input_type) {
@@ -1377,7 +1409,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 476/481
+    //      TOTAL RESULT: 501/506
     // ###############################
 
     std::vector<Score> scores;
@@ -1442,6 +1474,10 @@ RunTest(const TestConfig &tc) {
 
     // Pass 14/14
     scores.push_back(CheckQueryList(tc, TableAliases));
+
+    // Pass 25/25
+    // Failures due to naive matching.
+    scores.push_back(CheckQueryList(tc, DDL));
 
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;

@@ -122,8 +122,24 @@ class AlterTableHandler : public DDLHandler {
                                   const ProxyState &ps) const
     {
         assert(sub_dispatcher->canDo(lex));
-        const AlterSubHandler &handler = sub_dispatcher->dispatch(lex);
-        return handler.transformLex(a, lex, ps);
+        const std::vector<AlterSubHandler *> &handlers =
+            sub_dispatcher->dispatch(lex);
+
+        LEX *new_lex = copyWithTHD(lex);
+
+        for (auto it : handlers) {
+            new_lex = it->transformLex(a, new_lex, ps);
+        }
+
+        // -----------------------------
+        //         Rewrite TABLE
+        // -----------------------------
+        // > Rewrite after doing the transformations as the handlers
+        // expect the original table name to be intact.
+        new_lex->select_lex.table_list =
+            rewrite_table_list(new_lex->select_lex.table_list, a, true);
+
+        return new_lex;
     }
 
     const std::unique_ptr<AlterDispatcher> sub_dispatcher;

@@ -262,6 +262,20 @@ getOnionIndexTypes()
     return std::vector<onion>({oOPE, oDET, oPLAIN});
 }
 
+static std::string
+getOriginalKeyName(Key *const key)
+{
+    if (Key::PRIMARY == key->type) {
+        return "PRIMARY";
+    }
+
+    const std::string out_name = convert_lex_str(key->name);
+    TEST_TextMessageError(out_name.size() > 0,
+                          "Non-Primary keys can not have blank name!");
+
+    return out_name;
+}
+
 std::vector<Key *>
 rewrite_key(const TableMeta &tm, Key *const key, const Analysis &a)
 {
@@ -274,7 +288,7 @@ rewrite_key(const TableMeta &tm, Key *const key, const Analysis &a)
 
         // Set anonymous name.
         const std::string new_name =
-            a.getAnonIndexName(tm, convert_lex_str(key->name), o);
+            a.getAnonIndexName(tm, getOriginalKeyName(key), o);
         new_key->name = string_to_lex_str(new_name);
 
         // Set anonymous columns.
@@ -313,8 +327,6 @@ rewrite_key(const TableMeta &tm, Key *const key, const Analysis &a)
     if (Key::PRIMARY == key->type) {
         if (output_keys.size() > 0) {
             return std::vector<Key *>({output_keys.front()});
-        } else {
-            return std::vector<Key *>();
         }
     }
 

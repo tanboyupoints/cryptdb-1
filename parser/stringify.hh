@@ -518,7 +518,11 @@ static std::string prefix_drop_column(Alter_drop adrop) {
 
 static std::string prefix_drop_index(Alter_drop adrop) {
     std::ostringstream ss;
-    ss << "DROP INDEX " << adrop;
+    if (equalsIgnoreCase(adrop.name, "PRIMARY")) {
+        ss << "DROP PRIMARY KEY";
+    } else {
+        ss << "DROP INDEX " << adrop;
+    }
     return ss.str();
 }
 
@@ -547,10 +551,15 @@ prefix_add_index(Key key)
 {
     const std::string index_name = convert_lex_str(key.name);
     std::ostringstream key_output;
-    key_output << " ADD INDEX " << index_name << " ("
-               << ListJoin<Key_part_spec>(key.columns, ",",
+    if (Key::PRIMARY == key.type) {
+        key_output << " ADD PRIMARY KEY (";
+    } else {
+        key_output << " ADD INDEX " << index_name << " (";
+    }
+    key_output << ListJoin<Key_part_spec>(key.columns, ",",
                                           do_prefix_add_index())
                << ")";
+
     return key_output.str();
 }
 
@@ -850,33 +859,58 @@ operator<<(std::ostream &out, LEX &lex)
      *
      * ALTER TABLE t DROP COLUMN c, DROP COLUMN d;
      */
-    case SQLCOM_ALTER_TABLE:
+    case SQLCOM_ALTER_TABLE: {
         out << "ALTER TABLE";
         lex.select_lex.table_list.first->print(t, &s, QT_ORDINARY);
         out << " " << s;
 
+        bool prev = false;
         // TODO: Support other flags.
         // ALTER_ADD_COLUMN, ALTER_CHANGE_COLUMN, ALTER_ADD_INDEX,
         // ALTER_DROP_INDEX, ALTER_FOREIGN_KEY
         if (lex.alter_info.flags & ALTER_DROP_COLUMN) {
             out << " " << ListJoin<Alter_drop>(lex.alter_info.drop_list,
                                                ",", prefix_drop_column);
-        } else if (lex.alter_info.flags & ALTER_ADD_COLUMN) {
-            out << " " << ListJoin<Create_field>(lex.alter_info.create_list,
+            prev = true;
+        }
+
+        if (lex.alter_info.flags & ALTER_ADD_COLUMN) {
+            if (true == prev) {
+                out << ", ";
+            }
+            out << " " <<ListJoin<Create_field>(lex.alter_info.create_list,
                                                  ",", prefix_add_column);
-        } else if (lex.alter_info.flags & ALTER_ADD_INDEX) {
+            prev = true;
+        }
+
+        if (lex.alter_info.flags & ALTER_ADD_INDEX) {
+            if (true == prev) {
+                out << ", ";
+            }
             out << " " << ListJoin<Key>(lex.alter_info.key_list, ",",
                                         prefix_add_index);
-        } else if (lex.alter_info.flags & ALTER_DROP_INDEX) {
+            prev = true;
+        }
+
+        if (lex.alter_info.flags & ALTER_DROP_INDEX) {
+            if (true == prev) {
+                out << ", ";
+            }
             out << " " << ListJoin<Alter_drop>(lex.alter_info.drop_list,
                                                ",", prefix_drop_index);
-        } else if (lex.alter_info.flags & ALTER_KEYS_ONOFF) {
+            prev = true;
+        }
+
+        if (lex.alter_info.flags & ALTER_KEYS_ONOFF) {
+            if (true == prev) {
+                out << ", ";
+            }
             out << " " << enableOrDisableKeysOutput(lex);
-        } else {
-            throw CryptDBError("Unsupported ALTER in stringify");
+            prev = true;
         }
 
         break;
+    }
 
     case SQLCOM_LOCK_TABLES:
         // HACK: prettyLockType(...) should be used.

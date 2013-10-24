@@ -1,22 +1,47 @@
 #include <main/dispatcher.hh>
 
-long long SQLDispatcher::extract(LEX* lex) const
+bool
+SQLDispatcher::canDo(LEX *const lex) const
+{
+    return handlers.end() != handlers.find(extract(lex));
+}
+
+const SQLHandler &
+SQLDispatcher::dispatch(LEX *const lex) const
+{
+    auto it = handlers.find(extract(lex));
+    assert(handlers.end() != it);
+
+    assert(it->second);
+    return *it->second;
+}
+
+long long
+SQLDispatcher::extract(LEX *const lex) const
 {
     return lex->sql_command;
 }
 
-long long AlterDispatcher::extract(LEX* lex) const
+// FIXME: Implement.
+bool
+AlterDispatcher::canDo(LEX *const lex) const
 {
-    static long mask = calculateMask();
-    return lex->alter_info.flags & mask;
+    return true;
 }
 
-long AlterDispatcher::calculateMask() const {
-    long mask = 0;
+std::vector<AlterSubHandler *>
+AlterDispatcher::dispatch(LEX *const lex) const
+{
+    std::vector<AlterSubHandler *> out;
     for (auto it = handlers.begin(); it != handlers.end(); it++) {
-        mask |= (*it).first;
+        long long extract = lex->alter_info.flags & (*it).first;
+        if (extract) {
+            auto it_handler = handlers.find(extract);
+            assert(handlers.end() != it_handler && it_handler->second);
+            out.push_back(it_handler->second.get());
+        }
     }
 
-    return mask;
+    return out;
 }
 
