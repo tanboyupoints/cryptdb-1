@@ -23,8 +23,8 @@ Convention : When this document uses syntax like
         By default cryptdb uses 'root' for the username and 'letmein'
         for the password. You can change this by modifying the source.
             + Tests: Currently the tests require root/letmein
-            + Shell: main/cdb_test.cc line 109.
-            + Proxy: mysqlproxy/wrapper.lua line 17.
+            + Shell: main/cdb_test.cc
+            + Proxy: mysqlproxy/wrapper.lua
     * Rebuildling CryptDB
         If you modify the source and want to rebuild, issue 'make' in the
         cryptdb directory.  If you change the UDFs you will also need to do
@@ -71,7 +71,7 @@ Convention : When this document uses syntax like
       can fail for a few reasons.
       I) CryptDB can support the query, but we have not yet implemented it.
          This should throw an UNIMPLEMENTED exception.
-      II) CryptDB can not support this type of query, likely
+      II) CryptDB can not support this type of query, likely for
           cryptographic reasons. The error should include a message telling
           you more about the issue.
 
@@ -95,6 +95,7 @@ Convention : When this document uses syntax like
             how MySQL operations correspond to the cryptographic onions.
       III) State corruption (ie a bug in our code), this will likely lead
            to a crash.
+      IV) Invalid query; problem with the query syntax.
 
 #########################################
 #########################################
@@ -102,17 +103,15 @@ Convention : When this document uses syntax like
 #########################################
 #########################################
 
-    > "purgatory" : If you see errors related to "purgatory"; you probably
-       need to 'USE' a database.
-    > For example queries, take a look at our tests test/TestQueries.cc
     > The benchmarks in the CryptDB paper are based on an older version of
-      CryptDB and likely do not reflect current performance.  It is our
-      intention to improve the performance of this new version.
+      CryptDB. We have added new features and functionality to the current
+      version which we have not yet optimized (but it is part of our
+      roadmap).
+    > For example queries, take a look at our tests test/TestQueries.cc
     > Consider connecting directly to MySQL to see what is in the raw
       database.
     > Resetting state (e.g., after running tests)
         > Take a look at scripts/refresh.sh ; you probably want that.
-	  Before using it, add 'rm -r /path/to/cryptdb/shadow/*' to the file.
         > If you create a database in cryptdb and then reset
           the state without first dropping the database from _within_
           cryptdb; you will need to drop it from the regular mysql client.
