@@ -71,7 +71,12 @@ make_item_by_type(const std::string &value, enum_field_types type)
     case MYSQL_TYPE_LONGLONG:
     case MYSQL_TYPE_INT24:
     case MYSQL_TYPE_TINY:
-        i = new Item_int(static_cast<long long>(valFromStr(value)));
+        i = new (current_thd->mem_root) Item_int(static_cast<long long>(valFromStr(value)));
+        break;
+
+    case MYSQL_TYPE_DOUBLE:
+        i = new (current_thd->mem_root) Item_float(value.c_str(),
+                                                   value.size());
         break;
 
     case MYSQL_TYPE_BLOB:
@@ -85,8 +90,9 @@ make_item_by_type(const std::string &value, enum_field_types type)
     case MYSQL_TYPE_NEWDATE:
     case MYSQL_TYPE_TIME:
     case MYSQL_TYPE_DATETIME:
-        i = new Item_string(make_thd_string(value), value.length(),
-                            &my_charset_bin);
+        i = new (current_thd->mem_root) Item_string(make_thd_string(value),
+                                                    value.length(),
+                                                    &my_charset_bin);
         break;
 
     default:
