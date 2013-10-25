@@ -1083,6 +1083,7 @@ static QueryList MiscBugs = QueryList("MiscBugs",
       Query("INSERT INTO more_bugs VALUES (9012), (2913), (19114)"),
       Query("SELECT spider + spider FROM bugs"),    // proxy test
       Query("SELECT spider + spider FROM bugs"),    // proxy test
+      // Query("SELECT SUM(spider) FROM bugs"),
       // Query("SELECT GREATEST(ant, 5000) FROM more_bugs"),
       // Query("SELECT GREATEST(12, ant, 5000) FROM more_bugs"),
       // Query("CREATE TABLE crawlers (pink DATE)"),
