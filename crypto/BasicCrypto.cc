@@ -4,6 +4,8 @@
  *
  */
 
+#include <climits>
+
 #include <crypto/BasicCrypto.hh>
 #include <util/ctr.hh>
 #include <util/util.hh>
@@ -13,11 +15,19 @@
 using namespace std;
 
 
-uint rounded_len(uint len, uint block_size, bool dopad) {
+bool
+rounded_len(unsigned long len, uint block_size, bool dopad,
+            unsigned long *const out) {
+    assert(out);
     if (dopad || (len % block_size)) {
-        return (len/block_size + 1) * block_size;
+        if (ULONG_MAX / block_size < (len/block_size + 1)) {
+            return false;
+        }
+        *out = (len/block_size + 1) * block_size;
+        return true;
     } else {
-        return len;
+        *out = len;
+        return true;
     }
 }
 

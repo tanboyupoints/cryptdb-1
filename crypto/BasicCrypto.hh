@@ -35,7 +35,8 @@ AES_KEY * get_AES_KEY(const std::string &key);
 AES_KEY * get_AES_enc_key(const std::string & key);
 AES_KEY * get_AES_dec_key(const std::string & key);
 
-uint rounded_len(uint len, uint block_size, bool dopad);
+bool rounded_len(unsigned long len, uint block_size, bool dopad,
+                 unsigned long *const out);
 
 std::string marshallKey(const std::string &key);
 //std::string unmarshallKey(const std::string &key);

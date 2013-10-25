@@ -228,10 +228,11 @@ std::string prng_expand(const std::string &seed_key, uint key_bytes)
 // returns the length of output by AES encryption of a string of given type
 // and len
 static
-std::pair<enum enum_field_types, int>
-type_len_for_AES_str(enum enum_field_types type, int len, bool pad)
+std::pair<enum enum_field_types, unsigned long>
+type_len_for_AES_str(enum enum_field_types type, unsigned long len,
+                     bool pad)
 {
-    int res_len = -1;
+    unsigned long res_len = len;
     enum enum_field_types res_type = type;
 
     switch (type) {
@@ -248,7 +249,10 @@ type_len_for_AES_str(enum enum_field_types type, int len, bool pad)
         case MYSQL_TYPE_TIME:
         case MYSQL_TYPE_DATETIME:
             res_type = MYSQL_TYPE_VARCHAR;
-            res_len = rounded_len(len, AES_BLOCK_BYTES, pad);
+            TEST_TextMessageError(rounded_len(len, AES_BLOCK_BYTES, pad,
+                                              &res_len),
+                                  "The field you are trying to create is"
+                                  " too large!");
             break;
         default: {
             const std::string t =
@@ -263,16 +267,15 @@ type_len_for_AES_str(enum enum_field_types type, int len, bool pad)
 
 //TODO: remove above newcreatefield
 static Create_field*
-createFieldHelper(const Create_field * const f, int field_length,
+createFieldHelper(const Create_field * const f,
+                  unsigned long field_length,
                   enum enum_field_types type,
                   const std::string &anonname = "",
                   CHARSET_INFO * const charset = NULL)
 {
     const THD * const thd = current_thd;
     Create_field * const f0 = f->clone(thd->mem_root);
-    if (field_length != -1) {
-        f0->length = field_length;
-    }
+    f0->length = field_length;
     f0->sql_type = type;
 
     if (charset != NULL) {
@@ -476,7 +479,7 @@ RND_str::newCreateField(const Create_field * const cf,
                         const std::string &anonname) const
 {
     auto typelen = type_len_for_AES_str(cf->sql_type, cf->length, false);
-  
+
     return createFieldHelper(cf, typelen.second, typelen.first,
                              anonname, &my_charset_bin);
 }
@@ -487,7 +490,7 @@ RND_str::encrypt(const Item &ptext, uint64_t IV) const
     const std::string enc =
         encrypt_AES_CBC(ItemToString(ptext), enckey,
                         BytesFromInt(IV, SALT_LEN_BYTES), false);
-    
+
     LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV "
               << IV << "--->" << "len of enc " << enc.length()
               << " enc " << enc;
@@ -1303,7 +1306,8 @@ Create_field *
 OPE_int::newCreateField(const Create_field * const cf,
                         const std::string &anonname) const
 {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname);
+    return createFieldHelper(cf, cf->length, MYSQL_TYPE_LONGLONG,
+                             anonname);
 }
 
 Item *
@@ -1346,8 +1350,8 @@ Create_field *
 OPE_str::newCreateField(const Create_field * const cf,
                         const std::string &anonname) const
 {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname,
-                             &my_charset_bin);
+    return createFieldHelper(cf, cf->length, MYSQL_TYPE_LONGLONG,
+                             anonname, &my_charset_bin);
 }
 
 /*
@@ -1673,7 +1677,7 @@ Create_field *
 Search::newCreateField(const Create_field * const cf,
                        const std::string &anonname) const
 {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname,
+    return createFieldHelper(cf, cf->length, MYSQL_TYPE_BLOB, anonname,
                              &my_charset_bin);
 }
 

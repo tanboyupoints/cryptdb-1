@@ -1069,6 +1069,32 @@ static QueryList DDL = QueryList("DDL",
     { Query("DROP TABLE ddl_test")},
     { Query("DROP TABLE ddl_test")});
 
+// the oDET column will encrypt three times and two of these will pad;
+// the maxmimum field size if 2**32 - 1; so the maximum field size
+// we support is 2**32 - 33
+static QueryList MiscBugs = QueryList("MiscBugs",
+    { Query("CREATE TABLE crawlies (purple VARCHAR(4294967263))"),
+      Query("CREATE TABLE bugs (spider TEXT)"),
+      Query("CREATE TABLE more_bugs (ant INTEGER)")},
+    { Query("CREATE TABLE crawlies (purple VARCHAR(4294967263))"),
+      Query("CREATE TABLE bugs (spider TEXT)"),
+      Query("CREATE TABLE more_bugs (ant INTEGER)")},
+    { Query("INSERT INTO bugs VALUES ('8legs'), ('crawly'), ('manyiz')"),
+      Query("INSERT INTO more_bugs VALUES (9012), (2913), (19114)"),
+      Query("SELECT spider + spider FROM bugs"),    // breaks in proxy
+      Query("SELECT spider + spider FROM bugs"),    // breaks in proxy
+      // Query("SELECT GREATEST(ant, 5000) FROM more_bugs"),
+      // Query("SELECT GREATEST(12, ant, 5000) FROM more_bugs"),
+      // Query("CREATE TABLE crawlers (pink DATE)"),
+      // Query("SELECT * FROM bugs, more_bugs, crawlers, crawlies")
+    },
+    { Query("DROP TABLE crawlies"),
+      Query("DROP TABLE bugs"),
+      Query("DROP TABLE more_bugs")},
+    { Query("DROP TABLE crawlies"),
+      Query("DROP TABLE bugs"),
+      Query("DROP TABLE more_bugs")});
+
 //-----------------------------------------------------------------------
 
 Connection::Connection(const TestConfig &input_tc, test_mode input_type) {
@@ -1409,7 +1435,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 502/506
+    //      TOTAL RESULT: 512/516
     // ###############################
 
     std::vector<Score> scores;
@@ -1478,8 +1504,10 @@ RunTest(const TestConfig &tc) {
     scores.push_back(CheckQueryList(tc, TableAliases));
 
     // Pass 25/25
-    // Failures due to naive matching.
     scores.push_back(CheckQueryList(tc, DDL));
+
+    // Pass 10/10
+    scores.push_back(CheckQueryList(tc, MiscBugs));
 
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;
