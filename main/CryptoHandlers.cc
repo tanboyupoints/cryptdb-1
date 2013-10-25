@@ -1551,20 +1551,12 @@ HOM_dec::decrypt(Item * const ctext, uint64_t IV) const
 
 
 HOM::HOM(Create_field * const f, const std::string &seed_key)
-    : seed_key(seed_key)
-{
-    const std::unique_ptr<streamrng<arc4>>
-        prng(new streamrng<arc4>(seed_key));
-    sk = new Paillier_priv(Paillier_priv::keygen(prng.get(), nbits));
-}
+    : seed_key(seed_key), sk(NULL), waiting(true)
+{}
 
 HOM::HOM(unsigned int id, const std::string &serial)
-    : EncLayer(id), seed_key(serial)
-{
-    const std::unique_ptr<streamrng<arc4>>
-        prng(new streamrng<arc4>(seed_key));
-    sk = new Paillier_priv(Paillier_priv::keygen(prng.get(), nbits));
-}
+    : EncLayer(id), seed_key(serial), sk(NULL), waiting(true)
+{}
 
 Create_field *
 HOM::newCreateField(const Create_field * const cf,
@@ -1574,10 +1566,22 @@ HOM::newCreateField(const Create_field * const cf,
                              anonname, &my_charset_bin);
 }
 
+void
+HOM::unwait() const
+{
+    const std::unique_ptr<streamrng<arc4>>
+        prng(new streamrng<arc4>(seed_key));
+    sk = new Paillier_priv(Paillier_priv::keygen(prng.get(), nbits));
+    waiting = false;
+}
 
 Item *
 HOM::encrypt(const Item &ptext, uint64_t IV) const
 {
+    if (true == waiting) {
+        this->unwait();
+    }
+
     const ZZ enc = sk->encrypt(ItemIntToZZ(ptext));
     return ZZToItemStr(enc);
 }
@@ -1585,6 +1589,10 @@ HOM::encrypt(const Item &ptext, uint64_t IV) const
 Item *
 HOM::decrypt(Item * const ctext, uint64_t IV) const
 {
+    if (true == waiting) {
+        this->unwait();
+    }
+
     const ZZ enc = ItemStrToZZ(ctext);
     const ZZ dec = sk->decrypt(enc);
     LOG(encl) << "HOM ciph " << enc << "---->" << dec;
@@ -1622,6 +1630,10 @@ static udf_func u_sum_f = {
 Item *
 HOM::sumUDA(Item *const expr) const
 {
+    if (true == waiting) {
+        this->unwait();
+    }
+
     List<Item> l;
     l.push_back(expr);
     l.push_back(ZZToItemStr(sk->hompubkey()));
@@ -1631,6 +1643,10 @@ HOM::sumUDA(Item *const expr) const
 Item *
 HOM::sumUDF(Item *const i1, Item *const i2) const
 {
+    if (true == waiting) {
+        this->unwait();
+    }
+
     List<Item> l;
     l.push_back(i1);
     l.push_back(i2);
