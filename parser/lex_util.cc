@@ -38,7 +38,7 @@ dup_item(const Item_func &i)
             return new (current_thd->mem_root)
                 Item_func_neg(i.arguments()[0]);
         default:
-            throw CryptDBError("Can't clone function type: " + i.type());
+            cryptdb_err() << "Can't clone function type: " << i.type();
     }
 }
 
