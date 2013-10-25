@@ -32,11 +32,11 @@ def get_pkgs
 
     pkg_shell = ShellDoer.new("~")
     pkg_shell.>(%q{
-        sudo apt-get install liblua5.1-0-dev libntl-dev        \
-                libmysqlclient-dev libssl-dev libbsd-dev  \
-                libevent-dev libglib2.0-dev libgmp-dev    \
-                mysql-server libaio-dev automake          \
-                gtk-doc-tools flex cmake libncurses5-dev  \
+        sudo apt-get install liblua5.1-0-dev libntl-dev         \
+                libmysqlclient-dev libssl-dev libbsd-dev        \
+                libevent-dev libglib2.0-dev libgmp-dev          \
+                mysql-server libaio-dev automake                \
+                gtk-doc-tools flex cmake libncurses5-dev        \
                 bison g++ make
     })
 end
@@ -160,7 +160,7 @@ class ShellDoer
 
     private
     def pretty_execute(cmd)
-        %x(cd #{@dir} && #{cmd} 1>&2)
+        %x(cd #{@dir} && #{cmd.strip} 1>&2)
         if $?.exitstatus != 0
             fail "`#{cmd}` failed".red.bold
         end
