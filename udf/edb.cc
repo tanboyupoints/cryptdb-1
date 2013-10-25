@@ -213,10 +213,9 @@ cryptdb_decrypt_int_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
 {
     if (args->arg_count != 3 ||
         args->arg_type[0] != INT_RESULT ||
-        args->arg_type[1] != STRING_RESULT ||
-        args->arg_type[2] != INT_RESULT)
+        args->arg_type[1] != STRING_RESULT)
     {
-        strcpy(message, "Usage: cryptdb_decrypt_int_det(int ciphertext, string key, int salt)");
+        strcpy(message, "Usage: cryptdb_decrypt_int_det(int ciphertext, string key)");
         return 1;
     }
 
@@ -329,12 +328,11 @@ my_bool
 cryptdb_decrypt_text_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
                               char *const message)
 {
-    if (args->arg_count != 3 ||
+    if (args->arg_count != 2 ||
         args->arg_type[0] != STRING_RESULT ||
-        args->arg_type[1] != STRING_RESULT ||
-        args->arg_type[2] != INT_RESULT)
+        args->arg_type[1] != STRING_RESULT)
     {
-        strcpy(message, "Usage: cryptdb_decrypt_text_det(string ciphertext, string key, int salt)");
+        strcpy(message, "Usage: cryptdb_decrypt_text_det(string ciphertext, string key)");
         return 1;
     }
 
