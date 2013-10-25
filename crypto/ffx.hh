@@ -1,6 +1,5 @@
 #pragma once
 
-#include <util/static_assert.hh>
 
 /*
  * Based on "The FFX Mode of Operation for Format-Preserving Encryption"
@@ -50,7 +49,7 @@ class ffx2 : public ffx2_mac_header {
     ffx2(const BlockCipher *key, uint nbits, const std::vector<uint8_t> &t)
         : ffx2_mac_header(nbits, t), mac_base(key)
     {
-        _static_assert(BlockCipher::blocksize >= 8);
+        static_assert(BlockCipher::blocksize >= 8, "Block size too small");
         auto h = static_cast<const ffx2_mac_header *> (this);
         mac_base.update(h, sizeof(*h));
         mac_base.update(&t[0], t.size());
@@ -115,7 +114,7 @@ class ffx2_block_cipher {
     ffx2_block_cipher(const BlockCipher *key, const std::vector<uint8_t> &t)
         : fi(key, nbits, t)
     {
-        _static_assert(nbits % 8 == 0);
+        static_assert(nbits % 8 == 0, "Not a multiple of 8 bits");
     }
 
     void block_encrypt(const void *ptext, void *ctext) const {
