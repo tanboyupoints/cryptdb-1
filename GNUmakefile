@@ -8,7 +8,7 @@ CXXFLAGS := -g -O0 -fno-strict-aliasing -fno-rtti -fwrapv -fPIC \
 	    -Wextra -Wmissing-noreturn -Wwrite-strings -Wno-unused-parameter \
 	    -Wno-deprecated \
 	    -Wmissing-declarations -Woverloaded-virtual  \
-	    -Wunreachable-code -D_GNU_SOURCE -std=c++11 -I$(TOP)
+	    -Wunreachable-code -D_GNU_SOURCE -std=c++0x -I$(TOP)
 LDFLAGS  := -L$(TOP)/$(OBJDIR) -Wl,--no-undefined
 
 ## Copy conf/config.mk.sample to conf/config.mk and adjust accordingly.
