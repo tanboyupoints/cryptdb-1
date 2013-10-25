@@ -106,7 +106,7 @@ sanityCheck(FieldMeta &fm)
 static bool
 sanityCheck(TableMeta &tm)
 {
-    for (auto it = tm.children.begin() : tm.children) {
+    for (auto it = tm.children.begin(); it != tm.children.end(); it++) {
         const std::unique_ptr<FieldMeta> &fm = (*it).second;
         assert(sanityCheck(*fm.get()));
     }
