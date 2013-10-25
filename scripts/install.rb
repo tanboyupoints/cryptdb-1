@@ -161,7 +161,7 @@ class ShellDoer
     private
     def pretty_execute(cmd)
         %x(cd #{@dir} && #{cmd.strip} 1>&2)
-        if $?.esudo xitstatus != 0
+        if $?.exitstatus != 0
             fail "`#{cmd}` failed".red.bold
         end
     end
