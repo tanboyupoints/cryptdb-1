@@ -19,7 +19,7 @@
 // SchemaInfo/TableMeta/FieldMeta/OnionMeta/EncLayer and the keys.
 
 class Analysis;
-struct FieldMeta;
+class FieldMeta;
 
 /*
  * The name must be unique as it is used as a unique identifier when
@@ -81,7 +81,7 @@ private:
     SECLEVEL getSecLevel() const;
 } OnionMeta;
 
-struct TableMeta;
+class TableMeta;
 //TODO: FieldMeta and TableMeta are partly duplicates with the original
 // FieldMetadata an TableMetadata
 // which contains data we want to add to this structure soon

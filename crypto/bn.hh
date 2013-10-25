@@ -7,14 +7,14 @@
 
 #include <util/errstream.hh>
 
-class bignum_ctx {
+class _bignum_ctx {
  public:
-    bignum_ctx() { c = BN_CTX_new(); }
-    ~bignum_ctx() { BN_CTX_free(c); }
+    _bignum_ctx() { c = BN_CTX_new(); }
+    ~_bignum_ctx() { BN_CTX_free(c); }
     BN_CTX *ctx() { return c; }
 
     static BN_CTX *the_ctx() {
-        static bignum_ctx cx;
+        static _bignum_ctx cx;
         return cx.ctx();
     }
 
@@ -68,8 +68,8 @@ class bignum {
 
     op(operator+, BN_add)
     op(operator-, BN_sub)
-    op(operator%, BN_mod, bignum_ctx::the_ctx())
-    op(operator*, BN_mul, bignum_ctx::the_ctx())
+    op(operator%, BN_mod, _bignum_ctx::the_ctx())
+    op(operator*, BN_mul, _bignum_ctx::the_ctx())
 #undef op
 
 #define pred(predname, cmp)                                     \
@@ -86,7 +86,7 @@ class bignum {
 
     bignum invmod(const bignum &mod) {
         bignum r;
-        throw_c(BN_mod_inverse(r.bn(), &b, mod.bn(), bignum_ctx::the_ctx()));
+        throw_c(BN_mod_inverse(r.bn(), &b, mod.bn(), _bignum_ctx::the_ctx()));
         return r;
     }
 
