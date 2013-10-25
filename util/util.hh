@@ -337,20 +337,6 @@ std::string strFromVal(uint32_t x);
 uint64_t valFromStr(const std::string & str);
 
 
-//marshalls a binary value into characters readable by Postgres
-std::string marshallBinary(const std::string &s);
-/*
-std::string  marshallSalt(const std::string & s);
-std::string unmarshallSalt(const std::string & s);
-*/
-
-
-// unmarshalls a char * received from Postgres into a binary and
-// sets newlen to the length of the result..
-// marshall and unmarshallBinary are not inverses of each other.
-// XXX why not?
-std::string unmarshallBinary(const std::string &s);
-
 void consolidate(std::list<std::string> & words);
 
 
