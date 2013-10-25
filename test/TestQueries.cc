@@ -1070,17 +1070,23 @@ static QueryList DDL = QueryList("DDL",
     { Query("DROP TABLE ddl_test")});
 
 // the oDET column will encrypt three times and two of these will pad;
-// the maxmimum field size if 2**32 - 1; so the maximum field size
-// we support is 2**32 - 33
+// the maximum field size if 2**32 - 1; so the maximum field size
+// we support is 2**32 - 1 - (2 * AES_BLOCK_BYTES)
 static QueryList MiscBugs = QueryList("MiscBugs",
-    { Query("CREATE TABLE crawlies (purple VARCHAR(4294967263))"),
+    { Query("CREATE TABLE crawlies (purple VARCHAR(4294967263),"
+            "                       pink VARCHAR(0))"),
+      Query("CREATE TABLE enums (x enum('this', 'that'))"),
       Query("CREATE TABLE bugs (spider TEXT)"),
       Query("CREATE TABLE more_bugs (ant INTEGER)")},
-    { Query("CREATE TABLE crawlies (purple VARCHAR(4294967263))"),
+    { Query("CREATE TABLE crawlies (purple VARCHAR(4294967263),"
+            "                       pink VARCHAR(0))"),
+      Query("CREATE TABLE enums (x enum('this', 'that'))"),
       Query("CREATE TABLE bugs (spider TEXT)"),
       Query("CREATE TABLE more_bugs (ant INTEGER)")},
     { Query("INSERT INTO bugs VALUES ('8legs'), ('crawly'), ('manyiz')"),
       Query("INSERT INTO more_bugs VALUES (9012), (2913), (19114)"),
+      Query("INSERT INTO enums VALUES ('this'), ('that')"),
+      Query("SELECT * FROM enums"),                 // proxy test
       Query("SELECT spider + spider FROM bugs"),    // proxy test
       Query("SELECT spider + spider FROM bugs"),    // proxy test
       // Query("SELECT SUM(spider) FROM bugs"),
@@ -1436,7 +1442,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 512/516
+    //      TOTAL RESULT: 515/519
     // ###############################
 
     std::vector<Score> scores;
@@ -1507,7 +1513,7 @@ RunTest(const TestConfig &tc) {
     // Pass 25/25
     scores.push_back(CheckQueryList(tc, DDL));
 
-    // Pass 10/10
+    // Pass 13/13
     scores.push_back(CheckQueryList(tc, MiscBugs));
 
     for (auto it : scores) {

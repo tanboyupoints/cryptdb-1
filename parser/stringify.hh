@@ -246,7 +246,10 @@ operator<<(std::ostream &out, Create_field &f)
     // mandatory (length) cases
     case MYSQL_TYPE_VARCHAR:
     case MYSQL_TYPE_VAR_STRING:
-        assert(f.length);
+        // mysql accepts zero length fields
+        if (0 == f.length) {
+            std::cerr << "WARN: Creating zero length field!" << std::endl;
+        }
         out << "(" << f.length << ")";
         break;
 
