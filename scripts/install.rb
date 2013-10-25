@@ -161,7 +161,7 @@ class ShellDoer
     private
     def pretty_execute(cmd)
         %x(cd #{@dir} && #{cmd.strip} 1>&2)
-        if $?.exitstatus != 0
+        if $?.esudo xitstatus != 0
             fail "`#{cmd}` failed".red.bold
         end
     end
@@ -269,3 +269,4 @@ get_pkgs()
 fn(ARGV[0], ARGV[1], ARGV[2])
 
 
+#TODO: add restart of Mysql server after UDF updates

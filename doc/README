@@ -109,7 +109,7 @@ Convention : When this document uses syntax like
       intention to improve the performance of this new version.
     > Consider connecting directly to MySQL to see what is in the raw
       database.
-    > Resetting state.
+    > Resetting state (e.g., after running tests)
         > Take a look at scripts/refresh.sh ; you probably want that.
 	  Before using it, add 'rm -r /path/to/cryptdb/shadow/*' to the file.
         > If you create a database in cryptdb and then reset
