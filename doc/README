@@ -36,6 +36,7 @@ Convention : When this document uses syntax like
 #########################################
 #########################################
 
+    Set (or place in your .bashrc):
     > export EDBDIR=/full/path/to/cryptdb/	
 
     I. Shell
