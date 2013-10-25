@@ -72,6 +72,8 @@ char *    cryptdb_agg(UDF_INIT *const initid, UDF_ARGS *const args,
                       char *const result, unsigned long *const length,
                       char *const is_null, char *const error);
 
+my_bool   cryptdb_func_add_set_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                                    char *const message);
 void      cryptdb_func_add_set_deinit(UDF_INIT *const initid);
 char *    cryptdb_func_add_set(UDF_INIT *const initid, UDF_ARGS *const args,
                                char *const result, unsigned long *const length,
@@ -158,6 +160,15 @@ my_bool
 cryptdb_decrypt_int_sem_init(UDF_INIT *const initid, UDF_ARGS *const args,
                              char *const message)
 {
+    if (args->arg_count != 3 ||
+        args->arg_type[0] != INT_RESULT ||
+        args->arg_type[1] != STRING_RESULT ||
+        args->arg_type[2] != INT_RESULT)
+    {
+        strcpy(message, "Usage: cryptdb_decrypt_int_sem(int ciphertext, string key, int salt)");
+        return 1;
+    }
+
     initid->maybe_null = 1;
     return 0;
 }
@@ -200,6 +211,15 @@ my_bool
 cryptdb_decrypt_int_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
                              char *const message)
 {
+    if (args->arg_count != 3 ||
+        args->arg_type[0] != INT_RESULT ||
+        args->arg_type[1] != STRING_RESULT ||
+        args->arg_type[2] != INT_RESULT)
+    {
+        strcpy(message, "Usage: cryptdb_decrypt_int_det(int ciphertext, string key, int salt)");
+        return 1;
+    }
+
     initid->maybe_null = 1;
     return 0;
 }
@@ -240,6 +260,15 @@ my_bool
 cryptdb_decrypt_text_sem_init(UDF_INIT *const initid, UDF_ARGS *const args,
                               char *const message)
 {
+    if (args->arg_count != 3 ||
+        args->arg_type[0] != STRING_RESULT ||
+        args->arg_type[1] != STRING_RESULT ||
+        args->arg_type[2] != INT_RESULT)
+    {
+        strcpy(message, "Usage: cryptdb_decrypt_text_sem(string ciphertext, string key, int salt)");
+        return 1;
+    }
+
     initid->maybe_null = 1;
     return 0;
 }
@@ -300,6 +329,16 @@ my_bool
 cryptdb_decrypt_text_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
                               char *const message)
 {
+    if (args->arg_count != 3 ||
+        args->arg_type[0] != STRING_RESULT ||
+        args->arg_type[1] != STRING_RESULT ||
+        args->arg_type[2] != INT_RESULT)
+    {
+        strcpy(message, "Usage: cryptdb_decrypt_text_det(string ciphertext, string key, int salt)");
+        return 1;
+    }
+
+    initid->maybe_null = 1;
     return 0;
 }
 
@@ -362,6 +401,15 @@ my_bool
 cryptdb_searchSWP_init(UDF_INIT *const initid, UDF_ARGS *const args,
                        char *const message)
 {
+    if (args->arg_count != 3 ||
+        args->arg_type[0] != STRING_RESULT ||
+        args->arg_type[1] != STRING_RESULT ||
+        args->arg_type[2] != STRING_RESULT)
+    {
+        strcpy(message, "Usage: cryptdb_searchSWP(string ciphertext, string ciph, string wordKey)");
+        return 1;
+    }
+
     Token *const t = new Token();
 
     uint64_t ciphLen;
@@ -410,12 +458,18 @@ my_bool
 cryptdb_agg_init(UDF_INIT *const initid, UDF_ARGS *const args,
                  char *const message)
 {
-    std::cerr << "in agg_init \n";
+    if (args->arg_count != 2 ||
+        args->arg_type[0] != STRING_RESULT ||
+        args->arg_type[1] != STRING_RESULT)
+    {
+        strcpy(message, "Usage: cryptdb_agg(string ciphertext, string pubkey)");
+        return 1;
+    }
+
     agg_state *const as = new agg_state();
     as->rbuf = malloc(Paillier_len_bytes);
     initid->ptr = reinterpret_cast<char *>(as);
     initid->maybe_null = 1;
-    std::cerr << "returning from agg_init \n";
     return 0;
 }
 
@@ -482,11 +536,29 @@ cryptdb_agg(UDF_INIT *const initid, UDF_ARGS *const args, char *const result,
 // for update with increment
 // > UNUSED
 
+my_bool
+cryptdb_func_add_set_init(UDF_INIT *const initid, UDF_ARGS *const args,
+                          char *const message)
+{
+    if (args->arg_count != 3 ||
+        args->arg_type[0] != STRING_RESULT ||
+        args->arg_type[1] != STRING_RESULT ||
+        args->arg_type[2] != STRING_RESULT)
+    {
+        strcpy(message, "Usage: cryptdb_func_add_set(string ciphertext0, string ciphertext1, string pubkey)");
+        return 1;
+    }
+
+    return 0;
+}
+
 void
 cryptdb_func_add_set_deinit(UDF_INIT *const initid)
 {
-    if (initid->ptr)
+    if (initid->ptr) {
         free(initid->ptr);
+        initid->ptr = NULL;
+    }
 }
 
 char *
@@ -494,8 +566,10 @@ cryptdb_func_add_set(UDF_INIT *const initid, UDF_ARGS *const args,
                      char *const result, unsigned long *const length,
                      char *const is_null, char *const error)
 {
-    if (initid->ptr)
+    if (initid->ptr) {
         free(initid->ptr);
+        initid->ptr = NULL;
+    }
 
     AssignOnce<uint64_t> out_len;
     ZZ res;
@@ -531,7 +605,11 @@ my_bool
 cryptdb_version_init(UDF_INIT *const initid, UDF_ARGS *const args,
                      char *const message)
 {
-    initid->maybe_null = 0;
+    if (args->arg_count != 0) {
+        strcpy(message, "cryptdb_version() requires no arguments");
+        return 1;
+    }
+
     return 0;
 }
 
