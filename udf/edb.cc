@@ -211,7 +211,7 @@ my_bool
 cryptdb_decrypt_int_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
                              char *const message)
 {
-    if (args->arg_count != 3 ||
+    if (args->arg_count != 2 ||
         args->arg_type[0] != INT_RESULT ||
         args->arg_type[1] != STRING_RESULT)
     {
