@@ -1,4 +1,4 @@
-// gcc -shared -fpic locklib.c -o ../obj/scripts/locklib.so --llua5.1
+// gcc -shared -fpic locklib.cc -o ../obj/scripts/locklib.so --llua5.1
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -63,10 +63,11 @@ static const struct luaL_reg locklib[] = {
     {NULL, NULL}
 };
 
-extern "C" int
+extern "C" int luaopen_locklib(lua_State *L);
+
+int
 luaopen_locklib(lua_State *L)
 {
     luaL_openlib(L, "locklib", locklib, 0);
     return 1;
 }
-

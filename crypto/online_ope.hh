@@ -4,7 +4,6 @@
 #include <iostream>
 
 #include <crypto/blowfish.hh>
-#include <util/static_assert.hh>
 #include <util/errstream.hh>
 
 using namespace std;
@@ -67,7 +66,8 @@ template<class V, class BlockCipher>
 class ope_client {
  public:
     ope_client(BlockCipher *bc, ope_server<V> *server) : b(bc), s(server) {
-        _static_assert(BlockCipher::blocksize == sizeof(V));
+        static_assert(BlockCipher::blocksize == sizeof(V),
+                      "blocksize mismatch");
     }
 
     V decrypt(uint64_t ct) const {

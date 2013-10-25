@@ -2,7 +2,6 @@
 #include <crypto/mont.hh>
 
 #include <gmp.h>
-#include <util/static_assert.hh>
 
 using namespace std;
 using namespace NTL;
@@ -25,7 +24,7 @@ montgomery::from_mont(const ZZ &a)
 ZZ
 montgomery::mmul(const ZZ &a, const ZZ &b)
 {
-    _static_assert( sizeof(mp_limb_t) == sizeof(long) );
+    static_assert(sizeof(mp_limb_t) == sizeof(long), "mp_limb_t not long");
     ZZ ab = a * b;
     if (ab == 0) return ab; // to avoid testing in loop
 

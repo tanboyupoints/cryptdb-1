@@ -322,19 +322,17 @@ unmarshallBinary(const std::string &s)
 #if MYSQL_S
     offset = 2;
     myassert(s[0] == 'X',
-             "unmarshallBinary: first char is not x; it is " + s[0]);
+             "unmarshallBinary: first char is not x");
     len = len - 1;     // removing last apostrophe
 #else
     myassert(s[0] == '\\',
-             "unmarshallBinary: first char is not slash; it is " + s[0]);
+             "unmarshallBinary: first char is not slash");
     myassert(s[1] == 'x',
-             "unmarshallBinary: second char is not x; it is " + s[1]);
+             "unmarshallBinary: second char is not x");
     offset = 2;
 #endif
 
-    myassert((len - offset) % 2 == 0,
-             "unmarshallBinary: newlen is odd! newlen is " +
-             strFromVal(len-offset));
+    myassert((len - offset) % 2 == 0, "unmarshallBinary: newlen is odd!");
 
     std::string r;
     for (uint i = 0; i < (len-offset)/2; i++)

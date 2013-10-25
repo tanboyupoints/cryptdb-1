@@ -266,8 +266,8 @@ class perfsum_ctr : public perfsum_base, public Enabler {
   } __attribute__((aligned (128)));
 
   struct stats stat[maxcpu];
-  const struct ctrgroup_chain<Counters...> *const cg;
-  const struct perfsum_ctr<Enabler, Counters...> *const base;
+  const ctrgroup_chain<Counters...> *const cg;
+  const perfsum_ctr<Enabler, Counters...> *const base;
 
   template<class T>
   uint64_t addcpus(T f) const {

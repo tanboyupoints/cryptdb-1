@@ -11,7 +11,8 @@
 #include <rewrite_main.hh>
 #include <cryptdbimport.hh>
 
-static void do_display_help(const char *arg)
+static void __attribute__((noreturn))
+do_display_help(const char *arg)
 {
     std::cout << "CryptDBImport" << std::endl;
     std::cout << "Use: " << arg << " [OPTIONS]" << std::endl;

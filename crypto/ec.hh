@@ -24,21 +24,21 @@ class ec_point {
         bignum zero(0);
         ec_point res(gr);
         throw_c(EC_POINT_mul(gr, res.p(), zero.bn(),
-                             pt, n.bn(), bignum_ctx::the_ctx()));
+                             pt, n.bn(), _bignum_ctx::the_ctx()));
         return res;
     }
 
     bool operator==(const ec_point &other) const {
-        return EC_POINT_cmp(gr, pt, other.pt, bignum_ctx::the_ctx()) == 0;
+        return EC_POINT_cmp(gr, pt, other.pt, _bignum_ctx::the_ctx()) == 0;
     }
 
     bool operator!=(const ec_point &other) const {
-        return EC_POINT_cmp(gr, pt, other.pt, bignum_ctx::the_ctx()) != 0;
+        return EC_POINT_cmp(gr, pt, other.pt, _bignum_ctx::the_ctx()) != 0;
     }
 
     std::string to_string(point_conversion_form_t form =
                           POINT_CONVERSION_UNCOMPRESSED) const {
-        char *s = EC_POINT_point2hex(gr, pt, form, bignum_ctx::the_ctx());
+        char *s = EC_POINT_point2hex(gr, pt, form, _bignum_ctx::the_ctx());
         std::string r(s);
         free(s);
         return r;
