@@ -139,7 +139,9 @@ def fn(cdb_path, in_make_v=nil, in_gcc_v=nil)
     end
     cryptdb_shell.>("make clean")
     cryptdb_shell.>("make")
+    cryptdb_shell.>("service mysql stop", true)
     cryptdb_shell.>("make install")
+    cryptdb_shell.>("service mysql start")
 
     shadow_path = File.join(cryptdb_path, SHADOW_NAME)
     cryptdb_shell.>("rm -rf #{shadow_path}")
@@ -154,14 +156,14 @@ class ShellDoer
         @dir = dir
     end
 
-    def >(cmd)
-        pretty_execute(cmd)
+    def >(cmd, ignore=false)
+        pretty_execute(cmd, ignore)
     end
 
     private
-    def pretty_execute(cmd)
+    def pretty_execute(cmd, ignore)
         %x(cd #{@dir} && #{cmd.strip} 1>&2)
-        if $?.exitstatus != 0
+        if $?.exitstatus != 0 && false == ignore
             fail "`#{cmd}` failed".red.bold
         end
     end

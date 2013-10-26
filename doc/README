@@ -14,6 +14,7 @@ Convention : When this document uses syntax like
 #########################################
 #########################################
     * Build CryptDB using the installation script.
+      > note, this script will stop and start your mysql instance.
       > scripts/install.rb <path-to-cryptdb>
         + <path-to-cryptdb> should just be '.' if you are in the cryptdb
           directory
@@ -22,7 +23,7 @@ Convention : When this document uses syntax like
     * Username/Password
         By default cryptdb uses 'root' for the username and 'letmein'
         for the password. You can change this by modifying the source.
-            + Tests: Currently the tests require root/letmein
+            + Tests: test/test_utils.hh
             + Shell: main/cdb_test.cc
             + Proxy: mysqlproxy/wrapper.lua
     * Rebuildling CryptDB
