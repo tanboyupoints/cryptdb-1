@@ -211,9 +211,10 @@ my_bool
 cryptdb_decrypt_int_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
                              char *const message)
 {
-    if (args->arg_count != 2 ||
+    if (args->arg_count != 3 ||
         args->arg_type[0] != INT_RESULT ||
-        args->arg_type[1] != STRING_RESULT)
+        args->arg_type[1] != STRING_RESULT ||
+        args->arg_type[2] != INT_RESULT)
     {
         strcpy(message, "Usage: cryptdb_decrypt_int_det(int ciphertext, string key)");
         return 1;
