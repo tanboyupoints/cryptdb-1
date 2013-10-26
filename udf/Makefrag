@@ -11,7 +11,7 @@ $(OBJDIR)/udf/edb.so: $(OBJDIR)/udf/edb.o \
 	$(CXX) -shared -o $@ $< $(LDFLAGS) \
 	       $(OBJDIR)/libedbcrypto.a \
 	       $(OBJDIR)/libedbutil.a \
-	       -lcrypto -lntl
+	       -lcrypto -lntl -lgmp
 
 install: install_udf
 
