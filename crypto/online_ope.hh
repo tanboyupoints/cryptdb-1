@@ -1,9 +1,10 @@
 #pragma once
 
 #include <string>
-#include <crypto/blowfish.hh>
-#include <util/static_assert.hh>
 #include <iostream>
+
+#include <crypto/blowfish.hh>
+#include <util/errstream.hh>
 
 using namespace std;
 
@@ -65,7 +66,8 @@ template<class V, class BlockCipher>
 class ope_client {
  public:
     ope_client(BlockCipher *bc, ope_server<V> *server) : b(bc), s(server) {
-        _static_assert(BlockCipher::blocksize == sizeof(V));
+        static_assert(BlockCipher::blocksize == sizeof(V),
+                      "blocksize mismatch");
     }
 
     V decrypt(uint64_t ct) const {
@@ -101,7 +103,7 @@ class ope_client {
 	    return encrypt(pt);
         }
 
-        assert(nbits <= 63);
+        throw_c(nbits <= 63);
         return (v<<(64-nbits)) | (1ULL<<(63-nbits));
     }
 

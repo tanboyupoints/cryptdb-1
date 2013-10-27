@@ -11,6 +11,20 @@ public:
     std::string msg;
 };
 
+class CryptoError : public CryptDBError {
+public:
+    CryptoError(const std::string &m) : CryptDBError(m) {}
+};
+
+inline void
+throw_c(bool test, const std::string &msg = "crypto fail")
+{
+    if (false == test) {
+        throw CryptoError(msg);
+    }
+
+    return;
+}
 class fatal : public std::stringstream {
  public:
     ~fatal() __attribute__((noreturn)) {
@@ -21,7 +35,7 @@ class fatal : public std::stringstream {
 
 class cryptdb_err : public std::stringstream {
  public:
-    ~cryptdb_err() /*throw (CryptDBError)*/ {
+    ~cryptdb_err() __attribute__((noreturn)) {
         std::cerr << str() << std::endl;
         throw CryptDBError(str());
     }

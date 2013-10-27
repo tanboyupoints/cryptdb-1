@@ -6,6 +6,8 @@
 #include <iostream>
 #include <functional>
 
+#include <util/enum_text.hh>
+
 template<class T>
 std::string stringify_ptr(T * x) {
     if (x == NULL ) {
@@ -22,10 +24,10 @@ operator<<(std::ostream &out, String &s)
 }
 
 static inline std::ostream&
-operator<<(std::ostream &out, Item &i)
+operator<<(std::ostream &out, const Item &i)
 {
     String s;
-    i.print(&s, QT_ORDINARY);
+    const_cast<Item &>(i).print(&s, QT_ORDINARY);
 
     return out << s;
 }
@@ -93,14 +95,14 @@ operator<<(std::ostream &out, List<T> &l)
 }
 
 static inline std::ostream&
-operator<<(std::ostream &out, SELECT_LEX &select_lex)
+operator<<(std::ostream &out, const SELECT_LEX &select_lex)
 {
     // TODO(stephentu): mysql's select print is
     // missing some parts, like procedure, into outfile,
     // for update, and lock in share mode
     String s;
-    THD *t = current_thd;
-    select_lex.print(t, &s, QT_ORDINARY);
+    const_cast<SELECT_LEX &>(select_lex).print(current_thd, &s,
+                                               QT_ORDINARY);
     return out << s;
 }
 
@@ -244,7 +246,10 @@ operator<<(std::ostream &out, Create_field &f)
     // mandatory (length) cases
     case MYSQL_TYPE_VARCHAR:
     case MYSQL_TYPE_VAR_STRING:
-        assert(f.length);
+        // mysql accepts zero length fields
+        if (0 == f.length) {
+            std::cerr << "WARN: Creating zero length field!" << std::endl;
+        }
         out << "(" << f.length << ")";
         break;
 
@@ -373,6 +378,8 @@ string_to_lex_str(const std::string &s)
 
 static std::ostream&
 operator<<(std::ostream &out, enum legacy_db_type db_type) {
+    out << "InnoDB";
+    /*
     switch (db_type) {
     case DB_TYPE_INNODB: {out << "InnoDB"; break;}
     case DB_TYPE_ISAM: {out << "ISAM"; break;}
@@ -382,6 +389,7 @@ operator<<(std::ostream &out, enum legacy_db_type db_type) {
         assert_s(false, "stringify does not know how to print db_type "
                         + strFromVal((uint)db_type));
     }
+    */
 
     return out;
 }
@@ -513,7 +521,11 @@ static std::string prefix_drop_column(Alter_drop adrop) {
 
 static std::string prefix_drop_index(Alter_drop adrop) {
     std::ostringstream ss;
-    ss << "DROP INDEX " << adrop;
+    if (equalsIgnoreCase(adrop.name, "PRIMARY")) {
+        ss << "DROP PRIMARY KEY";
+    } else {
+        ss << "DROP INDEX " << adrop;
+    }
     return ss.str();
 }
 
@@ -542,12 +554,49 @@ prefix_add_index(Key key)
 {
     const std::string index_name = convert_lex_str(key.name);
     std::ostringstream key_output;
-    key_output << " ADD INDEX " << index_name << " ("
-               << ListJoin<Key_part_spec>(key.columns, ",",
+    if (Key::PRIMARY == key.type) {
+        key_output << " ADD PRIMARY KEY (";
+    } else {
+        key_output << " ADD INDEX " << index_name << " (";
+    }
+    key_output << ListJoin<Key_part_spec>(key.columns, ",",
                                           do_prefix_add_index())
                << ")";
+
     return key_output.str();
 }
+
+static std::string
+enableOrDisableKeysOutput(const LEX &lex)
+{
+    auto key_status = lex.alter_info.keys_onoff;
+    const std::string &out =
+        TypeText<enum_enable_or_disable>::toText(key_status) +
+        " KEYS";
+
+    return out;
+}
+
+/*
+static std::string
+prettyLockType(enum thr_lock_type lock_type)
+{
+    switch (lock_type) {
+        case TL_READ:
+        case TL_READ_NO_INSERT:
+            return "READ";
+        case TL_WRITE:
+        case TL_WRITE_DEFAULT:
+            return "WRITE";
+        default:
+            // FIXME: Use TEST_TextMessageError
+            std::cerr << "Unsupported lock type: " << lock_type
+                      << std::endl;
+            assert(false);
+    }
+}
+*/
+
 static inline std::ostream&
 operator<<(std::ostream &out, LEX &lex)
 {
@@ -758,8 +807,26 @@ operator<<(std::ostream &out, LEX &lex)
         }
         break;
 
+    case SQLCOM_CREATE_DB:
+        out << "create database ";
+        if (lex.create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS) {
+            out << "if not exists ";
+        }
+
+        out << convert_lex_str(lex.name);
+        break;
+
     case SQLCOM_CHANGE_DB:
         out << "USE " << lex.select_lex.db;
+        break;
+
+    case SQLCOM_DROP_DB:
+        out << "drop database ";
+        if (lex.drop_if_exists) {
+            out << "if exists ";
+        }
+
+        out << convert_lex_str(lex.name);
         break;
 
     case SQLCOM_BEGIN:
@@ -795,30 +862,66 @@ operator<<(std::ostream &out, LEX &lex)
      *
      * ALTER TABLE t DROP COLUMN c, DROP COLUMN d;
      */
-    case SQLCOM_ALTER_TABLE:
+    case SQLCOM_ALTER_TABLE: {
         out << "ALTER TABLE";
         lex.select_lex.table_list.first->print(t, &s, QT_ORDINARY);
         out << " " << s;
 
+        bool prev = false;
         // TODO: Support other flags.
         // ALTER_ADD_COLUMN, ALTER_CHANGE_COLUMN, ALTER_ADD_INDEX,
         // ALTER_DROP_INDEX, ALTER_FOREIGN_KEY
         if (lex.alter_info.flags & ALTER_DROP_COLUMN) {
             out << " " << ListJoin<Alter_drop>(lex.alter_info.drop_list,
                                                ",", prefix_drop_column);
-        } else if (lex.alter_info.flags & ALTER_ADD_COLUMN) {
-            out << " " << ListJoin<Create_field>(lex.alter_info.create_list,
-                                                 ",", prefix_add_column);
-        } else if (lex.alter_info.flags & ALTER_ADD_INDEX) {
-            out << " " << ListJoin<Key>(lex.alter_info.key_list, ",",
-                                        prefix_add_index);
-        } else if (lex.alter_info.flags & ALTER_DROP_INDEX) {
-            out << " " << ListJoin<Alter_drop>(lex.alter_info.drop_list,
-                                               ",", prefix_drop_index);
-        } else {
-            throw CryptDBError("Unsupported ALTER in stringify");
+            prev = true;
         }
 
+        if (lex.alter_info.flags & ALTER_ADD_COLUMN) {
+            if (true == prev) {
+                out << ", ";
+            }
+            out << " " <<ListJoin<Create_field>(lex.alter_info.create_list,
+                                                 ",", prefix_add_column);
+            prev = true;
+        }
+
+        if (lex.alter_info.flags & ALTER_ADD_INDEX) {
+            if (true == prev) {
+                out << ", ";
+            }
+            out << " " << ListJoin<Key>(lex.alter_info.key_list, ",",
+                                        prefix_add_index);
+            prev = true;
+        }
+
+        if (lex.alter_info.flags & ALTER_DROP_INDEX) {
+            if (true == prev) {
+                out << ", ";
+            }
+            out << " " << ListJoin<Alter_drop>(lex.alter_info.drop_list,
+                                               ",", prefix_drop_index);
+            prev = true;
+        }
+
+        if (lex.alter_info.flags & ALTER_KEYS_ONOFF) {
+            if (true == prev) {
+                out << ", ";
+            }
+            out << " " << enableOrDisableKeysOutput(lex);
+            prev = true;
+        }
+
+        break;
+    }
+
+    case SQLCOM_LOCK_TABLES:
+        // HACK: prettyLockType(...) should be used.
+        out << "do 0";
+        break;
+
+    case SQLCOM_UNLOCK_TABLES:
+        out << " UNLOCK TABLES";
         break;
 
     case SQLCOM_SET_OPTION:

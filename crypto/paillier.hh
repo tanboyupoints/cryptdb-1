@@ -35,7 +35,7 @@ class Paillier {
     template<class PackT>
     NTL::ZZ encrypt_pack(const std::vector<PackT> &items) {
         uint32_t npack = pack_count<PackT>();
-        assert(items.size() == npack);
+        throw_c(items.size() == npack);
 
         NTL::ZZ sum = NTL::to_ZZ(0);
         for (uint i = 0; i < npack; i++)
@@ -46,7 +46,7 @@ class Paillier {
     template<class PackT>
     NTL::ZZ add_pack(const NTL::ZZ &agg, const NTL::ZZ &pack, uint32_t packidx) {
         uint32_t npack = pack_count<PackT>();
-        assert(packidx < npack);
+        throw_c(packidx < npack);
 
         NTL::ZZ s = mul(pack, NTL::to_ZZ(1) << (npack-1-packidx) * (sizeof(PackT)*8));
         return add(agg, s);
@@ -69,7 +69,7 @@ class Paillier {
         }
 
         void add(const NTL::ZZ &pack, uint32_t packidx) {
-            assert(packidx <= aggs.size());
+            throw_c(packidx <= aggs.size());
             aggs[packidx] = p->add(aggs[packidx], pack);
         }
 
@@ -85,7 +85,7 @@ class Paillier {
     template<class PackT>
     NTL::ZZ encrypt_pack2(const std::vector<PackT> &items) {
         uint32_t npack = pack2_count<PackT>();
-        assert(items.size() == npack);
+        throw_c(items.size() == npack);
 
         NTL::ZZ sum = NTL::to_ZZ(0);
         for (uint i = 0; i < npack; i++)

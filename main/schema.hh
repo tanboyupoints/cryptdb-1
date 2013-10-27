@@ -1,13 +1,13 @@
 #pragma once
 
 #include <util/onions.hh>
-
+#include <util/enum_text.hh>
 #include <parser/embedmysql.hh>
 #include <parser/stringify.hh>
 #include <main/CryptoHandlers.hh>
 #include <main/Translator.hh>
-#include <main/enum_text.hh>
 #include <main/dbobject.hh>
+#include <main/macro_util.hh>
 #include <string>
 #include <map>
 #include <list>
@@ -19,7 +19,7 @@
 // SchemaInfo/TableMeta/FieldMeta/OnionMeta/EncLayer and the keys.
 
 class Analysis;
-struct FieldMeta;
+class FieldMeta;
 
 /*
  * The name must be unique as it is used as a unique identifier when
@@ -41,10 +41,6 @@ public:
               const AES_KEY * const m_key, Create_field * const cf,
               unsigned long uniq_count);
 
-    static std::unique_ptr<OnionMeta>
-        copyWithNewName(const OnionMeta * const om,
-                        const std::string &name);
-
     // Restore.
     static std::unique_ptr<OnionMeta>
         deserialize(unsigned int id, const std::string &serial);
@@ -57,10 +53,10 @@ public:
     // FIXME: Use rtti.
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
-    std::vector<std::shared_ptr<DBMeta>>
+    std::vector<DBMeta *>
         fetchChildren(const std::unique_ptr<Connect> &e_conn);
-    void applyToChildren(std::function<void(std::shared_ptr<DBMeta>)>) const;
-    AbstractMetaKey *getKey(const DBMeta *const child) const;
+    bool applyToChildren(std::function<bool(const DBMeta &)>) const;
+    UIntMetaKey const &getKey(const DBMeta &child) const;
     EncLayer *getLayerBack() const;
     EncLayer *getLayer(const SECLEVEL &sl) const;
     bool hasEncLayer(const SECLEVEL &sl) const;
@@ -69,23 +65,23 @@ public:
     // Need access to layers.
     friend class Analysis;
     friend class FieldMeta;
-    friend bool sanityCheck(FieldMeta * const);
+    friend class OnionMetaAdjustor;
+    friend bool sanityCheck(FieldMeta &);
     friend Item *decrypt_item_layers(Item *const, const FieldMeta *const,
-                                     onion, uint64_t,
-                                     const std::vector<Item *> &);
+                                     onion, uint64_t);
 
 private:
-    std::vector<std::shared_ptr<EncLayer>> layers; // first in list is
+    std::vector<std::unique_ptr<EncLayer>> layers; // first in list is
                                                    // lowest layer
     constexpr static const char *type_name = "onionMeta";
     const std::string onionname;
     unsigned long uniq_count;
+    mutable std::list<std::unique_ptr<UIntMetaKey>> generated_keys;
 
-    SECLEVEL getSecLevel();
-    void removeLayerBack();
+    SECLEVEL getSecLevel() const;
 } OnionMeta;
 
-struct TableMeta;
+class TableMeta;
 //TODO: FieldMeta and TableMeta are partly duplicates with the original
 // FieldMetadata an TableMetadata
 // which contains data we want to add to this structure soon
@@ -93,8 +89,6 @@ typedef class FieldMeta : public MappedDBMeta<OnionMeta, OnionMetaKey> {
 public:
     const std::string fname;
     const std::string salt_name;
-    const onionlayout onion_layout;
-    const bool has_salt; //whether this field has its own salt
 
     // New.
     FieldMeta(const std::string &name, Create_field * const field,
@@ -118,7 +112,7 @@ public:
 
     std::string serialize(const DBObject &parent) const;
     std::string stringify() const;
-    std::vector<std::pair<OnionMetaKey *, OnionMeta *>>
+    std::vector<std::pair<const OnionMetaKey *, OnionMeta *>>
         orderedOnionMetas() const;
     std::string getSaltName() const;
     unsigned long getUniq() const {return uniq_count;}
@@ -135,9 +129,13 @@ public:
     bool hasOnion(onion o) const;
     bool hasDefault() const {return has_default;}
     std::string defaultValue() const {return default_value;}
+    const onionlayout &getOnionLayout() const {return onion_layout;}
+    bool getHasSalt() const {return has_salt;}
 
 private:
     constexpr static const char *type_name = "fieldMeta";
+    const onionlayout onion_layout;
+    const bool has_salt; //whether this field has its own salt
     const SECURITY_RATING sec_rating;
     unsigned long uniq_count;
     unsigned long counter;
@@ -145,7 +143,6 @@ private:
     const std::string default_value;
 
     SECLEVEL getOnionLevel(onion o) const;
-    bool setOnionLevel(onion o, SECLEVEL maxl);
     static onionlayout determineOnionLayout(const AES_KEY *const m_key,
                                             const Create_field *const f,
                                             SECURITY_RATING sec_rating);
@@ -198,31 +195,46 @@ private:
                                  onion o) const;
 } TableMeta;
 
+class DatabaseMeta : public MappedDBMeta<TableMeta, IdentityMetaKey> {
+public:
+    // New DatabaseMeta.
+    DatabaseMeta() : MappedDBMeta(0) {}
+    // Restore.
+    static std::unique_ptr<DatabaseMeta>
+        deserialize(unsigned int id, const std::string &serial);
+    DatabaseMeta(unsigned int id) : MappedDBMeta(id) {}
+
+    ~DatabaseMeta() {}
+
+    std::string serialize(const DBObject &parent) const;
+    // FIXME: rtti
+    std::string typeName() const {return type_name;}
+    static std::string instanceTypeName() {return type_name;}
+
+private:
+    constexpr static const char *type_name = "databaseMeta";
+};
 
 // AWARE: Table/Field aliases __WILL NOT__ be looked up when calling from
 // this level or below. Use Analysis::* if you need aliasing.
-typedef class SchemaInfo : public MappedDBMeta<TableMeta, IdentityMetaKey> {
+typedef class SchemaInfo : public MappedDBMeta<DatabaseMeta,
+                                               IdentityMetaKey> {
 public:
     SchemaInfo() : MappedDBMeta(0) {}
     ~SchemaInfo() {}
 
     std::string typeName() const {return type_name;}
     static std::string instanceTypeName() {return type_name;}
-    std::string getTableNameFromFieldMeta(const FieldMeta * const fm)
-        const;
-
-    friend class Analysis;
 
 private:
     constexpr static const char *type_name = "schemaInfo";
 
-    // These functions do not support Aliasing, use Analysis::getTableMeta
-    // and Analysis::getFieldMeta.
-    FieldMeta * getFieldMeta(const std::string &table,
-                             const std::string &field) const;
     std::string serialize(const DBObject &parent) const
     {
-        throw CryptDBError("SchemaInfo can not be serialized!");
+        FAIL_TextMessageError("SchemaInfo can not be serialized!");
     }
 } SchemaInfo;
+
+bool
+IsMySQLTypeNumeric(enum_field_types t);
 

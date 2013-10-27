@@ -11,50 +11,40 @@
 template <typename Input, typename FetchMe>
 class Dispatcher {
 public:
-    bool addHandler(long long cmd, FetchMe h) {
+    virtual ~Dispatcher() {}
+
+    bool addHandler(long long cmd, FetchMe *const h) {
+        if (NULL == h) {
+            return false;
+        }
+
         auto it = handlers.find(cmd);
         if (handlers.end() != it) {
             return false;
         }
-	
-        handlers[cmd] = h;
+
+        handlers[cmd] = std::unique_ptr<FetchMe>(h);
         return true;
     }
 
-    bool canDo(Input lex) const {
-        return handlers.end() != handlers.find(extract(lex));
-    }
+    virtual bool canDo(LEX *const lex) const = 0;
 
-    const FetchMe dispatch(Input lex) const {
-        auto it = handlers.find(extract(lex));
-        if (handlers.end() == it) {
-            return NULL;
-        } else {
-            return it->second;
-        }
-    }
+protected:
+    std::map<long long, std::unique_ptr<FetchMe>> handlers;
+};
 
-    std::map<long long, FetchMe> handlers;
-
-    virtual ~Dispatcher() {
-        auto cp = handlers;
-        handlers.clear();
-	
-        for (auto it : cp) {
-            delete it.second;
-        }
-    }
+class SQLDispatcher : public Dispatcher<LEX*, SQLHandler> {
+public:
+    bool canDo(LEX *const lex) const;
+    const SQLHandler &dispatch(LEX *const lex) const;
 
 private:
-    virtual long long extract(Input lex) const = 0;
+    virtual long long extract(LEX *const lex) const;
 };
 
-class SQLDispatcher : public Dispatcher<LEX*, SQLHandler*> {
-    virtual long long extract(LEX* lex) const;
-};
-
-class AlterDispatcher : public Dispatcher<LEX*, AlterSubHandler*> {
-    virtual long long extract(LEX* lex) const;
-    long calculateMask() const;
+class AlterDispatcher : public Dispatcher<LEX*, AlterSubHandler> {
+public:
+    std::vector<AlterSubHandler *> dispatch(LEX *const lex) const;
+    bool canDo(LEX *const lex) const;
 };
 

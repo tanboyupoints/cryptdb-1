@@ -58,7 +58,7 @@ static inline std::string &trim(std::string &s) {
 }
 
 /** returns true if should stop, to keep looping */
-static bool handle_line(ProxyState& ps, const std::string& q)
+static bool handle_line(ProxyState& ps, const std::string& q, bool pp=true)
 {
   if (q == "\\q") {
     std::cerr << "Goodbye!\n";
@@ -92,14 +92,38 @@ static bool handle_line(ProxyState& ps, const std::string& q)
   }
 
   static SchemaCache schema_cache;
-  return executeQuery(ps, q, &schema_cache);
+  try {
+      const std::string &default_db =
+          getDefaultDatabaseForConnection(ps.getConn());
+      const EpilogueResult &epi_result =
+          executeQuery(ps, q, default_db, &schema_cache, pp);
+      if (QueryAction::ROLLBACK == epi_result.action) {
+          std::cout << GREEN_BEGIN << "ROLLBACK issued!" << COLOR_END
+                    << std::endl;
+      }
+      return epi_result.res_type.success();
+  } catch (const SynchronizationException &e) {
+      std::cout << e << std::endl;
+      return true;
+  } catch (const AbstractException &e) {
+      std::cout << e << std::endl;
+      return true;
+  }  catch (const CryptDBError &e) {
+      std::cout << "Low level error: " << e.msg << std::endl;
+      return true;
+  } catch (const std::runtime_error &e) {
+      std::cout << "Unexpected Error: " << e.what() << std::endl;
+      return false;
+  }
 }
 
 int
 main(int ac, char **av)
 {
-    if (ac != 2) {
-        std::cerr << "Usage: " << av[0] << " embed-db " << std::endl;
+    if (ac != 3) {
+        std::cerr << std::endl << "Usage: " << av[0]
+                  << " <embedded-db-path> <to-be-encrypted-db-name>"
+                  << std::endl << std::endl;
         exit(1);
     }
 
@@ -109,7 +133,16 @@ main(int ac, char **av)
 
     ConnectionInfo ci("localhost", "root", "letmein");
     const std::string master_key = "2392834";
-    ProxyState ps(ci, av[1], "cryptdbtest", master_key);
+    ProxyState ps(ci, av[1], master_key);
+    const std::string create_db =
+        "CREATE DATABASE IF NOT EXISTS " + std::string(av[2]);
+    if (!handle_line(ps, create_db, false)) {
+        return 1;
+    }
+    const std::string use_db = "USE " + std::string(av[2]);
+    if (!handle_line(ps, use_db, false)) {
+        return 1;
+    }
 
     const std::string prompt = BOLD_BEGIN + "CryptDB=#" + COLOR_END + " ";
 

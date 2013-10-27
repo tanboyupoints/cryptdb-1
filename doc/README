@@ -1,18 +1,35 @@
 CryptDB: http://css.csail.mit.edu/cryptdb
 Wiki: https://github.com/burrows-labs/cryptdb-wiki/wiki/_pages
 
+Convention : When this document uses syntax like
+                single-quote text single-quote
+                + 'some-text-here'
+                + 'a second example'
+             Such indicates that the reader is to use the value _without_
+             the single-quotes.
+
 #########################################
 #########################################
 ########### Getting Started #############
 #########################################
 #########################################
-    > Build CryptDB, as described in doc/BUILD.
-    > Username/Password
+    * Build CryptDB using the installation script.
+      > note, this script will stop and start your mysql instance.
+      > scripts/install.rb <path-to-cryptdb>
+        + <path-to-cryptdb> should just be '.' if you are in the cryptdb
+          directory
+        + the script will likely require root privileges in order to
+          install dependencies and UDFs.
+    * Username/Password
         By default cryptdb uses 'root' for the username and 'letmein'
         for the password. You can change this by modifying the source.
-            + Tests: Currently the tests require root/letmein
-            + Shell: main/cdb_test.cc line 109.
-            + Proxy: mysqlproxy/wrapper.lua line 17.
+            + Tests: test/test_utils.hh
+            + Shell: main/cdb_test.cc
+            + Proxy: mysqlproxy/wrapper.lua
+    * Rebuildling CryptDB
+        If you modify the source and want to rebuild, issue 'make' in the
+        cryptdb directory.  If you change the UDFs you will also need to do
+        'make install' (which will likely require root privilege).
 
 #########################################
 #########################################
@@ -20,23 +37,26 @@ Wiki: https://github.com/burrows-labs/cryptdb-wiki/wiki/_pages
 #########################################
 #########################################
 
+    Set (or place in your .bashrc):
+    > export EDBDIR=/full/path/to/cryptdb/	
+
     I. Shell
-        > To Start: obj/main/cdb_test  /var/lib/shadow-mysql
+        > To Start: obj/main/cdb_test  ./shadow <some-database-name>
         > Type SQL queries that will be encrypted.
 
     II. Proxy
-        > To Start: 
-            export EDBDIR=./cryptdb/obj
-            mysql-proxy --plugins=proxy --event-threads=4 \
-                        --max-open-files=1024 \
-                        --proxy-lua-script=$EDBDIR/../mysqlproxy/wrapper.lua \
-                        --proxy-address=127.0.0.1:3307 \
-                        --proxy-backend-addresses=localhost:3306
+        A) To Start: 
+             > /path/to/cryptdb/bins/proxy-bin/bin/mysql-proxy         \
+                         --plugins=proxy --event-threads=4             \
+                         --max-open-files=1024                         \
+                         --proxy-lua-script=$EDBDIR/mysqlproxy/wrapper.lua \
+                         --proxy-address=127.0.0.1:3307                \
+                         --proxy-backend-addresses=localhost:3306
 
-        > Connect to CryptDB: (where root/letmein are username/password)
-            mysql -u root -pletmein -h 127.0.0.1 -P 3307 cryptdbtest
-        > Type queries that will execute on encrypted data at the DB
-          server!
+        B) Connect to CryptDB: (where root/letmein are username/password)
+           mysql -u root -pletmein -h 127.0.0.1 -P 3307
+        C) CREATE a database; USE it; Then type queries that will execute
+           on encrypted data at the DB server!
 
     III. Tests
         > To Start:
@@ -52,7 +72,7 @@ Wiki: https://github.com/burrows-labs/cryptdb-wiki/wiki/_pages
       can fail for a few reasons.
       I) CryptDB can support the query, but we have not yet implemented it.
          This should throw an UNIMPLEMENTED exception.
-      II) CryptDB can not support this type of query, likely
+      II) CryptDB can not support this type of query, likely for
           cryptographic reasons. The error should include a message telling
           you more about the issue.
 
@@ -67,7 +87,7 @@ Wiki: https://github.com/burrows-labs/cryptdb-wiki/wiki/_pages
             In the case of this query, you can see that it would like
             to compare order with onion 1 (OPE), 4 (PLAIN) or 6 (WAIT).
 
-            But if you look at it's first child 'additive', you can see
+            But if you look at it's first child "additive", you can see
             that it would like to use the HOM onion.  Because the HOM
             onion is not supported by the order operation, the query
             fails and gives you this error message.
@@ -76,6 +96,7 @@ Wiki: https://github.com/burrows-labs/cryptdb-wiki/wiki/_pages
             how MySQL operations correspond to the cryptographic onions.
       III) State corruption (ie a bug in our code), this will likely lead
            to a crash.
+      IV) Invalid query; problem with the query syntax.
 
 #########################################
 #########################################
@@ -83,20 +104,18 @@ Wiki: https://github.com/burrows-labs/cryptdb-wiki/wiki/_pages
 #########################################
 #########################################
 
-    > For example queries, take a look at our tests test/TestQueries.cc
     > The benchmarks in the CryptDB paper are based on an older version of
-      CryptDB and likely do not reflect current performance.  It is our
-      intention to improve the performance of this new version.
+      CryptDB. We have added new features and functionality to the current
+      version which we have not yet optimized (but it is part of our
+      roadmap).
+    > For example queries, take a look at our tests test/TestQueries.cc
     > Consider connecting directly to MySQL to see what is in the raw
       database.
-    > Cleaning the embedded database.
-        + To get a fresh embedded database to work with, issue these
-          commands.
-            $ rm -r /var/lib/shadow-mysql/*
-            $ mysql -u root -pletmein -e "drop database cryptdbtest"
-            $ mysql -u root -pletmein -e "create database cryptdbtest"
-            $ mysql -u root -pletmein -e "drop database cryptdbtest_control"
-            $ mysql -u root -pletmein -e "create database cryptdbtest_control"
+    > Resetting state (e.g., after running tests)
+        > Take a look at scripts/refresh.sh ; you probably want that.
+        > If you create a database in cryptdb and then reset
+          the state without first dropping the database from _within_
+          cryptdb; you will need to drop it from the regular mysql client.
     > Modifying the UDFs.
         + If you make changes to edb/udf.cc, you must reinstall the UDFs
           before your changes will take affect.

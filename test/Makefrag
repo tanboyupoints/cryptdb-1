@@ -11,7 +11,7 @@ TEST_OBJS := $(patsubst %.cc,$(OBJDIR)/test/%.o,$(TEST_SRCS))
 $(OBJDIR)/test/test: $(TEST_OBJS) \
 		     $(OBJDIR)/libcryptdb.so $(OBJDIR)/libedbcrypto.so \
 		     $(OBJDIR)/libedbutil.so $(OBJDIR)/libedbparser.so
-	$(CXX) -o $@ $(TEST_OBJS) $(LDFLAGS) \
+	$(CXX) -o $@ $(TEST_OBJS) $(LDFLAGS) $(LDRPATH) \
 	       -lcryptdb -ledbcrypto -ledbutil -ledbparser
 
 # vim: set noexpandtab:

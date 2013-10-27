@@ -18,16 +18,24 @@ class WrapperState {
 
 public:
     std::string last_query;
+    std::string default_db;
     std::ofstream * PLAIN_LOG;
-    std::string cur_db;
-    QueryRewrite * qr;
 
     WrapperState() {}
     ~WrapperState() {}
 
     SchemaCache &getSchemaCache() {return schema_cache;}
+    const std::unique_ptr<QueryRewrite> &getQueryRewrite() const {
+        assert(this->qr);
+        return this->qr;
+    }
+    void setQueryRewrite(QueryRewrite *const in_qr) {
+        // assert(!this->qr);
+        this->qr = std::unique_ptr<QueryRewrite>(in_qr);
+    }
 
 private:
+    std::unique_ptr<QueryRewrite> qr;
     SchemaCache schema_cache;
 };
 
@@ -63,7 +71,12 @@ make_item_by_type(const std::string &value, enum_field_types type)
     case MYSQL_TYPE_LONGLONG:
     case MYSQL_TYPE_INT24:
     case MYSQL_TYPE_TINY:
-        i = new Item_int(static_cast<long long>(valFromStr(value)));
+        i = new (current_thd->mem_root) Item_int(static_cast<long long>(valFromStr(value)));
+        break;
+
+    case MYSQL_TYPE_DOUBLE:
+        i = new (current_thd->mem_root) Item_float(value.c_str(),
+                                                   value.size());
         break;
 
     case MYSQL_TYPE_BLOB:
@@ -77,8 +90,9 @@ make_item_by_type(const std::string &value, enum_field_types type)
     case MYSQL_TYPE_NEWDATE:
     case MYSQL_TYPE_TIME:
     case MYSQL_TYPE_DATETIME:
-        i = new Item_string(make_thd_string(value), value.length(),
-                            &my_charset_bin);
+        i = new (current_thd->mem_root) Item_string(make_thd_string(value),
+                                                    value.length(),
+                                                    &my_charset_bin);
         break;
 
     default:
@@ -147,11 +161,11 @@ connect(lua_State *const L)
         const char * ev = getenv("ENC_BY_DEFAULT");
         if (ev && equalsIgnoreCase(false_str, ev)) {
             std::cerr << "\n\n enc by default false " << "\n\n";
-            ps = new ProxyState(ci, embed_dir, dbname, mkey,
+            ps = new ProxyState(ci, embed_dir, mkey,
                                 SECURITY_RATING::PLAIN);
         } else {
             std::cerr << "\n\nenc by default true" << "\n\n";
-            ps = new ProxyState(ci, embed_dir, dbname, mkey,
+            ps = new ProxyState(ci, embed_dir, mkey,
                                 SECURITY_RATING::BEST_EFFORT);
         }
 
@@ -210,8 +224,6 @@ connect(lua_State *const L)
         }
     }
 
-
-
     return 0;
 }
 
@@ -228,16 +240,19 @@ disconnect(lua_State *const L)
     }
 
     LOG(wrapper) << "disconnect " << client;
-    if (clients[client]->qr) {
-        delete clients[client]->qr;
-    }
-    delete clients[client];
+
+    auto ws = clients[client];
+    clients[client] = NULL;
+
+    SchemaCache &schema_cache = ws->getSchemaCache();
+    TEST_TextMessageError(schema_cache.cleanupStaleness(ps->getEConn()),
+                          "Failed to cleanup staleness!");
+    delete ws;
     clients.erase(client);
 
     return 0;
 }
 
-// FIXME: Use TELL policy.
 static int
 rewrite(lua_State *const L)
 {
@@ -252,10 +267,10 @@ rewrite(lua_State *const L)
     WrapperState *const c_wrapper = clients[client];
 
     const std::string query = xlua_tolstring(L, 2);
-    const std::string query_data = xlua_tolstring(L, 3);
+    const unsigned long long _thread_id =
+        strtoull(xlua_tolstring(L, 3).c_str(), NULL, 10);
 
     std::list<std::string> new_queries;
-    AssignOnce<PREAMBLE_STATUS> preamble_status;
 
     c_wrapper->last_query = query;
     t.lap_ms();
@@ -263,22 +278,33 @@ rewrite(lua_State *const L)
         try {
             assert(ps);
 
-            QueryRewrite *qr = NULL;
             SchemaCache &schema_cache = c_wrapper->getSchemaCache();
-            SchemaInfo *const schema =
-                schema_cache.getSchema(ps->getConn(), ps->getEConn());
-            preamble_status =
-                queryPreamble(*ps, query, &qr, &new_queries, schema);
-
+            std::unique_ptr<QueryRewrite> qr;
+            TEST_TextMessageError(retrieveDefaultDatabase(_thread_id,
+                                                          ps->getConn(),
+                                            &c_wrapper->default_db),
+                            "proxy failed to retrieve default database!");
+            queryPreamble(*ps, query, &qr, &new_queries, &schema_cache,
+                          c_wrapper->default_db);
             assert(qr);
-            assert(preamble_status.get() != PREAMBLE_STATUS::FAILURE);
 
-            c_wrapper->qr = qr;
-        } catch (CryptDBError &e) {
+            c_wrapper->setQueryRewrite(qr.release());
+        } catch (const SynchronizationException &e) {
+            lua_pushboolean(L, false);              // status
+            xlua_pushlstring(L, e.to_string());     // error message
+            lua_pushnil(L);                         // new queries
+            return 3;
+        } catch (const AbstractException &e) {
+            lua_pushboolean(L, false);              // status
+            xlua_pushlstring(L, e.to_string());     // error message
+            lua_pushnil(L);                         // new queries
+            return 3;
+        } catch (const CryptDBError &e) {
             LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
-            lua_pushboolean(L, false);
-            lua_pushnil(L);
-            return 2;
+            lua_pushboolean(L, false);              // status
+            xlua_pushlstring(L, e.msg);             // error message
+            lua_pushnil(L);                         // new queries
+            return 3;
         }
     }
 
@@ -286,10 +312,8 @@ rewrite(lua_State *const L)
         *(c_wrapper->PLAIN_LOG) << query << "\n";
     }
 
-    assert(PREAMBLE_STATUS::SUCCESS == preamble_status.get() ||
-           (PREAMBLE_STATUS::ROLLBACK == preamble_status.get() &&
-            new_queries.size() == 1));
-    lua_pushboolean(L, PREAMBLE_STATUS::ROLLBACK == preamble_status.get());
+    lua_pushboolean(L, true);                       // status
+    lua_pushnil(L);                                 // error message
 
     // NOTE: Potentially out of int range.
     assert(new_queries.size() < INT_MAX);
@@ -297,67 +321,20 @@ rewrite(lua_State *const L)
     const int top = lua_gettop(L);
     int index = 1;
     for (auto it : new_queries) {
-        xlua_pushlstring(L, it);
+        xlua_pushlstring(L, it);                    // new queries
         lua_rawseti(L, top, index);
         index++;
     }
 
-    return 2;
+    return 3;
 }
 
-static int
-queryFailure(lua_State *const L)
-{
-    ANON_REGION(__func__, &perf_cg);
-    scoped_lock l(&big_lock);
-    assert(0 == mysql_thread_init());
-
-    const std::string client = xlua_tolstring(L, 1);
-    if (clients.find(client) == clients.end()) {
-        throw CryptDBError("Failed to properly handle failed query!");
-    }
-
-    assert(EXECUTE_QUERIES);
-
-    assert(ps);
-    assert(clients[client]->qr);
-
-    QueryRewrite *const qr = clients[client]->qr;
-    assert(qr->output->handleQueryFailure(ps->getEConn()));
-
-    return 0;
-}
-
-static int
-rollbackOnionAdjust(lua_State *const L)
-{
-    ANON_REGION(__func__, &perf_cg);
-    scoped_lock l(&big_lock);
-    assert(0 == mysql_thread_init());
-
-    const std::string client = xlua_tolstring(L, 1);
-    if (clients.find(client) == clients.end()) {
-        return 0;
-    }
-    WrapperState *const c_wrapper = clients[client];
-
-    assert(ps);
-
-    SchemaCache &schema_cache = c_wrapper->getSchemaCache();
-    SchemaInfo *const schema =
-        schema_cache.getSchema(ps->getConn(), ps->getEConn());
-    assert(queryHandleRollback(*ps, c_wrapper->last_query, schema));
-
-    schema_cache.updateStaleness(c_wrapper->qr->output->stalesSchema());
-    return 0;
-}
-
-inline std::vector<Item *>
+inline std::vector<std::shared_ptr<Item> >
 itemNullVector(unsigned int count)
 {
-    std::vector<Item *> out;
+    std::vector<std::shared_ptr<Item> > out;
     for (unsigned int i = 0; i < count; ++i) {
-        out.push_back(make_null());
+        out.push_back(std::shared_ptr<Item>(make_null()));
     }
 
     return out;
@@ -399,7 +376,8 @@ getResTypeFromLuaTable(lua_State *const L, int fields_index,
 
         /* initialize all items to NULL, since Lua skips
            nil array entries */
-        std::vector<Item *> row = itemNullVector(out_res->types.size());
+        std::vector<std::shared_ptr<Item> > row =
+            itemNullVector(out_res->types.size());
 
         lua_pushnil(L);
         while (lua_next(L, -2)) {
@@ -410,7 +388,7 @@ getResTypeFromLuaTable(lua_State *const L, int fields_index,
             const std::string data = xlua_tolstring(L, -1);
             Item *const value =
                 make_item_by_type(data, out_res->types[key]);
-            row[key] = value;
+            row[key] = std::shared_ptr<Item>(value);
 
             lua_pop(L, 1);
         }
@@ -451,20 +429,53 @@ envoi(lua_State *const L)
 
     ResType res;
     getResTypeFromLuaTable(L, 2, 3, &res);
-    assert(c_wrapper->qr);
-    ResType *const out_res =
-        queryEpilogue(*ps, c_wrapper->qr, &res, c_wrapper->last_query,
-                      false);
-    assert(out_res);
+    const std::unique_ptr<QueryRewrite> &qr = c_wrapper->getQueryRewrite();
+    try {
+        const EpilogueResult &epi_result =
+            queryEpilogue(*ps, *qr.get(), res, c_wrapper->last_query,
+                          c_wrapper->default_db, false);
+        if (QueryAction::ROLLBACK == epi_result.action) {
+            lua_pushboolean(L, true);           // success
+            lua_pushboolean(L, true);           // rollback
+            lua_pushnil(L);                     // error message
+            lua_pushnil(L);                     // plaintext fields
+            lua_pushnil(L);                     // plaintext rows
+            return 5;
+        }
 
-    c_wrapper->getSchemaCache().updateStaleness(c_wrapper->qr->output->stalesSchema());
-
-    return returnResultSet(L, *out_res);
+        assert(QueryAction::VANILLA == epi_result.action);
+        return returnResultSet(L, epi_result.res_type);
+    } catch (const SynchronizationException &e) {
+        lua_pushboolean(L, false);              // status
+        lua_pushboolean(L, false);              // rollback
+        xlua_pushlstring(L, e.to_string());     // error message
+        lua_pushnil(L);                         // plaintext fields
+        lua_pushnil(L);                         // plaintext rows
+        return 5;
+    } catch (const AbstractException &e) {
+        lua_pushboolean(L, false);              // status
+        lua_pushboolean(L, false);              // rollback
+        xlua_pushlstring(L, e.to_string());     // error message
+        lua_pushnil(L);                         // plaintext fields
+        lua_pushnil(L);                         // plaintext rows
+        return 5;
+    } catch (const CryptDBError &e) {
+        lua_pushboolean(L, false);              // status
+        lua_pushboolean(L, false);              // rollback
+        xlua_pushlstring(L, e.msg);             // error message
+        lua_pushnil(L);                         // plaintext fields
+        lua_pushnil(L);                         // plaintext rows
+        return 5;
+    }
 }
 
 static int
 returnResultSet(lua_State *const L, const ResType &rd)
 {
+    lua_pushboolean(L, true);                   // status
+    lua_pushboolean(L, false);                  // rollback
+    lua_pushnil(L);                             // error message
+
     /* return decrypted result set */
     lua_createtable(L, (int)rd.names.size(), 0);
     int const t_fields = lua_gettop(L);
@@ -473,7 +484,7 @@ returnResultSet(lua_State *const L, const ResType &rd)
         int const t_field = lua_gettop(L);
 
         /* set name for field */
-        xlua_pushlstring(L, rd.names[i]);
+        xlua_pushlstring(L, rd.names[i]);       // plaintext fields
         lua_setfield(L, t_field, "name");
 
 /*
@@ -495,9 +506,10 @@ returnResultSet(lua_State *const L, const ResType &rd)
 
         for (uint j = 0; j < rd.rows[i].size(); j++) {
             if (NULL == rd.rows[i][j]) {
-                lua_pushnil(L);
+                lua_pushnil(L);                 // plaintext rows
             } else {
-                xlua_pushlstring(L, ItemToString(rd.rows[i][j]));
+                xlua_pushlstring(L,             // plaintext rows
+                                 ItemToString(*rd.rows[i][j]));
             }
             lua_rawseti(L, t_row, j+1);
         }
@@ -505,7 +517,7 @@ returnResultSet(lua_State *const L, const ResType &rd)
         lua_rawseti(L, t_rows, i+1);
     }
 
-    return 2;
+    return 5;
 }
 
 static const struct luaL_reg
@@ -515,8 +527,6 @@ cryptdb_lib[] = {
     F(disconnect),
     F(rewrite),
     F(envoi),
-    F(rollbackOnionAdjust),
-    F(queryFailure),
     { 0, 0 },
 };
 

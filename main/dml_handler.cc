@@ -9,45 +9,56 @@ extern CItemTypesDir itemTypes;
 
 // Prototypes.
 static void
-process_select_lex(LEX *lex, Analysis & a);
-
-static void
 process_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a);
 
 static void
-process_filters_lex(st_select_lex * select_lex, Analysis & a);
+process_filters_lex(const st_select_lex &select_lex, Analysis &a);
 
 static inline void
-analyze_field_value_pair(Item_field * field, Item * val, Analysis & a);
+gatherAndAddAnalysisRewritePlanForFieldValuePair(const Item_field &field,
+                                                 const Item &val,
+                                                 Analysis &a);
 
 static st_select_lex *
-rewrite_filters_lex(st_select_lex *select_lex, Analysis &a);
-
-static void
-rewrite_field_value_pairs(List_iterator<Item> fd_it,
-                          List_iterator<Item> val_it, Analysis &a,
-                          bool *invalids, List<Item> *res_items,
-                          List<Item> *res_values);
+rewrite_filters_lex(const st_select_lex &select_lex, Analysis &a);
 
 static bool
-invalidates(FieldMeta * fm, const EncSet & es);
+rewrite_field_value_pairs(List_iterator<Item> fd_it,
+                          List_iterator<Item> val_it, Analysis &a,
+                          List<Item> *const res_fields,
+                          List<Item> *const res_values);
+
+enum class
+SIMPLE_UPDATE_TYPE {UNSUPPORTED, ON_DUPLICATE_VALUE,
+                    SAME_VALUE, NEW_VALUE};
+
+SIMPLE_UPDATE_TYPE
+determineUpdateType(const Item &value_item, const FieldMeta &fm,
+                    const EncSet &es);
+
+void
+handleUpdateType(SIMPLE_UPDATE_TYPE update_type, const EncSet &es,
+                 const Item_field &field_item, const Item &value_item,
+                 List<Item> *const res_fields,
+                 List<Item> *const res_values, Analysis &a);
 
 template <typename ContainerType>
-void rewriteInsertHelper(Item *const i, Analysis &a, FieldMeta *const fm,
+void rewriteInsertHelper(const Item &i, const FieldMeta &fm, Analysis &a,
                          ContainerType *const append_list)
 {
     std::vector<Item *> l;
-    itemTypes.do_rewrite_insert(i, a, l, fm);
+    itemTypes.do_rewrite_insert(i, fm, a, &l);
     for (auto it : l) {
         append_list->push_back(it);
     }
 }
 
 class InsertHandler : public DMLHandler {
-    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps) const
+    virtual void gather(Analysis &a, LEX *const lex,
+                        const ProxyState &ps) const
     {
-        process_select_lex(lex, a);
+        process_select_lex(lex->select_lex, a);
 
         // -----------------------
         // ON DUPLICATE KEY UPDATE
@@ -62,11 +73,14 @@ class InsertHandler : public DMLHandler {
     virtual LEX *rewrite(Analysis &a, LEX *const lex, const ProxyState &ps)
         const
     {
-        LEX *const new_lex = copy(lex);
+        LEX *const new_lex = copyWithTHD(lex);
 
         const std::string &table =
-                lex->select_lex.table_list.first->table_name;
-        const TableMeta *const tm = a.getTableMeta(table);
+            lex->select_lex.table_list.first->table_name;
+        const std::string &db_name =
+            lex->select_lex.table_list.first->db;
+        TEST_DatabaseDiscrepancy(db_name, a.getDatabaseName());
+        const TableMeta &tm = a.getTableMeta(db_name, table);
 
         //rewrite table name
         new_lex->select_lex.table_list.first =
@@ -75,39 +89,51 @@ class InsertHandler : public DMLHandler {
         // -------------------------
         // Fields (and default data)
         // -------------------------
+        // If the fields list doesn't exist, or is empty; the 'else' of
+        // this code block will put every field into fmVec.
+        // > INSERT INTO t VALUES (1, 2, 3);
+        // > INSERT INTO t () VALUES ();
+        // FIXME: Make vector of references.
         std::vector<FieldMeta *> fmVec;
         std::vector<Item *> implicit_defaults;
         if (lex->field_list.head()) {
             auto it = List_iterator<Item>(lex->field_list);
             List<Item> newList;
             for (;;) {
-                Item *const i = it++;
+                const Item *const i = it++;
                 if (!i) {
                     break;
                 }
                 TEST_TextMessageError(i->type() == Item::FIELD_ITEM,
                                       "Expected field item!");
-                Item_field *const ifd = static_cast<Item_field*>(i);
-                fmVec.push_back(a.getFieldMeta(ifd->table_name,
-                                               ifd->field_name));
-                rewriteInsertHelper(i, a, NULL, &newList);
+                const Item_field *const ifd =
+                    static_cast<const Item_field *>(i);
+                FieldMeta &fm =
+                    a.getFieldMeta(db_name, ifd->table_name,
+                                   ifd->field_name);
+                fmVec.push_back(&fm);
+                rewriteInsertHelper(*i, fm, a, &newList);
             }
 
             // Collect the implicit defaults.
+            // > Such must be done because fields that can not have NULL
+            // will be implicitly converted by mysql sans encryption.
             std::vector<FieldMeta *> field_implicit_defaults =
-                vectorDifference(tm->defaultedFieldMetas(), fmVec);
-            Item_field *const seed_item_field =
+                vectorDifference(tm.defaultedFieldMetas(), fmVec);
+            const Item_field *const seed_item_field =
                 static_cast<Item_field *>(new_lex->field_list.head());
             for (auto implicit_it : field_implicit_defaults) {
                 // Get default fields.
-                Item_field *const item_field =
-                    make_item(seed_item_field, table, implicit_it->fname);
-                rewriteInsertHelper(item_field, a, NULL, &newList);
+                const Item_field *const item_field =
+                    make_item_field(*seed_item_field, table,
+                                    implicit_it->fname);
+                rewriteInsertHelper(*item_field, *implicit_it, a,
+                                    &newList);
 
                 // Get default values.
                 const std::string def_value = implicit_it->defaultValue();
-                rewriteInsertHelper(make_item_string(def_value), a,
-                                    implicit_it, &implicit_defaults);
+                rewriteInsertHelper(*make_item_string(def_value),
+                                    *implicit_it, a, &implicit_defaults);
             }
 
             new_lex->field_list = newList;
@@ -117,7 +143,7 @@ class InsertHandler : public DMLHandler {
             //   values must be explicity INSERTed so we don't have to
             //   take any action with respect to defaults.
             assert(fmVec.empty());
-            std::vector<FieldMeta *> fmetas = tm->orderedFieldMetas();
+            std::vector<FieldMeta *> fmetas = tm.orderedFieldMetas();
             fmVec.assign(fmetas.begin(), fmetas.end());
         }
 
@@ -132,22 +158,31 @@ class InsertHandler : public DMLHandler {
                 if (!li) {
                     break;
                 }
-                assert(li->elements == fmVec.size());
                 List<Item> *const newList0 = new List<Item>();
-                auto it0 = List_iterator<Item>(*li);
-                auto fmVecIt = fmVec.begin();
-                for (;;) {
-                    Item *const i = it0++;
-                    if (!i) {
-                        assert(fmVec.end() == fmVecIt);
-                        break;
+                if (li->elements != fmVec.size()) {
+                    TEST_TextMessageError(0 == li->elements
+                                         && NULL == lex->field_list.head(),
+                                          "size mismatch between fields"
+                                          " and values!");
+                    // Query such as this.
+                    // > INSERT INTO <table> () VALUES ();
+                    // > INSERT INTO <table> VALUES ();
+                } else {
+                    auto it0 = List_iterator<Item>(*li);
+                    auto fmVecIt = fmVec.begin();
+                    for (;;) {
+                        const Item *const i = it0++;
+                        if (!i) {
+                            assert(fmVec.end() == fmVecIt);
+                            break;
+                        }
+                        assert(fmVec.end() != fmVecIt);
+                        rewriteInsertHelper(*i, **fmVecIt, a, newList0);
+                        ++fmVecIt;
                     }
-                    assert(fmVec.end() != fmVecIt);
-                    rewriteInsertHelper(i, a, *fmVecIt, newList0);
-                    ++fmVecIt;
-                }
-                for (auto def_it : implicit_defaults) {
-                    newList0->push_back(def_it);
+                    for (auto def_it : implicit_defaults) {
+                        newList0->push_back(def_it);
+                    }
                 }
                 newList.push_back(newList0);
             }
@@ -160,12 +195,10 @@ class InsertHandler : public DMLHandler {
         {
             auto fd_it = List_iterator<Item>(lex->update_list);
             auto val_it = List_iterator<Item>(lex->value_list);
-            bool invalids;
-            List<Item> res_items, res_values;
-            rewrite_field_value_pairs(fd_it, val_it, a, &invalids,
-                                      &res_items, &res_values);
-            //TODO: cleanup old item and value list
-            new_lex->update_list = res_items;
+            List<Item> res_fields, res_values;
+            assert(rewrite_field_value_pairs(fd_it, val_it, a, &res_fields,
+                                             &res_values));
+            new_lex->update_list = res_fields;
             new_lex->value_list = res_values;
         }
 
@@ -177,7 +210,7 @@ class UpdateHandler : public DMLHandler {
     virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
-        process_table_list(&lex->select_lex.top_join_list, a);
+        process_table_list(lex->select_lex.top_join_list, a);
 
         if (lex->select_lex.item_list.head()) {
             assert(lex->value_list.head());
@@ -187,13 +220,13 @@ class UpdateHandler : public DMLHandler {
             process_field_value_pairs(fd_it, val_it, a);
         }
 
-        process_filters_lex(&lex->select_lex, a);
+        process_filters_lex(lex->select_lex, a);
     }
 
-    virtual  LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
-        LEX * new_lex = copy(lex);
+        LEX *const new_lex = copyWithTHD(lex);
 
         LOG(cdb_v) << "rewriting update \n";
 
@@ -206,7 +239,7 @@ class UpdateHandler : public DMLHandler {
 
         // Rewrite filters
         set_select_lex(new_lex,
-                       rewrite_filters_lex(&new_lex->select_lex, a));
+                       rewrite_filters_lex(new_lex->select_lex, a));
 
         // Rewrite SET values
         assert(lex->select_lex.item_list.head());
@@ -214,50 +247,50 @@ class UpdateHandler : public DMLHandler {
 
         auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
         auto val_it = List_iterator<Item>(lex->value_list);
-        bool invalids;
-        List<Item> res_items, res_values;
-        rewrite_field_value_pairs(fd_it, val_it, a, &invalids,
-                                  &res_items, &res_values);
-        a.special_update = invalids;
-        //TODO: cleanup old item and value list
-        new_lex->select_lex.item_list = res_items;
+        List<Item> res_fields, res_values;
+        a.special_update =
+            false == rewrite_field_value_pairs(fd_it, val_it, a, 
+                                               &res_fields, &res_values);
+        new_lex->select_lex.item_list = res_fields;
         new_lex->value_list = res_values;
         return new_lex;
     }
 };
 
 class DeleteHandler : public DMLHandler {
-    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps)
+    virtual void gather(Analysis &a, LEX *const lex, const ProxyState &ps)
         const
     {
-        process_select_lex(lex, a);
+        process_select_lex(lex->select_lex, a);
     }
+
     virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
-        LEX * new_lex = copy(lex);
+        LEX *const new_lex = copyWithTHD(lex);
         new_lex->query_tables = rewrite_table_list(lex->query_tables, a);
         set_select_lex(new_lex,
-                       rewrite_select_lex(&new_lex->select_lex, a));
+                       rewrite_select_lex(new_lex->select_lex, a));
 
         return new_lex;
     }
 };
 
 class SelectHandler : public DMLHandler {
-    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps)
+    virtual void gather(Analysis &a, LEX *const lex, const ProxyState &ps)
         const
     {
-        process_select_lex(lex, a);
+        process_select_lex(lex->select_lex, a);
     }
+
     virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
-        LEX * new_lex = copy(lex);
+        LEX *const new_lex = copyWithTHD(lex);
         new_lex->select_lex.top_join_list =
             rewrite_table_list(lex->select_lex.top_join_list, a);
         set_select_lex(new_lex,
-            rewrite_select_lex(&new_lex->select_lex, a));
+            rewrite_select_lex(new_lex->select_lex, a));
 
         return new_lex;
     }
@@ -274,19 +307,18 @@ class SelectHandler : public DMLHandler {
 // Helpers.
 
 static void
-process_order(Analysis & a, SQL_I_List<ORDER> & lst) {
-
-    for (ORDER *o = lst.first; o; o = o->next) {
-        analyze(*o->item, a);
+process_order(const SQL_I_List<ORDER> &lst, Analysis &a)
+{
+    for (const ORDER *o = lst.first; o; o = o->next) {
+        gatherAndAddAnalysisRewritePlan(**o->item, a);
     }
 }
 
-//TODO: not clear how these process_*_lex and rewrite_*_lex overlap, cleanup
 static void
-process_filters_lex(st_select_lex * select_lex, Analysis & a) {
-
-    if (select_lex->where) {
-        analyze(select_lex->where, a);
+process_filters_lex(const st_select_lex &select_lex, Analysis &a)
+{
+    if (select_lex.where) {
+        gatherAndAddAnalysisRewritePlan(*select_lex.where, a);
     }
 
     /*if (select_lex->join &&
@@ -294,33 +326,28 @@ process_filters_lex(st_select_lex * select_lex, Analysis & a) {
         select_lex->where != select_lex->join->conds)
         analyze(select_lex->join->conds, reason(FULL_EncSet, "join->conds", select_lex->join->conds, 0), a);*/
 
-    if (select_lex->having) {
-        analyze(select_lex->having, a);
+    if (select_lex.having) {
+        gatherAndAddAnalysisRewritePlan(*select_lex.having, a);
     }
 
-    process_order(a, select_lex->group_list);
-    process_order(a, select_lex->order_list);
-
-}
-
-static void
-process_select_lex(LEX *lex, Analysis & a)
-{
-    process_table_list(&lex->select_lex.top_join_list, a);
-    process_select_lex(&lex->select_lex, a);
+    process_order(select_lex.group_list, a);
+    process_order(select_lex.order_list, a);
 }
 
 void
-process_select_lex(st_select_lex *select_lex, Analysis &a)
+process_select_lex(const st_select_lex &select_lex, Analysis &a)
 {
+    process_table_list(select_lex.top_join_list, a);
+
     //select clause
-    auto item_it = List_iterator<Item>(select_lex->item_list);
+    auto item_it =
+        RiboldMYSQL::constList_iterator<Item>(select_lex.item_list);
     for (;;) {
-        Item *item = item_it++;
+        const Item *const item = item_it++;
         if (!item)
             break;
 
-        analyze(item, a);
+        gatherAndAddAnalysisRewritePlan(*item, a);
     }
 
     process_filters_lex(select_lex, a);
@@ -331,18 +358,19 @@ process_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a)
 {
     for (;;) {
-        Item *field_item = fd_it++;
-        Item *value_item = val_it++;
+        const Item *const field_item = fd_it++;
+        const Item *const value_item = val_it++;
         if (!field_item) {
             assert(!value_item);
             break;
         }
         assert(value_item != NULL);
         assert(field_item->type() == Item::FIELD_ITEM);
-        Item_field *ifd = static_cast<Item_field *>(field_item);
+        const Item_field *const ifd =
+            static_cast<const Item_field *>(field_item);
 
-        // FIXME: Change function name.
-        analyze_field_value_pair(ifd, value_item, a);
+        gatherAndAddAnalysisRewritePlanForFieldValuePair(*ifd,
+                                                         *value_item, a);
     }
 }
 
@@ -355,38 +383,41 @@ process_field_value_pairs(List_iterator<Item> fd_it,
 //analyzes an expression of the form field = val expression from
 // an UPDATE
 static inline void
-analyze_field_value_pair(Item_field * field, Item * val, Analysis & a) {
-
-    reason r;
-    a.rewritePlans[val] = gather(val, r, a);
-    a.rewritePlans[field] = gather(field, r, a);
+gatherAndAddAnalysisRewritePlanForFieldValuePair(const Item_field &field,
+                                                 const Item &val,
+                                                 Analysis &a)
+{
+    a.rewritePlans[&val] = std::unique_ptr<RewritePlan>(gather(val, a));
+    a.rewritePlans[&field] =
+        std::unique_ptr<RewritePlan>(gather(field, a));
 
     //TODO: an optimization could be performed here to support more updates
     // For example: SET x = x+1, x = 2 --> no need to invalidate DET and OPE
     // onions because first SET does not matter
 }
 
+// FIXME: const Analysis
 static SQL_I_List<ORDER> *
-rewrite_order(Analysis &a, SQL_I_List<ORDER> &lst,
+rewrite_order(Analysis &a, const SQL_I_List<ORDER> &lst,
               const EncSet &constr, const std::string &name)
 {
-    SQL_I_List<ORDER> *new_lst = copy(&lst);
+    SQL_I_List<ORDER> *const new_lst = copyWithTHD(&lst);
     ORDER * prev = NULL;
     for (ORDER *o = lst.first; o; o = o->next) {
-        Item *const i = *o->item;
-        RewritePlan *const rp = getAssert(a.rewritePlans, i);
-        assert(rp);
+        const Item &i = **o->item;
+        const std::unique_ptr<RewritePlan> &rp =
+            constGetAssert(a.rewritePlans, &i);
         const EncSet es = constr.intersect(rp->es_out);
         // FIXME: Add version that will take a second EncSet of what
         // we had available (ie, rp->es_out).
-        TEST_NoAvailableEncSet(es, i->type(), constr, rp->r.why_t,
-                               NULL, 0);
+        TEST_NoAvailableEncSet(es, i.type(), constr, rp->r.why,
+                            std::vector<std::shared_ptr<RewritePlan> >());
         const OLK olk = es.chooseOne();
 
-        Item *const new_item = itemTypes.do_rewrite(*o->item, olk, rp, a);
+        Item *const new_item = itemTypes.do_rewrite(i, olk, *rp.get(), a);
         ORDER *const neworder = make_order(o, new_item);
         if (NULL == prev) {
-            *new_lst = *oneElemList(neworder);
+            *new_lst = *oneElemListWithTHD(neworder);
         } else {
             prev->next = neworder;
         }
@@ -397,17 +428,18 @@ rewrite_order(Analysis &a, SQL_I_List<ORDER> &lst,
 }
 
 static st_select_lex *
-rewrite_filters_lex(st_select_lex * select_lex, Analysis & a)
+rewrite_filters_lex(const st_select_lex &select_lex, Analysis & a)
 {
-    st_select_lex * new_select_lex = copy(select_lex);
+    st_select_lex *const new_select_lex = copyWithTHD(&select_lex);
 
+    // FIXME: Use const reference for list.
     new_select_lex->group_list =
-        *rewrite_order(a, select_lex->group_list, EQ_EncSet, "group by");
+        *rewrite_order(a, select_lex.group_list, EQ_EncSet, "group by");
     new_select_lex->order_list =
-        *rewrite_order(a, select_lex->order_list, ORD_EncSet, "order by");
+        *rewrite_order(a, select_lex.order_list, ORD_EncSet, "order by");
 
-    if (select_lex->where) {
-        set_where(new_select_lex, rewrite(select_lex->where,
+    if (select_lex.where) {
+        set_where(new_select_lex, rewrite(*select_lex.where,
                                           PLAIN_EncSet, a));
     }
     //  if (select_lex->join &&
@@ -419,24 +451,23 @@ rewrite_filters_lex(st_select_lex * select_lex, Analysis & a)
 
     // HACK: We only care about Analysis::item_cache from HAVING.
     a.item_cache.clear();
-    if (select_lex->having) {
-        set_having(new_select_lex, rewrite(select_lex->having,
-                                   PLAIN_EncSet, a));
+    if (select_lex.having) {
+        set_having(new_select_lex, rewrite(*select_lex.having,
+                                           PLAIN_EncSet, a));
     }
 
     return new_select_lex;
 }
 
-static void
+static bool
 rewrite_field_value_pairs(List_iterator<Item> fd_it,
                           List_iterator<Item> val_it, Analysis &a,
-                          bool *invalids, List<Item> *res_items,
-                          List<Item> *res_values)
+                          List<Item> *const res_fields,
+                          List<Item> *const res_values)
 {
-    *invalids = false;
     for (;;) {
-        Item *const field_item = fd_it++;
-        Item *const value_item = val_it++;
+        const Item *const field_item = fd_it++;
+        const Item *const value_item = val_it++;
         if (!field_item) {
             assert(NULL == value_item);
             break;
@@ -445,81 +476,42 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
 
         assert(field_item->type() == Item::FIELD_ITEM);
         const Item_field *const ifd =
-            static_cast<Item_field *>(field_item);
-        FieldMeta *const fm =
-            a.getFieldMeta(ifd->table_name, ifd->field_name);
+            static_cast<const Item_field *>(field_item);
+        FieldMeta &fm =
+            a.getFieldMeta(a.getDatabaseName(), ifd->table_name,
+                           ifd->field_name);
 
-        const RewritePlan *const rp =
-            getAssert(a.rewritePlans, value_item);
-        const EncSet needed = EncSet(a, fm);
-        const EncSet r_es = rp->es_out.intersect(needed);
-        // FIXME: Add version for situations when we don't know about
-        // children.
-        TEST_NoAvailableEncSet(r_es, ifd->type(), needed, rp->r.why_t,
-                               NULL, 0);
+        const std::unique_ptr<RewritePlan> &rp_field =
+            constGetAssert(a.rewritePlans, field_item);
+        const std::unique_ptr<RewritePlan> &rp_value =
+            constGetAssert(a.rewritePlans, value_item);
 
-        // Determine salt for field
-        bool add_salt = false;
-        if (fm->has_salt) {
-            const auto it_salt = a.salts.find(fm);
-            if ((it_salt == a.salts.end()) && needsSalt(r_es)) {
-                add_salt = true;
-                const salt_type salt = randomValue();
-                a.salts[fm] = salt;
-            }
+        const EncSet needed = EncSet(a, &fm);
+        const EncSet r_es =
+            rp_value->es_out.intersect(needed)
+                            .intersect(rp_field->es_out);
+
+        const SIMPLE_UPDATE_TYPE update_type =
+            determineUpdateType(*value_item, fm, r_es);
+        if (SIMPLE_UPDATE_TYPE::UNSUPPORTED == update_type) {
+            return false;
         }
 
-        // Does r_es support all onions on field?
-        *invalids = *invalids || invalidates(fm, r_es);
-        if (true == *invalids) {
-            // Is the HOM onion available? If so we will try to handle
-            // higher up.
-            auto hom = r_es.osl.find(oAGG);
-            if (hom != r_es.osl.end()) {
-                continue;
-            }
-
-            // We will have to go to PLAIN for this query.
-        }
-
-        for (auto pair : r_es.osl) {
-            const OLK olk = {pair.first, pair.second.first, fm};
-            RewritePlan *const rp_field =
-                getAssert(a.rewritePlans, field_item);
-            Item *const re_field =
-                itemTypes.do_rewrite(field_item, olk, rp_field, a);
-            res_items->push_back(re_field);
-
-            RewritePlan *const rp_value =
-                getAssert(a.rewritePlans, value_item);
-            Item *const re_value =
-                itemTypes.do_rewrite(value_item, olk, rp_value, a);
-            res_values->push_back(re_value);
-        }
-
-        // Add the salt field
-        if (add_salt) {
-            const salt_type salt = a.salts[fm];
-            assert(res_items->elements != 0);
-            Item_field * const rew_fd =
-                static_cast<Item_field *>(res_items->head());
-            assert(rew_fd);
-            const std::string anon_table_name = rew_fd->table_name;
-            const std::string anon_field_name = fm->getSaltName();
-            res_items->push_back(make_item(rew_fd, anon_table_name,
-                                           anon_field_name));
-            res_values->push_back(new Item_int((ulonglong)salt));
-        }
+        handleUpdateType(update_type, r_es, *ifd, *value_item,
+                         res_fields, res_values, a);
     }
+
+    return true;
 }
 
 static void
-addToReturn(ReturnMeta *rm, int pos, const OLK &constr, bool has_salt,
-            const std::string &name)
+addToReturn(ReturnMeta *const rm, int pos, const OLK &constr,
+            bool has_salt, const std::string &name)
 {
-    if (static_cast<unsigned int>(pos) != rm->rfmeta.size()) {
-        throw CryptDBError("ReturnMeta has badly ordered ReturnFields!");
-    }
+    const bool test = static_cast<unsigned int>(pos) == rm->rfmeta.size();
+    TEST_TextMessageError(test, "ReturnMeta has badly ordered"
+                                " ReturnFields!");
+
     const int salt_pos = has_salt ? pos + 1 : -1;
     std::pair<int, ReturnField>
         pair(pos, ReturnField(false, name, constr, salt_pos));
@@ -527,35 +519,36 @@ addToReturn(ReturnMeta *rm, int pos, const OLK &constr, bool has_salt,
 }
 
 static void
-addSaltToReturn(ReturnMeta *rm, int pos)
+addSaltToReturn(ReturnMeta *const rm, int pos)
 {
-    if (static_cast<unsigned int>(pos) != rm->rfmeta.size()) {
-        throw CryptDBError("ReturnMeta has badly ordered ReturnFields!");
-    }
+    const bool test = static_cast<unsigned int>(pos) == rm->rfmeta.size();
+    TEST_TextMessageError(test, "ReturnMeta has badly ordered"
+                                " ReturnFields!");
+
     std::pair<int, ReturnField>
         pair(pos, ReturnField(true, "", OLK::invalidOLK(), -1));
     rm->rfmeta.insert(pair);
 }
 
 static void
-rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
+rewrite_proj(const Item &i, const RewritePlan &rp, Analysis &a,
              List<Item> *newList)
 {
     AssignOnce<OLK> olk;
     AssignOnce<Item *> ir;
-    if (i->type() == Item::Type::FIELD_ITEM) {
-        Item_field *const field_i = static_cast<Item_field *>(i);
-        const auto cached_rewritten_i = a.item_cache.find(field_i);
+    if (i.type() == Item::Type::FIELD_ITEM) {
+        const Item_field &field_i = static_cast<const Item_field &>(i);
+        const auto cached_rewritten_i = a.item_cache.find(&field_i);
         if (cached_rewritten_i != a.item_cache.end()) {
             ir = cached_rewritten_i->second.first;
             olk = cached_rewritten_i->second.second;
         } else {
-            ir = rewrite(i, rp->es_out, a);
-            olk = rp->es_out.chooseOne();
+            ir = rewrite(i, rp.es_out, a);
+            olk = rp.es_out.chooseOne();
         }
     } else {
-        ir = rewrite(i, rp->es_out, a);
-        olk = rp->es_out.chooseOne();
+        ir = rewrite(i, rp.es_out, a);
+        olk = rp.es_out.chooseOne();
     }
     assert(ir.assigned() && ir.get());
     newList->push_back(ir.get());
@@ -563,40 +556,44 @@ rewrite_proj(Item *i, const RewritePlan *rp, Analysis &a,
 
     // This line implicity handles field aliasing for at least some cases.
     // As i->name can/will be the alias.
-    addToReturn(a.rmeta, a.pos++, olk.get(), use_salt, i->name);
+    addToReturn(&a.rmeta, a.pos++, olk.get(), use_salt, i.name);
 
     if (use_salt) {
         const std::string anon_table_name =
             static_cast<Item_field *>(ir.get())->table_name;
         const std::string anon_field_name = olk.get().key->getSaltName();
         Item_field *const ir_field =
-            make_item(static_cast<Item_field *>(ir.get()),
-                      anon_table_name, anon_field_name);
+            make_item_field(*static_cast<Item_field *>(ir.get()),
+                            anon_table_name, anon_field_name);
         newList->push_back(ir_field);
-        addSaltToReturn(a.rmeta, a.pos++);
+        addSaltToReturn(&a.rmeta, a.pos++);
     }
 }
 
 st_select_lex *
-rewrite_select_lex(st_select_lex *select_lex, Analysis &a)
+rewrite_select_lex(const st_select_lex &select_lex, Analysis &a)
 {
     // rewrite_filters_lex must be called before rewrite_proj because
     // it is responsible for filling Analysis::item_cache which
     // rewrite_proj uses.
-    st_select_lex *new_select_lex =
+    st_select_lex *const new_select_lex =
         rewrite_filters_lex(select_lex, a);
 
-    LOG(cdb_v) << "rewrite select lex input is " << *select_lex;
-    auto item_it = List_iterator<Item>(select_lex->item_list);
+    LOG(cdb_v) << "rewrite select lex input is "
+               << select_lex << std::endl;
+    auto item_it =
+        RiboldMYSQL::constList_iterator<Item>(select_lex.item_list);
 
     List<Item> newList;
     for (;;) {
-        Item * const item = item_it++;
+        const Item *const item = item_it++;
         if (!item)
             break;
         LOG(cdb_v) << "rewrite_select_lex " << *item << " with name "
-                   << item->name;
-        rewrite_proj(item, getAssert(a.rewritePlans, item), a, &newList);
+                   << item->name << std::endl;
+        rewrite_proj(*item,
+                     *constGetAssert(a.rewritePlans, item).get(),
+                     a, &newList);
     }
 
     // TODO(stephentu): investigate whether or not this is a memory leak
@@ -606,42 +603,45 @@ rewrite_select_lex(st_select_lex *select_lex, Analysis &a)
 }
 
 static void
-process_table_aliases(List<TABLE_LIST> *tll, Analysis & a)
+process_table_aliases(const List<TABLE_LIST> &tll, Analysis &a)
 {
-    List_iterator<TABLE_LIST> join_it(*tll);
+    RiboldMYSQL::constList_iterator<TABLE_LIST> join_it(tll);
     for (;;) {
-        TABLE_LIST *t = join_it++;
+        const TABLE_LIST *const t = join_it++;
         if (!t)
             break;
 
         if (t->is_alias) {
-            assert(a.addAlias(t->alias, t->table_name));
+            TEST_TextMessageError(t->db == a.getDatabaseName(),
+                                  "Database discrepancry!");
+            assert(a.addAlias(t->alias, t->db, t->table_name));
         }
 
         if (t->nested_join) {
-            process_table_aliases(&t->nested_join->join_list, a);
+            process_table_aliases(t->nested_join->join_list, a);
             return;
         }
     }
 }
 
 static void
-process_table_joins_and_derived(List<TABLE_LIST> *tll, Analysis & a)
+process_table_joins_and_derived(const List<TABLE_LIST> &tll,
+                                Analysis &a)
 {
-    List_iterator<TABLE_LIST> join_it(*tll);
+    RiboldMYSQL::constList_iterator<TABLE_LIST> join_it(tll);
     for (;;) {
-        TABLE_LIST *t = join_it++;
+        const TABLE_LIST *const t = join_it++;
         if (!t) {
             break;
         }
 
         if (t->nested_join) {
-            process_table_joins_and_derived(&t->nested_join->join_list, a);
+            process_table_joins_and_derived(t->nested_join->join_list, a);
             return;
         }
 
         if (t->on_expr) {
-            analyze(t->on_expr, a);
+            gatherAndAddAnalysisRewritePlan(*t->on_expr, a);
         }
 
         //std::string db(t->db, t->db_length);
@@ -650,17 +650,18 @@ process_table_joins_and_derived(List<TABLE_LIST> *tll, Analysis & a)
 
         // Handles SUBSELECTs in table clause.
         if (t->derived) {
-            st_select_lex_unit *u = t->derived;
-             // Not quite right, in terms of softness:
-             // should really come from the items that eventually
-             // reference columns in this derived table.
-            process_select_lex(u->first_select(), a);
+            // FIXME: Should be const.
+            st_select_lex_unit *const u = t->derived;
+            // Not quite right, in terms of softness:
+            // should really come from the items that eventually
+            // reference columns in this derived table.
+            process_select_lex(*u->first_select(), a);
         }
     }
 }
 
 void
-process_table_list(List<TABLE_LIST> *tll, Analysis & a)
+process_table_list(const List<TABLE_LIST> &tll, Analysis & a)
 {
     /*
      * later, need to rewrite different joins, e.g.
@@ -671,10 +672,12 @@ process_table_list(List<TABLE_LIST> *tll, Analysis & a)
     process_table_joins_and_derived(tll, a);
 }
 
-bool invalidates(FieldMeta * fm, const EncSet & es)
+static bool
+invalidates(const FieldMeta &fm, const EncSet & es)
 {
-    for (auto o_l : fm->children) {
-        onion o = o_l.first->getValue();
+    for (auto om_it = fm.children.begin(); om_it != fm.children.end();
+         om_it++) {
+        onion const o = (*om_it).first.getValue();
         if (es.osl.find(o) == es.osl.end()) {
             return true;
         }
@@ -683,14 +686,157 @@ bool invalidates(FieldMeta * fm, const EncSet & es)
     return false;
 }
 
+SIMPLE_UPDATE_TYPE
+determineUpdateType(const Item &value_item, const FieldMeta &fm,
+                    const EncSet &es)
+{
+    if (invalidates(fm, es)) {
+        return SIMPLE_UPDATE_TYPE::UNSUPPORTED;
+    }
+
+    if (value_item.type() == Item::Type::FIELD_ITEM) {
+        if (true == isItem_insert_value(value_item)) {
+            return SIMPLE_UPDATE_TYPE::ON_DUPLICATE_VALUE;
+        } else {
+            const std::string &item_field_name =
+                static_cast<const Item_field &>(value_item).field_name;
+            assert(equalsIgnoreCase(fm.fname, item_field_name));
+            return SIMPLE_UPDATE_TYPE::SAME_VALUE;
+        }
+    }
+
+    return SIMPLE_UPDATE_TYPE::NEW_VALUE;
+}
+
+static void
+doPairRewrite(FieldMeta &fm, const EncSet &es,
+              const Item_field &field_item, const Item &value_item,
+              List<Item> *const res_fields, List<Item> *const res_values,
+              Analysis &a)
+{
+    const std::unique_ptr<RewritePlan> &field_rp =
+        constGetAssert(a.rewritePlans,
+                       &static_cast<const Item &>(field_item));
+    const std::unique_ptr<RewritePlan> &value_rp =
+        constGetAssert(a.rewritePlans, &value_item);
+
+    for (auto pair : es.osl) {
+        const OLK olk = {pair.first, pair.second.first, &fm};
+
+        Item *const re_field =
+            itemTypes.do_rewrite(field_item, olk, *field_rp, a);
+        res_fields->push_back(re_field);
+
+        Item *const re_value =
+            itemTypes.do_rewrite(value_item, olk, *value_rp, a);
+        res_values->push_back(re_value);
+    }
+}
+
+static void
+addSalt(FieldMeta &fm, const Item_field &field_item,
+        List<Item> *const res_fields, List<Item> *const res_values,
+        Analysis &a,
+        std::function<Item *(const Item_field &rew_fd)> getSaltValue)
+{
+    assert(res_fields->elements != 0);
+    const Item_field * const rew_fd =
+        static_cast<Item_field *>(res_fields->head());
+    assert(rew_fd);
+    const std::string anon_table_name =
+        a.getAnonTableName(a.getDatabaseName(), field_item.table_name);
+    const std::string anon_field_name = fm.getSaltName();
+    res_fields->push_back(make_item_field(*rew_fd,
+                                          anon_table_name,
+                                          anon_field_name));
+    res_values->push_back(getSaltValue(*rew_fd));
+}
+
+void
+handleUpdateType(SIMPLE_UPDATE_TYPE update_type, const EncSet &es,
+                 const Item_field &field_item, const Item &value_item,
+                 List<Item> *const res_fields,
+                 List<Item> *const res_values, Analysis &a)
+{
+    FieldMeta &fm =
+        a.getFieldMeta(a.getDatabaseName(), field_item.table_name,
+                       field_item.field_name);
+
+    switch (update_type) {
+        case SIMPLE_UPDATE_TYPE::NEW_VALUE: {
+            bool add_salt = false;
+            if (fm.getHasSalt()) {
+                // Search for a salt first as a previous iteration may 
+                // have already referenced this @fm.
+                const auto it_salt = a.salts.find(&fm);
+                if ((it_salt == a.salts.end()) && needsSalt(es)) {
+                    add_salt = true;
+                    const salt_type salt = randomValue();
+                    a.salts.insert(std::make_pair(&fm, salt));
+                }
+            }
+
+            doPairRewrite(fm, es, field_item, value_item, res_fields,
+                          res_values, a);
+
+            if (add_salt) {
+                addSalt(fm, field_item, res_fields, res_values, a,
+                        [&fm, &a] (const Item_field &)
+                {
+                    const salt_type salt = a.salts[&fm];
+                    return new (current_thd->mem_root)
+                               Item_int(static_cast<ulonglong>(salt));
+                });
+            }
+            break;
+        }
+        case SIMPLE_UPDATE_TYPE::SAME_VALUE: {
+            doPairRewrite(fm, es, field_item, value_item, res_fields,
+                          res_values, a);
+            break;
+        }
+        case SIMPLE_UPDATE_TYPE::ON_DUPLICATE_VALUE: {
+            doPairRewrite(fm, es, field_item, value_item, res_fields,
+                          res_values, a);
+            if (fm.getHasSalt()) {
+                addSalt(fm, field_item, res_fields, res_values, a,
+                        [&value_item, &fm, &a]
+                        (const Item_field &rew_fd)
+                {
+                    const Item_insert_value &insert_value_item =
+                       static_cast<const Item_insert_value &>(value_item);
+                    const std::string anon_table_name =
+                        rew_fd.table_name;
+                    Item_field *const res_field =
+                        make_item_field(rew_fd, anon_table_name,
+                                        fm.getSaltName());
+                    return make_item_insert_value(insert_value_item,
+                                                  res_field);
+                });
+            }
+            break;
+        }
+
+        case SIMPLE_UPDATE_TYPE::UNSUPPORTED:
+        default :
+            TEST_TextMessageError(false,
+                                  "UNSUPPORTED or UNRECOGNIZED"
+                                  " SIMPLE_UPDATE_TYPE!");
+    }
+
+    return;
+}
+
 // FIXME: Add test to make sure handlers added successfully.
 SQLDispatcher *buildDMLDispatcher()
 {
     DMLHandler *h;
     SQLDispatcher *dispatcher = new SQLDispatcher();
-    
+
     h = new InsertHandler();
     dispatcher->addHandler(SQLCOM_INSERT, h);
+
+    h = new InsertHandler();
     dispatcher->addHandler(SQLCOM_REPLACE, h);
 
     h = new UpdateHandler;

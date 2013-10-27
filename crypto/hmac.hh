@@ -1,13 +1,13 @@
 #pragma once
 
-#include <assert.h>
 #include <string.h>
 
 template<class Hash>
 class hmac {
  public:
     hmac(const void *keydata, size_t keylen) {
-        assert(Hash::blocksize >= Hash::hashsize);
+        static_assert(Hash::blocksize >= Hash::hashsize,
+                      "Hack::blocksize should be >= Hash::hashsize");
 
         uint8_t k[Hash::blocksize];
         memset(k, 0, sizeof(k));

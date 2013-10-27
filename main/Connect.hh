@@ -7,9 +7,13 @@
 
 #include <vector>
 #include <string>
+#include <memory>
+
 #include <util/util.hh>
 #include <parser/sql_utils.hh>
 
+#include <mysql.h>
+typedef MYSQL_RES DBResult_native;
 
 extern "C" void *create_embedded_thd(int client_flag);
 
@@ -30,20 +34,17 @@ class DBResult {
 class Connect {
  public:
     Connect(const std::string &server, const std::string &user,
-            const std::string &passwd, const std::string &dbname,
-            uint port = 0);
+            const std::string &passwd, uint port = 0);
 
     Connect(MYSQL *const _conn) : conn(_conn), close_on_destroy(false) { }
 
     //returns Connect for the embedded server
-    static Connect *getEmbedded(const std::string &embed_dir,
-                                const std::string &dbname);
+    static Connect *getEmbedded(const std::string &embed_dir);
 
     // returns true if execution was ok; caller must delete DBResult
-    bool execute(const std::string &query, DBResult *&,
+    bool execute(const std::string &query, std::unique_ptr<DBResult> *res,
                  bool multiple_resultsets=false);
     bool execute(const std::string &query, bool multiple_resultsets=false);
-    bool select_db(const std::string &dbname);
 
     // returns error message if a query caused error
     std::string getError();
@@ -60,8 +61,7 @@ class Connect {
     MYSQL *conn;
 
     void do_connect(const std::string &server, const std::string &user,
-                    const std::string &passwd, const std::string &dbname,
-                    uint port);
+                    const std::string &passwd, uint port);
 
     bool close_on_destroy;
 };

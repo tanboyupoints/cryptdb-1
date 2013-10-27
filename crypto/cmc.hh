@@ -11,7 +11,7 @@ cmc_encrypt(const BlockCipher *c,
             const std::string &ptext,
             std::string *ctext)
 {
-    assert(ptext.size() % BlockCipher::blocksize == 0);
+    throw_c(ptext.size() % BlockCipher::blocksize == 0);
     ctext->resize(ptext.size());
     uint8_t x[BlockCipher::blocksize];
 
@@ -56,7 +56,7 @@ cmc_decrypt(const BlockCipher *c,
             const std::string &ctext,
             std::string *ptext)
 {
-    assert(ctext.size() % BlockCipher::blocksize == 0);
+    throw_c(ctext.size() % BlockCipher::blocksize == 0);
     ptext->resize(ctext.size());
     uint8_t x[BlockCipher::blocksize];
 

@@ -1,5 +1,6 @@
 #include <main/CryptoHandlers.hh>
 #include <main/macro_util.hh>
+#include <main/schema.hh>
 #include <parser/lex_util.hh>
 #include <crypto/ope.hh>
 #include <crypto/BasicCrypto.hh>
@@ -133,6 +134,19 @@ serial_unpack(std::string serial)
     return sl;
 }
 
+static uint
+getDecimals(const std::string &serial)
+{
+    return atoi(serial.substr(0, serial.find(' ')).c_str());
+}
+
+static std::string
+underSerial(const std::string &serial)
+{
+    const uint pos = serial.find(" ");
+    return serial.substr(pos + 1, std::string::npos);
+}
+
 // ============================ Factory implementations ====================//
 
 
@@ -150,7 +164,7 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * const cf,
         case SECLEVEL::PLAINVAL: {return new PlainText();}
         default:{}
     }
-    throw CryptDBError("unknown or unimplemented security level \n");
+    FAIL_TextMessageError("unknown or unimplemented security level");
 }
 
 EncLayer *
@@ -184,7 +198,7 @@ EncLayerFactory::deserializeLayer(unsigned int id,
 
         default:{}
     }
-    throw CryptDBError("unknown or unimplemented security level \n");
+    FAIL_TextMessageError("unknown or unimplemented security level");
 }
 
 /*
@@ -214,10 +228,11 @@ std::string prng_expand(const std::string &seed_key, uint key_bytes)
 // returns the length of output by AES encryption of a string of given type
 // and len
 static
-std::pair<enum enum_field_types, int>
-type_len_for_AES_str(enum enum_field_types type, int len, bool pad)
+std::pair<enum enum_field_types, unsigned long>
+type_len_for_AES_str(enum enum_field_types type, unsigned long len,
+                     bool pad)
 {
-    int res_len = -1;
+    unsigned long res_len = len;
     enum enum_field_types res_type = type;
 
     switch (type) {
@@ -227,13 +242,17 @@ type_len_for_AES_str(enum enum_field_types type, int len, bool pad)
         case MYSQL_TYPE_BLOB:
             break;
         case MYSQL_TYPE_VARCHAR:
+        case MYSQL_TYPE_STRING:
         case MYSQL_TYPE_TIMESTAMP:
         case MYSQL_TYPE_DATE:
         case MYSQL_TYPE_NEWDATE:
         case MYSQL_TYPE_TIME:
         case MYSQL_TYPE_DATETIME:
             res_type = MYSQL_TYPE_VARCHAR;
-            res_len = rounded_len(len, AES_BLOCK_BYTES, pad);
+            TEST_TextMessageError(rounded_len(len, AES_BLOCK_BYTES, pad,
+                                              &res_len),
+                                  "The field you are trying to create is"
+                                  " too large!");
             break;
         default: {
             const std::string t =
@@ -248,16 +267,15 @@ type_len_for_AES_str(enum enum_field_types type, int len, bool pad)
 
 //TODO: remove above newcreatefield
 static Create_field*
-createFieldHelper(const Create_field * const f, int field_length,
+createFieldHelper(const Create_field * const f,
+                  unsigned long field_length,
                   enum enum_field_types type,
                   const std::string &anonname = "",
                   CHARSET_INFO * const charset = NULL)
 {
     const THD * const thd = current_thd;
     Create_field * const f0 = f->clone(thd->mem_root);
-    if (field_length != -1) {
-        f0->length = field_length;
-    }
+    f0->length = field_length;
     f0->sql_type = type;
 
     if (charset != NULL) {
@@ -299,19 +317,20 @@ public:
 
     SECLEVEL level() const {return SECLEVEL::RND;}
     std::string name() const {return "RND_int";}
-    
-    Create_field * newCreateField(const Create_field * const cf,
-                                  const std::string &anonname = "");
 
-    Item * encrypt(Item * const ptext, uint64_t IV);
-    Item * decrypt(Item * const ctext, uint64_t IV);
-    Item * decryptUDF(Item * const col, Item * const ivcol);
+    Create_field * newCreateField(const Create_field * const cf,
+                                  const std::string &anonname = "")
+        const;
+
+    Item *encrypt(const Item &ptext, uint64_t IV) const;
+    Item * decrypt(Item * const ctext, uint64_t IV) const;
+    Item * decryptUDF(Item * const col, Item * const ivcol) const;
 
 private:
-    std::string key;
-    blowfish bf;
-    static const int key_bytes = 16;
-    static const int ciph_size = 8;
+    std::string const key;
+    blowfish const bf;
+    static int const key_bytes = 16;
+    static int const ciph_size = 8;
 
 };
 
@@ -323,21 +342,21 @@ public:
     std::string doSerialize() const {return rawkey;}
     RND_str(unsigned int id, const std::string &serial);
 
-
     SECLEVEL level() const {return SECLEVEL::RND;}
     std::string name() const {return "RND_str";}
     Create_field * newCreateField(const Create_field * const cf,
-                                  const std::string &anonname = "");
+                                  const std::string &anonname = "")
+        const;
 
-    Item * encrypt(Item * const ptext, uint64_t IV);
-    Item * decrypt(Item * const ctext, uint64_t IV);
-    Item * decryptUDF(Item * const col, Item * const ivcol);
+    Item *encrypt(const Item &ptext, uint64_t IV) const;
+    Item * decrypt(Item * const ctext, uint64_t IV) const;
+    Item * decryptUDF(Item * const col, Item * const ivcol) const;
 
 private:
-    std::string rawkey;
-    static const int key_bytes = 16;
-    AES_KEY * enckey;
-    AES_KEY * deckey;
+    std::string const rawkey;
+    static int const key_bytes = 16;
+    AES_KEY const * const enckey;
+    AES_KEY const * const deckey;
 
 };
 
@@ -373,7 +392,7 @@ RND_int::RND_int(unsigned int id, const std::string &serial)
 
 Create_field *
 RND_int::newCreateField(const Create_field * const cf,
-                        const std::string &anonname)
+                        const std::string &anonname) const
 {
     // MYSQL_TYPE_LONGLONG because blowfish works on 64 bit blocks.
     return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG,
@@ -382,29 +401,31 @@ RND_int::newCreateField(const Create_field * const cf,
 
 //TODO: may want to do more specialized crypto for lengths
 Item *
-RND_int::encrypt(Item * const ptext, uint64_t IV)
+RND_int::encrypt(const Item &ptext, uint64_t IV) const
 {
     // assert(!stringItem(ptext));
     //TODO: should have encrypt_SEM work for any length
-    const uint64_t p = ptext->val_uint();
+    const uint64_t p = RiboldMYSQL::val_uint(ptext);
     const uint64_t c = bf.encrypt(p ^ IV);
     LOG(encl) << "RND_int encrypt " << p << " IV " << IV << "-->" << c;
 
-    return new Item_int(static_cast<ulonglong>(c));
+    return new (current_thd->mem_root)
+               Item_int(static_cast<ulonglong>(c));
 }
 
 Item *
-RND_int::decrypt(Item * const ctext, uint64_t IV)
+RND_int::decrypt(Item * const ctext, uint64_t IV) const
 {
     const uint64_t c = static_cast<Item_int*>(ctext)->value;
     const uint64_t p = bf.decrypt(c) ^ IV;
     LOG(encl) << "RND_int decrypt " << c << " IV " << IV << " --> " << p;
 
-    return new Item_int(static_cast<ulonglong>(p));
+    return new (current_thd->mem_root)
+               Item_int(static_cast<ulonglong>(p));
 }
 
 static udf_func u_decRNDInt = {
-    LEXSTRING("decrypt_int_sem"),
+    LEXSTRING("cryptdb_decrypt_int_sem"),
     INT_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -419,7 +440,7 @@ static udf_func u_decRNDInt = {
 
 
 Item *
-RND_int::decryptUDF(Item * const col, Item * const ivcol)
+RND_int::decryptUDF(Item * const col, Item * const ivcol) const
 {
     List<Item> l;
     l.push_back(col);
@@ -428,11 +449,13 @@ RND_int::decryptUDF(Item * const col, Item * const ivcol)
 
     l.push_back(ivcol);
 
-    Item * const udfdec = new Item_func_udf_int(&u_decRNDInt, l);
+    Item *const udfdec =
+        new (current_thd->mem_root) Item_func_udf_int(&u_decRNDInt, l);
     udfdec->name = NULL; //no alias
 
     //add encompassing CAST for unsigned
-    Item * const udf = new Item_func_unsigned(udfdec);
+    Item *const udf =
+        new (current_thd->mem_root) Item_func_unsigned(udfdec);
     udf->name = NULL;
 
     return udf;
@@ -441,11 +464,9 @@ RND_int::decryptUDF(Item * const col, Item * const ivcol)
 ///////////////////////////////////////////////
 
 RND_str::RND_str(Create_field * const f, const std::string &seed_key)
-{
-    rawkey = prng_expand(seed_key, key_bytes);
-    enckey = get_AES_enc_key(rawkey);
-    deckey = get_AES_dec_key(rawkey);
-}
+    : rawkey(prng_expand(seed_key, key_bytes)),
+      enckey(get_AES_enc_key(rawkey)), deckey(get_AES_dec_key(rawkey))
+{}
 
 RND_str::RND_str(unsigned int id, const std::string &serial)
     : EncLayer(id), rawkey(serial), enckey(get_AES_enc_key(rawkey)),
@@ -455,47 +476,49 @@ RND_str::RND_str(unsigned int id, const std::string &serial)
 
 Create_field *
 RND_str::newCreateField(const Create_field * const cf,
-                        const std::string &anonname)
+                        const std::string &anonname) const
 {
     auto typelen = type_len_for_AES_str(cf->sql_type, cf->length, false);
-  
+
     return createFieldHelper(cf, typelen.second, typelen.first,
                              anonname, &my_charset_bin);
 }
 
 Item *
-RND_str::encrypt(Item * const ptext, uint64_t IV)
+RND_str::encrypt(const Item &ptext, uint64_t IV) const
 {
     const std::string enc =
         encrypt_AES_CBC(ItemToString(ptext), enckey,
                         BytesFromInt(IV, SALT_LEN_BYTES), false);
-    
+
     LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV "
               << IV << "--->" << "len of enc " << enc.length()
               << " enc " << enc;
 
-    return new Item_string(make_thd_string(enc), enc.length(),
-                           &my_charset_bin);
+    return new (current_thd->mem_root) Item_string(make_thd_string(enc),
+                                                   enc.length(),
+                                                   &my_charset_bin);
 }
 
 Item *
-RND_str::decrypt(Item * const ctext, uint64_t IV)
+RND_str::decrypt(Item * const ctext, uint64_t IV) const
 {
     const std::string dec =
-        decrypt_AES_CBC(ItemToString(ctext), deckey,
+        decrypt_AES_CBC(ItemToString(*ctext), deckey,
                         BytesFromInt(IV, SALT_LEN_BYTES), false);
-    LOG(encl) << "RND_str decrypt " << ItemToString(ctext) << " IV "
+    LOG(encl) << "RND_str decrypt " << ItemToString(*ctext) << " IV "
               << IV << "-->" << "len of dec " << dec.length()
               << " dec: " << dec;
 
-    return new Item_string(make_thd_string(dec), dec.length(),
-                           &my_charset_bin);
+    return new (current_thd->mem_root) Item_string(make_thd_string(dec),
+                                                   dec.length(),
+                                                   &my_charset_bin);
 }
 
 
 //TODO; make edb.cc udf naming consistent with these handlers
 static udf_func u_decRNDString = {
-    LEXSTRING("decrypt_text_sem"),
+    LEXSTRING("cryptdb_decrypt_text_sem"),
     STRING_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -510,14 +533,15 @@ static udf_func u_decRNDString = {
 
 
 Item *
-RND_str::decryptUDF(Item * const col, Item * const ivcol)
+RND_str::decryptUDF(Item * const col, Item * const ivcol) const
 {
     List<Item> l;
     l.push_back(col);
     l.push_back(get_key_item(rawkey));
     l.push_back(ivcol);
 
-    return new Item_func_udf_str(&u_decRNDString, l);
+    return new (current_thd->mem_root) Item_func_udf_str(&u_decRNDString,
+                                                         l);
 }
 
 
@@ -534,12 +558,13 @@ public:
 
     std::string doSerialize() const;
     Create_field *newCreateField(const Create_field *const cf,
-                                 const std::string &anonname = "");
+                                 const std::string &anonname = "")
+        const;
 
     // FIXME: final
-    Item *encrypt(Item *const ptext, uint64_t IV);
-    Item *decrypt(Item *const ctext, uint64_t IV);
-    Item *decryptUDF(Item *const col, Item *const ivcol = NULL);
+    Item *encrypt(const Item &ptext, uint64_t IV) const;
+    Item *decrypt(Item *const ctext, uint64_t IV) const;
+    Item *decryptUDF(Item *const col, Item *const ivcol = NULL) const;
 
 protected:
     const std::string key;
@@ -570,15 +595,11 @@ public:
 
     // FIXME: final.
     std::string doSerialize() const;
-    Item *encrypt(Item *const ptext, uint64_t IV);
-    Item *decrypt(Item *const ctext, uint64_t IV);
+    Item *encrypt(const Item &ptext, uint64_t IV) const;
+    Item *decrypt(Item *const ctext, uint64_t IV) const;
 
 protected:
     const uint decimals;      // number of decimals
-
-private:
-    static uint getDecimals(const std::string &serial);
-    static std::string underSerial(const std::string &serial);
 };
 
 
@@ -593,7 +614,7 @@ public:
 };
 
 static udf_func u_decDETInt = {
-    LEXSTRING("decrypt_int_det"),
+    LEXSTRING("cryptdb_decrypt_int_det"),
     INT_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -630,17 +651,18 @@ public:
     virtual SECLEVEL level() const {return SECLEVEL::DET;}
     std::string name() const {return "DET_str";}
     Create_field * newCreateField(const Create_field * const cf,
-                                  const std::string &anonname = "");
+                                  const std::string &anonname = "")
+        const;
 
-    Item * encrypt(Item * const ptext, uint64_t IV);
-    Item * decrypt(Item * const ctext, uint64_t IV);
-    Item * decryptUDF(Item * const col, Item * const ivcol = NULL);
+    Item *encrypt(const Item &ptext, uint64_t IV) const;
+    Item * decrypt(Item * const ctext, uint64_t IV) const;
+    Item * decryptUDF(Item * const col, Item * const ivcol = NULL) const;
 
 protected:
-    std::string rawkey;
+    std::string const rawkey;
     static const int key_bytes = 16;
-    AES_KEY * enckey;
-    AES_KEY * deckey;
+    AES_KEY const * const enckey;
+    AES_KEY const * const deckey;
 
 };
 
@@ -670,7 +692,7 @@ DETFactory::deserialize(unsigned int id, const SerialLayer &sl)
     } else if ("DET_str" == sl.name) {
         return new DET_str(id, sl.layer_info);
     } else {
-        throw CryptDBError("Unknown type for DET deserialization!");
+        FAIL_TextMessageError("Unknown type for DET deserialization!");
     }
 }
 
@@ -692,7 +714,7 @@ std::string DET_abstract_number::doSerialize() const
 
 Create_field *
 DET_abstract_number::newCreateField(const Create_field * const cf,
-                                    const std::string &anonname)
+                                    const std::string &anonname) const
 {
     const int64_t ciph_size = 8;
     // MYSQL_TYPE_LONGLONG because blowfish works on 64 bit blocks.
@@ -701,18 +723,18 @@ DET_abstract_number::newCreateField(const Create_field * const cf,
 }
 
 Item *
-DET_abstract_number::encrypt(Item *const ptext, uint64_t IV)
+DET_abstract_number::encrypt(const Item &ptext, uint64_t IV) const
 {
     // assert(!stringItem(ptext));
-    const ulonglong value = ptext->val_uint();
+    const ulonglong value = RiboldMYSQL::val_uint(ptext);
 
     const ulonglong res = static_cast<ulonglong>(bf.encrypt(value+shift));
     LOG(encl) << "DET_int enc " << value << "--->" << res;
-    return new Item_int(res);
+    return new (current_thd->mem_root) Item_int(res);
 }
 
 Item *
-DET_abstract_number::decrypt(Item *const ctext, uint64_t IV)
+DET_abstract_number::decrypt(Item *const ctext, uint64_t IV) const
 {
     const ulonglong value = static_cast<Item_int *>(ctext)->value;
 
@@ -722,39 +744,37 @@ DET_abstract_number::decrypt(Item *const ctext, uint64_t IV)
         longlong retdec = static_cast<longlong>(bf.decrypt(value));
         retdec -= shift;
         LOG(encl) << "DET_int dec " << value << "--->" << retdec;
-        return new Item_int(retdec);
+        return new (current_thd->mem_root) Item_int(retdec);
     }
 
     const ulonglong retdec = bf.decrypt(value) - shift;
     LOG(encl) << "DET_int dec " << value << "--->" << retdec;
-    return new Item_int(retdec);
+    return new (current_thd->mem_root) Item_int(retdec);
 }
 
 Item *
 DET_abstract_number::decryptUDF(Item *const col, Item *const ivcol)
+    const
 {
     List<Item> l;
     l.push_back(col);
 
     l.push_back(get_key_item(key));
     // Only used for signed columns, otherwise zero.
-    l.push_back(new Item_int(static_cast<ulonglong>(shift)));
+    l.push_back(new (current_thd->mem_root)
+                    Item_int(static_cast<ulonglong>(shift)));
 
-    Item *const udfdec = new Item_func_udf_int(&u_decDETInt, l);
+    Item *const udfdec = new (current_thd->mem_root)
+                             Item_func_udf_int(&u_decDETInt, l);
     udfdec->name = NULL;
 
-    AssignOnce<Item *> udf;
-    if (0 == shift) {
-        // CAST for unsigned
-        udf = new Item_func_unsigned(udfdec);
-        udf.get()->name = NULL;
-    } else {
-        // CAST for signed.
-        udf = new Item_func_signed(udfdec);
-        udf.get()->name = NULL;
-    }
+    Item *const udf = 0 == shift ? new (current_thd->mem_root)
+                                       Item_func_unsigned(udfdec)
+                                 : new (current_thd->mem_root)
+                                       Item_func_signed(udfdec);
+    udf->name = NULL;
 
-    return udf.get();
+    return udf;
 }
 
 std::string
@@ -798,7 +818,7 @@ DET_abstract_integer::getShift(const Create_field * const cf)
             case MYSQL_TYPE_LONGLONG:
                 return 0x8000000000000000;
             default:
-                throw CryptDBError("unknown int type!");
+                FAIL_TextMessageError("unknown int type!");
         }
     }
 }
@@ -832,49 +852,36 @@ DET_abstract_decimal::doSerialize() const
 }
 
 static Item_int *
-decimal_to_int(Item_decimal * const v, uint decimals,
+decimal_to_int(const Item_decimal &v, uint decimals,
                const ulonglong &shift)
 {
-    const ulonglong res =  v->val_real() * shift;
+    const ulonglong res = RiboldMYSQL::val_real(v) * shift;
 
-    return new Item_int(res);
+    return new (current_thd->mem_root) Item_int(res);
 }
 
-Item *DET_abstract_decimal::encrypt(Item *const ptext, uint64_t IV)
+Item *DET_abstract_decimal::encrypt(const Item &ptext, uint64_t IV) const
 {
-    Item_decimal * const ptext_dec = static_cast<Item_decimal *>(ptext);
+    const Item_decimal &ptext_dec =
+        static_cast<const Item_decimal &>(ptext);
     const std::unique_ptr<Item_int>
         ptext_int(decimal_to_int(ptext_dec, decimals, shift));
-    Item * const result =
-        DET_abstract_number::encrypt(ptext_int.get(), IV);
-
-    return result;
+    return DET_abstract_number::encrypt(*ptext_int, IV);
 }
 
-Item *DET_abstract_decimal::decrypt(Item *const ctext, uint64_t IV)
+Item *DET_abstract_decimal::decrypt(Item *const ctext, uint64_t IV) const
 {
     const std::unique_ptr<Item_int>
         res_int(static_cast<Item_int*>(DET_abstract_number::decrypt(ctext,
                                                                     IV)));
     Item_decimal * const res =
-        new Item_decimal(res_int.get()->value*1.0/shift, decimals,
-                         decimals);
+        new (current_thd->mem_root) Item_decimal(res_int->value*1.0/shift,
+                                                 decimals,
+                                                 decimals);
     LOG(encl) << "DET_dec dec " << res_int->value << "--->"
-              << res->val_real();
+              << RiboldMYSQL::val_real(*res) << std::endl;
 
     return res;
-}
-
-uint DET_abstract_decimal::getDecimals(const std::string &serial)
-{
-    return atoi(serial.substr(0, serial.find(' ')).c_str());
-}
-
-std::string
-DET_abstract_decimal::underSerial(const std::string &serial)
-{
-    const uint pos = serial.find(" ");
-    return serial.substr(pos + 1, std::string::npos);
 }
 
 DET_int::DET_int(Create_field *const f, const std::string &seed_key)
@@ -893,24 +900,10 @@ DET_dec::DET_dec(unsigned int id, const std::string &serial)
     : DET_abstract_decimal(id, serial)
 {}
 
-static std::string
-parent_serial(uint *const decimals, const std::string &serial)
-{
-    std::stringstream layerinfo(serial);
-
-    layerinfo >> *decimals;
-
-    const uint pos = layerinfo.tellg();
-
-    return serial.substr(pos+1, serial.length()-pos);
-}
-
 DET_str::DET_str(Create_field * const f, const std::string &seed_key)
-{
-    rawkey = prng_expand(seed_key, key_bytes);
-    enckey = get_AES_enc_key(rawkey);
-    deckey = get_AES_dec_key(rawkey);
-}
+    : rawkey(prng_expand(seed_key, key_bytes)),
+      enckey(get_AES_enc_key(rawkey)), deckey(get_AES_dec_key(rawkey))
+{}
 
 DET_str::DET_str(unsigned int id, const std::string &serial)
     : EncLayer(id), rawkey(serial), enckey(get_AES_enc_key(rawkey)),
@@ -920,7 +913,7 @@ DET_str::DET_str(unsigned int id, const std::string &serial)
 
 Create_field *
 DET_str::newCreateField(const Create_field * const cf,
-                        const std::string &anonname)
+                        const std::string &anonname) const
 {
     auto typelen = type_len_for_AES_str(cf->sql_type, cf->length, true);
 
@@ -929,32 +922,34 @@ DET_str::newCreateField(const Create_field * const cf,
 }
 
 Item *
-DET_str::encrypt(Item * const ptext, uint64_t IV)
+DET_str::encrypt(const Item &ptext, uint64_t IV) const
 {
     const std::string plain = ItemToString(ptext);
     const std::string enc = encrypt_AES_CMC(plain, enckey, true);
     LOG(encl) << " DET_str encrypt " << plain  << " IV " << IV << " ---> "
               << " enc len " << enc.length() << " enc " << enc;
 
-    return new Item_string(make_thd_string(enc), enc.length(),
-                           &my_charset_bin);
+    return new (current_thd->mem_root) Item_string(make_thd_string(enc),
+                                                   enc.length(),
+                                                   &my_charset_bin);
 }
 
 Item *
-DET_str::decrypt(Item * const ctext, uint64_t IV)
+DET_str::decrypt(Item * const ctext, uint64_t IV) const
 {
-    const std::string enc = ItemToString(ctext);
+    const std::string enc = ItemToString(*ctext);
     const std::string dec = decrypt_AES_CMC(enc, deckey, true);
     LOG(encl) << " DET_str decrypt enc len " << enc.length()
               << " enc " << enc << " IV " << IV << " ---> "
               << " dec len " << dec.length() << " dec " << dec;
 
-    return new Item_string(make_thd_string(dec), dec.length(),
-                           &my_charset_bin);
+    return new (current_thd->mem_root) Item_string(make_thd_string(dec),
+                                                   dec.length(),
+                                                   &my_charset_bin);
 }
 
 static udf_func u_decDETStr = {
-    LEXSTRING("decrypt_text_det"),
+    LEXSTRING("cryptdb_decrypt_text_det"),
     STRING_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -970,12 +965,12 @@ static udf_func u_decDETStr = {
 
 
 Item *
-DET_str::decryptUDF(Item * const col, Item * const ivcol)
+DET_str::decryptUDF(Item * const col, Item * const ivcol) const
 {
     List<Item> l;
     l.push_back(col);
     l.push_back(get_key_item(rawkey));
-    return new Item_func_udf_str(&u_decDETStr, l);
+    return new (current_thd->mem_root) Item_func_udf_str(&u_decDETStr, l);
 
 }
 
@@ -1051,7 +1046,7 @@ DETJOINFactory::deserialize(unsigned int id, const SerialLayer &sl)
     } else if ("DETJOIN_str" == sl.name) {
         return new DETJOIN_str(id, sl.layer_info);
     } else {
-        throw CryptDBError("DETJOINFactory does not recognize type!");
+        FAIL_TextMessageError("DETJOINFactory does not recognize type!");
     }
 }
 
@@ -1071,15 +1066,17 @@ public:
     SECLEVEL level() const {return SECLEVEL::OPE;}
     std::string name() const {return "OPE_int";}
     Create_field * newCreateField(const Create_field * const cf,
-                                  const std::string &anonname = "");
+                                  const std::string &anonname = "")
+        const;
 
-    Item * encrypt(Item * const p, uint64_t IV);
-    Item * decrypt(Item * const c, uint64_t IV);
+    Item *encrypt(const Item &p, uint64_t IV) const;
+    Item * decrypt(Item * const c, uint64_t IV) const;
 
 
 private:
-    std::string key;
-    OPE ope;
+    std::string const key;
+    // HACK.
+    mutable OPE ope;
     static const size_t key_bytes = 16;
     static const size_t plain_size = 4;
     static const size_t ciph_size = 8;
@@ -1094,8 +1091,8 @@ public:
 
     std::string name() const {return "OPE_tinyint";}
 
-    Item * encrypt(Item * const p, uint64_t IV);
-    Item * decrypt(Item * const c, uint64_t IV);
+    Item *encrypt(const Item &p, uint64_t IV) const;
+    Item * decrypt(Item * const c, uint64_t IV) const;
 };
 
 OPE_tinyint::OPE_tinyint(Create_field * const cf,
@@ -1108,20 +1105,21 @@ OPE_tinyint::OPE_tinyint(unsigned int id, const std::string &serial)
 {}
 
 Item *
-OPE_tinyint::encrypt(Item * const ptext, uint64_t IV)
+OPE_tinyint::encrypt(const Item &ptext, uint64_t IV) const
 {
-    const ulonglong val = ptext->val_uint();
+    const ulonglong val = RiboldMYSQL::val_uint(ptext);
 
     static const ulonglong tiny_max = 0xff;
-    if (tiny_max < ptext->val_uint())
-        throw CryptDBError("Backend storage unit it not TINYINT, won't floor. ");
+    TEST_TextMessageError(tiny_max > val,
+                          "Backend storage unit it not TINYINT,"
+                          " won't floor. ");
 
     LOG(encl) << "OPE_tinyint encrypt " << val << " IV " << IV << "--->";
     return OPE_int::encrypt(ptext, static_cast<const ulong>(val));
 }
 
 Item *
-OPE_tinyint::decrypt(Item * const ctext, uint64_t IV)
+OPE_tinyint::decrypt(Item * const ctext, uint64_t IV) const
 {
     return OPE_int::decrypt(ctext, IV);
 }
@@ -1135,8 +1133,8 @@ public:
 
     std::string name() const {return "OPE_mediumint";}
 
-    Item * encrypt(Item * const p, uint64_t IV);
-    Item * decrypt(Item * const c, uint64_t IV);
+    Item *encrypt(const Item &p, uint64_t IV) const;
+    Item * decrypt(Item * const c, uint64_t IV) const;
 };
 
 OPE_mediumint::OPE_mediumint(Create_field * const cf,
@@ -1149,20 +1147,21 @@ OPE_mediumint::OPE_mediumint(unsigned int id, const std::string &serial)
 {}
 
 Item *
-OPE_mediumint::encrypt(Item * const ptext, uint64_t IV)
+OPE_mediumint::encrypt(const Item &ptext, uint64_t IV) const
 {
-    const ulonglong val = ptext->val_uint();
+    const ulonglong val = RiboldMYSQL::val_uint(ptext);
 
     static const ulonglong medium_max = 0xffffff;
-    if (medium_max < ptext->val_uint())
-        throw CryptDBError("Backend storage unit it not MEDIUMINT, won't floor. ");
+    TEST_TextMessageError(medium_max > val,
+                          "Backend storage unit it not MEDIUMINT,"
+                          " won't floor. ");
 
     LOG(encl) << "OPE_mediumint encrypt " << val << " IV " << IV << "--->";
     return OPE_int::encrypt(ptext, static_cast<const ulong>(val));
 }
 
 Item *
-OPE_mediumint::decrypt(Item * const ctext, uint64_t IV)
+OPE_mediumint::decrypt(Item * const ctext, uint64_t IV) const
 {
     return OPE_int::decrypt(ctext, IV);
 }
@@ -1178,14 +1177,17 @@ public:
     SECLEVEL level() const {return SECLEVEL::OPE;}
     std::string name() const {return "OPE_str";}
     Create_field * newCreateField(const Create_field * const cf,
-                                  const std::string &anonname = "");
+                                  const std::string &anonname = "")
+        const;
 
-    Item * encrypt(Item * const p, uint64_t IV);
-    Item * decrypt(Item * const c, uint64_t IV)__attribute__((noreturn));
+    Item *encrypt(const Item &p, uint64_t IV) const;
+    Item * decrypt(Item * const c, uint64_t IV) const
+        __attribute__((noreturn));
 
 private:
-    std::string key;
-    OPE ope;
+    std::string const key;
+    // HACK.
+    mutable OPE ope;
     static const size_t key_bytes = 16;
     static const size_t plain_size = 4;
     static const size_t ciph_size = 8;
@@ -1202,12 +1204,12 @@ public:
 
     std::string name() const {return "OPE_dec";}
 
-    Item * encrypt(Item * const p, uint64_t IV);
-    Item * decrypt(Item * const c, uint64_t IV);
+    Item *encrypt(const Item &p, uint64_t IV) const;
+    Item * decrypt(Item * const c, uint64_t IV) const;
 
 private:
-    uint decimals;
-    ulonglong shift;
+    uint const decimals;
+    ulonglong const shift;
 };
 
 
@@ -1246,13 +1248,11 @@ OPEFactory::deserialize(unsigned int id, const SerialLayer &sl)
 }
 
 OPE_dec::OPE_dec(Create_field * const cf, const std::string &seed_key)
-    : OPE_int(cf, seed_key)
+    : OPE_int(cf, seed_key), decimals(cf->decimals),
+      shift(pow(10, decimals))
 {
     assert_s(cf->length - cf->decimals <= 8,
              "this type of decimal not supported ");
-
-    decimals = cf->decimals;
-    shift = pow(10, decimals);
 }
 
 std::string
@@ -1262,32 +1262,31 @@ OPE_dec::doSerialize() const
 }
 
 OPE_dec::OPE_dec(unsigned int id, const std::string &serial)
-    : OPE_int(id, parent_serial(&decimals, serial))
-{
-    shift = pow(10, decimals);
-}
+    : OPE_int(id, underSerial(serial)), decimals(getDecimals(serial)),
+      shift(pow(10, decimals))
+{}
 
 Item *
-OPE_dec::encrypt(Item * const ptext, uint64_t IV)
+OPE_dec::encrypt(const Item &ptext, uint64_t IV) const
 {
-    Item_decimal * const ptext_dec = static_cast<Item_decimal *>(ptext);
+    const Item_decimal &ptext_dec =
+        static_cast<const Item_decimal &>(ptext);
     const std::unique_ptr<Item_int>
         ptext_int(decimal_to_int(ptext_dec, decimals, shift));
-    Item * const result = OPE_int::encrypt(ptext_int.get(), IV);
-    
-    return result;
+    return OPE_int::encrypt(*ptext_int.get(), IV);
 }
 
 
 Item *
-OPE_dec::decrypt(Item * const ctext, uint64_t IV)
+OPE_dec::decrypt(Item * const ctext, uint64_t IV) const
 {
     const std::unique_ptr<Item_int>
         res_int(static_cast<Item_int *>(OPE_int::decrypt(ctext, IV)));
 
     Item_decimal * const res =
-        new Item_decimal(res_int.get()->value*1.0/shift, decimals,
-                         decimals);
+        new (current_thd->mem_root) Item_decimal(res_int->value*1.0/shift,
+                                                 decimals,
+                                                 decimals);
 
     return res;
 }
@@ -1305,26 +1304,27 @@ OPE_int::OPE_int(unsigned int id, const std::string &serial)
 
 Create_field *
 OPE_int::newCreateField(const Create_field * const cf,
-                        const std::string &anonname)
+                        const std::string &anonname) const
 {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname);
+    return createFieldHelper(cf, cf->length, MYSQL_TYPE_LONGLONG,
+                             anonname);
 }
 
 Item *
-OPE_int::encrypt(Item * const ptext, uint64_t IV)
+OPE_int::encrypt(const Item &ptext, uint64_t IV) const
 {
     // assert(!stringItem(ptext));
     // AWARE: Truncation.
-    const uint32_t pval = ptext->val_uint();
+    const uint32_t pval = RiboldMYSQL::val_uint(ptext);
     const ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ(pval)));
     LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV
               << "--->" << enc;
 
-    return new Item_int(enc);
+    return new (current_thd->mem_root) Item_int(enc);
 }
 
 Item *
-OPE_int::decrypt(Item * const ctext, uint64_t IV)
+OPE_int::decrypt(Item * const ctext, uint64_t IV) const
 {
     const ulonglong cval =
         static_cast<ulonglong>(static_cast<Item_int *>(ctext)->value);
@@ -1332,7 +1332,7 @@ OPE_int::decrypt(Item * const ctext, uint64_t IV)
     LOG(encl) << "OPE_int decrypt " << cval << " IV " << IV
               << "--->" << dec << std::endl;
 
-    return new Item_int(dec);
+    return new (current_thd->mem_root) Item_int(dec);
 }
 
 
@@ -1348,32 +1348,44 @@ OPE_str::OPE_str(unsigned int id, const std::string &serial)
 
 Create_field *
 OPE_str::newCreateField(const Create_field * const cf,
-                        const std::string &anonname)
+                        const std::string &anonname) const
 {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname,
-                             &my_charset_bin);
+    return createFieldHelper(cf, cf->length, MYSQL_TYPE_LONGLONG,
+                             anonname, &my_charset_bin);
 }
 
+/*
+ * Make all characters uppercase as mysql string order comparison
+ * is case insensitive.
+ *
+ * mysql> SELECT 'a' = 'a', 'A' = 'a', 'A' < 'b', 'z' > 'M';
+ * +-----------+-----------+-----------+-----------+
+ * | 'a' = 'a' | 'A' = 'a' | 'A' < 'b' | 'z' > 'M' |
+ * +-----------+-----------+-----------+-----------+
+ * |         1 |         1 |         1 |         1 |
+ * +-----------+-----------+-----------+-----------+
+ */
 Item *
-OPE_str::encrypt(Item * const ptext, uint64_t IV)
+OPE_str::encrypt(const Item &ptext, uint64_t IV) const
 {
-    std::string ps = ItemToString(ptext);
+    std::string ps = toUpperCase(ItemToString(ptext));
     if (ps.size() < plain_size)
         ps = ps + std::string(plain_size - ps.size(), 0);
 
     uint32_t pv = 0;
 
     for (uint i = 0; i < plain_size; i++) {
-        pv = pv * 256 + (int)ps[i];
+        pv = pv * 256 + static_cast<int>(ps[i]);
     }
 
     const ZZ enc = ope.encrypt(to_ZZ(pv));
 
-    return new Item_int(static_cast<ulonglong>(uint64FromZZ(enc)));
+    return new (current_thd->mem_root)
+               Item_int(static_cast<ulonglong>(uint64FromZZ(enc)));
 }
 
 Item *
-OPE_str::decrypt(Item * const ctext, uint64_t IV)
+OPE_str::decrypt(Item * const ctext, uint64_t IV) const
 {
     thrower() << "cannot decrypt string from OPE";
 }
@@ -1387,21 +1399,21 @@ public:
 
     //deserialize
     HOM_dec(unsigned int id, const std::string &serial);
-    
+
     std::string name() const {return "HOM_dec";}
-  
+
 
     //TODO needs multi encrypt and decrypt
-    Item * encrypt(Item * const p, uint64_t IV);
-    Item * decrypt(Item * const c, uint64_t IV);
+    Item *encrypt(const Item &p, uint64_t IV) const;
+    Item * decrypt(Item * const c, uint64_t IV) const;
 
     //expr is the expression (e.g. a field) over which to sum
     Item *sumUDA(Item *const expr) const;
     Item *sumUDF(Item *const i1, Item *const i2) const;
 
 private:
-    uint decimals;
-    ZZ shift;
+    uint const decimals;
+    ZZ const shift;
 
     std::string doSerialize() const;
     ~HOM_dec() {;}
@@ -1429,9 +1441,9 @@ HOMFactory::deserialize(unsigned int id, const SerialLayer &serial)
 }
 
 static ZZ
-ItemIntToZZ(Item * const ptext)
+ItemIntToZZ(const Item &ptext)
 {
-    const ulonglong val = ptext->val_uint();
+    const ulonglong val = RiboldMYSQL::val_uint(ptext);
     return ZZFromUint64(val);
 }
 
@@ -1439,7 +1451,7 @@ static Item *
 ZZToItemInt(const ZZ &val)
 {
     const ulonglong v = uint64FromZZ(val);
-    return new Item_int(v);
+    return new (current_thd->mem_root) Item_int(v);
 }
 
 static Item *
@@ -1447,7 +1459,8 @@ ZZToItemStr(const ZZ &val)
 {
     const std::string str = StringFromZZ(val);
     Item * const newit =
-        new Item_string(make_thd_string(str), str.length(),
+        new (current_thd->mem_root) Item_string(make_thd_string(str),
+                                                str.length(),
                         &my_charset_bin);
     newit->name = NULL; //no alias
 
@@ -1455,19 +1468,17 @@ ZZToItemStr(const ZZ &val)
 }
 
 static ZZ
-ItemStrToZZ(Item * const i)
+ItemStrToZZ(Item *const i)
 {
-    const std::string res = ItemToString(i);
+    const std::string res = ItemToString(*i);
     return ZZFromString(res);
 }
 
 HOM_dec::HOM_dec(Create_field * const cf, const std::string &seed_key)
-    :  HOM(cf, seed_key)
+    : HOM(cf, seed_key), decimals(cf->decimals),
+      shift(power(to_ZZ(10), decimals))
 {
     assert_s(cf->length <= 120, "too large decimal for HOM layer");
-
-    decimals = cf->decimals;
-    shift = power(to_ZZ(10), decimals);
 }
 
 std::string
@@ -1477,19 +1488,18 @@ HOM_dec::doSerialize() const
 }
 
 HOM_dec::HOM_dec(unsigned int id, const std::string &serial)
-    : HOM(id, parent_serial(&decimals, serial))
-{
-    shift = power(to_ZZ(10), decimals);
-}
+    : HOM(id, underSerial(serial)), decimals(getDecimals(serial)),
+      shift(power(to_ZZ(10), decimals))
+{}
 
 static ZZ
-ItemDecToZZ(Item * const ptext, const ZZ &shift, uint decimals)
+ItemDecToZZ(const Item &ptext, const ZZ &shift, uint decimals)
 {
-    String s;
-    static_cast<Item_decimal*>(ptext)->val_str(&s);
-
-    const std::string ss(s.ptr(), s.length()); // ss is a number
-                                               // : - xxxx.yyyy
+    bool is_null;
+    // ss is a number
+    // : - xxxx.yyyy
+    const std::string &ss(RiboldMYSQL::val_str(ptext, &is_null));
+    assert(false == is_null);
 
     std::string ss_int = ss.substr(0, ss.find('.')); // integer part
     if (ss_int == "") ss_int = "0";
@@ -1519,12 +1529,14 @@ ZZToItemDec(const ZZ &val, const ZZ &shift)
     const std::string num =
         DecStringFromZZ(val_int) + "." + DecStringFromZZ(val_dec);
     
-    return new Item_decimal(num.data(), num.length(), &my_charset_numeric);
+    return new (current_thd->mem_root) Item_decimal(num.data(),
+                                                    num.length(),
+                                                    &my_charset_numeric);
 }
 
 
 Item *
-HOM_dec::encrypt(Item * const ptext, uint64_t IV)
+HOM_dec::encrypt(const Item &ptext, uint64_t IV) const
 {
     const ZZ enc = sk->encrypt(ItemDecToZZ(ptext, shift, decimals));
 
@@ -1532,7 +1544,7 @@ HOM_dec::encrypt(Item * const ptext, uint64_t IV)
 }
 
 Item *
-HOM_dec::decrypt(Item * const ctext, uint64_t IV)
+HOM_dec::decrypt(Item * const ctext, uint64_t IV) const
 {
     const ZZ enc = ItemStrToZZ(ctext);
     const ZZ dec = sk->decrypt(enc);
@@ -1543,40 +1555,48 @@ HOM_dec::decrypt(Item * const ctext, uint64_t IV)
 
 
 HOM::HOM(Create_field * const f, const std::string &seed_key)
-    : seed_key(seed_key)
-{
-    const std::unique_ptr<streamrng<arc4>>
-        prng(new streamrng<arc4>(seed_key));
-    sk = new Paillier_priv(Paillier_priv::keygen(prng.get(), nbits));
-}
+    : seed_key(seed_key), sk(NULL), waiting(true)
+{}
 
 HOM::HOM(unsigned int id, const std::string &serial)
-    : EncLayer(id), seed_key(serial)
-{
-    const std::unique_ptr<streamrng<arc4>>
-        prng(new streamrng<arc4>(seed_key));
-    sk = new Paillier_priv(Paillier_priv::keygen(prng.get(), nbits));
-}
+    : EncLayer(id), seed_key(serial), sk(NULL), waiting(true)
+{}
 
 Create_field *
 HOM::newCreateField(const Create_field * const cf,
-                    const std::string &anonname)
+                    const std::string &anonname) const
 {
     return createFieldHelper(cf, 2*nbits/8, MYSQL_TYPE_VARCHAR,
                              anonname, &my_charset_bin);
 }
 
+void
+HOM::unwait() const
+{
+    const std::unique_ptr<streamrng<arc4>>
+        prng(new streamrng<arc4>(seed_key));
+    sk = new Paillier_priv(Paillier_priv::keygen(prng.get(), nbits));
+    waiting = false;
+}
 
 Item *
-HOM::encrypt(Item * const ptext, uint64_t IV)
+HOM::encrypt(const Item &ptext, uint64_t IV) const
 {
+    if (true == waiting) {
+        this->unwait();
+    }
+
     const ZZ enc = sk->encrypt(ItemIntToZZ(ptext));
     return ZZToItemStr(enc);
 }
 
 Item *
-HOM::decrypt(Item * const ctext, uint64_t IV)
+HOM::decrypt(Item * const ctext, uint64_t IV) const
 {
+    if (true == waiting) {
+        this->unwait();
+    }
+
     const ZZ enc = ItemStrToZZ(ctext);
     const ZZ dec = sk->decrypt(enc);
     LOG(encl) << "HOM ciph " << enc << "---->" << dec;
@@ -1584,7 +1604,7 @@ HOM::decrypt(Item * const ctext, uint64_t IV)
 }
 
 static udf_func u_sum_a = {
-    LEXSTRING("agg"),
+    LEXSTRING("cryptdb_agg"),
     STRING_RESULT,
     UDFTYPE_AGGREGATE,
     NULL,
@@ -1598,7 +1618,7 @@ static udf_func u_sum_a = {
 };
 
 static udf_func u_sum_f = {
-    LEXSTRING("func_add_set"),
+    LEXSTRING("cryptdb_func_add_set"),
     STRING_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -1614,21 +1634,29 @@ static udf_func u_sum_f = {
 Item *
 HOM::sumUDA(Item *const expr) const
 {
+    if (true == waiting) {
+        this->unwait();
+    }
+
     List<Item> l;
     l.push_back(expr);
     l.push_back(ZZToItemStr(sk->hompubkey()));
-    return new Item_func_udf_str(&u_sum_a, l);
+    return new (current_thd->mem_root) Item_func_udf_str(&u_sum_a, l);
 }
 
 Item *
 HOM::sumUDF(Item *const i1, Item *const i2) const
 {
+    if (true == waiting) {
+        this->unwait();
+    }
+
     List<Item> l;
     l.push_back(i1);
     l.push_back(i2);
     l.push_back(ZZToItemStr(sk->hompubkey()));
 
-    return new Item_func_udf_str(&u_sum_f, l);
+    return new (current_thd->mem_root) Item_func_udf_str(&u_sum_f, l);
 }
 
 HOM::~HOM() {
@@ -1638,21 +1666,18 @@ HOM::~HOM() {
 /******* SEARCH **************************/
 
 Search::Search(Create_field * const f, const std::string &seed_key)
-{
-    key = prng_expand(seed_key, key_bytes);
-}
+    : key(prng_expand(seed_key, key_bytes))
+{}
 
 Search::Search(unsigned int id, const std::string &serial) 
-    : EncLayer(id)
-{
-    key = prng_expand(serial, key_bytes);
-}
+    : EncLayer(id), key(prng_expand(serial, key_bytes))
+{}
 
 Create_field *
 Search::newCreateField(const Create_field * const cf,
-                       const std::string &anonname)
+                       const std::string &anonname) const
 {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname,
+    return createFieldHelper(cf, cf->length, MYSQL_TYPE_BLOB, anonname,
                              &my_charset_bin);
 }
 
@@ -1726,7 +1751,7 @@ newmem(const std::string &a)
 }
 
 Item *
-Search::encrypt(Item * const ptext, uint64_t IV)
+Search::encrypt(const Item &ptext, uint64_t IV) const
 {
     const std::string plainstr = ItemToString(ptext);
     //TODO: remove string, string serves this purpose now..
@@ -1739,13 +1764,13 @@ Search::encrypt(Item * const ptext, uint64_t IV)
 }
 
 Item *
-Search::decrypt(Item * const ctext, uint64_t IV)
+Search::decrypt(Item * const ctext, uint64_t IV) const
 {
     thrower() << "decryption from SWP not supported \n";
 }
 
 static udf_func u_search = {
-    LEXSTRING("searchSWP"),
+    LEXSTRING("cryptdb_searchSWP"),
     INT_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -1774,7 +1799,7 @@ searchstrip(std::string s)
 }
 
 Item *
-Search::searchUDF(Item * const field, Item * const expr)
+Search::searchUDF(Item * const field, Item * const expr) const
 {
     List<Item> l = List<Item>();
 
@@ -1782,7 +1807,7 @@ Search::searchUDF(Item * const field, Item * const expr)
 
     // Add token
     const Token t =
-        token(key, std::string(searchstrip(ItemToString(expr))));
+        token(key, std::string(searchstrip(ItemToString(*expr))));
     Item_string * const t1 =
         new Item_string(newmem(t.ciph), t.ciph.length(),
                         &my_charset_bin);
@@ -1800,7 +1825,7 @@ Search::searchUDF(Item * const field, Item * const expr)
 
 Create_field *
 PlainText::newCreateField(const Create_field * const cf,
-                          const std::string &anonname)
+                          const std::string &anonname) const
 {
     const THD * const thd = current_thd;
     Create_field * const f0 = cf->clone(thd->mem_root);
@@ -1812,21 +1837,21 @@ PlainText::newCreateField(const Create_field * const cf,
 }
 
 Item *
-PlainText::encrypt(Item * const ptext, uint64_t IV)
+PlainText::encrypt(const Item &ptext, uint64_t IV) const
 {
-    return clone_item(ptext);
+    return dup_item(ptext);
 }
 
 Item *
-PlainText::decrypt(Item * const ctext, uint64_t IV)
+PlainText::decrypt(Item *const ctext, uint64_t IV) const
 {
-    return clone_item(ctext);
+    return dup_item(*ctext);
 }
 
 Item *
-PlainText::decryptUDF(Item * const col, Item * const ivcol)
+PlainText::decryptUDF(Item * const col, Item * const ivcol) const
 {
-    throw CryptDBError("Can't decrypt from PLAIN");
+    FAIL_TextMessageError("No PLAIN decryption UDF");
 }
 
 std::string
@@ -1835,6 +1860,20 @@ PlainText::doSerialize() const
     return std::string("");
 }
 
+static udf_func u_cryptdb_version = {
+    LEXSTRING("cryptdb_version"),
+    STRING_RESULT,
+    UDFTYPE_FUNCTION,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0L,
+};
+
 const std::vector<udf_func*> udf_list = {
     &u_decRNDInt,
     &u_decRNDString,
@@ -1842,6 +1881,7 @@ const std::vector<udf_func*> udf_list = {
     &u_decDETStr,
     &u_sum_f,
     &u_sum_a,
-    &u_search
+    &u_search,
+    &u_cryptdb_version
 };
 

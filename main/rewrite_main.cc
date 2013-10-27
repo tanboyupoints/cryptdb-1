@@ -15,13 +15,12 @@
 #include <main/rewrite_main.hh>
 #include <main/rewrite_util.hh>
 #include <util/cryptdb_log.hh>
+#include <util/enum_text.hh>
 #include <main/CryptoHandlers.hh>
 #include <parser/lex_util.hh>
-#include <main/enum_text.hh>
 #include <main/sql_handler.hh>
 #include <main/dml_handler.hh>
 #include <main/ddl_handler.hh>
-#include <main/List_helpers.hh>
 #include <main/metadata_tables.hh>
 #include <main/macro_util.hh>
 
@@ -53,6 +52,15 @@ stringToItemField(const std::string &field,
 }
 */
 
+std::string global_crash_point = "";
+
+void
+crashTest(const std::string &current_point) {
+    if (current_point == global_crash_point) {
+      throw std::runtime_error("crash test exception");
+    }
+}
+
 static inline std::string
 extract_fieldname(Item_field *const i)
 {
@@ -80,42 +88,216 @@ mysql_query_wrapper(MYSQL *const m, const std::string &q)
 }
 
 bool
-sanityCheck(FieldMeta *const fm)
+sanityCheck(FieldMeta &fm)
 {
-    for (auto it : fm->children) {
-        // FIXME: PTR.
-        std::shared_ptr<OnionMeta> om = it.second;
-        const onion o = it.first->getValue();
-        const std::vector<SECLEVEL> &secs = fm->onion_layout.at(o);
-        for (unsigned int i = 0; i < om.get()->layers.size(); ++i) {
-            std::shared_ptr<EncLayer> layer = om.get()->layers[i];
-            // FIXME: PTR.
-            assert(layer.get()->level() == secs[i]);
+    for (auto it = fm.children.begin(); it != fm.children.end();
+         it++) {
+        OnionMeta *const om = (*it).second.get();
+        const onion o = (*it).first.getValue();
+        const std::vector<SECLEVEL> &secs = fm.getOnionLayout().at(o);
+        for (size_t i = 0; i < om->layers.size(); ++i) {
+            std::unique_ptr<EncLayer> const &layer = om->layers[i];
+            assert(layer->level() == secs[i]);
         }
     }
     return true;
 }
 
 static bool
-sanityCheck(TableMeta *const tm)
+sanityCheck(TableMeta &tm)
 {
-    for (auto it : tm->children) {
-        std::shared_ptr<FieldMeta> fm = it.second;
-        // FIXME: PTR.
-        assert(sanityCheck(fm.get()));
+    for (auto it = tm.children.begin(); it != tm.children.end(); it++) {
+        const std::unique_ptr<FieldMeta> &fm = (*it).second;
+        assert(sanityCheck(*fm.get()));
     }
     return true;
 }
 
 static bool
-sanityCheck(SchemaInfo *const schema)
+sanityCheck(DatabaseMeta &dm)
 {
-    for (auto it : schema->children) {
-        std::shared_ptr<TableMeta> tm = it.second;
-        // FIXME: PTR.
-        assert(sanityCheck(tm.get()));
+    for (auto it = dm.children.begin(); it != dm.children.end(); it++) {
+        const std::unique_ptr<TableMeta> &tm = (*it).second;
+        assert(sanityCheck(*tm.get()));
     }
     return true;
+}
+
+static bool
+sanityCheck(SchemaInfo &schema)
+{
+    for (auto it = schema.children.begin(); it != schema.children.end();
+         it++) {
+        const std::unique_ptr<DatabaseMeta> &tm = (*it).second;
+        assert(sanityCheck(*tm.get()));
+    }
+    return true;
+}
+
+struct RecoveryDetails {
+    const bool embedded_begin;
+    const bool embedded_complete;
+    const bool existed_remote;
+    const bool remote_begin;
+    const bool remote_complete;
+    const std::string query;
+    const std::string default_db;
+
+    RecoveryDetails(bool embedded_begin, bool embedded_complete,
+                    bool existed_remote, bool remote_begin,
+                    bool remote_complete, const std::string &query,
+                    const std::string &default_db)
+        : embedded_begin(embedded_begin),
+          embedded_complete(embedded_complete),
+          existed_remote(existed_remote), remote_begin(remote_begin),
+          remote_complete(remote_complete), query(query),
+          default_db(default_db) {}
+};
+
+static bool
+false_if_false(bool test, const std::string &new_value)
+{
+    if (false == test) {
+        return test;
+    }
+
+    return string_to_bool(new_value);
+}
+static bool
+collectRecoveryDetails(const std::unique_ptr<Connect> &conn,
+                       const std::unique_ptr<Connect> &e_conn,
+                       unsigned long unfinished_id,
+                       std::unique_ptr<RecoveryDetails> *details)
+{
+    const std::string embedded_completion_table =
+        MetaData::Table::embeddedQueryCompletion();
+    const std::string remote_completion_table =
+        MetaData::Table::remoteQueryCompletion();
+
+    // collect completion data
+    std::unique_ptr<DBResult> dbres;
+    const std::string embedded_completion_q =
+        " SELECT begin, complete, original_query, default_db FROM " +
+            embedded_completion_table +
+        "  WHERE id = " + std::to_string(unfinished_id) + ";";
+    RETURN_FALSE_IF_FALSE(e_conn->execute(embedded_completion_q, &dbres));
+    assert(mysql_num_rows(dbres->n) == 1);
+
+    const MYSQL_ROW embedded_row = mysql_fetch_row(dbres->n);
+    const unsigned long *const l = mysql_fetch_lengths(dbres->n);
+    const std::string string_embedded_begin(embedded_row[0], l[0]);
+    const std::string string_embedded_complete(embedded_row[1], l[1]);
+    const std::string string_embedded_query(embedded_row[2], l[2]);
+    const std::string string_embedded_default_db(embedded_row[3], l[3]);
+
+    const std::string remote_completion_q =
+        " SELECT begin, complete FROM " + remote_completion_table +
+        "  WHERE embedded_completion_id = " +
+                 std::to_string(unfinished_id) + ";";
+    RETURN_FALSE_IF_FALSE(conn->execute(remote_completion_q, &dbres));
+
+    const unsigned long remote_row_count = mysql_num_rows(dbres->n);
+    const MYSQL_ROW remote_row = mysql_fetch_row(dbres->n);
+    assert(!!remote_row == !!remote_row_count);
+
+    std::string string_remote_begin, string_remote_complete;
+    const bool existed_remote = !!remote_row;
+    if (existed_remote) {
+        const unsigned long *const l = mysql_fetch_lengths(dbres->n);
+        string_remote_begin    = std::string(remote_row[0], l[0]);
+        string_remote_complete = std::string(remote_row[1], l[1]);
+        assert(string_to_bool(string_remote_begin) == true);
+    }
+
+    const bool embedded_begin = string_to_bool(string_embedded_begin);
+    const bool embedded_complete =
+        string_to_bool(string_embedded_complete);
+    const bool remote_begin =
+        false_if_false(existed_remote, string_remote_begin);
+    const bool remote_complete =
+        false_if_false(existed_remote, string_remote_complete);
+
+    assert(true == embedded_begin);
+
+    *details =
+        std::unique_ptr<RecoveryDetails>(
+            new RecoveryDetails(embedded_begin, embedded_complete,
+                                existed_remote, remote_begin,
+                                remote_complete, string_embedded_query,
+                                string_embedded_default_db));
+
+    return true;
+}
+
+static bool
+abortQuery(const std::unique_ptr<Connect> &e_conn,
+           unsigned long unfinished_id)
+{
+    const std::string embedded_completion_table =
+        MetaData::Table::embeddedQueryCompletion();
+
+    const std::string update_aborted =
+        " UPDATE " + embedded_completion_table +
+        "    SET aborted = TRUE"
+        "  WHERE id = " + std::to_string(unfinished_id) + ";";
+
+    RETURN_FALSE_IF_FALSE(e_conn->execute("START TRANSACTION"));
+    ROLLBACK_AND_RFIF(setBleedingTableToRegularTable(e_conn), e_conn);
+    ROLLBACK_AND_RFIF(e_conn->execute(update_aborted), e_conn);
+    ROLLBACK_AND_RFIF(e_conn->execute("COMMIT"), e_conn);
+
+    return true;
+}
+
+static bool
+finishQuery(const std::unique_ptr<Connect> &e_conn,
+            unsigned long unfinished_id)
+{
+    const std::string embedded_completion_table =
+        MetaData::Table::embeddedQueryCompletion();
+
+    const std::string update_completed =
+        " UPDATE " + embedded_completion_table +
+        "    SET complete = TRUE"
+        "  WHERE id = " + std::to_string(unfinished_id) + ";";
+
+    RETURN_FALSE_IF_FALSE(e_conn->execute("START TRANSACTION"));
+    ROLLBACK_AND_RFIF(setRegularTableToBleedingTable(e_conn), e_conn);
+    ROLLBACK_AND_RFIF(e_conn->execute(update_completed), e_conn);
+    ROLLBACK_AND_RFIF(e_conn->execute("COMMIT"), e_conn);
+
+    return true;
+}
+
+static bool
+fixAdjustOnion(const std::unique_ptr<Connect> &conn,
+               const std::unique_ptr<Connect> &e_conn,
+               unsigned long unfinished_id)
+{
+    std::unique_ptr<RecoveryDetails> details;
+    RETURN_FALSE_IF_FALSE(collectRecoveryDetails(conn, e_conn,
+                                                 unfinished_id,
+                                                 &details));
+    assert(details->remote_begin == details->remote_complete);
+
+    lowLevelSetCurrentDatabase(e_conn, details->default_db);
+
+    // failure after initial embedded queries and before remote queries
+    if (false == details->remote_begin) {
+        assert(false == details->embedded_complete
+               && false == details->existed_remote
+               && false == details->remote_complete);
+        return abortQuery(e_conn, unfinished_id);
+    }
+
+    assert(true == details->remote_complete);
+
+    // failure after remote queries
+    {
+        assert(false == details->embedded_complete);
+
+        return finishQuery(e_conn, unfinished_id);
+    }
 }
 
 /*
@@ -127,166 +309,189 @@ static bool
 recoverableDeltaError(unsigned int err)
 {
     const bool ret =
+        ER_DB_CREATE_EXISTS == err ||       // Database already exists.
         ER_TABLE_EXISTS_ERROR == err ||     // Table already exists.
         ER_DUP_FIELDNAME == err ||          // Column already exists.
         ER_DUP_KEYNAME == err ||            // Key already exists.
+        ER_DB_DROP_EXISTS == err ||         // Database doesn't exist.
         ER_BAD_TABLE_ERROR == err ||        // Table doesn't exist.
         ER_CANT_DROP_FIELD_OR_KEY == err;   // Key/Col doesn't exist.
 
     return ret;
 }
 
+// we use a blacklist to determine if the query is bad and thus failed at
+// the remote server. if the query fails, but not for one of these
+// reasons, we can be reasonably sure that it did not succeed initially.
+// the blacklist include errors related to 'bad mysq/connection state'.
+// if a query fails for connectivity reasons during recovery, we still
+// don't know anything about why it failed initially; or even if it
+// succeeded initially.
+//
+// essentially the blacklist is all errors that could be thrown against
+// a 'good' query.
+//
+// blacklist taken from here:
+//  http://dev.mysql.com/doc/refman/5.0/en/mysql-stat.html
+//
+// we could potentially use a whitelist which would contain errors that
+// won't be caught by query_parse(...) and will result in the query
+// failing to execute remotely.
 static bool
-fixDelta(const std::unique_ptr<Connect> &conn,
-         const std::unique_ptr<Connect> &e_conn,
-         unsigned long delta_output_id)
+queryInitiallyFailedErrors(unsigned int err)
 {
-    std::list<std::string> local_queries;
-    bool expect_ddl;
+    // lifted from mysql-src/includes/errmsg.h
+    unsigned long cr_unknown_error        = 2000,
+                  cr_server_gone_error    = 2006,
+                  cr_server_lost          = 2013,
+                  cr_commands_out_of_sync = 2014;
 
-    const std::string query_table_name = MetaDataTables::Name::query();
+    const bool ret =
+        cr_unknown_error == err ||
+        cr_server_gone_error == err ||
+        cr_server_lost == err ||
+        cr_commands_out_of_sync == err;
 
-    // Get local queries (should only be one).
-    DBResult *dbres;
-    const std::string get_local_query_query =
-        " SELECT query FROM pdb." + query_table_name +
-        "  WHERE delta_output_id = " + std::to_string(delta_output_id) +
-        "    AND local = TRUE;";
-    RETURN_FALSE_IF_FALSE(e_conn->execute(get_local_query_query, dbres));
+    return !ret;
+}
 
-    // Onion adjustment queries do not have local.
-    ScopedMySQLRes local_r(dbres->n);
-    const unsigned long long local_row_count =
-        mysql_num_rows(local_r.res());
-    if (1 == local_row_count) {
-        expect_ddl = true;
-        const MYSQL_ROW local_row = mysql_fetch_row(local_r.res());
-        const unsigned long *const local_l =
-            mysql_fetch_lengths(local_r.res());
-        const std::string local_query(local_row[0], local_l[0]);
-        local_queries.push_back(local_query);
-    } else if (0 == local_row_count) {
-        expect_ddl = false;
-    } else {
-        return false;
-    }
+// 'bad_query' is a sanity checking mechanism; if the query is bad
+// against the remote database, it should also be bad against the embedded
+// database.
+static bool
+retryQuery(const std::unique_ptr<Connect> &c, const std::string &query,
+           bool *const bad_query)
+{
+    assert(bad_query);
 
+    *bad_query = false;
 
-    // Get remote queries (ORDER matters).
-    const std::string remote_query =
-        " SELECT query, ddl FROM pdb." + query_table_name +
-        "  WHERE delta_output_id = " + std::to_string(delta_output_id) +
-        "    AND local = FALSE;"
-        "  ORDER BY ASC id";
-    RETURN_FALSE_IF_FALSE(e_conn->execute(remote_query, dbres));
+    if (false == c->execute(query)) {
+        const unsigned int err = c->get_mysql_errno();
+        // if the error is not recoverable, we must determine if
+        // the query failed initially for the same error.
+        if (false == recoverableDeltaError(err)) {
+            *bad_query = queryInitiallyFailedErrors(err);
+            RETURN_FALSE_IF_FALSE(*bad_query);
 
-    ScopedMySQLRes remote_r(dbres->n);
-    MYSQL_ROW remote_row;
-    std::list<std::string> remote_queries;
-    while ((remote_row = mysql_fetch_row(remote_r.res()))) {
-        const unsigned long *const remote_l =
-            mysql_fetch_lengths(remote_r.res());
-        const std::string remote_query(remote_row[0], remote_l[0]);
-        const std::string remote_ddl(remote_row[1], remote_l[1]);
-        const bool ddl = string_to_bool(remote_ddl);
-        if (ddl != expect_ddl) {
-            throw CryptDBError("Expectations of DDLness are unmatched!");
+            // We could abort the query here because we know that
+            // the query is bad and can't be processed by the remote
+            // or embedded server.
         }
-
-        remote_queries.push_back(remote_query);
-    }
-
-    // Do sanity check.
-    RETURN_FALSE_IF_FALSE((expect_ddl && remote_queries.size() == 1 &&
-                           local_queries.size() == 1) ||
-                          (!expect_ddl && remote_queries.size() >= 1 &&
-                           local_queries.size() == 0));
-
-    if (expect_ddl) {  // Handle single DDL query.
-        if (false == conn->execute(remote_queries.back())) {
-            unsigned int const err = conn->get_mysql_errno();
-            if (false == recoverableDeltaError(err)) {
-                return false;
-            }
-        }
-    } else {        // Handle one or more DML queries.
-        DBResult *dbres;
-        const std::string dml_table =
-            MetaDataTables::Name::dmlCompletion();
-        const std::string dml_query =
-            " SELECT * FROM " + dml_table +
-            "  WHERE delta_output_id = " +
-            " " +    std::to_string(delta_output_id) + ";";
-        RETURN_FALSE_IF_FALSE(conn->execute(dml_query, dbres));
-
-        ScopedMySQLRes r(dbres->n);
-        const unsigned long long dml_row_count =
-            mysql_num_rows(r.res());
-        if (0 == dml_row_count) {
-            RETURN_FALSE_IF_FALSE(conn->execute("START TRANSACTION;"));
-            for (auto it : remote_queries) {
-                RETURN_FALSE_IF_FALSE(conn->execute(it));
-            }
-            RETURN_FALSE_IF_FALSE(saveDMLCompletion(conn,
-                                                    delta_output_id));
-            RETURN_FALSE_IF_FALSE(conn->execute("COMMIT"));
-        } else if (1 < dml_row_count) {
-            throw CryptDBError("Too many DML table results!");
-        }
-    }
-
-    // Cleanup database and do local query.
-    {
-        RETURN_FALSE_IF_FALSE(e_conn->execute("START TRANSACTION;"));
-        if (false == setRegularTableToBleedingTable(e_conn)) {
-            e_conn->execute("ROLLBACK;");
-            return false;
-        }
-
-        if (false == cleanupDeltaOutputAndQuery(e_conn,delta_output_id)) {
-            e_conn->execute("ROLLBACK;");
-            return false;
-        }
-        RETURN_FALSE_IF_FALSE(e_conn->execute("COMMIT;"));
-    }
-
-    // FIXME: local_query can be DDL.
-    // > This can be fixed with a bleeding table.
-    RETURN_FALSE_IF_FALSE(local_queries.size() <= 1);
-    for (auto it : local_queries) {
-        RETURN_FALSE_IF_FALSE(e_conn->execute(it));
     }
 
     return true;
 }
 
 static bool
+fixDDL(const std::unique_ptr<Connect> &conn,
+       const std::unique_ptr<Connect> &e_conn,
+       unsigned long unfinished_id)
+{
+    const std::string remote_completion_table =
+        MetaData::Table::remoteQueryCompletion();
+
+    std::unique_ptr<RecoveryDetails> details;
+    RETURN_FALSE_IF_FALSE(collectRecoveryDetails(conn, e_conn,
+                                                 unfinished_id,
+                                                 &details));
+    assert(true == details->embedded_begin
+           && false == details->embedded_complete);
+
+    lowLevelSetCurrentDatabase(e_conn, details->default_db);
+    lowLevelSetCurrentDatabase(conn, details->default_db);
+
+    // failure after initial embedded queries and before remote queries
+    if (false == details->remote_begin) {
+        assert(false == details->embedded_complete
+               && false == details->existed_remote
+               && false == details->remote_complete);
+        return abortQuery(e_conn, unfinished_id);
+    }
+
+    // --------------------------------------------------
+    //  After this point we must run to completion as we
+    //        _may_ have made a DDL modification
+    //  > unless we determine that it is a bad query.
+    //  -------------------------------------------------
+
+    // ugly sanity checking device
+    AssignOnce<bool> remote_bad_query;
+    // failure before remote queries complete
+    if (false == details->remote_complete) {
+        bool rbq;
+        // reissue the DDL query against the remote database.
+        RETURN_FALSE_IF_FALSE(retryQuery(conn, details->query,
+                                         &rbq));
+        remote_bad_query = rbq;
+
+        const std::string update_remote_complete =
+            "UPDATE " + remote_completion_table +
+            "   SET complete = TRUE"
+            " WHERE embedded_completion_id = " +
+                    std::to_string(unfinished_id) + ";";
+        RETURN_FALSE_IF_FALSE(conn->execute(update_remote_complete));
+    }
+
+    // failure after remote queries completed
+    {
+        assert(false == details->embedded_complete);
+
+        // reissue the DDL query against the embedded database
+        bool embedded_bad_query;
+        RETURN_FALSE_IF_FALSE(retryQuery(e_conn, details->query,
+                                         &embedded_bad_query));
+        assert(false == remote_bad_query.assigned()
+               || embedded_bad_query == remote_bad_query.get());
+
+        if (true == embedded_bad_query) {
+            return abortQuery(e_conn, unfinished_id);
+        }
+
+        return finishQuery(e_conn, unfinished_id);
+    }
+}
+
+static bool
 deltaSanityCheck(const std::unique_ptr<Connect> &conn,
                  const std::unique_ptr<Connect> &e_conn)
 {
-    const std::string table_name = MetaDataTables::Name::delta();
+    const std::string embedded_completion =
+        MetaData::Table::embeddedQueryCompletion();
+    std::unique_ptr<DBResult> dbres;
+    const std::string unfinished_deltas =
+        " SELECT id, type FROM " + embedded_completion +
+        "  WHERE (begin = FALSE OR complete = FALSE)"
+        "    AND aborted != TRUE;";
+    RETURN_FALSE_IF_FALSE(e_conn->execute(unfinished_deltas, &dbres));
+    const unsigned long long unfinished_count = mysql_num_rows(dbres->n);
+    std::cerr << GREEN_BEGIN << "there are " << unfinished_count
+              << " unfinished deltas" << COLOR_END << std::endl;
 
-    DBResult *dbres;
-    const std::string get_deltas =
-        " SELECT id FROM pdb." + table_name + ";";
-    RETURN_FALSE_IF_FALSE(e_conn->execute(get_deltas, dbres));
-
-    ScopedMySQLRes r(dbres->n);
-    const unsigned long long row_count = mysql_num_rows(r.res());
-
-    std::cerr << "There are " << row_count << " DeltaOutputz!"
-              << std::endl;
-    if (0 == row_count) {
+    if (0 == unfinished_count) {
         return true;
-    } else if (1 == row_count) {
-        MYSQL_ROW row = mysql_fetch_row(r.res());
-        const unsigned long *const l = mysql_fetch_lengths(r.res());
-        const std::string string_delta_output_id(row[0], l[0]);
-        const unsigned long delta_output_id =
-            atoi(string_delta_output_id.c_str());
-        return fixDelta(conn, e_conn, delta_output_id);
-    } else {
+    } else if (1 < unfinished_count) {
         return false;
+    }
+
+    const MYSQL_ROW row = mysql_fetch_row(dbres->n);
+    const unsigned long *const l = mysql_fetch_lengths(dbres->n);
+    const std::string string_unfinished_id(row[0], l[0]);
+    const std::string string_unfinished_type(row[1], l[1]);
+
+    const unsigned long unfinished_id =
+        atoi(string_unfinished_id.c_str());
+    const CompletionType type =
+        TypeText<CompletionType>::toType(string_unfinished_type);
+
+    switch (type) {
+        case CompletionType::AdjustOnionCompletion:
+            return fixAdjustOnion(conn, e_conn, unfinished_id);
+        case CompletionType::DDLCompletion:
+            return fixDDL(conn, e_conn, unfinished_id);
+        default:
+            std::cerr << "unknown completion type" << std::endl;
+            return false;
     }
 }
 
@@ -309,8 +514,7 @@ loadSchemaInfo(const std::unique_ptr<Connect> &conn,
         [&loadChildren, &e_conn](DBMeta *const parent) {
             auto kids = parent->fetchChildren(e_conn);
             for (auto it : kids) {
-                // FIXME: PTR.
-                loadChildren(it.get());
+                loadChildren(it);
             }
 
             return parent;  /* lambda */
@@ -319,7 +523,7 @@ loadSchemaInfo(const std::unique_ptr<Connect> &conn,
     loadChildren(schema);
     // FIXME: Ideally we would do this before loading the schema.
     // But first we must decide on a place to create the database from.
-    assert(sanityCheck(schema));
+    assert(sanityCheck(*schema));
 
     return schema;
 }
@@ -428,6 +632,21 @@ buildTypeTextTranslator()
                             mysql_item_types.size());
     translatorHelper(mysql_item_strings, mysql_item_types);
 
+    // ALTER TABLE [table] DISABLE/ENABLE KEYS
+    const std::vector<std::string> disable_enable_keys_strings
+    {
+        "DISABLE", "ENABLE", "LEAVE_AS_IS"
+    };
+    const std::vector<enum enum_enable_or_disable>
+        disable_enable_keys_types
+    {
+        DISABLE, ENABLE, LEAVE_AS_IS
+    };
+    RETURN_FALSE_IF_FALSE(disable_enable_keys_strings.size() ==
+                            disable_enable_keys_types.size());
+    translatorHelper(disable_enable_keys_strings,
+                     disable_enable_keys_types);
+
     // Onion Layouts.
     const std::vector<std::string> onion_layout_strings
     {
@@ -478,6 +697,20 @@ buildTypeTextTranslator()
                             == security_rating_types.size());
     translatorHelper(security_rating_strings, security_rating_types);
 
+    // Query Completions.
+    const std::vector<std::string> completion_strings
+    {
+        "DDLCompletion", "AdjustOnionCompletion"
+    };
+    const std::vector<CompletionType> completion_types
+    {
+        CompletionType::DDLCompletion,
+        CompletionType::AdjustOnionCompletion
+    };
+    RETURN_FALSE_IF_FALSE(completion_strings.size()
+                            == completion_types.size());
+    translatorHelper(completion_strings, completion_types);
+
     return true;
 }
 
@@ -494,44 +727,37 @@ buildTypeTextTranslatorHack()
 
 //l gets updated to the new level
 static std::string
-removeOnionLayer(Analysis &a, const ProxyState &ps,
-                 const FieldMeta *const fm,
-                 const std::string &table_name,
-                 onion o, SECLEVEL *const new_level,
-                 const std::string &cur_db)
+removeOnionLayer(const Analysis &a, const TableMeta &tm,
+                 const FieldMeta &fm,
+                 OnionMetaAdjustor *const om_adjustor,
+                 SECLEVEL *const new_level,
+                 std::vector<std::unique_ptr<Delta> > *const deltas)
 {
-    OnionMeta *const om = a.getOnionMeta(fm, o);
-
     // Remove the EncLayer.
-    // HACK: 'Pop'ping the layer is unsafe as it's being used as a
-    // technique to transmit information to successive calls of
-    // removeOnionLayer. This information is in no way respected by the
-    // persistency logic.
-    std::shared_ptr<EncLayer> back_el(a.popBackEncLayer(om));
+    EncLayer const &back_el = om_adjustor->popBackEncLayer();
 
     // Update the Meta.
-    a.deltas.push_back(new DeleteDelta(back_el, om, NULL));
-    const SECLEVEL local_new_level = a.getOnionLevel(om);
+    deltas->push_back(std::unique_ptr<Delta>(
+                        new DeleteDelta(back_el,
+                                        om_adjustor->getOnionMeta())));
+    const SECLEVEL local_new_level = om_adjustor->getSecLevel();
 
     //removes onion layer at the DB
-    const std::string tableanon =
-        a.getTableMeta(table_name)->getAnonTableName();
-
-    const std::string anon_table_name = a.getAnonTableName(table_name);
+    const std::string dbname = a.getDatabaseName();
+    const std::string anon_table_name = tm.getAnonTableName();
     Item_field *const salt =
-        new Item_field(NULL, ps.dbName().c_str(), anon_table_name.c_str(),
-                       fm->getSaltName().c_str());
-    std::cout << TypeText<onion>::toText(o) << std::endl;
+        new Item_field(NULL, dbname.c_str(), anon_table_name.c_str(),
+                       fm.getSaltName().c_str());
 
-    const std::string fieldanon = om->getAnonOnionName();
+    const std::string fieldanon = om_adjustor->getAnonOnionName();
     Item_field *const field =
-        new Item_field(NULL, ps.dbName().c_str(), anon_table_name.c_str(),
-                       om->getAnonOnionName().c_str());
+        new Item_field(NULL, dbname.c_str(), anon_table_name.c_str(),
+                       fieldanon.c_str());
 
-    Item *const decUDF = back_el.get()->decryptUDF(field, salt);
+    Item *const decUDF = back_el.decryptUDF(field, salt);
 
     std::stringstream query;
-    query << " UPDATE " << cur_db << "." << tableanon
+    query << " UPDATE " << dbname << "." << anon_table_name
           << "    SET " << fieldanon  << " = " << *decUDF
           << ";";
 
@@ -554,24 +780,29 @@ removeOnionLayer(Analysis &a, const ProxyState &ps,
  * changed schema to persistent storage.
  *
  */
-static std::list<std::string>
-adjustOnion(Analysis &a, const ProxyState &ps, onion o,
-            const FieldMeta *const fm, SECLEVEL tolevel,
-            const std::string &table_name, const std::string &cur_db)
+static std::pair<std::vector<std::unique_ptr<Delta> >,
+                 std::list<std::string>>
+adjustOnion(const Analysis &a, onion o, const TableMeta &tm,
+            const FieldMeta &fm, SECLEVEL tolevel)
 {
-    OnionMeta *const om = fm->getOnionMeta(o);
-    SECLEVEL newlevel = a.getOnionLevel(om);
+    std::cout << "onion: " << TypeText<onion>::toText(o) << std::endl;
+    // Make a copy of the onion meta for the purpose of making
+    // modifications during removeOnionLayer(...)
+    OnionMetaAdjustor om_adjustor(*fm.getOnionMeta(o));
+    SECLEVEL newlevel = om_adjustor.getSecLevel();
     assert(newlevel != SECLEVEL::INVALID);
 
     std::list<std::string> adjust_queries;
+    std::vector<std::unique_ptr<Delta> > deltas;
     while (newlevel > tolevel) {
         auto query =
-            removeOnionLayer(a, ps, fm, table_name, o, &newlevel, cur_db);
+            removeOnionLayer(a, tm, fm, &om_adjustor, &newlevel,
+                             &deltas);
         adjust_queries.push_back(query);
     }
     TEST_UnexpectedSecurityLevel(o, tolevel, newlevel);
 
-    return adjust_queries;
+    return make_pair(std::move(deltas), adjust_queries);
 }
 //TODO: propagate these adjustments in the embedded database?
 
@@ -676,24 +907,18 @@ do_optimize_const_item(T *i, Analysis &a) {
 
 Item *
 decrypt_item_layers(Item *const i, const FieldMeta *const fm, onion o,
-                    uint64_t IV, const std::vector<Item *> &res)
+                    uint64_t IV)
 {
     assert(!i->is_null());
 
     Item *dec = i;
-    Item *prev_dec = NULL;
 
     const OnionMeta *const om = fm->getOnionMeta(o);
     assert(om);
-    auto enc_layers = om->layers;
+    const auto &enc_layers = om->layers;
     for (auto it = enc_layers.rbegin(); it != enc_layers.rend(); ++it) {
         dec = (*it)->decrypt(dec, IV);
         LOG(cdb_v) << "dec okay";
-        //need to free space for all decs except last
-        if (prev_dec) {
-            delete prev_dec;
-        }
-        prev_dec = dec;
     }
 
     return dec;
@@ -724,10 +949,10 @@ intersect(const EncSet & es, FieldMeta * fm) {
  */
 static void optimize_select_lex(st_select_lex *select_lex, Analysis & a);
 
-static Item *getLeftExpr(Item_in_subselect *const i)
+static Item *getLeftExpr(const Item_in_subselect &i)
 {
     Item *const left_expr =
-        i->*rob<Item_in_subselect, Item*,
+        i.*rob<Item_in_subselect, Item*,
                 &Item_in_subselect::left_expr>::ptr();
     assert(left_expr);
 
@@ -736,52 +961,54 @@ static Item *getLeftExpr(Item_in_subselect *const i)
 }
 
 // HACK: Forces query down to PLAINVAL.
-static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_ITEM> {
-    virtual RewritePlan *do_gather_type(Item_subselect *i, reason &tr,
-                                        Analysis &a) const
+static class ANON : public CItemSubtypeIT<Item_subselect,
+                                          Item::Type::SUBSELECT_ITEM> {
+    virtual RewritePlan *
+    do_gather_type(const Item_subselect &i, Analysis &a) const
     {
         const std::string why = "subselect";
 
         // Gather subquery.
         std::unique_ptr<Analysis>
-            subquery_analysis(new Analysis(a.getSchema()));
-        st_select_lex *const select_lex = i->get_select_lex();
-        process_table_list(&select_lex->top_join_list,
-                           *subquery_analysis);
-        process_select_lex(select_lex, *subquery_analysis.get());
+            subquery_analysis(new Analysis(a.getDatabaseName(),
+                                           a.getSchema()));
+        const st_select_lex *const select_lex =
+            RiboldMYSQL::get_select_lex(i);
+        process_select_lex(*select_lex, *subquery_analysis);
 
         // HACK: Forces the subquery to use PLAINVAL for it's
         // projections.
-        auto item_it = List_iterator<Item>(select_lex->item_list);
+        auto item_it =
+            RiboldMYSQL::constList_iterator<Item>(select_lex->item_list);
         for (;;) {
-            Item *const item = item_it++;
+            const Item *const item = item_it++;
             if (!item) {
                 break;
             }
 
-            RewritePlan *const item_rp =
-                subquery_analysis.get()->rewritePlans[item];
-            TEST_NoAvailableEncSet(item_rp->es_out, i->type(),
-                                   PLAIN_EncSet, why, NULL, 0);
+            const std::unique_ptr<RewritePlan> &item_rp =
+                subquery_analysis->rewritePlans[item];
+            TEST_NoAvailableEncSet(item_rp->es_out, i.type(),
+                                   PLAIN_EncSet, why,
+                            std::vector<std::shared_ptr<RewritePlan> >());
             item_rp->es_out = PLAIN_EncSet;
         }
 
         const EncSet out_es = PLAIN_EncSet;
-        tr = reason(out_es, why, i);
+        const reason rsn = reason(out_es, why, i);
 
-        switch (i->substype()) {
+        switch (RiboldMYSQL::substype(i)) {
             case Item_subselect::subs_type::SINGLEROW_SUBS:
                 break;
             case Item_subselect::subs_type::EXISTS_SUBS:
                 assert(false);
             case Item_subselect::subs_type::IN_SUBS: {
-                Item *const left_expr = 
-                    getLeftExpr(static_cast<Item_in_subselect *>(i));
-                reason r;
+                const Item *const left_expr =
+                    getLeftExpr(static_cast<const Item_in_subselect &>(i));
                 RewritePlan *const rp_left_expr =
-                    gather(left_expr, r, *subquery_analysis.get());
-                tr.add_child(r);
-                a.rewritePlans[left_expr] = rp_left_expr;
+                    gather(*left_expr, *subquery_analysis.get());
+                a.rewritePlans[left_expr] =
+                    std::unique_ptr<RewritePlan>(rp_left_expr);
                 break;
             }
             case Item_subselect::subs_type::ALL_SUBS:
@@ -789,34 +1016,38 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
             case Item_subselect::subs_type::ANY_SUBS:
                 assert(false);
             default:
-                throw CryptDBError("Unknown subquery type!");
+                FAIL_TextMessageError("Unknown subquery type!");
         }
 
-        return new RewritePlanWithAnalysis(out_es, tr,
+        return new RewritePlanWithAnalysis(out_es, rsn,
                                            std::move(subquery_analysis));
     }
+
     virtual Item * do_optimize_type(Item_subselect *i, Analysis & a) const {
         optimize_select_lex(i->get_select_lex(), a);
         return i;
     }
-    virtual Item *do_rewrite_type(Item_subselect *i, const OLK &constr,
-                                  const RewritePlan *rp, Analysis &a)
+
+    virtual Item *
+    do_rewrite_type(const Item_subselect &i, const OLK &constr,
+                    const RewritePlan &rp, Analysis &a)
         const
     {
-        const RewritePlanWithAnalysis *const rp_w_analysis =
-            static_cast<const RewritePlanWithAnalysis *>(rp);
-        st_select_lex *const select_lex = i->get_select_lex();
+        const RewritePlanWithAnalysis &rp_w_analysis =
+            static_cast<const RewritePlanWithAnalysis &>(rp);
+        const st_select_lex *const select_lex =
+            RiboldMYSQL::get_select_lex(i);
 
         // ------------------------------
         //    General Subquery Rewrite
         // ------------------------------
         st_select_lex *const new_select_lex =
-            rewrite_select_lex(select_lex, *rp_w_analysis->a.get());
+            rewrite_select_lex(*select_lex, *rp_w_analysis.a.get());
 
         // Rewrite table names.
         new_select_lex->top_join_list =
             rewrite_table_list(select_lex->top_join_list,
-                               *rp_w_analysis->a.get());
+                               *rp_w_analysis.a.get());
 
         // Rewrite SELECT params.
         // HACK: The engine inside of the Item_subselect _can_ have a
@@ -826,25 +1057,26 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
         //   general solution seems difficuly.
         // > set_select_lex() attemps to rectify this problem in other
         //   cases
-        memcpy(select_lex, new_select_lex, sizeof(st_select_lex));
+        memcpy(const_cast<st_select_lex *>(select_lex), new_select_lex,
+               sizeof(st_select_lex));
 
         // ------------------------------
         //   Specific Subquery Rewrite
         // ------------------------------
         {
-            switch (i->substype()) {
+            switch (RiboldMYSQL::substype(i)) {
                 case Item_subselect::subs_type::SINGLEROW_SUBS:
                     return new Item_singlerow_subselect(new_select_lex);
                 case Item_subselect::subs_type::EXISTS_SUBS:
                     assert(false);
                 case Item_subselect::subs_type::IN_SUBS: {
-                    Item *const left_expr =
-                        getLeftExpr(static_cast<Item_in_subselect *>(i));
-                    RewritePlan *const rp_left_expr =
-                        getAssert(a.rewritePlans, left_expr);
+                    const Item *const left_expr =
+                        getLeftExpr(static_cast<const Item_in_subselect &>(i));
+                    const std::unique_ptr<RewritePlan> &rp_left_expr =
+                        constGetAssert(a.rewritePlans, left_expr);
                     Item *const new_left_expr =
-                        itemTypes.do_rewrite(left_expr, constr,
-                                             rp_left_expr, a);
+                        itemTypes.do_rewrite(*left_expr, constr,
+                                             *rp_left_expr.get(), a);
                     return new Item_in_subselect(new_left_expr,
                                                  new_select_lex);
                 }
@@ -853,7 +1085,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
                 case Item_subselect::subs_type::ANY_SUBS:
                     assert(false);
                 default:
-                    throw CryptDBError("Unknown subquery type!");
+                    FAIL_TextMessageError("Unknown subquery type!");
             }
         }
     }
@@ -861,7 +1093,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect, Item::Type::SUBSELECT_
 
 // NOTE: Shouldn't be needed unless we allow mysql to rewrite subqueries.
 static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
-    virtual RewritePlan *do_gather_type(Item_cache *i, reason &tr,
+    virtual RewritePlan *do_gather_type(const Item_cache &i,
                                         Analysis &a) const
     {
         UNIMPLEMENTED;
@@ -900,13 +1132,15 @@ static class ANON : public CItemSubtypeIT<Item_cache, Item::Type::CACHE_ITEM> {
         return NULL;
         */
     }
+
     virtual Item * do_optimize_type(Item_cache *i, Analysis & a) const
     {
         // TODO(stephentu): figure out how to use rob here
         return i;
     }
-    virtual Item *do_rewrite_type(Item_cache *i, const OLK &constr,
-                                  const RewritePlan *rp, Analysis &a)
+
+    virtual Item *do_rewrite_type(const Item_cache &i, const OLK &constr,
+                                  const RewritePlan &rp, Analysis &a)
         const
     {
         UNIMPLEMENTED;
@@ -970,8 +1204,8 @@ optimize_table_list(List<TABLE_LIST> *tll, Analysis &a)
 }
 
 static bool
-noRewrite(const LEX *const lex) {
-    switch (lex->sql_command) {
+noRewrite(const LEX &lex) {
+    switch (lex.sql_command) {
     case SQLCOM_SHOW_DATABASES:
     case SQLCOM_SET_OPTION:
     case SQLCOM_BEGIN:
@@ -979,6 +1213,7 @@ noRewrite(const LEX *const lex) {
     case SQLCOM_COMMIT:
     case SQLCOM_SHOW_TABLES:
     case SQLCOM_SHOW_VARIABLES:
+    case SQLCOM_UNLOCK_TABLES:
         return true;
     case SQLCOM_SELECT: {
 
@@ -999,42 +1234,54 @@ lex_to_query(LEX *const lex)
 }
 
 const bool Rewriter::translator_dummy = buildTypeTextTranslatorHack();
-const SQLDispatcher *Rewriter::dml_dispatcher = buildDMLDispatcher();
-const SQLDispatcher *Rewriter::ddl_dispatcher = buildDDLDispatcher();
+const std::unique_ptr<SQLDispatcher> Rewriter::dml_dispatcher =
+    std::unique_ptr<SQLDispatcher>(buildDMLDispatcher());
+const std::unique_ptr<SQLDispatcher> Rewriter::ddl_dispatcher =
+    std::unique_ptr<SQLDispatcher>(buildDDLDispatcher());
 
+// NOTE : This will probably choke on multidatabase queries.
 RewriteOutput *
 Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
                         const std::string &query)
 {
     std::unique_ptr<query_parse> p;
     try {
-        p =
-            std::unique_ptr<query_parse>(new query_parse(ps.dbName(),
-                                                         query));
+        p = std::unique_ptr<query_parse>(
+                new query_parse(a.getDatabaseName(), query));
     } catch (std::runtime_error &e) {
-        std::cerr << "Bad Query: " << query << std::endl;
-        return new SimpleOutput(mysql_noop());
+        FAIL_TextMessageError("Bad Query: [" + query + "]\t"
+                              "Error Data: " + e.what());
     }
-    LEX *const lex = p.get()->lex();
+    LEX *const lex = p->lex();
 
     LOG(cdb_v) << "pre-analyze " << *lex;
 
     // optimization: do not process queries that we will not rewrite
-    if (noRewrite(lex)) {
+    if (noRewrite(*lex)) {
         return new SimpleOutput(query);
     } else if (dml_dispatcher->canDo(lex)) {
-        const SQLHandler *const handler = dml_dispatcher->dispatch(lex);
+        const SQLHandler &handler = dml_dispatcher->dispatch(lex);
         AssignOnce<LEX *> out_lex;
 
         try {
-            out_lex = handler->transformLex(a, lex, ps);
+            out_lex = handler.transformLex(a, lex, ps);
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
             std::cout << "Adjusting onion!" << std::endl;
-            auto adjust_queries = 
-                adjustOnion(a, ps, e.o, e.fm, e.tolevel, e.table_name,
-                            ps.dbName());
-            return new AdjustOnionOutput(a.deltas, adjust_queries);
+            std::pair<std::vector<std::unique_ptr<Delta> >,
+                      std::list<std::string>>
+                out_data = adjustOnion(a, e.o, e.tm, e.fm, e.tolevel);
+            std::vector<std::unique_ptr<Delta> > &deltas =
+                out_data.first;
+            const std::list<std::string>  &adjust_queries =
+                out_data.second;
+            std::function<std::string(const std::string &)>
+                hackEscape = [&ps](const std::string &s)
+            {
+                return escapeString(ps.getConn(), s);
+            };
+            return new AdjustOnionOutput(query, std::move(deltas),
+                                         adjust_queries, hackEscape);
         }
 
         // Return if it's a regular DML query.
@@ -1056,13 +1303,17 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
             where_clause = " TRUE ";
         }
 
-        return new SpecialUpdate(query, lex_to_query(out_lex.get()),
-                                 plain_table, crypted_table,
-                                 where_clause, ps);
+        return new SpecialUpdate(query,  plain_table, crypted_table,
+                                 where_clause, a.getDatabaseName(), ps);
     } else if (ddl_dispatcher->canDo(lex)) {
-        const SQLHandler *const handler = ddl_dispatcher->dispatch(lex);
-        LEX *const out_lex = handler->transformLex(a, lex, ps);
-        return new DDLOutput(query, lex_to_query(out_lex), a.deltas);
+        const SQLHandler &handler = ddl_dispatcher->dispatch(lex);
+        LEX *const out_lex = handler.transformLex(a, lex, ps);
+        // HACK.
+        const std::string &original_query =
+            lex->sql_command != SQLCOM_LOCK_TABLES ? query : "do 0";
+
+        return new DDLOutput(original_query, lex_to_query(out_lex),
+                             std::move(a.deltas));
     } else {
         return NULL;
     }
@@ -1102,17 +1353,18 @@ Rewriter::handleDirective(Analysis &a, const ProxyState &ps,
                           const std::string &query)
 {
     DirectiveData data(query);
-    const FieldMeta *const fm =
-        a.getFieldMeta(data.table_name, data.field_name);
-    const SECURITY_RATING current_rating = fm->getSecurityRating();
+    const FieldMeta &fm =
+        a.getFieldMeta(a.getDatabaseName(), data.table_name,
+                       data.field_name);
+    const SECURITY_RATING current_rating = fm.getSecurityRating();
     if (current_rating < data.sec_rating) {
-        throw CryptDBError("cryptdb does not support going to a more "
-                           "secure rating!");
+        FAIL_TextMessageError("cryptdb does not support going to a more"
+                              " secure rating!");
     } else if (current_rating == data.sec_rating) {
         return new SimpleOutput(mysql_noop());
     } else {
         // Actually do things.
-        throw CryptDBError("implement handleDirective!");
+        FAIL_TextMessageError("implement handleDirective!");
     }
 }
 
@@ -1136,32 +1388,28 @@ cryptdbDirective(const std::string &query)
 
 QueryRewrite
 Rewriter::rewrite(const ProxyState &ps, const std::string &q,
-                  SchemaInfo *const schema)
+                  SchemaInfo const &schema,
+                  const std::string &default_db)
 {
     LOG(cdb_v) << "q " << q;
     assert(0 == mysql_thread_init());
     //assert(0 == create_embedded_thd(0));
 
-    assert(schema);
-    Analysis analysis(schema);
+    Analysis analysis(default_db, schema);
 
     RewriteOutput *output;
-    try {
-        if (cryptdbDirective(q)) {
-            output = Rewriter::handleDirective(analysis, ps, q);
-        } else {
-            // FIXME: Memleak return of 'dispatchOnLex()'
-            output = Rewriter::dispatchOnLex(analysis, ps, q);
-            if (!output) {
-                output = new SimpleOutput(mysql_noop());
-            }
+    if (cryptdbDirective(q)) {
+        output = Rewriter::handleDirective(analysis, ps, q);
+    } else {
+        // NOTE: Care what data you try to read from Analysis
+        // at this height.
+        output = Rewriter::dispatchOnLex(analysis, ps, q);
+        if (!output) {
+            output = new SimpleOutput(mysql_noop());
         }
-    } catch (AbstractCryptDBError &e) {
-        std::cout << e << std::endl;
-        output = new SimpleOutput(mysql_noop());
     }
 
-    return QueryRewrite(true, *analysis.rmeta, output);
+    return QueryRewrite(true, analysis.rmeta, output);
 }
 
 //TODO: replace stringify with <<
@@ -1183,14 +1431,14 @@ std::string ReturnMeta::stringify() {
     return res.str();
 }
 
-ResType *
+ResType
 Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
 {
     const unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
     const unsigned int cols = dbres.names.size();
 
-    ResType *const res = new ResType();
+    ResType res;
 
     // un-anonymize the names
     for (auto it = dbres.names.begin();
@@ -1199,18 +1447,18 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
         const ReturnField &rf = rmeta.rfmeta.at(index);
         if (!rf.getIsSalt()) {
             //need to return this field
-            res->names.push_back(rf.fieldCalled());
+            res.names.push_back(rf.fieldCalled());
             // switch types to original ones : TODO
 
         }
     }
 
-    const unsigned int real_cols = res->names.size();
+    const unsigned int real_cols = res.names.size();
 
     //allocate space in results for decrypted rows
-    res->rows = std::vector<std::vector<Item*> >(rows);
+    res.rows = std::vector<std::vector<std::shared_ptr<Item> > >(rows);
     for (unsigned int i = 0; i < rows; i++) {
-        res->rows[i] = std::vector<Item*>(real_cols);
+        res.rows[i] = std::vector<std::shared_ptr<Item> >(real_cols);
     }
 
     // decrypt rows
@@ -1224,21 +1472,21 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
         FieldMeta *const fm = rf.getOLK().key;
         for (unsigned int r = 0; r < rows; r++) {
             if (!fm || dbres.rows[r][c]->is_null()) {
-                res->rows[r][col_index] = dbres.rows[r][c];
+                res.rows[r][col_index] = dbres.rows[r][c];
             } else {
                 uint64_t salt = 0;
                 const int salt_pos = rf.getSaltPosition();
                 if (salt_pos >= 0) {
                     Item_int *const salt_item =
-                        static_cast<Item_int *>(dbres.rows[r][salt_pos]);
+                        static_cast<Item_int *>(dbres.rows[r][salt_pos].get());
                     assert_s(!salt_item->null_value, "salt item is null");
                     salt = salt_item->value;
                 }
 
-                res->rows[r][col_index] =
-                    decrypt_item_layers(dbres.rows[r][c], fm,
-                                        rf.getOLK().o, salt,
-                                        res->rows[r]);
+                std::shared_ptr<Item> dec_item(
+                    decrypt_item_layers(dbres.rows[r][c].get(),
+                                        fm, rf.getOLK().o, salt));
+                res.rows[r][col_index] = dec_item;
             }
         }
         col_index++;
@@ -1247,83 +1495,52 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
     return res;
 }
 
-static ResType *
+static ResType
 mysql_noop_res(const ProxyState &ps)
 {
-    DBResult *noop_dbres;
-    assert(ps.getConn()->execute(mysql_noop(), noop_dbres));
-    return new ResType(noop_dbres->unpack());
+    std::unique_ptr<DBResult> noop_dbres;
+    assert(ps.getConn()->execute(mysql_noop(), &noop_dbres));
+    return ResType(noop_dbres->unpack());
 }
 
-// FIXME: DBResult and ResType memleaks.
-// FIXME: Use TELL policy.
-ResType *
+EpilogueResult
 executeQuery(const ProxyState &ps, const std::string &q,
-             SchemaCache *schema_cache)
+             const std::string &default_db,
+             SchemaCache *const schema_cache, bool pp)
 {
-    // Allows us to use default value of NULL for schema_cache in places
-    // where cacheing the schema offers little advantage.
-    SchemaCache temp_schema_cache;
-    if (NULL == schema_cache) {
-        schema_cache = &temp_schema_cache;
-    }
+    assert(schema_cache);
 
-    try {
-        QueryRewrite *qr = NULL;
-        // out_queryz: queries intended to be run against remote server.
-        std::list<std::string> out_queryz;
-        SchemaInfo *const schema =
-            schema_cache->getSchema(ps.getConn(), ps.getEConn());
-        PREAMBLE_STATUS const preamble_status =
-            queryPreamble(ps, q, &qr, &out_queryz, schema);
-        assert(PREAMBLE_STATUS::FAILURE != preamble_status);
+    std::unique_ptr<QueryRewrite> qr;
+    // out_queryz: queries intended to be run against remote server.
+    std::list<std::string> out_queryz;
+    queryPreamble(ps, q, &qr, &out_queryz, schema_cache, default_db);
+    assert(qr);
 
-        DBResult *dbres = NULL;
-        for (auto it : out_queryz) {
+    std::unique_ptr<DBResult> dbres;
+    for (auto it : out_queryz) {
+        if (true == pp) {
             prettyPrintQuery(it);
-
-            if (!ps.getConn()->execute(it, dbres,
-                                       qr->output->multipleResultSets())) {
-                qr->output->handleQueryFailure(ps.getEConn());
-                throw CryptDBError("Failed to execute query!");
-            }
-
-            // XOR: Either we have one result set, or we were expecting
-            // multiple result sets and we threw them all away.
-            assert(!!dbres != !!qr->output->multipleResultSets());
         }
 
-        // ----------------------------------
-        //       Post Query Processing
-        // ----------------------------------
-        // > Handle schema cacheing immediately after executing a query.
-        //   + Updating the cache here is 'aggresive' in the case
-        //     where we are doing an onion adjustment ROLLBACK
-        //     and queryHandleRollback fails.
-        schema_cache->updateStaleness(qr->output->stalesSchema());
-
-        if (PREAMBLE_STATUS::ROLLBACK == preamble_status) {
-            assert(queryHandleRollback(ps, q, schema));
-            return new ResType(dbres->unpack());
-        }
-
-        assert(PREAMBLE_STATUS::SUCCESS == preamble_status);
-
-        ResType *const res =
-            dbres ? new ResType(dbres->unpack()) : mysql_noop_res(ps);
-        ResType *const out_res = queryEpilogue(ps, qr, res, q, true);
-        assert(out_res);
-
-        return out_res;
-    } catch (std::runtime_error &e) {
-        std::cout << "Unexpected Error: " << e.what() << " in query "
-                  << q << std::endl;
-        return NULL;
-    }  catch (CryptDBError &e) {
-        std::cout << "Internal Error: " << e.msg << " in query " << q
-                  << std::endl;
-        return NULL;
+        TEST_Sync(ps.getConn()->execute(it, &dbres,
+                                    qr->output->multipleResultSets()),
+                  "failed to execute query!");
+        // XOR: Either we have one result set, or we were expecting
+        // multiple result sets and we threw them all away.
+        assert(!!dbres != !!qr->output->multipleResultSets());
     }
+
+    // ----------------------------------
+    //       Post Query Processing
+    // ----------------------------------
+    const ResType &res =
+        dbres ? ResType(dbres->unpack()) : mysql_noop_res(ps);
+    assert(res.success());
+    const EpilogueResult epi_result =
+        queryEpilogue(ps, *qr.get(), res, q, default_db, pp);
+    assert(epi_result.res_type.success());
+
+    return epi_result;
 }
 
 void
@@ -1356,3 +1573,43 @@ printRes(const ResType &r) {
     }
 }
 
+EncLayer &OnionMetaAdjustor::getBackEncLayer() const
+{
+    return *duped_layers.back();
+}
+
+EncLayer &OnionMetaAdjustor::popBackEncLayer()
+{
+    EncLayer *const out_layer = duped_layers.back();
+    duped_layers.pop_back();
+
+    return *out_layer;
+}
+
+SECLEVEL OnionMetaAdjustor::getSecLevel() const
+{
+    return duped_layers.back()->level();
+}
+
+const OnionMeta &OnionMetaAdjustor::getOnionMeta() const
+{
+    return original_om;
+}
+
+std::string OnionMetaAdjustor::getAnonOnionName() const
+{
+    return original_om.getAnonOnionName();
+}
+
+std::vector<EncLayer *>
+OnionMetaAdjustor::pullCopyLayers(OnionMeta const &om)
+{
+    std::vector<EncLayer *> v;
+
+    auto const &enc_layers = om.layers;
+    for (auto it = enc_layers.begin(); it != enc_layers.end(); it++) {
+        v.push_back((*it).get());
+    }
+
+    return v;
+}

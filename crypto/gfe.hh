@@ -40,7 +40,7 @@ class gfe {
     dotproduct(const std::vector<uint8_t> &v1, const std::vector<uint8_t> &v2)
     {
         uint64_t count = 0;
-        assert(v1.size() == v2.size());
+        throw_c(v1.size() == v2.size());
         for (size_t i = 0; i < v1.size(); i++)
             count += __builtin_popcount(v1[i] & v2[i]);
         return count;
@@ -99,7 +99,7 @@ class gfe_priv : public gfe<T> {
     prfvec(const std::vector<std::pair<int, T>> &pv)
     {
         std::vector<uint8_t> rv(gfe<T>::kq_ * gfe<T>::k_ / 8);
-        assert(pv.size() == gfe<T>::k_);
+        throw_c(pv.size() == gfe<T>::k_);
         for (uint i = 0; i < gfe<T>::k_; i++) {
             auto x = prf(pv[i]);
             memcpy(&rv[i * gfe<T>::kq_ / 8], &x[0], gfe<T>::kq_ / 8);

@@ -19,6 +19,7 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+#include <assert.h>
 
 #include <sys/time.h>
 
@@ -80,21 +81,6 @@ const std::set<std::string> annotations =
 
 // ============= DATA STRUCTURES ===================================//
 
-#if MYSQL_S
-#include "mysql.h"
-typedef MYSQL_RES DBResult_native;
-#else
-#include "libpq-fe.h"
-typedef PGresult DBResult_native;
-#endif
-
-
-
-typedef struct AutoInc {
-    AutoInc(std::string fieldval=""):incvalue(0), field(fieldval) {}
-    my_ulonglong incvalue;
-    std::string field;
-} AutoInc;
 
 const std::string BASE_SALT_NAME = "cdb_salt";
 typedef uint64_t salt_type;
@@ -190,9 +176,6 @@ typedef struct TempMKM {
 } TMKM;
 
 //=============  Useful functions =========================//
-
-bool
-IsMySQLTypeNumeric(enum_field_types t);
 
 // extracts (nobytes) bytes from int by placing the most significant bits at
 // the end
@@ -304,14 +287,23 @@ roll(typename std::list<T>::iterator & it,  int count)
 }
 
 template<typename A, typename B>
-B getAssert(const std::map<A, B> & m, const A & x, const std::string & str = "" ) {
+const B &constGetAssert(const std::map<A, B> &m, const A &x,
+                        const std::string &str = "")
+{
     auto it = m.find(x);
-    if (it == m.end()) {
+    if (m.end() == it) {
         std::cerr << "item not present in map " << x << ". " << str
                   << std::endl;
-        assert_s(false, "");
+        assert(false);
     }
     return it->second;
+}
+
+template<typename A, typename B>
+B &getAssert(std::map<A, B> &m, const A &x,
+             const std::string &str = "")
+{
+    return const_cast<B &>(constGetAssert(m, x, str));
 }
 
 //returns true if x is in m and sets y=m[x] in that case
@@ -344,20 +336,6 @@ std::string strFromVal(uint32_t x);
 
 uint64_t valFromStr(const std::string & str);
 
-
-//marshalls a binary value into characters readable by Postgres
-std::string marshallBinary(const std::string &s);
-/*
-std::string  marshallSalt(const std::string & s);
-std::string unmarshallSalt(const std::string & s);
-*/
-
-
-// unmarshalls a char * received from Postgres into a binary and
-// sets newlen to the length of the result..
-// marshall and unmarshallBinary are not inverses of each other.
-// XXX why not?
-std::string unmarshallBinary(const std::string &s);
 
 void consolidate(std::list<std::string> & words);
 
@@ -444,6 +422,11 @@ class Timer {
 
 template <typename T>
 class AssignOnce {
+private:
+    AssignOnce(const AssignOnce &other) = delete;
+    AssignOnce(AssignOnce &&other) = delete;
+    AssignOnce &operator=(AssignOnce &&other) = delete;
+
 public:
     AssignOnce() : frozen(false) {}
     ~AssignOnce() {;}
@@ -471,8 +454,36 @@ public:
 private:
     T value;
     bool frozen;
+};
 
-    AssignOnce(const AssignOnce &other);
+template <typename T>
+class AssignFirst {
+private:
+    AssignFirst(const AssignFirst &other) = delete;
+    AssignFirst(AssignFirst &&other) = delete;
+    AssignFirst &operator=(AssignFirst &&other) = delete;
+
+public:
+    AssignFirst() : assigned(false) {}
+    ~AssignFirst() {}
+    const AssignFirst &operator=(T value) {
+        this->value = value;
+        this->assigned = true;
+
+        return *this;
+    }
+
+    const T get() const {
+        if (false == this->assigned) {
+            throw CryptDBError("First assign to AssignFirst object!");
+        }
+
+        return this->value;
+    }
+
+private:
+    T value;
+    bool assigned;
 };
 
 template <typename T>
@@ -505,6 +516,62 @@ private:
     T value;
     mutable bool available;
 };
+
+template <typename T>
+class CarefulClear {
+public:
+    CarefulClear(T value) : value(value), is_set(true) {}
+    CarefulClear() : is_set(false) {}
+
+    T get() const {
+        if (false == is_set) {
+            throw CryptDBError("CarefulClear : must set (=) before get");
+        }
+
+        return value;
+    }
+
+    const CarefulClear &operator=(T new_value)
+    {
+        if (true == is_set) {
+            throw CryptDBError("CarefulClear : must clear before set (=)");
+        }
+        value = new_value;
+        is_set = true;
+
+        return *this;
+    }
+
+    void clear() {
+        if (false == is_set) {
+            throw CryptDBError("CarefulClear : already cleared");
+        }
+
+        is_set = false;
+    }
+
+    bool isSet() const {return is_set;}
+
+private:
+    T value;
+    bool is_set;
+};
+
+class OnUnscope {
+    OnUnscope() = delete;
+    OnUnscope(const OnUnscope &a) = delete;
+    OnUnscope(OnUnscope &&a) = delete;
+    OnUnscope &operator=(const OnUnscope &a) = delete;
+    OnUnscope &operator=(OnUnscope &&a) = delete;
+
+public:
+    OnUnscope(std::function<void(void)> fn) : fn(fn) {}
+    ~OnUnscope() {fn();}
+
+private:
+    const std::function<void(void)> fn;
+};
+
 
 // Taken from jsmith @ cplusplus.com
 template <typename T>

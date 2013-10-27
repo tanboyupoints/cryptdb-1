@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <crypto/hgd.hh>
 #include <NTL/RR.h>
 
@@ -64,7 +63,7 @@ HGD(const ZZ &KK, const ZZ &NN1, const ZZ &NN2, PRNG *prng)
      * CHECK PARAMETER VALIDITY
      */
     if ((NN1 < 0) || (NN2 < 0) || (KK < 0) || (KK > NN1 + NN2))
-        assert(false);
+        throw_c(false);
 
     /*
      * INITIALIZE

@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <string.h>
 #include <string>
 #include <crypto/online_ope.hh>
@@ -150,7 +149,7 @@ ope_server<EncT>::tree_insert(tree_node<EncT> **np, uint64_t v,
 			      const EncT &encval, uint64_t nbits, uint64_t pathlen)
 {
     if (nbits == 0) {
-        assert(*np == 0);
+        throw_c(*np == 0);
 
         tree_node<EncT> *n = new tree_node<EncT>(encval);
         *np = n;
@@ -165,7 +164,7 @@ ope_server<EncT>::tree_insert(tree_node<EncT> **np, uint64_t v,
 	}
 
     } else {
-        assert(*np);
+        throw_c(*np);
         tree_insert((v&(1ULL<<(nbits-1))) ? &(*np)->right : &(*np)->left,
                     v, encval, nbits-1, pathlen);
     }
@@ -247,7 +246,7 @@ ope_server<EncT>::node_to_balance(uint64_t v, uint64_t nbits,  bool & isLeft, ui
 					    v, nbits, scapegoat_alpha,
 					    isLeft, child_size, found, subtree_size);
 
-    assert(found); //math guarantees an unbalanced node on v's path to root exists
+    throw_c(found); //math guarantees an unbalanced node on v's path to root exists
 
     return unb;
 }

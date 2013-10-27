@@ -7,32 +7,26 @@
 
 #include <stdexcept>
 #include <assert.h>
-#include <main/Connect.hh>
-#include <util/cryptdb_log.hh>
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <memory>
+
+#include <main/Connect.hh>
+#include <main/macro_util.hh>
+#include <util/cryptdb_log.hh>
+#include <main/schema.hh>
 
 Connect::Connect(const std::string &server, const std::string &user,
-                 const std::string &passwd, const std::string &dbname,
-                 uint port)
+                 const std::string &passwd, uint port)
     : conn(nullptr), close_on_destroy(true)
 {
-    do_connect(server, user, passwd, dbname, port);
-
-    if (dbname.size() == 0) {
-        LOG(warn) << "database name not set";
-    } else {
-        if (!select_db(dbname)) {
-            throw CryptDBError("cannot select dbname " + dbname);
-        }
-    }
+    do_connect(server, user, passwd, port);
 }
 
 void
 Connect::do_connect(const std::string &server, const std::string &user,
-                    const std::string &passwd, const std::string &dbname,
-                    uint port)
+                    const std::string &passwd, uint port)
 {
     const char *dummy_argv[] = {
         "progname",
@@ -59,27 +53,15 @@ Connect::do_connect(const std::string &server, const std::string &user,
                             passwd.c_str(), 0, port, 0,
                             CLIENT_MULTI_STATEMENTS)) {
         LOG(warn) << "connecting to server " << server
-                  << " db " << dbname
                   << " user " << user
                   << " pwd " << passwd
                   << " port " << port;
         LOG(warn) << "mysql_real_connect: " << mysql_error(conn);
         throw std::runtime_error("cannot connect");
     }
-
-    // We create the database here because the database will
-    // not exist if it is our first time connecting to it.
-    assert(execute("CREATE DATABASE IF NOT EXISTS " + dbname + ";"));
 }
 
-bool
-Connect::select_db(const std::string &dbname)
-{
-    return mysql_select_db(conn, dbname.c_str()) ? false : true;
-}
-
-Connect *Connect::getEmbedded(const std::string &embed_db,
-                              const std::string &dbname)
+Connect *Connect::getEmbedded(const std::string &embed_db)
 {
     init_mysql(embed_db);
 
@@ -97,11 +79,6 @@ Connect *Connect::getEmbedded(const std::string &embed_db,
     Connect *const conn = new Connect(m);
     conn->close_on_destroy = true;
 
-    // We build the database here instead of initially connecting to it
-    // because it may be our first time accessing that database and 
-    // it will not exist yet.
-    assert(conn->execute("CREATE DATABASE IF NOT EXISTS " + dbname + ";"));
-
     return conn;
 }
 
@@ -109,24 +86,25 @@ Connect *Connect::getEmbedded(const std::string &embed_db,
 // > This is a hack that allows us to deal with the two sets which
 // are returned when CALLing a stored procedure.
 bool
-Connect::execute(const std::string &query, DBResult *&res,
+Connect::execute(const std::string &query, std::unique_ptr<DBResult> *res,
                  bool multiple_resultsets)
 {
     //silently ignore empty queries
     if (query.length() == 0) {
         LOG(warn) << "empty query";
-        res = 0;
+        *res = nullptr;
         return true;
     }
     bool success = true;
     if (mysql_query(conn, query.c_str())) {
         LOG(warn) << "mysql_query: " << mysql_error(conn);
         LOG(warn) << "on query: " << query;
-        res = 0;
+        *res = nullptr;
         success = false;
     } else {
         if (false == multiple_resultsets) {
-            res = DBResult::wrap(mysql_store_result(conn));
+            *res =
+                std::unique_ptr<DBResult>(DBResult::wrap(mysql_store_result(conn)));
         } else {
             int status;
             do {
@@ -141,7 +119,7 @@ Connect::execute(const std::string &query, DBResult *&res,
                 assert(status <= 0);
             } while (0 == status);
 
-            res = NULL;
+            *res = nullptr;
         }
     }
 
@@ -155,10 +133,8 @@ Connect::execute(const std::string &query, DBResult *&res,
 bool
 Connect::execute(const std::string &query, bool multiple_resultsets)
 {
-    DBResult *aux;
-    const bool r = execute(query, aux, multiple_resultsets);
-    if (r)
-        delete aux;
+    std::unique_ptr<DBResult> aux;
+    const bool r = execute(query, &aux, multiple_resultsets);
     return r;
 }
 
@@ -195,8 +171,7 @@ Connect::~Connect()
 }
 
 DBResult::DBResult()
-{
-}
+{}
 
 DBResult *
 DBResult::wrap(DBResult_native *const n)
@@ -217,35 +192,36 @@ getItem(char *const content, enum_field_types type, uint len)
     if (content == NULL) {
         return new Item_null();
     }
-    AssignOnce<Item *> i;
     const std::string content_str = std::string(content, len);
     if (IsMySQLTypeNumeric(type)) {
         const ulonglong val = valFromStr(content_str);
-        i = new Item_int(val);
+        return new Item_int(val);
     } else {
-        i = new Item_string(make_thd_string(content_str), len,
-                            &my_charset_bin);
+        return new Item_string(make_thd_string(content_str), len,
+                               &my_charset_bin);
     }
-
-    return i.get();
 }
 
-// returns the data in the last server response
-// TODO: to optimize return pointer to avoid overcopying large result sets?
+// > returns the data in the last server response
+// > TODO: to optimize return pointer to avoid overcopying large
+//   result sets?
+// > This function must not return pointers (internal or otherwise) to
+//   objects that it owns.
+//   > ie, We must be able to delete 'this' without mangling the 'ResType'
+//     returned from this->unpack(...).
 ResType
 DBResult::unpack()
 {
-    if (n == NULL) {
+    if (nullptr == n) {
         return ResType();
     }
 
     const size_t rows = static_cast<size_t>(mysql_num_rows(n));
-    AssignOnce<int> cols;
-    if (rows > 0) {
-        cols = mysql_num_fields(n);
-    } else {
+    if (0 == rows) {
         return ResType();
     }
+
+    const int cols = mysql_num_fields(n);
 
     ResType res;
 
@@ -266,11 +242,11 @@ DBResult::unpack()
         }
         unsigned long *const lengths = mysql_fetch_lengths(n);
 
-        std::vector<Item *> resrow;
+        std::vector<std::shared_ptr<Item> > resrow;
 
-        for (int j = 0; j < cols.get(); j++) {
-            Item *const it = getItem(row[j], res.types[j], lengths[j]);
-            resrow.push_back(it);
+        for (int j = 0; j < cols; j++) {
+            Item *const item = getItem(row[j], res.types[j], lengths[j]);
+            resrow.push_back(std::shared_ptr<Item>(item));
         }
 
         res.rows.push_back(resrow);

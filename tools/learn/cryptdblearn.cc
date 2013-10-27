@@ -146,7 +146,7 @@ int main(int argc, char **argv)
     
     ConnectionInfo ci("localhost", username, password);
     const std::string master_key = "2392834";
-    ProxyState ps(ci, "/var/lib/shadow-mysql", dbname, master_key);
+    ProxyState ps(ci, "/var/lib/shadow-mysql", master_key);
 
     Learn *learn; 
     

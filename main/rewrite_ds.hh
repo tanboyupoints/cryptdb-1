@@ -166,23 +166,13 @@ class Item;
 
 class reason {
 public:
-    reason(const EncSet &es, const std::string &why_t_arg,
-                Item *const why_t_item_arg)
-        :  encset(es), why_t(why_t_arg), why_t_item(why_t_item_arg)
-    { childr = new std::list<reason>();}
-    reason()
-        : encset(EMPTY_EncSet), why_t(""), why_t_item(NULL),
-          childr(NULL) {}
-    void add_child(const reason &ch) {
-        childr->push_back(ch);
-    }
+    reason(const EncSet &es, const std::string &why,
+           const Item &item)
+        : encset(es), why(why), item(item) {}
 
-    EncSet encset;
-
-    std::string why_t;
-    Item *why_t_item;
-
-    std::list<reason> *childr;
+    const EncSet encset;
+    const std::string why;
+    const Item &item;
 };
 
 std::ostream&
@@ -211,21 +201,23 @@ class RewritePlanOneOLK: public RewritePlan {
 public:
     const OLK olk;
     // the following store how to rewrite children
-    RewritePlan **const childr_rp;
+    std::vector<std::shared_ptr<RewritePlan> > childr_rp;
 
     RewritePlanOneOLK(const EncSet &es_out, const OLK &olk,
-                      RewritePlan **const childr_rp, reason r)
-        : RewritePlan(es_out, r), olk(olk), childr_rp(childr_rp) {}
+                      const std::vector<std::shared_ptr<RewritePlan> >
+                        &childr_rp, reason r)
+        : RewritePlan(es_out, r), olk(olk),
+          childr_rp(childr_rp) {}
 };
 
 class RewritePlanPerChildOLK : public RewritePlan {
 public:
-    const std::vector<std::pair<RewritePlan *, OLK>> child_olks;
+    const std::vector<std::pair<std::shared_ptr<RewritePlan>, OLK>>
+        child_olks;
 
     RewritePlanPerChildOLK(const EncSet &es_out,
-                           std::vector<std::pair<RewritePlan *, OLK>>
-                            child_olks,
-                           reason r)
+                const std::vector<std::pair<std::shared_ptr<RewritePlan>,
+                                          OLK>> &child_olks, reason r)
         : RewritePlan(es_out, r), child_olks(child_olks) {}
 };
 

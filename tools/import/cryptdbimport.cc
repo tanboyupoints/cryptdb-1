@@ -11,7 +11,8 @@
 #include <rewrite_main.hh>
 #include <cryptdbimport.hh>
 
-static void do_display_help(const char *arg)
+static void __attribute__((noreturn))
+do_display_help(const char *arg)
 {
     std::cout << "CryptDBImport" << std::endl;
     std::cout << "Use: " << arg << " [OPTIONS]" << std::endl;
@@ -77,9 +78,14 @@ Import::executeQueries(ProxyState& ps)
             if(lastChar == ';'){
                 s += line;
                 std::cout << s << std::endl;
-                assert(executeQuery(ps, s));
+                // FIXME
+                assert(false);
+                /*
+                const EpilogueResult &epi_res = executeQuery(ps, s);
+                assert(epi_res.res_type.success());
                 s.clear();
                 continue;
+                */
             }
             s += line;
         }
@@ -122,7 +128,7 @@ int main(int argc, char **argv)
                         ConnectionInfo ci("localhost", username, password);
                         const std::string master_key = "2392834";
                         ProxyState ps(ci, "/var/lib/shadow-mysql",
-                                      "cryptdbtest", master_key);
+                                      master_key);
 
                         // Execute queries
                         import.executeQueries(ps);
