@@ -222,6 +222,7 @@ end
 def generate_config(mysql_path)
     ["MYSRC := #{mysql_path}",
      "MYBUILD  := $(MYSRC)/build",
+     "RPATH := 1",
      "",
      "## To enable debugging:",
      "# CXXFLAGS += -g",
