@@ -179,6 +179,10 @@ class DropIndexSubHandler : public AlterSubHandler {
         const std::vector<onion> key_onions = getOnionIndexTypes();
         for (auto onion_it : key_onions) {
             const onion o = onion_it;
+            // HACK.
+            if (oPLAIN == o) {
+                continue;
+            }
             Alter_drop *const new_adrop =
                 adrop->clone(current_thd->mem_root);
             new_adrop->name =

@@ -1075,20 +1075,20 @@ static QueryList DDL = QueryList("DDL",
 static QueryList MiscBugs = QueryList("MiscBugs",
     { Query("CREATE TABLE crawlies (purple VARCHAR(4294967263),"
             "                       pink VARCHAR(0))"),
-      Query("CREATE TABLE enums (x enum('this', 'that'))"),
+      // Query("CREATE TABLE enums (x enum('this', 'that'))"),
       Query("CREATE TABLE bugs (spider TEXT)"),
       Query("CREATE TABLE more_bugs (ant INTEGER)")},
     { Query("CREATE TABLE crawlies (purple VARCHAR(4294967263),"
             "                       pink VARCHAR(0))"),
-      Query("CREATE TABLE enums (x enum('this', 'that'))"),
+      // Query("CREATE TABLE enums (x enum('this', 'that'))"),
       Query("CREATE TABLE bugs (spider TEXT)"),
       Query("CREATE TABLE more_bugs (ant INTEGER)")},
     { Query("INSERT INTO bugs VALUES ('8legs'), ('crawly'), ('manyiz')"),
       Query("INSERT INTO more_bugs VALUES (9012), (2913), (19114)"),
-      Query("INSERT INTO enums VALUES ('this'), ('that')"),
-      Query("SELECT * FROM enums"),                 // proxy test
-      Query("SELECT spider + spider FROM bugs"),    // proxy test
-      Query("SELECT spider + spider FROM bugs"),    // proxy test
+      // Query("INSERT INTO enums VALUES ('this'), ('that')"),
+      // Query("SELECT * FROM enums"),                 // proxy test
+      // Query("SELECT spider + spider FROM bugs"),    // proxy test
+      // Query("SELECT spider + spider FROM bugs"),    // proxy test
       // Query("SELECT SUM(spider) FROM bugs"),
       // Query("SELECT GREATEST(ant, 5000) FROM more_bugs"),
       // Query("SELECT GREATEST(12, ant, 5000) FROM more_bugs"),
@@ -1442,14 +1442,14 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 515/519
+    //      TOTAL RESULT: 469/471
     // ###############################
 
     std::vector<Score> scores;
 
     assert(testSlowMatch());
 
-    // Pass 54/54
+    // Pass 50/50
     scores.push_back(CheckQueryList(tc, Select));
 
     // Pass 31/31
@@ -1479,7 +1479,7 @@ RunTest(const TestConfig &tc) {
     // Pass 44/44
     scores.push_back(CheckQueryList(tc, UserGroupForum));
 
-    // Pass 42/42
+    // Pass 41/41
     scores.push_back(CheckQueryList(tc, Null));
 
     // Pass 21/21
@@ -1488,7 +1488,7 @@ RunTest(const TestConfig &tc) {
         scores.push_back(CheckQueryList(tc, BestEffort));
     }
 
-    // Pass 28/28
+    // Pass 27/27
     scores.push_back(CheckQueryList(tc, Auto));
 
     // Pass ?/?
@@ -1513,7 +1513,7 @@ RunTest(const TestConfig &tc) {
     // Pass 25/25
     scores.push_back(CheckQueryList(tc, DDL));
 
-    // Pass 13/13
+    // Pass 8/8
     scores.push_back(CheckQueryList(tc, MiscBugs));
 
     for (auto it : scores) {
