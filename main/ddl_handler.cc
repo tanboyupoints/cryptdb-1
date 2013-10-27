@@ -215,6 +215,7 @@ class ChangeDBHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
                                   const ProxyState &ps) const
     {
+        a.no_change_meta_ddl = true;
         return copyWithTHD(lex);
     }
 };

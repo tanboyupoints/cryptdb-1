@@ -1312,6 +1312,12 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         const std::string &original_query =
             lex->sql_command != SQLCOM_LOCK_TABLES ? query : "do 0";
 
+        // Optimization so we don't load *Meta if it doesn't change.
+        // > ie, USE <database>.
+        if (true == a.no_change_meta_ddl) {
+            return new DMLOutput(original_query, lex_to_query(out_lex));
+        }
+
         return new DDLOutput(original_query, lex_to_query(out_lex),
                              std::move(a.deltas));
     } else {

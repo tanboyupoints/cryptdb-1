@@ -376,8 +376,8 @@ class Analysis {
 
 public:
     Analysis(const std::string &default_db, const SchemaInfo &schema)
-        : pos(0), special_update(false), db_name(default_db),
-          schema(schema) {}
+        : pos(0), special_update(false), no_change_meta_ddl(false),
+          db_name(default_db), schema(schema) {}
 
     unsigned int pos; // > a counter indicating how many projection
                       // fields have been analyzed so far
@@ -391,6 +391,7 @@ public:
     ReturnMeta rmeta;
 
     bool special_update;
+    bool no_change_meta_ddl;
 
     // These functions are prefered to their lower level counterparts.
     bool addAlias(const std::string &alias, const std::string &db,
