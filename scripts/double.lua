@@ -26,9 +26,8 @@ local LOG_FILE_PATH      = CRYPTDB_DIR .. "/logs/double.log"
 local cryptdb_lane       = nil
 local log_file_h         = nil
 
--- we don't want crosstalk between different instances of 'double'
-local RESULTS_QUEUE      = "results_" .. math.random(10000)
-local QUERY_QUEUE        = "query_" .. math.random(10000)
+local RESULTS_QUEUE      = "results"
+local QUERY_QUEUE        = "query"
 
 function connect_server()
     print("Double Connection.")
