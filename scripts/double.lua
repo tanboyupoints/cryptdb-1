@@ -2,8 +2,9 @@
 -- datastructures that are essentially isomorphic with a minimal amount
 -- of looping.
 
--- wordpress testing hack
-local new_session = true
+-- GLOBAL STATE
+local new_session     = true            -- wordpress testing hack
+local cryptdb_is_dead = false
 
 package.cpath = package.cpath .. ";/usr/local/lib/lua/5.1/?.so"
 package.path  = package.path .. ";/usr/local/share/lua/5.1/?.lua"
@@ -13,7 +14,7 @@ local get_locklib =
     assert(package.loadlib(CRYPTDB_DIR .. "/obj/scripts/locklib.so",
                            "luaopen_locklib"))
 get_locklib()
-local luasql = assert(require("luasql.mysql"))
+-- local luasql = assert(require("luasql.mysql"))
 local proto  = assert(require("mysql.proto"))
 local lanes  = assert(require("lanes"))
 if require("lanes").configure then
@@ -28,6 +29,10 @@ local log_file_h         = nil
 
 local RESULTS_QUEUE      = "results"
 local QUERY_QUEUE        = "query"
+
+-- special messages sent on the RESULTS_QUEUE cannot be nil, tables or
+-- numbers.
+local CRYPTDB_IS_DEAD    = "cryptdb is dead"
 
 function connect_server()
     print("Double Connection.")
@@ -84,12 +89,15 @@ function read_query(packet)
         proxy.queries:append(42, packet, {resultset_is_needed = true})
     end
 
-    -- Clear the queues
-    linda:set(QUERY_QUEUE)
-    linda:set(RESULTS_QUEUE)
+    if false == cryptdb_is_dead then
+        -- Clear the queues
+        linda:set(QUERY_QUEUE)
+        linda:set(RESULTS_QUEUE)
 
-    -- Send the new query
-    linda:send(QUERY_QUEUE, cryptdb_query)
+        -- Send the new query
+        linda:send(QUERY_QUEUE, cryptdb_query)
+    end
+
     return proxy.PROXY_SEND_QUERY
 end
 
@@ -110,17 +118,29 @@ function read_query_result(inj)
         return
     end
 
+    if true == cryptdb_is_dead then
+        if log_file_h then
+            log_file_h:write(create_log_entry(client_name, query, true,
+                                              false, "cryptdb is dead"))
+            log_file_h:flush()
+        end
+    end
+
     -- > somemtimes this is a table (ie SELECT), sometimes it's nil (query
     --   error), sometimes it's number of rows affected by command
-    key, cryptdb_results = linda:receive(7.0, RESULTS_QUEUE)
+    key, cryptdb_results = linda:receive(1.0, RESULTS_QUEUE)
     local cryptdb_error = not cryptdb_results
-    local regular_error =  proxy.MYSQLD_PACKET_ERR ==
+    local regular_error = proxy.MYSQLD_PACKET_ERR ==
                                 inj.resultset.query_status
 
     if regular_error or cryptdb_error then
         out_status = "error"
     elseif "string" == type(cryptdb_results) then
-        out_status = cryptdb_results
+        -- special message
+        if CRYPTDB_IS_DEAD == cryptdb_results then
+            cryptdb_is_dead = true
+            out_status = "cryptdb is dead"
+        end
     elseif "number" == type(cryptdb_results) then
         -- WARN: this is always going to give a nonsensical result
         -- for UPDATE and DDL queries.
@@ -191,13 +211,14 @@ function exec_q()
     end
 
     local c = init()
-    -- failure loop
+    -- failure exit
     if nil == c then
         io.stderr:write("\nERROR: failed to connect to cryptdb\n\n")
-        while true do
-            linda:receive(1.0, QUERY_QUEUE)
-            linda:send(RESULTS_QUEUE, nil)
-        end
+        -- once we know the main thread is waiting for query results,
+        -- tell him that we are dead
+        linda:receive(QUERY_QUEUE)
+        linda:send(RESULTS_QUEUE, CRYPTDB_IS_DEAD)
+        return nil
     end
 
     set_finalizer(function(err) if c then c:close() end end)
