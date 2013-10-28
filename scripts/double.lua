@@ -21,7 +21,7 @@ if require("lanes").configure then
 end
 local linda  = lanes.linda()
 
-local LOCK_FILE          = "cdb.lock"
+local LOCK_NAME          = "cdb.lock"
 local LOG_FILE_PATH      = CRYPTDB_DIR .. "/logs/double.log"
 local cryptdb_lane       = nil
 local log_file_h         = nil
@@ -31,7 +31,7 @@ local QUERY_QUEUE        = "query"
 
 function connect_server()
     print("Double Connection.")
-    -- initialize pre-emptive thread
+    -- initialize and start pre-emptive thread
     local cryptdb_lane_gen =
         lanes.gen("*", {required = {'luasql.mysql',}}, exec_q)
     cryptdb_lane = cryptdb_lane_gen()
@@ -44,6 +44,8 @@ function disconnect_client()
     if log_file_h then
         log_file_h:close()
     end
+
+    assert(cryptdb_lane:cancel(5.0))
 end
 
 function read_query(packet)
@@ -68,7 +70,7 @@ function read_query(packet)
 
     local cryptdb_query
     -- acquire lock and build queries
-    status, lock_fd = locklib.acquire_lock(LOCK_FILE)
+    status, lock_fd = locklib.acquire_lock(LOCK_NAME)
     if false == status then
         print("Swallowed Query: [" ..  query .. "]")
         return nil
@@ -193,10 +195,12 @@ function exec_q()
     if nil == c then
         io.stderr:write("\nERROR: failed to connect to cryptdb\n\n")
         while true do
-            local _ = linda:receive(1.0, QUERY_QUEUE)
+            linda:receive(1.0, QUERY_QUEUE)
             linda:send(RESULTS_QUEUE, nil)
         end
     end
+
+    set_finalizer(function(err) if c then c:close() end end)
 
     -- query/parse loop
     while true do
@@ -228,7 +232,6 @@ function exec_q()
         end
     end
 end
-
 
 function create_log_entry(client, query, cryptdb_error, regular_error,
                           status)
