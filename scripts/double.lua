@@ -3,8 +3,11 @@
 -- of looping.
 
 -- GLOBAL STATE
-local new_session     = true            -- wordpress testing hack
-local cryptdb_is_dead = false
+local new_session       = true            -- wordpress testing hack
+local cryptdb_is_dead   = false
+local result_set_count  = nil
+local result_set_index  = nil
+local swallowed         = false
 
 package.cpath = package.cpath .. ";/usr/local/lib/lua/5.1/?.so"
 package.path  = package.path .. ";/usr/local/share/lua/5.1/?.lua"
@@ -54,6 +57,10 @@ function disconnect_client()
 end
 
 function read_query(packet)
+    result_set_count = 0
+    result_set_index = 0
+    swallowed        = false
+
     local query  = string.sub(packet, 2)
 
     -- don't acquire lock or do anything with cryptdb if the query is blank
@@ -61,6 +68,21 @@ function read_query(packet)
     -- trigger 'read_query_result(...)'
     if 0 == string.len(query:gsub("%s+", "")) then
         return nil
+    end
+
+    -- acquire lock if cryptdb is functional
+    if false == cryptdb_is_dead then
+        status, lock_fd = locklib.acquire_lock(LOCK_NAME)
+        if false == status then
+            print("Swallowed Query: [" ..  query .. "]")
+            local noop = "do 0;"
+            proxy.queries:append(13, string.char(proxy.COM_QUERY) .. noop,
+                                 {resultset_is_needed = true})
+            result_set_count = result_set_count + 1
+            swallowed        = true
+            return proxy.PROXY_SEND_QUERY
+        end
+        assert(lock_fd)
     end
 
     -- HACK: turns off strict mode for wordpress because
@@ -71,25 +93,21 @@ function read_query(packet)
         proxy.queries:append(1337, string.char(proxy.COM_QUERY) .. mode,
                              {resultset_is_needed = true})
         new_session = false
+        result_set_count = result_set_count + 1
     end
 
-    local cryptdb_query
-    -- acquire lock and build queries
-    status, lock_fd = locklib.acquire_lock(LOCK_NAME)
-    if false == status then
-        print("Swallowed Query: [" ..  query .. "]")
-        return nil
-    else
+    -- forward the query as is to the regular database
+    proxy.queries:append(42, packet, {resultset_is_needed = true})
+    result_set_count = result_set_count + 1
+
+    if false == cryptdb_is_dead then
+        -- build the query for cryptdb
         if string.byte(packet) == proxy.COM_INIT_DB then
             cryptdb_query = "USE " .. query
         else
             cryptdb_query = query
         end
 
-        proxy.queries:append(42, packet, {resultset_is_needed = true})
-    end
-
-    if false == cryptdb_is_dead then
         -- Clear the queues
         linda:set(QUERY_QUEUE)
         linda:set(RESULTS_QUEUE)
@@ -102,28 +120,16 @@ function read_query(packet)
 end
 
 function read_query_result(inj)
+    assert(not not swallowed ~= not not lock_fd)
+
     local client_name = proxy.connection.client.src.name
     local query = string.sub(inj.query, 2)
-
     local out_status = nil
 
-    if nil == lock_fd then
-        if log_file_h then
-            log_file_h:write(create_log_entry(client_name, query, false,
-                                             false,
-                                             "lock acquisition failed"))
-            log_file_h:flush()
-        end
-
-        return
-    end
-
     if true == cryptdb_is_dead then
-        if log_file_h then
-            log_file_h:write(create_log_entry(client_name, query, true,
-                                              false, "cryptdb is dead"))
-            log_file_h:flush()
-        end
+        create_log_entry(log_file_h, client_name, query, true, false,
+                         "cryptdb is dead")
+        return
     end
 
     -- > somemtimes this is a table (ie SELECT), sometimes it's nil (query
@@ -180,17 +186,19 @@ function read_query_result(inj)
         end
     end
 
-    if log_file_h then
-        log_file_h:write(create_log_entry(client_name, query,
-                                          cryptdb_error, regular_error,
-                                          out_status))
-        log_file_h:flush()
-    end
+    create_log_entry(log_file_h, client_name, query, cryptdb_error,
+                     regular_error, out_status)
 
     -- release lock
     assert(lock_fd)
-    locklib.release_lock(lock_fd)
-    lock_fd = nil
+    result_set_index = result_set_index + 1
+    if result_set_index == result_set_count then
+        locklib.release_lock(lock_fd)
+        lock_fd = nil
+        return
+    end
+
+    return proxy.PROXY_IGNORE_RESULT
 end
 
 -- never returns (sends messages)
@@ -254,9 +262,12 @@ function exec_q()
     end
 end
 
-function create_log_entry(client, query, cryptdb_error, regular_error,
-                          status)
-    return client .. "," .. csv_escape(query) .. "," .. os.date("%c") .. "," .. ppbool(cryptdb_error) .. "," .. ppbool(regular_error) .. "," .. status .. "\n"
+function create_log_entry(file, client, query, cryptdb_error,
+                          regular_error, status)
+    if file then
+        file:write(client .. "," .. csv_escape(query) .. "," .. os.date("%c") .. "," .. ppbool(cryptdb_error) .. "," .. ppbool(regular_error) .. "," .. status .. "\n")
+        file:flush()
+    end
 end
 
 function table_test(results_a, results_b)
