@@ -96,7 +96,7 @@ class ChangeColumnSubHandler : public AlterSubHandler {
                                   const ProxyState &ps,
                                   const Preamble &preamble) const
     {
-        assert(false);
+        FAIL_TextMessageError("implement ChangeColumnSubHandler");
     }
 };
 
@@ -105,7 +105,7 @@ class ForeignKeySubHandler : public AlterSubHandler {
                                   const ProxyState &ps,
                                   const Preamble &preamble) const
     {
-        throw CryptDBError("implement ForeignKeySubHandler!");
+        FAIL_TextMessageError("implement ForeignKeySubHandler");
     }
 };
 
