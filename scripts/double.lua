@@ -109,7 +109,7 @@ function read_query(packet)
         end
 
         -- Clear the queues
-        linda:set(QUERY_QUEUE)
+        -- linda:set(QUERY_QUEUE)
         linda:set(RESULTS_QUEUE)
 
         -- Send the new query
