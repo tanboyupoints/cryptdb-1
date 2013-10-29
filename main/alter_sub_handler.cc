@@ -49,11 +49,9 @@ class DropColumnSubHandler : public AlterSubHandler {
                 [preamble, &a, this] (List<Alter_drop> out_list,
                                             Alter_drop *adrop)
         {
-            FieldMeta const &fm =
-                a.getFieldMeta(preamble.dbname, preamble.table,
-                               adrop->name);
             TableMeta const &tm =
                 a.getTableMeta(preamble.dbname, preamble.table);
+            FieldMeta const &fm = a.getFieldMeta(tm, adrop->name);
             List<Alter_drop> lst = this->rewrite(fm, adrop);
             out_list.concat(&lst);
             a.deltas.push_back(std::unique_ptr<Delta>(
