@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <string.h>
+#include <time.h>
 
 #include <pthread.h>
 #include <sys/types.h>
@@ -18,6 +19,12 @@ struct LuaQuery {
     const char *query;      // remove
     void **magic_ptr;
 };
+
+static struct LuaQuery *
+createLuaQuery(const char *query);
+
+static void
+destroyLuaQuery(struct LuaQuery **lua_query);
 
 void *
 do_query(void *lq);
@@ -52,73 +59,84 @@ pushvalue(lua_State *const L, void *const row, long int len)
 static int
 query(lua_State *const L)
 {
+    // NOTE: Will not handle embedded NUL characters.
     size_t length;
-    // FIXME:
-    char *const query = calloc(200, sizeof(char));
-    strcpy(query, lua_tolstring(L, 1, &length));
-
-    struct LuaQuery *const lua_query = malloc(sizeof(struct LuaQuery));
+    struct LuaQuery *lua_query =
+        createLuaQuery(lua_tolstring(L, 1, &length));
     if (!lua_query) {
-        fprintf(stderr, "malloc failed!\n");
-        lua_pushboolean(L, false);
-        lua_pushnil(L);
-        lua_pushnil(L);
-        return 3;
+        fprintf(stderr, "createLuaQuery failed!\n");
+        goto error_exit;
     }
-
-    lua_query->magic_ptr = malloc(sizeof(void *));
-    if (!lua_query->magic_ptr) {
-        free(lua_query);
-        fprintf(stderr, "malloc failed!\n");
-        lua_pushboolean(L, false);
-        lua_pushnil(L);
-        lua_pushnil(L);
-        return 3;
-    }
-    *lua_query->magic_ptr = NULL;
-    lua_query->query = query;
 
     pthread_t thread;
     // const char *const query = "CREATE TABLE lua.something6(x integer)";
     if (pthread_create(&thread, NULL, do_query, (void *)lua_query)) {
-        free(lua_query->magic_ptr);
-        free(lua_query);
         fprintf(stderr, "pthread_create failed!\n");
-        lua_pushboolean(L, false);
-        lua_pushnil(L);
-        lua_pushnil(L);
-        return 3;
+        goto error_exit;
     }
 
     lua_pushboolean(L, true);
     lua_pushnumber(L, (unsigned long)lua_query);
     lua_pushnumber(L, thread);
     return 3;
+
+error_exit:
+    if (lua_query) {
+        destroyLuaQuery(&lua_query);
+    }
+    lua_pushboolean(L, false);
+    lua_pushnil(L);
+    lua_pushnil(L);
+    return 3;
 }
 
 static int
 results(lua_State *const L)
 {
-    struct LuaQuery *const lua_query =
+    struct LuaQuery *lua_query =
         (struct LuaQuery *)lua_tointeger(L, 1);
     pthread_t thread = (pthread_t)lua_tointeger(L, 2);
 
     *lua_query->magic_ptr = L;
 
+    struct timespec ts;
+    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+        fprintf(stderr, "clock_gettime failed!\n");
+        goto error_exit;
+    }
+    ts.tv_sec += 1;
+
     int thread_output;
-    if (pthread_join(thread, (void **)&thread_output)) {
-        free(lua_query->magic_ptr);
-        free(lua_query);
+    if (pthread_timedjoin_np(thread, (void **)&thread_output, &ts)) {
         fprintf(stderr, "pthread_join failed!\n");
-        lua_pushboolean(L, false);
-        lua_pushnil(L);
-        return 2;
+        goto error_exit;
     }
 
-    printf("thread out: %d\n", thread_output);
-    free(lua_query->magic_ptr);
-    free(lua_query);
+    destroyLuaQuery(&lua_query);
+    assert(2 == thread_output);
     return thread_output;
+
+error_exit:
+    destroyLuaQuery(&lua_query);
+    lua_pushboolean(L, false);
+    lua_pushnil(L);
+    return 2;
+}
+
+static const struct luaL_reg
+main_lib[] = {
+#define F(n) { #n, n }
+    F(pass_table),
+    F(query),
+    F(results),
+    {0, 0},
+};
+
+extern int
+lua_main_init(lua_State *const L)
+{
+    luaL_openlib(L, "Main", main_lib, 0);
+    return 1;
 }
 
 static lua_State *
@@ -212,18 +230,42 @@ error_exit:
     return (void *)2;
 }
 
-static const struct luaL_reg
-main_lib[] = {
-#define F(n) { #n, n }
-    F(pass_table),
-    F(query),
-    F(results),
-    {0, 0},
-};
-
-extern int
-lua_main_init(lua_State *const L)
+static struct LuaQuery *
+createLuaQuery(const char *query)
 {
-    luaL_openlib(L, "Main", main_lib, 0);
-    return 1;
+    struct LuaQuery *const lua_query = malloc(sizeof(struct LuaQuery));
+    if (!lua_query) {
+        fprintf(stderr, "malloc failed!\n");
+        return NULL;
+    }
+
+    lua_query->magic_ptr = malloc(sizeof(void *));
+    if (!lua_query->magic_ptr) {
+        free(lua_query);
+        fprintf(stderr, "malloc failed!\n");
+        return NULL;
+    }
+    *lua_query->magic_ptr = NULL;
+
+    lua_query->query = strdup(query);
+    if (NULL == lua_query->query) {
+        free(lua_query->magic_ptr);
+        free(lua_query);
+        fprintf(stderr, "strdup failed!\n");
+        return NULL;
+    }
+
+    return lua_query;
+}
+
+static void
+destroyLuaQuery(struct LuaQuery **lua_query)
+{
+    assert(lua_query && *lua_query && (*lua_query)->query &&
+           (*lua_query)->magic_ptr);
+    free((char *)(*lua_query)->query);
+    free((*lua_query)->magic_ptr);
+    free(*lua_query);
+
+    *lua_query = NULL;
 }
