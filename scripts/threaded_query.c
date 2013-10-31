@@ -181,12 +181,6 @@ issueCommand(lua_State *const L, enum Command command,
 {
     assert(L && lua_query);
 
-    if (zombie(lua_query)) {
-        lua_pushboolean(L, false);
-        lua_pushnil(L);
-        return;
-    }
-
     assert(false == lua_query->completion_signal);
 
     // execute command
@@ -203,6 +197,9 @@ issueCommand(lua_State *const L, enum Command command,
 
     // handle result
     if (false == lua_query->completion_signal) {
+        // bad state because the thread might signal completion after
+        // we reset completion
+
         if (KILL == command) {
             if (false == stopLuaQuery(lua_query)) {
                 fprintf(stderr, "failed to stop thread after KILL failed");
@@ -214,12 +211,16 @@ issueCommand(lua_State *const L, enum Command command,
             return;
         }
 
-        // bad state because the thread might signal completion after
-        // we reset completion
+        if (zombie(lua_query)) {
+            fprintf(stderr, "zombie, no restart!\n");
+            lua_pushboolean(L, false);
+            lua_pushnil(L);
+            return;
+        }
+
         fprintf(stderr, "no completion signal, restarting!\n");
 
-        // if need be we can handle cases where we at least stopped the
-        // thread.
+        // we could handle cases where we at least stopped the thread.
         if (false == restartLuaQuery(lua_query)) {
             fprintf(stderr, "panic: failed to restart thread!\n");
             exit(0);
@@ -308,7 +309,7 @@ commandHandler(void *const lq)
     const char *const host      = "127.0.0.1";
     const char *const user      = "root";
     const char *const passwd    = "letmein";
-    const unsigned int port     = 3306;
+    const unsigned int port     = 3307;
 
     // hackery, we don't want to receive asynchronous cancellations until
     // after we acquire resources.  we also need to clean up our mysql
@@ -402,7 +403,7 @@ commandHandler(void *const lq)
     pthread_cleanup_pop(0);
 
 no_killing_error_exit:
-    return (void *)SAD_THREAD_EXIT;
+    return SAD_THREAD_EXIT;
 }
 
 static bool
