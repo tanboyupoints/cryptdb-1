@@ -19,6 +19,13 @@
 #define HAPPY_THREAD_EXIT       (void *)101
 #define SAD_THREAD_EXIT         (void *)0x5AD
 
+#define NO_KILLING(stmt)                                                \
+{                                                                       \
+        assert(!pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL));  \
+        (stmt);                                                         \
+        assert(!pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL));   \
+}
+
 enum Command {QUERY, RESULTS, KILL};
 
 struct LuaQuery {
@@ -47,24 +54,13 @@ void
 issueCommand(lua_State *L, enum Command command,
              struct LuaQuery *const lua_query, unsigned int wait);
 
+bool
+issueQuery(lua_State *L, enum Command command,
+           const char *const query, struct LuaQuery *const lua_query,
+           unsigned int wait);
+
 void *
 commandHandler(void *const lq);
-
-static int
-pass_table(lua_State *const L)
-{
-    lua_newtable(L);
-
-    lua_pushstring(L, "key0");
-    lua_pushstring(L, "value0");
-    lua_settable(L, -3);
-
-    lua_pushstring(L, "key1");
-    lua_pushstring(L, "value1");
-    lua_settable(L, -3);
-
-    return 1;
-}
 
 // taken from luasql-mysql
 static void
@@ -104,15 +100,13 @@ query(lua_State *const L)
     size_t length;
     const char *const q = lua_tolstring(L, 2, &length);
 
-    // FIXME: Move to issueQuery
-    lua_query->query = strdup(q);
-    if (NULL == lua_query->query) {
-        // don't know how many values the caller expects.
-        fprintf(stderr, "strdup failed!\n");
-        exit(0);
+    if (false == issueQuery(L, QUERY, q, lua_query, 1)) {
+        fprintf(stderr, "issueQuery failed!\n");
+        lua_pushboolean(L, false);
+        return 1;
     }
 
-    issueCommand(L, QUERY, lua_query, 1);
+    assert(1 == lua_query->output_count);
     return lua_query->output_count;
 }
 
@@ -124,6 +118,7 @@ results(lua_State *const L)
     assert(lua_query);
 
     issueCommand(L, RESULTS, lua_query, 1);
+    assert(2 == lua_query->output_count);
     return lua_query->output_count;
 }
 
@@ -136,6 +131,7 @@ kill(lua_State *const L)
     issueCommand(L, KILL, lua_query, 1);
 
     const int output_count = lua_query->output_count;
+    assert(1 == output_count);
     destroyLuaQuery(&lua_query);
     return output_count;
 }
@@ -143,7 +139,6 @@ kill(lua_State *const L)
 static const struct luaL_reg
 main_lib[] = {
 #define F(n) { #n, n }
-    F(pass_table),
     F(start),
     F(query),
     F(results),
@@ -154,7 +149,7 @@ main_lib[] = {
 extern int
 lua_main_init(lua_State *const L)
 {
-    luaL_openlib(L, "Main", main_lib, 0);
+    luaL_openlib(L, "ThreadedQuery", main_lib, 0);
     return 1;
 }
 
@@ -210,8 +205,23 @@ issueCommand(lua_State *const L, enum Command command,
     return;
 }
 
+bool
+issueQuery(lua_State *const L, enum Command command,
+           const char *const query, struct LuaQuery *lua_query,
+           unsigned int wait)
+{
+    lua_query->query = strdup(query);
+    if (NULL == lua_query->query) {
+        fprintf(stderr, "strdup failed!\n");
+        return false;
+    }
+
+    issueCommand(L, command, lua_query, wait);
+    return true;
+}
+
 static void
-waitForCommand(struct LuaQuery *lua_query)
+waitForCommand(struct LuaQuery *const lua_query)
 {
     while (false == lua_query->command_ready);
     assert(lua_query->ell);
@@ -223,7 +233,7 @@ completeLuaQuery(struct LuaQuery *lua_query, unsigned output_count)
 {
     assert(true == lua_query->command_ready &&
            false == lua_query->completion_signal);
-    
+
     assert(!!lua_query->query == !!(QUERY == lua_query->command));
     if (lua_query->query) {
         free((void *)lua_query->query);
@@ -236,9 +246,17 @@ completeLuaQuery(struct LuaQuery *lua_query, unsigned output_count)
     lua_query->completion_signal = true;
 }
 
+static void
+cleanup_handler(void *const mysql_conn)
+{
+    assert(mysql_conn);
+    mysql_close(mysql_conn);
+}
+
 void *
 commandHandler(void *const lq)
 {
+    assert(!pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL));
     assert(!pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL));
 
     struct LuaQuery *lua_query = (struct LuaQuery *)lq;
@@ -246,7 +264,7 @@ commandHandler(void *const lq)
     MYSQL *const init = mysql_init(NULL);
     if (!init) {
         fprintf(stderr, "mysql_init failed!\n");
-        goto error_exit;
+        goto no_killing_error_exit;
     }
 
     const char *const host      = "localhost";
@@ -254,13 +272,18 @@ commandHandler(void *const lq)
     const char *const passwd    = "letmein";
     const unsigned int port     = 3306;
 
+    // hackery, we don't want to receive asynchronous cancellations until
+    // after we acquire resources.  we also need to clean up our mysql
+    // connection if it succeeds.
     MYSQL *const conn =
         mysql_real_connect(init, host, user, passwd, NULL, port, NULL, 0);
     if (!conn) {
         fprintf(stderr, "mysql_real_connect failed!\n");
-        goto error_exit;
+        goto no_killing_error_exit;
     }
 
+    pthread_cleanup_push(&cleanup_handler, conn);
+    assert(!pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL));
     // debug variable
     bool queried = false;
     while (true) {
@@ -270,8 +293,10 @@ commandHandler(void *const lq)
 
         assert(false == lua_query->completion_signal);
         if (KILL == lua_query->command) {
+            assert(!pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL));
             lua_pushboolean(lua_query->ell, true);
             completeLuaQuery(lua_query, 1);
+            mysql_close(conn);
             return HAPPY_THREAD_EXIT;
         } else if (QUERY == lua_query->command) {
             if (mysql_query(conn, lua_query->query)) {
@@ -280,7 +305,7 @@ commandHandler(void *const lq)
             } else {
                 lua_pushboolean(lua_query->ell, true);
             }
-            completeLuaQuery(lua_query, 1);
+            NO_KILLING(completeLuaQuery(lua_query, 1));
             queried = true;
             continue;
         }
@@ -291,19 +316,19 @@ commandHandler(void *const lq)
         MYSQL_RES *const result = mysql_store_result(conn);
         const int field_count = mysql_field_count(conn);
         if (NULL == result) {
-            if (0 != field_count) {
+            if (mysql_errno(conn)) {
                 // query failed
-                assert(mysql_errno(conn));
-                mysql_close(conn);
-                fprintf(stderr, "mysql_store_result failed!\n");
-                goto error_exit;
+                lua_pushboolean(lua_query->ell, false);
+                lua_pushnil(lua_query->ell);
+
+                NO_KILLING(completeLuaQuery(lua_query, 2));
+                continue;
             }
-            assert(0 == mysql_errno(conn));
 
             lua_pushboolean(lua_query->ell, true);
             lua_pushnumber(lua_query->ell, mysql_affected_rows(conn));
 
-            completeLuaQuery(lua_query, 2);
+            NO_KILLING(completeLuaQuery(lua_query, 2));
             continue;
         }
         assert(0 == mysql_errno(conn));
@@ -331,16 +356,21 @@ commandHandler(void *const lq)
             row_index += 1;
         }
 
-        completeLuaQuery(lua_query, 2);
+        NO_KILLING(completeLuaQuery(lua_query, 2));
     }
 
-error_exit:
-    ;
+    // should never reach this point.
+    assert(false);
+    pthread_cleanup_pop(0);
+
+no_killing_error_exit:
+    assert(!pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL));
     waitForCommand(lua_query);
+
     lua_pushboolean(lua_query->ell, false);
     lua_pushnil(lua_query->ell);
 
-    completeLuaQuery(lua_query, 2);
+    NO_KILLING(completeLuaQuery(lua_query, 2));
     return (void *)SAD_THREAD_EXIT;
 }
 
@@ -384,7 +414,7 @@ stopLuaQuery(struct LuaQuery *const lua_query)
     // try to cancel the thread if it hasn't already exited
     // > not safe to cancel a thread after joining it as system may reuse
     //   id
-    int why = pthread_cancel(lua_query->thread);
+    const int why = pthread_cancel(lua_query->thread);
     if (why != 0 && why != ESRCH) {
         fprintf(stderr, "pthread_cancel did something weird!!\n");
         return false;
