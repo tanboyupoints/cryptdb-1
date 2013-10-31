@@ -15,19 +15,31 @@
 #include <lua5.1/lauxlib.h>
 #include <lua5.1/lualib.h>
 
+enum Command {QUERY, KILL};
+
 struct LuaQuery {
-    const char *query;      // remove
+    enum Command command;
+    bool command_ready;
+    bool completion_signal;
     void **magic_ptr;
+
+    const char *query;
+    unsigned int output_count;
 };
 
 static struct LuaQuery *
-createLuaQuery(const char *query);
+createLuaQuery(const char *const query);
 
 static void
 destroyLuaQuery(struct LuaQuery **lua_query);
 
+void
+issueCommand(lua_State *L, enum Command command,
+             struct LuaQuery *const lua_query, const pthread_t thread,
+             unsigned int wait);
+
 void *
-do_query(void *lq);
+commandHandler(void *const lq);
 
 static int
 pass_table(lua_State *const L)
@@ -69,8 +81,7 @@ query(lua_State *const L)
     }
 
     pthread_t thread;
-    // const char *const query = "CREATE TABLE lua.something6(x integer)";
-    if (pthread_create(&thread, NULL, do_query, (void *)lua_query)) {
+    if (pthread_create(&thread, NULL, commandHandler, (void *)lua_query)) {
         fprintf(stderr, "pthread_create failed!\n");
         goto error_exit;
     }
@@ -95,32 +106,24 @@ results(lua_State *const L)
 {
     struct LuaQuery *lua_query =
         (struct LuaQuery *)lua_tointeger(L, 1);
-    pthread_t thread = (pthread_t)lua_tointeger(L, 2);
+    const pthread_t thread = (pthread_t)lua_tointeger(L, 2);
 
-    *lua_query->magic_ptr = L;
+    issueCommand(L, QUERY, lua_query, thread, 1);
+    return lua_query->output_count;
+}
 
-    struct timespec ts;
-    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-        fprintf(stderr, "clock_gettime failed!\n");
-        goto error_exit;
-    }
-    ts.tv_sec += 1;
+static int
+kill(lua_State *const L)
+{
+    struct LuaQuery *lua_query =
+        (struct LuaQuery *)lua_tointeger(L, 1);
+    const pthread_t thread = (pthread_t)lua_tointeger(L, 2);
 
-    int thread_output;
-    if (pthread_timedjoin_np(thread, (void **)&thread_output, &ts)) {
-        fprintf(stderr, "pthread_join failed!\n");
-        goto error_exit;
-    }
+    issueCommand(L, KILL, lua_query, thread, 1);
 
+    const int output_count = lua_query->output_count;
     destroyLuaQuery(&lua_query);
-    assert(2 == thread_output);
-    return thread_output;
-
-error_exit:
-    destroyLuaQuery(&lua_query);
-    lua_pushboolean(L, false);
-    lua_pushnil(L);
-    return 2;
+    return output_count;
 }
 
 static const struct luaL_reg
@@ -129,6 +132,7 @@ main_lib[] = {
     F(pass_table),
     F(query),
     F(results),
+    F(kill),
     {0, 0},
 };
 
@@ -139,18 +143,74 @@ lua_main_init(lua_State *const L)
     return 1;
 }
 
+
+// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+//                  Helpers
+// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+void
+issueCommand(lua_State *const L, enum Command command,
+             struct LuaQuery *lua_query, const pthread_t thread,
+             unsigned int wait)
+{
+    assert(false == lua_query->completion_signal);
+
+    lua_query->command       = command;
+    *lua_query->magic_ptr    = L;
+    lua_query->command_ready = true;
+
+    const time_t test = time(NULL) + wait;
+    while (false == lua_query->completion_signal) {
+        if (difftime(test, time(NULL)) < 0) {
+            break;
+        }
+    }
+
+    if (false == lua_query->completion_signal) {
+        // bad state because the thread might signal completion after
+        // we reset completion
+        fprintf(stderr, "thread did not self kill successfully!\n");
+        goto panic_exit;
+    }
+    lua_query->completion_signal = false;
+
+    assert(false == lua_query->command_ready);
+    return;
+
+panic_exit:
+    // we don't know what happened to the lua state
+    fprintf(stderr, "panicing!\n");
+    destroyLuaQuery(&lua_query);
+    exit(1);
+}
+
 static lua_State *
 handleMagicPointer(struct LuaQuery *lua_query)
 {
-    while (NULL == *lua_query->magic_ptr);
+    while (false == lua_query->command_ready);
+    assert(*lua_query->magic_ptr);
     return (lua_State *)*lua_query->magic_ptr;
 }
 
+void
+completeLuaQuery(struct LuaQuery *lua_query, unsigned output_count)
+{
+    assert(true == lua_query->command_ready &&
+           false == lua_query->completion_signal);
+
+    lua_query->command_ready     = false;
+    *lua_query->magic_ptr        = NULL;
+    lua_query->output_count      = output_count;
+    lua_query->completion_signal = true;
+}
+
 void *
-do_query(void *lq)
+commandHandler(void *const lq)
 {
     struct LuaQuery *lua_query = (struct LuaQuery *)lq;
-    void **const magic_ptr = lua_query->magic_ptr;
+    // do we need to do this for each thread?
     MYSQL *const init = mysql_init(NULL);
     if (!init) {
         fprintf(stderr, "mysql_init failed!\n");
@@ -175,63 +235,77 @@ do_query(void *lq)
         goto error_exit;
     }
 
-    MYSQL_RES *const result = mysql_store_result(conn);
-    const int field_count = mysql_field_count(conn);
-    if (NULL == result) {
-        if (0 == field_count) {
+    while (true) {
+        // blocking
+        lua_State *const ell = handleMagicPointer(lua_query);
+
+        assert(false == lua_query->completion_signal);
+        if (KILL == lua_query->command) {
+            lua_pushboolean(ell, true);
+            completeLuaQuery(lua_query, 1);
+            return (void *)0;
+        }
+
+        assert(QUERY == lua_query->command);
+
+        MYSQL_RES *const result = mysql_store_result(conn);
+        const int field_count = mysql_field_count(conn);
+        if (NULL == result) {
+            if (0 != field_count) {
+                // query failed
+                assert(mysql_errno(conn));
+                mysql_close(conn);
+                fprintf(stderr, "mysql_store_result failed!\n");
+                goto error_exit;
+            }
             assert(0 == mysql_errno(conn));
 
-            lua_State *const ell = handleMagicPointer(lua_query);
             lua_pushboolean(ell, true);
             lua_pushnumber(ell, mysql_affected_rows(conn));
-            return (void *)2;
+
+            completeLuaQuery(lua_query, 2);
+            continue;
         }
+        assert(0 == mysql_errno(conn));
 
-        assert(mysql_errno(conn));
-        mysql_close(conn);
-        fprintf(stderr, "mysql_store_result failed!\n");
-        goto error_exit;
-    }
-    assert(0 == mysql_errno(conn));
-
-    lua_State *const ell = handleMagicPointer(lua_query);
-    // resultset
-    lua_pushboolean(ell, true);
-    lua_newtable(ell);
-    MYSQL_ROW row;
-    int row_index = 0;
-    while ((row = mysql_fetch_row(result))) {
-        unsigned long *const l = mysql_fetch_lengths(result);
-
-        // row
-        lua_pushnumber(ell, row_index + 1);
+        // resultset
+        lua_pushboolean(ell, true);
         lua_newtable(ell);
-        int col_index = 0;
-        for (; col_index < field_count; ++col_index) {
-            lua_pushnumber(ell, col_index + 1);
-            pushvalue(ell, row[col_index], l[col_index]);
+
+        MYSQL_ROW row;
+        int row_index = 0;
+        while ((row = mysql_fetch_row(result))) {
+            const unsigned long *const l = mysql_fetch_lengths(result);
+
+            // row
+            lua_pushnumber(ell, row_index + 1);
+            lua_newtable(ell);
+            int col_index = 0;
+            for (; col_index < field_count; ++col_index) {
+                lua_pushnumber(ell, col_index + 1);
+                pushvalue(ell, row[col_index], l[col_index]);
+                lua_settable(ell, -3);
+            }
             lua_settable(ell, -3);
+
+            row_index += 1;
         }
-        lua_settable(ell, -3);
 
-        row_index += 1;
+        completeLuaQuery(lua_query, 2);
     }
-
-    return (void *)2;
 
 error_exit:
-    fprintf(stderr, "error exit!\n");
     ;
     lua_State *const ell_err = handleMagicPointer(lua_query);
-
     lua_pushboolean(ell_err, false);
     lua_pushnil(ell_err);
 
-    return (void *)2;
+    completeLuaQuery(lua_query, 2);
+    return (void *)1;
 }
 
 static struct LuaQuery *
-createLuaQuery(const char *query)
+createLuaQuery(const char *const query)
 {
     struct LuaQuery *const lua_query = malloc(sizeof(struct LuaQuery));
     if (!lua_query) {
@@ -255,6 +329,8 @@ createLuaQuery(const char *query)
         return NULL;
     }
 
+    lua_query->command_ready     = false;
+    lua_query->completion_signal = false;
     return lua_query;
 }
 
