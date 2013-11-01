@@ -83,6 +83,7 @@ TEST(test_luaToCharp)
     const char *const s1      = "green\0purple"; unsigned s1_len = 11;
     const char *const s2      = "blue";
 
+    lua_pushnil(L);
     lua_pushstring(L, s0);
     lua_pushlstring(L, s1, s1_len);
     lua_pushstring(L, s1);
@@ -98,6 +99,7 @@ TEST(test_luaToCharp)
     TEST_ASSERT(!strcmp(luaToCharp(L, -4), s1));
     TEST_ASSERT(!memcmp(luaToCharp(L, -5), s1, s1_len));
     TEST_ASSERT(!strcmp(luaToCharp(L, -6), s0));
+    TEST_ASSERT(!strcmp(luaToCharp(L, -7), ""));
 END_TEST
 
 TEST(test_waitForCommand)
