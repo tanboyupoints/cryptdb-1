@@ -424,6 +424,8 @@ commandHandler(void *const lq)
             mysql_close(conn);
             return HAPPY_THREAD_EXIT;
         } else if (QUERY == lua_query->command) {
+            queried = true;
+
             if (mysql_query(conn, lua_query->sql)) {
                 assert(mysql_errno(conn));
                 lua_pushboolean(lua_query->persist.ell, false);
@@ -431,7 +433,6 @@ commandHandler(void *const lq)
                 lua_pushboolean(lua_query->persist.ell, true);
             }
             NO_KILLING(completeLuaQuery(lua_query, 1));
-            queried = true;
             continue;
         }
 
@@ -633,7 +634,7 @@ stopLuaQueryThread(struct LuaQuery *const lua_query)
 
     if (exit_code != PTHREAD_CANCELED && exit_code != HAPPY_THREAD_EXIT
         && exit_code != SAD_THREAD_EXIT) {
-        fprintf(stderr, "unclear why thread exited!\n");
+        fprintf(stderr, "unclear why thread exited: %p\n", exit_code);
         return false;
     }
 
