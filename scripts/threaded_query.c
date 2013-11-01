@@ -82,18 +82,20 @@ static bool stopLuaQueryThread(struct LuaQuery *const lua_query);
 static bool restartLuaQueryThread(struct LuaQuery *lua_query);
 
 static bool zombie(struct LuaQuery *const lua_query);
-void issueCommand(lua_State *L, enum Command command,
-                  struct LuaQuery *const lua_query, unsigned int wait);
-bool issueQuery(lua_State *L, enum Command command,
-                const char *const query, struct LuaQuery *const lua_query,
-                unsigned int wait);
-void *commandHandler(void *const lq);
+static void issueCommand(lua_State *L, enum Command command,
+                         struct LuaQuery *const lua_query,
+                         unsigned int wait);
+static bool issueQuery(lua_State *L, enum Command command,
+                       const char *const query,
+                       struct LuaQuery *const lua_query,
+                       unsigned int wait);
+static void *commandHandler(void *const lq);
 
-void nilTheStack(lua_State *const L, int pushed);
-void nilTheStackPlus(struct LuaQuery *const lua_query, int pushed);
+static void nilTheStack(lua_State *const L, int pushed);
+static void nilTheStackPlus(struct LuaQuery *const lua_query, int pushed);
 
-static void
-pushvalue(lua_State *const L, const char *const string, long int len);
+static void pushvalue(lua_State *const L, const char *const string,
+                      long int len);
 static const char *luaToCharp(lua_State *const L, int index);
 
 static int
@@ -372,7 +374,7 @@ commandHandler(void *const lq)
             return HAPPY_THREAD_EXIT;
         } else if (QUERY == lua_query->command) {
             if (mysql_query(conn, lua_query->query)) {
-                fprintf(stderr, "mysql_query failed!\n");
+                assert(mysql_errno(conn));
                 lua_pushboolean(lua_query->persist.ell, false);
             } else {
                 lua_pushboolean(lua_query->persist.ell, true);
@@ -671,7 +673,7 @@ luaToCharp(lua_State *const L, int index)
     size_t length;
     const char *const p = lua_tolstring(L, index, &length);
     if (!p) {
-        fprintf(stderr, "lua_tolstring failed!");
+        fprintf(stderr, "lua_tolstring failed!\n");
         exit(0);
     }
 

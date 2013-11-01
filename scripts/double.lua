@@ -35,7 +35,8 @@ function connect_server()
     print("Double Connection.")
 
     -- initialize and start pre-emptive thread
-    status, tquery = ThreadedQuery.start()
+    status, tquery =
+        ThreadedQuery.start("127.0.0.1", "root", "letmein", 3307)
     if nil == status then
         tquery = nil
     end

@@ -2,7 +2,6 @@
 #define GREEN_BEGIN     "\033[1;92m"
 #define RED_BEGIN       "\033[1;31m"
 
-
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 //            Simple Testing DSL
@@ -379,8 +378,8 @@ all(struct lua_State *const L)
     printf("\n"
            "################################\n"
            "     Passed %d/%d Unit Tests\n"
-           "################################\n", __passed_tests,
-                                                 __total_tests);
+           "################################\n\n", __passed_tests,
+                                                   __total_tests);
 
     return 0;
 }
