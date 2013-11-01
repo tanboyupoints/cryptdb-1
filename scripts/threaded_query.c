@@ -45,6 +45,9 @@ struct HostData {
 //   meaningfully read after running issueCommand.
 struct PersistentState {
     unsigned int restarts;
+    // using a pointer for 'host_data' allows for PersistentState
+    // to determine if 'host_data' is valid or not.
+    // > non-NULL == valid
     const struct HostData *host_data;
 
     // parameter to all commands
@@ -90,7 +93,7 @@ void nilTheStack(lua_State *const L, int pushed);
 void nilTheStackPlus(struct LuaQuery *const lua_query, int pushed);
 
 static void
-pushvalue(lua_State *const L, void *const row, long int len);
+pushvalue(lua_State *const L, const char *const string, long int len);
 static const char *luaToCharp(lua_State *const L, int index);
 
 static int
@@ -207,6 +210,7 @@ issueCommand(lua_State *const L, enum Command command,
 {
     assert(L && lua_query);
 
+    assert(NULL == lua_query->persist.ell);
     assert(false == lua_query->completion_signal);
 
     // execute command
@@ -234,6 +238,8 @@ issueCommand(lua_State *const L, enum Command command,
 
             lua_pushboolean(L, true);
             nilTheStackPlus(lua_query, 1);
+
+            lua_query->persist.ell = NULL;
             return;
         }
 
@@ -241,6 +247,8 @@ issueCommand(lua_State *const L, enum Command command,
             fprintf(stderr, "zombie, no restart!\n");
             lua_pushboolean(L, false);
             lua_pushnil(L);
+
+            lua_query->persist.ell = NULL;
             return;
         }
 
@@ -258,12 +266,14 @@ issueCommand(lua_State *const L, enum Command command,
         // return failure to the caller
         lua_pushboolean(L, false);
         nilTheStackPlus(lua_query, 1);
+
+        lua_query->persist.ell = NULL;
         return;
     }
-
-    lua_query->completion_signal = false;
-
     assert(false == lua_query->command_ready);
+
+    lua_query->completion_signal    = false;
+    lua_query->persist.ell          = NULL;
     return;
 }
 
@@ -306,7 +316,6 @@ completeLuaQuery(struct LuaQuery *lua_query, unsigned output_count)
     assert(COMMAND_OUTPUT_COUNT == lua_query->output_count);
 
     lua_query->command_ready     = false;
-    lua_query->persist.ell       = NULL;
     lua_query->completion_signal = true;
 }
 
@@ -473,7 +482,7 @@ clearLuaQuery(struct LuaQuery *const lua_query)
     lua_query->command_ready        = false;
     lua_query->completion_signal    = false;
     lua_query->command              = -1;
-    lua_query->query                = false;
+    lua_query->query                = NULL;
     lua_query->thread               = NO_THREAD;
     lua_query->output_count         = -1;
 }
@@ -482,6 +491,8 @@ static bool
 newLuaQuery(struct LuaQuery *const lua_query,
             struct HostData *const host_data)
 {
+    memset(lua_query, sizeof(struct LuaQuery), 0);
+
     clearLuaQuery(lua_query);
 
     // persistent data should only be initialized at object creation
@@ -645,12 +656,12 @@ nilTheStackPlus(struct LuaQuery *const lua_query, int pushed)
 
 // taken from luasql-mysql
 void
-pushvalue(lua_State *const L, void *const row, long int len)
+pushvalue(lua_State *const L, const char *const string, long int len)
 {
-    if (row == NULL) {
+    if (string == NULL) {
         lua_pushnil(L);
     } else {
-        lua_pushlstring(L, row, len);
+        lua_pushlstring(L, string, len);
     }
 }
 
@@ -669,3 +680,4 @@ luaToCharp(lua_State *const L, int index)
     return p;
 }
 
+#include "threaded_query_tests.c"
