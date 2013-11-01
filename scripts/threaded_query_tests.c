@@ -242,14 +242,53 @@ test_stopAndStartLuaQueryThread(struct lua_State *const L)
 static int
 test_destroyLuaQuery(struct lua_State *const L)
 {
-    // stub: pita
+    struct HostData *host_data =
+        createHostData("something", "else", "isunderthebed!", 199);
+    assert(host_data);
+
+    struct LuaQuery *lua_query = createLuaQuery(&host_data);
+    assert(lua_query);
+
+    destroyLuaQuery(&lua_query);
+    assert(NULL == lua_query);
+
+    TEST_SUCCESS("test_destroyLuaQuery");
     return 0;
 }
 
 static int
 test_restartLuaQuery(struct lua_State *const L)
 {
-    // stub: pita
+    assert(MAX_RESTARTS > 0);
+
+    const char *const init_host     = "127.0.0.1";
+    const char *const init_user     = "where";
+    const char *const init_passwd   = "vacation?";
+    const unsigned int init_port    = 0x9999;
+
+    struct HostData *host_data =
+        createHostData(init_host, init_user, init_passwd, init_port);
+    assert(host_data);
+
+    struct LuaQuery *lua_query = createLuaQuery(&host_data);
+    assert(lua_query);
+
+    assert(restartLuaQueryThread(lua_query));
+    assert(false            == lua_query->command_ready);
+    assert(false            == lua_query->completion_signal);
+    assert(-1               == lua_query->command);
+    assert(NULL             == lua_query->query);
+    assert(-1               == lua_query->output_count);
+    assert(!strcmp(init_host, lua_query->persist.host_data->host));
+    assert(!strcmp(init_user, lua_query->persist.host_data->user));
+    assert(!strcmp(init_passwd, lua_query->persist.host_data->passwd));
+    assert(init_port        == lua_query->persist.host_data->port);
+    assert(1                == lua_query->persist.restarts);
+    assert(NULL             == lua_query->persist.ell);
+
+    assert(stopLuaQueryThread(lua_query));
+
+    TEST_SUCCESS("test_restartLuaQuery");
     return 0;
 }
 
@@ -289,6 +328,36 @@ test_zombie(struct lua_State *const L)
 static int
 test_createHostData(struct lua_State *const L)
 {
+    const char *const init_host     = "birdsandplains";
+    const char *const init_user     = "automobiles";
+    const char *const init_passwd   = "sendandreceive";
+    const unsigned int init_port    = 0x9898;
+
+    const struct HostData test_host_data = {
+        .host           = strdup(init_host),
+        .user           = strdup(init_user),
+        .passwd         = strdup(init_passwd),
+        .port           = init_port
+    };
+
+    struct HostData *const host_data =
+        createHostData(init_host, init_user, init_passwd, init_port);
+    assert(host_data);
+
+    assert(!strcmp(test_host_data.host, host_data->host));
+    assert(!strcmp(test_host_data.user, host_data->user));
+    assert(!strcmp(test_host_data.passwd, host_data->passwd));
+    assert(test_host_data.port == host_data->port);
+    assert(init_port           == host_data->port);
+
+    // make sure createHostData didn't mutate values it doesn't own
+    assert(init_host    != host_data->host);
+    assert(init_user    != host_data->user);
+    assert(init_passwd  != host_data->passwd);
+
+    assert(!strcmp(test_host_data.host, init_host));
+    assert(!strcmp(test_host_data.user, init_user));
+    assert(!strcmp(test_host_data.passwd, init_passwd));
 
     TEST_SUCCESS("test_createHostData");
     return 0;
@@ -297,8 +366,14 @@ test_createHostData(struct lua_State *const L)
 static int
 test_destroyHostData(struct lua_State *const L)
 {
+    struct HostData *host_data =
+        createHostData("some", "data", "willdo", 1005);
+    assert(host_data);
 
-    TEST_SUCCESS("test_createHostData");
+    destroyHostData(&host_data);
+    assert(NULL == host_data);
+
+    TEST_SUCCESS("test_destroyHostData");
     return 0;
 }
 
@@ -313,8 +388,11 @@ all(struct lua_State *const L)
     test_createLuaQuery(L);
     test_stopLuaQueryThread(L);
     test_stopAndStartLuaQueryThread(L);
-
+    test_destroyLuaQuery(L);
+    test_restartLuaQuery(L);
     test_zombie(L);
+    test_createHostData(L);
+    test_destroyHostData(L);
 
     return 0;
 }
