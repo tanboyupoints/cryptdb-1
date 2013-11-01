@@ -31,6 +31,7 @@
 #define MAX_RESTARTS            3
 #define COMMAND_OUTPUT_COUNT    2
 
+enum RESTART_STATUS {RESTARTED, ONLY_SANE_STOP, FUBAR};
 enum Command {QUERY, RESULTS, KILL};
 
 struct HostData {
@@ -63,7 +64,7 @@ struct LuaQuery {
     struct PersistentState persist;
 
     // QUERY parameter
-    const char *query;
+    const char *sql;
 
     // output
     unsigned int output_count;
@@ -79,7 +80,11 @@ static struct LuaQuery *createLuaQuery(struct HostData **p_host_data);
 static void destroyLuaQuery(struct LuaQuery **lua_query);
 static bool startLuaQueryThread(struct LuaQuery *const lua_query);
 static bool stopLuaQueryThread(struct LuaQuery *const lua_query);
-static bool restartLuaQueryThread(struct LuaQuery *lua_query);
+void clearLuaQuery(struct LuaQuery *const lua_query);
+void finishedCommandIssue(struct LuaQuery *const lua_query);
+void strangeFinishedCommandIssue(struct LuaQuery *const lua_query,
+                                 bool exit_status);
+static enum RESTART_STATUS restartLuaQueryThread(struct LuaQuery *lua_query);
 
 static bool zombie(struct LuaQuery *const lua_query);
 static void issueCommand(lua_State *L, enum Command command,
@@ -229,53 +234,60 @@ issueCommand(lua_State *const L, enum Command command,
 
     // handle result
     if (false == lua_query->completion_signal) {
-        // bad state because the thread might signal completion after
-        // we reset completion
+        // the worker thread did not complete the operation
+        // > a bad state because the thread might signal completion
+        // after we reset completion
 
+        // if we were trying to kill, issue a hard kill
+        // > if the hard kill fails, we can no longer effectively
+        // communicate with this thread. this is problematic because
+        // a rogue thread has a pointer to the lua_State.
         if (KILL == command) {
             if (false == stopLuaQueryThread(lua_query)) {
-                fprintf(stderr, "failed to stop thread after KILL failed");
+                fprintf(stderr, "panicing: failed to stop thread after"
+                                " KILL failed");
                 exit(0);
             }
 
-            lua_pushboolean(L, true);
-            nilTheStackPlus(lua_query, 1);
-
-            lua_query->persist.ell = NULL;
+            strangeFinishedCommandIssue(lua_query, true);
             return;
         }
 
         if (zombie(lua_query)) {
             fprintf(stderr, "zombie, no restart!\n");
-            lua_pushboolean(L, false);
-            lua_pushnil(L);
-
-            lua_query->persist.ell = NULL;
+            strangeFinishedCommandIssue(lua_query, false);
             return;
         }
 
         fprintf(stderr, "no completion signal, restarting!\n");
 
-        // we could handle cases where we at least stopped the thread.
-        if (false == restartLuaQueryThread(lua_query)) {
-            fprintf(stderr, "panic: failed to restart thread!\n");
-            exit(0);
+        const enum RESTART_STATUS rstatus =
+            restartLuaQueryThread(lua_query);
+        switch (rstatus) {
+            case RESTARTED:
+                // managed to get a replacement thread running
+            case ONLY_SANE_STOP:
+                // killed the original thread; but no replacement thread
+                assert(L        == lua_query->persist.ell);
+                assert(false    == lua_query->completion_signal);
+                assert(false    == lua_query->command_ready);
+
+                strangeFinishedCommandIssue(lua_query, false);
+                return;
+
+            case FUBAR:
+                // rogue thread has lua_State pointer
+            default:
+                fprintf(stderr, "panicing: rogue worker thread!\n");
+                exit(0);
         }
-
-        assert(false == lua_query->completion_signal
-               && false == lua_query->command_ready);
-
-        // return failure to the caller
-        lua_pushboolean(L, false);
-        nilTheStackPlus(lua_query, 1);
-
-        lua_query->persist.ell = NULL;
-        return;
     }
-    assert(false == lua_query->command_ready);
 
-    lua_query->completion_signal    = false;
-    lua_query->persist.ell          = NULL;
+    assert(L        == lua_query->persist.ell);
+    assert(true     == lua_query->completion_signal);
+    assert(false    == lua_query->command_ready);
+
+    finishedCommandIssue(lua_query);
     return;
 }
 
@@ -284,8 +296,8 @@ issueQuery(lua_State *const L, enum Command command,
            const char *const query, struct LuaQuery *lua_query,
            unsigned int wait)
 {
-    lua_query->query = strdup(query);
-    if (NULL == lua_query->query) {
+    lua_query->sql = strdup(query);
+    if (NULL == lua_query->sql) {
         perror("strdup failed!\n");
         return false;
     }
@@ -302,17 +314,26 @@ waitForCommand(struct LuaQuery *const lua_query)
     return;
 }
 
-void
-completeLuaQuery(struct LuaQuery *lua_query, unsigned output_count)
+static void
+freeSQL(struct LuaQuery *const lua_query)
 {
-    assert(true == lua_query->command_ready &&
-           false == lua_query->completion_signal);
-
-    assert(!!lua_query->query == !!(QUERY == lua_query->command));
-    if (lua_query->query) {
-        free((void *)lua_query->query);
-        lua_query->query = NULL;
+    assert(!!lua_query->sql == !!(QUERY == lua_query->command));
+    if (lua_query->sql) {
+        free((void *)lua_query->sql);
+        lua_query->sql = NULL;
     }
+}
+
+// commandHandler signals back that it has finished
+void
+completeLuaQuery(struct LuaQuery *const lua_query,
+                 unsigned output_count)
+{
+    assert(true     == lua_query->command_ready);
+    assert(false    == lua_query->completion_signal);
+    assert(lua_query->persist.ell);
+
+    freeSQL(lua_query);
 
     nilTheStackPlus(lua_query, output_count);
     assert(COMMAND_OUTPUT_COUNT == lua_query->output_count);
@@ -321,6 +342,36 @@ completeLuaQuery(struct LuaQuery *lua_query, unsigned output_count)
     lua_query->completion_signal = true;
 }
 
+// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+//    issueCommand puts things back to a neutral state
+// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+void
+finishedCommandIssue(struct LuaQuery *const lua_query)
+{
+    lua_query->command_ready        = false;
+    lua_query->completion_signal    = false;
+    lua_query->command              = -1;
+    lua_query->persist.ell          = NULL;
+}
+
+void
+strangeFinishedCommandIssue(struct LuaQuery *const lua_query,
+                            bool exit_status)
+{
+    // we may be in an abnormal state; as we likely came here after an
+    // asynch kill.
+    assert(lua_query->persist.ell);
+
+    freeSQL(lua_query);
+
+    lua_pushboolean(lua_query->persist.ell, exit_status);
+    nilTheStackPlus(lua_query, 1);
+    assert(COMMAND_OUTPUT_COUNT == lua_query->output_count);
+
+    finishedCommandIssue(lua_query);
+}
+
+// close the mysql connection if we receive an asynch kill order
 static void
 cleanup_handler(void *const mysql_conn)
 {
@@ -373,7 +424,7 @@ commandHandler(void *const lq)
             mysql_close(conn);
             return HAPPY_THREAD_EXIT;
         } else if (QUERY == lua_query->command) {
-            if (mysql_query(conn, lua_query->query)) {
+            if (mysql_query(conn, lua_query->sql)) {
                 assert(mysql_errno(conn));
                 lua_pushboolean(lua_query->persist.ell, false);
             } else {
@@ -478,13 +529,13 @@ destroyHostData(struct HostData **p_host_data)
 }
 
 // doesn't modify persistent data
-static void
+void
 clearLuaQuery(struct LuaQuery *const lua_query)
 {
     lua_query->command_ready        = false;
     lua_query->completion_signal    = false;
     lua_query->command              = -1;
-    lua_query->query                = NULL;
+    lua_query->sql                  = NULL;
     lua_query->thread               = NO_THREAD;
     lua_query->output_count         = -1;
 }
@@ -590,7 +641,7 @@ stopLuaQueryThread(struct LuaQuery *const lua_query)
     return true;
 }
 
-bool
+enum RESTART_STATUS
 restartLuaQueryThread(struct LuaQuery *lua_query)
 {
     assert(lua_query->persist.restarts < MAX_RESTARTS);
@@ -600,17 +651,17 @@ restartLuaQueryThread(struct LuaQuery *lua_query)
     // first stop the thread
     if (false == stopLuaQueryThread(lua_query)) {
         fprintf(stderr, "stopLuaQueryThread failed in restart!\n");
-        return false;
+        return FUBAR;
     }
 
     // then start a new one and reset state
     clearLuaQuery(lua_query);
     if (false == startLuaQueryThread(lua_query)) {
         fprintf(stderr, "startLuaQueryThread failed in restart!\n");
-        return false;
+        return ONLY_SANE_STOP;
     }
 
-    return true;
+    return RESTARTED;
 }
 
 static void
@@ -623,8 +674,8 @@ destroyLuaQuery(struct LuaQuery **lua_query)
         exit(0);
     }
 
-    if ((*lua_query)->query) {
-        free((char *)(*lua_query)->query);
+    if ((*lua_query)->sql) {
+        free((char *)(*lua_query)->sql);
     }
     destroyHostData((struct HostData **)&(*lua_query)->persist.host_data);
     free(*lua_query);
@@ -673,8 +724,7 @@ luaToCharp(lua_State *const L, int index)
     size_t length;
     const char *const p = lua_tolstring(L, index, &length);
     if (!p) {
-        fprintf(stderr, "lua_tolstring failed!\n");
-        exit(0);
+        return "";
     }
 
     assert(0 == p[length]);
