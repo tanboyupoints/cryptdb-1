@@ -4,6 +4,16 @@
 
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+//           Real Login Credentials
+// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+const char *const real_host         = "127.0.0.1";
+const char *const real_user         = "root";
+const char *const real_passwd       = "letmein";
+const unsigned int real_port        = 3306;
+
+// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 //            Simple Testing DSL
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -123,7 +133,8 @@ TEST(test_completeLuaQuery)
         .persist            = {
             .restarts           = init_restarts,
             .host_data          = init_host_data,
-            .ell                = L
+            .ell                = L,
+            .wait               = 1
         },
         .sql                = NULL,
         .output_count       = -1
@@ -157,7 +168,9 @@ TEST(test_newLuaQuery)
         .port       = init_port
     };
 
-    TEST_ASSERT(newLuaQuery(&lua_query, &host_data));
+    const unsigned int init_wait    = 1;
+
+    TEST_ASSERT(newLuaQuery(&lua_query, &host_data, init_wait));
 
     TEST_ASSERT(-1                   == lua_query.command);
     TEST_ASSERT(false                == lua_query.command_ready);
@@ -166,6 +179,7 @@ TEST(test_newLuaQuery)
     TEST_ASSERT(0                    == lua_query.persist.restarts);
     TEST_ASSERT(&host_data           == lua_query.persist.host_data);
     TEST_ASSERT(NULL                 == lua_query.persist.ell);
+    TEST_ASSERT(init_wait            == lua_query.persist.wait);
     TEST_ASSERT(NULL                 == lua_query.sql);
     TEST_ASSERT(-1                   == lua_query.output_count);
 
@@ -188,8 +202,10 @@ TEST(test_createLuaQuery)
     };
     const struct HostData *p_host_data = (struct HostData *)&host_data;
 
+    const unsigned int init_wait    = 1;
+
     struct LuaQuery *const lua_query =
-        createLuaQuery((struct HostData **)&p_host_data);
+        createLuaQuery((struct HostData **)&p_host_data, init_wait);
 
     TEST_ASSERT(lua_query);
     TEST_ASSERT(-1                   == lua_query->command);
@@ -199,14 +215,15 @@ TEST(test_createLuaQuery)
     TEST_ASSERT(0                    == lua_query->persist.restarts);
     TEST_ASSERT(&host_data           == lua_query->persist.host_data);
     TEST_ASSERT(NULL                 == lua_query->persist.ell);
+    TEST_ASSERT(init_wait            == lua_query->persist.wait);
     TEST_ASSERT(NULL                 == lua_query->sql);
     TEST_ASSERT(-1                   == lua_query->output_count);
 
-    TEST_ASSERT(NULL                 == p_host_data);
-    TEST_ASSERT(host_data.host       == lua_query->persist.host_data->host);
-    TEST_ASSERT(host_data.user       == lua_query->persist.host_data->user);
-    TEST_ASSERT(host_data.passwd     == lua_query->persist.host_data->passwd);
-    TEST_ASSERT(host_data.port       == lua_query->persist.host_data->port);
+    TEST_ASSERT(NULL              == p_host_data);
+    TEST_ASSERT(host_data.host    == lua_query->persist.host_data->host);
+    TEST_ASSERT(host_data.user    == lua_query->persist.host_data->user);
+    TEST_ASSERT(host_data.passwd  == lua_query->persist.host_data->passwd);
+    TEST_ASSERT(host_data.port    == lua_query->persist.host_data->port);
 
     TEST_ASSERT(stopLuaQueryThread(lua_query));
 END_TEST
@@ -217,8 +234,11 @@ TEST(test_stopLuaQueryThread)
     memcpy(&test_lua_query, &lua_query, sizeof(struct LuaQuery));
 
     test_lua_query.thread = lua_query.thread = (pthread_t)malloc(20);
+    test_lua_query.persist.wait = lua_query.persist.wait = 1;
+
     TEST_ASSERT(false == stopLuaQueryThread(&lua_query));
-    TEST_ASSERT(!memcmp(&lua_query, &test_lua_query, sizeof(struct LuaQuery)));
+    TEST_ASSERT(!memcmp(&lua_query, &test_lua_query,
+                        sizeof(struct LuaQuery)));
 END_TEST
 
 TEST(test_stopAndStartLuaQueryThread)
@@ -238,13 +258,19 @@ TEST(test_stopAndStartLuaQueryThread)
         .port       = init_port
     };
 
+    const unsigned int init_wait    = 1;
+
     lua_query.thread = NO_THREAD;
     test_lua_query.persist.host_data =
-        lua_query.persist.host_data =   &host_data;
+        lua_query.persist.host_data         = &host_data;
+    test_lua_query.persist.wait =
+        lua_query.persist.wait              = init_wait;
+
     TEST_ASSERT(startLuaQueryThread(&lua_query));
     TEST_ASSERT(stopLuaQueryThread(&lua_query));
     test_lua_query.thread = lua_query.thread;
-    TEST_ASSERT(!memcmp(&lua_query, &test_lua_query, sizeof(struct LuaQuery)));
+    TEST_ASSERT(!memcmp(&lua_query, &test_lua_query,
+                        sizeof(struct LuaQuery)));
 END_TEST
 
 TEST(test_destroyLuaQuery)
@@ -252,7 +278,8 @@ TEST(test_destroyLuaQuery)
         createHostData("something", "else", "isunderthebed!", 199);
     TEST_ASSERT(host_data);
 
-    struct LuaQuery *lua_query = createLuaQuery(&host_data);
+    const unsigned int init_wait = 1;
+    struct LuaQuery *lua_query = createLuaQuery(&host_data, init_wait);
     TEST_ASSERT(lua_query);
 
     destroyLuaQuery(&lua_query);
@@ -271,7 +298,8 @@ TEST(test_restartLuaQuery)
         createHostData(init_host, init_user, init_passwd, init_port);
     TEST_ASSERT(host_data);
 
-    struct LuaQuery *lua_query = createLuaQuery(&host_data);
+    const unsigned init_wait        = 1;
+    struct LuaQuery *lua_query = createLuaQuery(&host_data, init_wait);
     TEST_ASSERT(lua_query);
 
     TEST_ASSERT(RESTARTED == restartLuaQueryThread(lua_query));
@@ -282,10 +310,11 @@ TEST(test_restartLuaQuery)
     TEST_ASSERT(-1               == lua_query->output_count);
     TEST_ASSERT(!strcmp(init_host, lua_query->persist.host_data->host));
     TEST_ASSERT(!strcmp(init_user, lua_query->persist.host_data->user));
-    TEST_ASSERT(!strcmp(init_passwd, lua_query->persist.host_data->passwd));
+    TEST_ASSERT(!strcmp(init_passwd,lua_query->persist.host_data->passwd));
     TEST_ASSERT(init_port        == lua_query->persist.host_data->port);
     TEST_ASSERT(1                == lua_query->persist.restarts);
     TEST_ASSERT(NULL             == lua_query->persist.ell);
+    TEST_ASSERT(init_wait        == lua_query->persist.wait);
 
     TEST_ASSERT(stopLuaQueryThread(lua_query));
 END_TEST
@@ -302,7 +331,8 @@ TEST(test_fubarRestartLuaQuery)
         createHostData(init_host, init_user, init_passwd, init_port);
     TEST_ASSERT(host_data);
 
-    struct LuaQuery *lua_query = createLuaQuery(&host_data);
+    const unsigned int init_wait    = 1;
+    struct LuaQuery *lua_query = createLuaQuery(&host_data, init_wait);
     TEST_ASSERT(lua_query);
 
     // This should cause stopLuaQueryThread to fail.
@@ -333,27 +363,30 @@ TEST(test_badIssueCommand)
         createHostData(init_host, init_user, init_passwd, init_port);
     TEST_ASSERT(host_data);
 
-    struct LuaQuery *lua_query = createLuaQuery(&host_data);
+    const unsigned int init_wait    = 1;
+    struct LuaQuery *lua_query = createLuaQuery(&host_data, init_wait);
     TEST_ASSERT(lua_query);
 
     // soft kill should fail, then hard kill should succeed
     TEST_ASSERT(!pthread_create(&lua_query->thread, NULL, dummyThread,
                                 NULL));
-    issueCommand(L, KILL, lua_query, 1);
+    issueCommand(L, KILL, lua_query);
     TEST_ASSERT(true           == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
-    TEST_ASSERT(NULL                    == lua_query->persist.ell);
     TEST_ASSERT(false                   == lua_query->command_ready);
     TEST_ASSERT(false                   == lua_query->completion_signal);
     TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
+    TEST_ASSERT(NULL                    == lua_query->persist.ell);
+    TEST_ASSERT(init_wait               == lua_query->persist.wait);
 
     // test restart attempts
     size_t i = 0;
     for (; i < MAX_RESTARTS; ++i) {
-        issueCommand(L, QUERY, lua_query, 1);
+        issueCommand(L, QUERY, lua_query);
         TEST_ASSERT(false      == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
         TEST_ASSERT(NO_THREAD               != lua_query->thread);
         TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
         TEST_ASSERT(NULL                    == lua_query->persist.ell);
+        TEST_ASSERT(init_wait               == lua_query->persist.wait);
 
         TEST_ASSERT(stopLuaQueryThread(lua_query));
         TEST_ASSERT(NO_THREAD               == lua_query->thread);
@@ -363,30 +396,78 @@ TEST(test_badIssueCommand)
     }
 
     // test for sane zombie
-    lua_query->sql = strdup("wordly");
-    issueCommand(L, QUERY, lua_query, 1);
+    issueQuery(L, QUERY, strdup("worldly"), lua_query);
     TEST_ASSERT(false          == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
     TEST_ASSERT(NO_THREAD               == lua_query->thread)
     TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
     TEST_ASSERT(MAX_RESTARTS            == lua_query->persist.restarts);
     TEST_ASSERT(NULL                    == lua_query->persist.ell);
+    TEST_ASSERT(init_wait               == lua_query->persist.wait);
 
     TEST_ASSERT(stopLuaQueryThread(lua_query));
     TEST_ASSERT(NO_THREAD               == lua_query->thread)
     TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
     TEST_ASSERT(MAX_RESTARTS            == lua_query->persist.restarts);
 
-    issueCommand(L, KILL, lua_query, 1);
+    issueCommand(L, KILL, lua_query);
     TEST_ASSERT(true           == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
     TEST_ASSERT(NO_THREAD               == lua_query->thread);
     TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
     TEST_ASSERT(MAX_RESTARTS            == lua_query->persist.restarts);
     TEST_ASSERT(NULL                    == lua_query->persist.ell);
+    TEST_ASSERT(init_wait               == lua_query->persist.wait);
 
     TEST_ASSERT(!strcmp(init_host, lua_query->persist.host_data->host));
     TEST_ASSERT(!strcmp(init_user, lua_query->persist.host_data->user));
     TEST_ASSERT(!strcmp(init_passwd,lua_query->persist.host_data->passwd));
     TEST_ASSERT(init_port == lua_query->persist.host_data->port);
+END_TEST
+
+TEST(test_handleKilledQuery)
+    TEST_ASSERT(MAX_RESTARTS > 0)
+
+    const char *const init_host     = strdup("google.com");
+    const char *const init_user     = strdup(real_user);
+    const char *const init_passwd   = strdup(real_passwd);
+    const unsigned int init_port    = real_port;
+
+    struct HostData *bad_host_data =
+        createHostData(init_host, init_user, init_passwd, init_port);
+    TEST_ASSERT(bad_host_data);
+
+    const unsigned int init_wait    = 20;
+    struct LuaQuery *lua_query = createLuaQuery(&bad_host_data, init_wait);
+    TEST_ASSERT(lua_query);
+
+    issueQuery(L, QUERY, strdup("do 0"), lua_query);
+    TEST_ASSERT(false          == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
+    TEST_ASSERT(NO_THREAD               != lua_query->thread);
+    TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
+    TEST_ASSERT(1                       == lua_query->persist.restarts);
+    TEST_ASSERT(NULL                    == lua_query->persist.ell);
+    TEST_ASSERT(init_wait               == lua_query->persist.wait);
+
+    struct HostData *good_host_data =
+        createHostData(strdup(real_host), strdup(real_user),
+                       strdup(real_passwd), real_port);
+    TEST_ASSERT(good_host_data);
+    lua_query->persist.host_data = good_host_data;
+
+    issueCommand(L, RESULTS, lua_query);
+    TEST_ASSERT(false          == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
+    TEST_ASSERT(NO_THREAD               != lua_query->thread);
+    TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
+    TEST_ASSERT(1                       == lua_query->persist.restarts);
+    TEST_ASSERT(NULL                    == lua_query->persist.ell);
+    TEST_ASSERT(init_wait               == lua_query->persist.wait);
+
+    issueCommand(L, KILL, lua_query);
+    TEST_ASSERT(true          == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
+    TEST_ASSERT(NO_THREAD               != lua_query->thread);
+    TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
+    TEST_ASSERT(1                       == lua_query->persist.restarts);
+    TEST_ASSERT(NULL                    == lua_query->persist.ell);
+    TEST_ASSERT(init_wait               == lua_query->persist.wait);
 END_TEST
 
 TEST(test_zombie)
@@ -479,6 +560,7 @@ all(struct lua_State *const L)
     test_restartLuaQuery(L);
     test_fubarRestartLuaQuery(L);
     test_badIssueCommand(L);
+    test_handleKilledQuery(L);
     test_zombie(L);
     test_createHostData(L);
     test_destroyHostData(L);
