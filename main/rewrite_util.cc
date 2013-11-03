@@ -262,6 +262,20 @@ getOnionIndexTypes()
     return std::vector<onion>({oOPE, oDET, oPLAIN});
 }
 
+static std::string
+getOriginalKeyName(Key *const key)
+{
+    if (Key::PRIMARY == key->type) {
+        return "PRIMARY";
+    }
+
+    const std::string out_name = convert_lex_str(key->name);
+    TEST_TextMessageError(out_name.size() > 0,
+                          "Non-Primary keys can not have blank name!");
+
+    return out_name;
+}
+
 std::vector<Key *>
 rewrite_key(const TableMeta &tm, Key *const key, const Analysis &a)
 {
@@ -274,38 +288,34 @@ rewrite_key(const TableMeta &tm, Key *const key, const Analysis &a)
 
         // Set anonymous name.
         const std::string new_name =
-            a.getAnonIndexName(tm, convert_lex_str(key->name), o);
+            a.getAnonIndexName(tm, getOriginalKeyName(key), o);
         new_key->name = string_to_lex_str(new_name);
+        new_key->columns.empty();
 
         // Set anonymous columns.
-        const auto col_it =
-            List_iterator<Key_part_spec>(key->columns);
-        // HACK: Determine if we succeed in creating the INDEX on
-        // each onion.
-        bool fail = false;
-        new_key->columns =
-            accumList<Key_part_spec>(col_it,
-                [o, &tm, &a, &fail] (List<Key_part_spec> out_field_list,
-                                     Key_part_spec *const key_part)
-                {
-                    Key_part_spec *const new_key_part =
-                        copyWithTHD(key_part);
-                    const std::string field_name =
-                        convert_lex_str(new_key_part->field_name);
-                    const FieldMeta &fm = a.getFieldMeta(tm, field_name);
-                    const OnionMeta *const om = fm.getOnionMeta(o);
-                    if (NULL == om) {
-                        fail = true;
-                        return out_field_list;  /* lambda */
-                    }
+        auto col_it =
+            RiboldMYSQL::constList_iterator<Key_part_spec>(key->columns);
+        for (;;) {
+            const Key_part_spec *const key_part = col_it++;
+            if (NULL == key_part) {
+                output_keys.push_back(new_key);
+                break;
+            }
 
-                    new_key_part->field_name =
-                        string_to_lex_str(om->getAnonOnionName());
-                    out_field_list.push_back(new_key_part);
-                    return out_field_list; /* lambda */
-                });
-        if (false == fail) {
-            output_keys.push_back(new_key);
+            Key_part_spec *const new_key_part = copyWithTHD(key_part);
+            const std::string field_name =
+                convert_lex_str(new_key_part->field_name);
+            // > the onion may not exist; ie oPLAIN with SENSITIVE and not
+            // an AUTO INCREMENT column
+            const FieldMeta &fm = a.getFieldMeta(tm, field_name);
+            const OnionMeta *const om = fm.getOnionMeta(o);
+            if (NULL == om) {
+                break;
+            }
+
+            new_key_part->field_name =
+                string_to_lex_str(om->getAnonOnionName());
+            new_key->columns.push_back(new_key_part);
         }
     }
 
@@ -313,8 +323,6 @@ rewrite_key(const TableMeta &tm, Key *const key, const Analysis &a)
     if (Key::PRIMARY == key->type) {
         if (output_keys.size() > 0) {
             return std::vector<Key *>({output_keys.front()});
-        } else {
-            return std::vector<Key *>();
         }
     }
 

@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <string.h>
 #include <sys/fcntl.h>
 #include <crypto/prng.hh>
@@ -9,8 +8,8 @@ using namespace std;
 urandom::urandom()
     : f("/dev/urandom")
 {
-    if (f.fail())
-        thrower() << "cannot open /dev/urandom: " << strerror(errno);
+    throw_c(false == f.fail(),
+            "cannot open /dev/urandom: " + std::string(strerror(errno)));
 }
 
 void

@@ -10,10 +10,10 @@ class CreateTableHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
                                   const ProxyState &ps) const
     {
-        const std::string db_name =
+        const std::string &db_name =
             lex->select_lex.table_list.first->db;
         TEST_DatabaseDiscrepancy(db_name, a.getDatabaseName());
-        const std::string table =
+        const std::string &table =
             lex->select_lex.table_list.first->table_name;
         LEX *const new_lex = copyWithTHD(lex);
 
@@ -122,8 +122,24 @@ class AlterTableHandler : public DDLHandler {
                                   const ProxyState &ps) const
     {
         assert(sub_dispatcher->canDo(lex));
-        const AlterSubHandler &handler = sub_dispatcher->dispatch(lex);
-        return handler.transformLex(a, lex, ps);
+        const std::vector<AlterSubHandler *> &handlers =
+            sub_dispatcher->dispatch(lex);
+
+        LEX *new_lex = copyWithTHD(lex);
+
+        for (auto it : handlers) {
+            new_lex = it->transformLex(a, new_lex, ps);
+        }
+
+        // -----------------------------
+        //         Rewrite TABLE
+        // -----------------------------
+        // > Rewrite after doing the transformations as the handlers
+        // expect the original table name to be intact.
+        new_lex->select_lex.table_list =
+            rewrite_table_list(new_lex->select_lex.table_list, a, true);
+
+        return new_lex;
     }
 
     const std::unique_ptr<AlterDispatcher> sub_dispatcher;
@@ -136,7 +152,7 @@ class DropTableHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
                                   const ProxyState &ps) const
     {
-        LEX *final_lex = rewrite(a, lex, ps);
+        LEX *const final_lex = rewrite(a, lex, ps);
         update(a, lex, ps);
 
         return final_lex;
@@ -177,7 +193,7 @@ class CreateDBHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
                                   const ProxyState &ps) const
     {
-        const std::string dbname =
+        const std::string &dbname =
             convert_lex_str(lex->name);
         if (false == a.databaseMetaExists(dbname)) {
             std::unique_ptr<DatabaseMeta> dm(new DatabaseMeta());
@@ -199,6 +215,7 @@ class ChangeDBHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
                                   const ProxyState &ps) const
     {
+        a.no_change_meta_ddl = true;
         return copyWithTHD(lex);
     }
 };
@@ -207,9 +224,9 @@ class DropDBHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
                                   const ProxyState &ps) const
     {
-        const std::string dbname =
+        const std::string &dbname =
             convert_lex_str(lex->name);
-        DatabaseMeta &dm = a.getDatabaseMeta(dbname);
+        const DatabaseMeta &dm = a.getDatabaseMeta(dbname);
         a.deltas.push_back(std::unique_ptr<Delta>(
                                     new DeleteDelta(dm, a.getSchema())));
 

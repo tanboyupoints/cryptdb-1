@@ -538,7 +538,7 @@ rewrite_proj(const Item &i, const RewritePlan &rp, Analysis &a,
     AssignOnce<Item *> ir;
     if (i.type() == Item::Type::FIELD_ITEM) {
         const Item_field &field_i = static_cast<const Item_field &>(i);
-        const auto cached_rewritten_i = a.item_cache.find(&field_i);
+        const auto &cached_rewritten_i = a.item_cache.find(&field_i);
         if (cached_rewritten_i != a.item_cache.end()) {
             ir = cached_rewritten_i->second.first;
             olk = cached_rewritten_i->second.second;
@@ -559,9 +559,10 @@ rewrite_proj(const Item &i, const RewritePlan &rp, Analysis &a,
     addToReturn(&a.rmeta, a.pos++, olk.get(), use_salt, i.name);
 
     if (use_salt) {
-        const std::string anon_table_name =
+        // HACK: 'ir' doesn't have to be an Item_field
+        const std::string &anon_table_name =
             static_cast<Item_field *>(ir.get())->table_name;
-        const std::string anon_field_name = olk.get().key->getSaltName();
+        const std::string &anon_field_name = olk.get().key->getSaltName();
         Item_field *const ir_field =
             make_item_field(*static_cast<Item_field *>(ir.get()),
                             anon_table_name, anon_field_name);
@@ -721,7 +722,7 @@ doPairRewrite(FieldMeta &fm, const EncSet &es,
         constGetAssert(a.rewritePlans, &value_item);
 
     for (auto pair : es.osl) {
-        const OLK olk = {pair.first, pair.second.first, &fm};
+        const OLK &olk = {pair.first, pair.second.first, &fm};
 
         Item *const re_field =
             itemTypes.do_rewrite(field_item, olk, *field_rp, a);
@@ -805,7 +806,7 @@ handleUpdateType(SIMPLE_UPDATE_TYPE update_type, const EncSet &es,
                 {
                     const Item_insert_value &insert_value_item =
                        static_cast<const Item_insert_value &>(value_item);
-                    const std::string anon_table_name =
+                    const std::string &anon_table_name =
                         rew_fd.table_name;
                     Item_field *const res_field =
                         make_item_field(rew_fd, anon_table_name,
@@ -819,8 +820,7 @@ handleUpdateType(SIMPLE_UPDATE_TYPE update_type, const EncSet &es,
 
         case SIMPLE_UPDATE_TYPE::UNSUPPORTED:
         default :
-            TEST_TextMessageError(false,
-                                  "UNSUPPORTED or UNRECOGNIZED"
+            FAIL_TextMessageError("UNSUPPORTED or UNRECOGNIZED"
                                   " SIMPLE_UPDATE_TYPE!");
     }
 
@@ -831,7 +831,7 @@ handleUpdateType(SIMPLE_UPDATE_TYPE update_type, const EncSet &es,
 SQLDispatcher *buildDMLDispatcher()
 {
     DMLHandler *h;
-    SQLDispatcher *dispatcher = new SQLDispatcher();
+    SQLDispatcher *const dispatcher = new SQLDispatcher();
 
     h = new InsertHandler();
     dispatcher->addHandler(SQLCOM_INSERT, h);

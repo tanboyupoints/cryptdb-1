@@ -32,11 +32,11 @@ def get_pkgs
 
     pkg_shell = ShellDoer.new("~")
     pkg_shell.>(%q{
-        apt-get install liblua5.1-0-dev libntl-dev        \
-                libmysqlclient-dev libssl-dev libbsd-dev  \
-                libevent-dev libglib2.0-dev libgmp-dev    \
-                mysql-server libaio-dev automake          \
-                gtk-doc-tools flex cmake libncurses5-dev  \
+        sudo apt-get install gawk liblua5.1-0-dev libntl-dev         \
+                libmysqlclient-dev libssl-dev libbsd-dev        \
+                libevent-dev libglib2.0-dev libgmp-dev          \
+                mysql-server libaio-dev automake                \
+                gtk-doc-tools flex cmake libncurses5-dev        \
                 bison g++ make
     })
 end
@@ -139,7 +139,9 @@ def fn(cdb_path, in_make_v=nil, in_gcc_v=nil)
     end
     cryptdb_shell.>("make clean")
     cryptdb_shell.>("make")
+    cryptdb_shell.>("service mysql stop", true)
     cryptdb_shell.>("make install")
+    cryptdb_shell.>("service mysql start")
 
     shadow_path = File.join(cryptdb_path, SHADOW_NAME)
     cryptdb_shell.>("rm -rf #{shadow_path}")
@@ -154,14 +156,14 @@ class ShellDoer
         @dir = dir
     end
 
-    def >(cmd)
-        pretty_execute(cmd)
+    def >(cmd, ignore=false)
+        pretty_execute(cmd, ignore)
     end
 
     private
-    def pretty_execute(cmd)
-        %x(cd #{@dir} && #{cmd} 1>&2)
-        if $?.exitstatus != 0
+    def pretty_execute(cmd, ignore)
+        %x(cd #{@dir} && #{cmd.strip} 1>&2)
+        if $?.exitstatus != 0 && false == ignore
             fail "`#{cmd}` failed".red.bold
         end
     end
@@ -269,3 +271,4 @@ get_pkgs()
 fn(ARGV[0], ARGV[1], ARGV[2])
 
 
+#TODO: add restart of Mysql server after UDF updates

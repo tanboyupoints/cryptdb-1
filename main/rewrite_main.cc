@@ -106,7 +106,7 @@ sanityCheck(FieldMeta &fm)
 static bool
 sanityCheck(TableMeta &tm)
 {
-    for (auto it = tm.children.begin() : tm.children) {
+    for (auto it = tm.children.begin(); it != tm.children.end(); it++) {
         const std::unique_ptr<FieldMeta> &fm = (*it).second;
         assert(sanityCheck(*fm.get()));
     }
@@ -298,7 +298,6 @@ fixAdjustOnion(const std::unique_ptr<Connect> &conn,
 
         return finishQuery(e_conn, unfinished_id);
     }
-
 }
 
 /*
@@ -1312,6 +1311,12 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         // HACK.
         const std::string &original_query =
             lex->sql_command != SQLCOM_LOCK_TABLES ? query : "do 0";
+
+        // Optimization so we don't load *Meta if it doesn't change.
+        // > ie, USE <database>.
+        if (true == a.no_change_meta_ddl) {
+            return new DMLOutput(original_query, lex_to_query(out_lex));
+        }
 
         return new DDLOutput(original_query, lex_to_query(out_lex),
                              std::move(a.deltas));

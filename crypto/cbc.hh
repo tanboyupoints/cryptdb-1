@@ -23,9 +23,9 @@ cbc_encrypt(const BlockCipher *c,
             const std::string &ptext,
             std::string *ctext)
 {
-    assert(ivec.size() == BlockCipher::blocksize);
+    throw_c(ivec.size() == BlockCipher::blocksize);
     size_t ptsize = ptext.size();
-    assert(ptsize >= BlockCipher::blocksize);
+    throw_c(ptsize >= BlockCipher::blocksize);
     ctext->resize(ptsize);
 
     const uint8_t *iv = (const uint8_t*) ivec.data();
@@ -65,9 +65,9 @@ cbc_decrypt(const BlockCipher *c,
             const std::string &ctext,
             std::string *ptext)
 {
-    assert(ivec.size() == BlockCipher::blocksize);
+    throw_c(ivec.size() == BlockCipher::blocksize);
     size_t ctsize = ctext.size();
-    assert(ctsize >= BlockCipher::blocksize);
+    throw_c(ctsize >= BlockCipher::blocksize);
     ptext->resize(ctsize);
 
     const uint8_t *iv = (const uint8_t*) ivec.data();

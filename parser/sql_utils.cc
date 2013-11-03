@@ -1,5 +1,6 @@
 #include <parser/sql_utils.hh>
 #include <parser/lex_util.hh>
+#include <mysql.h>
 
 
 

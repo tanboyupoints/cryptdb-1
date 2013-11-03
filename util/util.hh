@@ -81,21 +81,6 @@ const std::set<std::string> annotations =
 
 // ============= DATA STRUCTURES ===================================//
 
-#if MYSQL_S
-#include "mysql.h"
-typedef MYSQL_RES DBResult_native;
-#else
-#include "libpq-fe.h"
-typedef PGresult DBResult_native;
-#endif
-
-
-
-typedef struct AutoInc {
-    AutoInc(std::string fieldval=""):incvalue(0), field(fieldval) {}
-    my_ulonglong incvalue;
-    std::string field;
-} AutoInc;
 
 const std::string BASE_SALT_NAME = "cdb_salt";
 typedef uint64_t salt_type;
@@ -191,9 +176,6 @@ typedef struct TempMKM {
 } TMKM;
 
 //=============  Useful functions =========================//
-
-bool
-IsMySQLTypeNumeric(enum_field_types t);
 
 // extracts (nobytes) bytes from int by placing the most significant bits at
 // the end
@@ -355,20 +337,6 @@ std::string strFromVal(uint32_t x);
 uint64_t valFromStr(const std::string & str);
 
 
-//marshalls a binary value into characters readable by Postgres
-std::string marshallBinary(const std::string &s);
-/*
-std::string  marshallSalt(const std::string & s);
-std::string unmarshallSalt(const std::string & s);
-*/
-
-
-// unmarshalls a char * received from Postgres into a binary and
-// sets newlen to the length of the result..
-// marshall and unmarshallBinary are not inverses of each other.
-// XXX why not?
-std::string unmarshallBinary(const std::string &s);
-
 void consolidate(std::list<std::string> & words);
 
 
@@ -454,6 +422,11 @@ class Timer {
 
 template <typename T>
 class AssignOnce {
+private:
+    AssignOnce(const AssignOnce &other) = delete;
+    AssignOnce(AssignOnce &&other) = delete;
+    AssignOnce &operator=(AssignOnce &&other) = delete;
+
 public:
     AssignOnce() : frozen(false) {}
     ~AssignOnce() {;}
@@ -481,8 +454,36 @@ public:
 private:
     T value;
     bool frozen;
+};
 
-    AssignOnce(const AssignOnce &other);
+template <typename T>
+class AssignFirst {
+private:
+    AssignFirst(const AssignFirst &other) = delete;
+    AssignFirst(AssignFirst &&other) = delete;
+    AssignFirst &operator=(AssignFirst &&other) = delete;
+
+public:
+    AssignFirst() : assigned(false) {}
+    ~AssignFirst() {}
+    const AssignFirst &operator=(T value) {
+        this->value = value;
+        this->assigned = true;
+
+        return *this;
+    }
+
+    const T get() const {
+        if (false == this->assigned) {
+            throw CryptDBError("First assign to AssignFirst object!");
+        }
+
+        return this->value;
+    }
+
+private:
+    T value;
+    bool assigned;
 };
 
 template <typename T>

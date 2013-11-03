@@ -1,5 +1,6 @@
 #include <main/CryptoHandlers.hh>
 #include <main/macro_util.hh>
+#include <main/schema.hh>
 #include <parser/lex_util.hh>
 #include <crypto/ope.hh>
 #include <crypto/BasicCrypto.hh>
@@ -227,10 +228,11 @@ std::string prng_expand(const std::string &seed_key, uint key_bytes)
 // returns the length of output by AES encryption of a string of given type
 // and len
 static
-std::pair<enum enum_field_types, int>
-type_len_for_AES_str(enum enum_field_types type, int len, bool pad)
+std::pair<enum enum_field_types, unsigned long>
+type_len_for_AES_str(enum enum_field_types type, unsigned long len,
+                     bool pad)
 {
-    int res_len = -1;
+    unsigned long res_len = len;
     enum enum_field_types res_type = type;
 
     switch (type) {
@@ -247,7 +249,10 @@ type_len_for_AES_str(enum enum_field_types type, int len, bool pad)
         case MYSQL_TYPE_TIME:
         case MYSQL_TYPE_DATETIME:
             res_type = MYSQL_TYPE_VARCHAR;
-            res_len = rounded_len(len, AES_BLOCK_BYTES, pad);
+            TEST_TextMessageError(rounded_len(len, AES_BLOCK_BYTES, pad,
+                                              &res_len),
+                                  "The field you are trying to create is"
+                                  " too large!");
             break;
         default: {
             const std::string t =
@@ -262,16 +267,15 @@ type_len_for_AES_str(enum enum_field_types type, int len, bool pad)
 
 //TODO: remove above newcreatefield
 static Create_field*
-createFieldHelper(const Create_field * const f, int field_length,
+createFieldHelper(const Create_field * const f,
+                  unsigned long field_length,
                   enum enum_field_types type,
                   const std::string &anonname = "",
                   CHARSET_INFO * const charset = NULL)
 {
     const THD * const thd = current_thd;
     Create_field * const f0 = f->clone(thd->mem_root);
-    if (field_length != -1) {
-        f0->length = field_length;
-    }
+    f0->length = field_length;
     f0->sql_type = type;
 
     if (charset != NULL) {
@@ -421,7 +425,7 @@ RND_int::decrypt(Item * const ctext, uint64_t IV) const
 }
 
 static udf_func u_decRNDInt = {
-    LEXSTRING("decrypt_int_sem"),
+    LEXSTRING("cryptdb_decrypt_int_sem"),
     INT_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -475,7 +479,7 @@ RND_str::newCreateField(const Create_field * const cf,
                         const std::string &anonname) const
 {
     auto typelen = type_len_for_AES_str(cf->sql_type, cf->length, false);
-  
+
     return createFieldHelper(cf, typelen.second, typelen.first,
                              anonname, &my_charset_bin);
 }
@@ -486,7 +490,7 @@ RND_str::encrypt(const Item &ptext, uint64_t IV) const
     const std::string enc =
         encrypt_AES_CBC(ItemToString(ptext), enckey,
                         BytesFromInt(IV, SALT_LEN_BYTES), false);
-    
+
     LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV "
               << IV << "--->" << "len of enc " << enc.length()
               << " enc " << enc;
@@ -514,7 +518,7 @@ RND_str::decrypt(Item * const ctext, uint64_t IV) const
 
 //TODO; make edb.cc udf naming consistent with these handlers
 static udf_func u_decRNDString = {
-    LEXSTRING("decrypt_text_sem"),
+    LEXSTRING("cryptdb_decrypt_text_sem"),
     STRING_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -610,7 +614,7 @@ public:
 };
 
 static udf_func u_decDETInt = {
-    LEXSTRING("decrypt_int_det"),
+    LEXSTRING("cryptdb_decrypt_int_det"),
     INT_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -945,7 +949,7 @@ DET_str::decrypt(Item * const ctext, uint64_t IV) const
 }
 
 static udf_func u_decDETStr = {
-    LEXSTRING("decrypt_text_det"),
+    LEXSTRING("cryptdb_decrypt_text_det"),
     STRING_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -1302,7 +1306,8 @@ Create_field *
 OPE_int::newCreateField(const Create_field * const cf,
                         const std::string &anonname) const
 {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname);
+    return createFieldHelper(cf, cf->length, MYSQL_TYPE_LONGLONG,
+                             anonname);
 }
 
 Item *
@@ -1345,8 +1350,8 @@ Create_field *
 OPE_str::newCreateField(const Create_field * const cf,
                         const std::string &anonname) const
 {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_LONGLONG, anonname,
-                             &my_charset_bin);
+    return createFieldHelper(cf, cf->length, MYSQL_TYPE_LONGLONG,
+                             anonname, &my_charset_bin);
 }
 
 /*
@@ -1550,20 +1555,12 @@ HOM_dec::decrypt(Item * const ctext, uint64_t IV) const
 
 
 HOM::HOM(Create_field * const f, const std::string &seed_key)
-    : seed_key(seed_key)
-{
-    const std::unique_ptr<streamrng<arc4>>
-        prng(new streamrng<arc4>(seed_key));
-    sk = new Paillier_priv(Paillier_priv::keygen(prng.get(), nbits));
-}
+    : seed_key(seed_key), sk(NULL), waiting(true)
+{}
 
 HOM::HOM(unsigned int id, const std::string &serial)
-    : EncLayer(id), seed_key(serial)
-{
-    const std::unique_ptr<streamrng<arc4>>
-        prng(new streamrng<arc4>(seed_key));
-    sk = new Paillier_priv(Paillier_priv::keygen(prng.get(), nbits));
-}
+    : EncLayer(id), seed_key(serial), sk(NULL), waiting(true)
+{}
 
 Create_field *
 HOM::newCreateField(const Create_field * const cf,
@@ -1573,10 +1570,22 @@ HOM::newCreateField(const Create_field * const cf,
                              anonname, &my_charset_bin);
 }
 
+void
+HOM::unwait() const
+{
+    const std::unique_ptr<streamrng<arc4>>
+        prng(new streamrng<arc4>(seed_key));
+    sk = new Paillier_priv(Paillier_priv::keygen(prng.get(), nbits));
+    waiting = false;
+}
 
 Item *
 HOM::encrypt(const Item &ptext, uint64_t IV) const
 {
+    if (true == waiting) {
+        this->unwait();
+    }
+
     const ZZ enc = sk->encrypt(ItemIntToZZ(ptext));
     return ZZToItemStr(enc);
 }
@@ -1584,6 +1593,10 @@ HOM::encrypt(const Item &ptext, uint64_t IV) const
 Item *
 HOM::decrypt(Item * const ctext, uint64_t IV) const
 {
+    if (true == waiting) {
+        this->unwait();
+    }
+
     const ZZ enc = ItemStrToZZ(ctext);
     const ZZ dec = sk->decrypt(enc);
     LOG(encl) << "HOM ciph " << enc << "---->" << dec;
@@ -1591,7 +1604,7 @@ HOM::decrypt(Item * const ctext, uint64_t IV) const
 }
 
 static udf_func u_sum_a = {
-    LEXSTRING("agg"),
+    LEXSTRING("cryptdb_agg"),
     STRING_RESULT,
     UDFTYPE_AGGREGATE,
     NULL,
@@ -1605,7 +1618,7 @@ static udf_func u_sum_a = {
 };
 
 static udf_func u_sum_f = {
-    LEXSTRING("func_add_set"),
+    LEXSTRING("cryptdb_func_add_set"),
     STRING_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -1621,6 +1634,10 @@ static udf_func u_sum_f = {
 Item *
 HOM::sumUDA(Item *const expr) const
 {
+    if (true == waiting) {
+        this->unwait();
+    }
+
     List<Item> l;
     l.push_back(expr);
     l.push_back(ZZToItemStr(sk->hompubkey()));
@@ -1630,6 +1647,10 @@ HOM::sumUDA(Item *const expr) const
 Item *
 HOM::sumUDF(Item *const i1, Item *const i2) const
 {
+    if (true == waiting) {
+        this->unwait();
+    }
+
     List<Item> l;
     l.push_back(i1);
     l.push_back(i2);
@@ -1656,7 +1677,7 @@ Create_field *
 Search::newCreateField(const Create_field * const cf,
                        const std::string &anonname) const
 {
-    return createFieldHelper(cf, -1, MYSQL_TYPE_BLOB, anonname,
+    return createFieldHelper(cf, cf->length, MYSQL_TYPE_BLOB, anonname,
                              &my_charset_bin);
 }
 
@@ -1749,7 +1770,7 @@ Search::decrypt(Item * const ctext, uint64_t IV) const
 }
 
 static udf_func u_search = {
-    LEXSTRING("searchSWP"),
+    LEXSTRING("cryptdb_searchSWP"),
     INT_RESULT,
     UDFTYPE_FUNCTION,
     NULL,
@@ -1839,6 +1860,20 @@ PlainText::doSerialize() const
     return std::string("");
 }
 
+static udf_func u_cryptdb_version = {
+    LEXSTRING("cryptdb_version"),
+    STRING_RESULT,
+    UDFTYPE_FUNCTION,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0L,
+};
+
 const std::vector<udf_func*> udf_list = {
     &u_decRNDInt,
     &u_decRNDString,
@@ -1846,6 +1881,7 @@ const std::vector<udf_func*> udf_list = {
     &u_decDETStr,
     &u_sum_f,
     &u_sum_a,
-    &u_search
+    &u_search,
+    &u_cryptdb_version
 };
 

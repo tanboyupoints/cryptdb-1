@@ -13,7 +13,7 @@ class Dispatcher {
 public:
     virtual ~Dispatcher() {}
 
-    bool addHandler(long long cmd, FetchMe *h) {
+    bool addHandler(long long cmd, FetchMe *const h) {
         if (NULL == h) {
             return false;
         }
@@ -27,30 +27,24 @@ public:
         return true;
     }
 
-    bool canDo(Input lex) const {
-        return handlers.end() != handlers.find(extract(lex));
-    }
+    virtual bool canDo(LEX *const lex) const = 0;
 
-    const FetchMe &dispatch(Input lex) const {
-        auto it = handlers.find(extract(lex));
-        assert(handlers.end() != it);
-
-        assert(it->second);
-        return *it->second;
-    }
-
+protected:
     std::map<long long, std::unique_ptr<FetchMe>> handlers;
-
-private:
-    virtual long long extract(Input lex) const = 0;
 };
 
 class SQLDispatcher : public Dispatcher<LEX*, SQLHandler> {
-    virtual long long extract(LEX* lex) const;
+public:
+    bool canDo(LEX *const lex) const;
+    const SQLHandler &dispatch(LEX *const lex) const;
+
+private:
+    virtual long long extract(LEX *const lex) const;
 };
 
 class AlterDispatcher : public Dispatcher<LEX*, AlterSubHandler> {
-    virtual long long extract(LEX* lex) const;
-    long calculateMask() const;
+public:
+    std::vector<AlterSubHandler *> dispatch(LEX *const lex) const;
+    bool canDo(LEX *const lex) const;
 };
 

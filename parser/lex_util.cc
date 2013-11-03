@@ -38,7 +38,7 @@ dup_item(const Item_func &i)
             return new (current_thd->mem_root)
                 Item_func_neg(i.arguments()[0]);
         default:
-            throw CryptDBError("Can't clone function type: " + i.type());
+            cryptdb_err() << "Can't clone function type: " << i.type();
     }
 }
 
@@ -48,6 +48,14 @@ dup_item(const Item_decimal &i)
     assert(i.type() == Item::Type::DECIMAL_ITEM);
     // FIXME: Memleak, should be allocated on THD.
     return static_cast<Item_decimal *>(const_cast<Item_decimal &>(i).clone_item());
+}
+
+Item_float *
+dup_item(const Item_float &i)
+{
+    assert(i.type() == Item::Type::REAL_ITEM);
+    return new (current_thd->mem_root) Item_float(i.name, i.value,
+                                                i.decimals, i.max_length);
 }
 
 Item *
@@ -64,6 +72,9 @@ dup_item(const Item &i)
             return dup_item(static_cast<const Item_func &>(i));
         case Item::Type::DECIMAL_ITEM:
             return dup_item(static_cast<const Item_decimal &>(i));
+        case Item::Type::REAL_ITEM:
+            assert(i.field_type() == MYSQL_TYPE_DOUBLE);
+            return dup_item(static_cast<const Item_float &>(i));
         default:
             throw CryptDBError("Unable to clone: " +
                                std::to_string(i.type()));

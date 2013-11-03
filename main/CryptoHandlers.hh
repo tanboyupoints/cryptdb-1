@@ -111,9 +111,14 @@ public:
 protected:
     std::string const seed_key;
     static const uint nbits = 1024;
-    Paillier_priv * sk;
+    mutable Paillier_priv * sk;
 
     ~HOM();
+
+private:
+    void unwait() const;
+
+    mutable bool waiting;
 };
 
 class Search : public EncLayer {

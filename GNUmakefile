@@ -1,6 +1,7 @@
 OBJDIR	 := obj
 TOP	 := $(shell echo $${PWD-`pwd`})
 CXX	 := g++
+AR	 := ar
 ## -g -O0 -> -O2
 CXXFLAGS := -g -O0 -fno-strict-aliasing -fno-rtti -fwrapv -fPIC \
 	    -Wall -Werror -Wpointer-arith -Wendif-labels -Wformat=2  \
@@ -8,14 +9,15 @@ CXXFLAGS := -g -O0 -fno-strict-aliasing -fno-rtti -fwrapv -fPIC \
 	    -Wno-deprecated \
 	    -Wmissing-declarations -Woverloaded-virtual  \
 	    -Wunreachable-code -D_GNU_SOURCE -std=c++0x -I$(TOP)
-LDFLAGS	 := -lz -llua5.1 -lcrypto -lntl \
-	    -L$(TOP)/$(OBJDIR) -Wl,-rpath=$(TOP)/$(OBJDIR) -Wl,-rpath=$(TOP)
-# Use this flag if you need to root out undefined reference problems
-# occuring at runtime.
-# -Wl,--no-undefined
+LDFLAGS  := -L$(TOP)/$(OBJDIR) -Wl,--no-undefined
 
 ## Copy conf/config.mk.sample to conf/config.mk and adjust accordingly.
 include conf/config.mk
+
+## Use RPATH only for debug builds; set RPATH=1 in config.mk.
+ifeq ($(RPATH),1)
+LDRPATH	 := -Wl,-rpath=$(TOP)/$(OBJDIR) -Wl,-rpath=$(TOP)
+endif
 
 CXXFLAGS += -I$(MYBUILD)/include \
 	    -I$(MYSRC)/include \
@@ -48,6 +50,9 @@ doc:
 whitespace:
 	find . -name '*.cc' -o -name '*.hh' -type f -exec sed -i 's/ *$//' '{}' ';'
 
+.PHONY: always
+always:
+
 # Eliminate default suffix rules
 .SUFFIXES:
 
@@ -61,6 +66,10 @@ $(OBJDIR)/%.o: %.cc
 	@mkdir -p $(@D)
 	$(CXX) -MD $(CXXFLAGS) -c $< -o $@
 
+$(OBJDIR)/%.o: $(OBJDIR)/%.cc
+	@mkdir -p $(@D)
+	$(CXX) -MD $(CXXFLAGS) -c $< -o $@
+
 include crypto/Makefrag
 include parser/Makefrag
 include main/Makefrag
@@ -70,6 +79,7 @@ include udf/Makefrag
 include mysqlproxy/Makefrag
 include tools/import/Makefrag
 include tools/learn/Makefrag
+include scripts/Makefrag
 
 $(OBJDIR)/.deps: $(foreach dir, $(OBJDIRS), $(wildcard $(OBJDIR)/$(dir)/*.d))
 	@mkdir -p $(@D)

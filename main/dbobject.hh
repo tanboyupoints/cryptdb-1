@@ -212,5 +212,5 @@ public:
     std::map<KeyType, std::unique_ptr<ChildType>> children;
 };
 
-#include <dbobject.tt>
+#include <main/dbobject.tt>
 

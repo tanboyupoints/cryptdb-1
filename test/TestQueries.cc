@@ -605,6 +605,9 @@ static QueryList Null = QueryList("Null",
         // Query Fail
         //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_null (username, password) VALUES ('alice', 'secretA')"),
         Query("INSERT INTO u_null VALUES (1, 'alice')"),
+        Query("INSERT INTO u_null VALUES (), ()"),
+        Query("INSERT INTO u_null VALUES (2, 'somewhere'), (3, 'cookies')"),
+
         Query("INSERT INTO test_null (uid, age) VALUES (1, 20)"),
         Query("SELECT * FROM test_null"),
         Query("INSERT INTO test_null (uid, address) VALUES (1, 'somewhere over the rainbow')"),
@@ -627,7 +630,19 @@ static QueryList Null = QueryList("Null",
         Query("SELECT * FROM test_null"),
         Query("SELECT * FROM test_null WHERE address = 'cookies'"),
         Query("SELECT * FROM test_null WHERE address < 'amber'"),
-        Query("SELECT * FROM test_null WHERE address LIKE 'aaron'")},
+        Query("SELECT * FROM test_null WHERE address LIKE 'aaron'"),
+        Query("SELECT * FROM test_null LEFT JOIN u_null"
+              "    ON test_null.uid = u_null.uid"),
+        Query("SELECT * FROM test_null, u_null"),
+        Query("SELECT * FROM test_null RIGHT JOIN u_null"
+              "    ON test_null.uid = u_null.uid"),
+        Query("SELECT * FROM test_null, u_null"),
+        Query("SELECT * FROM test_null RIGHT JOIN u_null"
+              "    ON test_null.address = u_null.username"),
+        Query("SELECT * FROM test_null, u_null"),
+        Query("SELECT * FROM test_null LEFT JOIN u_null"
+              "    ON u_null.username = test_null.address"),
+        Query("SELECT * FROM test_null, u_null")},
     { Query("DROP TABLE test_null"),
       Query("DROP TABLE u_null"),
       Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_null") },
@@ -885,6 +900,71 @@ static QueryList TableAliases = QueryList("TableAliases",
       Query("DROP TABLE mercury"),
       Query("DROP TABLE moon")});
 
+static QueryList DDL = QueryList("DDL",
+    { Query("CREATE TABLE ddl_test (a integer, b integer, c integer)")},
+    { Query("CREATE TABLE ddl_test (a integer, b integer, c integer)")},
+    { Query("INSERT INTO ddl_test VALUES (1, 2, 3)"),
+      Query("SELECT * FROM ddl_test"),
+      Query("ALTER TABLE ddl_test DROP COLUMN a"),
+      Query("SELECT * FROM ddl_test"),
+      Query("ALTER TABLE ddl_test ADD COLUMN a integer"),
+      Query("SELECT * FROM ddl_test"),
+      Query("INSERT INTO ddl_test VALUES (3, 4, 5), (5, 6, 7),(7, 8, 9)"),
+      Query("SELECT * FROM ddl_test"),
+      Query("ALTER TABLE ddl_test DROP COLUMN b, DROP COLUMN c"),
+      Query("SELECT * FROM ddl_test"),
+      Query("ALTER TABLE ddl_test ADD COLUMN b integer, DROP COLUMN a,"
+            "                     ADD COLUMN c integer"),
+      Query("INSERT INTO ddl_test VALUES (15, '1212'), (20, '7676')"),
+      Query("SELECT * FROM ddl_test"),
+      Query("DELETE FROM ddl_test"),
+      Query("INSERT INTO ddl_test VALUES (12, 15), (44, 14), (19, 5)"),
+      Query("ALTER TABLE ddl_test ADD PRIMARY KEY(b)"),
+      Query("SELECT * FROM ddl_test"),
+      Query("ALTER TABLE ddl_test DROP PRIMARY KEY,"
+            "                     ADD PRIMARY KEY(b)"),
+      Query("SELECT * FROM ddl_test"),
+      Query("ALTER TABLE ddl_test ADD INDEX j(b), ADD INDEX k(b, c)"),
+      Query("SELECT * FROM ddl_test"),
+      Query("ALTER TABLE ddl_test DROP INDEX j, DROP INDEX k,"
+            "                     ADD INDEX j(b), ADD INDEX k(b, c)"),
+      Query("SELECT * FROM ddl_test")},
+    { Query("DROP TABLE ddl_test")},
+    { Query("DROP TABLE ddl_test")});
+
+// the oDET column will encrypt three times and two of these will pad;
+// the maximum field size if 2**32 - 1; so the maximum field size
+// we support is 2**32 - 1 - (2 * AES_BLOCK_BYTES)
+static QueryList MiscBugs = QueryList("MiscBugs",
+    { Query("CREATE TABLE crawlies (purple VARCHAR(4294967263),"
+            "                       pink VARCHAR(0))"),
+      Query("CREATE TABLE enums (x enum('this', 'that'))"),
+      Query("CREATE TABLE bugs (spider TEXT)"),
+      Query("CREATE TABLE more_bugs (ant INTEGER)")},
+    { Query("CREATE TABLE crawlies (purple VARCHAR(4294967263),"
+            "                       pink VARCHAR(0))"),
+      Query("CREATE TABLE enums (x enum('this', 'that'))"),
+      Query("CREATE TABLE bugs (spider TEXT)"),
+      Query("CREATE TABLE more_bugs (ant INTEGER)")},
+    { Query("INSERT INTO bugs VALUES ('8legs'), ('crawly'), ('manyiz')"),
+      Query("INSERT INTO more_bugs VALUES (9012), (2913), (19114)"),
+      Query("INSERT INTO enums VALUES ('this'), ('that')"),
+      Query("SELECT * FROM enums"),                 // proxy test
+      Query("SELECT spider + spider FROM bugs"),    // proxy test
+      Query("SELECT spider + spider FROM bugs"),    // proxy test
+      // Query("SELECT SUM(spider) FROM bugs"),
+      // Query("SELECT GREATEST(ant, 5000) FROM more_bugs"),
+      // Query("SELECT GREATEST(12, ant, 5000) FROM more_bugs"),
+      // Query("CREATE TABLE crawlers (pink DATE)"),
+      // Query("SELECT * FROM bugs, more_bugs, crawlers, crawlies")
+    },
+    { Query("DROP TABLE crawlies"),
+      Query("DROP TABLE bugs"),
+      Query("DROP TABLE more_bugs")},
+    { Query("DROP TABLE crawlies"),
+      Query("DROP TABLE bugs"),
+      Query("DROP TABLE more_bugs")});
+
 //-----------------------------------------------------------------------
 
 Connection::Connection(const TestConfig &input_tc, test_mode input_type) {
@@ -920,31 +1000,37 @@ Connection::start() {
     std::string masterKey = BytesFromInt(mkey, AES_KEY_BYTES);
     switch (type) {
         //plain -- new connection straight to the DB
-        case UNENCRYPTED:
-            {
-                Connect *const c =
-                    new Connect(tc.host, tc.user, tc.pass, tc.port);
-                conn_set.insert(c);
-                this->conn = conn_set.begin();
-                break;
+    case UNENCRYPTED:
+    {
+	Connect *const c =
+	    new Connect(tc.host, tc.user, tc.pass, tc.port);
+	conn_set.insert(c);
+	this->conn = conn_set.begin();
+	break;
             }
-            //single -- new Rewriter
-        case SINGLE:
-            break;
-        case PROXYPLAIN:
-            //break;
-        case PROXYSINGLE:
-            {
-                ConnectionInfo ci(tc.host, tc.user, tc.pass);
-                const std::string master_key = "2392834";
-                ProxyState *const ps =
-                    new ProxyState(ci, tc.shadowdb_dir, master_key);
+    //single -- new Rewriter
+    case SINGLE:
+	break;
+    case PROXYPLAIN:
+	//break;
+    case PROXYENC:
+    {
+	//TODO:  a separate process for proxy
+	
+    }
+    case ENC:
+    {
+	ConnectionInfo ci(tc.host, tc.user, tc.pass);
+	const std::string master_key = "2392834";
+	ProxyState *const ps =
+	    new ProxyState(ci, tc.shadowdb_dir, master_key);
                 re_set.insert(ps);
                 this->re_it = re_set.begin();
-            }
-            break;
-        default:
-            assert_s(false, "invalid type passed to Connection");
+    }
+    break;
+    
+    default:
+	assert_s(false, "invalid type passed to Connection");
     }
 }
 
@@ -953,7 +1039,7 @@ Connection::stop() {
     switch (type) {
     case PROXYPLAIN:
         //break;
-    case PROXYSINGLE:
+    case ENC:
         for (auto r = re_set.begin(); r != re_set.end(); r++) {
             delete *r;
         }
@@ -975,7 +1061,7 @@ Connection::stop() {
 ResType
 Connection::execute(const Query &query) {
     switch (type) {
-    case PROXYSINGLE:
+    case ENC:
         return executeRewriter(query);
     case UNENCRYPTED:
     case PROXYPLAIN:
@@ -1052,9 +1138,9 @@ Connection::executeLast() {
         break;
     case UNENCRYPTED:
     case PROXYPLAIN:
-       // break;
+        // break;
     case PROXYSINGLE:
-		//TODO(ccarvalho) check this 
+        //TODO(ccarvalho) check this 
         break;
 
     default:
@@ -1094,12 +1180,12 @@ CheckAnnotatedQuery(const TestConfig &tc,
         global_crash_point = *cp;
 
         try {
-	    if (test_query.query != empty_str) {
-	        test->execute(test_query);
+            if (test_query.query != empty_str) {
+                test->execute(test_query);
             }
         } catch (const std::runtime_error &e) {
-	    if (strcmp(e.what(), "crash test exception") != 0) {
-	        throw;
+            if (strcmp(e.what(), "crash test exception") != 0) {
+                throw;
             }
         }
     }
@@ -1152,7 +1238,7 @@ CheckQuery(const TestConfig &tc, const Query &query) {
             case UNENCRYPTED:
             case PROXYPLAIN:
                 //break;
-            case PROXYSINGLE:
+            case ENC:
                 //TODO(ccarvalho): check proxy
             default:
                 LOG(test) << "not a valid case of this test; skipped";
@@ -1198,7 +1284,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
         case SINGLE:
         case PROXYPLAIN:
            // break;
-        case PROXYSINGLE:
+        case ENC:
             score.mark(CheckQuery(tc, *q));
             break;
 
@@ -1219,15 +1305,17 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 466/471
+    //      TOTAL RESULT: 515/519
     // ###############################
 
     std::vector<Score> scores;
 
+    assert(testSlowMatch());
+
     // Pass 54/54
     scores.push_back(CheckQueryList(tc, Select));
 
-    // Pass 30/31
+    // Pass 31/31
     scores.push_back(CheckQueryList(tc, HOM));
 
     // Pass 20/20
@@ -1254,7 +1342,7 @@ RunTest(const TestConfig &tc) {
     // Pass 44/44
     scores.push_back(CheckQueryList(tc, UserGroupForum));
 
-    // Pass 32/32
+    // Pass 42/42
     scores.push_back(CheckQueryList(tc, Null));
 
     // Pass 21/21
@@ -1284,6 +1372,12 @@ RunTest(const TestConfig &tc) {
 
     // Pass 14/14
     scores.push_back(CheckQueryList(tc, TableAliases));
+
+    // Pass 25/25
+    scores.push_back(CheckQueryList(tc, DDL));
+
+    // Pass 13/13
+    scores.push_back(CheckQueryList(tc, MiscBugs));
 
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;
@@ -1315,8 +1409,8 @@ string_to_test_mode(const std::string &s)
         return SINGLE;
     else if (s == "proxy-plain")
         return PROXYPLAIN;
-    else if (s == "proxy-single")
-        return PROXYSINGLE;
+    else if (s == "enc")
+        return ENC;
     else
         thrower() << "unknown test mode " << s;
     return TESTINVALID;
@@ -1339,7 +1433,7 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
              << "    plain" << std::endl
              << "    single" << std::endl
              << "    proxy-plain" << std::endl
-             << "    proxy-single" << std::endl
+             << "    enc" << std::endl
              << "single make connections through EDBProxy" << std::endl
              << "proxy-* makes connections *'s encryption type through the proxy" << std::endl
              << "num_conn is the number of conns made to a single db (default 1)" << std::endl
@@ -1354,7 +1448,7 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
             break;
         case PROXYPLAIN:
            // break;
-        case PROXYSINGLE:
+        case ENC:
             //TODO(ccarvalho) check this
             break;
         default:
@@ -1363,23 +1457,28 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
     }
 
 
-    TestConfig control_tc = TestConfig();
-    control_tc.db = control_tc.db+"_control";
+    try {
+        TestConfig control_tc = TestConfig();
+        control_tc.db = control_tc.db+"_control";
 
-    Connection test_(tc, test_type);
-    test = &test_;
-    test->execute("CREATE DATABASE IF NOT EXISTS " + tc.db + ";");
-    test->execute("USE " + tc.db + ";");
+        Connection test_(tc, test_type);
+        test = &test_;
+        test->execute("CREATE DATABASE IF NOT EXISTS " + tc.db + ";");
+        test->execute("USE " + tc.db + ";");
 
-    Connection control_(control_tc, control_type);
-    control = &control_;
-    control->execute("CREATE DATABASE IF NOT EXISTS " + control_tc.db + ";");
-    control->execute("USE " + control_tc.db + ";");
+        Connection control_(control_tc, control_type);
+        control = &control_;
+        control->execute("CREATE DATABASE IF NOT EXISTS " + control_tc.db + ";");
+        control->execute("USE " + control_tc.db + ";");
 
-    enum { nrounds = 1 };
-    for (uint i = 0; i < nrounds; i++)
-        RunTest(tc);
+        enum { nrounds = 1 };
+        for (uint i = 0; i < nrounds; i++)
+            RunTest(tc);
 
-    std::cerr << "RESULT: " << npass << "/" << ntest << std::endl;
+        std::cerr << "RESULT: " << npass << "/" << ntest << std::endl;
+    } catch (const AbstractException &e) {
+        std::cout << e << std::endl;
+        throw;
+    }
 }
 

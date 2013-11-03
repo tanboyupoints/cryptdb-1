@@ -1,19 +1,20 @@
 #pragma once
 
-#include <assert.h>
 #include <stdexcept>
 #include <ostream>
 #include <openssl/bn.h>
 #include <openssl/crypto.h>
 
-class bignum_ctx {
+#include <util/errstream.hh>
+
+class _bignum_ctx {
  public:
-    bignum_ctx() { c = BN_CTX_new(); }
-    ~bignum_ctx() { BN_CTX_free(c); }
+    _bignum_ctx() { c = BN_CTX_new(); }
+    ~_bignum_ctx() { BN_CTX_free(c); }
     BN_CTX *ctx() { return c; }
 
     static BN_CTX *the_ctx() {
-        static bignum_ctx cx;
+        static _bignum_ctx cx;
         return cx.ctx();
     }
 
@@ -34,17 +35,17 @@ class bignum {
 
     bignum(const bignum &other) {
         BN_init(&b);
-        assert(BN_copy(&b, other.bn()));
+        throw_c(BN_copy(&b, other.bn()));
     }
 
     bignum(const uint8_t *buf, size_t nbytes) {
         BN_init(&b);
-        assert(BN_bin2bn(buf, nbytes, &b));
+        throw_c(BN_bin2bn(buf, nbytes, &b));
     }
 
     bignum(const std::string &v) {
         BN_init(&b);
-        assert(BN_bin2bn((uint8_t*) v.data(), v.size(), &b));
+        throw_c(BN_bin2bn((uint8_t*) v.data(), v.size(), &b));
     }
 
     ~bignum() { BN_free(&b); }
@@ -61,14 +62,14 @@ class bignum {
 #define op(opname, func, args...)                               \
     bignum opname(const bignum &mod) {                          \
         bignum res;                                             \
-        assert(1 == func(res.bn(), &b, mod.bn(), ##args));      \
+        throw_c(1 == func(res.bn(), &b, mod.bn(), ##args));      \
         return res;                                             \
     }
 
     op(operator+, BN_add)
     op(operator-, BN_sub)
-    op(operator%, BN_mod, bignum_ctx::the_ctx())
-    op(operator*, BN_mul, bignum_ctx::the_ctx())
+    op(operator%, BN_mod, _bignum_ctx::the_ctx())
+    op(operator*, BN_mul, _bignum_ctx::the_ctx())
 #undef op
 
 #define pred(predname, cmp)                                     \
@@ -85,7 +86,7 @@ class bignum {
 
     bignum invmod(const bignum &mod) {
         bignum r;
-        assert(BN_mod_inverse(r.bn(), &b, mod.bn(), bignum_ctx::the_ctx()));
+        throw_c(BN_mod_inverse(r.bn(), &b, mod.bn(), _bignum_ctx::the_ctx()));
         return r;
     }
 

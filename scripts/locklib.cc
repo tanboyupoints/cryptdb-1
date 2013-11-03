@@ -1,14 +1,15 @@
-// gcc -shared -fpic locklib.c -o ../obj/scripts/locklib.so --llua5.1
+// gcc -shared -fpic locklib.cc -o ../obj/scripts/locklib.so --llua5.1
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include <sys/stat.h>
+#include <sys/un.h>
+#include <sys/socket.h>
 #include <unistd.h>
-#include <errno.h>
-#include <fcntl.h>
 
 #include <lua5.1/lua.h>
 #include <lua5.1/lauxlib.h>
@@ -18,39 +19,40 @@ static int
 acquire_lock(lua_State *const L)
 {
     const char *const path = lua_tolstring(L, 1, NULL);
-    const int fd = creat(path, S_IRUSR | S_IWUSR);
-    if (-1 == fd) {
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    // abstract socket
+    strncpy(&addr.sun_path[1], path, sizeof(addr.sun_path) - 2);
+    addr.sun_family = AF_UNIX;
+
+    int sock = socket(PF_UNIX, SOCK_DGRAM, 0);
+    if (sock < 0) {
+        fprintf(stderr, "failed to open socket!\n");
+
         lua_pushboolean(L, false);
         lua_pushinteger(L, -1);
-        fprintf(stderr, "bad fd!\n");
         return 2;
     }
-    struct flock lock = {
-        .l_type      = F_WRLCK,
-        .l_whence    = SEEK_SET,
-        .l_start     = 0,
-        .l_len       = 0
-    };
 
-    const int res = fcntl(fd, F_SETLKW, &lock);
-    if (-1 == res) {
-        fprintf(stderr, "ERROR: fcntl errno(%d): %s\n", errno,
-                                                        strerror(errno));
+    if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        close(sock);
+        fprintf(stderr, "failed to bind socket!\n");
+
         lua_pushboolean(L, false);
         lua_pushinteger(L, -1);
         return 2;
     }
 
     lua_pushboolean(L, true);
-    lua_pushinteger(L, fd);
+    lua_pushinteger(L, sock);
     return 2;
 }
 
 static int
 release_lock(lua_State *const L)
 {
-    const int fd = lua_tointeger(L, 1);
-    close(fd);
+    const int sock = lua_tointeger(L, 1);
+    close(sock);
 
     return 0;
 }
@@ -60,6 +62,8 @@ static const struct luaL_reg locklib[] = {
     {"release_lock", release_lock},
     {NULL, NULL}
 };
+
+extern "C" int luaopen_locklib(lua_State *L);
 
 int
 luaopen_locklib(lua_State *L)

@@ -2,13 +2,14 @@
 
 #include <string.h>
 #include <stdint.h>
-#include <assert.h>
 #include <vector>
+
+#include <util/errstream.hh>
 
 class skip32 {
  public:
     skip32(const std::vector<uint8_t> &k) {
-        assert(k.size() == 10);
+        throw_c(k.size() == 10);
         key = k;
     }
 

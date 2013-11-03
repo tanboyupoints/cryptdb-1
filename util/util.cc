@@ -37,24 +37,6 @@ throw (CryptDBError)
     }
 }
 
-bool
-IsMySQLTypeNumeric(enum_field_types t) {
-    switch (t) {
-        case MYSQL_TYPE_DECIMAL:
-        case MYSQL_TYPE_TINY:
-        case MYSQL_TYPE_SHORT:
-        case MYSQL_TYPE_LONG:
-        case MYSQL_TYPE_FLOAT:
-        case MYSQL_TYPE_DOUBLE:
-        case MYSQL_TYPE_LONGLONG:
-        case MYSQL_TYPE_INT24:
-        case MYSQL_TYPE_NEWDECIMAL:
-            return true;
-        default: return false;
-    }
-}
-
-
 double
 timeInSec(struct timeval tvstart, struct timeval tvend)
 {
@@ -303,65 +285,6 @@ valFromStr(const std::string &str)
 
     return  val;
 }
-
-std::string
-marshallBinary(const std::string &s)
-{
-    std::string r;
-    r += "X\'";
-
-    const char *sp = &s[0];
-    static const char *digits = "0123456789ABCDEF";
-    size_t l = s.length();
-    for (size_t i = 0; i < l; i++) {
-        r += digits[sp[i] >> 4 & 0xf];
-        r += digits[sp[i] & 0xf];
-    }
-
-    r += "\'";
-    return r;
-}
-
-
-static unsigned char
-getFromHex(const std::string &hexValues)
-{
-    unsigned int v;
-    sscanf(hexValues.c_str(), "%2x", &v);
-    return (unsigned char) v;
-}
-
-std::string
-unmarshallBinary(const std::string &s)
-{
-    uint offset;
-    size_t len = s.length();
-
-#if MYSQL_S
-    offset = 2;
-    myassert(s[0] == 'X',
-             "unmarshallBinary: first char is not x; it is " + s[0]);
-    len = len - 1;     // removing last apostrophe
-#else
-    myassert(s[0] == '\\',
-             "unmarshallBinary: first char is not slash; it is " + s[0]);
-    myassert(s[1] == 'x',
-             "unmarshallBinary: second char is not x; it is " + s[1]);
-    offset = 2;
-#endif
-
-    myassert((len - offset) % 2 == 0,
-             "unmarshallBinary: newlen is odd! newlen is " +
-             strFromVal(len-offset));
-
-    std::string r;
-    for (uint i = 0; i < (len-offset)/2; i++)
-        r += getFromHex(&s[offset+i*2]);
-    return r;
-}
-
-
-
 
 static uint hexval(char c) {
     if (c >= '0' && c <= '9') {

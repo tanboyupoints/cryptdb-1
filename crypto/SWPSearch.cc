@@ -68,8 +68,8 @@ unpad(const string & vec)
         index--;
     }
 
-    assert_s((index>=0) && (vec[index] == 1),
-             "input was not padded correctly");
+    throw_c((index>=0) && (vec[index] == 1),
+            "input was not padded correctly");
 
     return vec.substr(0, index);
 }
@@ -78,8 +78,8 @@ string
 SWP::encryptSym(const string & key, const string & val, const string & iv)
 {
 
-    assert_s(key.length() == AES_BLOCK_SIZE, "key has incorrect length");
-    assert_s(iv.length() == AES_BLOCK_SIZE, "iv has incorrect length");
+    throw_c(key.length() == AES_BLOCK_SIZE, "key has incorrect length");
+    throw_c(iv.length() == AES_BLOCK_SIZE, "iv has incorrect length");
 
 
     AES_KEY aes_key;
@@ -105,8 +105,8 @@ string
 SWP::decryptSym(const string & key, const string & ciph, const string & iv)
 {
 
-    assert_s(iv.length() == AES_BLOCK_SIZE, "iv has incorrect length");
-    assert_s(key.length() == AES_BLOCK_SIZE, "key has incorrect length");
+    throw_c(iv.length() == AES_BLOCK_SIZE, "iv has incorrect length");
+    throw_c(key.length() == AES_BLOCK_SIZE, "key has incorrect length");
 
     AES_KEY aes_key;
 
@@ -183,7 +183,7 @@ SWP::SWPHalfEncrypt(const string & key, string word, string & ciph,
 
 static string
 bytewise_xor(const string & a, const string & b) {
-    assert_s(a.length() == b.length(), "bytewise_xor expects equal lengths");
+    throw_c(a.length() == b.length(), "bytewise_xor expects equal lengths");
 
     unsigned int len = a.length();
 
@@ -272,7 +272,7 @@ SWP::encrypt(const string & key, const list<string> & words)
 
         string word = *it;
 
-        assert_s(word.length() < SWPCiphSize, string(
+        throw_c(word.length() < SWPCiphSize, string(
                      " given word ") + word +
                  " is longer than SWPCiphSize");
 
@@ -310,7 +310,7 @@ SWP::decrypt(const string & key, const list<string>  & ciph)
 {
     list<string> * result = new list<string>();
 
-    assert_s(
+    throw_c(
         canDecrypt,
         "the current choice of parameters for SWP does not allow decryption");
 
@@ -322,8 +322,8 @@ SWP::decrypt(const string & key, const list<string>  & ciph)
 
         string word = *it;
 
-        assert_s(word.length() == SWPCiphSize,
-                 " given ciphertext with invalid length ");
+        throw_c(word.length() == SWPCiphSize,
+                " given ciphertext with invalid length ");
 
         result->push_back(SWPdecrypt(key, word, index));
 
