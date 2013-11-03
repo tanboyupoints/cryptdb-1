@@ -1,66 +1,4 @@
-#define COLOR_END       "\033[0m"
-#define GREEN_BEGIN     "\033[1;92m"
-#define RED_BEGIN       "\033[1;31m"
-
-// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-//           Real Login Credentials
-// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-const char *const real_host         = "127.0.0.1";
-const char *const real_user         = "root";
-const char *const real_passwd       = "letmein";
-const unsigned int real_port        = 3306;
-
-// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-//            Simple Testing DSL
-// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-static unsigned __total_tests       = 0;
-static unsigned __passed_tests      = 0;
-
-static unsigned __total_asserts     = 0;
-static unsigned __passed_asserts    = 0;
-
-#define DEFINED_NAME
-
-#define TEST_SUCCESS                                \
-{                                                   \
-   printf("%s%s succeeded!%s\n", GREEN_BEGIN,       \
-                                (__test_name),      \
-                                COLOR_END);         \
-}
-
-#define TEST_FAILURE                                \
-{                                                   \
-   printf("%s%s failed!%s\n", RED_BEGIN,            \
-                              (__test_name),        \
-                              COLOR_END);           \
-}
-
-#define TEST_ASSERT(expr)                           \
-{                                                   \
-    ++__total_asserts;                              \
-    if (!(expr)) {                                  \
-        TEST_FAILURE                                \
-        return 0;                                   \
-    }                                               \
-    ++__passed_asserts;                             \
-}
-
-#define TEST(name)                                  \
-    static int                                      \
-    name(struct lua_State *const L)                 \
-    {                                               \
-        const char *const __test_name = #name;      \
-        ++__total_tests;
-
-#define END_TEST                                    \
-        TEST_SUCCESS                                \
-        ++__passed_tests;                           \
-    }
+#include "testing_dsl.h"
 
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -124,6 +62,7 @@ TEST(test_completeLuaQuery)
     const pthread_t init_thread         = (pthread_t)0x1;
     const void *const init_host_data    = (void *)0x2;
     const unsigned int init_restarts    = 0x3;
+    const bool init_mysql_connected     = false;
 
     struct LuaQuery lua_query = {
         .command            = init_command,
@@ -137,7 +76,8 @@ TEST(test_completeLuaQuery)
             .wait               = 1
         },
         .sql                = NULL,
-        .output_count       = -1
+        .output_count       = -1,
+        .mysql_connected    = init_mysql_connected
     };
 
     completeLuaQuery(&lua_query, 0);
@@ -150,18 +90,21 @@ TEST(test_completeLuaQuery)
     TEST_ASSERT(L                    == lua_query.persist.ell);
     TEST_ASSERT(NULL                 == lua_query.sql);
     TEST_ASSERT(COMMAND_OUTPUT_COUNT == lua_query.output_count);
+    TEST_ASSERT(init_mysql_connected == lua_query.mysql_connected);
 END_TEST
 
 TEST(test_newLuaQuery)
-    struct LuaQuery lua_query;
-    memset(&lua_query, 0xDEADBEEF, sizeof(struct LuaQuery));
+    struct LuaQuery *const lua_query = malloc(sizeof(struct LuaQuery));
+    memset(lua_query, 0xDEADBEEF, sizeof(struct LuaQuery));
 
-    const char *const init_host     = "127.0.0.1";
-    const char *const init_user     = "martianinvader";
-    const char *const init_passwd   = "lophtcrak";
+    const char *const init_host     = strdup(fast_bad_host);
+    const char *const init_user     = strdup("martianinvader");
+    const char *const init_passwd   = strdup("lophtcrak");
     const unsigned int init_port    = 0x1111;
 
-    struct HostData host_data = {
+    struct HostData *host_data = malloc(sizeof(struct HostData));
+    TEST_ASSERT(host_data);
+    *host_data = (struct HostData){
         .host       = init_host,
         .user       = init_user,
         .passwd     = init_passwd,
@@ -170,88 +113,104 @@ TEST(test_newLuaQuery)
 
     const unsigned int init_wait    = 1;
 
-    TEST_ASSERT(newLuaQuery(&lua_query, &host_data, init_wait));
+    TEST_ASSERT(newLuaQuery(lua_query, host_data, init_wait));
 
-    TEST_ASSERT(-1                   == lua_query.command);
-    TEST_ASSERT(false                == lua_query.command_ready);
-    TEST_ASSERT(false                == lua_query.completion_signal);
-    TEST_ASSERT(NO_THREAD            != lua_query.thread);
-    TEST_ASSERT(0                    == lua_query.persist.restarts);
-    TEST_ASSERT(&host_data           == lua_query.persist.host_data);
-    TEST_ASSERT(NULL                 == lua_query.persist.ell);
-    TEST_ASSERT(init_wait            == lua_query.persist.wait);
-    TEST_ASSERT(NULL                 == lua_query.sql);
-    TEST_ASSERT(-1                   == lua_query.output_count);
-
-    // the thread is using data allocated from this thread and will
-    // segfault and shutdown if we do not manually kill.
-    TEST_ASSERT(stopLuaQueryThread(&lua_query));
-END_TEST
-
-TEST(test_createLuaQuery)
-    const char *const init_host     = "127.0.0.1";
-    const char *const init_user     = "rainbow";
-    const char *const init_passwd   = "jetplane";
-    const unsigned int init_port    = 0x2222;
-
-    const struct HostData host_data = {
-        .host       = init_host,
-        .user       = init_user,
-        .passwd     = init_passwd,
-        .port       = init_port
-    };
-    const struct HostData *p_host_data = (struct HostData *)&host_data;
-
-    const unsigned int init_wait    = 1;
-
-    struct LuaQuery *const lua_query =
-        createLuaQuery((struct HostData **)&p_host_data, init_wait);
-
-    TEST_ASSERT(lua_query);
     TEST_ASSERT(-1                   == lua_query->command);
     TEST_ASSERT(false                == lua_query->command_ready);
     TEST_ASSERT(false                == lua_query->completion_signal);
     TEST_ASSERT(NO_THREAD            != lua_query->thread);
     TEST_ASSERT(0                    == lua_query->persist.restarts);
-    TEST_ASSERT(&host_data           == lua_query->persist.host_data);
+    TEST_ASSERT(host_data            == lua_query->persist.host_data);
     TEST_ASSERT(NULL                 == lua_query->persist.ell);
     TEST_ASSERT(init_wait            == lua_query->persist.wait);
     TEST_ASSERT(NULL                 == lua_query->sql);
     TEST_ASSERT(-1                   == lua_query->output_count);
+    TEST_ASSERT(false                == lua_query->mysql_connected);
 
-    TEST_ASSERT(NULL              == p_host_data);
-    TEST_ASSERT(host_data.host    == lua_query->persist.host_data->host);
-    TEST_ASSERT(host_data.user    == lua_query->persist.host_data->user);
-    TEST_ASSERT(host_data.passwd  == lua_query->persist.host_data->passwd);
-    TEST_ASSERT(host_data.port    == lua_query->persist.host_data->port);
+    POSSIBLE_SELF_OWNING_THREAD(lua_query->thread);
 
-    TEST_ASSERT(stopLuaQueryThread(lua_query));
+    // the thread is using data allocated from this thread and will
+    // segfault and shutdown if we do not manually kill.
+    TEST_ASSERT(FAILURE != stopLuaQueryThread(lua_query));
+END_TEST
+
+TEST(test_createLuaQuery)
+    const char *const init_host     = strdup(fast_bad_host);
+    const char *const init_user     = strdup("rainbow");
+    const char *const init_passwd   = strdup("jetplane");
+    const unsigned int init_port    = 0x2222;
+
+    struct HostData *host_data = malloc(sizeof(struct HostData));
+    TEST_ASSERT(host_data);
+    *host_data = (struct HostData){
+        .host       = init_host,
+        .user       = init_user,
+        .passwd     = init_passwd,
+        .port       = init_port
+    };
+    struct HostData *const orig_host_data = host_data;
+
+    const unsigned int init_wait    = 1;
+
+    struct LuaQuery **const p_lua_query =
+        createLuaQuery((struct HostData **)&host_data, init_wait);
+    TEST_ASSERT(p_lua_query);
+    struct LuaQuery *const lua_query = *p_lua_query;
+
+    TEST_ASSERT(-1                   == lua_query->command);
+    TEST_ASSERT(false                == lua_query->command_ready);
+    TEST_ASSERT(false                == lua_query->completion_signal);
+    TEST_ASSERT(NO_THREAD            != lua_query->thread);
+    TEST_ASSERT(0                    == lua_query->persist.restarts);
+    TEST_ASSERT(orig_host_data       == lua_query->persist.host_data);
+    TEST_ASSERT(NULL                 == lua_query->persist.ell);
+    TEST_ASSERT(init_wait            == lua_query->persist.wait);
+    TEST_ASSERT(NULL                 == lua_query->sql);
+    TEST_ASSERT(-1                   == lua_query->output_count);
+    TEST_ASSERT(false                == lua_query->mysql_connected);
+
+    TEST_ASSERT(NULL                == host_data);
+    TEST_ASSERT(orig_host_data->host== lua_query->persist.host_data->host);
+    TEST_ASSERT(orig_host_data->user== lua_query->persist.host_data->user);
+    TEST_ASSERT(orig_host_data->passwd== lua_query->persist.host_data->passwd);
+    TEST_ASSERT(orig_host_data->port ==lua_query->persist.host_data->port);
+
+    POSSIBLE_SELF_OWNING_THREAD(lua_query->thread);
+
+    TEST_ASSERT(FAILURE != stopLuaQueryThread(lua_query));
 END_TEST
 
 TEST(test_stopLuaQueryThread)
     struct LuaQuery lua_query, test_lua_query;
-    memset(&lua_query, 0x13371337, sizeof(struct LuaQuery));
+    memset(&lua_query, 0xFEFEFEFE, sizeof(struct LuaQuery));
     memcpy(&test_lua_query, &lua_query, sizeof(struct LuaQuery));
 
+    test_lua_query.mysql_connected = lua_query.mysql_connected = true;
     test_lua_query.thread = lua_query.thread = (pthread_t)malloc(20);
     test_lua_query.persist.wait = lua_query.persist.wait = 1;
 
-    TEST_ASSERT(false == stopLuaQueryThread(&lua_query));
+    TEST_ASSERT(FAILURE == stopLuaQueryThread(&lua_query));
     TEST_ASSERT(!memcmp(&lua_query, &test_lua_query,
                         sizeof(struct LuaQuery)));
 END_TEST
 
 TEST(test_stopAndStartLuaQueryThread)
-    struct LuaQuery lua_query, test_lua_query;
-    memset(&lua_query, 0xDEADBEEF, sizeof(struct LuaQuery));
-    memcpy(&test_lua_query, &lua_query, sizeof(struct LuaQuery));
+    struct LuaQuery *lua_query = malloc(sizeof(struct LuaQuery));
+    TEST_ASSERT(lua_query);
+    memset(lua_query, 0xDEADBEEF, sizeof(struct LuaQuery));
 
-    const char *const init_host     = "127.0.0.1";
-    const char *const init_user     = "buildings";
-    const char *const init_passwd   = "cars";
+    struct LuaQuery *const test_lua_query =
+        malloc(sizeof(struct LuaQuery));
+    TEST_ASSERT(test_lua_query);
+    memcpy(test_lua_query, lua_query, sizeof(struct LuaQuery));
+
+    const char *const init_host     = strdup(fast_bad_host);
+    const char *const init_user     = strdup("buildings");
+    const char *const init_passwd   = strdup("cars");
     const unsigned int init_port    = 0x3333;
 
-    const struct HostData host_data = {
+    struct HostData *host_data = malloc(sizeof(struct HostData));
+    *host_data = (struct HostData){
         .host       = init_host,
         .user       = init_user,
         .passwd     = init_passwd,
@@ -260,86 +219,117 @@ TEST(test_stopAndStartLuaQueryThread)
 
     const unsigned int init_wait    = 1;
 
-    lua_query.thread = NO_THREAD;
-    test_lua_query.persist.host_data =
-        lua_query.persist.host_data         = &host_data;
-    test_lua_query.persist.wait =
-        lua_query.persist.wait              = init_wait;
+    lua_query->thread = NO_THREAD;
+    test_lua_query->persist.host_data =
+        lua_query->persist.host_data         = host_data;
+    test_lua_query->persist.wait =
+        lua_query->persist.wait              = init_wait;
 
-    TEST_ASSERT(startLuaQueryThread(&lua_query));
-    TEST_ASSERT(stopLuaQueryThread(&lua_query));
-    test_lua_query.thread = lua_query.thread;
-    TEST_ASSERT(!memcmp(&lua_query, &test_lua_query,
+    TEST_ASSERT(startLuaQueryThread(lua_query));
+
+    POSSIBLE_SELF_OWNING_THREAD(lua_query->thread);
+
+    TEST_ASSERT(FAILURE != stopLuaQueryThread(lua_query));
+    test_lua_query->thread = lua_query->thread;
+    TEST_ASSERT(!memcmp(lua_query, test_lua_query,
                         sizeof(struct LuaQuery)));
 END_TEST
 
 TEST(test_destroyLuaQuery)
     struct HostData *host_data =
-        createHostData("something", "else", "isunderthebed!", 199);
+        createHostData(fast_bad_host, "else", "isunderthebed!", 199);
     TEST_ASSERT(host_data);
 
     const unsigned int init_wait = 1;
-    struct LuaQuery *lua_query = createLuaQuery(&host_data, init_wait);
-    TEST_ASSERT(lua_query);
+    struct LuaQuery **p_lua_query = createLuaQuery(&host_data, init_wait);
+    TEST_ASSERT(p_lua_query && *p_lua_query);
 
-    destroyLuaQuery(&lua_query);
-    TEST_ASSERT(NULL == lua_query);
+    POSSIBLE_SELF_OWNING_THREAD((*p_lua_query)->thread);
+
+    destroyLuaQuery(&p_lua_query);
+
+    TEST_ASSERT(NULL == p_lua_query);
 END_TEST
 
 TEST(test_restartLuaQuery)
     TEST_ASSERT(MAX_RESTARTS > 0);
 
-    const char *const init_host     = "127.0.0.1";
-    const char *const init_user     = "where";
-    const char *const init_passwd   = "vacation?";
+    const char *const init_host     = strdup(fast_bad_host);
+    const char *const init_user     = strdup("where");
+    const char *const init_passwd   = strdup("vacation?");
     const unsigned int init_port    = 0x9999;
 
+    struct HostData **p_host_data = malloc(sizeof(struct HostData *));
+    TEST_ASSERT(p_host_data);
     struct HostData *host_data =
         createHostData(init_host, init_user, init_passwd, init_port);
     TEST_ASSERT(host_data);
+    p_host_data = &host_data;
 
     const unsigned init_wait        = 1;
-    struct LuaQuery *lua_query = createLuaQuery(&host_data, init_wait);
-    TEST_ASSERT(lua_query);
+    struct LuaQuery **p_lua_query = createLuaQuery(p_host_data, init_wait);
+    TEST_ASSERT(p_lua_query && *p_lua_query);
 
-    TEST_ASSERT(RESTARTED == restartLuaQueryThread(lua_query));
-    TEST_ASSERT(false            == lua_query->command_ready);
-    TEST_ASSERT(false            == lua_query->completion_signal);
-    TEST_ASSERT(-1               == lua_query->command);
-    TEST_ASSERT(NULL             == lua_query->sql);
-    TEST_ASSERT(-1               == lua_query->output_count);
-    TEST_ASSERT(!strcmp(init_host, lua_query->persist.host_data->host));
-    TEST_ASSERT(!strcmp(init_user, lua_query->persist.host_data->user));
-    TEST_ASSERT(!strcmp(init_passwd,lua_query->persist.host_data->passwd));
-    TEST_ASSERT(init_port        == lua_query->persist.host_data->port);
-    TEST_ASSERT(1                == lua_query->persist.restarts);
-    TEST_ASSERT(NULL             == lua_query->persist.ell);
-    TEST_ASSERT(init_wait        == lua_query->persist.wait);
+    TEST_ASSERT(-1                  == (*p_lua_query)->command);
+    TEST_ASSERT(NO_THREAD           != (*p_lua_query)->thread);
 
-    TEST_ASSERT(stopLuaQueryThread(lua_query));
+    POSSIBLE_SELF_OWNING_THREAD((*p_lua_query)->thread);
+
+    TEST_ASSERT(RESTARTED == restartLuaQueryThread(p_lua_query));
+    TEST_ASSERT(false            == (*p_lua_query)->command_ready);
+    TEST_ASSERT(false            == (*p_lua_query)->completion_signal);
+    TEST_ASSERT(-1               == (*p_lua_query)->command);
+    TEST_ASSERT(NULL             == (*p_lua_query)->sql);
+    TEST_ASSERT(-1               == (*p_lua_query)->output_count);
+    TEST_ASSERT(false            == (*p_lua_query)->mysql_connected);
+    TEST_ASSERT(NO_THREAD        != (*p_lua_query)->thread);
+    TEST_ASSERT(!strcmp(init_host,
+                        (*p_lua_query)->persist.host_data->host));
+    TEST_ASSERT(!strcmp(init_user,
+                        (*p_lua_query)->persist.host_data->user));
+    TEST_ASSERT(!strcmp(init_passwd,
+                        (*p_lua_query)->persist.host_data->passwd));
+    TEST_ASSERT(init_port      == (*p_lua_query)->persist.host_data->port);
+    TEST_ASSERT(1                == (*p_lua_query)->persist.restarts);
+    TEST_ASSERT(NULL             == (*p_lua_query)->persist.ell);
+    TEST_ASSERT(init_wait       == (*p_lua_query)->persist.wait);
+
+    POSSIBLE_SELF_OWNING_THREAD((*p_lua_query)->thread);
+
+    TEST_ASSERT(FAILURE != stopLuaQueryThread(*p_lua_query));
 END_TEST
 
-TEST(test_fubarRestartLuaQuery)
+TEST(test_restartBadLuaQuery)
     TEST_ASSERT(MAX_RESTARTS > 0)
 
-    const char *const init_host     = "127.0.0.1";
-    const char *const init_user     = "saysomething";
-    const char *const init_passwd   = "quickly?";
+    const char *const init_host     = strdup(fast_bad_host);
+    const char *const init_user     = strdup("saysomething");
+    const char *const init_passwd   = strdup("quickly?");
     const unsigned int init_port    = 0xFFFF;
 
+    struct HostData **p_host_data = malloc(sizeof(struct HostData *));
+    TEST_ASSERT(p_host_data);
     struct HostData *host_data =
         createHostData(init_host, init_user, init_passwd, init_port);
     TEST_ASSERT(host_data);
+    p_host_data = &host_data;
 
     const unsigned int init_wait    = 1;
-    struct LuaQuery *lua_query = createLuaQuery(&host_data, init_wait);
-    TEST_ASSERT(lua_query);
+    struct LuaQuery **p_lua_query = createLuaQuery(p_host_data, init_wait);
+    TEST_ASSERT(p_lua_query && *p_lua_query);
+    struct LuaQuery *lua_query = *p_lua_query;
+
+    POSSIBLE_SELF_OWNING_THREAD(lua_query->thread);
 
     // This should cause stopLuaQueryThread to fail.
+    pthread_cancel(lua_query->thread);
     lua_query->thread = (pthread_t)malloc(20);
     memset((void *)lua_query->thread, 0x12345678, 4);
 
-    TEST_ASSERT(FUBAR == restartLuaQueryThread(lua_query));
+    TEST_ASSERT(RESTARTED == restartLuaQueryThread(&lua_query));
+
+    TEST_ASSERT(FAILURE != stopLuaQueryThread(lua_query));
+    // POSSIBLE_SELF_OWNING_THREAD(lua_query->thread);
 END_TEST
 
 void *
@@ -354,7 +344,7 @@ dummyThread(void *const unused)
 TEST(test_badIssueCommand)
     TEST_ASSERT(MAX_RESTARTS > 0)
 
-    const char *const init_host     = "127.0.0.1";
+    const char *const init_host     = fast_bad_host;
     const char *const init_user     = "going";
     const char *const init_passwd   = "tophail?";
     const unsigned int init_port    = 0xEEEE;
@@ -364,110 +354,130 @@ TEST(test_badIssueCommand)
     TEST_ASSERT(host_data);
 
     const unsigned int init_wait    = 1;
-    struct LuaQuery *lua_query = createLuaQuery(&host_data, init_wait);
-    TEST_ASSERT(lua_query);
+    struct LuaQuery **p_lua_query = createLuaQuery(&host_data, init_wait);
+    TEST_ASSERT(p_lua_query && *p_lua_query);
 
     // soft kill should fail, then hard kill should succeed
-    TEST_ASSERT(!pthread_create(&lua_query->thread, NULL, dummyThread,
+    TEST_ASSERT(!pthread_create(&(*p_lua_query)->thread, NULL, dummyThread,
                                 NULL));
-    issueCommand(L, KILL, lua_query);
+    issueCommand(L, KILL, p_lua_query);
     TEST_ASSERT(true           == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
-    TEST_ASSERT(false                   == lua_query->command_ready);
-    TEST_ASSERT(false                   == lua_query->completion_signal);
-    TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
-    TEST_ASSERT(NULL                    == lua_query->persist.ell);
-    TEST_ASSERT(init_wait               == lua_query->persist.wait);
+    TEST_ASSERT(false                   == (*p_lua_query)->command_ready);
+    TEST_ASSERT(false                == (*p_lua_query)->completion_signal);
+    TEST_ASSERT(COMMAND_OUTPUT_COUNT    == (*p_lua_query)->output_count);
+    TEST_ASSERT(false                  == (*p_lua_query)->mysql_connected);
+    TEST_ASSERT(NULL                    == (*p_lua_query)->persist.ell);
+    TEST_ASSERT(init_wait               == (*p_lua_query)->persist.wait);
 
     // test restart attempts
     size_t i = 0;
     for (; i < MAX_RESTARTS; ++i) {
-        issueCommand(L, QUERY, lua_query);
+        issueQuery(L, QUERY, "SELECT SOMETHING", p_lua_query);
         TEST_ASSERT(false      == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
-        TEST_ASSERT(NO_THREAD               != lua_query->thread);
-        TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
-        TEST_ASSERT(NULL                    == lua_query->persist.ell);
-        TEST_ASSERT(init_wait               == lua_query->persist.wait);
+        TEST_ASSERT(NO_THREAD               != (*p_lua_query)->thread);
+        TEST_ASSERT(COMMAND_OUTPUT_COUNT  == (*p_lua_query)->output_count);
+        TEST_ASSERT(false              == (*p_lua_query)->mysql_connected);
+        TEST_ASSERT(NULL                   == (*p_lua_query)->persist.ell);
+        TEST_ASSERT(init_wait             == (*p_lua_query)->persist.wait);
 
-        TEST_ASSERT(stopLuaQueryThread(lua_query));
-        TEST_ASSERT(NO_THREAD               == lua_query->thread);
-        TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
+        TEST_ASSERT(FAILURE != stopLuaQueryThread(*p_lua_query));
+        TEST_ASSERT(NO_THREAD               == (*p_lua_query)->thread);
+        TEST_ASSERT(COMMAND_OUTPUT_COUNT  == (*p_lua_query)->output_count);
+        TEST_ASSERT(false             == (*p_lua_query)->mysql_connected);
 
-        TEST_ASSERT(i+1                     ==lua_query->persist.restarts);
+        TEST_ASSERT(i+1               ==(*p_lua_query)->persist.restarts);
     }
 
     // test for sane zombie
-    issueQuery(L, QUERY, strdup("worldly"), lua_query);
+    issueQuery(L, QUERY, strdup("worldly"), p_lua_query);
     TEST_ASSERT(false          == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
-    TEST_ASSERT(NO_THREAD               == lua_query->thread)
-    TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
-    TEST_ASSERT(MAX_RESTARTS            == lua_query->persist.restarts);
-    TEST_ASSERT(NULL                    == lua_query->persist.ell);
-    TEST_ASSERT(init_wait               == lua_query->persist.wait);
+    TEST_ASSERT(NO_THREAD               == (*p_lua_query)->thread)
+    TEST_ASSERT(COMMAND_OUTPUT_COUNT    == (*p_lua_query)->output_count);
+    TEST_ASSERT(false                  == (*p_lua_query)->mysql_connected);
+    TEST_ASSERT(MAX_RESTARTS          == (*p_lua_query)->persist.restarts);
+    TEST_ASSERT(NULL                    == (*p_lua_query)->persist.ell);
+    TEST_ASSERT(init_wait               == (*p_lua_query)->persist.wait);
 
-    TEST_ASSERT(stopLuaQueryThread(lua_query));
-    TEST_ASSERT(NO_THREAD               == lua_query->thread)
-    TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
-    TEST_ASSERT(MAX_RESTARTS            == lua_query->persist.restarts);
+    TEST_ASSERT(NOTHING_TO_STOP == stopLuaQueryThread((*p_lua_query)));
+    TEST_ASSERT(NO_THREAD               == (*p_lua_query)->thread)
+    TEST_ASSERT(COMMAND_OUTPUT_COUNT    == (*p_lua_query)->output_count);
+    TEST_ASSERT(false                  == (*p_lua_query)->mysql_connected);
+    TEST_ASSERT(MAX_RESTARTS          == (*p_lua_query)->persist.restarts);
 
-    issueCommand(L, KILL, lua_query);
+    issueCommand(L, KILL, p_lua_query);
     TEST_ASSERT(true           == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
-    TEST_ASSERT(NO_THREAD               == lua_query->thread);
-    TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
-    TEST_ASSERT(MAX_RESTARTS            == lua_query->persist.restarts);
-    TEST_ASSERT(NULL                    == lua_query->persist.ell);
-    TEST_ASSERT(init_wait               == lua_query->persist.wait);
+    TEST_ASSERT(NO_THREAD               == (*p_lua_query)->thread);
+    TEST_ASSERT(COMMAND_OUTPUT_COUNT    == (*p_lua_query)->output_count);
+    TEST_ASSERT(false                  == (*p_lua_query)->mysql_connected);
+    TEST_ASSERT(MAX_RESTARTS          == (*p_lua_query)->persist.restarts);
+    TEST_ASSERT(NULL                    == (*p_lua_query)->persist.ell);
+    TEST_ASSERT(init_wait               == (*p_lua_query)->persist.wait);
 
-    TEST_ASSERT(!strcmp(init_host, lua_query->persist.host_data->host));
-    TEST_ASSERT(!strcmp(init_user, lua_query->persist.host_data->user));
-    TEST_ASSERT(!strcmp(init_passwd,lua_query->persist.host_data->passwd));
-    TEST_ASSERT(init_port == lua_query->persist.host_data->port);
+    TEST_ASSERT(!strcmp(init_host,
+                        (*p_lua_query)->persist.host_data->host));
+    TEST_ASSERT(!strcmp(init_user,
+                        (*p_lua_query)->persist.host_data->user));
+    TEST_ASSERT(!strcmp(init_passwd,
+                        (*p_lua_query)->persist.host_data->passwd));
+    TEST_ASSERT(init_port == (*p_lua_query)->persist.host_data->port);
 END_TEST
 
 TEST(test_handleKilledQuery)
     TEST_ASSERT(MAX_RESTARTS > 0)
 
-    const char *const init_host     = strdup("google.com");
-    const char *const init_user     = strdup(real_user);
-    const char *const init_passwd   = strdup(real_passwd);
+    const char *const init_host     = slow_bad_host;
+    const char *const init_user     = real_user;
+    const char *const init_passwd   = real_passwd;
     const unsigned int init_port    = real_port;
 
     struct HostData *bad_host_data =
         createHostData(init_host, init_user, init_passwd, init_port);
     TEST_ASSERT(bad_host_data);
 
-    const unsigned int init_wait    = 20;
-    struct LuaQuery *lua_query = createLuaQuery(&bad_host_data, init_wait);
-    TEST_ASSERT(lua_query);
+    const unsigned int init_wait    = 1;
+    struct LuaQuery **p_bad_lua_query =
+        createLuaQuery(&bad_host_data, init_wait);
+    TEST_ASSERT(p_bad_lua_query && *p_bad_lua_query);
 
-    issueQuery(L, QUERY, strdup("do 0"), lua_query);
-    TEST_ASSERT(false          == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
-    TEST_ASSERT(NO_THREAD               != lua_query->thread);
-    TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
-    TEST_ASSERT(1                       == lua_query->persist.restarts);
-    TEST_ASSERT(NULL                    == lua_query->persist.ell);
-    TEST_ASSERT(init_wait               == lua_query->persist.wait);
+    issueQuery(L, QUERY, strdup("do 0"), p_bad_lua_query);
+    TEST_ASSERT(false         == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
+    TEST_ASSERT(NO_THREAD            != (*p_bad_lua_query)->thread);
+    TEST_ASSERT(COMMAND_OUTPUT_COUNT == (*p_bad_lua_query)->output_count);
+    TEST_ASSERT(false         == (*p_bad_lua_query)->mysql_connected);
+    TEST_ASSERT(1             == (*p_bad_lua_query)->persist.restarts);
+    TEST_ASSERT(NULL                 == (*p_bad_lua_query)->persist.ell);
+    TEST_ASSERT(init_wait            == (*p_bad_lua_query)->persist.wait);
+
+    POSSIBLE_SELF_OWNING_THREAD((*p_bad_lua_query)->thread);
 
     struct HostData *good_host_data =
-        createHostData(strdup(real_host), strdup(real_user),
-                       strdup(real_passwd), real_port);
+        createHostData(real_host, real_user, real_passwd, real_port);
     TEST_ASSERT(good_host_data);
-    lua_query->persist.host_data = good_host_data;
 
-    issueCommand(L, RESULTS, lua_query);
+    struct LuaQuery *good_lua_query = malloc(sizeof(struct LuaQuery));
+    TEST_ASSERT(good_lua_query);
+    memcpy(good_lua_query, *p_bad_lua_query, sizeof(struct LuaQuery));
+    good_lua_query->persist.host_data = good_host_data;
+
+    issueCommand(L, RESULTS, &good_lua_query);
+    UGLY_SLEEP
+
     TEST_ASSERT(false          == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
-    TEST_ASSERT(NO_THREAD               != lua_query->thread);
-    TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
-    TEST_ASSERT(1                       == lua_query->persist.restarts);
-    TEST_ASSERT(NULL                    == lua_query->persist.ell);
-    TEST_ASSERT(init_wait               == lua_query->persist.wait);
+    TEST_ASSERT(NO_THREAD            != good_lua_query->thread);
+    TEST_ASSERT(COMMAND_OUTPUT_COUNT == good_lua_query->output_count);
+    TEST_ASSERT(true                 == good_lua_query->mysql_connected);
+    TEST_ASSERT(2                    == good_lua_query->persist.restarts);
+    TEST_ASSERT(NULL                 == good_lua_query->persist.ell);
+    TEST_ASSERT(init_wait            == good_lua_query->persist.wait);
 
-    issueCommand(L, KILL, lua_query);
+    issueCommand(L, KILL, &good_lua_query);
     TEST_ASSERT(true          == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
-    TEST_ASSERT(NO_THREAD               != lua_query->thread);
-    TEST_ASSERT(COMMAND_OUTPUT_COUNT    == lua_query->output_count);
-    TEST_ASSERT(1                       == lua_query->persist.restarts);
-    TEST_ASSERT(NULL                    == lua_query->persist.ell);
-    TEST_ASSERT(init_wait               == lua_query->persist.wait);
+    TEST_ASSERT(NO_THREAD            != good_lua_query->thread);
+    TEST_ASSERT(COMMAND_OUTPUT_COUNT == good_lua_query->output_count);
+    TEST_ASSERT(true                 == good_lua_query->mysql_connected);
+    TEST_ASSERT(2                    == good_lua_query->persist.restarts);
+    TEST_ASSERT(NULL                 == good_lua_query->persist.ell);
+    TEST_ASSERT(init_wait            == good_lua_query->persist.wait);
 END_TEST
 
 TEST(test_zombie)
@@ -505,9 +515,9 @@ TEST(test_createHostData)
     const unsigned int init_port    = 0x9898;
 
     const struct HostData test_host_data = {
-        .host           = strdup(init_host),
-        .user           = strdup(init_user),
-        .passwd         = strdup(init_passwd),
+        .host           = init_host,
+        .user           = init_user,
+        .passwd         = init_passwd,
         .port           = init_port
     };
 
@@ -558,22 +568,15 @@ all(struct lua_State *const L)
     test_stopAndStartLuaQueryThread(L);
     test_destroyLuaQuery(L);
     test_restartLuaQuery(L);
-    test_fubarRestartLuaQuery(L);
+    test_restartBadLuaQuery(L);
     test_badIssueCommand(L);
     test_handleKilledQuery(L);
     test_zombie(L);
     test_createHostData(L);
     test_destroyHostData(L);
 
-    printf("\n"
-           "################################\n"
-           "     Passed %d/%d Unit Tests\n"
-           "       %d/%d Assertions\n"
-           "################################\n\n",
-           __passed_tests, __total_tests,
-           __passed_asserts, __total_asserts);
-
-    return 0;
+    printTestStats();
+    waitForSelfOwningThreads();
 }
 
 

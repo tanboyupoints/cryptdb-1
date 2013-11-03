@@ -3,6 +3,7 @@
 local COLOR_END         = string.char(27) .. "[0m"
 local GREEN             = string.char(27) .. "[1;92m"
 local RED               = string.char(27) .. "[1;31m"
+local PURPLE            = string.char(27) .. "[1;35m"
 
 local unit_lib =
     assert(package.loadlib("/home/burrows/code/cryptdb/scripts/threaded_query.so",
@@ -26,6 +27,8 @@ function main()
     --
     -- integration tests
     --
+    -- > these tests have the potential to segfault if self owning threads
+    --   don't finish cleanp before program exit.
     os.execute("service mysql stop")
     os.execute("mysqld --bind-address=127.0.0.1 &")
     os.execute("sleep 3")
@@ -61,6 +64,14 @@ function main()
     os.execute("mysql -uroot -pletmein -e \"drop database lua_test\"")
     os.execute("pkill -9 mysqld")
     os.execute("service mysql start")
+
+    os.execute("sleep 3")
+end
+
+function warnedSleep()
+    print(PURPLE .. "warning: test requires non-determinstic sleep!\n" ..
+          COLOR_END)
+    os.execute("sleep 3")
 end
 
 -- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -68,7 +79,6 @@ end
 --             Integration Tests
 -- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 -- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 function test_normalQueryExecution()
     os.execute("mysql -uroot -pletmein -e \"create table lua_test.t (x integer, y integer)\"")
@@ -128,6 +138,7 @@ function test_normalQueryExecution()
     if not (status) then
         return false
     end
+    warnedSleep()
 
     return true
 end
@@ -140,29 +151,42 @@ function test_restartedQueryExecution()
     -- should fail to connect
     status, lua_query =
         ThreadedQuery.start("127.0.0.1", "root", "letmein", 3306)
-    assert(status and lua_query)
+    if not (status and lua_query) then
+        return false
+    end
 
     -- try reconnect and fail
     status = ThreadedQuery.query(lua_query, "SELECT * FROM lua_test.t2")
-    assert(not status)
+    if not (not status) then
+        return false
+    end
 
     os.execute("mysqld --bind-address=127.0.0.1 &")
     os.execute("sleep 3")
 
     -- reconnect and succeed, but no data
     status, result = ThreadedQuery.results(lua_query)
-    assert(not status and result == nil)
+    if not (not status and result == nil) then
+        return false
+    end
 
     -- successfully execute query
     status = ThreadedQuery.query(lua_query, "SELECT * FROM lua_test.t2")
-    assert(status)
+    if not (status) then
+        return false
+    end
 
     -- successfully fetch data
     status, result = ThreadedQuery.results(lua_query)
-    assert(status and type(result) == "table")
+    if not (status and type(result) == "table") then
+        return false
+    end
 
     status = ThreadedQuery.kill(lua_query)
-    assert(status)
+    if not (status) then
+        return false
+    end
+    warnedSleep()
 
     return true
 end
