@@ -667,6 +667,7 @@ END_TEST
 static int
 all(struct lua_State *const L)
 {
+    // tests
     test_pushvalue(L);
     test_luaToCharp(L);
     test_waitForCommand(L);
@@ -686,6 +687,7 @@ all(struct lua_State *const L)
     test_deepCopyLuaQuery(L);
     test_undoDeepCopyLuaQuery(L);
 
+    // bookkeeping
     printTestStats();
     waitForSelfOwningThreads();
 }

@@ -103,6 +103,8 @@ waitForSelfOwningThreads()
         void *exit_code;
         pthread_timedjoin_np(__self_owning_threads[i], &exit_code, &ts);
     }
+
+    printf("\n### done waiting on threads! ###\n");
 }
 
 static void

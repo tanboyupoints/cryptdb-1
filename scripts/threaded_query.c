@@ -202,6 +202,13 @@ kill(lua_State *const L)
     return COMMAND_OUTPUT_COUNT;
 }
 
+// rider function
+static int
+_geteuid(lua_State *const L)
+{
+    lua_pushnumber(L, geteuid());
+    return 1;
+}
 static const struct luaL_reg
 main_lib[] = {
 #define F(n) { #n, n }
@@ -209,6 +216,7 @@ main_lib[] = {
     F(query),
     F(results),
     F(kill),
+    F(_geteuid),
     {0, 0},
 };
 
