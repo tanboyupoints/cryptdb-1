@@ -60,20 +60,11 @@ struct QueryList {
   	      std::vector<Query> cr,
 	      std::vector<Query> co,
 	      std::vector<Query> dr)
-      : QueryList(namearg, cr, cr, co, dr, dr)
-    {}
-
-    QueryList(std::string namearg,
-              std::vector<Query> pc,
-              std::vector<Query> sc,
-              std::vector<Query> c,
-              std::vector<Query> pd,
-              std::vector<Query> sd)
         : name(namearg),
-          create(pc, sc),
-          common(c),
-          drop(pd, sd)
-    {} 
+          create(cr, cr),
+	  common(co),
+	  drop(dr, dr)
+    {}
 };
 
 class Connection {
