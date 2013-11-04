@@ -550,6 +550,115 @@ TEST(test_destroyHostData)
     TEST_ASSERT(NULL == host_data);
 END_TEST
 
+TEST(test_deepCopyLuaQuery)
+    const char *const init_host         = "some-host";
+    const char *const init_user         = "a-user";
+    const char *const init_passwd       = "dat-passwd";
+    const unsigned int init_port        = 0x7654;
+
+    struct HostData *host_data =
+        createHostData(init_host, init_user, init_passwd, init_port);
+    TEST_ASSERT(host_data);
+
+    const unsigned int init_wait        = 1;
+    struct LuaQuery **p_lua_query = createLuaQuery(&host_data, init_wait);
+    TEST_ASSERT(p_lua_query && *p_lua_query);
+    TEST_ASSERT(NULL == host_data);
+    struct LuaQuery *const lua_query = *p_lua_query;
+    POSSIBLE_SELF_OWNING_THREAD(lua_query->thread);
+
+    struct LuaQuery *const cp_lua_query = deepCopyLuaQuery(*p_lua_query);
+    TEST_ASSERT(cp_lua_query);
+
+    TEST_ASSERT(cp_lua_query->command           == lua_query->command);
+    TEST_ASSERT(cp_lua_query->command_ready   == lua_query->command_ready);
+    TEST_ASSERT(cp_lua_query->completion_signal
+                    == lua_query->completion_signal);
+    TEST_ASSERT(cp_lua_query->thread            == lua_query->thread);
+    TEST_ASSERT(cp_lua_query->persist.restarts
+                    == lua_query->persist.restarts);
+    // deep copied
+    TEST_ASSERT(cp_lua_query->persist.host_data
+                    != lua_query->persist.host_data);
+    TEST_ASSERT(cp_lua_query->persist.host_data->host
+                    != lua_query->persist.host_data->host);
+    TEST_ASSERT(cp_lua_query->persist.host_data->user
+                    != lua_query->persist.host_data->user);
+    TEST_ASSERT(cp_lua_query->persist.host_data->passwd
+                    != lua_query->persist.host_data->passwd);
+    TEST_ASSERT(!strcmp(cp_lua_query->persist.host_data->host,
+                        lua_query->persist.host_data->host));
+    TEST_ASSERT(!strcmp(cp_lua_query->persist.host_data->user,
+                        lua_query->persist.host_data->user));
+    TEST_ASSERT(!strcmp(cp_lua_query->persist.host_data->passwd,
+                        lua_query->persist.host_data->passwd));
+    TEST_ASSERT(cp_lua_query->persist.host_data->port
+                    == lua_query->persist.host_data->port);
+
+    TEST_ASSERT(cp_lua_query->persist.ell == lua_query->persist.ell);
+    TEST_ASSERT(NULL == cp_lua_query->persist.ell);
+    TEST_ASSERT(cp_lua_query->persist.wait == lua_query->persist.wait);
+
+    // deep copied
+    TEST_ASSERT(cp_lua_query->sql != lua_query->sql
+                || NULL == cp_lua_query->sql);
+    if (cp_lua_query->sql) {
+        TEST_ASSERT(!strcmp(cp_lua_query->sql, lua_query->sql));
+    }
+
+    TEST_ASSERT(cp_lua_query->output_count == lua_query->output_count);
+
+    destroyLuaQuery(&p_lua_query);
+END_TEST
+
+TEST(test_undoDeepCopyLuaQuery)
+    const char *const init_host         = fast_bad_host;
+    const char *const init_user         = "kansisc9tymichigan";
+    const char *const init_passwd       = "uknow";
+    const unsigned int init_port        = 0x4589;
+
+    struct HostData *host_data =
+        createHostData(init_host, init_user, init_passwd, init_port);
+    TEST_ASSERT(host_data);
+
+    const unsigned int init_wait        = 1;
+    struct LuaQuery **p_lua_query = createLuaQuery(&host_data, init_wait);
+    TEST_ASSERT(p_lua_query && *p_lua_query);
+    TEST_ASSERT(NULL == host_data);
+    POSSIBLE_SELF_OWNING_THREAD((*p_lua_query)->thread);
+    struct LuaQuery *save_lua_query = malloc(sizeof(struct LuaQuery));
+    TEST_ASSERT(save_lua_query);
+    memcpy(save_lua_query, *p_lua_query, sizeof(struct LuaQuery));
+
+    struct LuaQuery *cp_lua_query = deepCopyLuaQuery(*p_lua_query);
+    TEST_ASSERT(cp_lua_query);
+
+    struct LuaQuery *const save_cp_lua_query = cp_lua_query;
+    undoDeepCopyLuaQuery(&cp_lua_query);
+    // deleted the copy
+    TEST_ASSERT(NULL == cp_lua_query);
+    TEST_ASSERT(NULL == save_cp_lua_query->sql);
+    TEST_ASSERT(NULL == save_cp_lua_query->persist.host_data);
+
+    // left the original intact
+    TEST_ASSERT(p_lua_query && *p_lua_query);
+    TEST_ASSERT((*p_lua_query)->persist.host_data);
+
+    NON_DETERMINISM
+    save_lua_query->mysql_connected = (*p_lua_query)->mysql_connected;
+
+    TEST_ASSERT(!memcmp(*p_lua_query, save_lua_query,
+                        sizeof(struct LuaQuery)));
+    TEST_ASSERT(!strcmp((*p_lua_query)->persist.host_data->host,
+                        save_lua_query->persist.host_data->host));
+    TEST_ASSERT(!strcmp((*p_lua_query)->persist.host_data->user,
+                        save_lua_query->persist.host_data->user));
+    TEST_ASSERT(!strcmp((*p_lua_query)->persist.host_data->passwd,
+                        save_lua_query->persist.host_data->passwd));
+    TEST_ASSERT((*p_lua_query)->persist.host_data->port
+                    == save_lua_query->persist.host_data->port);
+END_TEST
+
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 //                 Helpers
@@ -574,6 +683,8 @@ all(struct lua_State *const L)
     test_zombie(L);
     test_createHostData(L);
     test_destroyHostData(L);
+    test_deepCopyLuaQuery(L);
+    test_undoDeepCopyLuaQuery(L);
 
     printTestStats();
     waitForSelfOwningThreads();
@@ -601,4 +712,5 @@ lua_test_init(lua_State *const L)
 
     return 1;
 }
+
 
