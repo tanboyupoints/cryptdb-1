@@ -708,9 +708,9 @@ CheckAnnotatedQuery(const TestConfig &tc, const Query &query)
     std::string r;
     ntest++;
 
-    std::vector<std::string> cps = query.crash_points;
+    std::vector<CrashPoint *> cps = query.crash_points;
     for (auto cp = cps.begin(); cp != cps.end(); ++cp) {
-        global_crash_point = *cp;
+      global_crash_point = (*cp)->name;
 
         try {
 	    if (query.query != empty_str) {

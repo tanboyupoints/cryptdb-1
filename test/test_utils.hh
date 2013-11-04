@@ -51,20 +51,28 @@ class TestConfig {
     std::string edbdir;
 };
 
+struct CrashPoint {
+    std::string name;
+
+    CrashPoint(std::string namearg)
+        : name(namearg)
+    {}
+};
+
 struct Query {
     std::string query;
-    std::vector<std::string> crash_points;
+    std::vector<CrashPoint *> crash_points;
 
     Query(const std::string &q) {
         query = q;
     }
 
-    Query(const std::string &q, const std::string &cp) {
+    Query(const std::string &q, CrashPoint * cp) {
         query = q;
         crash_points.push_back(cp);
     }
 
-    Query(const std::string &q, const std::vector<std::string> &cps) {
+    Query(const std::string &q, std::vector<CrashPoint *> cps) {
         query = q;
         crash_points = cps;
     }
