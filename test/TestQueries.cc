@@ -704,7 +704,6 @@ Connection::executeLastEDB() {
 static bool
 CheckAnnotatedQuery(const TestConfig &tc, const Query &query)
 {
-    const std::string empty_str = "";
     std::string r;
     ntest++;
 
@@ -713,21 +712,15 @@ CheckAnnotatedQuery(const TestConfig &tc, const Query &query)
       global_crash_point = (*cp)->name;
 
         try {
-	    if (query.query != empty_str) {
-	        test->execute(query);
-            }
+	    test->execute(query);
         } catch (const CrashTestException &e) {}
     }
-    global_crash_point = empty_str;
+    global_crash_point = "";
 
     LOG(test) << "query: " << query.query;
-    const ResType control_res =
-        (empty_str == query.query) ? ResType(true) :
-                                control->execute(query);
+    const ResType control_res = control->execute(query);
 
-    const ResType test_res =
-        (empty_str == query.query) ? ResType(true) :
-                                    test->execute(query);
+    const ResType test_res = test->execute(query);
 
     if (control_res.ok != test_res.ok) {
         LOG(warn) << "control " << control_res.ok
