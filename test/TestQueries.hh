@@ -19,51 +19,20 @@ typedef enum test_mode {
     TESTINVALID
 } test_mode;
 
-struct QueryChoice {
-    const std::vector<Query> plain;
-    const std::vector<Query> single;
-
-    QueryChoice(const std::vector<Query> &plain_arg,
-                const std::vector<Query> &single_arg)
-        : plain(plain_arg), single(single_arg)
-    {
-        assert(plain_arg.size() == single_arg.size());
-    }
-
-    const std::vector<Query> &choose(test_mode t) const {
-        switch (t) {
-        case UNENCRYPTED:
-        case PROXYPLAIN:
-            return plain;
-
-        case SINGLE:
-        case PROXYSINGLE:
-            return single;
-
-        default:
-            assert(0);
-        }
-    }
-
-    size_t size() const {
-        return plain.size();
-    }
-};
-
 struct QueryList {
     std::string name;
-    QueryChoice create;
+    std::vector<Query> create;
     std::vector<Query> common;
-    QueryChoice drop;
+    std::vector<Query> drop;
 
     QueryList(std::string namearg,
   	      std::vector<Query> cr,
 	      std::vector<Query> co,
 	      std::vector<Query> dr)
         : name(namearg),
-          create(cr, cr),
+          create(cr),
 	  common(co),
-	  drop(dr, dr)
+	  drop(dr)
     {}
 };
 

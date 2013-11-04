@@ -702,21 +702,19 @@ Connection::executeLastEDB() {
 //----------------------------------------------------------------------
 
 static bool
-CheckAnnotatedQuery(const TestConfig &tc,
-                    const Query &control_query,
-                    const Query &test_query)
+CheckAnnotatedQuery(const TestConfig &tc, const Query &query)
 {
     const std::string empty_str = "";
     std::string r;
     ntest++;
 
-    std::vector<std::string> cps = test_query.crash_points;
+    std::vector<std::string> cps = query.crash_points;
     for (auto cp = cps.begin(); cp != cps.end(); ++cp) {
         global_crash_point = *cp;
 
         try {
-	    if (test_query.query != empty_str) {
-	        test->execute(test_query);
+	    if (query.query != empty_str) {
+	        test->execute(query);
             }
         } catch (const std::runtime_error &e) {
 	    if (strcmp(e.what(), "crash test exception") != 0) {
@@ -726,27 +724,26 @@ CheckAnnotatedQuery(const TestConfig &tc,
     }
     global_crash_point = empty_str;
 
-    LOG(test) << "control query: " << control_query.query;
+    LOG(test) << "query: " << query.query;
     const ResType control_res =
-        (empty_str == control_query.query) ? ResType(true) :
-                                control->execute(control_query);
+        (empty_str == query.query) ? ResType(true) :
+                                control->execute(query);
 
-    LOG(test) << "test query: " << test_query.query;
     const ResType test_res =
-        (empty_str == test_query.query) ? ResType(true) :
-                                    test->execute(test_query);
+        (empty_str == query.query) ? ResType(true) :
+                                    test->execute(query);
 
     if (control_res.ok != test_res.ok) {
         LOG(warn) << "control " << control_res.ok
             << ", test " << test_res.ok
             << ", and true is " << true
-            << " for query: " << test_query.query;
+            << " for query: " << query.query;
 
         if (tc.stop_if_fail)
             thrower() << "stop on failure";
         return false;
     } else if (!match(test_res, control_res)) {
-        LOG(warn) << "result mismatch for query: " << test_query.query;
+        LOG(warn) << "result mismatch for query: " << query.query;
         LOG(warn) << "control is:";
         printRes(control_res);
         LOG(warn) << "test is:";
@@ -783,7 +780,7 @@ CheckQuery(const TestConfig &tc, const Query &query) {
         return true;
     }
 
-    return CheckAnnotatedQuery(tc, query, query);
+    return CheckAnnotatedQuery(tc, query);
 }
 
 struct Score {
@@ -807,9 +804,8 @@ static Score
 CheckQueryList(const TestConfig &tc, const QueryList &queries) {
     Score score(queries.name);
     for (unsigned int i = 0; i < queries.create.size(); i++) {
-        Query control_query = queries.create.choose(control_type)[i];
-        Query test_query = queries.create.choose(test_type)[i]; 
-        score.mark(CheckAnnotatedQuery(tc, control_query, test_query));
+        Query query = queries.create[i]; 
+        score.mark(CheckAnnotatedQuery(tc, query));
     }
 
     for (auto q = queries.common.begin(); q != queries.common.end(); q++) {
@@ -826,9 +822,8 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
     }
 
     for (unsigned int i = 0; i < queries.drop.size(); i++) {
-        Query control_query = queries.drop.choose(control_type)[i];
-        Query test_query = queries.drop.choose(test_type)[i];
-        score.mark(CheckAnnotatedQuery(tc, control_query, test_query));
+        Query query = queries.drop[i];
+        score.mark(CheckAnnotatedQuery(tc, query));
     }
 
     return score;
