@@ -26,10 +26,7 @@ static Connection * control;
 static Connection * test;
 
 static QueryList Insert = QueryList("SingleInsert",
-    { Query("CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)"),
-      Query(""),
-      Query(""),
-      Query("") },
+    { Query("CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)")},
     // TODO parser currently has no KEY functionality (broken?)
     { Query("INSERT INTO test_insert VALUES (1, 21, 100, '24 Rosedale, Toronto, ONT', 'Pat Carlson')"),
       Query("SELECT * FROM test_insert"),
@@ -55,10 +52,7 @@ static QueryList Insert = QueryList("SingleInsert",
 
 //migrated from TestSinglePrinc TestSelect
 static QueryList Select = QueryList("SingleSelect",
-    { Query("CREATE TABLE IF NOT EXISTS test_select (id integer, age integer, salary integer, address text, name text)"),
-      Query(""),
-      Query(""),
-      Query("") },
+    { Query("CREATE TABLE IF NOT EXISTS test_select (id integer, age integer, salary integer, address text, name text)") },
     { Query("INSERT INTO test_select VALUES (1, 10, 0, 'first star to the right and straight on till morning', 'Peter Pan')"),
       Query("INSERT INTO test_select VALUES (2, 16, 1000, 'Green Gables', 'Anne Shirley')"),
       Query("INSERT INTO test_select VALUES (3, 8, 0, 'London', 'Lucy')"),
@@ -115,12 +109,7 @@ static QueryList Select = QueryList("SingleSelect",
 //migrated from TestSinglePrinc TestJoin
 static QueryList Join = QueryList("SingleJoin",
     { Query("CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)"),
-      Query("CREATE TABLE test_join2 (id integer, books integer, name text)"),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query("") },
+      Query("CREATE TABLE test_join2 (id integer, books integer, name text)") },
     { Query("INSERT INTO test_join1 VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')"),
       Query("INSERT INTO test_join1 VALUES (2, 16, 1000, 'Green Gables', 'Anne Shirley')"),
       Query("INSERT INTO test_join1 VALUES (3, 8, 0, 'London', 'Lucy')"),
@@ -145,11 +134,7 @@ static QueryList Join = QueryList("SingleJoin",
 
 //migrated from TestSinglePrinc TestUpdate
 static QueryList Update = QueryList("SingleUpdate",
-    { Query("CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)"),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query("") },
+    { Query("CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)") },
     { Query("INSERT INTO test_update VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')"),
       Query("INSERT INTO test_update VALUES (2, 16, 1000, 'Green Gables', 'Anne Shirley')"),
       Query("INSERT INTO test_update VALUES (3, 8, 0, 'London', 'Lucy')"),
@@ -188,11 +173,7 @@ static QueryList Update = QueryList("SingleUpdate",
 
 
 static QueryList HOM = QueryList("HOMAdd",
-    { Query("CREATE TABLE test_HOM (id integer, age integer, salary integer, address text, name text)"),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query("")},
+    { Query("CREATE TABLE test_HOM (id integer, age integer, salary integer, address text, name text)") },
     { Query("INSERT INTO test_HOM VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')"),
       Query("INSERT INTO test_HOM VALUES (2, 16, 1000, 'Green Gables', 'Anne Shirley')"),
       Query("INSERT INTO test_HOM VALUES (3, 8, 0, 'London', 'Lucy')"),
@@ -224,11 +205,7 @@ static QueryList HOM = QueryList("HOMAdd",
 
 //migrated from TestDelete
 static QueryList Delete = QueryList("SingleDelete",
-    { Query("CREATE TABLE test_delete (id integer, age integer, salary integer, address text, name text)"),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query("") },
+    { Query("CREATE TABLE test_delete (id integer, age integer, salary integer, address text, name text)") },
       // Query Fail
       //Query("CRYPTDB test_delete.age ENC"),
       //Query("CRYPTDB test_delete.salary ENC"),
@@ -261,14 +238,9 @@ static QueryList Delete = QueryList("SingleDelete",
 /*
 //migrated from TestSearch
 static QueryList Search = QueryList("SingleSearch",
-    { Query("CREATE TABLE test_search (id integer, searchable text)"),
-      Query("") },
-    { Query("CREATE TABLE test_search (id integer, searchable text)"),
-      Query("") },
     // Query Fail
     //Query("CRYPTDB test_search.seachable ENC") },
-    { Query("CREATE TABLE test_search (id integer, searchable text)"),
-      Query("") },
+    { Query("CREATE TABLE test_search (id integer, searchable text)") },
     { Query("INSERT INTO test_search VALUES (1, 'short text')"),
       Query("INSERT INTO test_search VALUES (2, 'Text with CAPITALIZATION')"),
       Query("INSERT INTO test_search VALUES (3, '')"),
@@ -282,17 +254,11 @@ static QueryList Search = QueryList("SingleSearch",
       Query("SELECT * FROM test_search WHERE searchable < 'slow'"),
       Query("UPDATE test_search SET searchable='text that is new' WHERE id=1"),
       Query("SELECT * FROM test_search WHERE searchable < 'slow'") },
-    { Query("DROP TABLE test_search") },
-    { Query("DROP TABLE test_search") },
     { Query("DROP TABLE test_search") } );
 */
 
 static QueryList Basic = QueryList("MultiBasic",
-    { Query(""),
-      Query(""),
-      Query("CREATE TABLE t1 (id integer, post text, age bigint)"),
-      Query(""),
-      Query(""),
+    { Query("CREATE TABLE t1 (id integer, post text, age bigint)"),
       Query("CREATE TABLE u_basic (id integer, username text)"),
       Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_basic (username text, psswd text)") },
     {     
@@ -325,13 +291,7 @@ static QueryList PrivMessages = QueryList("MultiPrivMessages",
     { Query("CREATE TABLE msgs (msgid integer, msgtext text)"),
       Query("CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)"),
       Query("CREATE TABLE u_mess (userid integer, username text)"),
-      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_mess (username text, psswd text)"),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query("")},
+      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_mess (username text, psswd text)") },
     {     
     // Query Fail
     // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_mess (username, psswd) VALUES ('alice', 'secretalice')"),
@@ -360,14 +320,7 @@ static QueryList UserGroupForum = QueryList("UserGroupForum",
       Query("CREATE TABLE usergroup (userid integer, groupid integer)"),
       Query("CREATE TABLE groupforum (forumid integer, groupid integer, optionid integer)"),
       Query("CREATE TABLE forum (forumid integer, forumtext text)"),
-      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u (username text, psswd text)"),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query("")},
+      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u (username text, psswd text)") },
     { 
       // Query Fail
       // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice', 'secretalice')"),
@@ -532,13 +485,7 @@ static QueryList UserGroupForum = QueryList("UserGroupForum",
       Query("DROP TABLE "+PWD_TABLE_PREFIX+"u") });
 
 static QueryList Auto = QueryList("AutoInc",
-    { Query("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)"),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query("")},
+    { Query("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)") },
     { Query("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world', 100)"),
       Query("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world2', 21)"),
       Query("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world3', 10909)"),
@@ -568,13 +515,7 @@ static QueryList Auto = QueryList("AutoInc",
  * > OPE
  */
 static QueryList Negative = QueryList("Negative",
-    { Query("CREATE TABLE negs (a integer, b integer, c integer)"),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query("")},
+    { Query("CREATE TABLE negs (a integer, b integer, c integer)") },
     { Query("INSERT INTO negs (a, b, c) VALUES (10, -20, -100)"),
       Query("INSERT INTO negs (a, b, c) VALUES (-100, 50, -12)"),
       Query("INSERT INTO negs (a, b, c) VALUES (-8, -50, -18)"),
@@ -589,12 +530,8 @@ static QueryList Negative = QueryList("Negative",
 static QueryList Null = QueryList("Null",
     { Query("CREATE TABLE test_null (uid integer, age integer, address text)"),
       Query("CREATE TABLE u_null (uid integer, username text)"),
-      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_null (username text, password text)"),
-      Query(""),
-      Query("") },
+      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_null (username text, password text)") },
     { Query("CREATE TABLE test_null (uid integer, age integer, address text)"),
-      Query(""),
-      Query(""),
       // Query Fail
       //Query("CRYPTDB test_null.age ENC"),
       //Query("CRYPTDB test_null.address ENC"),
@@ -650,7 +587,7 @@ static QueryList Null = QueryList("Null",
       Query("DROP TABLE u_null"),
       Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_null") });
 
-static QueryList ManyConnections = QueryList("Multiple connections",
+/*static QueryList ManyConnections = QueryList("Multiple connections",
     { Query("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext text)"),
       Query("CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)"),
       Query("CREATE TABLE forum (forumid integer AUTO_INCREMENT PRIMARY KEY, title text)"),
@@ -663,10 +600,7 @@ static QueryList ManyConnections = QueryList("Multiple connections",
       Query(""),
       Query(""),
       Query(""),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query("")},
+      Query("") },
     { Query("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext text)"),
       Query("CRYPTDB msgs.msgtext ENC"),
       Query("CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)"),
@@ -679,10 +613,7 @@ static QueryList ManyConnections = QueryList("Multiple connections",
       Query("CREATE TABLE u_conn (userid enc integer, username enc text)"),
       Query("CRYPTDB u_conn.userid ENC"),
       Query("CRYPTDB u_conn.username ENC"),
-      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_conn (username text, psswd text)"),
-      Query(""),
-      Query(""),
-      Query("")},
+      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_conn (username text, psswd text)") },
     { Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_conn (username, psswd) VALUES ('alice','secretA')"),
       Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_conn (username, psswd) VALUES ('bob','secretB')"),
       Query("INSERT INTO u_conn VALUES (1, 'alice')"),
@@ -729,13 +660,10 @@ static QueryList ManyConnections = QueryList("Multiple connections",
       Query("DROP TABLE forum"),
       Query("DROP TABLE post"),
       Query("DROP TABLE u_conn"),
-      Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_conn") });
+      Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_conn") });*/
 
 static QueryList BestEffort = QueryList("BestEffort",
-    { Query("CREATE TABLE t (x integer, y integer)"),
-      Query(""),
-      Query(""),
-      Query("")},
+    { Query("CREATE TABLE t (x integer, y integer)") },
     { Query("INSERT INTO t VALUES (1, 100)"),
       Query("INSERT INTO t VALUES (22, 413)"),
       Query("INSERT INTO t VALUES (1001, 15)"),
@@ -765,9 +693,7 @@ static QueryList DefaultValue = QueryList("DefaultValue",
       "                    z INTEGER)"),
       Query("CREATE TABLE def_1 (a INTEGER NOT NULL DEFAULT '100',"
       "                    b INTEGER,"
-      "                    c VARCHAR(100))"),
-      Query(""),
-      Query("")},
+      "                    c VARCHAR(100))") },
     { Query("INSERT INTO def_0 VALUES (100, 'singsongs', 500),"
             "                         (220, 'heyfriend', 15)"),
       Query("INSERT INTO def_0 (z) VALUES (500), (220), (32)"),
@@ -791,9 +717,7 @@ static QueryList DefaultValue = QueryList("DefaultValue",
 static QueryList Decimal = QueryList("Decimal",
     { Query("CREATE TABLE dec_0 (x DECIMAL(10, 5),"
       "                    y DECIMAL(10, 5) NOT NULL DEFAULT 12.125)"),
-      Query("CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))"),
-      Query(""),
-      Query("")},
+      Query("CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))") },
     { Query("INSERT INTO dec_0 VALUES (50, 100.5)"),
       Query("INSERT INTO dec_0 VALUES (20.50, 1000.5)"),
       Query("INSERT INTO dec_0 VALUES (50, 100.59)"),
@@ -816,10 +740,7 @@ static QueryList Decimal = QueryList("Decimal",
 static QueryList NonStrictMode = QueryList("NonStrictMode",
     { Query("CREATE TABLE not_strict (x INTEGER NOT NULL,"
       "                         y INTEGER NOT NULL DEFAULT 100,"
-      "                         z VARCHAR(100) NOT NULL)"),
-      Query(""),
-      Query(""),
-      Query("")},
+      "                         z VARCHAR(100) NOT NULL)") },
     { Query("INSERT INTO not_strict VALUES (150, 230, 'flowers')"),
       Query("INSERT INTO not_strict VALUES (850, 930, 'rainbow')"),
       Query("INSERT INTO not_strict (y) VALUES (11930)"),
@@ -838,11 +759,7 @@ static QueryList NonStrictMode = QueryList("NonStrictMode",
     { Query("DROP TABLE not_strict")});
 
 static QueryList Transactions = QueryList("Transactions",
-    { Query("CREATE TABLE trans (a integer, b integer, c integer)ENGINE=InnoDB"),
-      Query(""),
-      Query(""), 
-      Query(""),
-      Query("")},
+    { Query("CREATE TABLE trans (a integer, b integer, c integer)ENGINE=InnoDB") },
     { Query("INSERT INTO trans VALUES (1, 2, 3)"),
       Query("INSERT INTO trans VALUES (33, 22, 11)"),
       Query("SELECT * FROM trans"),
@@ -880,8 +797,7 @@ static QueryList Transactions = QueryList("Transactions",
 static QueryList TableAliases = QueryList("TableAliases",
     { Query("CREATE TABLE star (a integer, b integer, c integer)"),
       Query("CREATE TABLE mercury (a integer, b integer, c integer)"),
-      Query("CREATE TABLE moon (x integer, y integer, z integer)"),
-      Query("")},
+      Query("CREATE TABLE moon (x integer, y integer, z integer)") },
     { Query("INSERT INTO star VALUES (55, 66, 77), (99, 22, 109)"),
       Query("INSERT INTO mercury VALUES (55, 18, 17), (16, 15, 14)"),
       Query("INSERT INTO moon VALUES (55, 18, 1), (22, 22, 444)"),
@@ -1312,65 +1228,65 @@ RunTest(const TestConfig &tc) {
 
     assert(testSlowMatch());
 
-    // Pass 54/54
+    // Pass 51/51
     scores.push_back(CheckQueryList(tc, Select));
 
-    // Pass 31/31
+    // Pass 26/27
     scores.push_back(CheckQueryList(tc, HOM));
 
-    // Pass 20/20
+    // Pass 17/17
     scores.push_back(CheckQueryList(tc, Insert));
 
-    // Pass 27/27
+    // Pass 22/22
     scores.push_back(CheckQueryList(tc, Join));
 
-    // Pass 21/21
+    // Pass 17/17
     scores.push_back(CheckQueryList(tc, Basic));
 
-    // Pass 40/40
+    // Pass 36/36
     scores.push_back(CheckQueryList(tc, Update));
 
-    // Pass 28/28
+    // Pass 24/24
     scores.push_back(CheckQueryList(tc, Delete));
 
     // Pass ?/?
     // scores.push_back(CheckQueryList(tc, Search));
 
-    // Pass 20/20
+    // Pass 14/14
     scores.push_back(CheckQueryList(tc, PrivMessages));
 
-    // Pass 44/44
+    // Pass 37/37
     scores.push_back(CheckQueryList(tc, UserGroupForum));
 
     // Pass 42/42
     scores.push_back(CheckQueryList(tc, Null));
 
-    // Pass 21/21
+    // Pass 18/18
     ProxyState *const ps = test->getProxyState();
     if (ps->defaultSecurityRating() == SECURITY_RATING::BEST_EFFORT) {
         scores.push_back(CheckQueryList(tc, BestEffort));
     }
 
-    // Pass 28/28
+    // Pass 22/22
     scores.push_back(CheckQueryList(tc, Auto));
 
-    // Pass 14/16
+    // Pass 8/10
     scores.push_back(CheckQueryList(tc, Negative));
 
-    // Pass 21/21
+    // Pass 19/19
     scores.push_back(CheckQueryList(tc, DefaultValue));
 
     // Pass ?/?
     // scores.push_back(CheckQueryList(tc, Decimal));
 
-    // Pass 20/20
+    // Pass 17/17
     scores.push_back(CheckQueryList(tc, NonStrictMode));
 
-    // Pass 32/34
+    // Pass 28/30
     // NOTE: two queries should fail
     scores.push_back(CheckQueryList(tc, Transactions));
 
-    // Pass 14/14
+    // Pass 13/13
     scores.push_back(CheckQueryList(tc, TableAliases));
 
     // Pass 25/25
