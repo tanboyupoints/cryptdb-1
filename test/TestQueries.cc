@@ -716,11 +716,7 @@ CheckAnnotatedQuery(const TestConfig &tc, const Query &query)
 	    if (query.query != empty_str) {
 	        test->execute(query);
             }
-        } catch (const std::runtime_error &e) {
-	    if (strcmp(e.what(), "crash test exception") != 0) {
-	        throw;
-            }
-        }
+        } catch (const CrashTestException &e) {}
     }
     global_crash_point = empty_str;
 
