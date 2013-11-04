@@ -9,6 +9,7 @@
 
 #include <pthread.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include <mysql/mysql.h>
 
@@ -361,8 +362,6 @@ completeLuaQuery(struct LuaQuery *const lua_query,
     assert(false    == lua_query->completion_signal);
     assert(lua_query->persist.ell);
 
-    freeSQL(lua_query);
-
     nilTheStackPlus(lua_query, output_count);
     assert(COMMAND_OUTPUT_COUNT == lua_query->output_count);
 
@@ -376,6 +375,9 @@ completeLuaQuery(struct LuaQuery *const lua_query,
 void
 finishedCommandIssue(struct LuaQuery *const lua_query)
 {
+    // Do the first; so we can keep asserts.
+    freeSQL(lua_query);
+
     lua_query->command_ready        = false;
     lua_query->completion_signal    = false;
     lua_query->command              = -1;
@@ -389,8 +391,6 @@ strangeFinishedCommandIssue(struct LuaQuery *const lua_query,
     // we may be in an abnormal state; as we likely came here after an
     // asynch kill.
     assert(lua_query->persist.ell);
-
-    freeSQL(lua_query);
 
     lua_pushboolean(lua_query->persist.ell, exit_status);
     nilTheStackPlus(lua_query, 1);
@@ -470,7 +470,7 @@ commandHandler(void *const lq)
             } else {
                 lua_pushboolean(lua_query->persist.ell, true);
             }
-            NO_KILLING(completeLuaQuery(lua_query, 1));
+            completeLuaQuery(lua_query, 1);
             continue;
         }
 
@@ -483,7 +483,7 @@ commandHandler(void *const lq)
             lua_pushboolean(lua_query->persist.ell, false);
             lua_pushnil(lua_query->persist.ell);
 
-            NO_KILLING(completeLuaQuery(lua_query, 2));
+            completeLuaQuery(lua_query, 2);
             continue;
         }
         queried = false;
@@ -496,7 +496,7 @@ commandHandler(void *const lq)
                 lua_pushboolean(lua_query->persist.ell, false);
                 lua_pushnil(lua_query->persist.ell);
 
-                NO_KILLING(completeLuaQuery(lua_query, 2));
+                completeLuaQuery(lua_query, 2);
                 continue;
             }
 
@@ -504,7 +504,7 @@ commandHandler(void *const lq)
             lua_pushnumber(lua_query->persist.ell,
                            mysql_affected_rows(conn));
 
-            NO_KILLING(completeLuaQuery(lua_query, 2));
+            completeLuaQuery(lua_query, 2);
             continue;
         }
         assert(0 == mysql_errno(conn));
@@ -534,7 +534,7 @@ commandHandler(void *const lq)
         }
 
         mysql_free_result(result);
-        NO_KILLING(completeLuaQuery(lua_query, 2));
+        completeLuaQuery(lua_query, 2);
     }
 
     // should never reach this point.
@@ -764,6 +764,8 @@ undoDeepCopyLuaQuery(struct LuaQuery **p_lua_query)
 enum RESTART_STATUS
 restartLuaQueryThread(struct LuaQuery **p_lua_query)
 {
+    // Until we explicitly stop the thread, *p_lua_query can be modified
+    // from under us.
     assert(p_lua_query && *p_lua_query);
 
     assert((*p_lua_query)->persist.restarts < MAX_RESTARTS);
