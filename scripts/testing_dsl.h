@@ -40,6 +40,13 @@ static unsigned __passed_asserts                = 0;
     system("sleep 2");                                              \
 }
 
+#define NON_DETERMINISM                                             \
+{                                                                   \
+    fprintf(stderr, "\t\t%swarning: test does something"            \
+                    " non-deterministic!%s\n",                      \
+            PURPLE_BEGIN, COLOR_END);                               \
+}
+
 #define TEST_SUCCESS                                \
 {                                                   \
    printf("%s%s succeeded!%s\n", GREEN_BEGIN,       \
@@ -96,6 +103,8 @@ waitForSelfOwningThreads()
         void *exit_code;
         pthread_timedjoin_np(__self_owning_threads[i], &exit_code, &ts);
     }
+
+    printf("\n### done waiting on threads! ###\n");
 }
 
 static void

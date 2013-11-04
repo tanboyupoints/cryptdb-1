@@ -92,9 +92,9 @@ static struct HostData *createHostData(const char *const host,
                                        unsigned int port);
 static void destroyHostData(struct HostData **p_host_data);
 
-static struct LuaQuery **createLuaQuery(struct HostData **p_host_data,
-                                        unsigned int wait);
-static void destroyLuaQuery(struct LuaQuery ***pp_lua_query);
+static struct LuaQuery **
+createLuaQuery(struct HostData **const p_host_data, unsigned int wait);
+static void destroyLuaQuery(struct LuaQuery ***const pp_lua_query);
 static bool startLuaQueryThread(struct LuaQuery *const lua_query);
 static enum STOP_TYPE stopLuaQueryThread(struct LuaQuery *const lua_query);
 void clearLuaQuery(struct LuaQuery *const lua_query);
@@ -202,6 +202,13 @@ kill(lua_State *const L)
     return COMMAND_OUTPUT_COUNT;
 }
 
+// rider function
+static int
+_geteuid(lua_State *const L)
+{
+    lua_pushnumber(L, geteuid());
+    return 1;
+}
 static const struct luaL_reg
 main_lib[] = {
 #define F(n) { #n, n }
@@ -209,6 +216,7 @@ main_lib[] = {
     F(query),
     F(results),
     F(kill),
+    F(_geteuid),
     {0, 0},
 };
 
@@ -609,7 +617,7 @@ newLuaQuery(struct LuaQuery *const lua_query,
 
 // on success, we take ownership of @p_host_data
 static struct LuaQuery **
-createLuaQuery(struct HostData **p_host_data, unsigned int wait)
+createLuaQuery(struct HostData **const p_host_data, unsigned int wait)
 {
     assert(p_host_data && *p_host_data);
 
@@ -710,7 +718,7 @@ stopLuaQueryThread(struct LuaQuery *const lua_query)
 }
 
 static struct LuaQuery *
-deepCopyLuaQuery(struct LuaQuery *const lua_query)
+deepCopyLuaQuery(const struct LuaQuery *const lua_query)
 {
     assert(lua_query);
 
@@ -748,6 +756,7 @@ undoDeepCopyLuaQuery(struct LuaQuery **p_lua_query)
 {
     assert(p_lua_query && *p_lua_query);
     freeSQL(*p_lua_query);
+    assert(NULL == (*p_lua_query)->sql);
     destroyHostData((struct HostData **)&(*p_lua_query)->persist.host_data);
     *p_lua_query = NULL;
 }
@@ -808,7 +817,7 @@ restartLuaQueryThread(struct LuaQuery **p_lua_query)
 }
 
 static void
-destroyLuaQueryNonThreadMetaData(struct LuaQuery ***pp_lua_query)
+destroyLuaQueryNonThreadMetaData(struct LuaQuery ***const pp_lua_query)
 {
     assert(pp_lua_query && *pp_lua_query && **pp_lua_query);
 
@@ -822,7 +831,7 @@ destroyLuaQueryNonThreadMetaData(struct LuaQuery ***pp_lua_query)
 }
 
 static void
-destroyLuaQuery(struct LuaQuery ***pp_lua_query)
+destroyLuaQuery(struct LuaQuery ***const pp_lua_query)
 {
     assert(pp_lua_query && *pp_lua_query && **pp_lua_query);
 

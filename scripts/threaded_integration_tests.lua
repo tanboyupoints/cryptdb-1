@@ -5,25 +5,16 @@ local GREEN             = string.char(27) .. "[1;92m"
 local RED               = string.char(27) .. "[1;31m"
 local PURPLE            = string.char(27) .. "[1;35m"
 
-local unit_lib =
-    assert(package.loadlib("/home/burrows/code/cryptdb/scripts/threaded_query.so",
-                           "lua_test_init"))
-unit_lib()
-
 local main_lib =
     assert(package.loadlib("/home/burrows/code/cryptdb/scripts/threaded_query.so",
                            "lua_main_init"))
 main_lib()
 
--- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
--- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
---                Run Tests
--- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
--- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 function main()
-    -- unit tests
-    TestThreadedQuery.all()
-
+    if 0 ~= ThreadedQuery._geteuid() then
+        print(RED .. "exiting: integration tests require root!" .. COLOR_END)
+        return
+    end
     --
     -- integration tests
     --
@@ -65,13 +56,13 @@ function main()
     os.execute("pkill -9 mysqld")
     os.execute("service mysql start")
 
-    os.execute("sleep 3")
+    warnedSleep()
 end
 
 function warnedSleep()
-    print(PURPLE .. "warning: test requires non-determinstic sleep!\n" ..
+    print(PURPLE .. "warning: integration tests require non-determinstic sleep!\n" ..
           COLOR_END)
-    os.execute("sleep 3")
+    os.execute("sleep 5")
 end
 
 -- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -93,44 +84,52 @@ function test_normalQueryExecution()
     -- do a query
     status = ThreadedQuery.query(lua_query, "SELECT * FROM lua_test.t")
     if not status then
+        ThreadedQuery.kill(lua_query)
         return false
     end
 
     status, result = ThreadedQuery.results(lua_query)
     if not (status and type(result) == "table") then
+        ThreadedQuery.kill(lua_query)
         return false
     end
 
     -- do it again
     status = ThreadedQuery.query(lua_query, "SELECT * FROM lua_test.t")
     if not assert(status) then
+        ThreadedQuery.kill(lua_query)
         return false
     end
 
     status, result = ThreadedQuery.results(lua_query)
     if not (status and type(result) == "table") then
+        ThreadedQuery.kill(lua_query)
         return false
     end
 
     -- different query
     status = ThreadedQuery.query(lua_query, "UPDATE lua_test.t SET x = 15")
     if not (status) then
+        ThreadedQuery.kill(lua_query)
         return false
     end
 
     status, result = ThreadedQuery.results(lua_query)
     if not (status and type(result) == "number") then
+        ThreadedQuery.kill(lua_query)
         return false
     end
 
     -- issue a malformed query
     status = ThreadedQuery.query(lua_query, "SELECT * FROM lua_test.tt")
     if not (not status) then
+        ThreadedQuery.kill(lua_query)
         return false
     end
 
     status, result = ThreadedQuery.results(lua_query)
     if not (not status and result == nil) then
+        ThreadedQuery.kill(lua_query)
         return false
     end
 
@@ -138,7 +137,6 @@ function test_normalQueryExecution()
     if not (status) then
         return false
     end
-    warnedSleep()
 
     return true
 end
@@ -167,18 +165,21 @@ function test_restartedQueryExecution()
     -- reconnect and succeed, but no data
     status, result = ThreadedQuery.results(lua_query)
     if not (not status and result == nil) then
+        ThreadedQuery.kill(lua_query)
         return false
     end
 
     -- successfully execute query
     status = ThreadedQuery.query(lua_query, "SELECT * FROM lua_test.t2")
     if not (status) then
+        ThreadedQuery.kill(lua_query)
         return false
     end
 
     -- successfully fetch data
     status, result = ThreadedQuery.results(lua_query)
     if not (status and type(result) == "table") then
+        ThreadedQuery.kill(lua_query)
         return false
     end
 
@@ -186,7 +187,6 @@ function test_restartedQueryExecution()
     if not (status) then
         return false
     end
-    warnedSleep()
 
     return true
 end
