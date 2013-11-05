@@ -1,8 +1,6 @@
 /*
  * TestQueries.cc
  *  -- end to end query and result test, independant of connection process
- *
- *
  */
 
 #include <algorithm>
@@ -26,8 +24,7 @@ static Connection * control;
 static Connection * test;
 
 static QueryList Insert = QueryList("SingleInsert",
-    { Query("CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)")},
-    // TODO parser currently has no KEY functionality (broken?)
+    { Query("CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)") },
     { Query("INSERT INTO test_insert VALUES (1, 21, 100, '24 Rosedale, Toronto, ONT', 'Pat Carlson')"),
       Query("SELECT * FROM test_insert"),
       Query("INSERT INTO test_insert (id, age, salary, address, name) VALUES (2, 23, 101, '25 Rosedale, Toronto, ONT', 'Pat Carlson2')"),
@@ -37,11 +34,6 @@ static QueryList Insert = QueryList("SingleInsert",
       Query("INSERT INTO test_insert (age, address, salary, name) VALUES (26, 'test address', 30, 'test name')"),
       Query("SELECT * FROM test_insert"),
       Query("INSERT INTO test_insert (age, address, salary, name) VALUES (27, 'test address2', 31, 'test name')"),
-      // Query Fail
-      //Query("select last_insert_id()"),
-      // This one crashes DBMS! DBMS recovery: ./mysql_upgrade -u root -pletmein 
-      //Query("INSERT INTO test_insert (id) VALUES (7)"),
-      //Query("select sum(id) from test_insert"),
       Query("INSERT INTO test_insert (age) VALUES (40)"),
       Query("SELECT age FROM test_insert"),
       Query("INSERT INTO test_insert (name) VALUES ('Wendy')"),
@@ -50,7 +42,6 @@ static QueryList Insert = QueryList("SingleInsert",
       Query("SELECT name, address, age FROM test_insert WHERE id=42") },
     { Query("DROP TABLE test_insert") } );
 
-//migrated from TestSinglePrinc TestSelect
 static QueryList Select = QueryList("SingleSelect",
     { Query("CREATE TABLE IF NOT EXISTS test_select (id integer, age integer, salary integer, address text, name text)") },
     { Query("INSERT INTO test_select VALUES (1, 10, 0, 'first star to the right and straight on till morning', 'Peter Pan')"),
@@ -100,13 +91,10 @@ static QueryList Select = QueryList("SingleSelect",
       Query("SELECT t.address AS b FROM test_select t"),
       Query("SELECT * FROM test_select HAVING age"),
       Query("SELECT * FROM test_select HAVING age && id"),
-      // BestEffort (Add more subquery tests as we expand functionality)
       Query("SELECT * FROM test_select WHERE id IN (SELECT id FROM test_select)"),
-      Query("SELECT * FROM test_select WHERE id IN (SELECT 1 FROM test_select)")
-      },
+      Query("SELECT * FROM test_select WHERE id IN (SELECT 1 FROM test_select)") },
     { Query("DROP TABLE test_select") } );
 
-//migrated from TestSinglePrinc TestJoin
 static QueryList Join = QueryList("SingleJoin",
     { Query("CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)"),
       Query("CREATE TABLE test_join2 (id integer, books integer, name text)") },
@@ -127,12 +115,10 @@ static QueryList Join = QueryList("SingleJoin",
       Query("SELECT * FROM test_join1, test_join2 WHERE test_join1.address=test_join2.name"),
       Query("SELECT address FROM test_join1 AS a, test_join2 WHERE a.id=test_join2.id"),
       Query("SELECT a.id, b.id, age, books, b.name FROM test_join1 a, test_join2 AS b WHERE a.id=b.id"),
-      Query("SELECT test_join1.name, age, salary, b.name, books FROM test_join1, test_join2 b WHERE test_join1.age = b.books"),
-            },
+      Query("SELECT test_join1.name, age, salary, b.name, books FROM test_join1, test_join2 b WHERE test_join1.age = b.books") },
     { Query("DROP TABLE test_join1"),
       Query("DROP TABLE test_join2") } );
 
-//migrated from TestSinglePrinc TestUpdate
 static QueryList Update = QueryList("SingleUpdate",
     { Query("CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)") },
     { Query("INSERT INTO test_update VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')"),
@@ -171,7 +157,6 @@ static QueryList Update = QueryList("SingleUpdate",
       Query("SELECT * FROM test_update") },
     { Query("DROP TABLE test_update") } );
 
-
 static QueryList HOM = QueryList("HOMAdd",
     { Query("CREATE TABLE test_HOM (id integer, age integer, salary integer, address text, name text)") },
     { Query("INSERT INTO test_HOM VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')"),
@@ -192,10 +177,8 @@ static QueryList HOM = QueryList("HOMAdd",
       Query("SELECT * FROM test_HOM"),
       Query("UPDATE test_HOM SET age = age + 3 WHERE id=1"),
       Query("SELECT * FROM test_HOM"),
-
       Query("UPDATE test_HOM SET age = 100 WHERE id = 1"),
       Query("SELECT * FROM test_HOM WHERE age = 100"),
-
       Query("SELECT COUNT(*) FROM test_HOM WHERE age > 100"),
       Query("SELECT COUNT(*) FROM test_HOM WHERE age < 100"),
       Query("SELECT COUNT(*) FROM test_HOM WHERE age <= 100"),
@@ -203,14 +186,8 @@ static QueryList HOM = QueryList("HOMAdd",
       Query("SELECT COUNT(*) FROM test_HOM WHERE age = 100") },
     { Query("DROP TABLE test_HOM") } );
 
-//migrated from TestDelete
 static QueryList Delete = QueryList("SingleDelete",
     { Query("CREATE TABLE test_delete (id integer, age integer, salary integer, address text, name text)") },
-      // Query Fail
-      //Query("CRYPTDB test_delete.age ENC"),
-      //Query("CRYPTDB test_delete.salary ENC"),
-      //Query("CRYPTDB test_delete.address ENC"),
-      //Query("CRYPTDB test_delete.name ENC") },
     { Query("INSERT INTO test_delete VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')"),
       Query("INSERT INTO test_delete VALUES (2, 16, 1000, 'Green Gables', 'Anne Shirley')"),
       Query("INSERT INTO test_delete VALUES (3, 8, 0, 'London', 'Lucy')"),
@@ -235,49 +212,17 @@ static QueryList Delete = QueryList("SingleDelete",
       Query("SELECT * FROM test_delete") },
     { Query("DROP TABLE test_delete") } );
 
-/*
-//migrated from TestSearch
-static QueryList Search = QueryList("SingleSearch",
-    // Query Fail
-    //Query("CRYPTDB test_search.seachable ENC") },
-    { Query("CREATE TABLE test_search (id integer, searchable text)") },
-    { Query("INSERT INTO test_search VALUES (1, 'short text')"),
-      Query("INSERT INTO test_search VALUES (2, 'Text with CAPITALIZATION')"),
-      Query("INSERT INTO test_search VALUES (3, '')"),
-      Query("INSERT INTO test_search VALUES (4, 'When I have fears that I may cease to be, before my pen has gleaned my teeming brain; before high piled books in charactery hold like ruch garners the full-ripened grain. When I behold on the nights starred face huge cloudy symbols of high romance and think that I may never live to trace their shadows with the magic hand of chance; when I feel fair creature of the hour that I shall never look upon thee more, never have relish of the faerie power of unreflecting love, I stand alone on the edge of the wide world and think till love and fame to nothingness do sink')"),
-      Query("SELECT * FROM test_search WHERE searchable LIKE '%text%'"),
-      Query("SELECT * FROM test_search WHERE searchable LIKE 'short%'"),
-      Query("SELECT * FROM test_search WHERE searchable LIKE ''"),
-      Query("SELECT * FROM test_search WHERE searchable LIKE '%capitalization'"),
-      Query("SELECT * FROM test_search WHERE searchable LIKE 'noword'"),
-      Query("SELECT * FROM test_search WHERE searchable LIKE 'when%'"),
-      Query("SELECT * FROM test_search WHERE searchable < 'slow'"),
-      Query("UPDATE test_search SET searchable='text that is new' WHERE id=1"),
-      Query("SELECT * FROM test_search WHERE searchable < 'slow'") },
-    { Query("DROP TABLE test_search") } );
-*/
-
 static QueryList Basic = QueryList("MultiBasic",
     { Query("CREATE TABLE t1 (id integer, post text, age bigint)"),
       Query("CREATE TABLE u_basic (id integer, username text)"),
       Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_basic (username text, psswd text)") },
-    {     
-      //Query Fail
-      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_basic (username, psswd) VALUES ('alice', 'secretalice')"),*/
-      //Query("DELETE FROM "+PWD_TABLE_PREFIX+"u_basic WHERE username='alice'"),
-      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_basic (username, psswd) VALUES ('alice', 'secretalice')"),
-
-      Query("INSERT INTO u_basic VALUES (1, 'alice')"),
+    { Query("INSERT INTO u_basic VALUES (1, 'alice')"),
       Query("SELECT * FROM u_basic"),
       Query("INSERT INTO t1 VALUES (1, 'text which is inserted', 23)"),
       Query("SELECT * FROM t1"),
       Query("SELECT post from t1 WHERE id = 1 AND age = 23"),
       Query("UPDATE t1 SET post='hello!' WHERE age > 22 AND id =1"),
       Query("SELECT * FROM t1"),
-      
-      // Query Fail
-      //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_basic (username, psswd) VALUES ('raluca','secretraluca')"),
-      
       Query("INSERT INTO u_basic VALUES (2, 'raluca')"),
       Query("SELECT * FROM u_basic"),
       Query("INSERT INTO t1 VALUES (2, 'raluca has text here', 5)"),
@@ -286,49 +231,29 @@ static QueryList Basic = QueryList("MultiBasic",
       Query("DROP TABLE t1"),
       Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_basic") });
 
-//migrated from PrivMessages
 static QueryList PrivMessages = QueryList("MultiPrivMessages",
     { Query("CREATE TABLE msgs (msgid integer, msgtext text)"),
       Query("CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)"),
       Query("CREATE TABLE u_mess (userid integer, username text)"),
       Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_mess (username text, psswd text)") },
-    {     
-    // Query Fail
-    // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_mess (username, psswd) VALUES ('alice', 'secretalice')"),
-
-    // Query Fail
-    // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_mess (username, psswd) VALUES ('bob', 'secretbob')"),
-      Query("INSERT INTO u_mess VALUES (1, 'alice')"),
+    { Query("INSERT INTO u_mess VALUES (1, 'alice')"),
       Query("INSERT INTO u_mess VALUES (2, 'bob')"),
       Query("INSERT INTO privmsg (msgid, recid, senderid) VALUES (9, 1, 2)"),
       Query("INSERT INTO msgs VALUES (1, 'hello world')"),
       Query("SELECT msgtext FROM msgs WHERE msgid=1"),
-      // Why broken?
-      // Query("SELECT msgtext FROM msgs, privmsg, u_mess WHERE username = 'alice' AND userid = recid AND msgs.msgid = privmsg.msgid"),
-      Query("INSERT INTO msgs VALUES (9, 'message for alice from bob')"),
-      // Why broken?
-      // Query("SELECT msgtext FROM msgs, privmsg, u_mess WHERE username = 'alice' AND userid = recid AND msgs.msgid = privmsg.msgid")
-    },
+      Query("INSERT INTO msgs VALUES (9, 'message for alice from bob')") },
     { Query("DROP TABLE msgs"),
       Query("DROP TABLE privmsg"),
       Query("DROP TABLE u_mess"),
       Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_mess") });
 
-//migrated from UserGroupForum
 static QueryList UserGroupForum = QueryList("UserGroupForum",
     { Query("CREATE TABLE u (userid integer, username text)"),
       Query("CREATE TABLE usergroup (userid integer, groupid integer)"),
       Query("CREATE TABLE groupforum (forumid integer, groupid integer, optionid integer)"),
       Query("CREATE TABLE forum (forumid integer, forumtext text)"),
       Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u (username text, psswd text)") },
-    { 
-      // Query Fail
-      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice', 'secretalice')"),
-      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')"),
-      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('chris', 'secretchris')"),
-
-      // Alice, Bob, Chris all logged on
-
+    { // Alice, Bob, Chris all logged on
       Query("INSERT INTO u VALUES (1, 'alice')"),
       Query("INSERT INTO u VALUES (2, 'bob')"),
       Query("INSERT INTO u VALUES (3, 'chris')"),
@@ -339,145 +264,54 @@ static QueryList UserGroupForum = QueryList("UserGroupForum",
       Query("INSERT INTO usergroup VALUES (3,2)"),
 
       //Alice is in group 1, Bob in group 2, Chris in group 1 & group 2
-
       Query("SELECT * FROM usergroup"),
       Query("INSERT INTO groupforum VALUES (1,1,14)"),
       Query("INSERT INTO groupforum VALUES (1,1,20)"),
 
       //Group 1 has access to forum 1
-
       Query("SELECT * FROM groupforum"),
       Query("INSERT INTO forum VALUES (1, 'success-- you can see forum text')"),
       
-      // Query Fail
-      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'"),
-      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'"),
-      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='chris'"),
-
-      // All users logged off at this point
-
-      // alice
-      
-      // Query Fail
-      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice', 'secretalice')"),
       // only Alice logged in and she should see forum 1
       Query("SELECT forumtext FROM forum WHERE forumid=1"),
       
-      // Query Fail
-      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'"),
-
-
-      // bob
-
-      // Query Fail
-      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')"),
       // only Bob logged in and he should not see forum 1
       Query("SELECT forumtext FROM forum WHERE forumid=1"),
-      
-      // Query Fail
-      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'"),
-
-
-      // chris
-      
-      // Query Fail
-      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('chris', 'secretchris')"),
 
       // only Chris logged in and he should see forum 1
       Query("SELECT forumtext FROM forum WHERE forumid=1"),
+
       // change forum text while Chris logged in
       Query("UPDATE forum SET forumtext='you win!' WHERE forumid=1"),
       Query("SELECT forumtext FROM forum WHERE forumid=1"),
-      
-      // Query Fail
-      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='chris'"),
-
-
-      // alice
-
-      // Query Fail
-      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice','secretalice')"),
 
       // only Alice logged in and she should see new text in forum 1
       Query("SELECT forumtext FROM forum WHERE forumid=1"),
+
       // create an orphaned forum
       Query("INSERT INTO forum VALUES (2, 'orphaned text! everyone should be able to see me')"),
+
       // only Alice logged in and she should see text in orphaned forum 2
       Query("SELECT forumtext FROM forum WHERE forumid=2"),
-      
-      // Query Fail
-      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'"),
 
-
-      // bob
-
-      // Query Fail
-      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')"),
       // only Bob logged in and he should see text in orphaned forum 2
       Query("SELECT forumtext FROM forum WHERE forumid=2"),
       
-      // Query Fail
-      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'"),
-
-
-      // chris
-      
-      // Query Fail
-      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('chris','secretchris')"),
-      
       // only Chris logged in and he should see text in orphaned forum 2
       Query("SELECT forumtext FROM forum WHERE forumid=2"),
+
       // de-orphanize forum 2 -- now only accessible by group 2
       Query("INSERT INTO groupforum VALUES (2,2,20)"),
-      // only Chris logged in and he should see text in both forum 1 and forum 2
-      // Query("SELECT forumtext FROM forum AS f, groupforum AS g, usergroup AS ug, u WHERE f.forumid=g.forumid AND g.groupid=ug.groupid AND ug.userid=u.userid AND u.username='chris' AND g.optionid=20"),
-      
-      // Query Fail
-      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='chris'"),
-
-
-      // bob
-
-      // Query Fail
-      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob','secretbob')"),
-
-      // only Bob logged in and he should see text in forum 2
-      // Query("SELECT forumtext FROM forum AS f, groupforum AS g, usergroup AS ug, u WHERE f.forumid=g.forumid AND g.groupid=ug.groupid AND ug.userid=u.userid AND u.username='bob' AND g.optionid=20"),
-      
-      // Query Fail
-      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'"),
-
-
-      // alice
-
-      // Query Fail
-      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('alice','secretalice')"),
-
-      // only Alice logged in and she should see text in forum 1
-      // Query("SELECT forumtext FROM forum AS f, groupforum AS g, usergroup AS ug, u WHERE f.forumid=g.forumid AND g.groupid=ug.groupid AND ug.userid=u.userid AND u.username='alice' AND g.optionid=20"),
-      
-      // Query Fail
-      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='alice'"),
-
-      // all logged out at this point
 
       // give group 2 access to forum 1 with the wrong access IDs -- since the forum will be inaccessible to group 2, doesn't matter that no one is logged in
       Query("INSERT INTO groupforum VALUES (1,2,2)"),
       Query("INSERT INTO groupforum VALUES (1,2,0)"),
+
       // attempt to gice group 2 actual access to the forum -- should fail, because no one is logged in
       Query("INSERT INTO groupforum VALUES (1,2,20)"),
 
-
-      // bob
-
-      // Query Fail
-      // Query("INSERT INTO "+PWD_TABLE_PREFIX+"u (username, psswd) VALUES ('bob', 'secretbob')"),
       // only Bob logged in and he should still not have access to forum 1
-      Query("SELECT forumtext FROM forum WHERE forumid=1")
-      
-    },
-      // Query Fail
-      // Query("DELETE FROM "+PWD_TABLE_PREFIX+"u WHERE username='bob'")},
+      Query("SELECT forumtext FROM forum WHERE forumid=1") },
     { Query("DROP TABLE u"),
       Query("DROP TABLE usergroup"),
       Query("DROP TABLE groupforum"),
@@ -509,11 +343,6 @@ static QueryList Auto = QueryList("AutoInc",
       },
     { Query("DROP TABLE msgs")});
 
-/*
- * Add additional tests once functional.
- * > HOM
- * > OPE
- */
 static QueryList Negative = QueryList("Negative",
     { Query("CREATE TABLE negs (a integer, b integer, c integer)") },
     { Query("INSERT INTO negs (a, b, c) VALUES (10, -20, -100)"),
@@ -521,7 +350,6 @@ static QueryList Negative = QueryList("Negative",
       Query("INSERT INTO negs (a, b, c) VALUES (-8, -50, -18)"),
       Query("SELECT a FROM negs WHERE b = -50 OR b = 50"),
       Query("SELECT a FROM negs WHERE c = -100 OR b = -20"),
-      // Query("SELECT a FROM negs WHERE -c = 100"),
       Query("INSERT INTO negs (c) VALUES (-1009)"),
       Query("INSERT INTO negs (c) VALUES (1009)"),
       Query("SELECT * FROM negs WHERE c = -1009")},
@@ -531,136 +359,71 @@ static QueryList Null = QueryList("Null",
     { Query("CREATE TABLE test_null (uid integer, age integer, address text)"),
       Query("CREATE TABLE u_null (uid integer, username text)"),
       Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_null (username text, password text)") },
-    { Query("CREATE TABLE test_null (uid integer, age integer, address text)"),
-      // Query Fail
-      //Query("CRYPTDB test_null.age ENC"),
-      //Query("CRYPTDB test_null.address ENC"),
-      Query("CREATE TABLE u_null (uid integer, username text)"),
-      Query("CREATE TABLE " + PWD_TABLE_PREFIX + "u_null (username text, password text)")},
-    //can only handle NULL's on non-principal fields
-      { 
-        // Query Fail
-        //Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_null (username, password) VALUES ('alice', 'secretA')"),
-        Query("INSERT INTO u_null VALUES (1, 'alice')"),
-        Query("INSERT INTO u_null VALUES (), ()"),
-        Query("INSERT INTO u_null VALUES (2, 'somewhere'), (3, 'cookies')"),
-
-        Query("INSERT INTO test_null (uid, age) VALUES (1, 20)"),
-        Query("SELECT * FROM test_null"),
-        Query("INSERT INTO test_null (uid, address) VALUES (1, 'somewhere over the rainbow')"),
-        Query("INSERT INTO test_null () VALUES (), ()"),
-        Query("INSERT INTO test_null VALUES (), ()"),
-        Query("INSERT INTO test_null (address, age) VALUES ('cookies', 1)"),
-        Query("INSERT INTO test_null (age, address) VALUES (1, 'two')"),
-        Query("INSERT INTO test_null (address, uid) VALUES ('three', 4)"),
-        Query("SELECT * FROM test_null"),
-        Query("INSERT INTO test_null (uid, age) VALUES (1, NULL)"),
-        Query("SELECT * FROM test_null"),
-        Query("INSERT INTO test_null (uid, address) VALUES (1, NULL)"),
-        Query("SELECT * FROM test_null"),
-        Query("INSERT INTO test_null VALUES (1, 25, 'Australia')"),
-        Query("SELECT * FROM test_null"),
-        Query("SELECT * FROM test_null WHERE uid = 1"),
-        Query("SELECT * FROM test_null WHERE age < 50"),
-        Query("SELECT SUM(uid) FROM test_null"),
-        Query("SELECT MAX(uid) FROM test_null"),
-        Query("SELECT * FROM test_null"),
-        Query("SELECT * FROM test_null WHERE address = 'cookies'"),
-        Query("SELECT * FROM test_null WHERE address < 'amber'"),
-        Query("SELECT * FROM test_null WHERE address LIKE 'aaron'"),
-        Query("SELECT * FROM test_null LEFT JOIN u_null"
-              "    ON test_null.uid = u_null.uid"),
-        Query("SELECT * FROM test_null, u_null"),
-        Query("SELECT * FROM test_null RIGHT JOIN u_null"
-              "    ON test_null.uid = u_null.uid"),
-        Query("SELECT * FROM test_null, u_null"),
-        Query("SELECT * FROM test_null RIGHT JOIN u_null"
-              "    ON test_null.address = u_null.username"),
-        Query("SELECT * FROM test_null, u_null"),
-        Query("SELECT * FROM test_null LEFT JOIN u_null"
-              "    ON u_null.username = test_null.address"),
-        Query("SELECT * FROM test_null, u_null")},
-    { Query("DROP TABLE test_null"),
-      Query("DROP TABLE u_null"),
-      Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_null") },
+    { Query("INSERT INTO u_null VALUES (1, 'alice')"),
+      Query("INSERT INTO u_null VALUES (), ()"),
+      Query("INSERT INTO u_null VALUES (2, 'somewhere'), (3, 'cookies')"),
+      Query("INSERT INTO test_null (uid, age) VALUES (1, 20)"),
+      Query("SELECT * FROM test_null"),
+      Query("INSERT INTO test_null (uid, address) VALUES (1, 'somewhere over the rainbow')"),
+      Query("INSERT INTO test_null () VALUES (), ()"),
+      Query("INSERT INTO test_null VALUES (), ()"),
+      Query("INSERT INTO test_null (address, age) VALUES ('cookies', 1)"),
+      Query("INSERT INTO test_null (age, address) VALUES (1, 'two')"),
+      Query("INSERT INTO test_null (address, uid) VALUES ('three', 4)"),
+      Query("SELECT * FROM test_null"),
+      Query("INSERT INTO test_null (uid, age) VALUES (1, NULL)"),
+      Query("SELECT * FROM test_null"),
+      Query("INSERT INTO test_null (uid, address) VALUES (1, NULL)"),
+      Query("SELECT * FROM test_null"),
+      Query("INSERT INTO test_null VALUES (1, 25, 'Australia')"),
+      Query("SELECT * FROM test_null"),
+      Query("SELECT * FROM test_null WHERE uid = 1"),
+      Query("SELECT * FROM test_null WHERE age < 50"),
+      Query("SELECT SUM(uid) FROM test_null"),
+      Query("SELECT MAX(uid) FROM test_null"),
+      Query("SELECT * FROM test_null"),
+      Query("SELECT * FROM test_null WHERE address = 'cookies'"),
+      Query("SELECT * FROM test_null WHERE address < 'amber'"),
+      Query("SELECT * FROM test_null WHERE address LIKE 'aaron'"),
+      Query("SELECT * FROM test_null LEFT JOIN u_null"
+            "    ON test_null.uid = u_null.uid"),
+      Query("SELECT * FROM test_null, u_null"),
+      Query("SELECT * FROM test_null RIGHT JOIN u_null"
+            "    ON test_null.uid = u_null.uid"),
+      Query("SELECT * FROM test_null, u_null"),
+      Query("SELECT * FROM test_null RIGHT JOIN u_null"
+            "    ON test_null.address = u_null.username"),
+      Query("SELECT * FROM test_null, u_null"),
+      Query("SELECT * FROM test_null LEFT JOIN u_null"
+            "    ON u_null.username = test_null.address"),
+      Query("SELECT * FROM test_null, u_null") },
+  /*{ Query("INSERT INTO u_null VALUES (1, 'alice')"),
+      Query("INSERT INTO test_null (uid, age) VALUES (1, 20)"),
+      Query("SELECT * FROM test_null"),
+      Query("INSERT INTO test_null (uid, address) VALUES (1, 'somewhere over the rainbow')"),
+      Query("INSERT INTO test_null () VALUES (), ()"),
+      Query("INSERT INTO test_null VALUES (), ()"),
+      Query("INSERT INTO test_null (address, age) VALUES ('cookies', 1)"),
+      Query("INSERT INTO test_null (age, address) VALUES (1, 'two')"),
+      Query("INSERT INTO test_null (address, uid) VALUES ('three', 4)"),
+      Query("SELECT * FROM test_null"),
+      Query("INSERT INTO test_null (uid, age) VALUES (1, NULL)"),
+      Query("SELECT * FROM test_null"),
+      Query("INSERT INTO test_null (uid, address) VALUES (1, NULL)"),
+      Query("SELECT * FROM test_null"),
+      Query("INSERT INTO test_null VALUES (1, 25, 'Australia')"),
+      Query("SELECT * FROM test_null"),
+      Query("SELECT * FROM test_null WHERE uid = 1"),
+      Query("SELECT * FROM test_null WHERE age < 50"),
+      Query("SELECT SUM(uid) FROM test_null"),
+      Query("SELECT MAX(uid) FROM test_null"),
+      Query("SELECT * FROM test_null"),
+      Query("SELECT * FROM test_null WHERE address = 'cookies'"),
+      Query("SELECT * FROM test_null WHERE address < 'amber'"),
+      Query("SELECT * FROM test_null WHERE address LIKE 'aaron'") },*/
     { Query("DROP TABLE test_null"),
       Query("DROP TABLE u_null"),
       Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_null") });
-
-/*static QueryList ManyConnections = QueryList("Multiple connections",
-    { Query("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext text)"),
-      Query("CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)"),
-      Query("CREATE TABLE forum (forumid integer AUTO_INCREMENT PRIMARY KEY, title text)"),
-      Query("CREATE TABLE post (postid integer AUTO_INCREMENT PRIMARY KEY, forumid integer, posttext text, author integer)"),
-      Query("CREATE TABLE u_conn (userid integer, username text)"),
-      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_conn (username text, psswd text)"),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query(""),
-      Query("") },
-    { Query("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, msgtext text)"),
-      Query("CRYPTDB msgs.msgtext ENC"),
-      Query("CREATE TABLE privmsg (msgid integer, recid integer, senderid integer)"),
-      Query("CRYPTDB privmsg.recid ENC"),
-      Query("CRYPTDB privmsg.senderid ENC"),
-      Query("CREATE TABLE forum (forumid integer AUTO_INCREMENT PRIMARY KEY, title text)"),
-      Query("CRYPTDB forum.title ENC"),
-      Query("CREATE TABLE post (postid integer AUTO_INCREMENT PRIMARY KEY, forumid integer, posttext text, author integer)"),
-      Query("CRYPTDB post.posttext ENC"),
-      Query("CREATE TABLE u_conn (userid enc integer, username enc text)"),
-      Query("CRYPTDB u_conn.userid ENC"),
-      Query("CRYPTDB u_conn.username ENC"),
-      Query("CREATE TABLE "+PWD_TABLE_PREFIX+"u_conn (username text, psswd text)") },
-    { Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_conn (username, psswd) VALUES ('alice','secretA')"),
-      Query("INSERT INTO "+PWD_TABLE_PREFIX+"u_conn (username, psswd) VALUES ('bob','secretB')"),
-      Query("INSERT INTO u_conn VALUES (1, 'alice')"),
-      Query("INSERT INTO u_conn VALUES (2, 'bob')"),
-      Query("INSERT INTO privmsg (msgid, recid, senderid) VALUES (9, 1, 2)"),
-      Query("SELECT LAST_INSERT_ID()"),
-      Query("INSERT INTO forum (title) VALUES ('my first forum')"),
-      Query("SELECT LAST_INSERT_ID()"),
-      Query("INSERT INTO forum (title) VALUES ('my first forum')"),
-      Query("SELECT LAST_INSERT_ID()"),
-      Query("INSERT INTO forum VALUES (11, 'testtest')"),
-      Query("INSERT INTO post (forumid, posttext, author) VALUES (1,'first post in first forum!', 1)"),
-      Query("SELECT LAST_INSERT_ID()"),
-      Query("INSERT INTO msgs (msgtext) VALUES ('hello world')"),
-      Query("SELECT LAST_INSERT_ID()"),
-      Query("INSERT INTO forum (title) VALUES ('two fish')"),
-      Query("INSERT INTO post (forumid, posttext, author) VALUES (12,'red fish',2)"),
-      Query("INSERT INTO post (forumid, posttext, author) VALUES (12,'blue fish',1)"),
-      Query("SELECT LAST_INSERT_ID()"),
-      Query("INSERT INTO msgs (msgtext) VALUES ('hello world2')"),
-      Query("SELECT LAST_INSERT_ID()"),
-      Query("INSERT INTO post (forumid, posttext, author) VALUES (12,'black fish, blue fish',1)"),
-      Query("INSERT INTO post (forumid, posttext, author) VALUES (12,'old fish, new fish',2)"),
-      Query("SELECT LAST_INSERT_ID()"),
-      Query("INSERT INTO msgs (msgtext) VALUES ('hello world3')"),
-      Query("SELECT LAST_INSERT_ID()"),
-      Query("SELECT msgtext FROM msgs WHERE msgid=1"),
-      Query("SELECT * FROM forum"),
-      Query("SELECT msgtext FROM msgs WHERE msgid=2"),
-      Query("SELECT msgtext FROM msgs WHERE msgid=3"),
-      Query("SELECT post.* FROM post, forum WHERE post.forumid = forum.forumid AND forum.title = 'two fish'"),
-      Query("SELECT msgtext FROM msgs, privmsg, u_conn WHERE username = 'alice' AND userid = recid AND msgs.msgid = privmsg.msgid"),
-      Query("INSERT INTO msgs VALUES (9, 'message for alice from bob')"),
-            //Query("SELECT LAST_INSERT_ID()"),
-      Query("SELECT msgtext FROM msgs, privmsg, u_conn WHERE username = 'alice' AND userid = recid AND msgs.msgid = privmsg.msgid") },
-    { Query("DROP TABLE msgs"),
-      Query("DROP TABLE privmsg"),
-      Query("DROP TABLE forum"),
-      Query("DROP TABLE post"),
-      Query("DROP TABLE u_conn"),
-      Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_conn") },
-    { Query("DROP TABLE msgs"),
-      Query("DROP TABLE privmsg"),
-      Query("DROP TABLE forum"),
-      Query("DROP TABLE post"),
-      Query("DROP TABLE u_conn"),
-      Query("DROP TABLE "+PWD_TABLE_PREFIX+"u_conn") });*/
 
 static QueryList BestEffort = QueryList("BestEffort",
     { Query("CREATE TABLE t (x integer, y integer)") },
@@ -674,7 +437,6 @@ static QueryList BestEffort = QueryList("BestEffort",
       Query("SELECT 2+2 FROM t"),
       Query("SELECT x+2+x FROM t"),
       Query("SELECT 2+x+2 FROM t"),
-      // Query("SELECT 2+2+x FROM t"),
       Query("SELECT x+y+3+4 FROM t"),
       Query("SELECT 2*x*2*y FROM t"),
       Query("SELECT x, y FROM t WHERE x AND y"), 
@@ -683,10 +445,6 @@ static QueryList BestEffort = QueryList("BestEffort",
       Query("SELECT 10, x+y FROM t WHERE x") },
     { Query("DROP TABLE t")});
 
-// We do not support queries like this.
-// > INSERT INTO t () VALUES ();
-// > INSERT INTO t VALUES (DEFAULT);
-// > INSERT INTO t VALUES (DEFAULT(x));
 static QueryList DefaultValue = QueryList("DefaultValue",
     { Query("CREATE TABLE def_0 (x INTEGER NOT NULL DEFAULT 10,"
       "                    y VARCHAR(100) NOT NULL DEFAULT 'purpflowers',"
@@ -723,15 +481,12 @@ static QueryList Decimal = QueryList("Decimal",
       Query("INSERT INTO dec_0 VALUES (50, 100.59)"),
       Query("INSERT INTO dec_0 (x) VALUES (1.1)"),
       Query("INSERT INTO dec_1 VALUES (8, 1000.5)"),
-      // Query("INSERT INTO dec_1 VALUES (118, -49.2)"),
-      // Query("INSERT INTO dec_1 VALUES (5, -49.2)"),
       Query("SELECT * FROM dec_0 WHERE x = 50"),
       Query("SELECT * FROM dec_0 WHERE x < 50"),
       Query("SELECT * FROM dec_0 WHERE y = 100.5"),
       Query("SELECT * FROM dec_0"),
       Query("INSERT INTO dec_0 VALUES (19, 100.5)"),
       Query("SELECT * FROM dec_0 WHERE y = 100.5"),
-      // Query("SELECT * FROM dec_1 WHERE a = 5 AND b = -49.2"),
       Query("SELECT * FROM dec_1"),
       Query("SELECT * FROM dec_0, dec_1 WHERE dec_0.y = dec_1.b")},
     { Query("DROP TABLE dec_0"),
@@ -779,18 +534,14 @@ static QueryList Transactions = QueryList("Transactions",
       Query("COMMIT"),
       Query("ROLLBACK"),
       Query("SELECT * FROM trans"),
-
       Query("START TRANSACTION"),
       Query("UPDATE trans SET a = a + 1, c = 50 WHERE a < 50000"),
-      // commit required for control database
-      Query("COMMIT"),
+      Query("COMMIT"),  // commit required for control database
       Query("SELECT * FROM trans"),
-
       Query("START TRANSACTION"),
       Query("INSERT INTO trans VALUES (1, 50, 150)"),
       Query("UPDATE trans SET b = b + 10 WHERE c = 50"),
-      // commit required for control database.
-      Query("COMMIT"),
+      Query("COMMIT"),  // commit required for control database
       Query("SELECT * FROM trans")},
     { Query("DROP TABLE trans")});
 
@@ -818,7 +569,6 @@ static QueryList TableAliases = QueryList("TableAliases",
 
 static QueryList DDL = QueryList("DDL",
     { Query("CREATE TABLE ddl_test (a integer, b integer, c integer)")},
-    { Query("CREATE TABLE ddl_test (a integer, b integer, c integer)")},
     { Query("INSERT INTO ddl_test VALUES (1, 2, 3)"),
       Query("SELECT * FROM ddl_test"),
       Query("ALTER TABLE ddl_test DROP COLUMN a"),
@@ -845,18 +595,12 @@ static QueryList DDL = QueryList("DDL",
       Query("ALTER TABLE ddl_test DROP INDEX j, DROP INDEX k,"
             "                     ADD INDEX j(b), ADD INDEX k(b, c)"),
       Query("SELECT * FROM ddl_test")},
-    { Query("DROP TABLE ddl_test")},
     { Query("DROP TABLE ddl_test")});
 
 // the oDET column will encrypt three times and two of these will pad;
 // the maximum field size if 2**32 - 1; so the maximum field size
 // we support is 2**32 - 1 - (2 * AES_BLOCK_BYTES)
 static QueryList MiscBugs = QueryList("MiscBugs",
-    { Query("CREATE TABLE crawlies (purple VARCHAR(4294967263),"
-            "                       pink VARCHAR(0))"),
-      Query("CREATE TABLE enums (x enum('this', 'that'))"),
-      Query("CREATE TABLE bugs (spider TEXT)"),
-      Query("CREATE TABLE more_bugs (ant INTEGER)")},
     { Query("CREATE TABLE crawlies (purple VARCHAR(4294967263),"
             "                       pink VARCHAR(0))"),
       Query("CREATE TABLE enums (x enum('this', 'that'))"),
@@ -876,9 +620,6 @@ static QueryList MiscBugs = QueryList("MiscBugs",
     },
     { Query("DROP TABLE crawlies"),
       Query("DROP TABLE bugs"),
-      Query("DROP TABLE more_bugs")},
-    { Query("DROP TABLE crawlies"),
-      Query("DROP TABLE bugs"),
       Query("DROP TABLE more_bugs")});
 
 //-----------------------------------------------------------------------
@@ -886,7 +627,6 @@ static QueryList MiscBugs = QueryList("MiscBugs",
 Connection::Connection(const TestConfig &input_tc, test_mode input_type) {
     tc = input_tc;
     type = input_type;
-    //cl = 0;
     proxy_pid = -1;
 
     try {
@@ -916,108 +656,88 @@ Connection::start() {
     std::string masterKey = BytesFromInt(mkey, AES_KEY_BYTES);
     switch (type) {
         //plain -- new connection straight to the DB
-    case UNENCRYPTED:
-    {
-	Connect *const c =
-	    new Connect(tc.host, tc.user, tc.pass, tc.port);
-	conn_set.insert(c);
-	this->conn = conn_set.begin();
-	break;
-            }
-    //single -- new Rewriter
-    case SINGLE:
-	break;
-    case PROXYPLAIN:
-	//break;
-    case PROXYENC:
-    {
-	//TODO:  a separate process for proxy
-	
-    }
-    case ENC:
-    {
-	ConnectionInfo ci(tc.host, tc.user, tc.pass);
-	const std::string master_key = "2392834";
-	ProxyState *const ps =
-	    new ProxyState(ci, tc.shadowdb_dir, master_key);
-                re_set.insert(ps);
-                this->re_it = re_set.begin();
-    }
-    break;
-    
-    default:
-	assert_s(false, "invalid type passed to Connection");
+        case UNENCRYPTED:
+        {
+	    Connect *const c =
+	        new Connect(tc.host, tc.user, tc.pass, tc.port);
+	    conn_set.insert(c);
+	    this->conn = conn_set.begin();
+	    break;
+        }
+        //single -- new Rewriter
+        case SINGLE:
+            break;
+        case PROXYPLAIN:
+        case PROXYENC:
+	  // TODO: a separate process for proxy
+        case ENC:
+        {
+            ConnectionInfo ci(tc.host, tc.user, tc.pass);
+            const std::string master_key = "2392834";
+            ProxyState *const ps =
+                new ProxyState(ci, tc.shadowdb_dir, master_key);
+            re_set.insert(ps);
+            this->re_it = re_set.begin();
+        }
+        break;
+        default:
+	    assert_s(false, "invalid type passed to Connection");
     }
 }
 
 void
 Connection::stop() {
     switch (type) {
-    case PROXYPLAIN:
-        //break;
-    case ENC:
-        for (auto r = re_set.begin(); r != re_set.end(); r++) {
-            delete *r;
-        }
-        re_set.clear();
-        break;
-    case SINGLE:
-        break;
-    case UNENCRYPTED:
-        for (auto c = conn_set.begin(); c != conn_set.end(); c++) {
-            delete *c;
-        }
-        conn_set.clear();
-        break;
-    default:
-        break;
+        case PROXYPLAIN:
+        case ENC:
+            for (auto r = re_set.begin(); r != re_set.end(); r++) {
+                delete *r;
+            }
+            re_set.clear();
+            break;
+        case SINGLE:
+            break;
+        case UNENCRYPTED:
+            for (auto c = conn_set.begin(); c != conn_set.end(); c++) {
+                delete *c;
+            }
+            conn_set.clear();
+            break;
+        default:
+            break;
     }
 }
 
 ResType
 Connection::execute(const Query &query) {
     switch (type) {
-    case ENC:
-        return executeRewriter(query);
-    case UNENCRYPTED:
-    case PROXYPLAIN:
-        return executeConn(query);
-        //break;
-        //return executeConn(query);
-    case SINGLE:
-        break;
-    default:
-        assert_s(false, "unrecognized type in Connection");
+        case ENC:
+            return executeRewriter(query);
+        case UNENCRYPTED:
+        case PROXYPLAIN:
+            return executeConn(query);
+        case SINGLE:
+            break;
+        default:
+            assert_s(false, "unrecognized type in Connection");
     }
     return ResType(false);
 }
 
 void
 Connection::executeFail(const Query &query) {
-    //cerr << type << " " << query << endl;
     LOG(test) << "Query: " << query.query << " could not execute" << std::endl;
 }
-
-/*ResType
-Connection::executeEDBProxy(string query) {
-    ResType res = cl->execute(query);
-    if (!res.ok) {
-        executeFail(query);
-    }
-    return res;
-    }*/
 
 ResType
 Connection::executeConn(const Query &query) {
     std::unique_ptr<DBResult> dbres(nullptr);
 
-    //cycle through connections of which should execute query
     conn++;
     if (conn == conn_set.end()) {
         conn = conn_set.begin();
     }
 
-    //cout << query << endl;
     if (!(*conn)->execute(query.query, &dbres)) {
         executeFail(query);
         return ResType(false);
@@ -1028,14 +748,11 @@ Connection::executeConn(const Query &query) {
 ResType
 Connection::executeRewriter(const Query &query) {
     //translate the query
-    //
-    //
     re_it++;
     if (re_it == re_set.end()) {
         re_it = re_set.begin();
     }
 
-    //cout << query << endl;
     ProxyState *const ps = *re_it;
     // If this assert fails, deteremine if one schema_cache makes sense
     // for multiple connections.
@@ -1050,17 +767,14 @@ Connection::executeRewriter(const Query &query) {
 my_ulonglong
 Connection::executeLast() {
     switch(type) {
-    case SINGLE:
-        break;
-    case UNENCRYPTED:
-    case PROXYPLAIN:
-        // break;
-    case PROXYSINGLE:
-        //TODO(ccarvalho) check this 
-        break;
-
-    default:
-        assert_s(false, "type does not exist");
+        case SINGLE:
+        case UNENCRYPTED:
+        case PROXYPLAIN:
+        case PROXYSINGLE:
+	    // TODO(ccarvalho) check this 
+            break;
+        default:
+            assert_s(false, "type does not exist");
     }
     return 0;
 }
@@ -1083,51 +797,37 @@ Connection::executeLastEDB() {
 //----------------------------------------------------------------------
 
 static bool
-CheckAnnotatedQuery(const TestConfig &tc,
-                    const Query &control_query,
-                    const Query &test_query)
+CheckAnnotatedQuery(const TestConfig &tc, const Query &query)
 {
-    const std::string empty_str = "";
     std::string r;
     ntest++;
 
-    std::vector<std::string> cps = test_query.crash_points;
+    std::vector<CrashPoint *> cps = query.crash_points;
     for (auto cp = cps.begin(); cp != cps.end(); ++cp) {
-        global_crash_point = *cp;
+      global_crash_point = (*cp)->name;
 
         try {
-            if (test_query.query != empty_str) {
-                test->execute(test_query);
-            }
-        } catch (const std::runtime_error &e) {
-            if (strcmp(e.what(), "crash test exception") != 0) {
-                throw;
-            }
-        }
+	    test->execute(query);
+        } catch (const CrashTestException &e) {}
     }
-    global_crash_point = empty_str;
+    global_crash_point = "";
 
-    LOG(test) << "control query: " << control_query.query;
-    const ResType control_res =
-        (empty_str == control_query.query) ? ResType(true) :
-                                control->execute(control_query);
+    LOG(test) << "query: " << query.query;
+    const ResType control_res = control->execute(query);
 
-    LOG(test) << "test query: " << test_query.query;
-    const ResType test_res =
-        (empty_str == test_query.query) ? ResType(true) :
-                                    test->execute(test_query);
+    const ResType test_res = test->execute(query);
 
     if (control_res.ok != test_res.ok) {
         LOG(warn) << "control " << control_res.ok
             << ", test " << test_res.ok
             << ", and true is " << true
-            << " for query: " << test_query.query;
+            << " for query: " << query.query;
 
         if (tc.stop_if_fail)
             thrower() << "stop on failure";
         return false;
     } else if (!match(test_res, control_res)) {
-        LOG(warn) << "result mismatch for query: " << test_query.query;
+        LOG(warn) << "result mismatch for query: " << query.query;
         LOG(warn) << "control is:";
         printRes(control_res);
         LOG(warn) << "test is:";
@@ -1153,7 +853,6 @@ CheckQuery(const TestConfig &tc, const Query &query) {
         switch(test_type) {
             case UNENCRYPTED:
             case PROXYPLAIN:
-                //break;
             case ENC:
                 //TODO(ccarvalho): check proxy
             default:
@@ -1165,7 +864,7 @@ CheckQuery(const TestConfig &tc, const Query &query) {
         return true;
     }
 
-    return CheckAnnotatedQuery(tc, query, query);
+    return CheckAnnotatedQuery(tc, query);
 }
 
 struct Score {
@@ -1189,30 +888,26 @@ static Score
 CheckQueryList(const TestConfig &tc, const QueryList &queries) {
     Score score(queries.name);
     for (unsigned int i = 0; i < queries.create.size(); i++) {
-        Query control_query = queries.create.choose(control_type)[i];
-        Query test_query = queries.create.choose(test_type)[i]; 
-        score.mark(CheckAnnotatedQuery(tc, control_query, test_query));
+        Query query = queries.create[i]; 
+        score.mark(CheckAnnotatedQuery(tc, query));
     }
 
     for (auto q = queries.common.begin(); q != queries.common.end(); q++) {
         switch (test_type) {
-        case PLAIN:
-        case SINGLE:
-        case PROXYPLAIN:
-           // break;
-        case ENC:
-            score.mark(CheckQuery(tc, *q));
-            break;
-
-        default:
-            assert_s(false, "test_type invalid");
+            case PLAIN:
+            case SINGLE:
+            case PROXYPLAIN:
+            case ENC:
+                score.mark(CheckQuery(tc, *q));
+                break;
+            default:
+                assert_s(false, "test_type invalid");
         }
     }
 
     for (unsigned int i = 0; i < queries.drop.size(); i++) {
-        Query control_query = queries.drop.choose(control_type)[i];
-        Query test_query = queries.drop.choose(test_type)[i];
-        score.mark(CheckAnnotatedQuery(tc, control_query, test_query));
+        Query query = queries.drop[i];
+        score.mark(CheckAnnotatedQuery(tc, query));
     }
 
     return score;
@@ -1249,9 +944,6 @@ RunTest(const TestConfig &tc) {
     // Pass 24/24
     scores.push_back(CheckQueryList(tc, Delete));
 
-    // Pass ?/?
-    // scores.push_back(CheckQueryList(tc, Search));
-
     // Pass 14/14
     scores.push_back(CheckQueryList(tc, PrivMessages));
 
@@ -1276,9 +968,6 @@ RunTest(const TestConfig &tc) {
     // Pass 19/19
     scores.push_back(CheckQueryList(tc, DefaultValue));
 
-    // Pass ?/?
-    // scores.push_back(CheckQueryList(tc, Decimal));
-
     // Pass 17/17
     scores.push_back(CheckQueryList(tc, NonStrictMode));
 
@@ -1298,15 +987,7 @@ RunTest(const TestConfig &tc) {
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;
     }
-
-    /*
-    //everything has to restart so that last_insert_id() are lined up
-    test->restart();
-    control->restart();
-    CheckQueryList(tc, ManyConnections);
-    */
 }
-
 
 //---------------------------------------------------------------------
 
@@ -1335,40 +1016,38 @@ string_to_test_mode(const std::string &s)
 void
 TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
     switch(argc) {
-    case 4:
-        //TODO check that argv[3] is a proper int-string
-        no_conn = valFromStr(argv[3]);
-    case 3:
-        control_type = string_to_test_mode(argv[1]);
-        test_type = string_to_test_mode(argv[2]);
-        break;
-    default:
-        std::cerr << "Usage:" << std::endl
-             << "    .../tests/test queries control-type test-type [num_conn]" << std::endl
-             << "Possible control and test types:" << std::endl
-             << "    plain" << std::endl
-             << "    single" << std::endl
-             << "    proxy-plain" << std::endl
-             << "    enc" << std::endl
-             << "single make connections through EDBProxy" << std::endl
-             << "proxy-* makes connections *'s encryption type through the proxy" << std::endl
-             << "num_conn is the number of conns made to a single db (default 1)" << std::endl
-             << "    for num_conn > 1, control and test should both be proxy-* for valid results" << std::endl;
-        return;
+        case 4:
+            // TODO check that argv[3] is a proper int-string
+            no_conn = valFromStr(argv[3]);
+        case 3:
+            control_type = string_to_test_mode(argv[1]);
+            test_type = string_to_test_mode(argv[2]);
+            break;
+        default:
+            std::cerr << "Usage:" << std::endl
+                << "    .../tests/test queries control-type test-type [num_conn]" << std::endl
+                << "Possible control and test types:" << std::endl
+         	<< "    plain" << std::endl
+	        << "    single" << std::endl
+                << "    proxy-plain" << std::endl
+                << "    enc" << std::endl
+                << "single make connections through EDBProxy" << std::endl
+                << "proxy-* makes connections *'s encryption type through the proxy" << std::endl
+                << "num_conn is the number of conns made to a single db (default 1)" << std::endl
+                << "    for num_conn > 1, control and test should both be proxy-* for valid results" << std::endl;
+            return;
     }
 
     if (no_conn > 1) {
         switch(test_type) {
-        case UNENCRYPTED:
-        case SINGLE:
-            break;
-        case PROXYPLAIN:
-           // break;
-        case ENC:
-            //TODO(ccarvalho) check this
-            break;
-        default:
-            std::cerr << "test_type does not exist" << std::endl;
+            case UNENCRYPTED:
+            case SINGLE:
+            case PROXYPLAIN:
+            case ENC:
+                // TODO(ccarvalho) check this
+                break;
+            default:
+                std::cerr << "test_type does not exist" << std::endl;
         }
     }
 
@@ -1397,4 +1076,3 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
         throw;
     }
 }
-
