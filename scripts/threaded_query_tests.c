@@ -480,6 +480,7 @@ TEST(test_handleKilledQuery)
     struct LuaQuery **p_bad_lua_query =
         createLuaQuery(&bad_host_data, init_wait);
     TEST_ASSERT(p_bad_lua_query && *p_bad_lua_query);
+    POSSIBLE_SELF_OWNING_THREAD(THD((*p_bad_lua_query)->thread));
 
     issueQuery(L, strdup("do 0"), p_bad_lua_query);
     TEST_ASSERT(false         == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
@@ -489,8 +490,6 @@ TEST(test_handleKilledQuery)
     TEST_ASSERT(1             == (*p_bad_lua_query)->persist.restarts);
     TEST_ASSERT(NULL                 == (*p_bad_lua_query)->persist.ell);
     TEST_ASSERT(init_wait            == (*p_bad_lua_query)->persist.wait);
-
-    POSSIBLE_SELF_OWNING_THREAD(THD((*p_bad_lua_query)->thread));
 
     struct HostData *good_host_data =
         createHostData(real_host, real_user, real_passwd, real_port);
@@ -610,7 +609,7 @@ TEST(test_destroyHostData)
 END_TEST
 
 TEST(test_deepCopyLuaQuery)
-    const char *const init_host         = "some-host";
+    const char *const init_host         = fast_bad_host;
     const char *const init_user         = "a-user";
     const char *const init_passwd       = "dat-passwd";
     const unsigned int init_port        = 0x7654;
@@ -719,6 +718,26 @@ TEST(test_undoDeepCopyLuaQuery)
                     == save_lua_query->persist.host_data->port);
 END_TEST
 
+TEST(test_killThreadOwningMutex)
+    const char *const init_host         = real_host;
+    const char *const init_user         = real_user;
+    const char *const init_passwd       = real_passwd;
+    const unsigned int init_port        = real_port;
+
+    struct HostData *host_data =
+        createHostData(init_host, init_user, init_passwd, init_port);
+    TEST_ASSERT(host_data);
+
+    const unsigned int init_wait        = 1;
+    struct LuaQuery **p_lua_query = createLuaQuery(&host_data, init_wait);
+    UGLY_SLEEP
+
+    // POSSIBLE_SELF_OWNING_THREAD(THD((*p_lua_query)->thread));
+
+    destroyLuaQuery(&p_lua_query);
+    TEST_ASSERT(NULL == p_lua_query);
+END_TEST
+
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 //                 Helpers
@@ -747,6 +766,7 @@ all(struct lua_State *const L)
     test_destroyHostData(L);
     test_deepCopyLuaQuery(L);
     test_undoDeepCopyLuaQuery(L);
+    test_killThreadOwningMutex(L);
 
     // bookkeeping
     printTestStats();

@@ -437,6 +437,8 @@ waitForCommand(struct LuaQuery *const lua_query)
     // > this mutex should always be available to us here.
     assert(!pthread_mutex_lock(MUTEX_ADDR(lua_query->mutex)));
     while (false == lua_query->command_ready) {
+        // A cancellatin point; if killed during pthread_cond_wait the
+        // mutex is reacquired before calling cleanup handlers
         const int error =
             pthread_cond_wait(COND_ADDR(lua_query->cond),
                               MUTEX_ADDR(lua_query->mutex));
@@ -516,10 +518,24 @@ strangeFinishedCommandIssue(struct LuaQuery *const lua_query,
 
 // close the mysql connection if we receive an asynch kill order
 static void
-cleanup_handler(void *const mysql_conn)
+mysql_cleanup_handler(void *const mysql_conn)
 {
     assert(mysql_conn);
     mysql_close(mysql_conn);
+}
+
+static void
+mutex_cleanup_handler(void *const lpq)
+{
+    // if we have the mutex locked; kill it during 'pthread_cond_wait' or
+    // between pthread_mutex_lock and pthread_cond_wait or between
+    // pthread_cond_wait and pthread_mutex_unlock or between
+    // pthread_cond_wait and pthread_cond_wait during a spurious wakeup.
+    // > we must unlock this mutex so that it can be destroyed
+
+    struct LuaQuery *const lua_query = (struct LuaQuery *)lpq;
+    const int err = pthread_mutex_unlock(MUTEX_ADDR(lua_query->mutex));
+    assert(0 == err || EPERM == err);
 }
 
 void *
@@ -561,7 +577,8 @@ commandHandler(void *const lq)
 
     // if the caller tried to kill us before this point, we should
     // immediately die after entering ASYNCH KILL mode.
-    pthread_cleanup_push(&cleanup_handler, conn);
+    pthread_cleanup_push(&mysql_cleanup_handler, conn);
+    pthread_cleanup_push(&mutex_cleanup_handler, lua_query);
     assert(!pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL));
     // debug variable
     bool queried = false;
@@ -654,6 +671,7 @@ commandHandler(void *const lq)
 
     // should never reach this point.
     assert(false);
+    pthread_cleanup_pop(0);
     pthread_cleanup_pop(0);
 }
 
