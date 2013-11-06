@@ -302,15 +302,29 @@ issueCommand(lua_State *const L, enum Command command,
     struct timespec ts;
     if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
         fprintf(stderr, "clock_gettime failed!\n");
-        // FIXME: graceful failure
-        exit(0);
+        strangeFinishedCommandIssue(*p_lua_query, false);
     }
     ts.tv_sec += (*p_lua_query)->persist.wait;
 
-    // FIXME: assert
-    // FIXME: should not use 'try'
-    assert(!pthread_mutex_trylock(MUTEX_ADDR((*p_lua_query)->mutex)));
-    assert(!pthread_cond_signal(COND_ADDR((*p_lua_query)->cond)));
+    if (pthread_mutex_lock(MUTEX_ADDR((*p_lua_query)->mutex))) {
+        perror("pthread_mutex_lock failed!\n");
+        // if we don't acquire the lock we can't tell the worker thread
+        // that we have work for him.
+        strangeFinishedCommandIssue(*p_lua_query, false);
+        return;
+    }
+
+    if (pthread_cond_signal(COND_ADDR((*p_lua_query)->cond))) {
+        perror("pthread_cond_signal failed!\n");
+        // if we don't signal the worker thread he won't know that we
+        // have work for him
+        // > we must fail to unlock the mutex, otherwise things become
+        // unrecoverable.
+        assert(!pthread_mutex_unlock(MUTEX_ADDR((*p_lua_query)->mutex)));
+        strangeFinishedCommandIssue(*p_lua_query, false);
+        return;
+    }
+
     while (false == (*p_lua_query)->completion_signal) {
         const int error =
             pthread_cond_timedwait(COND_ADDR((*p_lua_query)->cond),
@@ -327,7 +341,8 @@ issueCommand(lua_State *const L, enum Command command,
         }
         break;
     }
-    pthread_mutex_unlock(MUTEX_ADDR((*p_lua_query)->mutex));
+    // we must unlock the mutex otherwise things become unrecoverable
+    assert(!pthread_mutex_unlock(MUTEX_ADDR((*p_lua_query)->mutex)));
 
     // handle result
     if (false == (*p_lua_query)->completion_signal) {
@@ -409,8 +424,8 @@ issueQuery(lua_State *const L, const char *const query,
 static void
 waitForCommand(struct LuaQuery *const lua_query)
 {
-    // FIXME: assert
-    assert(!pthread_mutex_trylock(MUTEX_ADDR(lua_query->mutex)));
+    // > this mutex should always be available to us here.
+    assert(!pthread_mutex_lock(MUTEX_ADDR(lua_query->mutex)));
     while (false == lua_query->command_ready) {
         const int error =
             pthread_cond_wait(COND_ADDR(lua_query->cond),
@@ -1072,6 +1087,7 @@ luaToCharp(lua_State *const L, int index)
     return p;
 }
 
+// HACK.
 void *
 nullFail(void *p)
 {
@@ -1086,14 +1102,6 @@ validBox(Box b)
 {
     static unsigned char zeros[BOX_SIZE] = {};
     return b.valid;
-}
-
-static Box
-newBox(void *p, size_t n)
-{
-    Box b = {.valid = true};
-    memcpy(b.value, p, n);
-    return b;
 }
 
 #include "threaded_query_tests.c"
