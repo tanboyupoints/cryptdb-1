@@ -46,32 +46,32 @@ enum STOP_TYPE {SUCCESS, NOTHING_TO_STOP, PENDING_SELF_DESTRUCTION,
 # define BOX_SIZE 100
 typedef struct ValidityBox {
     bool valid;
-    unsigned char value[BOX_SIZE];
+    unsigned char *value;
 } Box;
 
 #define THD(box)                                            \
-    (assert((box).valid), *(pthread_t *)&(box).value)
+    (assert((box).valid), **(pthread_t **)&(box).value)
 
 #define THD_ADDR(box)                                       \
     ((box).valid = true,                                    \
-     (pthread_t *)&(box).value)
+     *(pthread_t **)&(box).value)
 
 #define MUTEX(box)                                          \
-    (assert((box).valid), *(pthread_mutex_t)&(box).value)
+    (assert((box).valid), **(pthread_mutex_t **)&(box).value)
 
 #define MUTEX_ADDR(box)                                     \
     ((box).valid = true,                                    \
-     (pthread_mutex_t *)&(box).value)
+     *(pthread_mutex_t **)&(box).value)
 
 #define COND(box)                                           \
-    (assert((box).valid), *(pthread_cond_t)&(box).value)
+    (assert((box).valid), **(pthread_cond_t **)&(box).value)
 
 #define COND_ADDR(box)                                      \
     ((box).valid = true,                                    \
-     (pthread_cond_t *)&(box).value)
+     *(pthread_cond_t **)&(box).value)
 
 #define NEW_BOX                                             \
-    ((Box){.valid = false, .value = {}})
+    ((Box){.valid = false, .value = nullFail(calloc(BOX_SIZE, 1))})
 
 #define ASSERT_VALID_BOX(box)                               \
 {                                                           \
@@ -155,8 +155,7 @@ static enum RESTART_STATUS restartLuaQueryThread(struct LuaQuery **lua_query);
 static bool zombie(struct LuaQuery *const lua_query);
 static void issueCommand(lua_State *L, enum Command command,
                          struct LuaQuery **const p_lua_query);
-static bool issueQuery(lua_State *L, enum Command command,
-                       const char *const query,
+static bool issueQuery(lua_State *L, const char *const query,
                        struct LuaQuery **const p_lua_query);
 static void *commandHandler(void *const lq);
 
@@ -167,6 +166,7 @@ static void nilTheStackPlus(struct LuaQuery *const lua_query,
 static void pushvalue(lua_State *const L, const char *const string,
                       long int len);
 static const char *luaToCharp(lua_State *const L, int index);
+void *nullFail(void *p);
 
 static int
 start(lua_State *const L)
@@ -208,7 +208,7 @@ query(lua_State *const L)
 
     const char *const q = luaToCharp(L, 2);
 
-    if (false == issueQuery(L, QUERY, q, p_lua_query)) {
+    if (false == issueQuery(L, q, p_lua_query)) {
         fprintf(stderr, "issueQuery failed!\n");
         lua_pushboolean(L, false);
         nilTheStackPlus(*p_lua_query, 1);
@@ -307,8 +307,10 @@ issueCommand(lua_State *const L, enum Command command,
     }
     ts.tv_sec += (*p_lua_query)->persist.wait;
 
+    // FIXME: assert
     // FIXME: should not use 'try'
-    pthread_mutex_trylock(MUTEX_ADDR((*p_lua_query)->mutex));
+    assert(!pthread_mutex_trylock(MUTEX_ADDR((*p_lua_query)->mutex)));
+    assert(!pthread_cond_signal(COND_ADDR((*p_lua_query)->cond)));
     while (false == (*p_lua_query)->completion_signal) {
         const int error =
             pthread_cond_timedwait(COND_ADDR((*p_lua_query)->cond),
@@ -317,12 +319,13 @@ issueCommand(lua_State *const L, enum Command command,
         if (0 == error) {
             // Make sure this is not a spurious wakeup.
             continue;
-        } else if (ETIMEDOUT == error) {
-            break;
         }
 
-        perror("panicking: pthread_cond_timedwait failed!\n");
-        exit(0);
+        if (ETIMEDOUT != error) {
+            perror("pthread_cond_timedwait failed,"
+                   " trying to continue\n");
+        }
+        break;
     }
     pthread_mutex_unlock(MUTEX_ADDR((*p_lua_query)->mutex));
 
@@ -362,6 +365,7 @@ issueCommand(lua_State *const L, enum Command command,
         switch (rstatus) {
             case RESTARTED:
                 // managed to get a replacement thread running
+                assert((*p_lua_query)->thread.valid);
             case ONLY_SANE_STOP:
                 // killed the original thread; but no replacement thread
                 assert(L        == (*p_lua_query)->persist.ell);
@@ -388,8 +392,7 @@ issueCommand(lua_State *const L, enum Command command,
 }
 
 bool
-issueQuery(lua_State *const L, enum Command command,
-           const char *const query,
+issueQuery(lua_State *const L, const char *const query,
            struct LuaQuery **const p_lua_query)
 {
     // HACK.
@@ -399,14 +402,15 @@ issueQuery(lua_State *const L, enum Command command,
         return false;
     }
 
-    issueCommand(L, command, p_lua_query);
+    issueCommand(L, QUERY, p_lua_query);
     return true;
 }
 
 static void
 waitForCommand(struct LuaQuery *const lua_query)
 {
-    pthread_mutex_lock(MUTEX_ADDR(lua_query->mutex));
+    // FIXME: assert
+    assert(!pthread_mutex_trylock(MUTEX_ADDR(lua_query->mutex)));
     while (false == lua_query->command_ready) {
         const int error =
             pthread_cond_wait(COND_ADDR(lua_query->cond),
@@ -846,11 +850,6 @@ deepCopyLuaQuery(const struct LuaQuery *const lua_query)
 
     memcpy(new_lua_query, lua_query, sizeof(struct LuaQuery));
 
-    // thread state is not copyable
-    INVALIDATE(new_lua_query->thread);
-    INVALIDATE(new_lua_query->mutex);
-    INVALIDATE(new_lua_query->cond);
-
     // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     //         do deep copies
     // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -872,6 +871,10 @@ deepCopyLuaQuery(const struct LuaQuery *const lua_query)
         return NULL;
     }
 
+    // FIXME: Memleaks boxes on failure.
+    new_lua_query->thread = NEW_BOX;
+
+    new_lua_query->mutex = NEW_BOX;
     if (pthread_mutex_init(MUTEX_ADDR(new_lua_query->mutex), NULL)) {
         free(new_lua_query);
         free((void *)new_lua_query->persist.host_data);
@@ -879,6 +882,7 @@ deepCopyLuaQuery(const struct LuaQuery *const lua_query)
         return NULL;
     }
 
+    new_lua_query->cond = NEW_BOX;
     if (pthread_cond_init(COND_ADDR(new_lua_query->cond), NULL)) {
         free(new_lua_query);
         free((void *)new_lua_query->persist.host_data);
@@ -971,7 +975,12 @@ destroyLuaQueryMetaData(struct LuaQuery ***const pp_lua_query)
 
     // FIXME: check returns
     pthread_mutex_destroy(MUTEX_ADDR((**pp_lua_query)->mutex));
+    free((**pp_lua_query)->mutex.value);
+    (**pp_lua_query)->mutex.value = NULL;
+
     pthread_cond_destroy(COND_ADDR((**pp_lua_query)->cond));
+    free((**pp_lua_query)->cond.value);
+    (**pp_lua_query)->cond.value = NULL;
 
     free(**pp_lua_query);
     **pp_lua_query = NULL;
@@ -1059,6 +1068,14 @@ luaToCharp(lua_State *const L, int index)
     }
 
     assert(0 == p[length]);
+
+    return p;
+}
+
+void *
+nullFail(void *p)
+{
+    if (!p) {exit(2);}
 
     return p;
 }
