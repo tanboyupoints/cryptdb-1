@@ -293,7 +293,8 @@ TEST(test_destroyLuaQuery)
 END_TEST
 
 TEST(test_restartLuaQuery)
-    TEST_ASSERT(MAX_RESTARTS > 0);
+    TEST_ASSERT(MAX_PER_CONNECTION_RESTARTS > 0);
+    TEST_ASSERT(MAX_GLOBAL_RESTARTS > 0);
 
     const char *const init_host     = strdup(fast_bad_host);
     const char *const init_user     = strdup("where");
@@ -341,7 +342,8 @@ TEST(test_restartLuaQuery)
 END_TEST
 
 TEST(test_restartBadLuaQuery)
-    TEST_ASSERT(MAX_RESTARTS > 0)
+    TEST_ASSERT(MAX_PER_CONNECTION_RESTARTS > 0);
+    TEST_ASSERT(MAX_GLOBAL_RESTARTS > 0);
 
     const char *const init_host     = strdup(fast_bad_host);
     const char *const init_user     = strdup("saysomething");
@@ -383,7 +385,8 @@ dummyThread(void *const unused)
 }
 
 TEST(test_badIssueCommand)
-    TEST_ASSERT(MAX_RESTARTS > 0)
+    TEST_ASSERT(MAX_PER_CONNECTION_RESTARTS > 0);
+    TEST_ASSERT(MAX_GLOBAL_RESTARTS > 0);
 
     const char *const init_host     = fast_bad_host;
     const char *const init_user     = "going";
@@ -465,7 +468,8 @@ TEST(test_badIssueCommand)
 END_TEST
 
 TEST(test_handleKilledQuery)
-    TEST_ASSERT(MAX_RESTARTS > 0)
+    TEST_ASSERT(MAX_PER_CONNECTION_RESTARTS > 0);
+    TEST_ASSERT(MAX_GLOBAL_RESTARTS > 0);
 
     const char *const init_host     = slow_bad_host;
     const char *const init_user     = real_user;
@@ -512,7 +516,7 @@ TEST(test_handleKilledQuery)
     TEST_ASSERT(init_wait            == good_lua_query->persist.wait);
 
     issueCommand(L, KILL, &good_lua_query);
-    TEST_ASSERT(true          == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
+    TEST_ASSERT(!zombie(good_lua_query) == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
     TEST_ASSERT(true                 == validBox(good_lua_query->thread));
     TEST_ASSERT(COMMAND_OUTPUT_COUNT == good_lua_query->output_count);
     TEST_ASSERT(true                 == good_lua_query->mysql_connected);
@@ -543,17 +547,17 @@ TEST(test_zombie)
     memset(&lua_query, 0x11111111, sizeof(struct LuaQuery));
     memcpy(&test_lua_query, &lua_query, sizeof(struct LuaQuery));
 
-    TEST_ASSERT(MAX_RESTARTS >= 0);
-    if (MAX_RESTARTS > 0) {
+    if (MAX_PER_CONNECTION_RESTARTS > 0
+        && MAX_GLOBAL_RESTARTS > 0) {
         test_lua_query.persist.restarts =
-            lua_query.persist.restarts =        MAX_RESTARTS - 1;
+            lua_query.persist.restarts =   MAX_PER_CONNECTION_RESTARTS - 1;
         TEST_ASSERT(false == zombie(&lua_query));
         TEST_ASSERT(!memcmp(&lua_query, &test_lua_query,
                        sizeof(struct LuaQuery)));
     }
 
     test_lua_query.persist.restarts =
-        lua_query.persist.restarts =            MAX_RESTARTS;
+        lua_query.persist.restarts =    MAX_PER_CONNECTION_RESTARTS;
     TEST_ASSERT(true == zombie(&lua_query));
     TEST_ASSERT(!memcmp(&lua_query, &test_lua_query, sizeof(struct LuaQuery)));
 

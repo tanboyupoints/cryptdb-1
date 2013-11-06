@@ -27,15 +27,17 @@
         assert(!pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL));   \
 }
 
-// Once it's done 'MAX_RESTARTS' restarts, it will no longer communicate
-// with the worker thread;
+// Once it's done 'MAX_PER_CONNECTION_RESTARTS' restarts, it will no
+// longer communicate with the worker thread; same if global_restarts has
+// reach MAX_GLOBAL_RESTARTS.
 // > BUG: the last available restart will not _actually_ lead to data
 //   exchange; but it will _do_ the restart.
 //   + This is because a thread doesn't actually become a zombie until
 //     it's done MAX_RESTARTS restarts and it fails to respond one more
 //     time; we are not currently accounting for the second half of the
 //     premise.
-#define MAX_RESTARTS            5
+#define MAX_GLOBAL_RESTARTS            5
+#define MAX_PER_CONNECTION_RESTARTS    2
 #define COMMAND_OUTPUT_COUNT    2
 
 enum RESTART_STATUS {RESTARTED, ONLY_SANE_STOP, FUBAR};
@@ -941,7 +943,7 @@ restartLuaQueryThread(struct LuaQuery **p_lua_query)
     // from under us.
     assert(p_lua_query && *p_lua_query);
 
-    assert((*p_lua_query)->persist.restarts < MAX_RESTARTS);
+    assert((*p_lua_query)->persist.restarts < MAX_PER_CONNECTION_RESTARTS);
 
     ++(*p_lua_query)->persist.restarts;
     ++global_restarts;
@@ -1056,11 +1058,12 @@ destroyLuaQuery(struct LuaQuery ***const pp_lua_query)
 bool
 zombie(struct LuaQuery *const lua_query)
 {
-    assert(lua_query->persist.restarts <= MAX_RESTARTS);
-    assert(global_restarts <= MAX_RESTARTS);
+    assert(lua_query->persist.restarts <= MAX_PER_CONNECTION_RESTARTS);
+    assert(global_restarts <= MAX_GLOBAL_RESTARTS);
 
     // return MAX_RESTARTS == lua_query->persist.restarts;
-    return MAX_RESTARTS == global_restarts;
+    return MAX_GLOBAL_RESTARTS == global_restarts
+           || MAX_PER_CONNECTION_RESTARTS == lua_query->persist.restarts;
 }
 
 
