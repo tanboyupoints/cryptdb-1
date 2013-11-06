@@ -241,6 +241,7 @@ results(lua_State *const L)
     return (*p_lua_query)->output_count;
 }
 
+// if it returns, it succeeded; otherwise we aborted
 static int
 kill(lua_State *const L)
 {
@@ -362,24 +363,9 @@ issueCommand(lua_State *const L, enum Command command,
 
     // handle result
     if (false == (*p_lua_query)->completion_signal) {
-        // the worker thread did not complete the operation
-        // > a bad state because the thread might signal completion
-        // after we reset completion
-
-        // if we were trying to kill, issue a hard kill
-        // > if the hard kill fails, we can no longer effectively
-        // communicate with this thread. this is problematic because
-        // a rogue thread has a pointer to the lua_State.
+        // if the goal is to kill the thread; don't bother restarting
         if (KILL == command) {
-            const enum STOP_TYPE stop_type =
-                stopLuaQueryThread(*p_lua_query);
-            if (FAILURE == stop_type) {
-                fprintf(stderr, "panicking: failed to stop thread after"
-                                " KILL failed");
-                exit(0);
-            }
-
-            strangeFinishedCommandIssue(*p_lua_query, true);
+            strangeFinishedCommandIssue(*p_lua_query, false);
             return;
         }
 

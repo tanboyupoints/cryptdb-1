@@ -403,7 +403,7 @@ TEST(test_badIssueCommand)
     TEST_ASSERT(!pthread_create(THD_ADDR((*p_lua_query)->thread),
                                 NULL, dummyThread, NULL));
     issueCommand(L, KILL, p_lua_query);
-    TEST_ASSERT(true           == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
+    TEST_ASSERT(false          == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
     TEST_ASSERT(false                   == (*p_lua_query)->command_ready);
     TEST_ASSERT(false                == (*p_lua_query)->completion_signal);
     TEST_ASSERT(COMMAND_OUTPUT_COUNT    == (*p_lua_query)->output_count);
@@ -413,7 +413,7 @@ TEST(test_badIssueCommand)
 
     // test restart attempts
     size_t i = 0;
-    for (; i < MAX_RESTARTS; ++i) {
+    for (; false == zombie(*p_lua_query); ++i) {
         issueQuery(L, "SELECT SOMETHING", p_lua_query);
         TEST_ASSERT(false      == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
         TEST_ASSERT(true       == validBox((*p_lua_query)->thread));
@@ -436,7 +436,7 @@ TEST(test_badIssueCommand)
     TEST_ASSERT(false          == validBox((*p_lua_query)->thread));
     TEST_ASSERT(COMMAND_OUTPUT_COUNT    == (*p_lua_query)->output_count);
     TEST_ASSERT(false          == (*p_lua_query)->mysql_connected);
-    TEST_ASSERT(MAX_RESTARTS   == (*p_lua_query)->persist.restarts);
+    TEST_ASSERT(true           == zombie((*p_lua_query)));
     TEST_ASSERT(NULL           == (*p_lua_query)->persist.ell);
     TEST_ASSERT(init_wait      == (*p_lua_query)->persist.wait);
 
@@ -444,14 +444,14 @@ TEST(test_badIssueCommand)
     TEST_ASSERT(false           == validBox((*p_lua_query)->thread));
     TEST_ASSERT(COMMAND_OUTPUT_COUNT    == (*p_lua_query)->output_count);
     TEST_ASSERT(false           == (*p_lua_query)->mysql_connected);
-    TEST_ASSERT(MAX_RESTARTS    == (*p_lua_query)->persist.restarts);
+    TEST_ASSERT(true           == zombie((*p_lua_query)));
 
     issueCommand(L, KILL, p_lua_query);
-    TEST_ASSERT(true           == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
+    TEST_ASSERT(false          == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
     TEST_ASSERT(false          == validBox((*p_lua_query)->thread));
     TEST_ASSERT(COMMAND_OUTPUT_COUNT    == (*p_lua_query)->output_count);
     TEST_ASSERT(false          == (*p_lua_query)->mysql_connected);
-    TEST_ASSERT(MAX_RESTARTS   == (*p_lua_query)->persist.restarts);
+    TEST_ASSERT(true           == zombie((*p_lua_query)));
     TEST_ASSERT(NULL           == (*p_lua_query)->persist.ell);
     TEST_ASSERT(init_wait      == (*p_lua_query)->persist.wait);
 
