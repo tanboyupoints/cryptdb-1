@@ -27,7 +27,15 @@
         assert(!pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL));   \
 }
 
-#define MAX_RESTARTS            3
+// Once it's done 'MAX_RESTARTS' restarts, it will no longer communicate
+// with the worker thread;
+// > BUG: the last available restart will not _actually_ lead to data
+//   exchange; but it will _do_ the restart.
+//   + This is because a thread doesn't actually become a zombie until
+//     it's done MAX_RESTARTS restarts and it fails to respond one more
+//     time; we are not currently accounting for the second half of the
+//     premise.
+#define MAX_RESTARTS            5
 #define COMMAND_OUTPUT_COUNT    2
 
 enum RESTART_STATUS {RESTARTED, ONLY_SANE_STOP, FUBAR};
@@ -168,6 +176,8 @@ static void pushvalue(lua_State *const L, const char *const string,
 static const char *luaToCharp(lua_State *const L, int index);
 void *nullFail(void *p);
 
+static unsigned global_restarts = 0;
+
 static int
 start(lua_State *const L)
 {
@@ -299,6 +309,12 @@ issueCommand(lua_State *const L, enum Command command,
     (*p_lua_query)->persist.ell   = L;
     (*p_lua_query)->command_ready = true;
 
+    if (zombie(*p_lua_query)) {
+        fprintf(stderr, "zombie, no restart!\n");
+        strangeFinishedCommandIssue(*p_lua_query, false);
+        return;
+    }
+
     struct timespec ts;
     if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
         fprintf(stderr, "clock_gettime failed!\n");
@@ -364,12 +380,6 @@ issueCommand(lua_State *const L, enum Command command,
             }
 
             strangeFinishedCommandIssue(*p_lua_query, true);
-            return;
-        }
-
-        if (zombie(*p_lua_query)) {
-            fprintf(stderr, "zombie, no restart!\n");
-            strangeFinishedCommandIssue(*p_lua_query, false);
             return;
         }
 
@@ -930,6 +940,7 @@ restartLuaQueryThread(struct LuaQuery **p_lua_query)
     assert((*p_lua_query)->persist.restarts < MAX_RESTARTS);
 
     ++(*p_lua_query)->persist.restarts;
+    ++global_restarts;
 
     // first make a copy of the metadata in case we lose ownership of
     // if when we try to stop the thread.
@@ -1042,8 +1053,10 @@ bool
 zombie(struct LuaQuery *const lua_query)
 {
     assert(lua_query->persist.restarts <= MAX_RESTARTS);
+    assert(global_restarts <= MAX_RESTARTS);
 
-    return MAX_RESTARTS == lua_query->persist.restarts;
+    // return MAX_RESTARTS == lua_query->persist.restarts;
+    return MAX_RESTARTS == global_restarts;
 }
 
 
