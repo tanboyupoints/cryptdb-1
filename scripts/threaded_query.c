@@ -20,15 +20,20 @@
 #define HAPPY_THREAD_EXIT       (void *)101
 #define SAD_THREAD_EXIT         (void *)0x5AD
 
-#define NO_KILLING(stmt)                                                \
-{                                                                       \
-        assert(!pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL));  \
-        (stmt);                                                         \
-        assert(!pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL));   \
-}
+#define STOP_KILLING                                                    \
+        assert(!pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL))
+
+#define RESUME_KILLING                                                  \
+        assert(!pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL))
+
+#define DMZ(stmt)                                                   \
+    STOP_KILLING;                                                   \
+    (stmt);                                                         \
+    RESUME_KILLING;
 
 // Once it's done 'MAX_PER_CONNECTION_RESTARTS' restarts, it will no
-// longer communicate with the worker thread; same if global_restarts has
+// longer communicate with the worker thread;
+// > Once we reach MAX_GLOBAL_RESTARTS; everything is a zombie
 // reach MAX_GLOBAL_RESTARTS.
 // > BUG: the last available restart will not _actually_ lead to data
 //   exchange; but it will _do_ the restart.
@@ -36,18 +41,18 @@
 //     it's done MAX_RESTARTS restarts and it fails to respond one more
 //     time; we are not currently accounting for the second half of the
 //     premise.
-#define MAX_GLOBAL_RESTARTS            5
-#define MAX_PER_CONNECTION_RESTARTS    2
-#define COMMAND_OUTPUT_COUNT    2
+#define MAX_GLOBAL_RESTARTS             10
+#define MAX_PER_CONNECTION_RESTARTS     2
+#define COMMAND_OUTPUT_COUNT            2
 
 enum RESTART_STATUS {RESTARTED, ONLY_SANE_STOP, FUBAR};
 enum Command {QUERY, RESULTS, KILL};
 
 // SUCCESS          : a thread was running and we killed it
-// NOTHING_TO_STOP  : tried to stop a thread; but none was running.
+// NOTHING_TO_STOP  : tried to stop a thread; but none was running
 // PENDING_SELF_DESTRUCTION : a thread was running and we sent it a kill
-//                            signal, but it has not yet entered asynch
-//                            kill mode. the thread must exit at the next
+//                            signal, but it has not yet enabled kill
+//                            mode. the thread must exit at the next
 //                            opportunity and clean up it's own metadata.
 // FAILURE          : a thread was running, but we failed to kill it.
 enum STOP_TYPE {SUCCESS, NOTHING_TO_STOP, PENDING_SELF_DESTRUCTION,
@@ -177,6 +182,7 @@ static void pushvalue(lua_State *const L, const char *const string,
                       long int len);
 static const char *luaToCharp(lua_State *const L, int index);
 void *nullFail(void *p);
+bool validBox(Box b);
 
 static unsigned global_restarts = 0;
 
@@ -296,8 +302,8 @@ lua_main_init(lua_State *const L)
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-// > guarenteed to return meaningful (safe to access)
-//   LuaQuery::PresistentData and LuaQuery::output_count.
+// > the caller should only directly access
+//   LuaQuery::persist::output_count; the rest of LuaQuery is opaque
 void
 issueCommand(lua_State *const L, enum Command command,
              struct LuaQuery **const p_lua_query)
@@ -378,7 +384,7 @@ issueCommand(lua_State *const L, enum Command command,
         switch (rstatus) {
             case RESTARTED:
                 // managed to get a replacement thread running
-                assert((*p_lua_query)->thread.valid);
+                assert(validBox((*p_lua_query)->thread));
             case ONLY_SANE_STOP:
                 // killed the original thread; but no replacement thread
                 assert(L        == (*p_lua_query)->persist.ell);
@@ -470,8 +476,7 @@ completeLuaQuery(struct LuaQuery *const lua_query,
     lua_query->command_ready     = false;
     lua_query->completion_signal = true;
 
-    // FIXME: check result
-    pthread_cond_signal(COND_ADDR(lua_query->cond));
+    assert(!pthread_cond_signal(COND_ADDR(lua_query->cond)));
 }
 
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -526,11 +531,17 @@ mutex_cleanup_handler(void *const lpq)
     assert(0 == err || EPERM == err);
 }
 
+// ???: The docs _seem_ to indicate that pthread_exit should be called
+// implicity on return; but empirically this does not seem to be
+// happening.
 void *
 commandHandler(void *const lq)
 {
+    // mysql_store_result, lua_newtable, lua_pushnumber, etc are
+    // probably not kill safe
+    // > we rely on pthread_cond_wait as a cancellation point
     assert(!pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL));
-    assert(!pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL));
+    assert(!pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL));
 
     struct LuaQuery *lua_query = (struct LuaQuery *)lq;
     assert(lua_query);
@@ -564,11 +575,11 @@ commandHandler(void *const lq)
     lua_query->mysql_connected = true;
 
     // if the caller tried to kill us before this point, we should
-    // immediately die after entering ASYNCH KILL mode.
+    // immediately die after entering enable kill mode
     pthread_cleanup_push(&mysql_cleanup_handler, conn);
     pthread_cleanup_push(&mutex_cleanup_handler, lua_query);
     assert(!pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL));
-    // debug variable
+
     bool queried = false;
     while (true) {
         // blocking
@@ -576,10 +587,9 @@ commandHandler(void *const lq)
 
         assert(false == lua_query->completion_signal);
         if (KILL == lua_query->command) {
-            assert(!pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL));
             lua_pushboolean(lua_query->persist.ell, true);
             completeLuaQuery(lua_query, 1);
-            return HAPPY_THREAD_EXIT;
+            pthread_exit(HAPPY_THREAD_EXIT);
         } else if (QUERY == lua_query->command) {
             assert(false == queried);
             queried = true;
@@ -708,10 +718,20 @@ clearLuaQuery(struct LuaQuery *const lua_query)
     lua_query->completion_signal    = false;
     lua_query->command              = -1;
     lua_query->sql                  = NULL;
+
+    _Static_assert(sizeof(pthread_t) <= BOX_SIZE,
+                   "BOX_SIZE is too small for pthread_t!");
     lua_query->thread               = NEW_BOX;
+
     lua_query->output_count         = -1;
     lua_query->mysql_connected      = false;
+
+    _Static_assert(sizeof(pthread_mutex_t) <= BOX_SIZE,
+                   "BOX_SIZE is too small for pthread_mutex_t!");
     lua_query->mutex                = NEW_BOX;
+
+    _Static_assert(sizeof(pthread_cond_t) <= BOX_SIZE,
+                   "BOX_SIZE is too small for pthread_cond_t!");
     lua_query->cond                 = NEW_BOX;
 }
 
@@ -804,6 +824,7 @@ startLuaQueryThread(struct LuaQuery *const lua_query)
         perror("pthread_create failed!\n");
         return false;
     }
+    // getchar();
 
     ASSERT_VALID_BOX(lua_query->thread);
     ASSERT_VALID_BOX(lua_query->mutex);
@@ -822,7 +843,7 @@ stopLuaQueryThread(struct LuaQuery *const lua_query)
 
     // kill(...) issues a soft kill that then a hardkill, so we don't
     // do anything if the soft kill succeeded
-    if (false == lua_query->thread.valid) {
+    if (false == validBox(lua_query->thread)) {
         return NOTHING_TO_STOP;
     }
 
@@ -868,6 +889,30 @@ stopLuaQueryThread(struct LuaQuery *const lua_query)
     return SUCCESS;
 }
 
+static struct HostData *
+deepCopyHostData(const struct HostData *const host_data)
+{
+    assert(host_data && host_data->user && host_data->passwd
+           && host_data->port);
+
+    return createHostData(host_data->host, host_data->user,
+                          host_data->passwd, host_data->port);
+}
+
+static void *
+elseNull(void *(*op)(void *), void *p)
+{
+    if (p) return (*op)(p);
+
+    return NULL;
+}
+
+static void*
+_strdup(void *p)
+{
+    return strdup(p);
+}
+
 static struct LuaQuery *
 deepCopyLuaQuery(const struct LuaQuery *const lua_query)
 {
@@ -884,20 +929,21 @@ deepCopyLuaQuery(const struct LuaQuery *const lua_query)
     // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     //         do deep copies
     // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    if (lua_query->sql) {
-        new_lua_query->sql = strdup(lua_query->sql);
-    } else {
-        new_lua_query->sql = NULL;
+    new_lua_query->sql = elseNull(_strdup, (void *)lua_query->sql);
+    if (lua_query->sql && !new_lua_query->sql) {
+        free(new_lua_query);
+
+        fprintf(stderr, "_strdup failed!\n");
     }
+    assert(!!lua_query->sql == !!new_lua_query->sql);
 
     new_lua_query->persist.host_data =
-        createHostData(lua_query->persist.host_data->host,
-                       lua_query->persist.host_data->user,
-                       lua_query->persist.host_data->passwd,
-                       lua_query->persist.host_data->port);
+        deepCopyHostData(lua_query->persist.host_data);
 
     if (!new_lua_query->persist.host_data) {
+        freeSQL(new_lua_query);
         free(new_lua_query);
+
         fprintf(stderr, "createHostData failed!\n");
         return NULL;
     }
@@ -907,17 +953,20 @@ deepCopyLuaQuery(const struct LuaQuery *const lua_query)
 
     new_lua_query->mutex = NEW_BOX;
     if (pthread_mutex_init(MUTEX_ADDR(new_lua_query->mutex), NULL)) {
-        free(new_lua_query);
+        freeSQL(new_lua_query);
         free((void *)new_lua_query->persist.host_data);
+        free(new_lua_query);
+
         perror("pthread_mutex_init failed!\n");
         return NULL;
     }
 
     new_lua_query->cond = NEW_BOX;
     if (pthread_cond_init(COND_ADDR(new_lua_query->cond), NULL)) {
-        free(new_lua_query);
-        free((void *)new_lua_query->persist.host_data);
         pthread_mutex_destroy(MUTEX_ADDR(new_lua_query->mutex));
+        freeSQL(new_lua_query);
+        free((void *)new_lua_query->persist.host_data);
+        free(new_lua_query);
 
         perror("pthread_cond_init failed!\n");
         return NULL;
@@ -933,6 +982,7 @@ undoDeepCopyLuaQuery(struct LuaQuery **p_lua_query)
     freeSQL(*p_lua_query);
     assert(NULL == (*p_lua_query)->sql);
     destroyHostData((struct HostData **)&(*p_lua_query)->persist.host_data);
+    free(*p_lua_query);
     *p_lua_query = NULL;
 }
 
@@ -1005,12 +1055,13 @@ destroyLuaQueryMetaData(struct LuaQuery ***const pp_lua_query)
     assert(!pthread_mutex_trylock(MUTEX_ADDR((**pp_lua_query)->mutex)));
     assert(!pthread_mutex_unlock(MUTEX_ADDR((**pp_lua_query)->mutex)));
 
-    // FIXME: check returns
+    // FIXME: This destroy fails; must determine why.
     pthread_mutex_destroy(MUTEX_ADDR((**pp_lua_query)->mutex));
+
     free((**pp_lua_query)->mutex.value);
     (**pp_lua_query)->mutex.value = NULL;
 
-    pthread_cond_destroy(COND_ADDR((**pp_lua_query)->cond));
+    assert(!pthread_cond_destroy(COND_ADDR((**pp_lua_query)->cond)));
     free((**pp_lua_query)->cond.value);
     (**pp_lua_query)->cond.value = NULL;
 
@@ -1061,7 +1112,6 @@ zombie(struct LuaQuery *const lua_query)
     assert(lua_query->persist.restarts <= MAX_PER_CONNECTION_RESTARTS);
     assert(global_restarts <= MAX_GLOBAL_RESTARTS);
 
-    // return MAX_RESTARTS == lua_query->persist.restarts;
     return MAX_GLOBAL_RESTARTS == global_restarts
            || MAX_PER_CONNECTION_RESTARTS == lua_query->persist.restarts;
 }
@@ -1116,11 +1166,9 @@ nullFail(void *p)
     return p;
 }
 
-// for debugging/testing
 bool
 validBox(Box b)
 {
-    static unsigned char zeros[BOX_SIZE] = {};
     return b.valid;
 }
 

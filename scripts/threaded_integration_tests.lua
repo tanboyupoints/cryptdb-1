@@ -141,6 +141,7 @@ function test_normalQueryExecution()
     return true
 end
 
+-- Requires 2 real reconnect attempts
 function test_restartedQueryExecution()
     os.execute("mysql -uroot -pletmein -e \"create table lua_test.t2 (x integer, y integer)\"")
     os.execute("mysql -uroot -pletmein -e \"insert into lua_test.t2 VALUES (1, 2), (3, 4), (4, 3)\"")
