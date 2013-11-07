@@ -1237,7 +1237,7 @@ extern const char str_regexp[] = "regexp";
 static CItemStrconv<str_regexp> ANON;
  
 extern const char str_date_add_interval[] = "date_add_interval";
-// Use encryption/rewriting.
+// FIXME: Use encryption/rewriting.
 static class ANON : public CItemSubtypeFN<Item_date_add_interval, str_date_add_interval> {
     virtual RewritePlan *
     do_gather_type(const Item_date_add_interval &i, Analysis &a) const
@@ -1343,3 +1343,28 @@ static CItemFuncMiscPlain<str_cast_as_unsigned> ANON;
 
 extern const char str_cast_as_signed[] = "cast_as_signed";
 static CItemFuncMiscPlain<str_cast_as_signed> ANON;
+
+extern const char str_current_user[] = "current_user";
+static class ANON : public CItemSubtypeFN<Item_func_current_user,
+                                          str_current_user> {
+    virtual RewritePlan *
+    do_gather_type(const Item_func_current_user &i, Analysis &a) const
+    {
+        const EncSet out_es = PLAIN_EncSet;
+        const EncSet child_es = PLAIN_EncSet;
+        const std::string why = str_current_user;
+
+        return allPlainIterateGather(i, why, a);
+    }
+
+    virtual Item *
+    do_rewrite_type(const Item_func_current_user &i, const OLK &constr,
+                    const RewritePlan &rp, Analysis &a) const
+    {
+        return rewrite_args_FN(i, constr,
+                               static_cast<const RewritePlanOneOLK &>(rp),
+                               a);
+    }
+} ANON;
+
+

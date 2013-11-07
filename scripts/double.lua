@@ -4,7 +4,6 @@
 
 -- GLOBAL STATE
 local new_session       = true            -- wordpress testing hack
-local cryptdb_is_dead   = false
 local result_set_count  = nil
 local result_set_index  = nil
 
@@ -81,18 +80,16 @@ function read_query(packet)
     proxy.queries:append(42, packet, {resultset_is_needed = true})
     result_set_count = result_set_count + 1
 
-    if false == cryptdb_is_dead then
-        -- build the query for cryptdb
-        if string.byte(packet) == proxy.COM_INIT_DB then
-            cryptdb_query = "USE " .. query
-        else
-            cryptdb_query = query
-        end
+    -- build the query for cryptdb
+    if string.byte(packet) == proxy.COM_INIT_DB then
+        cryptdb_query = "USE " .. query
+    else
+        cryptdb_query = query
+    end
 
-        -- Send the new query
-        if tquery then
-            ThreadedQuery.query(tquery, cryptdb_query);
-        end
+    -- Send the new query
+    if tquery then
+        ThreadedQuery.query(tquery, cryptdb_query);
     end
 
     return proxy.PROXY_SEND_QUERY
@@ -107,12 +104,6 @@ function read_query_result(inj)
     local client_name = proxy.connection.client.src.name
     local query = string.sub(inj.query, 2)
     local out_status = nil
-
-    if true == cryptdb_is_dead then
-        create_log_entry(log_file_h, client_name, query, true, false,
-                         "cryptdb is dead")
-        return
-    end
 
     -- > somemtimes this is a table (ie SELECT), sometimes it's nil (query
     --   error), sometimes it's number of rows affected by command

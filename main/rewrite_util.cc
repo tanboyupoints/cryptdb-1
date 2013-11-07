@@ -263,28 +263,28 @@ getOnionIndexTypes()
 }
 
 static std::string
-getOriginalKeyName(Key *const key)
+getOriginalKeyName(const Key &key)
 {
-    if (Key::PRIMARY == key->type) {
+    if (Key::PRIMARY == key.type) {
         return "PRIMARY";
     }
 
-    const std::string out_name = convert_lex_str(key->name);
+    const std::string out_name = convert_lex_str(key.name);
     TEST_TextMessageError(out_name.size() > 0,
                           "Non-Primary keys can not have blank name!");
 
     return out_name;
 }
 
-std::vector<Key *>
-rewrite_key(const TableMeta &tm, Key *const key, const Analysis &a)
+static std::vector<Key *>
+rewrite_key(const TableMeta &tm, const Key &key, const Analysis &a)
 {
     std::vector<Key *> output_keys;
 
     const std::vector<onion> key_onions = getOnionIndexTypes();
     for (auto onion_it : key_onions) {
         const onion o = onion_it;
-        Key *const new_key = key->clone(current_thd->mem_root);
+        Key *const new_key = key.clone(current_thd->mem_root);
 
         // Set anonymous name.
         const std::string new_name =
@@ -294,7 +294,7 @@ rewrite_key(const TableMeta &tm, Key *const key, const Analysis &a)
 
         // Set anonymous columns.
         auto col_it =
-            RiboldMYSQL::constList_iterator<Key_part_spec>(key->columns);
+            RiboldMYSQL::constList_iterator<Key_part_spec>(key.columns);
         for (;;) {
             const Key_part_spec *const key_part = col_it++;
             if (NULL == key_part) {
@@ -320,13 +320,38 @@ rewrite_key(const TableMeta &tm, Key *const key, const Analysis &a)
     }
 
     // Only create one PRIMARY KEY.
-    if (Key::PRIMARY == key->type) {
+    if (Key::PRIMARY == key.type) {
         if (output_keys.size() > 0) {
             return std::vector<Key *>({output_keys.front()});
         }
     }
 
     return output_keys;
+}
+
+// 'seed_lex' and 'out_lex' can be the same object.
+void
+highLevelRewriteKey(const TableMeta &tm, const LEX &seed_lex,
+                    LEX *const out_lex, const Analysis &a)
+{
+    assert(out_lex);
+
+    // Add each new index.
+    auto key_it =
+        List_iterator<Key>(const_cast<LEX &>(seed_lex).alter_info.key_list);
+    out_lex->alter_info.key_list =
+        accumList<Key>(key_it,
+            [&tm, &a] (List<Key> out_list, const Key *const key) {
+                // -----------------------------
+                //         Rewrite INDEX
+                // -----------------------------
+                auto new_keys = rewrite_key(tm, *key, a);
+                out_list.concat(vectorToListWithTHD(new_keys));
+
+                return out_list;    /* lambda */
+        });
+
+    return;
 }
 
 std::string

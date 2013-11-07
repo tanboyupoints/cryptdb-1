@@ -8,13 +8,10 @@
 
 class CreateTableHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps) const
+                                  const ProxyState &ps,
+                                  const Preamble &pre) const
     {
-        const std::string &db_name =
-            lex->select_lex.table_list.first->db;
-        TEST_DatabaseDiscrepancy(db_name, a.getDatabaseName());
-        const std::string &table =
-            lex->select_lex.table_list.first->table_name;
+        TEST_DatabaseDiscrepancy(pre.dbname, a.getDatabaseName());
         LEX *const new_lex = copyWithTHD(lex);
 
         //TODO: support for "create table like"
@@ -25,7 +22,7 @@ class CreateTableHandler : public DDLHandler {
 
         // Create the table regardless of 'IF NOT EXISTS' if the table
         // doesn't exist.
-        if (false == a.tableMetaExists(db_name, table)) {
+        if (false == a.tableMetaExists(pre.dbname, pre.table)) {
             // TODO: Use appropriate values for has_sensitive and has_salt.
             std::unique_ptr<TableMeta> tm(new TableMeta(true, true));
 
@@ -61,25 +58,15 @@ class CreateTableHandler : public DDLHandler {
             // -----------------------------
             //         Rewrite INDEX
             // -----------------------------
-            auto key_it =
-                List_iterator<Key>(lex->alter_info.key_list);
-            new_lex->alter_info.key_list =
-                accumList<Key>(key_it,
-                    [&tm, &a] (List<Key> out_list, Key *const key)
-                    {
-                        auto keys = rewrite_key(*tm.get(), key, a);
-                        out_list.concat(vectorToListWithTHD(keys));
-
-                        return out_list;
-                    });
+            highLevelRewriteKey(*tm.get(), *lex, new_lex, a);
 
             // -----------------------------
-            //         Update TABLE       
+            //         Update TABLE
             // -----------------------------
             a.deltas.push_back(std::unique_ptr<Delta>(
                             new CreateDelta(std::move(tm),
-                                            a.getDatabaseMeta(db_name),
-                                            IdentityMetaKey(table))));
+                                            a.getDatabaseMeta(pre.dbname),
+                                            IdentityMetaKey(pre.table))));
         } else { // Table already exists.
 
             // Make sure we aren't trying to create a table that
@@ -87,10 +74,10 @@ class CreateTableHandler : public DDLHandler {
             const bool test =
                 lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS;
             TEST_TextMessageError(test,
-                                  "Table " + table + " already exists!");
+                                "Table " + pre.table + " already exists!");
 
             // -----------------------------
-            //         Rewrite TABLE       
+            //         Rewrite TABLE
             // -----------------------------
             new_lex->select_lex.table_list =
                 rewrite_table_list(lex->select_lex.table_list, a);
@@ -119,7 +106,8 @@ class CreateTableHandler : public DDLHandler {
 //     going to get changed.
 class AlterTableHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps) const
+                                  const ProxyState &ps,
+                                  const Preamble &pre) const
     {
         assert(sub_dispatcher->canDo(lex));
         const std::vector<AlterSubHandler *> &handlers =
@@ -150,7 +138,8 @@ public:
 
 class DropTableHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps) const
+                                  const ProxyState &ps,
+                                  const Preamble &pre) const
     {
         LEX *const final_lex = rewrite(a, lex, ps);
         update(a, lex, ps);
@@ -191,7 +180,8 @@ class DropTableHandler : public DDLHandler {
 
 class CreateDBHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
-                                  const ProxyState &ps) const
+                                  const ProxyState &ps,
+                                  const Preamble &pre) const
     {
         const std::string &dbname =
             convert_lex_str(lex->name);
@@ -213,7 +203,8 @@ class CreateDBHandler : public DDLHandler {
 
 class ChangeDBHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
-                                  const ProxyState &ps) const
+                                  const ProxyState &ps,
+                                  const Preamble &pre) const
     {
         a.no_change_meta_ddl = true;
         return copyWithTHD(lex);
@@ -222,7 +213,8 @@ class ChangeDBHandler : public DDLHandler {
 
 class DropDBHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
-                                  const ProxyState &ps) const
+                                  const ProxyState &ps,
+                                  const Preamble &pre) const
     {
         const std::string &dbname =
             convert_lex_str(lex->name);
@@ -236,7 +228,8 @@ class DropDBHandler : public DDLHandler {
 
 class LockTablesHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
-                                  const ProxyState &ps) const
+                                  const ProxyState &ps,
+                                  const Preamble &pre) const
     {
         LEX *const new_lex = copyWithTHD(lex);
         new_lex->select_lex.table_list =
@@ -246,10 +239,49 @@ class LockTablesHandler : public DDLHandler {
     }
 };
 
+class CreateIndexHandler : public DDLHandler {
+    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
+                                  const ProxyState &ps,
+                                  const Preamble &pre) const
+    {
+        LEX *const new_lex = copyWithTHD(lex);
+
+        // rewrite table
+        new_lex->select_lex.table_list =
+            rewrite_table_list(lex->select_lex.table_list, a);
+
+        TEST_DatabaseDiscrepancy(pre.dbname, a.getDatabaseName());
+        TableMeta const &tm = a.getTableMeta(pre.dbname, pre.table);
+
+        highLevelRewriteKey(tm, *lex, new_lex, a);
+
+        return new_lex;
+    }
+};
+
+static std::string
+empty_if_null(const char *const p)
+{
+    if (p) return std::string(p);
+
+    return std::string("");
+}
+
 LEX *DDLHandler::transformLex(Analysis &a, LEX *lex,
                               const ProxyState &ps) const
 {
-    return this->rewriteAndUpdate(a, lex, ps);
+    AssignOnce<std::string> db;
+    AssignOnce<std::string> table;
+    if (lex->select_lex.table_list.first) {
+        db = empty_if_null(lex->select_lex.table_list.first->db);
+        table =
+            empty_if_null(lex->select_lex.table_list.first->table_name);
+    } else {
+        db =  "", table = "";
+    }
+
+    return this->rewriteAndUpdate(a, lex, ps, Preamble(db.get(),
+                                                       table.get()));
 }
 
 // FIXME: Add test to make sure handler added successfully.
@@ -278,6 +310,9 @@ SQLDispatcher *buildDDLDispatcher()
 
     h = new LockTablesHandler();
     dispatcher->addHandler(SQLCOM_LOCK_TABLES, h);
+
+    h = new CreateIndexHandler();
+    dispatcher->addHandler(SQLCOM_CREATE_INDEX, h);
 
     return dispatcher;
 }

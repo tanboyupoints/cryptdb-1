@@ -75,8 +75,12 @@ static unsigned __passed_asserts                = 0;
     static int                                      \
     name(struct lua_State *const L)                 \
     {                                               \
+        global_restarts = 0;                        \
         const char *const __test_name = #name;      \
         ++__total_tests;
+
+#define TEST_SUPPLEMENT(name)                       \
+    const char *const __test_name = "$supplementing$ "#name;
 
 #define END_TEST                                    \
         TEST_SUCCESS                                \
@@ -92,6 +96,8 @@ static unsigned __passed_asserts                = 0;
 static void
 waitForSelfOwningThreads()
 {
+    printf("%d possible self owning threads!\n",
+            __self_owning_threads_counter);
     // wait for possibly self owning threads to exit.
     size_t i = 0;
     for (; i < __self_owning_threads_counter; ++i) {
