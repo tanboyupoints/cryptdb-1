@@ -1065,7 +1065,10 @@ static QueryList DDL = QueryList("DDL",
       Query("SELECT * FROM ddl_test"),
       Query("ALTER TABLE ddl_test DROP INDEX j, DROP INDEX k,"
             "                     ADD INDEX j(b), ADD INDEX k(b, c)"),
-      Query("SELECT * FROM ddl_test")},
+      Query("SELECT * FROM ddl_test"),
+      Query("CREATE INDEX i ON ddl_test (b, c)"),
+      Query("ALTER TABLE ddl_test DROP INDEX i, ADD INDEX i(b)"),
+      Query("ALTER TABLE ddl_test DROP INDEX i")},
     { Query("DROP TABLE ddl_test")},
     { Query("DROP TABLE ddl_test")});
 
@@ -1442,7 +1445,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 515/519
+    //      TOTAL RESULT: 518/522
     // ###############################
 
     std::vector<Score> scores;
@@ -1510,7 +1513,7 @@ RunTest(const TestConfig &tc) {
     // Pass 14/14
     scores.push_back(CheckQueryList(tc, TableAliases));
 
-    // Pass 25/25
+    // Pass 28/28
     scores.push_back(CheckQueryList(tc, DDL));
 
     // Pass 13/13

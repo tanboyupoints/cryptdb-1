@@ -862,6 +862,7 @@ operator<<(std::ostream &out, LEX &lex)
      *
      * ALTER TABLE t DROP COLUMN c, DROP COLUMN d;
      */
+    case SQLCOM_CREATE_INDEX:
     case SQLCOM_ALTER_TABLE: {
         out << "ALTER TABLE";
         lex.select_lex.table_list.first->print(t, &s, QT_ORDINARY);

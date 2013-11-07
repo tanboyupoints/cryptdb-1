@@ -14,3 +14,10 @@ public:
     virtual ~SQLHandler() {;}
 };
 
+struct Preamble {
+    Preamble(const std::string &dbname, const std::string &table)
+        : dbname(dbname), table(table) {}
+    const std::string dbname;
+    const std::string table;
+};
+

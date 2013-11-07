@@ -4,6 +4,12 @@
 #include <parser/lex_util.hh>
 #include <util/enum_text.hh>
 
+// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+//     These handlers expect a LEX that they
+//            can update in place.
+// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 class AddColumnSubHandler : public AlterSubHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
                                   const ProxyState &ps,
@@ -115,20 +121,7 @@ class AddIndexSubHandler : public AlterSubHandler {
         TableMeta const &tm =
             a.getTableMeta(preamble.dbname, preamble.table);
 
-        // Add each new index.
-        auto key_it =
-            List_iterator<Key>(lex->alter_info.key_list);
-        lex->alter_info.key_list =
-            accumList<Key>(key_it,
-                [&tm, &a] (List<Key> out_list, Key *const key) {
-                    // -----------------------------
-                    //         Rewrite INDEX
-                    // -----------------------------
-                    auto new_keys = rewrite_key(tm, key, a);
-                    out_list.concat(vectorToListWithTHD(new_keys));
-
-                    return out_list;    /* lambda */
-            });
+        highLevelRewriteKey(tm, *lex, lex, a);
 
         return lex;
     }
