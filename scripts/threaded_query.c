@@ -595,7 +595,10 @@ commandHandler(void *const lq)
             completeLuaQuery(lua_query, 1);
             pthread_exit(HAPPY_THREAD_EXIT);
         } else if (QUERY == lua_query->command) {
-            assert(false == queried);
+            // 'queried' could be true here if we miss a RESULTS
+            // signal due to the 'optimization'
+            // assert(false == queried);
+
             assert(lua_query->sql);
             queried = true;
 
