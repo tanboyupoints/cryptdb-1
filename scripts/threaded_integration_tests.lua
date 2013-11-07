@@ -46,6 +46,14 @@ function main()
         print(RED .. "test_restartedQueryExection succeeded!" .. COLOR_END)
     end
 
+    total_integrations = total_integrations + 1
+    if test_doubleQuery() then
+        print(GREEN .."test_doubleQuery succeeded!".. COLOR_END)
+        passed_integrations = passed_integrations + 1
+    else
+        print(RED .. "test_doubleQuery succeeded!" .. COLOR_END)
+    end
+
     print("\n" ..
           "################################\n" ..
           "  Passed " .. passed_integrations .."/" .. total_integrations ..
@@ -136,6 +144,7 @@ function test_normalQueryExecution()
 
     status = ThreadedQuery.kill(lua_query)
     if not (status) then
+        print("failed to kill threads; likely segfault!")
         return false
     end
 
@@ -187,6 +196,49 @@ function test_restartedQueryExecution()
 
     status = ThreadedQuery.kill(lua_query)
     if not (status) then
+        print("failed to kill threads; likely segfault!")
+        return false
+    end
+
+    return true
+end
+
+function test_doubleQuery()
+    os.execute("mysql -uroot -pletmein -e \"create table lua_test.t3 (x integer, y integer)\"")
+    os.execute("mysql -uroot -pletmein -e \"insert into lua_test.t3 VALUES (2, 12), (40, 15), (5, 38)\"")
+
+    status, lua_query =
+        ThreadedQuery.start("127.0.0.1", "root", "letmein", 3306)
+    if not (status and lua_query) then
+        return false
+    end
+
+    status =
+        ThreadedQuery.query(lua_query,
+                            "INSERT INTO lua_test.t3 VALUES (1, 9)")
+    if not (status) then
+        ThreadedQuery.kill(lua_query)
+        return false
+    end
+
+    -- issue another query to emulate commandHandler missing the
+    -- RESULTS signal
+    status =
+        ThreadedQuery.query(lua_query, "SELECT * FROM lua_test.t3")
+    if not (status) then
+        ThreadedQuery.kill(lua_query)
+        return false
+    end
+
+    status, result = ThreadedQuery.results(lua_query)
+    if not (status and type(result) == "table") then
+        ThreadedQuery.kill(lua_query)
+        return false
+    end
+
+    status = ThreadedQuery.kill(lua_query)
+    if not (status) then
+        print("failed to kill threads; likely segfault!")
         return false
     end
 
