@@ -57,7 +57,7 @@ std::string global_crash_point = "";
 void
 crashTest(const std::string &current_point) {
     if (current_point == global_crash_point) {
-      throw std::runtime_error("crash test exception");
+      throw CrashTestException();
     }
 }
 

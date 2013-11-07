@@ -7,6 +7,7 @@
  *  TODO: need to integrate it with util.h: some declarations are repeated
  */
 
+#include <exception>
 #include <map>
 
 #include <main/Translator.hh>
@@ -35,6 +36,8 @@ extern std::string global_crash_point;
 
 void
 crashTest(const std::string &current_point);
+
+class CrashTestException: public std::exception {};
 
 class FieldReturned {
 public:
