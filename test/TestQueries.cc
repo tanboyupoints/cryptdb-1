@@ -916,7 +916,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 515/519
+    //      TOTAL RESULT: 448/452
     // ###############################
 
     std::vector<Score> scores;
@@ -926,7 +926,7 @@ RunTest(const TestConfig &tc) {
     // Pass 51/51
     scores.push_back(CheckQueryList(tc, Select));
 
-    // Pass 26/27
+    // Pass 27/27
     scores.push_back(CheckQueryList(tc, HOM));
 
     // Pass 17/17
@@ -950,7 +950,7 @@ RunTest(const TestConfig &tc) {
     // Pass 37/37
     scores.push_back(CheckQueryList(tc, UserGroupForum));
 
-    // Pass 42/42
+    // Pass 40/40
     scores.push_back(CheckQueryList(tc, Null));
 
     // Pass 18/18
