@@ -121,8 +121,9 @@ function test_normalQueryExecution()
     end
 
     -- issue a malformed query
+    -- > optimization makes it still succeed initially
     status = ThreadedQuery.query(lua_query, "SELECT * FROM lua_test.tt")
-    if not (not status) then
+    if not (status) then
         ThreadedQuery.kill(lua_query)
         return false
     end

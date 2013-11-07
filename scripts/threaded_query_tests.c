@@ -162,8 +162,6 @@ TEST(test_newLuaQuery)
     TEST_ASSERT(-1                   == lua_query->output_count);
     TEST_ASSERT(false                == lua_query->mysql_connected);
 
-    // POSSIBLE_SELF_OWNING_THREAD(THD(lua_query->thread));
-
     pthread_t thd = THD(lua_query->thread);
     // the thread is using data allocated from this thread and will
     // segfault and shutdown if we do not manually kill.
@@ -222,8 +220,6 @@ TEST(test_createLuaQuery)
     TEST_ASSERT(orig_host_data->port ==
                     lua_query->persist.host_data->port);
 
-    POSSIBLE_SELF_OWNING_THREAD(THD(lua_query->thread));
-
     TEST_ASSERT(FAILURE != stopLuaQueryThread(lua_query));
 END_TEST
 
@@ -262,8 +258,6 @@ TEST(test_stopLuaQueryThread2)
     TEST_ASSERT(p_lua_query && *p_lua_query);
     TEST_ASSERT(NULL        == host_data);
 
-    POSSIBLE_SELF_OWNING_THREAD(THD((*p_lua_query)->thread));
-
     struct LuaQuery *const test_lua_query =
         malloc(sizeof(struct LuaQuery));
     TEST_ASSERT(test_lua_query);
@@ -284,8 +278,6 @@ TEST(test_destroyLuaQuery)
     const unsigned int init_wait = 1;
     struct LuaQuery **p_lua_query = createLuaQuery(&host_data, init_wait);
     TEST_ASSERT(p_lua_query && *p_lua_query);
-
-    POSSIBLE_SELF_OWNING_THREAD(THD((*p_lua_query)->thread));
 
     destroyLuaQuery(&p_lua_query);
 
@@ -315,8 +307,6 @@ TEST(test_restartLuaQuery)
     TEST_ASSERT(-1                  == (*p_lua_query)->command);
     TEST_ASSERT(true                == validBox((*p_lua_query)->thread));
 
-    POSSIBLE_SELF_OWNING_THREAD(THD((*p_lua_query)->thread));
-
     TEST_ASSERT(RESTARTED == restartLuaQueryThread(p_lua_query));
     TEST_ASSERT(false            == (*p_lua_query)->command_ready);
     TEST_ASSERT(false            == (*p_lua_query)->completion_signal);
@@ -335,8 +325,6 @@ TEST(test_restartLuaQuery)
     TEST_ASSERT(1                == (*p_lua_query)->persist.restarts);
     TEST_ASSERT(NULL             == (*p_lua_query)->persist.ell);
     TEST_ASSERT(init_wait       == (*p_lua_query)->persist.wait);
-
-    POSSIBLE_SELF_OWNING_THREAD(THD((*p_lua_query)->thread));
 
     TEST_ASSERT(FAILURE != stopLuaQueryThread(*p_lua_query));
 END_TEST
@@ -362,15 +350,11 @@ TEST(test_restartBadLuaQuery)
     TEST_ASSERT(p_lua_query && *p_lua_query);
     struct LuaQuery *lua_query = *p_lua_query;
 
-    POSSIBLE_SELF_OWNING_THREAD(THD(lua_query->thread));
-
     // This should cause stopLuaQueryThread to fail.
     pthread_cancel(THD(lua_query->thread));
     lua_query->thread = NEW_BOX;
 
     TEST_ASSERT(RESTARTED == restartLuaQueryThread(&lua_query));
-
-    POSSIBLE_SELF_OWNING_THREAD(THD(lua_query->thread));
 
     TEST_ASSERT(FAILURE != stopLuaQueryThread(lua_query));
 END_TEST
@@ -484,7 +468,6 @@ TEST(test_handleKilledQuery)
     struct LuaQuery **p_bad_lua_query =
         createLuaQuery(&bad_host_data, init_wait);
     TEST_ASSERT(p_bad_lua_query && *p_bad_lua_query);
-    POSSIBLE_SELF_OWNING_THREAD(THD((*p_bad_lua_query)->thread));
 
     issueQuery(L, strdup("do 0"), p_bad_lua_query);
     TEST_ASSERT(false         == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
@@ -627,7 +610,6 @@ TEST(test_deepCopyLuaQuery)
     TEST_ASSERT(p_lua_query && *p_lua_query);
     TEST_ASSERT(NULL == host_data);
     struct LuaQuery *const lua_query = *p_lua_query;
-    POSSIBLE_SELF_OWNING_THREAD(THD(lua_query->thread));
 
     struct LuaQuery *const cp_lua_query = deepCopyLuaQuery(*p_lua_query);
     TEST_ASSERT(cp_lua_query);
@@ -688,7 +670,6 @@ TEST(test_undoDeepCopyLuaQuery)
     struct LuaQuery **p_lua_query = createLuaQuery(&host_data, init_wait);
     TEST_ASSERT(p_lua_query && *p_lua_query);
     TEST_ASSERT(NULL == host_data);
-    POSSIBLE_SELF_OWNING_THREAD(THD((*p_lua_query)->thread));
     struct LuaQuery *save_lua_query = malloc(sizeof(struct LuaQuery));
     TEST_ASSERT(save_lua_query);
     memcpy(save_lua_query, *p_lua_query, sizeof(struct LuaQuery));
@@ -735,8 +716,6 @@ TEST(test_killThreadOwningMutex)
     const unsigned int init_wait        = 1;
     struct LuaQuery **p_lua_query = createLuaQuery(&host_data, init_wait);
     UGLY_SLEEP
-
-    // POSSIBLE_SELF_OWNING_THREAD(THD((*p_lua_query)->thread));
 
     destroyLuaQuery(&p_lua_query);
     TEST_ASSERT(NULL == p_lua_query);

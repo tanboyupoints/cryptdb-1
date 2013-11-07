@@ -203,7 +203,7 @@ start(lua_State *const L)
         return 2;
     }
 
-    struct LuaQuery **const p_lua_query = createLuaQuery(&host_data, 1);
+    struct LuaQuery **const p_lua_query = createLuaQuery(&host_data, 2);
     if (!p_lua_query) {
         destroyHostData(&host_data);
         fprintf(stderr, "createLuaQuery failed!\n");
@@ -581,6 +581,10 @@ commandHandler(void *const lq)
     assert(!pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL));
 
     bool queried = false;
+    bool query_succeeded;
+
+    unsigned fast_query_size = 10000;
+    const char fast_query[fast_query_size];
     while (true) {
         // blocking
         waitForCommand(lua_query);
@@ -592,15 +596,22 @@ commandHandler(void *const lq)
             pthread_exit(HAPPY_THREAD_EXIT);
         } else if (QUERY == lua_query->command) {
             assert(false == queried);
+            assert(lua_query->sql);
             queried = true;
 
-            if (mysql_query(conn, lua_query->sql)) {
-                assert(mysql_errno(conn));
-                lua_pushboolean(lua_query->persist.ell, false);
-            } else {
-                lua_pushboolean(lua_query->persist.ell, true);
-            }
+            // optimization: don't block the caller with mysql_query
+            // > we could miss the next signal from the caller, in
+            // which case he will time us out and continue executing.
+            const char *const query = nullFail(strdup(lua_query->sql));
+            lua_pushboolean(lua_query->persist.ell, true);
+            // caller thinks we finish here
             completeLuaQuery(lua_query, 1);
+
+            query_succeeded = !mysql_query(conn, query);
+            if (false == query_succeeded) {
+                assert(mysql_errno(conn));
+            }
+            free((void *)query);
             continue;
         }
 
@@ -611,12 +622,18 @@ commandHandler(void *const lq)
         if (false == queried) {
             // trying to get results after thread was killed during QUERY
             lua_pushboolean(lua_query->persist.ell, false);
-            lua_pushnil(lua_query->persist.ell);
 
-            completeLuaQuery(lua_query, 2);
+            completeLuaQuery(lua_query, 1);
             continue;
         }
         queried = false;
+
+        if (false == query_succeeded) {
+            // query failed
+            lua_pushboolean(lua_query->persist.ell, false);
+            completeLuaQuery(lua_query, 1);
+            continue;
+        }
 
         MYSQL_RES *const result = mysql_store_result(conn);
         const int field_count = mysql_field_count(conn);
@@ -624,9 +641,8 @@ commandHandler(void *const lq)
             if (mysql_errno(conn)) {
                 // query failed
                 lua_pushboolean(lua_query->persist.ell, false);
-                lua_pushnil(lua_query->persist.ell);
 
-                completeLuaQuery(lua_query, 2);
+                completeLuaQuery(lua_query, 1);
                 continue;
             }
 
@@ -861,6 +877,7 @@ stopLuaQueryThread(struct LuaQuery *const lua_query)
     //   it failed to connect, or because pthread_cancel has queued
     //   a kill request for it.
     if (false == lua_query->mysql_connected) {
+        assert(!pthread_detach(THD(lua_query->thread)));
         INVALIDATE(lua_query->thread);
         return PENDING_SELF_DESTRUCTION;
     }
