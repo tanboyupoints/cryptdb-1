@@ -847,29 +847,6 @@ CheckAnnotatedQuery(const TestConfig &tc, const Query &query)
     }
 }
 
-static bool
-CheckQuery(const TestConfig &tc, const Query &query) {
-    std::cerr << "--------------------------------------------------------------------------------" << "\n";
-    //TODO: should be case insensitive
-    if (query.query == "SELECT LAST_INSERT_ID()") {
-        ntest++;
-        switch(test_type) {
-            case UNENCRYPTED:
-            case PROXYPLAIN:
-            case ENC:
-                //TODO(ccarvalho): check proxy
-            default:
-                LOG(test) << "not a valid case of this test; skipped";
-                break;
-        }
-
-        npass++;
-        return true;
-    }
-
-    return CheckAnnotatedQuery(tc, query);
-}
-
 struct Score {
     Score(const std::string &name) : success(0), total(0), name(name) {}
     void mark(bool t) {t ? pass() : fail();}
@@ -896,7 +873,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
     }
 
     for (auto q = queries.common.begin(); q != queries.common.end(); q++) {
-        score.mark(CheckQuery(tc, *q));
+        score.mark(CheckAnnotatedQuery(tc, *q));
     }
 
     for (unsigned int i = 0; i < queries.drop.size(); i++) {
