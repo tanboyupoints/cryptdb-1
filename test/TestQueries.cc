@@ -896,16 +896,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
     }
 
     for (auto q = queries.common.begin(); q != queries.common.end(); q++) {
-        switch (test_type) {
-            case PLAIN:
-            case SINGLE:
-            case PROXYPLAIN:
-            case ENC:
-                score.mark(CheckQuery(tc, *q));
-                break;
-            default:
-                assert_s(false, "test_type invalid");
-        }
+        score.mark(CheckQuery(tc, *q));
     }
 
     for (unsigned int i = 0; i < queries.drop.size(); i++) {
