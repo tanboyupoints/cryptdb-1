@@ -800,7 +800,7 @@ Connection::executeLastEDB() {
 //----------------------------------------------------------------------
 
 static bool
-CheckAnnotatedQuery(const TestConfig &tc, const Query &query)
+CheckQuery(const TestConfig &tc, const Query &query)
 {
     std::string r;
     ntest++;
@@ -869,16 +869,16 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
     Score score(queries.name);
     for (unsigned int i = 0; i < queries.create.size(); i++) {
         Query query = queries.create[i]; 
-        score.mark(CheckAnnotatedQuery(tc, query));
+        score.mark(CheckQuery(tc, query));
     }
 
     for (auto q = queries.common.begin(); q != queries.common.end(); q++) {
-        score.mark(CheckAnnotatedQuery(tc, *q));
+        score.mark(CheckQuery(tc, *q));
     }
 
     for (unsigned int i = 0; i < queries.drop.size(); i++) {
         Query query = queries.drop[i];
-        score.mark(CheckAnnotatedQuery(tc, query));
+        score.mark(CheckQuery(tc, query));
     }
 
     return score;
