@@ -803,9 +803,8 @@ CheckQuery(const TestConfig &tc, const Query &query)
     std::string r;
     ntest++;
 
-    std::vector<CrashPoint *> cps = query.crash_points;
-    for (auto cp = cps.begin(); cp != cps.end(); ++cp) {
-      global_crash_point = (*cp)->name;
+    if (query.crash_point != NULL) {
+        global_crash_point = query.crash_point->name;
 
         try {
 	    test->execute(query);

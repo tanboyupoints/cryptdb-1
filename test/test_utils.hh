@@ -63,20 +63,16 @@ struct CrashPoint {
 
 struct Query {
     std::string query;
-    std::vector<CrashPoint *> crash_points;
+    CrashPoint * crash_point;
 
     Query(const std::string &q) {
         query = q;
+	crash_point = NULL;
     }
 
     Query(const std::string &q, CrashPoint * cp) {
         query = q;
-        crash_points.push_back(cp);
-    }
-
-    Query(const std::string &q, std::vector<CrashPoint *> cps) {
-        query = q;
-        crash_points = cps;
+        crash_point = cp;
     }
 };
 
