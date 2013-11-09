@@ -21,18 +21,11 @@ typedef enum test_mode {
 
 struct QueryList {
     std::string name;
-    std::vector<Query> create;
-    std::vector<Query> common;
-    std::vector<Query> drop;
+    std::vector<Query> queries;
 
-    QueryList(std::string namearg,
-  	      std::vector<Query> cr,
-	      std::vector<Query> co,
-	      std::vector<Query> dr)
+    QueryList(std::string namearg, std::vector<Query> qs)
         : name(namearg),
-          create(cr),
-	  common(co),
-	  drop(dr)
+          queries(qs)
     {}
 };
 
