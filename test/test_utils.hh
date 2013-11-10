@@ -55,9 +55,10 @@ class TestConfig {
 
 struct CrashPoint {
     std::string name;
+    bool executed_query;
 
-    CrashPoint(std::string namearg)
-        : name(namearg)
+    CrashPoint(std::string namearg, bool eq)
+        : name(namearg), executed_query(eq)
     {}
 };
 

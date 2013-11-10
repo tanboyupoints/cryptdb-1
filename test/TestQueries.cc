@@ -803,45 +803,57 @@ CheckQuery(const TestConfig &tc, const Query &query)
     std::string r;
     ntest++;
 
+    LOG(test) << "query: " << query.query;
+
     if (query.crash_point != NULL) {
         global_crash_point = query.crash_point->name;
+	LOG(test) << "crash point: " << global_crash_point;
 
         try {
 	    test->execute(query);
         } catch (const CrashTestException &e) {}
-    }
-    global_crash_point = "";
 
-    LOG(test) << "query: " << query.query;
-    const ResType control_res = control->execute(query);
-
-    const ResType test_res = test->execute(query);
-
-    if (control_res.ok != test_res.ok) {
-        LOG(warn) << "control " << control_res.ok
-            << ", test " << test_res.ok
-            << ", and true is " << true
-            << " for query: " << query.query;
-
-        if (tc.stop_if_fail)
-            thrower() << "stop on failure";
-        return false;
-    } else if (!match(test_res, control_res)) {
-        LOG(warn) << "result mismatch for query: " << query.query;
-        LOG(warn) << "control is:";
-        printRes(control_res);
-        LOG(warn) << "test is:";
-        printRes(test_res);
-
-        if (tc.stop_if_fail) {
-            LOG(warn) << "RESULT: " << npass << "/" << ntest;
-            thrower() << "stop on failure";
+	if (query.crash_point->executed_query) {
+	    control->execute(query);
         }
-        return false;
+
+	global_crash_point = "";
     } else {
-        npass++;
-        return true;
+        LOG(test) << "no crash point";
+
+        const ResType test_res = test->execute(query);
+	const ResType control_res = control->execute(query);
+	
+	if (control_res.ok != test_res.ok) {
+	    LOG(warn) << "control " << control_res.ok
+	        << ", test " << test_res.ok
+		<< " for query: " << query.query;
+
+	    if (tc.stop_if_fail) {
+	        thrower() << "stop on failure";
+	    }
+
+	    return false;
+	} 
+
+	if (!match(test_res, control_res)) {
+	    LOG(warn) << "result mismatch for query: " << query.query;
+	    LOG(warn) << "control is:";
+	    printRes(control_res);
+	    LOG(warn) << "test is:";
+	    printRes(test_res);
+
+	    if (tc.stop_if_fail) {
+	        LOG(warn) << "RESULT: " << npass << "/" << ntest;
+		thrower() << "stop on failure";
+	    }
+
+	    return false;
+	}
     }
+
+    npass++;
+    return true;
 }
 
 struct Score {
