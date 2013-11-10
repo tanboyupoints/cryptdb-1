@@ -1,4 +1,5 @@
-// gcc -shared -fpic main.c -o main.so --llua5.1
+// gcc -shared -fpic threaded_query.c -o threaded_query.so --llua5.1 \
+//     -lmysqlclient -lrt
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -328,6 +329,7 @@ issueCommand(lua_State *const L, enum Command command,
     if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
         fprintf(stderr, "clock_gettime failed!\n");
         strangeFinishedCommandIssue(*p_lua_query, false);
+        return;
     }
     ts.tv_sec += (*p_lua_query)->persist.wait;
 
@@ -582,9 +584,6 @@ commandHandler(void *const lq)
 
     bool queried = false;
     bool query_succeeded;
-
-    unsigned fast_query_size = 10000;
-    const char fast_query[fast_query_size];
     while (true) {
         // blocking
         waitForCommand(lua_query);
@@ -954,6 +953,7 @@ deepCopyLuaQuery(const struct LuaQuery *const lua_query)
         free(new_lua_query);
 
         fprintf(stderr, "_strdup failed!\n");
+        return NULL;
     }
     assert(!!lua_query->sql == !!new_lua_query->sql);
 
@@ -973,6 +973,7 @@ deepCopyLuaQuery(const struct LuaQuery *const lua_query)
 
     new_lua_query->mutex = NEW_BOX;
     if (pthread_mutex_init(MUTEX_ADDR(new_lua_query->mutex), NULL)) {
+        INVALIDATE(new_lua_query->mutex);
         freeSQL(new_lua_query);
         free((void *)new_lua_query->persist.host_data);
         free(new_lua_query);
@@ -983,7 +984,9 @@ deepCopyLuaQuery(const struct LuaQuery *const lua_query)
 
     new_lua_query->cond = NEW_BOX;
     if (pthread_cond_init(COND_ADDR(new_lua_query->cond), NULL)) {
+        INVALIDATE(new_lua_query->cond);
         pthread_mutex_destroy(MUTEX_ADDR(new_lua_query->mutex));
+        INVALIDATE(new_lua_query->mutex);
         freeSQL(new_lua_query);
         free((void *)new_lua_query->persist.host_data);
         free(new_lua_query);
@@ -1002,6 +1005,7 @@ undoDeepCopyLuaQuery(struct LuaQuery **p_lua_query)
     freeSQL(*p_lua_query);
     assert(NULL == (*p_lua_query)->sql);
     destroyHostData((struct HostData **)&(*p_lua_query)->persist.host_data);
+    assert(NULL == (*p_lua_query)->persist.host_data);
     free(*p_lua_query);
     *p_lua_query = NULL;
 }
@@ -1181,7 +1185,7 @@ luaToCharp(lua_State *const L, int index)
 void *
 nullFail(void *p)
 {
-    if (!p) {exit(2);}
+    if (!p) {exit(EXIT_FAILURE);}
 
     return p;
 }
