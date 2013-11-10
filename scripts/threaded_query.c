@@ -691,6 +691,11 @@ commandHandler(void *const lq)
     pthread_cleanup_pop(0);
 }
 
+#define IF_THEN_FREE(p)                             \
+{                                                   \
+    if (p) {free((void *)p);}                       \
+}
+
 struct HostData *
 createHostData(const char *const host, const char *const user,
                const char *const passwd, unsigned int port)
@@ -705,6 +710,9 @@ createHostData(const char *const host, const char *const user,
     host_data->user = strdup(user);
     host_data->passwd = strdup(passwd);
     if (!host_data->host || !host_data->user || !host_data->passwd) {
+        IF_THEN_FREE(host_data->host);
+        IF_THEN_FREE(host_data->user);
+        IF_THEN_FREE(host_data->passwd);
         free(host_data);
         perror("strdup failed!\n");
         return NULL;
@@ -714,6 +722,8 @@ createHostData(const char *const host, const char *const user,
 
     return host_data;
 }
+
+#undef IF_THEN_FREE
 
 void
 destroyHostData(struct HostData **p_host_data)
@@ -758,7 +768,7 @@ newLuaQuery(struct LuaQuery *const lua_query,
             struct HostData *const host_data,
             unsigned int wait)
 {
-    memset(lua_query, sizeof(struct LuaQuery), 0);
+    memset(lua_query, 0, sizeof(struct LuaQuery));
 
     clearLuaQuery(lua_query);
 
@@ -1040,6 +1050,7 @@ restartLuaQueryThread(struct LuaQuery **p_lua_query)
     switch (stop_type) {
         case FAILURE:
             fprintf(stderr, "stopLuaQueryThread failed in restart!\n");
+            undoDeepCopyLuaQuery(&new_lua_query);
             return FUBAR;
         case PENDING_SELF_DESTRUCTION:
             // we lost ownership of original metadata
