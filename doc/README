@@ -14,6 +14,7 @@ Convention : When this document uses syntax like
 #########################################
 #########################################
     * Build CryptDB using the installation script.
+      > you will need to have Ruby installed
       > note, this script will stop and start your mysql instance.
       > scripts/install.rb <path-to-cryptdb>
         + <path-to-cryptdb> should just be '.' if you are in the cryptdb
@@ -37,7 +38,7 @@ Convention : When this document uses syntax like
 #########################################
 #########################################
 
-    Set (or place in your .bashrc):
+    Set (recommended: place this in your .bashrc):
     > export EDBDIR=/full/path/to/cryptdb/	
 
     I. Shell
