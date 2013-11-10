@@ -15,8 +15,6 @@
 #include <test/TestQueries.hh>
 
 
-static int ntest = 0;
-static int npass = 0;
 static test_mode control_type;
 static test_mode test_type;
 static uint64_t no_conn = 1;
@@ -800,9 +798,6 @@ Connection::executeLastEDB() {
 static bool
 CheckQuery(const TestConfig &tc, const Query &query)
 {
-    std::string r;
-    ntest++;
-
     LOG(test) << "query: " << query.query;
 
     if (query.crash_point != NULL) {
@@ -844,7 +839,6 @@ CheckQuery(const TestConfig &tc, const Query &query)
 	    printRes(test_res);
 
 	    if (tc.stop_if_fail) {
-	        LOG(warn) << "RESULT: " << npass << "/" << ntest;
 		thrower() << "stop on failure";
 	    }
 
@@ -852,25 +846,28 @@ CheckQuery(const TestConfig &tc, const Query &query)
 	}
     }
 
-    npass++;
     return true;
 }
 
 struct Score {
-    Score(const std::string &name) : success(0), total(0), name(name) {}
-    void mark(bool t) {t ? pass() : fail();}
-    std::string stringify() {
-        return name + ":\t" + std::to_string(success) + "/" +
-               std::to_string(total);
-    }
-
-private:
     unsigned int success;
     unsigned int total;
     std::string name;
 
-    void pass() {++success, ++total;}
-    void fail() {++total;}
+    Score(const std::string &name) : success(0), total(0), name(name) {}
+
+    void mark(bool t) {
+        total++;
+
+        if (t) {
+	  success++;
+        }
+    }
+
+    std::string stringify() {
+        return name + ":\t" + std::to_string(success) + "/" +
+               std::to_string(total);
+    }
 };
 
 static Score
@@ -954,9 +951,15 @@ RunTest(const TestConfig &tc) {
     // Pass 13/13
     scores.push_back(CheckQueryList(tc, MiscBugs));
 
+    int npass = 0;
+    int ntest = 0;
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;
+	npass += it.success;
+	ntest += it.total;
     }
+
+    std::cerr << "RESULT: " << npass << "/" << ntest << std::endl;
 }
 
 //---------------------------------------------------------------------
@@ -1037,8 +1040,6 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
         control->execute("USE " + control_tc.db + ";");
 
 	RunTest(tc);
-
-        std::cerr << "RESULT: " << npass << "/" << ntest << std::endl;
     } catch (const AbstractException &e) {
         std::cout << e << std::endl;
         throw;
