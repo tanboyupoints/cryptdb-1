@@ -1036,9 +1036,7 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
         control->execute("CREATE DATABASE IF NOT EXISTS " + control_tc.db + ";");
         control->execute("USE " + control_tc.db + ";");
 
-        enum { nrounds = 1 };
-        for (uint i = 0; i < nrounds; i++)
-            RunTest(tc);
+	RunTest(tc);
 
         std::cerr << "RESULT: " << npass << "/" << ntest << std::endl;
     } catch (const AbstractException &e) {
