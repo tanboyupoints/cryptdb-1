@@ -27,8 +27,12 @@ init_mysql(const string & embed_db)
             "--language=" MYSQL_BUILD_DIR "/sql/share/"
     };
 
-    assert(0 == mysql_library_init(sizeof(mysql_av) / sizeof(mysql_av[0]),
-                                   (char**) mysql_av, 0));
+    static bool library_init = false;
+    if (false == library_init) {
+        assert(0== mysql_library_init(sizeof(mysql_av)/sizeof(mysql_av[0]),
+                                      (char**) mysql_av, 0));
+        library_init = true;
+    }
 
     assert(0 == mysql_thread_init());
 

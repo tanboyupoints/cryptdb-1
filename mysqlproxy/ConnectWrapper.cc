@@ -250,6 +250,7 @@ disconnect(lua_State *const L)
     delete ws;
     clients.erase(client);
 
+    mysql_thread_end();
     return 0;
 }
 
