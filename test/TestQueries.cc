@@ -663,18 +663,18 @@ Connection::start() {
         //plain -- new connection straight to the DB
         case UNENCRYPTED:
         {
-	    Connect *const c =
-	        new Connect(tc.host, tc.user, tc.pass, tc.port);
-	    conn_set.insert(c);
-	    this->conn = conn_set.begin();
-	    break;
+            Connect *const c = 
+                new Connect(tc.host, tc.user, tc.pass, tc.port);
+            conn_set.insert(c);
+            this->conn = conn_set.begin();
+            break;
         }
         //single -- new Rewriter
         case SINGLE:
             break;
         case PROXYPLAIN:
         case PROXYENC:
-	  // TODO: a separate process for proxy
+        // TODO: a separate process for proxy
         case ENC:
         {
             ConnectionInfo ci(tc.host, tc.user, tc.pass);
@@ -686,7 +686,7 @@ Connection::start() {
         }
         break;
         default:
-	    assert_s(false, "invalid type passed to Connection");
+            assert_s(false, "invalid type passed to Connection");
     }
 }
 
@@ -776,7 +776,7 @@ Connection::executeLast() {
         case UNENCRYPTED:
         case PROXYPLAIN:
         case PROXYSINGLE:
-	    // TODO(ccarvalho) check this 
+            // TODO(ccarvalho) check this 
             break;
         default:
             assert_s(false, "type does not exist");
@@ -808,48 +808,48 @@ CheckQuery(const TestConfig &tc, const Query &query)
 
     if (query.crash_point != NULL) {
         global_crash_point = query.crash_point->name;
-	LOG(test) << "crash point: " << global_crash_point;
+        LOG(test) << "crash point: " << global_crash_point;
 
         try {
-	    test->execute(query);
+            test->execute(query);
         } catch (const CrashTestException &e) {}
 
-	if (query.crash_point->executed_query) {
-	    control->execute(query);
+        if (query.crash_point->executed_query) {
+            control->execute(query);
         }
 
-	global_crash_point = "";
+        global_crash_point = "";
     } else {
         LOG(test) << "no crash point";
 
         const ResType test_res = test->execute(query);
-	const ResType control_res = control->execute(query);
-	
-	if (control_res.ok != test_res.ok) {
-	    LOG(warn) << "control " << control_res.ok
-	        << ", test " << test_res.ok
-		<< " for query: " << query.query;
+        const ResType control_res = control->execute(query);
 
-	    if (tc.stop_if_fail) {
-	        thrower() << "stop on failure";
-	    }
+        if (control_res.ok != test_res.ok) {
+            LOG(warn) << "control " << control_res.ok
+                << ", test " << test_res.ok
+                << " for query: " << query.query;
 
-	    return false;
-	} 
+            if (tc.stop_if_fail) {
+                thrower() << "stop on failure";
+            }
 
-	if (!match(test_res, control_res)) {
-	    LOG(warn) << "result mismatch for query: " << query.query;
-	    LOG(warn) << "control is:";
-	    printRes(control_res);
-	    LOG(warn) << "test is:";
-	    printRes(test_res);
+            return false;
+        } 
 
-	    if (tc.stop_if_fail) {
-		thrower() << "stop on failure";
-	    }
+        if (!match(test_res, control_res)) {
+            LOG(warn) << "result mismatch for query: " << query.query;
+            LOG(warn) << "control is:";
+            printRes(control_res);
+            LOG(warn) << "test is:";
+            printRes(test_res);
 
-	    return false;
-	}
+            if (tc.stop_if_fail) {
+                thrower() << "stop on failure";
+            }
+
+            return false;
+        }
     }
 
     return true;
@@ -866,7 +866,7 @@ struct Score {
         total++;
 
         if (t) {
-	  success++;
+          success++;
         }
     }
 
@@ -961,8 +961,8 @@ RunTest(const TestConfig &tc) {
     int ntest = 0;
     for (auto it : scores) {
         std::cout << it.stringify() << std::endl;
-	npass += it.success;
-	ntest += it.total;
+        npass += it.success;
+        ntest += it.total;
     }
 
     std::cerr << "RESULT: " << npass << "/" << ntest << std::endl;
@@ -1006,8 +1006,8 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
             std::cerr << "Usage:" << std::endl
                 << "    .../tests/test queries control-type test-type [num_conn]" << std::endl
                 << "Possible control and test types:" << std::endl
-         	<< "    plain" << std::endl
-	        << "    single" << std::endl
+                << "    plain" << std::endl
+                << "    single" << std::endl
                 << "    proxy-plain" << std::endl
                 << "    enc" << std::endl
                 << "single make connections through EDBProxy" << std::endl
@@ -1045,7 +1045,7 @@ TestQueries::run(const TestConfig &tc, int argc, char ** argv) {
         control->execute("CREATE DATABASE IF NOT EXISTS " + control_tc.db + ";");
         control->execute("USE " + control_tc.db + ";");
 
-	RunTest(tc);
+        RunTest(tc);
     } catch (const AbstractException &e) {
         std::cout << e << std::endl;
         throw;
