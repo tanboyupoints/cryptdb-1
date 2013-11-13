@@ -68,7 +68,7 @@ struct Query {
 
     Query(const std::string &q) {
         query = q;
-	crash_point = NULL;
+        crash_point = NULL;
     }
 
     Query(const std::string &q, CrashPoint * cp) {
