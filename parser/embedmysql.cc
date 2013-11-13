@@ -161,6 +161,7 @@ query_parse::query_parse(const std::string &db, const std::string &q)
         case SQLCOM_SHOW_ENGINE_LOGS:
         case SQLCOM_SHOW_ENGINE_STATUS:
         case SQLCOM_SHOW_ENGINE_MUTEX:
+        case SQLCOM_SHOW_STORAGE_ENGINES:
         case SQLCOM_SHOW_PROCESSLIST:
         case SQLCOM_SHOW_MASTER_STAT:
         case SQLCOM_SHOW_SLAVE_STAT:

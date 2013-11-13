@@ -1214,6 +1214,7 @@ noRewrite(const LEX &lex) {
     case SQLCOM_SHOW_TABLES:
     case SQLCOM_SHOW_VARIABLES:
     case SQLCOM_UNLOCK_TABLES:
+    case SQLCOM_SHOW_STORAGE_ENGINES:
         return true;
     case SQLCOM_SELECT: {
 
@@ -1260,6 +1261,14 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
     if (noRewrite(*lex)) {
         return new SimpleOutput(query);
     } else if (dml_dispatcher->canDo(lex)) {
+        // HACK: We don't want to process INFORMATION_SCHEMA queries
+        if (lex->select_lex.table_list.first) {
+            const std::string &db = lex->select_lex.table_list.first->db;
+            if (equalsIgnoreCase("INFORMATION_SCHEMA", db)) {
+                return new SimpleOutput(query);
+            }
+        }
+
         const SQLHandler &handler = dml_dispatcher->dispatch(lex);
         AssignOnce<LEX *> out_lex;
 

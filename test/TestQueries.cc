@@ -606,6 +606,8 @@ static QueryList MiscBugs = QueryList("MiscBugs",
       Query("CREATE TABLE enums (x enum('this', 'that'))"),
       Query("CREATE TABLE bugs (spider TEXT)"),
       Query("CREATE TABLE more_bugs (ant INTEGER)"),
+      Query("CREATE TABLE real_type_bug (a real, b real unsigned,"
+            "                            c real unsigned not null)"),
       Query("INSERT INTO bugs VALUES ('8legs'), ('crawly'), ('manyiz')"),
       Query("INSERT INTO more_bugs VALUES (9012), (2913), (19114)"),
       Query("INSERT INTO enums VALUES ('this'), ('that')"),
@@ -617,6 +619,9 @@ static QueryList MiscBugs = QueryList("MiscBugs",
       // Query("SELECT GREATEST(12, ant, 5000) FROM more_bugs"),
       // Query("CREATE TABLE crawlers (pink DATE)"),
       // Query("SELECT * FROM bugs, more_bugs, crawlers, crawlies")
+      Query("INSERT INTO real_type_bug VALUES (1, 2, 3)"),
+      Query("SELECT * FROM real_type_bug"),
+      Query("UPDATE real_type_bug SET a = a + 1, b = b + 1"),
       Query("DROP TABLE crawlies"),
       Query("DROP TABLE bugs"),
       Query("DROP TABLE more_bugs") });
@@ -883,7 +888,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 451/455
+    //      TOTAL RESULT: 455/459
     // ###############################
 
     std::vector<Score> scores;
@@ -948,7 +953,7 @@ RunTest(const TestConfig &tc) {
     // Pass 28/28
     scores.push_back(CheckQueryList(tc, DDL));
 
-    // Pass 13/13
+    // Pass 17/17
     scores.push_back(CheckQueryList(tc, MiscBugs));
 
     int npass = 0;
