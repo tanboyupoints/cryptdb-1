@@ -197,6 +197,7 @@ query_parse::query_parse(const std::string &db, const std::string &q)
         case SQLCOM_DROP_INDEX:
             return;
         case SQLCOM_INSERT:
+        case SQLCOM_REPLACE:
         case SQLCOM_DELETE:
             if (string(lex->select_lex.table_list.first->table_name).substr(0, PWD_TABLE_PREFIX.length()) == PWD_TABLE_PREFIX) {
                 return;
@@ -265,7 +266,8 @@ query_parse::query_parse(const std::string &db, const std::string &q)
                             lex->query_tables, fields, all_fields,
                             lex->select_lex.order_list.first))
                 mysql_thrower() << "setup_order";
-        } else if (lex->sql_command == SQLCOM_INSERT) {
+        } else if (SQLCOM_INSERT == lex->sql_command
+                   || SQLCOM_REPLACE == lex->sql_command) {
             List_iterator_fast<List_item> its(lex->many_values);
             List_item *values = its++;
 

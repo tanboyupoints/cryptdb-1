@@ -622,6 +622,7 @@ static QueryList MiscBugs = QueryList("MiscBugs",
       Query("INSERT INTO real_type_bug VALUES (1, 2, 3)"),
       Query("SELECT * FROM real_type_bug"),
       Query("UPDATE real_type_bug SET a = a + 1, b = b + 1"),
+      Query("SHOW ENGINES"),
       Query("DROP TABLE crawlies"),
       Query("DROP TABLE bugs"),
       Query("DROP TABLE more_bugs") });
@@ -888,7 +889,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 455/459
+    //      TOTAL RESULT: 456/460
     // ###############################
 
     std::vector<Score> scores;
@@ -953,7 +954,7 @@ RunTest(const TestConfig &tc) {
     // Pass 28/28
     scores.push_back(CheckQueryList(tc, DDL));
 
-    // Pass 17/17
+    // Pass 18/18
     scores.push_back(CheckQueryList(tc, MiscBugs));
 
     int npass = 0;
