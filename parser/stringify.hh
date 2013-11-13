@@ -139,7 +139,7 @@ std::string ListJoin(List<T> lst, std::string delim,
 }
 
 static const char *
-sql_type_to_string(enum_field_types tpe, CHARSET_INFO *charset)
+sql_type_to_string(const Create_field &f)
 {
 #define ASSERT_NOT_REACHED() \
     do { \
@@ -147,13 +147,34 @@ sql_type_to_string(enum_field_types tpe, CHARSET_INFO *charset)
         return ""; \
     } while (0)
 
+    const enum_field_types tpe = f.sql_type;
+    const CHARSET_INFO *const charset = f.charset;
+
     switch (tpe) {
     case MYSQL_TYPE_DECIMAL     : return "DECIMAL";
     case MYSQL_TYPE_TINY        : return "TINYINT";
     case MYSQL_TYPE_SHORT       : return "SMALLINT";
     case MYSQL_TYPE_LONG        : return "INT";
     case MYSQL_TYPE_FLOAT       : return "FLOAT";
-    case MYSQL_TYPE_DOUBLE      : return "DOUBLE";
+    case MYSQL_TYPE_DOUBLE      :
+        // HACK:
+        /*
+            For arguments that have no fixed number of decimals, the
+            `decimals' value is set to 31, which is 1 more than the maximum
+            number of decimals permitted for the `DECIMAL':
+            numeric-types,  `FLOAT': numeric-types, and `DOUBLE':
+            numeric-types. data types. As of MySQL 5.5.3, this value is
+            available as the constant `NOT_FIXED_DEC' in the `mysql_com.h'
+            header file.
+
+            in short; 'real' is encoded as an invalid DOUBLE type.
+        */
+        if (NOT_FIXED_DEC == f.decimals
+            && (DBL_DIG + 7) == f.length) {
+            return "REAL";
+        }
+
+        return "DOUBLE";
     case MYSQL_TYPE_NULL        : ASSERT_NOT_REACHED();
     case MYSQL_TYPE_TIMESTAMP   : return "TIMESTAMP";
     case MYSQL_TYPE_LONGLONG    : return "BIGINT";
@@ -218,7 +239,7 @@ operator<<(std::ostream &out, Create_field &f)
 {
 
     // emit field name + type definition
-    out << f.field_name << " " << sql_type_to_string(f.sql_type, f.charset);
+    out << f.field_name << " " << sql_type_to_string(f);
 
     // emit extra length info if necessary
     switch (f.sql_type) {
@@ -238,6 +259,12 @@ operator<<(std::ostream &out, Create_field &f)
     // optional (length, decimal) cases
     case MYSQL_TYPE_FLOAT:
     case MYSQL_TYPE_DOUBLE:
+        // HACK: to get 'real' type support
+        if (NOT_FIXED_DEC == f.decimals
+            && (DBL_DIG + 7) == f.length) {
+            break;
+        }
+
         if (f.length && f.decimals) {
             out << "(" << f.length << ", " << f.decimals << ")";
         }
@@ -933,6 +960,7 @@ operator<<(std::ostream &out, LEX &lex)
     case SQLCOM_SHOW_VARIABLES:
     case SQLCOM_SHOW_STATUS:
     case SQLCOM_SHOW_COLLATIONS:
+    case SQLCOM_SHOW_STORAGE_ENGINES:
         /* placeholders to make analysis work.. */
         out << ".. type " << lex.sql_command << " query ..";
         break;

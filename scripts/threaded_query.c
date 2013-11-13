@@ -1,4 +1,5 @@
-// gcc -shared -fpic main.c -o main.so --llua5.1
+// gcc -shared -fpic threaded_query.c -o threaded_query.so --llua5.1 \
+//     -lmysqlclient -lrt
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -328,6 +329,7 @@ issueCommand(lua_State *const L, enum Command command,
     if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
         fprintf(stderr, "clock_gettime failed!\n");
         strangeFinishedCommandIssue(*p_lua_query, false);
+        return;
     }
     ts.tv_sec += (*p_lua_query)->persist.wait;
 
@@ -582,9 +584,6 @@ commandHandler(void *const lq)
 
     bool queried = false;
     bool query_succeeded;
-
-    unsigned fast_query_size = 10000;
-    const char fast_query[fast_query_size];
     while (true) {
         // blocking
         waitForCommand(lua_query);
@@ -692,6 +691,11 @@ commandHandler(void *const lq)
     pthread_cleanup_pop(0);
 }
 
+#define IF_THEN_FREE(p)                             \
+{                                                   \
+    if (p) {free((void *)p);}                       \
+}
+
 struct HostData *
 createHostData(const char *const host, const char *const user,
                const char *const passwd, unsigned int port)
@@ -706,6 +710,9 @@ createHostData(const char *const host, const char *const user,
     host_data->user = strdup(user);
     host_data->passwd = strdup(passwd);
     if (!host_data->host || !host_data->user || !host_data->passwd) {
+        IF_THEN_FREE(host_data->host);
+        IF_THEN_FREE(host_data->user);
+        IF_THEN_FREE(host_data->passwd);
         free(host_data);
         perror("strdup failed!\n");
         return NULL;
@@ -715,6 +722,8 @@ createHostData(const char *const host, const char *const user,
 
     return host_data;
 }
+
+#undef IF_THEN_FREE
 
 void
 destroyHostData(struct HostData **p_host_data)
@@ -759,7 +768,7 @@ newLuaQuery(struct LuaQuery *const lua_query,
             struct HostData *const host_data,
             unsigned int wait)
 {
-    memset(lua_query, sizeof(struct LuaQuery), 0);
+    memset(lua_query, 0, sizeof(struct LuaQuery));
 
     clearLuaQuery(lua_query);
 
@@ -954,6 +963,7 @@ deepCopyLuaQuery(const struct LuaQuery *const lua_query)
         free(new_lua_query);
 
         fprintf(stderr, "_strdup failed!\n");
+        return NULL;
     }
     assert(!!lua_query->sql == !!new_lua_query->sql);
 
@@ -973,6 +983,7 @@ deepCopyLuaQuery(const struct LuaQuery *const lua_query)
 
     new_lua_query->mutex = NEW_BOX;
     if (pthread_mutex_init(MUTEX_ADDR(new_lua_query->mutex), NULL)) {
+        INVALIDATE(new_lua_query->mutex);
         freeSQL(new_lua_query);
         free((void *)new_lua_query->persist.host_data);
         free(new_lua_query);
@@ -983,7 +994,9 @@ deepCopyLuaQuery(const struct LuaQuery *const lua_query)
 
     new_lua_query->cond = NEW_BOX;
     if (pthread_cond_init(COND_ADDR(new_lua_query->cond), NULL)) {
+        INVALIDATE(new_lua_query->cond);
         pthread_mutex_destroy(MUTEX_ADDR(new_lua_query->mutex));
+        INVALIDATE(new_lua_query->mutex);
         freeSQL(new_lua_query);
         free((void *)new_lua_query->persist.host_data);
         free(new_lua_query);
@@ -1002,6 +1015,7 @@ undoDeepCopyLuaQuery(struct LuaQuery **p_lua_query)
     freeSQL(*p_lua_query);
     assert(NULL == (*p_lua_query)->sql);
     destroyHostData((struct HostData **)&(*p_lua_query)->persist.host_data);
+    assert(NULL == (*p_lua_query)->persist.host_data);
     free(*p_lua_query);
     *p_lua_query = NULL;
 }
@@ -1036,6 +1050,7 @@ restartLuaQueryThread(struct LuaQuery **p_lua_query)
     switch (stop_type) {
         case FAILURE:
             fprintf(stderr, "stopLuaQueryThread failed in restart!\n");
+            undoDeepCopyLuaQuery(&new_lua_query);
             return FUBAR;
         case PENDING_SELF_DESTRUCTION:
             // we lost ownership of original metadata
@@ -1181,7 +1196,7 @@ luaToCharp(lua_State *const L, int index)
 void *
 nullFail(void *p)
 {
-    if (!p) {exit(2);}
+    if (!p) {exit(EXIT_FAILURE);}
 
     return p;
 }
