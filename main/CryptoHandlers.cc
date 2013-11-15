@@ -355,8 +355,8 @@ public:
 private:
     std::string const rawkey;
     static int const key_bytes = 16;
-    AES_KEY const * const enckey;
-    AES_KEY const * const deckey;
+    const std::unique_ptr<const AES_KEY> enckey;
+    const std::unique_ptr<const AES_KEY> deckey;
 
 };
 
@@ -488,7 +488,7 @@ Item *
 RND_str::encrypt(const Item &ptext, uint64_t IV) const
 {
     const std::string enc =
-        encrypt_AES_CBC(ItemToString(ptext), enckey,
+        encrypt_AES_CBC(ItemToString(ptext), enckey.get(),
                         BytesFromInt(IV, SALT_LEN_BYTES), false);
 
     LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV "
@@ -504,7 +504,7 @@ Item *
 RND_str::decrypt(Item * const ctext, uint64_t IV) const
 {
     const std::string dec =
-        decrypt_AES_CBC(ItemToString(*ctext), deckey,
+        decrypt_AES_CBC(ItemToString(*ctext), deckey.get(),
                         BytesFromInt(IV, SALT_LEN_BYTES), false);
     LOG(encl) << "RND_str decrypt " << ItemToString(*ctext) << " IV "
               << IV << "-->" << "len of dec " << dec.length()
@@ -661,8 +661,8 @@ public:
 protected:
     std::string const rawkey;
     static const int key_bytes = 16;
-    AES_KEY const * const enckey;
-    AES_KEY const * const deckey;
+    const std::unique_ptr<const AES_KEY> enckey;
+    const std::unique_ptr<const AES_KEY> deckey;
 
 };
 
@@ -925,7 +925,7 @@ Item *
 DET_str::encrypt(const Item &ptext, uint64_t IV) const
 {
     const std::string plain = ItemToString(ptext);
-    const std::string enc = encrypt_AES_CMC(plain, enckey, true);
+    const std::string enc = encrypt_AES_CMC(plain, enckey.get(), true);
     LOG(encl) << " DET_str encrypt " << plain  << " IV " << IV << " ---> "
               << " enc len " << enc.length() << " enc " << enc;
 
@@ -938,7 +938,7 @@ Item *
 DET_str::decrypt(Item * const ctext, uint64_t IV) const
 {
     const std::string enc = ItemToString(*ctext);
-    const std::string dec = decrypt_AES_CMC(enc, deckey, true);
+    const std::string dec = decrypt_AES_CMC(enc, deckey.get(), true);
     LOG(encl) << " DET_str decrypt enc len " << enc.length()
               << " enc " << enc << " IV " << IV << " ---> "
               << " dec len " << dec.length() << " dec " << dec;
