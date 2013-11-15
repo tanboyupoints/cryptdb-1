@@ -69,24 +69,6 @@ extract_fieldname(Item_field *const i)
     return fieldtemp.str();
 }
 
-
-//TODO: remove this at some point
-static inline void
-mysql_query_wrapper(MYSQL *const m, const std::string &q)
-{
-    if (mysql_query(m, q.c_str())) {
-        cryptdb_err() << "query failed: " << q
-                << " reason: " << mysql_error(m);
-    }
-
-    // HACK(stephentu):
-    // Calling mysql_query seems to have destructive effects
-    // on the current_thd. Thus, we must call create_embedded_thd
-    // again.
-    void *const ret = create_embedded_thd(0);
-    if (!ret) assert(false);
-}
-
 bool
 sanityCheck(FieldMeta &fm)
 {
@@ -1408,7 +1390,6 @@ Rewriter::rewrite(const ProxyState &ps, const std::string &q,
 {
     LOG(cdb_v) << "q " << q;
     assert(0 == mysql_thread_init());
-    //assert(0 == create_embedded_thd(0));
 
     Analysis analysis(default_db, schema);
 
