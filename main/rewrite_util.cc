@@ -168,22 +168,6 @@ gatherAndAddAnalysisRewritePlan(const Item &i, Analysis &a)
     a.rewritePlans[&i] = std::unique_ptr<RewritePlan>(gather(i, a));
 }
 
-LEX *
-begin_transaction_lex(const std::string &dbname)
-{
-    static const std::string query = "START TRANSACTION;";
-    query_parse *const begin_parse = new query_parse(dbname, query);
-    return begin_parse->lex();
-}
-
-LEX *
-commit_transaction_lex(const std::string &dbname)
-{
-    static const std::string query = "COMMIT;";
-    query_parse *const commit_parse = new query_parse(dbname, query);
-    return commit_parse->lex();
-}
-
 //TODO(raluca) : figure out how to create Create_field from scratch
 // and avoid this chaining and passing f as an argument
 static Create_field *
