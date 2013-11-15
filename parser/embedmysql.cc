@@ -90,6 +90,7 @@ query_parse::cleanup()
         t->end_statement();
         t->cleanup_after_query();
         close_thread_tables(t);
+        --thread_count;
         delete t;
         t = 0;
     }
@@ -115,6 +116,7 @@ cloneItemInOrder(ORDER * o) {
     o->item = tmp;
 }
 */
+
 query_parse::query_parse(const std::string &db, const std::string &q)
 {
     assert(create_embedded_thd(0));

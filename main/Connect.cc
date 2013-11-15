@@ -16,6 +16,9 @@
 #include <main/macro_util.hh>
 #include <util/cryptdb_log.hh>
 #include <main/schema.hh>
+#include <main/Analysis.hh>
+
+__thread ProxyState *thread_ps = NULL;
 
 Connect::Connect(const std::string &server, const std::string &user,
                  const std::string &passwd, uint port)
@@ -123,8 +126,11 @@ Connect::execute(const std::string &query, std::unique_ptr<DBResult> *res,
         }
     }
 
-    void *const ret = create_embedded_thd(0);
-    if (!ret) assert(false);
+    if (thread_ps) {
+        thread_ps->safeCreateEmbeddedTHD();
+    } else {
+        assert(create_embedded_thd(0));
+    }
 
     return success;
 }

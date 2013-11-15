@@ -369,25 +369,28 @@ synchronizeDatabases(const std::unique_ptr<Connect> &conn,
     return true;
 }
 
-ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
-                       const std::string &master_key,
-                       SECURITY_RATING default_sec_rating)
+SharedProxyState::SharedProxyState(ConnectionInfo ci,
+                                   const std::string &embed_dir,
+                                   const std::string &master_key,
+                                   SECURITY_RATING default_sec_rating)
     : masterKey(std::unique_ptr<AES_KEY>(getKey(master_key))),
-      mysql_dummy(ProxyState::db_init(embed_dir)), // HACK: Allows
+      embed_dir(embed_dir),
+      mysql_dummy(SharedProxyState::db_init(embed_dir)), // HACK: Allows
                                                    // connections in init
                                                    // list.
       conn(new Connect(ci.server, ci.user, ci.passwd, ci.port)),
-      e_conn(Connect::getEmbedded(embed_dir)), 
       default_sec_rating(default_sec_rating)
 {
-    assert(conn && e_conn);
+    std::unique_ptr<Connect>
+        init_e_conn(Connect::getEmbedded(embed_dir));
+    assert(conn && init_e_conn);
 
-    const std::string &prefix = 
+    const std::string prefix = 
         getenv("CRYPTDB_NAME") ? getenv("CRYPTDB_NAME")
                                : "generic_prefix_";
-    assert(MetaData::initialize(conn, e_conn, prefix));
+    assert(MetaData::initialize(conn, init_e_conn, prefix));
 
-    TEST_TextMessageError(synchronizeDatabases(conn, e_conn),
+    TEST_TextMessageError(synchronizeDatabases(conn, init_e_conn),
                           "Failed to synchronize embedded and remote"
                           " databases!");
 
@@ -396,15 +399,62 @@ ProxyState::ProxyState(ConnectionInfo ci, const std::string &embed_dir,
     assert(loadStoredProcedures(conn));
 }
 
-ProxyState::~ProxyState()
+SharedProxyState::~SharedProxyState()
 {
     // mysql_library_end();
 }
 
-int ProxyState::db_init(const std::string &embed_dir)
+int
+SharedProxyState::db_init(const std::string &embed_dir)
 {
     init_mysql(embed_dir);
     return 1;
+}
+
+ProxyState::~ProxyState() {}
+
+SECURITY_RATING
+ProxyState::defaultSecurityRating() const
+{
+    return shared.defaultSecurityRating();
+}
+
+const std::unique_ptr<AES_KEY> &
+ProxyState::getMasterKey() const
+{
+    return shared.getMasterKey();
+}
+
+const std::unique_ptr<Connect> &
+ProxyState::getConn() const
+{
+    return shared.getConn();
+}
+
+const std::unique_ptr<Connect> &
+ProxyState::getEConn() const
+{
+    return e_conn;
+}
+
+static void
+embeddedTHDCleanup(THD *thd)
+{
+    thd->clear_data_list();
+    --thread_count;
+    thd->unlink();
+    delete thd;
+}
+
+void
+ProxyState::safeCreateEmbeddedTHD()
+{
+    THD *thd = static_cast<THD *>(create_embedded_thd(0));
+    assert(thd);
+    thds.push_back(std::unique_ptr<THD,
+                                   void (*)(THD *)>(thd,
+                                       &embeddedTHDCleanup));
+    return;
 }
 
 std::string Delta::tableNameFromType(TableType table_type) const

@@ -11,6 +11,8 @@
 #include <main/rewrite_util.hh>
 #include <parser/sql_utils.hh>
 
+__thread ProxyState *thread_ps = NULL;
+
 // FIXME: Ownership semantics.
 class WrapperState {
     WrapperState(const WrapperState &other);
@@ -34,6 +36,8 @@ public:
         this->qr = std::unique_ptr<QueryRewrite>(in_qr);
     }
 
+    std::unique_ptr<ProxyState> ps;
+
 private:
     std::unique_ptr<QueryRewrite> qr;
     SchemaCache schema_cache;
@@ -42,7 +46,7 @@ private:
 static Timer t;
 
 //static EDBProxy * cl = NULL;
-static ProxyState * ps = NULL;
+static SharedProxyState * shared_ps = NULL;
 static pthread_mutex_t big_lock;
 
 static bool EXECUTE_QUERIES = true;
@@ -145,7 +149,7 @@ connect(lua_State *const L)
     clients[client] = new WrapperState();
 
     // Is it the first connection?
-    if (!ps) {
+    if (!shared_ps) {
         std::cerr << "starting proxy\n";
         //cryptdb_logger::setConf(string(getenv("CRYPTDB_LOG")?:""));
 
@@ -161,12 +165,12 @@ connect(lua_State *const L)
         const char * ev = getenv("ENC_BY_DEFAULT");
         if (ev && equalsIgnoreCase(false_str, ev)) {
             std::cerr << "\n\n enc by default false " << "\n\n";
-            ps = new ProxyState(ci, embed_dir, mkey,
-                                SECURITY_RATING::PLAIN);
+            shared_ps = new SharedProxyState(ci, embed_dir, mkey,
+                                             SECURITY_RATING::PLAIN);
         } else {
             std::cerr << "\n\nenc by default true" << "\n\n";
-            ps = new ProxyState(ci, embed_dir, mkey,
-                                SECURITY_RATING::BEST_EFFORT);
+            shared_ps = new SharedProxyState(ci, embed_dir, mkey,
+                                             SECURITY_RATING::BEST_EFFORT);
         }
 
         //may need to do training
@@ -223,6 +227,11 @@ connect(lua_State *const L)
             clients[client]->PLAIN_LOG = PLAIN_LOG;
         }
     }
+    clients[client]->ps =
+        std::unique_ptr<ProxyState>(new ProxyState(*shared_ps));
+    // We don't want to use the THD from the previous connection
+    // if such is even possible...
+    clients[client]->ps->safeCreateEmbeddedTHD();
 
     return 0;
 }
@@ -241,12 +250,14 @@ disconnect(lua_State *const L)
 
     LOG(wrapper) << "disconnect " << client;
 
+    ProxyState *const ps = thread_ps = clients[client]->ps.get();
     auto ws = clients[client];
     clients[client] = NULL;
 
     SchemaCache &schema_cache = ws->getSchemaCache();
     TEST_TextMessageError(schema_cache.cleanupStaleness(ps->getEConn()),
                           "Failed to cleanup staleness!");
+    thread_ps = NULL;
     delete ws;
     clients.erase(client);
 
@@ -266,6 +277,8 @@ rewrite(lua_State *const L)
         return 0;
     }
     WrapperState *const c_wrapper = clients[client];
+    ProxyState *const ps = thread_ps = c_wrapper->ps.get();
+    assert(ps);
 
     const std::string query = xlua_tolstring(L, 2);
     const unsigned long long _thread_id =
@@ -277,7 +290,6 @@ rewrite(lua_State *const L)
     t.lap_ms();
     if (EXECUTE_QUERIES) {
         try {
-            assert(ps);
 
             SchemaCache &schema_cache = c_wrapper->getSchemaCache();
             std::unique_ptr<QueryRewrite> qr;
@@ -410,15 +422,6 @@ envoi(lua_State *const L)
     scoped_lock l(&big_lock);
     assert(0 == mysql_thread_init());
 
-    THD *const thd = static_cast<THD *>(create_embedded_thd(0));
-    auto thd_cleanup = cleanup([&thd]
-        {
-            thd->clear_data_list();
-            thd->store_globals();
-            thd->unlink();
-            delete thd;
-        });
-
     const std::string client = xlua_tolstring(L, 1);
     if (clients.find(client) == clients.end()) {
         return 0;
@@ -426,7 +429,10 @@ envoi(lua_State *const L)
     WrapperState *const c_wrapper = clients[client];
 
     assert(EXECUTE_QUERIES);
+
+    ProxyState *const ps = thread_ps = c_wrapper->ps.get();
     assert(ps);
+    ps->safeCreateEmbeddedTHD();
 
     ResType res;
     getResTypeFromLuaTable(L, 2, 3, &res);

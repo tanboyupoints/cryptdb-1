@@ -67,13 +67,15 @@ public:
 
 } ConnectionInfo;
 
+class ProxyState;
+
 // state maintained at the proxy
-typedef struct ProxyState {
-    ProxyState(ConnectionInfo ci, const std::string &embed_dir,
-               const std::string &master_key,
-               SECURITY_RATING default_sec_rating =
-                SECURITY_RATING::BEST_EFFORT);
-    ~ProxyState();
+typedef struct SharedProxyState {
+    SharedProxyState(ConnectionInfo ci, const std::string &embed_dir,
+                     const std::string &master_key,
+                     SECURITY_RATING default_sec_rating =
+                     SECURITY_RATING::BEST_EFFORT);
+    ~SharedProxyState();
     SECURITY_RATING defaultSecurityRating() const
     {
         return default_sec_rating;
@@ -84,19 +86,39 @@ typedef struct ProxyState {
         return masterKey;
     }
     const std::unique_ptr<Connect> &getConn() const {return conn;}
-    const std::unique_ptr<Connect> &getEConn() const {return e_conn;}
 
     static int db_init(const std::string &embed_dir);
 
+    friend class ProxyState;
+
 private:
     const std::unique_ptr<AES_KEY> masterKey;
+    const std::string &embed_dir;
     const int mysql_dummy;
-    // connection to remote and embedded server
     const std::unique_ptr<Connect> conn;
-    const std::unique_ptr<Connect> e_conn;
     const SECURITY_RATING default_sec_rating;
-} ProxyState;
+} SharedProxyState;
 
+class ProxyState {
+public:
+    ProxyState(const SharedProxyState &shared)
+        : shared(shared),
+          e_conn(Connect::getEmbedded(shared.embed_dir)) {}
+    ~ProxyState();
+
+    SECURITY_RATING defaultSecurityRating() const;
+    const std::unique_ptr<AES_KEY> &getMasterKey() const;
+    const std::unique_ptr<Connect> &getConn() const;
+    const std::unique_ptr<Connect> &getEConn() const;
+    void safeCreateEmbeddedTHD();
+
+private:
+    const SharedProxyState &shared;
+    const std::unique_ptr<Connect> e_conn;
+    std::vector<std::unique_ptr<THD, void (*)(THD *)> > thds;
+};
+
+extern __thread ProxyState *thread_ps;
 
 // For REPLACE and DELETE we are duplicating the MetaKey information.
 class Delta {
