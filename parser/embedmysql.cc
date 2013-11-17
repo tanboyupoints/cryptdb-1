@@ -91,6 +91,7 @@ query_parse::cleanup()
         t->cleanup_after_query();
         close_thread_tables(t);
         --thread_count;
+        // t->clear_data_list();
         delete t;
         t = 0;
     }

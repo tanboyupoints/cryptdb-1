@@ -442,7 +442,11 @@ embeddedTHDCleanup(THD *thd)
 {
     thd->clear_data_list();
     --thread_count;
-    thd->unlink();
+    // thd->unlink() is called in by THD destructor
+    // > THD::~THD()
+    //     ilink::~ilink()
+    //       ilink::unlink()
+    // free_root(thd->main_mem_root, 0) is called in THD::~THD
     delete thd;
 }
 
