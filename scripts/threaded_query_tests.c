@@ -469,9 +469,101 @@ TEST(test_killThreadOwningMutex)
 
     const unsigned int init_wait        = 1;
     struct LuaQuery **p_lua_query = createLuaQuery(&host_data, init_wait);
+    TEST_ASSERT(p_lua_query && *p_lua_query);
 
     destroyLuaQuery(&p_lua_query);
     TEST_ASSERT(NULL == p_lua_query);
+END_TEST
+
+TEST(test_noMoreConnects)
+    const char *const init_host         = real_host;
+    const char *const init_user         = real_user;
+    const char *const init_passwd       = real_passwd;
+    const unsigned int init_port        = real_port;
+
+    struct HostData *host_data =
+        createHostData(init_host, init_user, init_passwd, init_port);
+    TEST_ASSERT(host_data);
+
+    const unsigned int init_wait        = 1;
+    struct LuaQuery **p_lua_query = createLuaQuery(&host_data, init_wait);
+    TEST_ASSERT(p_lua_query && *p_lua_query);
+
+    // do a query; the thread is operational
+    issueQuery(L, "SHOW DATABASES", p_lua_query);
+    TEST_ASSERT(true           == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
+    TEST_ASSERT(true           == validBox((*p_lua_query)->thread));
+    TEST_ASSERT(NORMAL         == (*p_lua_query)->state);
+
+    // kill the thread to emulate it being non-responsive
+    assert(!pthread_cancel(THD((*p_lua_query)->thread)));
+
+    // try to get your results and fail
+    issueCommand(L, RESULTS, p_lua_query);
+    TEST_ASSERT(false          == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
+    TEST_ASSERT(false          == validBox((*p_lua_query)->thread));
+    TEST_ASSERT(DEAD           == (*p_lua_query)->state);
+
+    // clean it up
+    destroyLuaQuery(&p_lua_query);
+    TEST_ASSERT(NULL           == p_lua_query);
+
+    // start another thread
+    struct HostData *host_data2 =
+        createHostData(init_host, init_user, init_passwd, init_port);
+    TEST_ASSERT(host_data2);
+
+    struct LuaQuery **p_lua_query2 =
+        createLuaQuery(&host_data2, init_wait);
+    TEST_ASSERT(p_lua_query2 && *p_lua_query2);
+
+    // this thread should also be functional
+    issueQuery(L, "SHOW DATABASES", p_lua_query2);
+    TEST_ASSERT(true           == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
+    TEST_ASSERT(true           == validBox((*p_lua_query2)->thread));
+    TEST_ASSERT(NORMAL         == (*p_lua_query2)->state);
+
+    issueCommand(L, RESULTS, p_lua_query2);
+    TEST_ASSERT(true           == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
+    TEST_ASSERT(true           == validBox((*p_lua_query2)->thread));
+    TEST_ASSERT(NORMAL         == (*p_lua_query2)->state);
+
+    // now kill it
+    issueCommand(L, KILL, p_lua_query2);
+    TEST_ASSERT(true           == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
+    // issueCommand does not update thread state metadata unless it has
+    // to hard kill the thread
+    TEST_ASSERT(true           == validBox((*p_lua_query2)->thread));
+    TEST_ASSERT(NORMAL         == (*p_lua_query2)->state);
+
+    // now start another connection
+    struct HostData *host_data3 =
+        createHostData(init_host, init_user, init_passwd, init_port);
+    TEST_ASSERT(host_data3);
+
+    struct LuaQuery **p_lua_query3 =
+        createLuaQuery(&host_data3, init_wait);
+    TEST_ASSERT(p_lua_query3 && *p_lua_query3);
+
+    // fudge the global timeouts so that it shouldn't try to query
+    global_timeouts = MAX_TIMEOUTS;
+    issueQuery(L, "SHOW DATABASES", p_lua_query3);
+    TEST_ASSERT(false          == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
+    TEST_ASSERT(true           == validBox((*p_lua_query3)->thread));
+    TEST_ASSERT(NORMAL         == (*p_lua_query3)->state);
+
+    // kill should fail as well
+    issueCommand(L, KILL, p_lua_query3);
+    TEST_ASSERT(false          == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
+    TEST_ASSERT(true           == validBox((*p_lua_query3)->thread));
+    TEST_ASSERT(NORMAL         == (*p_lua_query3)->state);
+
+    // now clean it up
+    TEST_ASSERT(true           == niceStopLuaQueryThread(*p_lua_query3));
+    destroyLuaQuery(&p_lua_query3);
+    TEST_ASSERT(NULL           == p_lua_query3);
+
+    TEST_ASSERT(true           == nonResponsiveRemote());
 END_TEST
 
 // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -500,6 +592,7 @@ all(struct lua_State *const L)
     test_createHostData(L);
     test_destroyHostData(L);
     test_killThreadOwningMutex(L);
+    test_noMoreConnects(L);
 
     // bookkeeping
     printTestStats();
