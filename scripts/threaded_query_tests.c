@@ -355,7 +355,7 @@ TEST(test_noReconnectAfterFailure)
         createLuaQuery(&bad_host_data, init_wait);
     TEST_ASSERT(p_bad_lua_query && *p_bad_lua_query);
 
-    issueQuery(L, strdup("do 0"), p_bad_lua_query);
+    issueQuery(L, "do 0", p_bad_lua_query);
     TEST_ASSERT(false         == lua_toboolean(L, -COMMAND_OUTPUT_COUNT));
     TEST_ASSERT(false         == validBox((*p_bad_lua_query)->thread));
     TEST_ASSERT(COMMAND_OUTPUT_COUNT == (*p_bad_lua_query)->output_count);
