@@ -32,21 +32,9 @@
     (stmt);                                                         \
     RESUME_KILLING;
 
-// Once it's done 'MAX_PER_CONNECTION_RESTARTS' restarts, it will no
-// longer communicate with the worker thread;
-// > Once we reach MAX_GLOBAL_RESTARTS; everything is a zombie
-// reach MAX_GLOBAL_RESTARTS.
-// > BUG: the last available restart will not _actually_ lead to data
-//   exchange; but it will _do_ the restart.
-//   + This is because a thread doesn't actually become a zombie until
-//     it's done MAX_RESTARTS restarts and it fails to respond one more
-//     time; we are not currently accounting for the second half of the
-//     premise.
-#define MAX_GLOBAL_RESTARTS             10
-#define MAX_PER_CONNECTION_RESTARTS     2
+#define MAX_TIMEOUTS                    10
 #define COMMAND_OUTPUT_COUNT            2
 
-enum RESTART_STATUS {RESTARTED, ONLY_SANE_STOP, FUBAR};
 enum Command {QUERY, RESULTS, KILL};
 
 // SUCCESS          : a thread was running and we killed it
@@ -116,7 +104,6 @@ struct HostData {
 // > must not be modified by commandHandler; these values can always be
 //   meaningfully read after running issueCommand.
 struct PersistentState {
-    unsigned int restarts;
     // using a pointer for 'host_data' allows for PersistentState
     // to determine if 'host_data' is valid or not.
     // > non-NULL == valid
@@ -128,8 +115,10 @@ struct PersistentState {
     unsigned int wait;
 };
 
+enum LuaQueryState {NORMAL, DEAD, SELF_OWNING};
 struct LuaQuery {
     // internal state
+    enum LuaQueryState state;
     enum Command command;
     bool command_ready;
     bool completion_signal;
@@ -161,19 +150,21 @@ static struct LuaQuery **
 createLuaQuery(struct HostData **const p_host_data, unsigned int wait);
 static void destroyLuaQuery(struct LuaQuery ***const pp_lua_query);
 static bool startLuaQueryThread(struct LuaQuery *const lua_query);
-static enum STOP_TYPE stopLuaQueryThread(struct LuaQuery *const lua_query);
-void clearLuaQuery(struct LuaQuery *const lua_query);
+static enum STOP_TYPE
+lowLevelStopLuaQueryThread(struct LuaQuery *const lua_query);
+bool niceStopLuaQueryThread(struct LuaQuery *const lua_query);
+
+void initLuaQuery(struct LuaQuery *const lua_query);
 void finishedCommandIssue(struct LuaQuery *const lua_query);
 void strangeFinishedCommandIssue(struct LuaQuery *const lua_query,
                                  bool exit_status);
-static enum RESTART_STATUS restartLuaQueryThread(struct LuaQuery **lua_query);
 
-static bool zombie(struct LuaQuery *const lua_query);
 static void issueCommand(lua_State *L, enum Command command,
                          struct LuaQuery **const p_lua_query);
 static bool issueQuery(lua_State *L, const char *const query,
                        struct LuaQuery **const p_lua_query);
 static void *commandHandler(void *const lq);
+bool nonResponsiveRemote();
 
 static void nilTheStack(lua_State *const L, int pushed);
 static void nilTheStackPlus(struct LuaQuery *const lua_query,
@@ -184,12 +175,20 @@ static void pushvalue(lua_State *const L, const char *const string,
 static const char *luaToCharp(lua_State *const L, int index);
 void *nullFail(void *p);
 bool validBox(Box b);
+bool saneLuaQuery(struct LuaQuery *const lua_query);
 
-static unsigned global_restarts = 0;
+unsigned global_timeouts = 0;
 
 static int
 start(lua_State *const L)
 {
+    // don't try to connect if cryptdb is being non-responsive
+    if (nonResponsiveRemote()) {
+        lua_pushboolean(L, false);
+        lua_pushnil(L);
+        return 2;
+    }
+
     const char *host        = luaToCharp(L, 1);
     const char *user        = luaToCharp(L, 2);
     const char *passwd      = luaToCharp(L, 3);
@@ -310,20 +309,22 @@ issueCommand(lua_State *const L, enum Command command,
              struct LuaQuery **const p_lua_query)
 {
     assert(L && p_lua_query && *p_lua_query);
+    assert(saneLuaQuery(*p_lua_query));
 
-    assert(NULL == (*p_lua_query)->persist.ell);
+    assert(NULL  == (*p_lua_query)->persist.ell);
     assert(false == (*p_lua_query)->completion_signal);
 
-    // execute command
+    // This allows us to intelligibly return at any point hereafter
     (*p_lua_query)->command       = command;
     (*p_lua_query)->persist.ell   = L;
-    (*p_lua_query)->command_ready = true;
 
-    if (zombie(*p_lua_query)) {
-        fprintf(stderr, "zombie, no restart!\n");
+    if (NORMAL != (*p_lua_query)->state || nonResponsiveRemote()) {
         strangeFinishedCommandIssue(*p_lua_query, false);
         return;
     }
+
+    // execute command
+    (*p_lua_query)->command_ready = true;
 
     struct timespec ts;
     if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
@@ -373,35 +374,19 @@ issueCommand(lua_State *const L, enum Command command,
 
     // handle result
     if (false == (*p_lua_query)->completion_signal) {
-        // if the goal is to kill the thread; don't bother restarting
-        if (KILL == command) {
-            strangeFinishedCommandIssue(*p_lua_query, false);
-            return;
+        fprintf(stderr, "no completion signal, stopping thread!\n");
+        if (false == niceStopLuaQueryThread(*p_lua_query)) {
+            fprintf(stderr, "niceStopLuaQueryThread failed!");
+            // can't continue from here as a rogue thread has a pointer
+            // into our lua_State
+            exit(0);
         }
+        assert((*p_lua_query)->state != NORMAL);
 
-        fprintf(stderr, "no completion signal, restarting!\n");
-
-        const enum RESTART_STATUS rstatus =
-            restartLuaQueryThread(p_lua_query);
-        switch (rstatus) {
-            case RESTARTED:
-                // managed to get a replacement thread running
-                assert(validBox((*p_lua_query)->thread));
-            case ONLY_SANE_STOP:
-                // killed the original thread; but no replacement thread
-                assert(L        == (*p_lua_query)->persist.ell);
-                assert(false    == (*p_lua_query)->completion_signal);
-                assert(false    == (*p_lua_query)->command_ready);
-
-                strangeFinishedCommandIssue(*p_lua_query, false);
-                return;
-
-            case FUBAR:
-                // rogue thread has lua_State pointer
-            default:
-                fprintf(stderr, "panicking: rogue worker thread!\n");
-                exit(0);
-        }
+        ++global_timeouts;
+        assert((*p_lua_query)->persist.ell);
+        strangeFinishedCommandIssue(*p_lua_query, false);
+        return;
     }
 
     assert(L        == (*p_lua_query)->persist.ell);
@@ -494,6 +479,8 @@ finishedCommandIssue(struct LuaQuery *const lua_query)
     lua_query->completion_signal    = false;
     lua_query->command              = -1;
     lua_query->persist.ell          = NULL;
+
+    assert(saneLuaQuery(lua_query));
 }
 
 void
@@ -511,7 +498,7 @@ strangeFinishedCommandIssue(struct LuaQuery *const lua_query,
     finishedCommandIssue(lua_query);
 }
 
-// close the mysql connection if we receive an asynch kill order
+// close the mysql connection
 static void
 mysql_cleanup_handler(void *const mysql_conn)
 {
@@ -740,8 +727,9 @@ destroyHostData(struct HostData **p_host_data)
 
 // doesn't modify persistent data
 void
-clearLuaQuery(struct LuaQuery *const lua_query)
+initLuaQuery(struct LuaQuery *const lua_query)
 {
+    lua_query->state                = NORMAL;
     lua_query->command_ready        = false;
     lua_query->completion_signal    = false;
     lua_query->command              = -1;
@@ -770,11 +758,10 @@ newLuaQuery(struct LuaQuery *const lua_query,
 {
     memset(lua_query, 0, sizeof(struct LuaQuery));
 
-    clearLuaQuery(lua_query);
+    initLuaQuery(lua_query);
 
-    // persistent data should only be initialized at object creation
+    // FIXME: 'persist' is deprecated
     lua_query->persist.host_data = host_data;
-    lua_query->persist.restarts  = 0;
     lua_query->persist.ell       = NULL;
     lua_query->persist.wait      = wait;
 
@@ -852,7 +839,6 @@ startLuaQueryThread(struct LuaQuery *const lua_query)
         perror("pthread_create failed!\n");
         return false;
     }
-    // getchar();
 
     ASSERT_VALID_BOX(lua_query->thread);
     ASSERT_VALID_BOX(lua_query->mutex);
@@ -864,7 +850,7 @@ startLuaQueryThread(struct LuaQuery *const lua_query)
 // NOTE: Callers are apt to fault if this function does not complete
 // successfully.
 enum STOP_TYPE
-stopLuaQueryThread(struct LuaQuery *const lua_query)
+lowLevelStopLuaQueryThread(struct LuaQuery *const lua_query)
 {
     ASSERT_VALID_BOX(lua_query->mutex);
     ASSERT_VALID_BOX(lua_query->cond);
@@ -1020,62 +1006,37 @@ undoDeepCopyLuaQuery(struct LuaQuery **p_lua_query)
     *p_lua_query = NULL;
 }
 
-enum RESTART_STATUS
-restartLuaQueryThread(struct LuaQuery **p_lua_query)
+bool
+niceStopLuaQueryThread(struct LuaQuery *p_lua_query)
 {
     // Until we explicitly stop the thread, *p_lua_query can be modified
     // from under us.
-    assert(p_lua_query && *p_lua_query);
-
-    assert((*p_lua_query)->persist.restarts < MAX_PER_CONNECTION_RESTARTS);
-
-    ++(*p_lua_query)->persist.restarts;
-    ++global_restarts;
-
-    // first make a copy of the metadata in case we lose ownership of
-    // if when we try to stop the thread.
-    struct LuaQuery *new_lua_query = deepCopyLuaQuery(*p_lua_query);
-    if (NULL == new_lua_query) {
-        perror("malloc failed!\n");
-        return FUBAR;
-    }
-    assert(new_lua_query != *p_lua_query);
-    assert(new_lua_query->sql != (*p_lua_query)->sql
-           || !(*p_lua_query)->sql);
-    assert(new_lua_query->persist.host_data !=
-                (*p_lua_query)->persist.host_data);
+    assert(p_lua_query);
 
     // now we can stop the thread
-    const enum STOP_TYPE stop_type = stopLuaQueryThread(*p_lua_query);
+    const enum STOP_TYPE stop_type =
+        lowLevelStopLuaQueryThread(p_lua_query);
     switch (stop_type) {
         case FAILURE:
-            fprintf(stderr, "stopLuaQueryThread failed in restart!\n");
-            undoDeepCopyLuaQuery(&new_lua_query);
-            return FUBAR;
+            fprintf(stderr, "lowLevelStopLuaQuery failed\n");
+            return false;
         case PENDING_SELF_DESTRUCTION:
             // we lost ownership of original metadata
             // > MEMLEAK
-            *p_lua_query = new_lua_query;
+            p_lua_query->state = SELF_OWNING;
             break;
         case SUCCESS:
         case NOTHING_TO_STOP:
             // we retained ownership of original metadata
-            undoDeepCopyLuaQuery(&new_lua_query);
+            p_lua_query->state = DEAD;
             break;
         default:
             fprintf(stderr, "unknown stop type!\n");
-            exit(0);
+            return false;
     }
-    ASSERT_INVALID_BOX((*p_lua_query)->thread);
+    ASSERT_INVALID_BOX(p_lua_query->thread);
 
-    // then start a new one and reset state
-    clearLuaQuery(*p_lua_query);
-    if (false == startLuaQueryThread(*p_lua_query)) {
-        fprintf(stderr, "startLuaQueryThread failed in restart!\n");
-        return ONLY_SANE_STOP;
-    }
-
-    return RESTARTED;
+    return true;
 }
 
 static void
@@ -1112,45 +1073,39 @@ destroyLuaQuery(struct LuaQuery ***const pp_lua_query)
 {
     assert(pp_lua_query && *pp_lua_query && **pp_lua_query);
 
-    // 'stopLuaQueryThread' will cleanup lua_query->thread for us
-    const enum STOP_TYPE stop_type = stopLuaQueryThread(**pp_lua_query);
-    switch (stop_type) {
-        case FAILURE:
-            fprintf(stderr, "stopLuaQueryThread failed!\n");
+    // if necessary, stop the thread first as this could potentially
+    // change state
+    if (NORMAL == (**pp_lua_query)->state) {
+        if (false == niceStopLuaQueryThread(**pp_lua_query)) {
+            fprintf(stderr, "niceStopLuaQueryThread failed!\n");
             exit(0);
-        case PENDING_SELF_DESTRUCTION:
-            // FIXME: Thread must free it's own metadata.
-            // > Currently this MEMLEAKs; but we could fix if necessary.
-            // > note that an implementation must respect that potentially
-            //   we will try to kill a thread before asynch mode, but we
-            //   don't intend on destroyLuaQuery(ing); just restarting the
-            //   thread.  this means that we must duplicate the lua_query
-            //   data before issuing a kill request because we are
-            //   potentially giving the thread ownership of this data.
-            ASSERT_INVALID_BOX((**pp_lua_query)->thread);
-            *pp_lua_query = NULL;
-            return;
-        case NOTHING_TO_STOP:
-        case SUCCESS:
+        }
+    }
+    assert(NORMAL != (**pp_lua_query)->state);
+
+    switch ((**pp_lua_query)->state) {
+        case DEAD:
             ASSERT_INVALID_BOX((**pp_lua_query)->thread);
             destroyLuaQueryMetaData(pp_lua_query);
             return;
+        case SELF_OWNING:
+            // Must clean it's self up
+            // FIXME: Should this be invalid?
+            ASSERT_INVALID_BOX((**pp_lua_query)->thread);
+            *pp_lua_query = NULL;
+            return;
         default:
-            fprintf(stderr, "unknown stop type!\n");
+            fprintf(stderr, "bad state in destroyLuaQuery!");
             exit(0);
     }
 }
 
 bool
-zombie(struct LuaQuery *const lua_query)
+nonResponsiveRemote()
 {
-    assert(lua_query->persist.restarts <= MAX_PER_CONNECTION_RESTARTS);
-    assert(global_restarts <= MAX_GLOBAL_RESTARTS);
-
-    return MAX_GLOBAL_RESTARTS == global_restarts
-           || MAX_PER_CONNECTION_RESTARTS == lua_query->persist.restarts;
+    assert(global_timeouts <= MAX_TIMEOUTS);
+    return MAX_TIMEOUTS == global_timeouts;
 }
-
 
 void
 nilTheStack(lua_State *const L, int pushed)
@@ -1205,6 +1160,13 @@ bool
 validBox(Box b)
 {
     return b.valid;
+}
+
+bool
+saneLuaQuery(struct LuaQuery *const lua_query)
+{
+    return !!validBox(lua_query->thread)
+       != !!(DEAD == lua_query->state || SELF_OWNING == lua_query->state);
 }
 
 #include "threaded_query_tests.c"

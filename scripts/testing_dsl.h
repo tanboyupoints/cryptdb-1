@@ -75,7 +75,6 @@ static unsigned __passed_asserts                = 0;
     static int                                      \
     name(struct lua_State *const L)                 \
     {                                               \
-        global_restarts = 0;                        \
         const char *const __test_name = #name;      \
         ++__total_tests;
 

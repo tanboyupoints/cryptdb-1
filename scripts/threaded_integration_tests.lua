@@ -39,11 +39,11 @@ function main()
     end
 
     total_integrations = total_integrations + 1
-    if test_restartedQueryExecution() then
-        print(GREEN .."test_restartedQueryExection succeeded!".. COLOR_END)
+    if test_failedQueryExecution() then
+        print(GREEN .."test_failedQueryExecution succeeded!".. COLOR_END)
         passed_integrations = passed_integrations + 1
     else
-        print(RED .. "test_restartedQueryExection succeeded!" .. COLOR_END)
+        print(RED .. "test_failedQueryExecution failed!" .. COLOR_END)
     end
 
     total_integrations = total_integrations + 1
@@ -51,7 +51,7 @@ function main()
         print(GREEN .."test_doubleQuery succeeded!".. COLOR_END)
         passed_integrations = passed_integrations + 1
     else
-        print(RED .. "test_doubleQuery succeeded!" .. COLOR_END)
+        print(RED .. "test_doubleQuery failed!" .. COLOR_END)
     end
 
     print("\n" ..
@@ -151,8 +151,7 @@ function test_normalQueryExecution()
     return true
 end
 
--- Requires 2 real reconnect attempts
-function test_restartedQueryExecution()
+function test_failedQueryExecution()
     os.execute("mysql -uroot -pletmein -e \"create table lua_test.t2 (x integer, y integer)\"")
     os.execute("mysql -uroot -pletmein -e \"insert into lua_test.t2 VALUES (1, 2), (3, 4), (4, 3)\"")
 
@@ -164,7 +163,7 @@ function test_restartedQueryExecution()
         return false
     end
 
-    -- try reconnect and fail
+    -- we're dead so do nothing
     status = ThreadedQuery.query(lua_query, "SELECT * FROM lua_test.t2")
     if not (not status) then
         return false
@@ -173,30 +172,31 @@ function test_restartedQueryExecution()
     os.execute("mysqld --bind-address=127.0.0.1 &")
     os.execute("sleep 3")
 
-    -- reconnect and succeed, but no data
+    -- stay dead
     status, result = ThreadedQuery.results(lua_query)
-    if not (not status and result == nil) then
+    if not (not status) then
         ThreadedQuery.kill(lua_query)
         return false
     end
 
-    -- successfully execute query
+    -- night of the living dead
     status = ThreadedQuery.query(lua_query, "SELECT * FROM lua_test.t2")
-    if not (status) then
+    if not (not status) then
         ThreadedQuery.kill(lua_query)
         return false
     end
 
-    -- successfully fetch data
+    -- dead dead dead
     status, result = ThreadedQuery.results(lua_query)
-    if not (status and type(result) == "table") then
+    if not (not status) then
         ThreadedQuery.kill(lua_query)
         return false
     end
 
+    -- easy to kill dead things
     status = ThreadedQuery.kill(lua_query)
     if not (status) then
-        print("failed to kill threads; likely segfault!")
+        print("failed to kill threads; expect segfault!")
         return false
     end
 
