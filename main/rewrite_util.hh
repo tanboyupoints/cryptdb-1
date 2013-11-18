@@ -161,25 +161,6 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
               const ResType &res, const std::string &query,
               const std::string &default_db, bool pp);
 
-class SchemaCache {
-public:
-    SchemaCache() : no_loads(true), id(randomValue() % UINT_MAX) {}
-
-    const SchemaInfo &getSchema(const std::unique_ptr<Connect> &conn,
-                                const std::unique_ptr<Connect> &e_conn);
-    void updateStaleness(const std::unique_ptr<Connect> &e_conn,
-                         bool staleness);
-    bool initialStaleness(const std::unique_ptr<Connect> &e_conn);
-    bool cleanupStaleness(const std::unique_ptr<Connect> &e_conn);
-    void lowLevelCurrentStale(const std::unique_ptr<Connect> &e_conn);
-    void lowLevelCurrentUnstale(const std::unique_ptr<Connect> &e_conn);
-
-private:
-    std::unique_ptr<const SchemaInfo> schema;
-    bool no_loads;
-    const unsigned int id;
-};
-
 template <typename InType, typename InterimType, typename OutType>
 std::function<OutType(InType in)>
 fnCompose(std::function<OutType(InterimType)> outer,

@@ -527,6 +527,122 @@ DatabaseMeta::serialize(const DBObject &parent) const
     return serial;
 }
 
+static bool
+lowLevelGetCurrentStaleness(const std::unique_ptr<Connect> &e_conn,
+                            unsigned int cache_id)
+{
+    const std::string &query =
+        " SELECT stale FROM " + MetaData::Table::staleness() +
+        "  WHERE cache_id = " + std::to_string(cache_id) + ";";
+    std::unique_ptr<DBResult> db_res;
+    TEST_TextMessageError(e_conn->execute(query, &db_res),
+                          "failed to get schema!");
+    assert(1 == mysql_num_rows(db_res->n));
+
+    const MYSQL_ROW row = mysql_fetch_row(db_res->n);
+    const unsigned long *const l = mysql_fetch_lengths(db_res->n);
+    assert(l != NULL);
+
+    return string_to_bool(std::string(row[0], l[0]));
+}
+
+const SchemaInfo &
+SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
+                       const std::unique_ptr<Connect> &e_conn)
+{
+    if (true == this->no_loads) {
+        // Use this cleanup if we can't maintain consistent states.
+        /*
+        TEST_TextMessageError(cleanupStaleness(e_conn),
+                              "Failed to cleanup staleness for first"
+                              " usage!");
+        */
+        TEST_TextMessageError(initialStaleness(e_conn),
+                              "Failed to initialize staleness for first"
+                              " usage!");
+        this->no_loads = false;
+    }
+    const bool stale = lowLevelGetCurrentStaleness(e_conn, this->id);
+
+    if (true == stale) {
+        this->schema.reset(loadSchemaInfo(conn, e_conn));
+    }
+
+    assert(this->schema);
+    return *this->schema.get();
+}
+
+static void
+lowLevelAllStale(const std::unique_ptr<Connect> &e_conn)
+{
+    const std::string &query =
+        " UPDATE " + MetaData::Table::staleness() +
+        "    SET stale = TRUE;";
+
+    TEST_TextMessageError(e_conn->execute(query),
+                          "failed to all stale!");
+}
+
+void
+SchemaCache::updateStaleness(const std::unique_ptr<Connect> &e_conn,
+                             bool staleness)
+{
+    if (true == staleness) {
+        // Make everyone stale.
+        lowLevelAllStale(e_conn);
+    } else {
+        // We are no longer stale.
+        this->lowLevelCurrentUnstale(e_conn);
+    }
+}
+
+bool
+SchemaCache::initialStaleness(const std::unique_ptr<Connect> &e_conn)
+{
+    const std::string seed_staleness =
+        " INSERT INTO " + MetaData::Table::staleness() +
+        "   (cache_id, stale) VALUES " +
+        "   (" + std::to_string(this->id) + ", TRUE);";
+    RETURN_FALSE_IF_FALSE(e_conn->execute(seed_staleness));
+
+    return true;
+}
+
+bool
+SchemaCache::cleanupStaleness(const std::unique_ptr<Connect> &e_conn)
+{
+    const std::string remove_staleness =
+        " DELETE FROM " + MetaData::Table::staleness() +
+        "       WHERE cache_id = " + std::to_string(this->id) + ";";
+    RETURN_FALSE_IF_FALSE(e_conn->execute(remove_staleness));
+
+    return true;
+}
+static void
+lowLevelToggleCurrentStaleness(const std::unique_ptr<Connect> &e_conn,
+                               unsigned int cache_id, bool staleness)
+{
+    const std::string &query =
+        " UPDATE " + MetaData::Table::staleness() +
+        "    SET stale = " + bool_to_string(staleness) +
+        "  WHERE cache_id = " + std::to_string(cache_id) + ";";
+
+    TEST_TextMessageError(e_conn->execute(query),
+                          "failed to unstale current!");
+}
+
+void
+SchemaCache::lowLevelCurrentStale(const std::unique_ptr<Connect> &e_conn)
+{
+    lowLevelToggleCurrentStaleness(e_conn, this->id, true);
+}
+
+void
+SchemaCache::lowLevelCurrentUnstale(const std::unique_ptr<Connect> &e_conn)
+{
+    lowLevelToggleCurrentStaleness(e_conn, this->id, false);
+}
+
 bool
 IsMySQLTypeNumeric(enum_field_types t) {
     switch (t) {

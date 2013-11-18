@@ -379,7 +379,8 @@ SharedProxyState::SharedProxyState(ConnectionInfo ci,
                                                    // connections in init
                                                    // list.
       conn(new Connect(ci.server, ci.user, ci.passwd, ci.port)),
-      default_sec_rating(default_sec_rating)
+      default_sec_rating(default_sec_rating),
+      cache(std::move(SchemaCache()))
 {
     std::unique_ptr<Connect>
         init_e_conn(Connect::getEmbedded(embed_dir));

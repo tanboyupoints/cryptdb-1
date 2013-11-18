@@ -26,7 +26,6 @@ public:
     WrapperState() {}
     ~WrapperState() {}
 
-    SchemaCache &getSchemaCache() {return schema_cache;}
     const std::unique_ptr<QueryRewrite> &getQueryRewrite() const {
         assert(this->qr);
         return this->qr;
@@ -40,7 +39,6 @@ public:
 
 private:
     std::unique_ptr<QueryRewrite> qr;
-    SchemaCache schema_cache;
 };
 
 static Timer t;
@@ -250,13 +248,9 @@ disconnect(lua_State *const L)
 
     LOG(wrapper) << "disconnect " << client;
 
-    ProxyState *const ps = thread_ps = clients[client]->ps.get();
     auto ws = clients[client];
     clients[client] = NULL;
 
-    SchemaCache &schema_cache = ws->getSchemaCache();
-    TEST_TextMessageError(schema_cache.cleanupStaleness(ps->getEConn()),
-                          "Failed to cleanup staleness!");
     thread_ps = NULL;
     delete ws;
     clients.erase(client);
@@ -290,8 +284,7 @@ rewrite(lua_State *const L)
     t.lap_ms();
     if (EXECUTE_QUERIES) {
         try {
-
-            SchemaCache &schema_cache = c_wrapper->getSchemaCache();
+            SchemaCache &schema_cache = shared_ps->getSchemaCache();
             std::unique_ptr<QueryRewrite> qr;
             TEST_TextMessageError(retrieveDefaultDatabase(_thread_id,
                                                           ps->getConn(),

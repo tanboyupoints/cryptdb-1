@@ -86,7 +86,7 @@ typedef struct SharedProxyState {
         return masterKey;
     }
     const std::unique_ptr<Connect> &getConn() const {return conn;}
-
+    SchemaCache &getSchemaCache() {return cache;}
     static int db_init(const std::string &embed_dir);
 
     friend class ProxyState;
@@ -97,6 +97,7 @@ private:
     const int mysql_dummy;
     const std::unique_ptr<Connect> conn;
     const SECURITY_RATING default_sec_rating;
+    SchemaCache cache;
 } SharedProxyState;
 
 class ProxyState {

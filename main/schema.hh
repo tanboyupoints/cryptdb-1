@@ -235,6 +235,32 @@ private:
     }
 } SchemaInfo;
 
+class SchemaCache {
+    SchemaCache(const SchemaCache &cache) = delete;
+    SchemaCache &operator=(const SchemaCache &cache) = delete;
+    SchemaCache &operator=(SchemaCache &&cache) = delete;
+
+public:
+    SchemaCache() : no_loads(true), id(randomValue() % UINT_MAX) {}
+    SchemaCache(SchemaCache &&cache)
+        : schema(std::move(cache.schema)), no_loads(cache.no_loads),
+          id(cache.id) {}
+
+    const SchemaInfo &getSchema(const std::unique_ptr<Connect> &conn,
+                                const std::unique_ptr<Connect> &e_conn);
+    void updateStaleness(const std::unique_ptr<Connect> &e_conn,
+                         bool staleness);
+    bool initialStaleness(const std::unique_ptr<Connect> &e_conn);
+    bool cleanupStaleness(const std::unique_ptr<Connect> &e_conn);
+    void lowLevelCurrentStale(const std::unique_ptr<Connect> &e_conn);
+    void lowLevelCurrentUnstale(const std::unique_ptr<Connect> &e_conn);
+
+private:
+    std::unique_ptr<const SchemaInfo> schema;
+    bool no_loads;
+    const unsigned int id;
+};
+
 bool
 IsMySQLTypeNumeric(enum_field_types t);
 
