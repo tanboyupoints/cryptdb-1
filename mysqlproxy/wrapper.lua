@@ -64,7 +64,7 @@ function read_query_real(packet)
     print("read_query: " .. query)
 
     if string.byte(packet) == proxy.COM_INIT_DB then
-        query = "USE " .. query
+        query = "USE `" .. query .. "`"
     end
 
     if string.byte(packet) == proxy.COM_INIT_DB or

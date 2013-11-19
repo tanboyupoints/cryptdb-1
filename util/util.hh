@@ -588,3 +588,10 @@ std::vector<T> vectorDifference(const std::vector<T> &model,
 
     return result;
 }
+
+inline std::string
+quoteText(const std::string &text)
+{
+    return "`" + text + "`";
+}
+

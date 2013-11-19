@@ -627,6 +627,23 @@ static QueryList MiscBugs = QueryList("MiscBugs",
       Query("DROP TABLE bugs"),
       Query("DROP TABLE more_bugs") });
 
+static QueryList QuotedSchemaObjects = QueryList("QuotedSchemaObjects",
+    { Query("CREATE DATABASE IF NOT EXISTS `over+there`"),
+      Query("USE `over+there`"),
+      Query("CREATE TABLE `over+there`.`more+quotes`"
+            "   (`quoted-+as*well` integer)"),
+      Query("CREATE TABLE `hard/\\quotes`"
+            "   (`!@abc` text, `$$eda` integer)"),
+      Query("INSERT INTO `hard/\\quotes` VALUES "
+            "   (1, 'quoting'), (12, 'shouldn;tbe'), (100, 'hard')"),
+      Query("SELECT * FROM `hard/\\quotes`"),
+      Query("SELECT * FROM `hard/\\quotes` WHERE `!@abc` < 1200"),
+      Query("SELECT * FROM `hard/\\quotes`"),
+      Query("SELECT * FROM `more+quotes`"),
+      Query("SELECT * FROM `over+there`.`more+quotes`"),
+      Query("DROP DATABASE IF EXISTS `over+there`")
+    });
+
 //-----------------------------------------------------------------------
 
 Connection::Connection(const TestConfig &input_tc, test_mode input_type) {
@@ -890,7 +907,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 456/460
+    //      TOTAL RESULT: 467/471
     // ###############################
 
     std::vector<Score> scores;
@@ -957,6 +974,9 @@ RunTest(const TestConfig &tc) {
 
     // Pass 18/18
     scores.push_back(CheckQueryList(tc, MiscBugs));
+
+    // Pass 11/11
+    scores.push_back(CheckQueryList(tc, QuotedSchemaObjects));
 
     int npass = 0;
     int ntest = 0;

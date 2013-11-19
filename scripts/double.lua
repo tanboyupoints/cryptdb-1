@@ -82,7 +82,7 @@ function read_query(packet)
 
     -- build the query for cryptdb
     if string.byte(packet) == proxy.COM_INIT_DB then
-        cryptdb_query = "USE " .. query
+        cryptdb_query = "USE `" .. query .. "`"
     else
         cryptdb_query = query
     end

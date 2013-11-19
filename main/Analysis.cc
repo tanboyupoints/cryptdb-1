@@ -4,8 +4,7 @@
 #include <main/metadata_tables.hh>
 #include <main/macro_util.hh>
 #include <main/stored_procedures.hh>
-
-// FIXME: Memory leaks when we allocate MetaKey<...>, use smart pointer.
+#include <util/util.hh>
 
 // FIXME: Wrong interfaces.
 EncSet::EncSet(Analysis &a, FieldMeta * const fm) {
@@ -296,7 +295,7 @@ lowLevelSetCurrentDatabase(const std::unique_ptr<Connect> &c,
         return true;
     }
 
-    const std::string query = "USE " + db + ";";
+    const std::string query = "USE " + quoteText(db) + ";";
     RFIF(c->execute(query));
 
     return true;

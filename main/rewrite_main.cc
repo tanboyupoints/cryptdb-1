@@ -739,7 +739,7 @@ removeOnionLayer(const Analysis &a, const TableMeta &tm,
     Item *const decUDF = back_el.decryptUDF(field, salt);
 
     std::stringstream query;
-    query << " UPDATE " << dbname << "." << anon_table_name
+    query << " UPDATE " << quoteText(dbname) << "." << anon_table_name
           << "    SET " << fieldanon  << " = " << *decUDF
           << ";";
 

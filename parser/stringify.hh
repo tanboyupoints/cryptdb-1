@@ -6,6 +6,7 @@
 #include <iostream>
 #include <functional>
 
+#include <util/util.hh>
 #include <util/enum_text.hh>
 
 template<class T>
@@ -840,11 +841,11 @@ operator<<(std::ostream &out, LEX &lex)
             out << "if not exists ";
         }
 
-        out << convert_lex_str(lex.name);
+        out << quoteText(convert_lex_str(lex.name));
         break;
 
     case SQLCOM_CHANGE_DB:
-        out << "USE " << lex.select_lex.db;
+        out << "USE " << quoteText(lex.select_lex.db);
         break;
 
     case SQLCOM_DROP_DB:
@@ -853,7 +854,7 @@ operator<<(std::ostream &out, LEX &lex)
             out << "if exists ";
         }
 
-        out << convert_lex_str(lex.name);
+        out << quoteText(convert_lex_str(lex.name));
         break;
 
     case SQLCOM_BEGIN:
