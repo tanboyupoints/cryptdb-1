@@ -641,7 +641,85 @@ static QueryList QuotedSchemaObjects = QueryList("QuotedSchemaObjects",
       Query("SELECT * FROM `hard/\\quotes`"),
       Query("SELECT * FROM `more+quotes`"),
       Query("SELECT * FROM `over+there`.`more+quotes`"),
-      Query("DROP DATABASE IF EXISTS `over+there`")
+      Query("DROP DATABASE IF EXISTS `over+there`"),
+      Query("USE cryptdbtest"),
+    });
+
+// TODO: add tests for showing current levels
+// NOTE: These tests are not very effective at determining if things are
+//       functional; need to compare levels and exceptions
+static QueryList Directives = QueryList("Directives",
+    { Query("CREATE TABLE directives (x integer, y text)"),
+      Query("INSERT INTO directives VALUES (1, 'school learnin`'),"
+            "                              (2, 'book learnin`')"),
+      Query("SELECT * FROM directives"),
+      // try to do non-existent directive
+      Query("SET @cryptdb='wontwork', @other='that'"),
+      // try to do multiple directives
+      Query("SET @cryptdb='adjust', @cryptdb='adjust', @and='that'"),
+      // try to adjust on a non existent database
+      Query("SET @cryptdb='adjust', @database='notreal',"
+            "    @field='wontmatter', @table='irrelevant',"
+            "    @oHOM='OPE'"),
+      Query("SELECT * FROM directives"),
+      // try to adjust a non existent table
+      Query("SET @cryptdb='adjust', @table='notrealnotreal',"
+            "    @database='cryptdbtest', @field='doesntmatter',"
+            "    @oOPE='OPE'"),
+      Query("SELECT * FROM directives"),
+      // try to adjust a non existent field
+      Query("SET @cryptdb='adjust', @database='cryptdbtest',"
+            "    @oOPE='OPE', @table='directives',"
+            "    @field='made-up'"),
+      Query("SELECT * FROM directives"),
+      // try to adjust a non existent onion
+      Query("SET @field='x', @cryptdb='adjust', @database='cryptdbtest',"
+            "    @table='directives',"
+            "    @badbad='OPE'"),
+      Query("SELECT * FROM directives"),
+      // try to adjust to non existent level
+      Query("SET @database='cryptdbtest',"
+            "    @table='directives', @field='x',"
+            "    @oOPE='unreality', @cryptdb='adjust'"),
+      Query("SELECT * FROM directives"),
+      // try to adjust onion to real level it doesnt support
+      // > FIXME: handling of this is not nice
+      Query("SET @cryptdb='adjust', @database='cryptdbtest',"
+            "    @table='directives', @field='x',"
+            "    @oOPE='HOM'"),
+      Query("SELECT * FROM directives"),
+      // do real adjustment
+      Query("SET @table='directives', @database='cryptdbtest',"
+            "    @cryptdb='adjust', @field='x',"
+            "    @oOPE='OPE'"),
+      Query("SELECT * FROM directives WHERE x < 100"),
+      // do it again (adjust to current level)
+      Query("SET @cryptdb='adjust', @database='cryptdbtest',"
+            "    @table='directives', @field='x',"
+            "    @oOPE='OPE'"),
+      Query("SELECT * FROM directives WHERE x < 100"),
+      // try to adjust upwards
+      Query("SET @cryptdb='adjust', @database='cryptdbtest',"
+            "    @table='directives', @field='x',"
+            "    @oOPE='RND'"),
+      Query("SELECT * FROM directives WHERE x < 100"),
+      // do multiple adjustments to same onion
+      // NOTE: unsupported
+      Query("SET @cryptdb='adjust', @database='cryptdbtest',"
+            "    @oDET='DETJOIN', @table='directives', @field='x',"
+            "    @oDET='DET'"),
+      Query("SELECT * FROM directives"),
+      // adjust down multiple layers
+      Query("SET @cryptdb='adjust', @database='cryptdbtest',"
+            "    @oDET='DETJOIN', @table='directives', @field='x'"),
+      Query("SELECT * FROM directives WHERE x = 1"),
+      // multiple adjustments to different onions
+      Query("SET @cryptdb='adjust', @database='cryptdbtest',"
+            "    @table='directives', @field='y',"
+            "    @oDET='DET', @oOPE='OPE'"),
+      Query("SELECT * FROM directives WHERE y < 'somerandomtext'"),
+      Query("SELECT * FROM directives WHERE y = 'moretext'"),
+      Query("DROP TABLE directives")
     });
 
 //-----------------------------------------------------------------------
@@ -840,7 +918,13 @@ CheckQuery(const TestConfig &tc, const Query &query)
     } else {
         LOG(test) << "no crash point";
 
-        const ResType test_res = test->execute(query);
+        ResType test_res;
+        try {
+            test_res = test->execute(query);
+        } catch (AbstractException &e) {
+            std::cout << e << std::endl;
+            return false;
+        }
         const ResType control_res = control->execute(query);
 
         if (control_res.ok != test_res.ok) {
@@ -907,7 +991,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 467/471
+    //      TOTAL RESULT: 490/503
     // ###############################
 
     std::vector<Score> scores;
@@ -975,8 +1059,11 @@ RunTest(const TestConfig &tc) {
     // Pass 18/18
     scores.push_back(CheckQueryList(tc, MiscBugs));
 
-    // Pass 11/11
+    // Pass 12/12
     scores.push_back(CheckQueryList(tc, QuotedSchemaObjects));
+
+    // Pass 22/31
+    scores.push_back(CheckQueryList(tc, Directives));
 
     int npass = 0;
     int ntest = 0;

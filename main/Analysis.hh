@@ -398,8 +398,11 @@ class Analysis {
     Analysis &operator=(Analysis &&a) = delete;
 
 public:
+    enum class SpecialQuery {NOT_SPECIAL, SHOW_LEVELS, SPECIAL_UPDATE,
+                             NO_CHANGE_META_DDL};
+
     Analysis(const std::string &default_db, const SchemaInfo &schema)
-        : pos(0), special_update(false), no_change_meta_ddl(false),
+        : pos(0), special_query(SpecialQuery::NOT_SPECIAL),
           db_name(default_db), schema(schema) {}
 
     unsigned int pos; // > a counter indicating how many projection
@@ -413,8 +416,7 @@ public:
     // information for decrypting results
     ReturnMeta rmeta;
 
-    bool special_update;
-    bool no_change_meta_ddl;
+    SpecialQuery special_query;
 
     // These functions are prefered to their lower level counterparts.
     bool addAlias(const std::string &alias, const std::string &db,

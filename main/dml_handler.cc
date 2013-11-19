@@ -4,6 +4,7 @@
 #include <main/dispatcher.hh>
 #include <main/macro_util.hh>
 #include <parser/lex_util.hh>
+#include <util/onions.hh>
 
 extern CItemTypesDir itemTypes;
 
@@ -248,9 +249,11 @@ class UpdateHandler : public DMLHandler {
         auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
         auto val_it = List_iterator<Item>(lex->value_list);
         List<Item> res_fields, res_values;
-        a.special_update =
+        a.special_query =
             false == rewrite_field_value_pairs(fd_it, val_it, a, 
-                                               &res_fields, &res_values);
+                                               &res_fields, &res_values)
+                ? Analysis::SpecialQuery::SPECIAL_UPDATE
+                : Analysis::SpecialQuery::NOT_SPECIAL;
         new_lex->select_lex.item_list = res_fields;
         new_lex->value_list = res_values;
         return new_lex;
@@ -820,12 +823,129 @@ handleUpdateType(SIMPLE_UPDATE_TYPE update_type, const EncSet &es,
 
         case SIMPLE_UPDATE_TYPE::UNSUPPORTED:
         default :
-            FAIL_TextMessageError("UNSUPPORTED or UNRECOGNIZED"
+            FAIL_TextMessageError("UNSUPPORTED or unrecognized"
                                   " SIMPLE_UPDATE_TYPE!");
     }
 
     return;
 }
+
+class SetHandler : public DMLHandler {
+    virtual void gather(Analysis &a, LEX *const lex, const ProxyState &ps)
+        const
+    {
+        // no-op
+    }
+
+    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+        const
+    {
+        bool show_directive = false, adjust_directive = false;
+        std::map<std::string, std::string> var_pairs;
+        auto var_it =
+            List_iterator<set_var_base>(lex->var_list);
+        for (;;) {
+            const set_var_base *const v = var_it++;
+            if (!v) {
+                break;
+            }
+
+            if (v->is_user_var()) {
+                const set_var_user *user_v =
+                    static_cast<const set_var_user *>(v);
+                Item_func_set_user_var *const i =
+                    user_v->*rob<set_var_user, Item_func_set_user_var *, &set_var_user::user_var_item>::ptr();
+                const std::string &var_name = convert_lex_str(i->name);
+                const Item *const *const args =
+                    i->*rob<Item_func, Item **,
+                            &Item_func_set_user_var::args>::ptr();
+                assert(args && args[0]);
+                std::string var_value = printItem(*args[0]);
+                TEST_TextMessageError(var_value.length() > 2,
+                                      "this " + var_value + " is probably"
+                                      " not what you meant");
+                var_value = var_value.substr(1, var_value.length() - 2);
+                if (equalsIgnoreCase("cryptdb", var_name)) {
+                    TEST_TextMessageError(false == show_directive
+                                          && false == adjust_directive,
+                                          "only one directive per query");
+
+                    if (equalsIgnoreCase("show", var_value)) {
+                        show_directive = true;
+                    } else if (equalsIgnoreCase("adjust", var_value)) {
+                        adjust_directive = true;
+                    } else {
+                        FAIL_TextMessageError("unsupported directive: " +
+                                                var_value);
+                    }
+                    continue;
+                }
+
+                // using the same key twice is not permitted
+                TEST_TextMessageError(var_pairs.end()
+                                        == var_pairs.find(var_name),
+                                      "you double specified: `"
+                                      + var_name + "`");
+
+                var_pairs[var_name] = var_value;
+            }
+        }
+
+        if (false == show_directive && false == adjust_directive) {
+            return lex;
+        }
+        assert(show_directive != adjust_directive);
+
+        if (show_directive) {
+            // complexity
+            FAIL_TextMessageError("complexity!");
+        } else if (adjust_directive) {
+            std::function<std::string(std::string)> getAndDestroy(
+                [&var_pairs] (const std::string &key)
+            {
+                auto it = var_pairs.find(key);
+                TEST_TextMessageError(it != var_pairs.end(),
+                                      "must supply a " + key);
+                const std::string value = it->second;
+                var_pairs.erase(it);
+
+                return value;
+            });
+
+            const std::string &database = getAndDestroy("database");
+            const std::string &table    = getAndDestroy("table");
+            const std::string &field    = getAndDestroy("field");
+
+            // the remaining values are <onion>=<level> pairs
+            for (auto it : var_pairs) {
+                const std::string &str_onion = it.first;
+                const std::string &str_level = it.second;
+
+                AssignOnce<onion> o;
+                AssignOnce<SECLEVEL> l;
+                try {
+                    o = TypeText<onion>::noCaseToType(str_onion);
+                    l = TypeText<SECLEVEL>::noCaseToType(str_level);
+                } catch (CryptDBError &e) {
+                    FAIL_TextMessageError("bad param; " + str_onion + "=" +
+                                          str_level);
+                }
+
+                const OnionMeta &om =
+                    a.getOnionMeta(database, table, field, o.get());
+                const SECLEVEL current_level = a.getOnionLevel(om);
+                if (l.get() < current_level) {
+                    const TableMeta &tm = a.getTableMeta(database, table);
+                    const FieldMeta &fm = a.getFieldMeta(tm, field);
+                    throw OnionAdjustExcept(tm, fm, o.get(), l.get());
+                }
+            }
+        }
+
+        return lex;
+    }
+};
+
 
 // FIXME: Add test to make sure handlers added successfully.
 SQLDispatcher *buildDMLDispatcher()
@@ -847,6 +967,9 @@ SQLDispatcher *buildDMLDispatcher()
 
     h = new SelectHandler;
     dispatcher->addHandler(SQLCOM_SELECT, h);
+
+    h = new SetHandler;
+    dispatcher->addHandler(SQLCOM_SET_OPTION, h);
 
     return dispatcher;
 }

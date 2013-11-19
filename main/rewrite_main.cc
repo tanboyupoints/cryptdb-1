@@ -1189,7 +1189,7 @@ static bool
 noRewrite(const LEX &lex) {
     switch (lex.sql_command) {
     case SQLCOM_SHOW_DATABASES:
-    case SQLCOM_SET_OPTION:
+    // case SQLCOM_SET_OPTION:
     case SQLCOM_BEGIN:
     case SQLCOM_ROLLBACK:
     case SQLCOM_COMMIT:
@@ -1275,10 +1275,24 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
                                          adjust_queries, hackEscape);
         }
 
-        // Return if it's a regular DML query.
-        if (false == a.special_update) {
-            return new DMLOutput(query, lex_to_query(out_lex.get()));
+        switch (a.special_query) {
+            case Analysis::SpecialQuery::NOT_SPECIAL:
+                // HACK: until we implement stringification of 'SET'
+                // > this query _should_ be a cryptdb adjust directive
+                if (SQLCOM_SET_OPTION == lex->sql_command) {
+                    return new SimpleOutput(query);
+                }
+
+                return new DMLOutput(query, lex_to_query(out_lex.get()));
+            case Analysis::SpecialQuery::SHOW_LEVELS:
+                // return new UseAfterOutput(query, lex);
+                return new SimpleOutput(query);
+            case Analysis::SpecialQuery::SPECIAL_UPDATE:
+                break;
+            default:
+                FAIL_TextMessageError("unknown special query!");
         }
+        assert(Analysis::SpecialQuery::SPECIAL_UPDATE == a.special_query);
 
         // Handle HOMorphic UPDATE.
         const auto plain_table =
@@ -1305,9 +1319,11 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
 
         // Optimization so we don't load *Meta if it doesn't change.
         // > ie, USE <database>.
-        if (true == a.no_change_meta_ddl) {
+        // possible FIXME: just look at the size of the deltas
+        if (Analysis::SpecialQuery::NO_CHANGE_META_DDL==a.special_query) {
             return new DMLOutput(original_query, lex_to_query(out_lex));
         }
+        assert(Analysis::SpecialQuery::NOT_SPECIAL == a.special_query);
 
         return new DDLOutput(original_query, lex_to_query(out_lex),
                              std::move(a.deltas));

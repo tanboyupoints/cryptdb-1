@@ -206,7 +206,7 @@ class ChangeDBHandler : public DDLHandler {
                                   const ProxyState &ps,
                                   const Preamble &pre) const
     {
-        a.no_change_meta_ddl = true;
+        a.special_query = Analysis::SpecialQuery::NO_CHANGE_META_DDL;
         return copyWithTHD(lex);
     }
 };

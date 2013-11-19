@@ -19,7 +19,7 @@ std::string stringify_ptr(T * x) {
 }
 
 static inline std::ostream&
-operator<<(std::ostream &out, String &s)
+operator<<(std::ostream &out, const String &s)
 {
     return out << std::string(s.ptr(), s.length());
 }
@@ -402,6 +402,21 @@ string_to_lex_str(const std::string &s)
 {
     char *const cstr = current_thd->strdup(s.c_str());
     return LEX_STRING({cstr, s.length()});
+}
+
+inline std::string
+String_to_std_string(const String &s)
+{
+    std::cout << s.ptr() << std::endl;
+    return std::string(s.ptr(), s.length());
+}
+
+inline std::string
+printItem(const Item &i)
+{
+    std::ostringstream o;
+    o << i;
+    return o.str();
 }
 
 static std::ostream&
@@ -898,8 +913,7 @@ operator<<(std::ostream &out, LEX &lex)
 
         bool prev = false;
         // TODO: Support other flags.
-        // ALTER_ADD_COLUMN, ALTER_CHANGE_COLUMN, ALTER_ADD_INDEX,
-        // ALTER_DROP_INDEX, ALTER_FOREIGN_KEY
+        //  > ALTER_CHANGE_COLUMN, ALTER_FOREIGN_KEY
         if (lex.alter_info.flags & ALTER_DROP_COLUMN) {
             out << " " << ListJoin<Alter_drop>(lex.alter_info.drop_list,
                                                ",", prefix_drop_column);
