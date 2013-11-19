@@ -626,8 +626,8 @@ RewriteOutput::usesEmbeddedDB() const
 }
 
 void
-SimpleOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
-                          const std::unique_ptr<Connect> &e_conn)
+SimpleOutput::beforeQuery(const std::unique_ptr<Connect> &,
+                          const std::unique_ptr<Connect> &)
 {
     return;
 }
@@ -642,10 +642,10 @@ SimpleOutput::getQuery(std::list<std::string> *const queryz,
     return;
 }
 
-void
-SimpleOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
+std::pair<bool, std::unique_ptr<DBResult>>
+SimpleOutput::afterQuery(const std::unique_ptr<Connect> &) const
 {
-    return;
+    return std::make_pair(false, std::unique_ptr<DBResult>(nullptr));
 }
 
 QueryAction
@@ -655,8 +655,8 @@ SimpleOutput::queryAction(const std::unique_ptr<Connect> &conn) const
 }
 
 void
-DMLOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
-                       const std::unique_ptr<Connect> &e_conn)
+DMLOutput::beforeQuery(const std::unique_ptr<Connect> &,
+                       const std::unique_ptr<Connect> &)
 {
     return;
 }
@@ -671,10 +671,10 @@ DMLOutput::getQuery(std::list<std::string> * const queryz,
     return;
 }
 
-void
-DMLOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
+std::pair<bool, std::unique_ptr<DBResult>>
+DMLOutput::afterQuery(const std::unique_ptr<Connect> &) const
 {
-    return;
+    return std::make_pair(false, std::unique_ptr<DBResult>(nullptr));
 }
 
 void
@@ -806,10 +806,10 @@ SpecialUpdate::getQuery(std::list<std::string> * const queryz,
     return;
 }
 
-void
-SpecialUpdate::afterQuery(const std::unique_ptr<Connect> &e_conn) const
+std::pair<bool, std::unique_ptr<DBResult>>
+SpecialUpdate::afterQuery(const std::unique_ptr<Connect> &) const
 {
-    return;
+    return std::make_pair(false, std::unique_ptr<DBResult>(nullptr));
 }
 
 bool
@@ -822,6 +822,122 @@ bool
 SpecialUpdate::usesEmbeddedDB() const
 {
     return true;
+}
+
+void
+UseAfterQueryResultOutput::beforeQuery(const std::unique_ptr<Connect> &,
+                                       const std::unique_ptr<Connect> &)
+{
+    return;
+}
+
+void
+UseAfterQueryResultOutput::getQuery(std::list<std::string> * const queryz,
+                                    SchemaInfo const &) const
+{
+    queryz->clear();
+    queryz->push_back(mysql_noop());
+
+    return;
+}
+
+static bool
+deleteAllShowDirectiveEntries(const std::unique_ptr<Connect> &e_conn)
+{
+    const std::string &query =
+        "DELETE FROM " + MetaData::Table::showDirective() + ";";
+    return e_conn->execute(query);
+}
+
+static bool
+addShowDirectiveEntry(const std::unique_ptr<Connect> &e_conn,
+                      const std::string &database,
+                      const std::string &table,
+                      const std::string &field,
+                      const std::string &onion,
+                      const std::string &level)
+{
+    const std::string &query =
+        "INSERT INTO " + MetaData::Table::showDirective() +
+        " (_database, _table, _field, _onion, _level) VALUES "
+        " ('" + database + "', '" + table + "',"
+        "  '" + field + "', '" + onion + "', '" + level + "')";
+    return e_conn->execute(query);
+}
+
+static bool
+getAllShowDirectiveEntries(const std::unique_ptr<Connect> &e_conn,
+                           std::unique_ptr<DBResult> *db_res)
+{
+    assert(db_res);
+    const std::string &query =
+        "SELECT * FROM " + MetaData::Table::showDirective() + ";";
+    return e_conn->execute(query, db_res);
+}
+
+// HACK hack HACK hackity hackhack
+std::pair<bool, std::unique_ptr<DBResult>>
+UseAfterQueryResultOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
+{
+    TEST_TextMessageError(deleteAllShowDirectiveEntries(e_conn),
+                          "failed to initialize show directives table");
+
+    const std::map<IdentityMetaKey, std::unique_ptr<DatabaseMeta> >
+        &databases = schema.children;
+    for (auto db_it = databases.begin(); db_it != databases.end();
+         ++db_it) {
+        const std::string &db_name = db_it->first.getValue();
+        const std::unique_ptr<DatabaseMeta> &dm = db_it->second;
+        const std::map<IdentityMetaKey, std::unique_ptr<TableMeta> >
+            &tables = dm->children;
+        for (auto table_it = tables.begin(); table_it != tables.end();
+             ++table_it) {
+            const std::string &table_name = table_it->first.getValue();
+            const std::unique_ptr<TableMeta> &tm = table_it->second;
+            std::map<IdentityMetaKey, std::unique_ptr<FieldMeta> >
+                &fields = tm->children;
+            for (auto field_it = fields.begin(); field_it != fields.end();
+                 ++field_it) {
+                const std::string &field_name =
+                    field_it->first.getValue();
+                const std::unique_ptr<FieldMeta> &fm = field_it->second;
+                std::map<OnionMetaKey, std::unique_ptr<OnionMeta> >
+                    &onions = fm->children;
+                for (auto onion_it = onions.begin();
+                     onion_it != onions.end();
+                     ++onion_it) {
+                    const std::string &onion_name =
+                      TypeText<onion>::toText(onion_it->first.getValue());
+                    const std::unique_ptr<OnionMeta> &om =
+                        onion_it->second;
+
+                    // HACK: this behavior is not usually safe, use
+                    // Analysis to get state information generally
+                    const std::string &level =
+                        TypeText<SECLEVEL>::toText(om->getSecLevel());
+                    const bool b =
+                        addShowDirectiveEntry(e_conn, db_name, table_name,
+                                              field_name, onion_name,
+                                              level);
+                    TEST_TextMessageError(true == b,
+                                          "failed producing directive"
+                                          " results");
+                }
+            }
+        }
+    }
+
+    std::unique_ptr<DBResult> db_res;
+    TEST_TextMessageError(getAllShowDirectiveEntries(e_conn, &db_res),
+                          "failed retrieving directive results");
+    return std::make_pair(true, std::move(db_res));
+}
+
+QueryAction
+UseAfterQueryResultOutput::queryAction(const std::unique_ptr<Connect> &)
+    const
+{
+    return QueryAction::RETURN_AFTER;
 }
 
 DeltaOutput::~DeltaOutput()
@@ -864,7 +980,7 @@ DeltaOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
     return;
 }
 
-void
+std::pair<bool, std::unique_ptr<DBResult>>
 DeltaOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
 {
     TEST_Sync(e_conn->execute("START TRANSACTION;"),
@@ -884,7 +1000,7 @@ DeltaOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
 
     SYNC_IF_FALSE(e_conn->execute("COMMIT;"), e_conn);
 
-    return;
+    return std::make_pair(false, std::unique_ptr<DBResult>(nullptr));
 }
 
 bool
@@ -957,7 +1073,7 @@ DDLOutput::getQuery(std::list<std::string> * const queryz,
     return;
 }
 
-void
+std::pair<bool, std::unique_ptr<DBResult>>
 DDLOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
 {
     // Update embedded database.
@@ -1020,7 +1136,7 @@ AdjustOnionOutput::getQuery(std::list<std::string> * const queryz,
     return;
 }
 
-void
+std::pair<bool, std::unique_ptr<DBResult>>
 AdjustOnionOutput::afterQuery(const std::unique_ptr<Connect> &e_conn)
     const
 {

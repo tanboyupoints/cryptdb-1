@@ -223,7 +223,8 @@ public:
                              const std::unique_ptr<Connect> &e_conn) = 0;
     virtual void getQuery(std::list<std::string> *const queryz,
                           SchemaInfo const &schema) const = 0;
-    virtual void afterQuery(const std::unique_ptr<Connect> &e_conn)
+    virtual std::pair<bool, std::unique_ptr<DBResult>>
+        afterQuery(const std::unique_ptr<Connect> &e_conn)
         const = 0;
     // This ASK code is a symptom of returning the rewritten query
     // to the proxy which then issues the query. A more TELL policy
@@ -248,7 +249,8 @@ public:
                      const std::unique_ptr<Connect> &e_conn);
     void getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
-    void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+    std::pair<bool, std::unique_ptr<DBResult>>
+        afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     QueryAction queryAction(const std::unique_ptr<Connect> &conn) const;
 };
 
@@ -263,7 +265,8 @@ public:
                      const std::unique_ptr<Connect> &e_conn);
     void getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
-    void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+    std::pair<bool, std::unique_ptr<DBResult>>
+        afterQuery(const std::unique_ptr<Connect> &e_conn) const;
 
 private:
     const std::string new_query;
@@ -287,7 +290,8 @@ public:
                      const std::unique_ptr<Connect> &e_conn);
     void getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
-    void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+    std::pair<bool, std::unique_ptr<DBResult>>
+        afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     bool multipleResultSets() const;
     bool usesEmbeddedDB() const;
 
@@ -302,6 +306,26 @@ private:
     AssignOnce<bool> do_nothing;
 };
 
+class UseAfterQueryResultOutput : public RewriteOutput {
+public:
+    UseAfterQueryResultOutput(const std::string &original_query,
+                              const SchemaInfo &schema)
+        : RewriteOutput(original_query), schema(schema) {}
+    ~UseAfterQueryResultOutput() {;}
+
+    void beforeQuery(const std::unique_ptr<Connect> &conn,
+                     const std::unique_ptr<Connect> &e_conn);
+    void getQuery(std::list<std::string> * const queryz,
+                  SchemaInfo const &schema) const;
+    std::pair<bool, std::unique_ptr<DBResult>>
+        afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+    QueryAction queryAction(const std::unique_ptr<Connect> &e_conn) const;
+
+private:
+    const SchemaInfo &schema;
+};
+
+
 enum class CompletionType {DDLCompletion, AdjustOnionCompletion};
 
 class DeltaOutput : public RewriteOutput {
@@ -315,7 +339,8 @@ public:
                      const std::unique_ptr<Connect> &e_conn);
     virtual void getQuery(std::list<std::string> * const queryz,
                           SchemaInfo const &schema) const = 0;
-    void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+    virtual std::pair<bool, std::unique_ptr<DBResult>>
+        afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     bool stalesSchema() const;
     bool usesEmbeddedDB() const;
 
@@ -340,7 +365,8 @@ public:
 
     void getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
-    void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+    std::pair<bool, std::unique_ptr<DBResult>>
+        afterQuery(const std::unique_ptr<Connect> &e_conn) const;
 
 protected:
     CompletionType getCompletionType() const;
@@ -366,7 +392,8 @@ public:
                      const std::unique_ptr<Connect> &e_conn);
     void getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
-    void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
+    std::pair<bool, std::unique_ptr<DBResult>>
+        afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     QueryAction queryAction(const std::unique_ptr<Connect> &conn) const;
 
 protected:

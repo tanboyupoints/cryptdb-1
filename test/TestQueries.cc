@@ -624,8 +624,11 @@ static QueryList MiscBugs = QueryList("MiscBugs",
       Query("UPDATE real_type_bug SET a = a + 1, b = b + 1"),
       Query("SHOW ENGINES"),
       Query("DROP TABLE crawlies"),
+      Query("DROP TABLE enums"),
       Query("DROP TABLE bugs"),
-      Query("DROP TABLE more_bugs") });
+      Query("DROP TABLE more_bugs"),
+      Query("DROP TABLE real_type_bug")
+    });
 
 static QueryList QuotedSchemaObjects = QueryList("QuotedSchemaObjects",
     { Query("CREATE DATABASE IF NOT EXISTS `over+there`"),
@@ -645,13 +648,13 @@ static QueryList QuotedSchemaObjects = QueryList("QuotedSchemaObjects",
       Query("USE cryptdbtest"),
     });
 
-// TODO: add tests for showing current levels
 // NOTE: These tests are not very effective at determining if things are
 //       functional; need to compare levels and exceptions
 static QueryList Directives = QueryList("Directives",
-    { Query("CREATE TABLE directives (x integer, y text)"),
-      Query("INSERT INTO directives VALUES (1, 'school learnin`'),"
-            "                              (2, 'book learnin`')"),
+    { Query("CREATE TABLE directives (x integer, y text, z integer)"),
+      Query("INSERT INTO directives VALUES (1, 'school learnin`', 7),"
+            "                              (2, 'book learnin`', 8),"
+            "                              (3, 'skool', 9)"),
       Query("SELECT * FROM directives"),
       // try to do non-existent directive
       Query("SET @cryptdb='wontwork', @other='that'"),
@@ -698,6 +701,7 @@ static QueryList Directives = QueryList("Directives",
             "    @table='directives', @field='x',"
             "    @oOPE='OPE'"),
       Query("SELECT * FROM directives WHERE x < 100"),
+      Query("SET @cryptdb='show', @random='stuff', @nothing='nothing'"),
       // try to adjust upwards
       Query("SET @cryptdb='adjust', @database='cryptdbtest',"
             "    @table='directives', @field='x',"
@@ -719,6 +723,12 @@ static QueryList Directives = QueryList("Directives",
             "    @oDET='DET', @oOPE='OPE'"),
       Query("SELECT * FROM directives WHERE y < 'somerandomtext'"),
       Query("SELECT * FROM directives WHERE y = 'moretext'"),
+      // do a good adjustment and one that won't do anything
+      Query("SET @cryptdb='adjust', @database='cryptdbtest',"
+            "    @table='directives', @field='z',"
+            "    @oDET='DET', @oOPE='RND'"),
+      Query("SELECT * FROM directives WHERE z = 8"),
+      Query("SET @more='less', @cryptdb='show', @nothing='short'"),
       Query("DROP TABLE directives")
     });
 
@@ -991,7 +1001,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 490/503
+    //      TOTAL RESULT: 494/509
     // ###############################
 
     std::vector<Score> scores;
@@ -1056,13 +1066,13 @@ RunTest(const TestConfig &tc) {
     // Pass 28/28
     scores.push_back(CheckQueryList(tc, DDL));
 
-    // Pass 18/18
+    // Pass 20/20
     scores.push_back(CheckQueryList(tc, MiscBugs));
 
     // Pass 12/12
     scores.push_back(CheckQueryList(tc, QuotedSchemaObjects));
 
-    // Pass 22/31
+    // Pass 24/35
     scores.push_back(CheckQueryList(tc, Directives));
 
     int npass = 0;

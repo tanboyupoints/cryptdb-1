@@ -66,6 +66,7 @@ public:
     friend class Analysis;
     friend class FieldMeta;
     friend class OnionMetaAdjustor;
+    friend class UseAfterQueryResultOutput;
     friend bool sanityCheck(FieldMeta &);
     friend Item *decrypt_item_layers(Item *const, const FieldMeta *const,
                                      onion, uint64_t);

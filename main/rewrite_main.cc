@@ -1285,8 +1285,8 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
 
                 return new DMLOutput(query, lex_to_query(out_lex.get()));
             case Analysis::SpecialQuery::SHOW_LEVELS:
-                // return new UseAfterOutput(query, lex);
-                return new SimpleOutput(query);
+                return new UseAfterQueryResultOutput(query,
+                                                     a.getSchema());
             case Analysis::SpecialQuery::SPECIAL_UPDATE:
                 break;
             default:

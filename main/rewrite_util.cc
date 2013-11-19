@@ -622,20 +622,32 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
               const ResType &res, const std::string &query,
               const std::string &default_db, bool pp)
 {
-    qr.output->afterQuery(ps.getEConn());
+    std::pair<bool, std::unique_ptr<DBResult>> after_out =
+        qr.output->afterQuery(ps.getEConn());
+    assert(!!after_out.first == !!after_out.second);
 
     const QueryAction action = qr.output->queryAction(ps.getConn());
-    if (QueryAction::AGAIN == action) {
-        std::unique_ptr<SchemaCache> schema_cache(new SchemaCache());
-        const EpilogueResult &epi_res =
-            executeQuery(ps, query, default_db, schema_cache.get(), pp);
-        TEST_Sync(schema_cache->cleanupStaleness(ps.getEConn()),
-                  "failed to cleanup cache after requery!");
-        return epi_res;
+    switch (action) {
+        case QueryAction::AGAIN: {
+            std::unique_ptr<SchemaCache> schema_cache(new SchemaCache());
+            const EpilogueResult &epi_res =
+                executeQuery(ps, query, default_db, schema_cache.get(),
+                             pp);
+            TEST_Sync(schema_cache->cleanupStaleness(ps.getEConn()),
+                      "failed to cleanup cache after requery!");
+            return epi_res;
+        }
+        case QueryAction::RETURN_AFTER: {
+            const ResType &after_res(after_out.second->unpack());
+            return EpilogueResult(QueryAction::NO_DECRYPT, after_res);
+        }
+        case QueryAction::DECRYPT:
+        case QueryAction::NO_DECRYPT:
+        case QueryAction::ROLLBACK:
+            break;
+        default:
+            FAIL_TextMessageError("unrecognized QueryAction");
     }
-    assert(QueryAction::NO_DECRYPT == action
-           || QueryAction::DECRYPT == action
-           || QueryAction::ROLLBACK == action);
 
     if (pp) {
         printEmbeddedState(ps);

@@ -897,8 +897,6 @@ class SetHandler : public DMLHandler {
         assert(show_directive != adjust_directive);
 
         if (show_directive) {
-            // complexity
-            FAIL_TextMessageError("complexity!");
             handleShowDirective(var_pairs, a);
         } else if (adjust_directive) {
             handleAdjustDirective(var_pairs, a);

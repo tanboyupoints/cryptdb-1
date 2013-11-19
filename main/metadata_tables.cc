@@ -33,6 +33,13 @@ MetaData::Table::staleness()
 }
 
 std::string
+MetaData::Table::showDirective()
+{
+    return DB::embeddedDB() + "." + Internal::getPrefix() +
+           "showDirective";
+}
+
+std::string
 MetaData::Table::remoteQueryCompletion()
 {
     return DB::remoteDB() + "." + Internal::getPrefix() +
@@ -144,6 +151,17 @@ MetaData::initialize(const std::unique_ptr<Connect> &conn,
         "    id SERIAL PRIMARY KEY)"
         " ENGINE=InnoDB;";
     RETURN_FALSE_IF_FALSE(e_conn->execute(create_staleness));
+
+    const std::string create_show_directive =
+        " CREATE TABLE IF NOT EXISTS " + Table::showDirective() +
+        "   (_database VARCHAR(500) NOT NULL,"
+        "    _table VARCHAR(500) NOT NULL,"
+        "    _field VARCHAR(500) NOT NULL,"
+        "    _onion VARCHAR(500) NOT NULL,"
+        "    _level VARCHAR(500) NOT NULL,"
+        "    id SERIAL PRIMARY KEY)"
+        " ENGINE=InnoDB;";
+    RETURN_FALSE_IF_FALSE(e_conn->execute(create_show_directive));
 
     // Remote database.
     const std::string create_remote_db =
