@@ -211,7 +211,8 @@ public:
 
 class Rewriter;
 
-enum class QueryAction {VANILLA, AGAIN, ROLLBACK};
+enum class QueryAction {DECRYPT, NO_DECRYPT, RETURN_AFTER, AGAIN,
+                        ROLLBACK};
 class RewriteOutput {
 public:
     RewriteOutput(const std::string &original_query)
@@ -227,7 +228,6 @@ public:
     // This ASK code is a symptom of returning the rewritten query
     // to the proxy which then issues the query. A more TELL policy
     // would likely lead to cleaner execution of queries.
-    virtual bool doDecryption() const;
     virtual bool stalesSchema() const;
     virtual bool multipleResultSets() const;
     virtual QueryAction queryAction(const std::unique_ptr<Connect> &conn)
@@ -249,7 +249,7 @@ public:
     void getQuery(std::list<std::string> * const queryz,
                   SchemaInfo const &schema) const;
     void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
-    bool doDecryption() const;
+    QueryAction queryAction(const std::unique_ptr<Connect> &conn) const;
 };
 
 class DMLOutput : public RewriteOutput {
@@ -368,7 +368,6 @@ public:
                   SchemaInfo const &schema) const;
     void afterQuery(const std::unique_ptr<Connect> &e_conn) const;
     QueryAction queryAction(const std::unique_ptr<Connect> &conn) const;
-    bool doDecryption() const;
 
 protected:
     CompletionType getCompletionType() const;

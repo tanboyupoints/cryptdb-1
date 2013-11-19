@@ -899,50 +899,69 @@ class SetHandler : public DMLHandler {
         if (show_directive) {
             // complexity
             FAIL_TextMessageError("complexity!");
+            handleShowDirective(var_pairs, a);
         } else if (adjust_directive) {
-            std::function<std::string(std::string)> getAndDestroy(
-                [&var_pairs] (const std::string &key)
-            {
-                auto it = var_pairs.find(key);
-                TEST_TextMessageError(it != var_pairs.end(),
-                                      "must supply a " + key);
-                const std::string value = it->second;
-                var_pairs.erase(it);
-
-                return value;
-            });
-
-            const std::string &database = getAndDestroy("database");
-            const std::string &table    = getAndDestroy("table");
-            const std::string &field    = getAndDestroy("field");
-
-            // the remaining values are <onion>=<level> pairs
-            for (auto it : var_pairs) {
-                const std::string &str_onion = it.first;
-                const std::string &str_level = it.second;
-
-                AssignOnce<onion> o;
-                AssignOnce<SECLEVEL> l;
-                try {
-                    o = TypeText<onion>::noCaseToType(str_onion);
-                    l = TypeText<SECLEVEL>::noCaseToType(str_level);
-                } catch (CryptDBError &e) {
-                    FAIL_TextMessageError("bad param; " + str_onion + "=" +
-                                          str_level);
-                }
-
-                const OnionMeta &om =
-                    a.getOnionMeta(database, table, field, o.get());
-                const SECLEVEL current_level = a.getOnionLevel(om);
-                if (l.get() < current_level) {
-                    const TableMeta &tm = a.getTableMeta(database, table);
-                    const FieldMeta &fm = a.getFieldMeta(tm, field);
-                    throw OnionAdjustExcept(tm, fm, o.get(), l.get());
-                }
-            }
+            handleAdjustDirective(var_pairs, a);
         }
 
         return lex;
+    }
+
+private:
+    void
+    handleAdjustDirective(std::map<std::string, std::string> var_pairs,
+                          Analysis &a) const
+    {
+        std::function<std::string(std::string)> getAndDestroy(
+            [&var_pairs] (const std::string &key)
+        {
+            auto it = var_pairs.find(key);
+            TEST_TextMessageError(it != var_pairs.end(),
+                                  "must supply a " + key);
+            const std::string value = it->second;
+            var_pairs.erase(it);
+
+            return value;
+        });
+
+        const std::string &database = getAndDestroy("database");
+        const std::string &table    = getAndDestroy("table");
+        const std::string &field    = getAndDestroy("field");
+
+        // the remaining values are <onion>=<level> pairs
+        for (auto it : var_pairs) {
+            const std::string &str_onion = it.first;
+            const std::string &str_level = it.second;
+
+            AssignOnce<onion> o;
+            AssignOnce<SECLEVEL> l;
+            try {
+                o = TypeText<onion>::noCaseToType(str_onion);
+                l = TypeText<SECLEVEL>::noCaseToType(str_level);
+            } catch (CryptDBError &e) {
+                FAIL_TextMessageError("bad param; " + str_onion + "=" +
+                                      str_level);
+            }
+
+            const OnionMeta &om =
+                a.getOnionMeta(database, table, field, o.get());
+            const SECLEVEL current_level = a.getOnionLevel(om);
+            if (l.get() < current_level) {
+                const TableMeta &tm = a.getTableMeta(database, table);
+                const FieldMeta &fm = a.getFieldMeta(tm, field);
+                throw OnionAdjustExcept(tm, fm, o.get(), l.get());
+            }
+        }
+
+        return;
+    }
+
+    void
+    handleShowDirective(std::map<std::string, std::string> var_pairs,
+                        Analysis &a) const
+    {
+        a.special_query = Analysis::SpecialQuery::SHOW_LEVELS;
+        return;
     }
 };
 

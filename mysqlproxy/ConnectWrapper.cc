@@ -443,7 +443,8 @@ envoi(lua_State *const L)
             return 5;
         }
 
-        assert(QueryAction::VANILLA == epi_result.action);
+        assert(QueryAction::NO_DECRYPT == epi_result.action
+               || QueryAction::DECRYPT == epi_result.action);
         return returnResultSet(L, epi_result.res_type);
     } catch (const SynchronizationException &e) {
         lua_pushboolean(L, false);              // status

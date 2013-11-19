@@ -435,7 +435,7 @@ rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
 {
     const QueryRewrite qr(Rewriter::rewrite(ps, q, schema, default_db));
     assert(false == qr.output->stalesSchema());
-    assert(QueryAction::VANILLA == qr.output->queryAction(ps.getConn()));
+    assert(QueryAction::DECRYPT == qr.output->queryAction(ps.getConn()));
 
     std::list<std::string> out_queryz;
     qr.output->getQuery(&out_queryz, schema);
@@ -633,13 +633,16 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
                   "failed to cleanup cache after requery!");
         return epi_res;
     }
+    assert(QueryAction::NO_DECRYPT == action
+           || QueryAction::DECRYPT == action
+           || QueryAction::ROLLBACK == action);
 
     if (pp) {
         printEmbeddedState(ps);
         prettyPrintQueryResult(res);
     }
 
-    if (qr.output->doDecryption()) {
+    if (QueryAction::DECRYPT == action) {
         const ResType &dec_res =
             Rewriter::decryptResults(res, qr.rmeta);
         assert(dec_res.success());

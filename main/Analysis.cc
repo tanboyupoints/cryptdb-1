@@ -603,11 +603,6 @@ bool DeleteDelta::apply(const std::unique_ptr<Connect> &e_conn,
 RewriteOutput::~RewriteOutput()
 {;}
 
-bool RewriteOutput::doDecryption() const
-{
-    return true;
-}
-
 bool RewriteOutput::stalesSchema() const
 {
     return false;
@@ -621,7 +616,7 @@ bool RewriteOutput::multipleResultSets() const
 QueryAction
 RewriteOutput::queryAction(const std::unique_ptr<Connect> &conn) const
 {
-    return QueryAction::VANILLA;
+    return QueryAction::DECRYPT;
 }
 
 bool
@@ -653,9 +648,10 @@ SimpleOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
     return;
 }
 
-bool SimpleOutput::doDecryption() const
+QueryAction
+SimpleOutput::queryAction(const std::unique_ptr<Connect> &conn) const
 {
-    return false;
+    return QueryAction::NO_DECRYPT;
 }
 
 void
@@ -698,7 +694,7 @@ SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
                      schema_cache.get());
     TEST_Sync(schema_cache->cleanupStaleness(e_conn),
               "failed to cleanup schema cache after nested query!");
-    assert(QueryAction::VANILLA == epi_result.action);
+    assert(QueryAction::DECRYPT == epi_result.action);
     const ResType select_res_type = epi_result.res_type;
     assert(select_res_type.success());
     if (select_res_type.rows.size() == 0) { // No work to be done.
@@ -1064,11 +1060,6 @@ AdjustOnionOutput::queryAction(const std::unique_ptr<Connect> &conn)
     const bool reissue = string_to_bool(std::string(row[0], l[0]));
 
     return reissue ? QueryAction::AGAIN : QueryAction::ROLLBACK;
-}
-
-bool AdjustOnionOutput::doDecryption() const
-{
-    return false;
 }
 
 CompletionType AdjustOnionOutput::getCompletionType() const
