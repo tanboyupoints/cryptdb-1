@@ -73,7 +73,7 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels,
     }
 }
 
-std::unique_ptr<OnionMeta>
+std::unique_ptr<OnionMeta, std::function<void(OnionMeta *)> >
 OnionMeta::deserialize(unsigned int id, const std::string &serial)
 {
     assert(id != 0);
@@ -82,8 +82,11 @@ OnionMeta::deserialize(unsigned int id, const std::string &serial)
     const std::string onionname = vec[0];
     const unsigned int uniq_count = atoi(vec[1].c_str());
 
-    return std::unique_ptr<OnionMeta>(new OnionMeta(id, onionname,
-                                                    uniq_count));
+    void *const p = RETURN_NULL_IF_NULL(malloc(sizeof(OnionMeta)));
+
+    return std::unique_ptr<OnionMeta, std::function<void(OnionMeta *)> >
+        (new (p) OnionMeta(id, onionname,  uniq_count),
+         destructThenFree<OnionMeta>);
 }
 
 std::string OnionMeta::serialize(const DBObject &parent) const
@@ -198,9 +201,10 @@ SECLEVEL OnionMeta::getSecLevel() const
     return layers.back()->level();
 }
 
-std::unique_ptr<FieldMeta>
+std::unique_ptr<FieldMeta, std::function<void(FieldMeta *)> >
 FieldMeta::deserialize(unsigned int id, const std::string &serial)
 {
+    assert(id != 0);
     const auto vec = unserialize_string(serial);
 
     const std::string fname = vec[0];
@@ -214,10 +218,13 @@ FieldMeta::deserialize(unsigned int id, const std::string &serial)
     const bool has_default = string_to_bool(vec[7]);
     const std::string default_value = vec[8];
 
-    return std::unique_ptr<FieldMeta>
-        (new FieldMeta(id, fname, has_salt, salt_name, onion_layout,
-                       sec_rating, uniq_count, counter, has_default,
-                       default_value));
+    void *const p = RETURN_NULL_IF_NULL(malloc(sizeof(FieldMeta)));
+
+    return std::unique_ptr<FieldMeta, std::function<void(FieldMeta *) > >
+        (new (p) FieldMeta(id, fname, has_salt, salt_name, onion_layout,
+                           sec_rating, uniq_count, counter, has_default,
+                           default_value),
+         destructThenFree<FieldMeta>);
 }
 
 // If mkey == NULL, the field is not encrypted
@@ -432,9 +439,10 @@ bool FieldMeta::hasOnion(onion o) const
     return childExists(OnionMetaKey(o));
 }
 
-std::unique_ptr<TableMeta>
+std::unique_ptr<TableMeta, std::function<void(TableMeta *)> >
 TableMeta::deserialize(unsigned int id, const std::string &serial)
 {
+    assert(id != 0);
     const auto vec = unserialize_string(serial);
 
     const std::string anon_table_name = vec[0];
@@ -443,9 +451,12 @@ TableMeta::deserialize(unsigned int id, const std::string &serial)
     const std::string salt_name = vec[3];
     const unsigned int counter = atoi(vec[4].c_str());
 
-    return std::unique_ptr<TableMeta>
-        (new TableMeta(id, anon_table_name, hasSensitive, has_salt,
-                       salt_name, counter));
+    void *const p = RETURN_NULL_IF_NULL(malloc(sizeof(TableMeta)));
+
+    return std::unique_ptr<TableMeta, std::function<void(TableMeta *)> >
+        (new (p) TableMeta(id, anon_table_name, hasSensitive, has_salt,
+                       salt_name, counter),
+         destructThenFree<TableMeta>);
 }
 
 std::string TableMeta::serialize(const DBObject &parent) const
@@ -512,10 +523,15 @@ std::string TableMeta::getAnonIndexName(const std::string &index_name,
     return std::string("index_") + std::to_string(hsh);
 }
 
-std::unique_ptr<DatabaseMeta>
+std::unique_ptr<DatabaseMeta, std::function<void(DatabaseMeta *)> >
 DatabaseMeta::deserialize(unsigned int id, const std::string &serial)
 {
-    return std::unique_ptr<DatabaseMeta>(new DatabaseMeta(id));
+    assert(id != 0);
+    void *const p = RETURN_NULL_IF_NULL(malloc(sizeof(DatabaseMeta)));
+
+    return std::unique_ptr<DatabaseMeta,
+                           std::function<void(DatabaseMeta *) > >
+        (new (p) DatabaseMeta(id), destructThenFree<DatabaseMeta>);
 }
 
 std::string
@@ -565,7 +581,7 @@ SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
     const bool stale = lowLevelGetCurrentStaleness(e_conn, this->id);
 
     if (true == stale) {
-        this->schema.reset(loadSchemaInfo(conn, e_conn));
+        this->schema = loadSchemaInfo(conn, e_conn);
     }
 
     assert(this->schema);

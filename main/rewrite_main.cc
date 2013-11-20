@@ -89,7 +89,7 @@ static bool
 sanityCheck(TableMeta &tm)
 {
     for (auto it = tm.children.begin(); it != tm.children.end(); it++) {
-        const std::unique_ptr<FieldMeta> &fm = (*it).second;
+        const auto &fm = (*it).second;
         assert(sanityCheck(*fm.get()));
     }
     return true;
@@ -99,7 +99,7 @@ static bool
 sanityCheck(DatabaseMeta &dm)
 {
     for (auto it = dm.children.begin(); it != dm.children.end(); it++) {
-        const std::unique_ptr<TableMeta> &tm = (*it).second;
+        const auto &tm = (*it).second;
         assert(sanityCheck(*tm.get()));
     }
     return true;
@@ -110,7 +110,7 @@ sanityCheck(SchemaInfo &schema)
 {
     for (auto it = schema.children.begin(); it != schema.children.end();
          it++) {
-        const std::unique_ptr<DatabaseMeta> &tm = (*it).second;
+        const auto &tm = (*it).second;
         assert(sanityCheck(*tm.get()));
     }
     return true;
@@ -483,14 +483,17 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
 //  1> Schema buildling (CREATE TABLE IF NOT EXISTS...)
 //  2> INSERTing
 //  3> SELECTing
-SchemaInfo *
+std::unique_ptr<SchemaInfo, std::function<void(SchemaInfo *)> >
 loadSchemaInfo(const std::unique_ptr<Connect> &conn,
                const std::unique_ptr<Connect> &e_conn)
 {
     // Must be done before loading the children.
     assert(deltaSanityCheck(conn, e_conn));
 
-    SchemaInfo *const schema = new SchemaInfo();
+    void *p = RETURN_NULL_IF_NULL(malloc(sizeof(SchemaInfo)));
+
+    std::unique_ptr<SchemaInfo, std::function<void(SchemaInfo *)> >
+        schema(new (p) SchemaInfo(), destructThenFree<SchemaInfo>);
     // Recursively rebuild the AbstractMeta<Whatever> and it's children.
     std::function<DBMeta *(DBMeta *const)> loadChildren =
         [&loadChildren, &e_conn](DBMeta *const parent) {
@@ -502,19 +505,13 @@ loadSchemaInfo(const std::unique_ptr<Connect> &conn,
             return parent;  /* lambda */
         };
 
-    loadChildren(schema);
-    // HACK: otherwise our cache may break when the client that last
-    //       filled it disconects
-    // > we need a higher level memory management abstraction
-    if (thread_ps) {
-        thread_ps->dumpTHDs();
-    }
+    loadChildren(schema.get());
 
     // FIXME: Ideally we would do this before loading the schema.
     // But first we must decide on a place to create the database from.
-    assert(sanityCheck(*schema));
+    assert(sanityCheck(*schema.get()));
 
-    return schema;
+    return std::move(schema);
 }
 
 template <typename Type> static void

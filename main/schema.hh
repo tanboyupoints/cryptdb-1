@@ -42,7 +42,7 @@ public:
               unsigned long uniq_count);
 
     // Restore.
-    static std::unique_ptr<OnionMeta>
+    static std::unique_ptr<OnionMeta, std::function<void(OnionMeta *)> >
         deserialize(unsigned int id, const std::string &serial);
     OnionMeta(unsigned int id, const std::string &onionname,
               unsigned long uniq_count)
@@ -97,7 +97,7 @@ public:
               unsigned long uniq_count);
     // Restore (WARN: Creates an incomplete type as it will not have it's
     // OnionMetas until they are added by the caller).
-    static std::unique_ptr<FieldMeta>
+    static std::unique_ptr<FieldMeta, std::function<void(FieldMeta *)> >
         deserialize(unsigned int id, const std::string &serial);
     FieldMeta(unsigned int id, const std::string &fname, bool has_salt,
               const std::string &salt_name, onionlayout onion_layout,
@@ -166,7 +166,7 @@ public:
           anon_table_name("table_" + getpRandomName()),
           counter(0) {}
     // Restore.
-    static std::unique_ptr<TableMeta>
+    static std::unique_ptr<TableMeta, std::function<void(TableMeta *)> >
         deserialize(unsigned int id, const std::string &serial);
     TableMeta(unsigned int id, const std::string &anon_table_name,
               bool has_sensitive, bool has_salt,
@@ -201,7 +201,8 @@ public:
     // New DatabaseMeta.
     DatabaseMeta() : MappedDBMeta(0) {}
     // Restore.
-    static std::unique_ptr<DatabaseMeta>
+    static std::unique_ptr<DatabaseMeta,
+                           std::function<void(DatabaseMeta *)> >
         deserialize(unsigned int id, const std::string &serial);
     DatabaseMeta(unsigned int id) : MappedDBMeta(id) {}
 
@@ -257,7 +258,9 @@ public:
     void lowLevelCurrentUnstale(const std::unique_ptr<Connect> &e_conn);
 
 private:
-    std::unique_ptr<const SchemaInfo> schema;
+    // FIXME: SchemaInfo pointer should be const
+    std::unique_ptr<SchemaInfo,
+                    std::function<void(SchemaInfo *) > > schema;
     bool no_loads;
     const unsigned int id;
 };

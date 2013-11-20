@@ -595,3 +595,11 @@ quoteText(const std::string &text)
     return "`" + text + "`";
 }
 
+template <typename T> void
+destructThenFree(T *const t)
+{
+    if (t) {
+        t->~T();
+        free(t);
+    }
+}

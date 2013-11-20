@@ -315,7 +315,7 @@ public:
     CItemSubtypeFN() { funcNames.reg(std::string(TYPE), *this); }
 };
 
-SchemaInfo *
+std::unique_ptr<SchemaInfo, std::function<void(SchemaInfo *)> >
 loadSchemaInfo(const std::unique_ptr<Connect> &conn,
                const std::unique_ptr<Connect> &e_conn);
 

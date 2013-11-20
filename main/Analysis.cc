@@ -892,34 +892,29 @@ UseAfterQueryResultOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) co
     TEST_TextMessageError(deleteAllShowDirectiveEntries(e_conn),
                           "failed to initialize show directives table");
 
-    const std::map<IdentityMetaKey, std::unique_ptr<DatabaseMeta> >
-        &databases = schema.children;
+    const auto &databases = schema.children;
     for (auto db_it = databases.begin(); db_it != databases.end();
          ++db_it) {
         const std::string &db_name = db_it->first.getValue();
-        const std::unique_ptr<DatabaseMeta> &dm = db_it->second;
-        const std::map<IdentityMetaKey, std::unique_ptr<TableMeta> >
-            &tables = dm->children;
+        const auto &dm = db_it->second;
+        const auto &tables = dm->children;
         for (auto table_it = tables.begin(); table_it != tables.end();
              ++table_it) {
             const std::string &table_name = table_it->first.getValue();
-            const std::unique_ptr<TableMeta> &tm = table_it->second;
-            std::map<IdentityMetaKey, std::unique_ptr<FieldMeta> >
-                &fields = tm->children;
+            const auto &tm = table_it->second;
+            const auto &fields = tm->children;
             for (auto field_it = fields.begin(); field_it != fields.end();
                  ++field_it) {
                 const std::string &field_name =
                     field_it->first.getValue();
-                const std::unique_ptr<FieldMeta> &fm = field_it->second;
-                std::map<OnionMetaKey, std::unique_ptr<OnionMeta> >
-                    &onions = fm->children;
+                const auto &fm = field_it->second;
+                const auto &onions = fm->children;
                 for (auto onion_it = onions.begin();
                      onion_it != onions.end();
                      ++onion_it) {
                     const std::string &onion_name =
                       TypeText<onion>::toText(onion_it->first.getValue());
-                    const std::unique_ptr<OnionMeta> &om =
-                        onion_it->second;
+                    const auto &om = onion_it->second;
 
                     // HACK: this behavior is not usually safe, use
                     // Analysis to get state information generally

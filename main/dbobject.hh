@@ -198,7 +198,8 @@ public:
     MappedDBMeta(unsigned int id) : DBMeta(id) {}
     virtual ~MappedDBMeta() {}
     virtual bool addChild(KeyType key,
-                          std::unique_ptr<ChildType> meta);
+                          std::unique_ptr<ChildType,
+                                  std::function<void(ChildType *)> > meta);
     virtual bool childExists(const KeyType &key) const;
     virtual ChildType *
         getChild(const KeyType &key) const;
@@ -209,7 +210,9 @@ public:
         fn) const;
 
     // FIXME: Make protected.
-    std::map<KeyType, std::unique_ptr<ChildType>> children;
+    std::map<KeyType,
+             std::unique_ptr<ChildType,
+                             std::function<void(ChildType *)> > > children;
 };
 
 #include <main/dbobject.tt>

@@ -12,6 +12,12 @@
 
 #define RFIF RETURN_FALSE_IF_FALSE
 
+#define RETURN_NULL_IF_NULL(p)              \
+    (p);                                    \
+    if (!(p)) {                             \
+        return NULL;                        \
+    }
+
 #define ROLLBACK_AND_RFIF(status, conn)                 \
 {                                                       \
     if (!(status)) {                                    \
