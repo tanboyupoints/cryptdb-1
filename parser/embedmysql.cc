@@ -72,12 +72,6 @@ embedmysql::conn()
     return m;
 }
 
-mysql_thrower::~mysql_thrower()
-{
-    *this << ": " << current_thd->stmt_da->message();
-    throw std::runtime_error(str());
-}
-
 extern "C" void *create_embedded_thd(int client_flag);
 
 void
@@ -147,10 +141,10 @@ query_parse::query_parse(const std::string &db, const std::string &q)
         alloc_query(t, buf, len + 1);
 
         if (ps.init(t, buf, len))
-            mysql_thrower() << "Parser_state::init";
+            throw CryptDBError("Parser_state::init");
 
         if (parse_sql(t, &ps, 0))
-            mysql_thrower() << "parse_sql";
+            throw CryptDBError("parse_sql");
 
         LEX *lex = t->lex;
 
@@ -219,10 +213,10 @@ query_parse::query_parse(const std::string &db, const std::string &q)
             lex->select_lex.table_list.first);
 
         if (t->fill_derived_tables())
-            mysql_thrower() << "fill_derived_tables";
+            throw CryptDBError("fill_derived_tables");
 
         if (open_normal_and_derived_tables(t, lex->query_tables, 0))
-            mysql_thrower() << "open_normal_and_derived_tables";
+            throw CryptDBError("open_normal_and_derived_tables");
 
         if (lex->sql_command == SQLCOM_SELECT) {
             if (!lex->select_lex.master_unit()->is_union() &&
@@ -242,12 +236,12 @@ query_parse::query_parse(const std::string &db, const std::string &q)
                                lex->proc_list.first,
                                &lex->select_lex,
                                &lex->unit))
-                    mysql_thrower() << "JOIN::prepare";
+                    throw CryptDBError("JOIN::prepare");
             } else {
                 thrower() << "skip unions for now (union=" << lex->select_lex.master_unit()->is_union()
                           << ", fake_select_lex=" << lex->select_lex.master_unit()->fake_select_lex << ")";
                 if (lex->unit.prepare(t, 0, 0))
-                    mysql_thrower() << "UNIT::prepare";
+                    throw CryptDBError("UNIT::prepare");
 
                 /* XXX unit->cleanup()? */
 
@@ -258,17 +252,17 @@ query_parse::query_parse(const std::string &db, const std::string &q)
             }
         } else if (lex->sql_command == SQLCOM_DELETE) {
             if (mysql_prepare_delete(t, lex->query_tables, &lex->select_lex.where))
-                mysql_thrower() << "mysql_prepare_delete";
+                throw CryptDBError("mysql_prepare_delete");
 
             if (lex->select_lex.setup_ref_array(t, lex->select_lex.order_list.elements))
-                mysql_thrower() << "setup_ref_array";
+                throw CryptDBError("setup_ref_array");
 
             List<Item> fields;
             List<Item> all_fields;
             if (setup_order(t, lex->select_lex.ref_pointer_array,
                             lex->query_tables, fields, all_fields,
                             lex->select_lex.order_list.first))
-                mysql_thrower() << "setup_order";
+                throw CryptDBError("setup_order");
         } else if (SQLCOM_INSERT == lex->sql_command
                    || SQLCOM_REPLACE == lex->sql_command) {
             List_iterator_fast<List_item> its(lex->many_values);
@@ -281,7 +275,7 @@ query_parse::query_parse(const std::string &db, const std::string &q)
                                      &lex->select_lex.where,
                                      /* select_insert */ 0,
                                      0, 0))
-                mysql_thrower() << "mysql_prepare_insert";
+                throw CryptDBError("mysql_prepare_insert");
 
             for (;;) {
                 values = its++;
@@ -289,26 +283,26 @@ query_parse::query_parse(const std::string &db, const std::string &q)
                     break;
 
                 if (setup_fields(t, 0, *values, MARK_COLUMNS_NONE, 0, 0))
-                    mysql_thrower() << "setup_fields";
+                    throw CryptDBError("setup_fields");
             }
         } else if (lex->sql_command == SQLCOM_UPDATE) {
             if (mysql_prepare_update(t, lex->query_tables, &lex->select_lex.where,
                                      lex->select_lex.order_list.elements,
                                      lex->select_lex.order_list.first))
-                mysql_thrower() << "mysql_prepare_update";
+                throw CryptDBError("mysql_prepare_update");
 
             if (setup_fields_with_no_wrap(t, 0, lex->select_lex.item_list,
                                           MARK_COLUMNS_NONE, 0, 0))
-                mysql_thrower() << "setup_fields_with_no_wrap";
+                throw CryptDBError("setup_fields_with_no_wrap");
 
             if (setup_fields(t, 0, lex->value_list,
                              MARK_COLUMNS_NONE, 0, 0))
-                mysql_thrower() << "setup_fields";
+                throw CryptDBError("setup_fields");
 
             List<Item> all_fields;
             if (fix_inner_refs(t, all_fields, &lex->select_lex,
                                lex->select_lex.ref_pointer_array))
-                mysql_thrower() << "fix_inner_refs";
+                throw CryptDBError("fix_inner_refs");
         } else {
             thrower() << "don't know how to prepare command " << lex->sql_command;
         }
