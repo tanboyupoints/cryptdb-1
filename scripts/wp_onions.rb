@@ -4,8 +4,9 @@ require 'rubygems'
 require 'mysql'
 
 # wordpress database prep
-# FIXME: some onions are missing, ie ones that lowered something in addition
-# to oPLAIN
+# FIXME: some onions are missing
+# > ones that lowered something in addition to oPLAIN
+
 $onions =
 [["wp_commentmeta", "meta_id", "oPLAIN", "PLAINVAL"],
  ["wp_commentmeta", "meta_key", "oDET", "DET"],
@@ -65,13 +66,14 @@ $onions =
  ["wp_users", "user_registered", "oPLAIN", "PLAINVAL"]]
 
 def fn(database)
-  c = Mysql.new('127.0.0.1', 'root', 'letmein', database, 3305)
-  c.query("USE `#{database}`")
-  $onions.each do |(table, field, onion, level)|
-	c.query("SET @cryptdb='adjust', @database='#{database}',
-		     @table='#{table}', @field='#{field}', @#{onion}='#{level}'")
-  end
-  c.close()
+    c = Mysql.new('127.0.0.1', 'root', 'letmein', database, 3305)
+    c.query("USE `#{database}`")
+    $onions.each do |(table, field, onion, level)|
+    c.query("SET @cryptdb='adjust', @database='#{database}',
+                 @table='#{table}', @field='#{field}',
+                 @#{onion}='#{level}'")
+    end
+    c.close()
 end
-  
+
 fn("burrows+gg")
