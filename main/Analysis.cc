@@ -461,6 +461,15 @@ ProxyState::safeCreateEmbeddedTHD()
     return;
 }
 
+void ProxyState::dumpTHDs()
+{
+    for (auto it = thds.begin(); it != thds.end(); ++it) {
+        it->release();
+    }
+
+    assert(0 == thds.size());
+}
+
 std::string Delta::tableNameFromType(TableType table_type) const
 {
     switch (table_type) {

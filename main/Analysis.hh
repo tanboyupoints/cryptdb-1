@@ -112,6 +112,7 @@ public:
     const std::unique_ptr<Connect> &getConn() const;
     const std::unique_ptr<Connect> &getEConn() const;
     void safeCreateEmbeddedTHD();
+    void dumpTHDs();
 
 private:
     const SharedProxyState &shared;

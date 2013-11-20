@@ -503,6 +503,10 @@ loadSchemaInfo(const std::unique_ptr<Connect> &conn,
         };
 
     loadChildren(schema);
+    if (thread_ps) {
+        thread_ps->dumpTHDs();
+    }
+
     // FIXME: Ideally we would do this before loading the schema.
     // But first we must decide on a place to create the database from.
     assert(sanityCheck(*schema));
