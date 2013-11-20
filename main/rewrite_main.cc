@@ -503,6 +503,9 @@ loadSchemaInfo(const std::unique_ptr<Connect> &conn,
         };
 
     loadChildren(schema);
+    // HACK: otherwise our cache may break when the client that last
+    //       filled it disconects
+    // > we need a higher level memory management abstraction
     if (thread_ps) {
         thread_ps->dumpTHDs();
     }

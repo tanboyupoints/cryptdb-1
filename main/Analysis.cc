@@ -466,6 +466,7 @@ void ProxyState::dumpTHDs()
     for (auto it = thds.begin(); it != thds.end(); ++it) {
         it->release();
     }
+    thds.clear();
 
     assert(0 == thds.size());
 }
