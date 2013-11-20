@@ -84,7 +84,7 @@ function test_normalQueryExecution()
     os.execute("mysql -uroot -pletmein -e \"insert into lua_test.t VALUES (1, 2), (3, 4), (4, 3)\"")
 
     status, lua_query =
-        ThreadedQuery.start("127.0.0.1", "root", "letmein", 3306)
+        ThreadedQuery.start("127.0.0.1", "root", "letmein", 3306, 2)
     if not (status and lua_query) then
         return false
     end
@@ -158,7 +158,7 @@ function test_failedQueryExecution()
     os.execute("pkill -9 mysqld")
     -- should fail to connect
     status, lua_query =
-        ThreadedQuery.start("127.0.0.1", "root", "letmein", 3306)
+        ThreadedQuery.start("127.0.0.1", "root", "letmein", 3306, 2)
     if not (status and lua_query) then
         return false
     end
@@ -208,7 +208,7 @@ function test_doubleQuery()
     os.execute("mysql -uroot -pletmein -e \"insert into lua_test.t3 VALUES (2, 12), (40, 15), (5, 38)\"")
 
     status, lua_query =
-        ThreadedQuery.start("127.0.0.1", "root", "letmein", 3306)
+        ThreadedQuery.start("127.0.0.1", "root", "letmein", 3306, 2)
     if not (status and lua_query) then
         return false
     end

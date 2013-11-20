@@ -1,4 +1,4 @@
-// gcc -shared -fpic threaded_query.c -o threaded_query.so --llua5.1 \
+// gcc -shared -fpic threaded_query.c -o threaded_query.so -llua5.1 \
 //     -lmysqlclient -lrt
 #include <stdlib.h>
 #include <stdio.h>
@@ -193,6 +193,7 @@ start(lua_State *const L)
     const char *user        = luaToCharp(L, 2);
     const char *passwd      = luaToCharp(L, 3);
     const unsigned int port = lua_tointeger(L, 4);
+    const unsigned int wait = lua_tointeger(L, 5);
 
     struct HostData *host_data =
         createHostData(host, user, passwd, port);
@@ -203,7 +204,8 @@ start(lua_State *const L)
         return 2;
     }
 
-    struct LuaQuery **const p_lua_query = createLuaQuery(&host_data, 2);
+    struct LuaQuery **const p_lua_query =
+        createLuaQuery(&host_data, wait);
     if (!p_lua_query) {
         destroyHostData(&host_data);
         fprintf(stderr, "createLuaQuery failed!\n");
