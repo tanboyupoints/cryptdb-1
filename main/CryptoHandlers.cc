@@ -56,56 +56,57 @@ struct SerialLayer;
 
 class LayerFactory {
 public:
-    static EncLayer * create(Create_field * const cf,
-                             const std::string &key) {
+    static std::unique_ptr<EncLayer>
+    create(Create_field * const cf, const std::string &key) {
         throw "needs to be inherited";
     };
-    static EncLayer * deserialize(const SerialLayer &serial) {
+    static std::unique_ptr<EncLayer>
+    deserialize(const SerialLayer &serial) {
         throw "needs to be inherited";
     };
 };
 
 class RNDFactory : public LayerFactory {
 public:
-    static EncLayer * create(Create_field * const cf,
-                             const std::string &key);
-    static EncLayer * deserialize(unsigned int id,
-                                  const SerialLayer &serial);
+    static std::unique_ptr<EncLayer>
+        create(Create_field * const cf, const std::string &key);
+    static std::unique_ptr<EncLayer>
+        deserialize(unsigned int id, const SerialLayer &serial);
 };
 
 
 class DETFactory : public LayerFactory {
 public:
-    static EncLayer * create(Create_field * const cf,
-                             const std::string &key);
-    static EncLayer * deserialize(unsigned int id,
-                                  const SerialLayer &serial);
+    static std::unique_ptr<EncLayer>
+        create(Create_field * const cf, const std::string &key);
+    static std::unique_ptr<EncLayer>
+        deserialize(unsigned int id, const SerialLayer &serial);
 };
 
 
 class DETJOINFactory : public LayerFactory {
 public:
-    static EncLayer * create(Create_field * const cf,
-                             const std::string &key);
-    static EncLayer * deserialize(unsigned int id,
-                                  const SerialLayer &serial);
+    static std::unique_ptr<EncLayer>
+        create(Create_field * const cf, const std::string &key);
+    static std::unique_ptr<EncLayer>
+        deserialize(unsigned int id, const SerialLayer &serial);
 };
 
 class OPEFactory : public LayerFactory {
 public:
-    static EncLayer * create(Create_field * const cf,
-                             const std::string &key);
-    static EncLayer * deserialize(unsigned int id,
-                                  const SerialLayer &serial);
+    static std::unique_ptr<EncLayer>
+        create(Create_field * const cf, const std::string &key);
+    static std::unique_ptr<EncLayer>
+        deserialize(unsigned int id, const SerialLayer &serial);
 };
 
 
 class HOMFactory : public LayerFactory {
 public:
-    static EncLayer * create(Create_field * const cf,
-                             const std::string &key);
-    static EncLayer * deserialize(unsigned int id,
-                                  const SerialLayer &serial);
+    static std::unique_ptr<EncLayer>
+        create(Create_field * const cf, const std::string &key);
+    static std::unique_ptr<EncLayer>
+        deserialize(unsigned int id, const SerialLayer &serial);
 };
 
 
@@ -150,7 +151,7 @@ underSerial(const std::string &serial)
 // ============================ Factory implementations ====================//
 
 
-EncLayer *
+std::unique_ptr<EncLayer>
 EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * const cf,
                           const std::string &key)
 {
@@ -160,14 +161,19 @@ EncLayerFactory::encLayer(onion o, SECLEVEL sl, Create_field * const cf,
         case SECLEVEL::DETJOIN: {return DETJOINFactory::create(cf, key);}
         case SECLEVEL::OPE:{return OPEFactory::create(cf, key);}
         case SECLEVEL::HOM: {return HOMFactory::create(cf, key);}
-        case SECLEVEL::SEARCH: {return new Search(cf, key);}
-        case SECLEVEL::PLAINVAL: {return new PlainText();}
+        case SECLEVEL::SEARCH: {
+            return std::unique_ptr<EncLayer>(new Search(cf, key));
+        }
+        case SECLEVEL::PLAINVAL: {
+            return std::unique_ptr<EncLayer>(new PlainText());
+        }
+
         default:{}
     }
     FAIL_TextMessageError("unknown or unimplemented security level");
 }
 
-EncLayer *
+std::unique_ptr<EncLayer>
 EncLayerFactory::deserializeLayer(unsigned int id,
                                   const std::string &serial)
 {
@@ -187,14 +193,14 @@ EncLayerFactory::deserializeLayer(unsigned int id,
         case SECLEVEL::OPE: 
             return OPEFactory::deserialize(id, li);
 
-        case SECLEVEL::HOM: 
-            return new HOM(id, serial);
+        case SECLEVEL::HOM:
+            return std::unique_ptr<EncLayer>(new HOM(id, serial));
 
-        case SECLEVEL::SEARCH: 
-            return new Search(id, serial);
-        
+        case SECLEVEL::SEARCH:
+            return std::unique_ptr<EncLayer>(new Search(id, serial));
+
         case SECLEVEL::PLAINVAL:
-            return new PlainText(id);
+            return std::unique_ptr<EncLayer>(new PlainText(id));
 
         default:{}
     }
@@ -360,23 +366,23 @@ private:
 
 };
 
-EncLayer *
+std::unique_ptr<EncLayer>
 RNDFactory::create(Create_field * const cf, const std::string &key)
 {
     if (IsMySQLTypeNumeric(cf->sql_type)) { // the ope case as well 
-        return new RND_int(cf, key);
+        return std::unique_ptr<EncLayer>(new RND_int(cf, key));
     } else {
-        return new RND_str(cf, key);
+        return std::unique_ptr<EncLayer>(new RND_str(cf, key));
     }
 }
 
-EncLayer *
+std::unique_ptr<EncLayer>
 RNDFactory::deserialize(unsigned int id, const SerialLayer &sl)
 {
     if (sl.name == "RND_int") {
-        return new RND_int(id, sl.layer_info);
+        return std::unique_ptr<EncLayer>(new RND_int(id, sl.layer_info));
     } else {
-        return new RND_str(id, sl.layer_info);
+        return std::unique_ptr<EncLayer>(new RND_str(id, sl.layer_info));
     }
 }
 
@@ -667,30 +673,30 @@ protected:
 };
 
 
-EncLayer *
+std::unique_ptr<EncLayer>
 DETFactory::create(Create_field * const cf, const std::string &key)
 {
     if (IsMySQLTypeNumeric(cf->sql_type)) {
         if (cf->sql_type == MYSQL_TYPE_DECIMAL
             || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
-            return new DET_dec(cf, key);
+            return std::unique_ptr<EncLayer>(new DET_dec(cf, key));
         } else {
-            return new DET_int(cf, key);
+            return std::unique_ptr<EncLayer>(new DET_int(cf, key));
         }
     } else {
-        return new DET_str(cf, key);
+        return std::unique_ptr<EncLayer>(new DET_str(cf, key));
     }
 }
 
-EncLayer *
+std::unique_ptr<EncLayer>
 DETFactory::deserialize(unsigned int id, const SerialLayer &sl)
 {
     if ("DET_int" == sl.name) {
-        return new DET_int(id, sl.layer_info);
+        return std::unique_ptr<EncLayer>(new DET_int(id, sl.layer_info));
     } else if ("DET_dec" == sl.name) {
-        return new DET_dec(id, sl.layer_info);
+        return std::unique_ptr<EncLayer>(new DET_dec(id, sl.layer_info));
     } else if ("DET_str" == sl.name) {
-        return new DET_str(id, sl.layer_info);
+        return std::unique_ptr<EncLayer>(new DET_str(id, sl.layer_info));
     } else {
         FAIL_TextMessageError("Unknown type for DET deserialization!");
     }
@@ -1020,31 +1026,34 @@ public:
     std::string name() const {return "DETJOIN_dec";}
 };
 
-EncLayer *
+std::unique_ptr<EncLayer>
 DETJOINFactory::create(Create_field * const cf,
                        const std::string &key)
 {
     if (IsMySQLTypeNumeric(cf->sql_type)) {
         if (cf->sql_type == MYSQL_TYPE_DECIMAL
             || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
-            return new DETJOIN_dec(cf, key);
+            return std::unique_ptr<EncLayer>(new DETJOIN_dec(cf, key));
         } else {
-            return new DETJOIN_int(cf, key);
+            return std::unique_ptr<EncLayer>(new DETJOIN_int(cf, key));
         }
     } else {
-        return new DETJOIN_str(cf, key);
+        return std::unique_ptr<EncLayer>(new DETJOIN_str(cf, key));
     }
 }
 
-EncLayer *
+std::unique_ptr<EncLayer>
 DETJOINFactory::deserialize(unsigned int id, const SerialLayer &sl)
 {
     if  ("DETJOIN_int" == sl.name) {
-        return new DETJOIN_int(id, sl.layer_info);
+        return std::unique_ptr<EncLayer>(new DETJOIN_int(id,
+                                                         sl.layer_info));
     } else if ("DETJOIN_dec" == sl.name) {
-        return new DETJOIN_dec(id, sl.layer_info);
+        return std::unique_ptr<EncLayer>(new DETJOIN_dec(id,
+                                                         sl.layer_info));
     } else if ("DETJOIN_str" == sl.name) {
-        return new DETJOIN_str(id, sl.layer_info);
+        return std::unique_ptr<EncLayer>(new DETJOIN_str(id,
+                                                         sl.layer_info));
     } else {
         FAIL_TextMessageError("DETJOINFactory does not recognize type!");
     }
@@ -1214,36 +1223,39 @@ private:
 
 
 
-EncLayer *
+std::unique_ptr<EncLayer>
 OPEFactory::create(Create_field * const cf, const std::string &key)
 {
     if (IsMySQLTypeNumeric(cf->sql_type)) { 
         if (cf->sql_type == MYSQL_TYPE_DECIMAL
             || cf->sql_type ==  MYSQL_TYPE_NEWDECIMAL) {
-            return new OPE_dec(cf, key);
+            return std::unique_ptr<EncLayer>(new OPE_dec(cf, key));
         } else if (cf->sql_type == MYSQL_TYPE_TINY) { 
-            return new OPE_tinyint(cf, key);
+            return std::unique_ptr<EncLayer>(new OPE_tinyint(cf, key));
         } else if (cf->sql_type == MYSQL_TYPE_INT24) { 
-            return new OPE_mediumint(cf, key);
+            return std::unique_ptr<EncLayer>(new OPE_mediumint(cf, key));
         }
-        return new OPE_int(cf, key);
+        return std::unique_ptr<EncLayer>(new OPE_int(cf, key));
     }
-    return new OPE_str(cf, key);
+    return std::unique_ptr<EncLayer>(new OPE_str(cf, key));
 }
 
-EncLayer *
+std::unique_ptr<EncLayer>
 OPEFactory::deserialize(unsigned int id, const SerialLayer &sl)
 {
     if (sl.name == "OPE_int") {
-        return new OPE_int(id, sl.layer_info);
+        return std::unique_ptr<EncLayer>(new OPE_int(id,
+                                                     sl.layer_info));
     } else if (sl.name == "OPE_tinyint") {
-        return new OPE_tinyint(id, sl.layer_info);
+        return std::unique_ptr<EncLayer>(new OPE_tinyint(id,
+                                                         sl.layer_info));
     } else if (sl.name == "OPE_mediumint") {
-        return new OPE_mediumint(id, sl.layer_info);
+        return std::unique_ptr<EncLayer>(new OPE_mediumint(id,
+                                                          sl.layer_info));
     } else if (sl.name == "OPE_str") {
-        return new OPE_str(id, sl.layer_info);
-    } else  {
-        return new OPE_dec(id, sl.layer_info);
+        return std::unique_ptr<EncLayer>(new OPE_str(id, sl.layer_info));
+    } else {
+        return std::unique_ptr<EncLayer>(new OPE_dec(id, sl.layer_info));
     }
 }
 
@@ -1399,6 +1411,7 @@ public:
 
     //deserialize
     HOM_dec(unsigned int id, const std::string &serial);
+    ~HOM_dec() {;}
 
     std::string name() const {return "HOM_dec";}
 
@@ -1416,28 +1429,28 @@ private:
     ZZ const shift;
 
     std::string doSerialize() const;
-    ~HOM_dec() {;}
 };
 
 
-EncLayer *
+std::unique_ptr<EncLayer>
 HOMFactory::create(Create_field * const cf, const std::string &key)
 {
     if (cf->sql_type == MYSQL_TYPE_DECIMAL
         || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
-        return new HOM_dec(cf, key);
+        return std::unique_ptr<EncLayer>(new HOM_dec(cf, key));
     }
 
-    return new HOM(cf, key);
+    return std::unique_ptr<EncLayer>(new HOM(cf, key));
 }
 
-EncLayer *
+std::unique_ptr<EncLayer>
 HOMFactory::deserialize(unsigned int id, const SerialLayer &serial)
 {
     if (serial.name == "HOM_dec") {
-        return new HOM_dec(id, serial.layer_info);
+        return std::unique_ptr<EncLayer>(new HOM_dec(id,
+                                                     serial.layer_info));
     }
-    return new HOM(id, serial.layer_info);
+    return std::unique_ptr<EncLayer>(new HOM(id, serial.layer_info));
 }
 
 static ZZ

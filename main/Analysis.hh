@@ -128,6 +128,7 @@ public:
     enum TableType {REGULAR_TABLE, BLEEDING_TABLE};
 
     Delta(const DBMeta &parent_meta) : parent_meta(parent_meta) {}
+    virtual ~Delta() {}
 
     /*
      * Take the update action against the database. Contains high level
@@ -480,7 +481,7 @@ public:
                                  onion o) const;
     static EncLayer &getBackEncLayer(const OnionMeta &om);
     static SECLEVEL getOnionLevel(const OnionMeta &om);
-    static std::vector<std::unique_ptr<EncLayer>> const &
+    static const std::vector<std::unique_ptr<EncLayer> > &
         getEncLayers(const OnionMeta &om);
     const SchemaInfo &getSchema() {return schema;}
 

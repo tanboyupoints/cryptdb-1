@@ -78,7 +78,7 @@ sanityCheck(FieldMeta &fm)
         const onion o = (*it).first.getValue();
         const std::vector<SECLEVEL> &secs = fm.getOnionLayout().at(o);
         for (size_t i = 0; i < om->layers.size(); ++i) {
-            std::unique_ptr<EncLayer> const &layer = om->layers[i];
+            const auto &layer = om->layers[i];
             assert(layer->level() == secs[i]);
         }
     }
@@ -483,17 +483,14 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
 //  1> Schema buildling (CREATE TABLE IF NOT EXISTS...)
 //  2> INSERTing
 //  3> SELECTing
-std::unique_ptr<SchemaInfo, std::function<void(SchemaInfo *)> >
+std::unique_ptr<SchemaInfo>
 loadSchemaInfo(const std::unique_ptr<Connect> &conn,
                const std::unique_ptr<Connect> &e_conn)
 {
     // Must be done before loading the children.
     assert(deltaSanityCheck(conn, e_conn));
 
-    void *p = RETURN_NULL_IF_NULL(malloc(sizeof(SchemaInfo)));
-
-    std::unique_ptr<SchemaInfo, std::function<void(SchemaInfo *)> >
-        schema(new (p) SchemaInfo(), destructThenFree<SchemaInfo>);
+    std::unique_ptr<SchemaInfo>schema(new SchemaInfo());
     // Recursively rebuild the AbstractMeta<Whatever> and it's children.
     std::function<DBMeta *(DBMeta *const)> loadChildren =
         [&loadChildren, &e_conn](DBMeta *const parent) {

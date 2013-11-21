@@ -596,10 +596,10 @@ quoteText(const std::string &text)
 }
 
 template <typename T> void
-destructThenFree(T *const t)
+destructThenFree(void *const p)
 {
-    if (t) {
-        t->~T();
-        free(t);
+    if (p) {
+        static_cast<T *>(p)->~T();
+        free(static_cast<T *>(p));
     }
 }

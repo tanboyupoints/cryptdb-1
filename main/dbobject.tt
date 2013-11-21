@@ -17,8 +17,7 @@ bool MetaKey<KeyType>::operator ==(const MetaKey<KeyType> &rhs) const
 template <typename ChildType, typename KeyType>
 bool
 MappedDBMeta<ChildType, KeyType>::addChild(KeyType key,
-                                           std::unique_ptr<ChildType,
-                            std::function<void(ChildType *)> > meta)
+                                           std::unique_ptr<ChildType> meta)
 {
     if (childExists(key)) {
         return false;
@@ -81,7 +80,7 @@ MappedDBMeta<ChildType, KeyType>::fetchChildren(const std::unique_ptr<Connect> &
             const std::unique_ptr<KeyType>
                 meta_key(AbstractMetaKey::factory<KeyType>(key));
             auto dChild = ChildType::deserialize;
-            std::unique_ptr<ChildType, std::function<void(ChildType *)> >
+            std::unique_ptr<ChildType>
                 new_old_meta(dChild(atoi(id.c_str()), serial));
 
             // Gobble the child.

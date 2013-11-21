@@ -93,6 +93,7 @@ public:
     // serialize and deserialize
     std::string doSerialize() const {return seed_key;}
     HOM(unsigned int id, const std::string &serial);
+    ~HOM();
 
     SECLEVEL level() const {return SECLEVEL::HOM;}
     std::string name() const {return "HOM";}
@@ -112,8 +113,6 @@ protected:
     std::string const seed_key;
     static const uint nbits = 1024;
     mutable Paillier_priv * sk;
-
-    ~HOM();
 
 private:
     void unwait() const;
@@ -151,13 +150,13 @@ extern const std::vector<udf_func*> udf_list;
 
 class EncLayerFactory {
 public:
-    static EncLayer * encLayer(onion o, SECLEVEL sl,
-                               Create_field * const cf,
-                               const std::string &key);
+    static std::unique_ptr<EncLayer>
+        encLayer(onion o, SECLEVEL sl, Create_field * const cf,
+                 const std::string &key);
 
     // creates EncLayer from its serialization
-    static EncLayer * deserializeLayer(unsigned int id,
-                                       const std::string &serial);
+    static std::unique_ptr<EncLayer>
+        deserializeLayer(unsigned int id, const std::string &serial);
 
     // static std::string serializeLayer(EncLayer * el, DBMeta *parent);
 };

@@ -142,6 +142,10 @@ public:
     DBMeta() {}
     explicit DBMeta(unsigned int id) : DBObject(id) {}
     virtual ~DBMeta() {;}
+
+    void *operator new(size_t n);
+    void operator delete(void *p);
+
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;
     virtual std::vector<DBMeta *>
@@ -197,22 +201,16 @@ public:
     MappedDBMeta() {}
     MappedDBMeta(unsigned int id) : DBMeta(id) {}
     virtual ~MappedDBMeta() {}
-    virtual bool addChild(KeyType key,
-                          std::unique_ptr<ChildType,
-                                  std::function<void(ChildType *)> > meta);
+    virtual bool addChild(KeyType key, std::unique_ptr<ChildType> meta);
     virtual bool childExists(const KeyType &key) const;
-    virtual ChildType *
-        getChild(const KeyType &key) const;
+    virtual ChildType * getChild(const KeyType &key) const;
     KeyType const &getKey(const DBMeta &child) const;
     virtual std::vector<DBMeta *>
         fetchChildren(const std::unique_ptr<Connect> &e_conn);
-    bool applyToChildren(std::function<bool(const DBMeta &)>
-        fn) const;
+    bool applyToChildren(std::function<bool(const DBMeta &)> fn) const;
 
     // FIXME: Make protected.
-    std::map<KeyType,
-             std::unique_ptr<ChildType,
-                             std::function<void(ChildType *)> > > children;
+    std::map<KeyType, std::unique_ptr<ChildType> > children;
 };
 
 #include <main/dbobject.tt>

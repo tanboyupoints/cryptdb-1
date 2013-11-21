@@ -1364,7 +1364,7 @@ SECLEVEL Analysis::getOnionLevel(const OnionMeta &om)
     return om.getSecLevel();
 }
 
-std::vector<std::unique_ptr<EncLayer>> const &
+const std::vector<std::unique_ptr<EncLayer> > &
 Analysis::getEncLayers(const OnionMeta &om)
 {
     return om.layers;
