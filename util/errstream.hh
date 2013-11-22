@@ -43,7 +43,7 @@ class cryptdb_err : public std::stringstream {
 
 class thrower : public std::stringstream {
  public:
-    ~thrower() __attribute__((noreturn)) {
+    ~thrower() noexcept(false) __attribute__((noreturn)) {
         throw std::runtime_error(str());
     }
 };
