@@ -1008,7 +1008,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 494/514
+    //      TOTAL RESULT: 497/514
     // ###############################
 
     std::vector<Score> scores;
