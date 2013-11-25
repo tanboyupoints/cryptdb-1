@@ -786,6 +786,7 @@ adjustOnion(const Analysis &a, onion o, const TableMeta &tm,
     TEST_UnexpectedSecurityLevel(o, tolevel, newlevel);
 
     return make_pair(std::move(deltas), adjust_queries);
+    // return make_pair(deltas, adjust_queries);
 }
 //TODO: propagate these adjustments in the embedded database?
 
@@ -1261,11 +1262,11 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
             LOG(cdb_v) << "caught onion adjustment";
             std::cout << "Adjusting onion!" << std::endl;
             std::pair<std::vector<std::unique_ptr<Delta> >,
-                      std::list<std::string>>
+                      std::list<std::string> >
                 out_data = adjustOnion(a, e.o, e.tm, e.fm, e.tolevel);
             std::vector<std::unique_ptr<Delta> > &deltas =
                 out_data.first;
-            const std::list<std::string>  &adjust_queries =
+            const std::list<std::string> &adjust_queries =
                 out_data.second;
             std::function<std::string(const std::string &)>
                 hackEscape = [&ps](const std::string &s)
@@ -1593,10 +1594,10 @@ EncLayer &OnionMetaAdjustor::getBackEncLayer() const
 
 EncLayer &OnionMetaAdjustor::popBackEncLayer()
 {
-    EncLayer *const out_layer = duped_layers.back();
+    EncLayer &out_layer = *duped_layers.back();
     duped_layers.pop_back();
 
-    return *out_layer;
+    return out_layer;
 }
 
 SECLEVEL OnionMetaAdjustor::getSecLevel() const

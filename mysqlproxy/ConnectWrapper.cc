@@ -140,10 +140,7 @@ connect(lua_State *const L)
 
     ConnectionInfo const ci = ConnectionInfo(server, user, psswd, port);
 
-    if (clients.find(client) != clients.end()) {
-           LOG(warn) << "duplicate client entry";
-    }
-
+    assert(clients.end() == clients.find(client));
     clients[client] = new WrapperState();
 
     // Is it the first connection?

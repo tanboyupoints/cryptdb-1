@@ -860,6 +860,12 @@ class SetHandler : public DMLHandler {
                     i->*rob<Item_func, Item **,
                             &Item_func_set_user_var::args>::ptr();
                 assert(args && args[0]);
+                // skip non string sets, ie
+                //   SET @this = @@that
+                if (Item::Type::STRING_ITEM != args[0]->type()) {
+                    continue;
+                }
+
                 std::string var_value = printItem(*args[0]);
                 TEST_TextMessageError(var_value.length() > 2,
                                       "this " + var_value + " is probably"
