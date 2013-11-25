@@ -339,6 +339,13 @@ static QueryList Auto = QueryList("AutoInc",
       Query("INSERT INTO msgs VALUES (2, 1998, 'stacksondeck') ON DUPLICATE KEY UPDATE zooanimals = VALUES(zooanimals), msgtext = VALUES(msgtext)"),
       Query("SELECT * FROM msgs"),
       Query("SELECT SUM(zooanimals) FROM msgs"),
+      Query("ALTER TABLE msgs AUTO_INCREMENT = 555"),
+      Query("INSERT INTO msgs (msgtext, zooanimals) VALUES"
+            "   ('dolphins', 12)"),
+      Query("SELECT * FROM msgs"),
+      Query("INSERT INTO msgs (msgtext, zooanimals) VALUES"
+            "   ('sharks', 12)"),
+      Query("SELECT * FROM msgs"),
       Query("DROP TABLE msgs") });
 
 static QueryList Negative = QueryList("Negative",
@@ -1001,7 +1008,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 494/509
+    //      TOTAL RESULT: 494/514
     // ###############################
 
     std::vector<Score> scores;
@@ -1044,7 +1051,7 @@ RunTest(const TestConfig &tc) {
         scores.push_back(CheckQueryList(tc, BestEffort));
     }
 
-    // Pass 22/22
+    // Pass 25/27
     scores.push_back(CheckQueryList(tc, Auto));
 
     // Pass 8/10
