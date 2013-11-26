@@ -31,8 +31,8 @@ class CreateTableHandler : public DDLHandler {
             // -----------------------------
             // HACK.
             // > We know that there is only one table.
-            // > We also know that rewrite_table_list is going to fail to
-            // find this table in 'a'.
+            // > We also know that Analysis does not have a reference to
+            //   the table as it depends on SchemaInfo.
             // > And we know that the table we want is tm with name table.
             // > This will _NOT_ gracefully handle a malformed CREATE TABLE
             // query.

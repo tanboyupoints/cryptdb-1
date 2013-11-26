@@ -567,6 +567,8 @@ static QueryList TableAliases = QueryList("TableAliases",
       Query("SELECT mercury.a, mercury.b, e.a FROM star AS mercury"
             " INNER JOIN mercury AS e ON (mercury.a = e.a)"
             " WHERE mercury.b <> 18 AND mercury.b <> 15"),
+      Query("SELECT * FROM star AS q WHERE a IN"
+            "   (SELECT a FROM mercury)"),
       Query("DROP TABLE star"),
       Query("DROP TABLE mercury"),
       Query("DROP TABLE moon") });

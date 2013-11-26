@@ -173,11 +173,10 @@ class InsertHandler : public DMLHandler {
                     auto fmVecIt = fmVec.begin();
                     for (;;) {
                         const Item *const i = it0++;
+                        assert(!!i == (fmVec.end() != fmVecIt));
                         if (!i) {
-                            assert(fmVec.end() == fmVecIt);
                             break;
                         }
-                        assert(fmVec.end() != fmVecIt);
                         rewriteInsertHelper(*i, **fmVecIt, a, newList0);
                         ++fmVecIt;
                     }
@@ -197,8 +196,11 @@ class InsertHandler : public DMLHandler {
             auto fd_it = List_iterator<Item>(lex->update_list);
             auto val_it = List_iterator<Item>(lex->value_list);
             List<Item> res_fields, res_values;
-            assert(rewrite_field_value_pairs(fd_it, val_it, a, &res_fields,
-                                             &res_values));
+            TEST_TextMessageError(
+                rewrite_field_value_pairs(fd_it, val_it, a, &res_fields,
+                                          &res_values),
+                "rewrite_field_value_pairs failed in ON DUPLICATE KEY"
+                " UPDATE");
             new_lex->update_list = res_fields;
             new_lex->value_list = res_values;
         }
@@ -363,11 +365,10 @@ process_field_value_pairs(List_iterator<Item> fd_it,
     for (;;) {
         const Item *const field_item = fd_it++;
         const Item *const value_item = val_it++;
+        assert(!!field_item == !!value_item);
         if (!field_item) {
-            assert(!value_item);
             break;
         }
-        assert(value_item != NULL);
         assert(field_item->type() == Item::FIELD_ITEM);
         const Item_field *const ifd =
             static_cast<const Item_field *>(field_item);
@@ -471,11 +472,10 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
     for (;;) {
         const Item *const field_item = fd_it++;
         const Item *const value_item = val_it++;
+        assert(!!field_item == !!value_item);
         if (!field_item) {
-            assert(NULL == value_item);
             break;
         }
-        assert(NULL != value_item);
 
         assert(field_item->type() == Item::FIELD_ITEM);
         const Item_field *const ifd =
@@ -620,7 +620,9 @@ process_table_aliases(const List<TABLE_LIST> &tll, Analysis &a)
         if (t->is_alias) {
             TEST_TextMessageError(t->db == a.getDatabaseName(),
                                   "Database discrepancry!");
-            assert(a.addAlias(t->alias, t->db, t->table_name));
+            TEST_TextMessageError(
+                a.addAlias(t->alias, t->db, t->table_name),
+                "failed to add alias " + std::string(t->alias));
         }
 
         if (t->nested_join) {

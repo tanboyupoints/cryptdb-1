@@ -106,6 +106,8 @@ testTextMessageError(const std::string &file_name,
     testTextMessageError(__FILE__, __LINE__, (test), (message));    \
 }                                                                   \
 
+#define TEST_Text TEST_TextMessageError
+
 #define FAIL_TextMessageError(message)                              \
 {                                                                   \
     throw TextMessageError(__FILE__, __LINE__, (message));          \

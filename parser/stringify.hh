@@ -451,13 +451,12 @@ operator<<(std::ostream &out, Key &k)
     case Key::SPATIAL     : kname = "SPATIAL";     break;
     case Key::FOREIGN_KEY : kname = "FOREIGN KEY"; break;
     default:
-        assert(false);
-        break;
+        thrower() << "Unsupported key type " << std::to_string(k.type);
     }
     out << kname;
 
     // index_name
-    std::string key_name(k.name.str, k.name.length);
+    const std::string key_name(k.name.str, k.name.length);
     if (!key_name.empty()) {
         out << " " << key_name;
     }
