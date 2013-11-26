@@ -535,7 +535,7 @@ addSaltToReturn(ReturnMeta *const rm, int pos)
 
 static void
 rewrite_proj(const Item &i, const RewritePlan &rp, Analysis &a,
-             List<Item> *newList)
+             List<Item> *const newList)
 {
     AssignOnce<OLK> olk;
     AssignOnce<Item *> ir;
@@ -562,7 +562,9 @@ rewrite_proj(const Item &i, const RewritePlan &rp, Analysis &a,
     addToReturn(&a.rmeta, a.pos++, olk.get(), use_salt, i.name);
 
     if (use_salt) {
-        // HACK: 'ir' doesn't have to be an Item_field
+        TEST_TextMessageError(Item::Type::FIELD_ITEM == ir.get()->type(),
+            "a projection requires a salt and is not a field; cryptdb"
+            " does not currently support such behavior");
         const std::string &anon_table_name =
             static_cast<Item_field *>(ir.get())->table_name;
         const std::string &anon_field_name = olk.get().key->getSaltName();
