@@ -184,7 +184,7 @@ sql_type_to_string(const Create_field &f)
     case MYSQL_TYPE_TIME        : return "TIME";
     case MYSQL_TYPE_DATETIME    : return "DATETIME";
     case MYSQL_TYPE_YEAR        : return "YEAR";
-    case MYSQL_TYPE_NEWDATE     : ASSERT_NOT_REACHED();
+    case MYSQL_TYPE_NEWDATE     : return "DATE";
     case MYSQL_TYPE_VARCHAR     :
         if (charset == &my_charset_bin) {
             return "VARBINARY";
@@ -980,10 +980,7 @@ operator<<(std::ostream &out, LEX &lex)
         break;
 
     default:
-        for (std::stringstream ss;;) {
-            ss << "unhandled sql command " << lex.sql_command;
-            throw std::runtime_error(ss.str());
-        }
+        thrower() << "unhandled sql command " << lex.sql_command;
     }
 
     return out;
