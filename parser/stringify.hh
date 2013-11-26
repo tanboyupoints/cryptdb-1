@@ -221,9 +221,8 @@ sql_type_to_string(const Create_field &f)
         }
     case MYSQL_TYPE_VAR_STRING  : ASSERT_NOT_REACHED();
     case MYSQL_TYPE_STRING      : return "CHAR";
-
-    /* don't bother to support */
-    case MYSQL_TYPE_GEOMETRY    : ASSERT_NOT_REACHED();
+    case MYSQL_TYPE_GEOMETRY    :
+        thrower() << "geometry types not supported!";
     }
 
     ASSERT_NOT_REACHED();
