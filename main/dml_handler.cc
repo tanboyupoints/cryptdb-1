@@ -409,16 +409,7 @@ rewrite_order(Analysis &a, const SQL_I_List<ORDER> &lst,
     ORDER * prev = NULL;
     for (ORDER *o = lst.first; o; o = o->next) {
         const Item &i = **o->item;
-        const std::unique_ptr<RewritePlan> &rp =
-            constGetAssert(a.rewritePlans, &i);
-        const EncSet es = constr.intersect(rp->es_out);
-        // FIXME: Add version that will take a second EncSet of what
-        // we had available (ie, rp->es_out).
-        TEST_NoAvailableEncSet(es, i.type(), constr, rp->r.why,
-                            std::vector<std::shared_ptr<RewritePlan> >());
-        const OLK olk = es.chooseOne();
-
-        Item *const new_item = itemTypes.do_rewrite(i, olk, *rp.get(), a);
+        Item *const new_item = rewrite(i, constr, a);
         ORDER *const neworder = make_order(o, new_item);
         if (NULL == prev) {
             *new_lst = *oneElemListWithTHD(neworder);

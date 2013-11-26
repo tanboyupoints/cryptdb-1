@@ -135,6 +135,8 @@ make_item_ref(const Item_ref &i, Item *const new_ref,
     return i0;
 }
 
+// a special type of Item used in ON DUPLICATE KEY UPDATE queries
+// where the item is inside of a VALUES(...) function
 Item_insert_value *
 make_item_insert_value(const Item_insert_value &i,
                        Item_field *const field)
