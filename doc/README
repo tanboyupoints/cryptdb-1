@@ -7,14 +7,16 @@ Convention : When this document uses syntax like
                 + 'a second example'
              Such indicates that the reader is to use the value _without_
              the single-quotes.
-
+	     
 #########################################
 #########################################
-########### Getting Started #############
+########### Getting started   ###########
 #########################################
 #########################################
+    * Requirements:
+      > Ubuntu 12.04, 13.04
+      > ruby
     * Build CryptDB using the installation script.
-      > you will need to have Ruby installed
       > note, this script will stop and start your mysql instance.
       > scripts/install.rb <path-to-cryptdb>
         + <path-to-cryptdb> should just be '.' if you are in the cryptdb
@@ -37,8 +39,7 @@ Convention : When this document uses syntax like
 ####### A few ways to run CryptDB #######
 #########################################
 #########################################
-
-    Set (recommended: place this in your .bashrc):
+    Set (or place in your .bashrc):
     > export EDBDIR=/full/path/to/cryptdb/	
 
     I. Shell
@@ -63,14 +64,24 @@ Convention : When this document uses syntax like
         > To Start:
             obj/test/test queries plain proxy-single
 
+
 #########################################
 #########################################
 ############ Failing queries ############
 #########################################
 #########################################
 
-    > CryptDB currently supports a subset of MySQL's capabilities. Queries
-      can fail for a few reasons.
+	    
+    Note that CryptDB is not a product, but just a more advanced research
+    prototype. It only has implemented a subset of SQL queries. For example,
+    it supports the regular MySQL client and a variety of queries you can
+    play with from this shell, Wordpress, and other apps. We did not test
+    it with other MySQL clients (e.g., PHP, Java) and these likely issue
+    some uncommon metadata query we did not implement. Feel free to
+    implement what's missing!
+
+
+    > Queries can fail for a few reasons.
       I) CryptDB can support the query, but we have not yet implemented it.
          This should throw an UNIMPLEMENTED exception.
       II) CryptDB can not support this type of query, likely for
