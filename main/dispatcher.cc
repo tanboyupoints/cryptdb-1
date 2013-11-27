@@ -25,6 +25,11 @@ SQLDispatcher::extract(LEX *const lex) const
 bool
 AlterDispatcher::canDo(LEX *const lex) const
 {
+    // there must be a command for us to do
+    if (0 == lex->alter_info.flags) {
+        return false;
+    }
+
     long long flags = lex->alter_info.flags;
     for (auto it = handlers.begin(); it != handlers.end(); it++) {
         flags -= lex->alter_info.flags & (*it).first;

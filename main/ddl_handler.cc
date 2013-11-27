@@ -119,7 +119,7 @@ class AlterTableHandler : public DDLHandler {
                                   const Preamble &pre) const
     {
         TEST_Text(sub_dispatcher->canDo(lex),
-                  "your ALTER TABLE query requires at least one"
+                  "your ALTER TABLE query may require at least one"
                   " unsupported feature");
         const std::vector<AlterSubHandler *> &handlers =
             sub_dispatcher->dispatch(lex);

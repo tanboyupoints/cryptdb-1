@@ -308,6 +308,16 @@ convert_lex_str(const LEX_STRING &l)
     return std::string(l.str, l.length);
 }
 
+inline std::string
+nullAccomodationConvertLexStr(const LEX_STRING &l)
+{
+    if (NULL == l.str) {
+        return "";
+    }
+
+    return convert_lex_str(l);
+}
+
 inline LEX_STRING
 string_to_lex_str(const std::string &s)
 {
@@ -381,7 +391,8 @@ operator<<(std::ostream &out, Key &k)
     if (k.type == Key::FOREIGN_KEY) {
         auto fk = static_cast< Foreign_key& >(k);
         out << " references ";
-        const std::string &db_str(convert_lex_str(fk.ref_table->db));
+        const std::string &db_str =
+            nullAccomodationConvertLexStr(fk.ref_table->db);
         const std::string &tl_str(convert_lex_str(fk.ref_table->table));
         if (!db_str.empty()) {
             out << "" << db_str << "." << tl_str << "";
