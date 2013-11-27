@@ -35,10 +35,6 @@ public:
     ~MySQLTypeMetaData() {}
 };
 
-extern const std::map<enum enum_field_types,
-                      std::unique_ptr<AbstractMySQLTypeMetaData> >
-    mysql_meta_data;
-
 const std::string MySQLTypeToText(const Create_field &f);
 bool encryptionSupported(const Create_field &f);
 bool isMySQLTypeNumeric(const Create_field &f);
