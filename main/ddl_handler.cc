@@ -15,10 +15,10 @@ class CreateTableHandler : public DDLHandler {
         LEX *const new_lex = copyWithTHD(lex);
 
         //TODO: support for "create table like"
-        if (lex->create_info.options & HA_LEX_CREATE_TABLE_LIKE) {
-            cryptdb_err() << "No support for create table like yet. "
-                          << "If you see this, please implement me";
-        }
+        TEST_TextMessageError(
+                !(lex->create_info.options & HA_LEX_CREATE_TABLE_LIKE),
+                "No support for create table like yet. "
+                "If you see this, please implement me");
 
         // Create the table regardless of 'IF NOT EXISTS' if the table
         // doesn't exist.
@@ -31,12 +31,16 @@ class CreateTableHandler : public DDLHandler {
             // -----------------------------
             // HACK.
             // > We know that there is only one table.
-            // > We also know that rewrite_table_list is going to fail to
-            // find this table in 'a'.
+            // > We do not currently support CREATE + SELECT syntax
+            //   ! CREATE TABLE t2 SELECT * FROM t1;
+            // > We also know that Analysis does not have a reference to
+            //   the table as it depends on SchemaInfo.
             // > And we know that the table we want is tm with name table.
             // > This will _NOT_ gracefully handle a malformed CREATE TABLE
             // query.
-            assert(1 == new_lex->select_lex.table_list.elements);
+            TEST_Text(1 == new_lex->select_lex.table_list.elements,
+                      "we do not support multiple tables in a CREATE"
+                      " TABLE queries");
             // Take the table name straight from 'tm' as
             // Analysis::getAnonTableName relies on SchemaInfo.
             TABLE_LIST *const tbl =

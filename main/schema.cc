@@ -52,8 +52,8 @@ DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
         " FROM " + table_name + 
         " WHERE " + table_name + ".parent_id"
         "   = " + parent_id + ";";
-    // FIXME: Throw exception.
-    assert(e_conn->execute(serials_query, &db_res));
+    TEST_TextMessageError(e_conn->execute(serials_query, &db_res),
+                          "doFetchChildren query failed");
     MYSQL_ROW row;
     while ((row = mysql_fetch_row(db_res->n))) {
         unsigned long * const l = mysql_fetch_lengths(db_res->n);

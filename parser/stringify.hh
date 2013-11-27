@@ -184,7 +184,7 @@ sql_type_to_string(const Create_field &f)
     case MYSQL_TYPE_TIME        : return "TIME";
     case MYSQL_TYPE_DATETIME    : return "DATETIME";
     case MYSQL_TYPE_YEAR        : return "YEAR";
-    case MYSQL_TYPE_NEWDATE     : ASSERT_NOT_REACHED();
+    case MYSQL_TYPE_NEWDATE     : return "DATE";
     case MYSQL_TYPE_VARCHAR     :
         if (charset == &my_charset_bin) {
             return "VARBINARY";
@@ -221,9 +221,8 @@ sql_type_to_string(const Create_field &f)
         }
     case MYSQL_TYPE_VAR_STRING  : ASSERT_NOT_REACHED();
     case MYSQL_TYPE_STRING      : return "CHAR";
-
-    /* don't bother to support */
-    case MYSQL_TYPE_GEOMETRY    : ASSERT_NOT_REACHED();
+    case MYSQL_TYPE_GEOMETRY    :
+        thrower() << "geometry types not supported!";
     }
 
     ASSERT_NOT_REACHED();
@@ -451,13 +450,12 @@ operator<<(std::ostream &out, Key &k)
     case Key::SPATIAL     : kname = "SPATIAL";     break;
     case Key::FOREIGN_KEY : kname = "FOREIGN KEY"; break;
     default:
-        assert(false);
-        break;
+        thrower() << "Unsupported key type " << std::to_string(k.type);
     }
     out << kname;
 
     // index_name
-    std::string key_name(k.name.str, k.name.length);
+    const std::string key_name(k.name.str, k.name.length);
     if (!key_name.empty()) {
         out << " " << key_name;
     }
@@ -981,10 +979,7 @@ operator<<(std::ostream &out, LEX &lex)
         break;
 
     default:
-        for (std::stringstream ss;;) {
-            ss << "unhandled sql command " << lex.sql_command;
-            throw std::runtime_error(ss.str());
-        }
+        thrower() << "unhandled sql command " << lex.sql_command;
     }
 
     return out;

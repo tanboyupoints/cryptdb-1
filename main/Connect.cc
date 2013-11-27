@@ -76,7 +76,7 @@ Connect *Connect::getEmbedded(const std::string &embed_db)
     if (!mysql_real_connect(m, 0, 0, 0, 0, 0, 0,
                             CLIENT_MULTI_STATEMENTS)) {
         mysql_close(m);
-        cryptdb_err() << "mysql_real_connect: " << mysql_error(m);
+        thrower() << "mysql_real_connect: " << mysql_error(m);
     }
 
     Connect *const conn = new Connect(m);

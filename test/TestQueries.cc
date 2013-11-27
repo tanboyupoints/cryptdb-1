@@ -575,6 +575,9 @@ static QueryList TableAliases = QueryList("TableAliases",
       Query("SELECT mercury.a, mercury.b, e.a FROM star AS mercury"
             " INNER JOIN mercury AS e ON (mercury.a = e.a)"
             " WHERE mercury.b <> 18 AND mercury.b <> 15"),
+      // throws an exception
+      // Query("SELECT * FROM star AS q WHERE a IN"
+            // "   (SELECT a FROM mercury)"),
       Query("DROP TABLE star"),
       Query("DROP TABLE mercury"),
       Query("DROP TABLE moon") });
@@ -632,11 +635,23 @@ static QueryList MiscBugs = QueryList("MiscBugs",
       // Query("SELECT SUM(spider) FROM bugs"),
       // Query("SELECT GREATEST(ant, 5000) FROM more_bugs"),
       // Query("SELECT GREATEST(12, ant, 5000) FROM more_bugs"),
-      // Query("CREATE TABLE crawlers (pink DATE)"),
-      // Query("SELECT * FROM bugs, more_bugs, crawlers, crawlies")
+      Query("CREATE TABLE crawlers (pink DATE)"),
+      Query("INSERT INTO crawlers VALUES"
+            "   ('0'), (0), ('2015-05-04 4:5:6')"),
+      Query("SELECT * FROM crawlers"),
+      Query("INSERT INTO crawlers VALUES"
+            "   ('2415-05-04 4:5:6'), ('1998-500-04 4:5:6')"),
+      Query("SELECT * FROM crawlers"),
+      Query("INSERT INTO crawlers VALUES"
+            "   ('100000-05-04 4:5:6'), ('1998-5-04 a:b:c'),"
+            "   ('1000-05-04 house'),   ('1998-4-04 2015')"),
+      Query("SELECT * FROM crawlers"),
+      Query("SELECT * FROM bugs, more_bugs, crawlers, crawlies"),
       Query("INSERT INTO real_type_bug VALUES (1, 2, 3)"),
       Query("SELECT * FROM real_type_bug"),
       Query("UPDATE real_type_bug SET a = a + 1, b = b + 1"),
+      // we don't currently support; but it shouldn't crash the system
+      Query("CREATE TABLE jjj SELECT * FROM enums"),
       Query("SHOW ENGINES"),
       Query("DROP TABLE crawlies"),
       Query("DROP TABLE enums"),
@@ -1044,7 +1059,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 497/514
+    //      TOTAL RESULT: 505/523
     // ###############################
 
     std::vector<Score> scores;
@@ -1109,7 +1124,7 @@ RunTest(const TestConfig &tc) {
     // Pass 28/28
     scores.push_back(CheckQueryList(tc, DDL));
 
-    // Pass 20/20
+    // Pass 28/29
     scores.push_back(CheckQueryList(tc, MiscBugs));
 
     // Pass 12/12
