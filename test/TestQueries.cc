@@ -958,18 +958,23 @@ CheckQuery(const TestConfig &tc, const Query &query)
     } else {
         LOG(test) << "no crash point";
 
-        ResType test_res;
+        // _always_ execute the query against the control database
+        // > there may be side effects that we want even if the test
+        //   database throws an exception
+        // > ie, if an INSERT throws an exception we want the SELECTs
+        //   coming afterwards to fail as well
+        const ResType control_res = control->execute(query);
+        AssignOnce<ResType> test_res;
         try {
             test_res = test->execute(query);
         } catch (AbstractException &e) {
             std::cout << e << std::endl;
             return false;
         }
-        const ResType control_res = control->execute(query);
 
-        if (control_res.ok != test_res.ok) {
+        if (control_res.ok != test_res.get().ok) {
             LOG(warn) << "control " << control_res.ok
-                << ", test " << test_res.ok
+                << ", test " << test_res.get().ok
                 << " for query: " << query.query;
 
             if (tc.stop_if_fail) {
@@ -979,12 +984,12 @@ CheckQuery(const TestConfig &tc, const Query &query)
             return false;
         } 
 
-        if (!match(test_res, control_res)) {
+        if (!match(test_res.get(), control_res)) {
             LOG(warn) << "result mismatch for query: " << query.query;
             LOG(warn) << "control is:";
             printRes(control_res);
             LOG(warn) << "test is:";
-            printRes(test_res);
+            printRes(test_res.get());
 
             if (tc.stop_if_fail) {
                 thrower() << "stop on failure";
@@ -1059,7 +1064,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 505/523
+    //      TOTAL RESULT: 504/523
     // ###############################
 
     std::vector<Score> scores;
@@ -1102,7 +1107,7 @@ RunTest(const TestConfig &tc) {
         scores.push_back(CheckQueryList(tc, BestEffort));
     }
 
-    // Pass 25/27
+    // Pass 24/27
     scores.push_back(CheckQueryList(tc, Auto));
 
     // Pass 8/10

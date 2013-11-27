@@ -101,21 +101,29 @@ class CreateTableHandler : public DDLHandler {
     }
 };
 
-// > TODO: mysql permits a single ALTER TABLE command to invoke _multiple_
-//   and _different_ subcommands.
-//   ie, ALTER TABLE t ADD COLUMN x integer, ADD INDEX i (z);
-//   Currently we do not support mixed operations.
-//   > Must guarentee that rewrite_table_list is only called one time.
-//   > If we drop Keys and Columns in the same query the order is probably
-//     going to get changed.
+// mysql does not support indiscriminate add-drops
+// ie, 
+//      mysql> create table pk (x integer);
+//      Query OK, 0 rows affected (0.09 sec)
+//
+//      mysql> alter table pk drop column x, add column x integer,
+//                            drop column x;
+//      ERROR 1091 (42000): Can't DROP 'x'; check that column/key exists
+//
+//      mysql> alter table pk drop column x, add column x integer;
+//      Query OK, 0 rows affected (0.03 sec)
+//      Records: 0  Duplicates: 0  Warnings: 0
 class AlterTableHandler : public DDLHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
                                   const ProxyState &ps,
                                   const Preamble &pre) const
     {
-        assert(sub_dispatcher->canDo(lex));
+        TEST_Text(sub_dispatcher->canDo(lex),
+                  "your ALTER TABLE query requires at least one"
+                  " unsupported feature");
         const std::vector<AlterSubHandler *> &handlers =
             sub_dispatcher->dispatch(lex);
+        assert(handlers.size() > 0);
 
         LEX *new_lex = copyWithTHD(lex);
 

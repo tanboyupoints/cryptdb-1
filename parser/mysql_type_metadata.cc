@@ -7,20 +7,16 @@
 #include <parser/mysql_type_metadata.hh>
 #include <parser/sql_utils.hh>
 
+#include <crypto/BasicCrypto.hh>
+
+std::pair<enum enum_field_types, unsigned long>
+genericVarCharCrypto(unsigned long len, bool pad);
+
 // ########################################
 // ########################################
 //             integer types
 // ########################################
 // ########################################
-
-template <enum enum_field_types id>
-std::pair<enum enum_field_types, unsigned long>
-MySQLIntegerMetaData<id>::AESTypeAndLength(unsigned long len,
-                                           bool pad) const
-{
-    assert(false);
-}
-
 template <enum enum_field_types id>
 Item *
 MySQLIntegerMetaData<id>::intoItem(const std::string &value) const
@@ -35,14 +31,6 @@ MySQLIntegerMetaData<id>::intoItem(const std::string &value) const
 //          fixed-point types
 // ########################################
 // ########################################
-template <enum enum_field_types id>
-std::pair<enum enum_field_types, unsigned long>
-AbstractMySQLDecimalMetaData<id>::AESTypeAndLength(unsigned long len,
-                                                   bool pad) const
-{
-    assert(false);
-}
-
 template <enum enum_field_types id>
 Item *
 AbstractMySQLDecimalMetaData<id>::intoItem(const std::string &value) const
@@ -114,7 +102,7 @@ std::pair<enum enum_field_types, unsigned long>
 AbstractMySQLStringMetaData<id>::AESTypeAndLength(unsigned long len,
                                                   bool pad) const
 {
-    assert(false);
+    return genericVarCharCrypto(len, pad);
 }
 
 template <enum enum_field_types id>
@@ -132,6 +120,14 @@ AbstractMySQLStringMetaData<id>::intoItem(const std::string &value) const
 //                date types
 // ########################################
 // ########################################
+template <enum enum_field_types id>
+std::pair<enum enum_field_types, unsigned long>
+AbstractMySQLDateMetaData<id>::AESTypeAndLength(unsigned long len,
+                                                 bool pad) const
+{
+    return genericVarCharCrypto(len, pad);
+}
+
 template <enum enum_field_types id>
 Item *
 AbstractMySQLDateMetaData<id>::intoItem(const std::string &value) const
@@ -166,7 +162,11 @@ std::pair<enum enum_field_types, unsigned long>
 AbstractMySQLBlobMetaData<id>::AESTypeAndLength(unsigned long len,
                                                 bool pad) const
 {
-    assert(false);
+    // HACK: add proper support for BLOB
+    if (MYSQL_TYPE_BLOB == id && len % AES_BLOCK_BYTES != 0) {
+        thrower() << "cryptdb does not support BLOB";
+    }
+    return std::make_pair(id, len);
 }
 
 template <enum enum_field_types id>
@@ -316,3 +316,22 @@ MySQLFieldTypeToItem(enum enum_field_types type, const std::string &value)
 {
     return fetch(type)->intoItem(value);
 }
+
+std::pair<enum enum_field_types, unsigned long>
+AESTypeAndLength(const Create_field &f, bool pad)
+{
+    return fetch(f.sql_type)->AESTypeAndLength(f.length, pad);
+}
+
+std::pair<enum enum_field_types, unsigned long>
+genericVarCharCrypto(unsigned long len, bool pad)
+{
+    unsigned long out_len;
+    if (false == rounded_len(len, AES_BLOCK_BYTES, pad, &out_len)) {
+        thrower() << "rounded_len failed, you may be trying to create too"
+                     " large of a field";
+    }
+
+    return std::make_pair(MYSQL_TYPE_VARCHAR, out_len);
+}
+

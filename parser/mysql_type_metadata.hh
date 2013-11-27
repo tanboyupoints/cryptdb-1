@@ -35,16 +35,14 @@ public:
     ~MySQLTypeMetaData() {}
 };
 
-extern const std::map<enum enum_field_types,
-                      std::unique_ptr<AbstractMySQLTypeMetaData> >
-    mysql_meta_data;
-
 const std::string MySQLTypeToText(const Create_field &f);
 bool encryptionSupported(const Create_field &f);
 bool isMySQLTypeNumeric(const Create_field &f);
 bool isMySQLTypeNumeric(enum enum_field_types type);
 Item *MySQLFieldTypeToItem(enum enum_field_types type,
                            const std::string &value);
+std::pair<enum enum_field_types, unsigned long>
+AESTypeAndLength(const Create_field &f, bool pad);
 
 // ########################################
 // ########################################
@@ -58,7 +56,7 @@ public:
     bool isNumeric() const {return true;}
     std::pair<enum enum_field_types, unsigned long>
         AESTypeAndLength(unsigned long len, bool pad) const
-        __attribute__((noreturn));
+        { assert(false); }
     Item *intoItem(const std::string &value) const;
 };
 
@@ -110,7 +108,7 @@ public:
         {return "DECIMAL";}
     std::pair<enum enum_field_types, unsigned long>
         AESTypeAndLength(unsigned long len, bool pad) const
-        __attribute__((noreturn));
+        { assert(false); }
     Item *intoItem(const std::string &value) const;
 };
 
@@ -164,8 +162,7 @@ public:
     bool encryptionSupported() const {return true;}
     bool isNumeric() const {return false;}
     std::pair<enum enum_field_types, unsigned long>
-        AESTypeAndLength(unsigned long len, bool pad) const
-        __attribute__((noreturn));
+        AESTypeAndLength(unsigned long len, bool pad) const;
     Item *intoItem(const std::string &value) const;
 
 };
@@ -204,8 +201,7 @@ public:
     bool encryptionSupported() const {return false;}
     bool isNumeric() const {return false;}
     std::pair<enum enum_field_types, unsigned long>
-        AESTypeAndLength(unsigned long len, bool pad) const
-        { assert(false); }
+        AESTypeAndLength(unsigned long len, bool pad) const;
     Item *intoItem(const std::string &value) const;
 };
 
@@ -275,8 +271,7 @@ public:
     bool encryptionSupported() const {return true;}
     bool isNumeric() const {return false;}
     std::pair<enum enum_field_types, unsigned long>
-        AESTypeAndLength(unsigned long len, bool pad) const
-        __attribute__((noreturn));
+        AESTypeAndLength(unsigned long len, bool pad) const;
     Item *intoItem(const std::string &value) const;
 };
 
