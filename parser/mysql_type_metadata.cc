@@ -275,15 +275,38 @@ const std::map<enum enum_field_types,
                std::unique_ptr<AbstractMySQLTypeMetaData> >
     mysql_meta_data = buildMySQLTypeMetaData();
 
+static const
+std::unique_ptr<AbstractMySQLTypeMetaData> &
+fetch(enum enum_field_types type)
+{
+    const auto it = mysql_meta_data.find(type);
+    if (mysql_meta_data.end() == it) {
+        thrower() << "unsupported MYSQL field type " << type << std::endl;
+    }
+
+    return it->second;
+}
+
 const std::string
 MySQLTypeToText(const Create_field &f)
 {
-    auto it = mysql_meta_data.find(f.sql_type);
-    if (mysql_meta_data.end() == it) {
-        thrower() << "unsupport MYSQL field type " << f.sql_type
-                  << std::endl;
-    }
-
-    return (*it).second->humanReadable(f);
+    return fetch(f.sql_type)->humanReadable(f);
 }
 
+bool
+encryptionSupported(const Create_field &f)
+{
+    return fetch(f.sql_type)->encryptionSupported();
+}
+
+bool
+isMySQLTypeNumeric(enum enum_field_types type)
+{
+    return fetch(type)->isNumeric();
+}
+
+bool
+isMySQLTypeNumeric(const Create_field &f)
+{
+    return isMySQLTypeNumeric(f.sql_type);
+}

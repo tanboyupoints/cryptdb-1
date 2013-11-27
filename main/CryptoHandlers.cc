@@ -2,6 +2,7 @@
 #include <main/macro_util.hh>
 #include <main/schema.hh>
 #include <parser/lex_util.hh>
+#include <parser/mysql_type_metadata.hh>
 #include <crypto/ope.hh>
 #include <crypto/BasicCrypto.hh>
 #include <crypto/SWPSearch.hh>
@@ -369,7 +370,7 @@ private:
 std::unique_ptr<EncLayer>
 RNDFactory::create(Create_field * const cf, const std::string &key)
 {
-    if (IsMySQLTypeNumeric(cf->sql_type)) { // the ope case as well 
+    if (isMySQLTypeNumeric(*cf)) { // the ope case as well 
         return std::unique_ptr<EncLayer>(new RND_int(cf, key));
     } else {
         return std::unique_ptr<EncLayer>(new RND_str(cf, key));
@@ -676,7 +677,7 @@ protected:
 std::unique_ptr<EncLayer>
 DETFactory::create(Create_field * const cf, const std::string &key)
 {
-    if (IsMySQLTypeNumeric(cf->sql_type)) {
+    if (isMySQLTypeNumeric(*cf)) {
         if (cf->sql_type == MYSQL_TYPE_DECIMAL
             || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
             return std::unique_ptr<EncLayer>(new DET_dec(cf, key));
@@ -1030,7 +1031,7 @@ std::unique_ptr<EncLayer>
 DETJOINFactory::create(Create_field * const cf,
                        const std::string &key)
 {
-    if (IsMySQLTypeNumeric(cf->sql_type)) {
+    if (isMySQLTypeNumeric(*cf)) {
         if (cf->sql_type == MYSQL_TYPE_DECIMAL
             || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
             return std::unique_ptr<EncLayer>(new DETJOIN_dec(cf, key));
@@ -1226,7 +1227,7 @@ private:
 std::unique_ptr<EncLayer>
 OPEFactory::create(Create_field * const cf, const std::string &key)
 {
-    if (IsMySQLTypeNumeric(cf->sql_type)) { 
+    if (isMySQLTypeNumeric(*cf)) { 
         if (cf->sql_type == MYSQL_TYPE_DECIMAL
             || cf->sql_type ==  MYSQL_TYPE_NEWDECIMAL) {
             return std::unique_ptr<EncLayer>(new OPE_dec(cf, key));

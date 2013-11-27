@@ -15,7 +15,7 @@ public:
     AbstractMySQLTypeMetaData() {}
     ~AbstractMySQLTypeMetaData() {}
 
-    virtual bool supportsEncryption() const = 0;
+    virtual bool encryptionSupported() const = 0;
     virtual bool isNumeric() const = 0;
     virtual const std::string humanReadable(const Create_field &f)
         const = 0;
@@ -40,6 +40,9 @@ extern const std::map<enum enum_field_types,
     mysql_meta_data;
 
 const std::string MySQLTypeToText(const Create_field &f);
+bool encryptionSupported(const Create_field &f);
+bool isMySQLTypeNumeric(const Create_field &f);
+bool isMySQLTypeNumeric(enum enum_field_types type);
 
 // ########################################
 // ########################################
@@ -49,7 +52,7 @@ const std::string MySQLTypeToText(const Create_field &f);
 template <enum enum_field_types id>
 class MySQLIntegerMetaData : public MySQLTypeMetaData<id> {
 public:
-    bool supportsEncryption() const {return true;}
+    bool encryptionSupported() const {return true;}
     bool isNumeric() const {return true;}
     std::pair<enum enum_field_types, unsigned long>
         AESTypeAndLength(unsigned long len, bool pad) const
@@ -99,7 +102,7 @@ public:
 template <enum enum_field_types id>
 class AbstractMySQLDecimalMetaData : public MySQLTypeMetaData<id> {
 public:
-    bool supportsEncryption() const {return true;}
+    bool encryptionSupported() const {return true;}
     bool isNumeric() const {return true;}
     const std::string humanReadable(const Create_field &) const
         {return "DECIMAL";}
@@ -124,7 +127,7 @@ class MySQLNewDecimalMetaData :
 template <enum enum_field_types id>
 class AbstractMySQLFloatMetaData : public MySQLTypeMetaData<id> {
 public:
-    bool supportsEncryption() const {return false;}
+    bool encryptionSupported() const {return false;}
     bool isNumeric() const {return true;}
     std::pair<enum enum_field_types, unsigned long>
         AESTypeAndLength(unsigned long len, bool pad) const
@@ -156,7 +159,7 @@ class AbstractMySQLStringMetaData : public MySQLTypeMetaData<id> {
 public:
     AbstractMySQLStringMetaData() {}
 
-    bool supportsEncryption() const {return true;}
+    bool encryptionSupported() const {return true;}
     bool isNumeric() const {return false;}
     std::pair<enum enum_field_types, unsigned long>
         AESTypeAndLength(unsigned long len, bool pad) const
@@ -196,7 +199,7 @@ class AbstractMySQLDateMetaData : public MySQLTypeMetaData<id> {
 public:
     AbstractMySQLDateMetaData() {}
 
-    bool supportsEncryption() const {return false;}
+    bool encryptionSupported() const {return false;}
     bool isNumeric() const {return false;}
     std::pair<enum enum_field_types, unsigned long>
         AESTypeAndLength(unsigned long len, bool pad) const
@@ -248,7 +251,7 @@ class MySQLEnumMetaData : public MySQLTypeMetaData<MYSQL_TYPE_ENUM> {
 public:
     MySQLEnumMetaData() {}
 
-    bool supportsEncryption() const {return false;}
+    bool encryptionSupported() const {return false;}
     bool isNumeric() const {return false;}
     virtual const std::string humanReadable(const Create_field &f) const
         {return "ENUM";}
@@ -267,7 +270,7 @@ public:
 template <enum enum_field_types id>
 class AbstractMySQLBlobMetaData : public MySQLTypeMetaData<id> {
 public:
-    bool supportsEncryption() const {return true;}
+    bool encryptionSupported() const {return true;}
     bool isNumeric() const {return false;}
     std::pair<enum enum_field_types, unsigned long>
         AESTypeAndLength(unsigned long len, bool pad) const

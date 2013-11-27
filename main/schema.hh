@@ -245,6 +245,3 @@ private:
     const unsigned int id;
 };
 
-bool
-IsMySQLTypeNumeric(enum_field_types t);
-

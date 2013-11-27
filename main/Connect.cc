@@ -12,11 +12,11 @@
 #include <sstream>
 #include <memory>
 
+#include <util/cryptdb_log.hh>
 #include <main/Connect.hh>
 #include <main/macro_util.hh>
-#include <util/cryptdb_log.hh>
-#include <main/schema.hh>
 #include <main/Analysis.hh>
+#include <parser/mysql_type_metadata.hh>
 
 __thread ProxyState *thread_ps = NULL;
 
@@ -199,7 +199,7 @@ getItem(char *const content, enum_field_types type, uint len)
         return new Item_null();
     }
     const std::string content_str = std::string(content, len);
-    if (IsMySQLTypeNumeric(type)) {
+    if (isMySQLTypeNumeric(type)) {
         const ulonglong val = valFromStr(content_str);
         return new Item_int(val);
     } else {
