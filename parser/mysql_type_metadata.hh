@@ -43,6 +43,8 @@ const std::string MySQLTypeToText(const Create_field &f);
 bool encryptionSupported(const Create_field &f);
 bool isMySQLTypeNumeric(const Create_field &f);
 bool isMySQLTypeNumeric(enum enum_field_types type);
+Item *MySQLFieldTypeToItem(enum enum_field_types type,
+                           const std::string &value);
 
 // ########################################
 // ########################################

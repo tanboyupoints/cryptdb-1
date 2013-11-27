@@ -310,3 +310,9 @@ isMySQLTypeNumeric(const Create_field &f)
 {
     return isMySQLTypeNumeric(f.sql_type);
 }
+
+Item *
+MySQLFieldTypeToItem(enum enum_field_types type, const std::string &value)
+{
+    return fetch(type)->intoItem(value);
+}
