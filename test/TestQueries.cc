@@ -21,8 +21,16 @@ static uint64_t no_conn = 1;
 static Connection * control;
 static Connection * test;
 
+
+static FieldOnionState num_os =
+    {{"oDET", "RND"}, {"oOPE", "RND"}, {"oAGG", "HOM"}, {"oPLAIN", "RND"}};
+static FieldOnionState str_os =
+    {{"oDET", "RND"}, {"oOPE", "RND"}, {"oPLAIN", "RND"}};
+static DBOnionState insert_os =
+    {{"test_insert", {{"id", num_os}, {"age", num_os}, {"salary", num_os}, {"address", str_os}, {"name", str_os}}}};
+
 static QueryList Insert = QueryList("SingleInsert",
-    { Query("CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)"),
+    { Query("CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)", &insert_os),
       Query("INSERT INTO test_insert VALUES (1, 21, 100, '24 Rosedale, Toronto, ONT', 'Pat Carlson')"),
       Query("SELECT * FROM test_insert"),
       Query("INSERT INTO test_insert (id, age, salary, address, name) VALUES (2, 23, 101, '25 Rosedale, Toronto, ONT', 'Pat Carlson2')"),
@@ -968,6 +976,34 @@ CheckQuery(const TestConfig &tc, const Query &query)
             }
 
             return false;
+        }
+    }
+
+    if (query.onion_states != NULL) {
+        DBOnionState dbos = *(query.onion_states);
+
+        ProxyState *const ps = test->getProxyState();
+        auto si = loadSchemaInfo(ps->getConn(), ps->getEConn());
+        const auto &dbs = si->children;
+        for (auto db_it = dbs.begin(); db_it != dbs.end(); ++db_it) {
+            const auto &ts = db_it->second->children;
+            for (auto t_it = ts.begin(); t_it != ts.end(); ++t_it) {
+                const std::string &t_name = t_it->first.getValue();
+                const auto &fs = t_it->second->children;
+                for (auto f_it = fs.begin(); f_it != fs.end(); ++f_it) {
+                    const std::string &f_name = f_it->first.getValue();
+                    const auto &os = f_it->second->children;
+                    for (auto o_it = os.begin(); o_it != os.end(); ++o_it) {
+                        const std::string &o_name =
+                            TypeText<onion>::toText(o_it->first.getValue());
+                        const std::string &level = 
+	  	            TypeText<SECLEVEL>::toText(o_it->second->getLayerBack()->level());
+                        if (dbos[t_name][f_name][o_name] != level) {
+                          return false;
+                        }
+                    }
+                }
+            }
         }
     }
 
