@@ -25,7 +25,7 @@
                                  (butlast row))
                 :database ,c))
 
-(defun fn-db-op (c dbname &rest body)
+(defmacro db-op (c dbname &rest body)
   `(let ((,c (clsql:connect
                 (list "127.0.0.1" ,dbname "root" "letmein" 3307)
                 :database-type :mysql
@@ -35,9 +35,6 @@
        (progn
          ,@body)
        (clsql:disconnect :database ,c))))
-
-(defmacro db-op (c dbname &rest body)
-  (apply #'fn-db-op c dbname body))
 
 (defun pretty-now ()
   (multiple-value-bind (seconds minutes hours days months years)
@@ -68,10 +65,10 @@
       `(defun adjust-main ()
          ,(format nil "onion adjuster for database: ~A, created: ~A"
                       database (pretty-now))
-         ,(apply #'fn-db-op
-             'conn
-             database
-             (mapcar #'(lambda (o) (generate-dropper o 'conn)) onions))
+         ,(macroexpand
+            `(db-op conn ,database
+               ,@(mapcar #'(lambda (o) (generate-dropper o 'conn))
+                         onions)))
          nil))))
 
 (defun main ()
