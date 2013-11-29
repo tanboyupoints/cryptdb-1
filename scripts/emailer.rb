@@ -7,7 +7,7 @@ To: cryptdb admins <admin@cryptdb.com>
 MIME-Version: 1.0
 Content-type: text/html
 Subject: double proxy may have crashed [eom]
-TEST
+asdf
 MESSAGE_END
 
 FIVE_MINUTES = 60*5
