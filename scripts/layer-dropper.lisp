@@ -2,6 +2,9 @@
 ;;;;
 ;;;; this code will generate a common lisp file that will replay the
 ;;;; onion adjustments that have occurred to ``*database*''
+
+(proclaim '(optimize (debug 3)))
+
 (defparameter *database* "ezyang+blog")
 
 (defun verify-fields (fields)
@@ -12,43 +15,64 @@
        (string= (nth 4 fields) "_level")
        (string= (nth 5 fields) "id")))
 
-(defun generate-dropper (row)
+(defun generate-dropper (row c)
   (assert (= 6 (length row)))
   `(clsql:query ,(apply #'format nil "SET @cryptdb='adjust',
                                           @database='~A',
                                           @table='~A',
                                           @field='~A',
                                           @~A='~A'"
-                                 (butlast row))))
+                                 (butlast row))
+                :database ,c))
+
+(defun fn-db-op (c dbname &rest body)
+  `(let ((,c (clsql:connect
+                (list "127.0.0.1" ,dbname "root" "letmein" 3307)
+                :database-type :mysql
+                :if-exists :new
+                :make-default nil)))
+     (unwind-protect
+       (progn
+         ,@body)
+       (clsql:disconnect :database ,c))))
+
+(defmacro db-op (c dbname &rest body)
+  (apply #'fn-db-op c dbname body))
+
+(defun pretty-now ()
+  (multiple-value-bind (seconds minutes hours days months years)
+        (decode-universal-time (get-universal-time))
+    (format nil "~A/~A/~A ~A:~A:~A" months days years
+                                    hours minutes seconds)))
 
 (defun do-stuff (database)
   "build a lisp form for adjusting ``database''"
-  (let ((c (clsql:connect
-             '("127.0.0.1" nil "root" "letmein" 3307)
-              :database-type :mysql
-              :if-exists :new)))
-    (unwind-protect
-      (multiple-value-bind (onions fields)
-          (clsql:query "SET @cryptdb='show'")
-        (assert (verify-fields fields))
-        ;;; remove RND and HOM onions
-        (setf onions
-              (remove-if #'(lambda (row)
-                             (member (nth 4 row)
-                                     '("RND" "HOM")
-                                     :test #'string=))
-                         onions))
-        ;;; only use results pertaining to 'database'
-        (setf onions
-              (remove-if-not #'(lambda (row)
-                                 (string= (nth 0 row) database))
-                             onions))
-        ;;; build the output lisp forms
-        `(defun adjust-main ()
-            ,(format nil "onion adjuster for database: ~A" database)
-            ,@(mapcar #'generate-dropper onions)
-            nil))
-      (clsql:disconnect :database c))))
+  (db-op c database
+    (multiple-value-bind (onions fields)
+        (clsql:query "SET @cryptdb='show'" :database c)
+      (assert (or (and (null onions) (null fields))
+                  (verify-fields fields)))
+      ;;; remove RND and HOM onions
+      (setf onions
+            (remove-if #'(lambda (row)
+                           (member (nth 4 row)
+                                   '("RND" "HOM")
+                                   :test #'string=))
+                       onions))
+      ;;; only use results pertaining to 'database'
+      (setf onions
+            (remove-if-not #'(lambda (row)
+                               (string= (nth 0 row) database))
+                           onions))
+      ;;; build the output lisp forms
+      `(defun adjust-main ()
+         ,(format nil "onion adjuster for database: ~A, created: ~A"
+                      database (pretty-now))
+         ,(apply #'fn-db-op
+             'conn
+             database
+             (mapcar #'(lambda (o) (generate-dropper o 'conn)) onions))
+         nil))))
 
 (defun main ()
   (with-open-file (stream "onions.lisp" :direction :output
