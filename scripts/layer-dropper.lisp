@@ -1,3 +1,5 @@
+;;;; tested with sbcl version 1.0.55.0.debian; requires the clsql package
+;;;;
 ;;;; this code will generate a common lisp file that will replay the
 ;;;; onion adjustments that have occurred to ``*database*''
 (defparameter *database* "ezyang+blog")
@@ -22,7 +24,7 @@
 (defun do-stuff (database)
   "build a lisp form for adjusting ``database''"
   (let ((c (clsql:connect
-             '("127.0.0.1" "burrows+ezcrypted" "root" "letmein" 3307)
+             '("127.0.0.1" nil "root" "letmein" 3307)
               :database-type :mysql
               :if-exists :new)))
     (unwind-protect
