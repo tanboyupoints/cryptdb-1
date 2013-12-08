@@ -15,19 +15,20 @@
        (string= (nth 4 fields) "_level")
        (string= (nth 5 fields) "id")))
 
-(defun generate-dropper (row c)
+(defun generate-dropper (row c dbname)
   (assert (= 6 (length row)))
-  `(clsql:query ,(apply #'format nil "SET @cryptdb='adjust',
-                                          @database='~A',
-                                          @table='~A',
-                                          @field='~A',
-                                          @~A='~A'"
-                                 (butlast row))
+  `(clsql:query (apply #'format nil "SET @cryptdb='adjust',
+                                         @database='~A',
+                                         @table='~A',
+                                         @field='~A',
+                                         @~A='~A'"
+                                ,dbname ',(butlast (cdr row)))
                 :database ,c))
 
-(defmacro db-op (c dbname &rest body)
-  `(let ((,c (clsql:connect
-                (list "127.0.0.1" ,dbname "root" "letmein" 3307)
+(defmacro db-op (c db &rest body)
+  `(let* ((,(car db) ,(cdr db))
+          (,c (clsql:connect
+                (list "127.0.0.1" ,(car db) "root" "letmein" 3307)
                 :database-type :mysql
                 :if-exists :new
                 :make-default nil)))
@@ -44,7 +45,7 @@
 
 (defun do-stuff (database)
   "build a lisp form for adjusting ``database''"
-  (db-op c database
+  (db-op c (db . database)
     (multiple-value-bind (onions fields)
         (clsql:query "SET @cryptdb='show'" :database c)
       (assert (or (and (null onions) (null fields))
@@ -66,8 +67,8 @@
          ,(format nil "onion adjuster for database: ~A, created: ~A"
                       database (pretty-now))
          ,(macroexpand
-            `(db-op conn ,database
-               ,@(mapcar #'(lambda (o) (generate-dropper o 'conn))
+            `(db-op conn (db . ,database)
+               ,@(mapcar #'(lambda (o) (generate-dropper o 'conn 'db))
                          onions)))
          nil))))
 
