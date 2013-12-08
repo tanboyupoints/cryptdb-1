@@ -653,6 +653,12 @@ static QueryList MiscBugs = QueryList("MiscBugs",
       // we don't currently support; but it shouldn't crash the system
       Query("CREATE TABLE jjj SELECT * FROM enums"),
       Query("SHOW ENGINES"),
+      Query("CREATE TABLE floating (x float)"),
+      Query("INSERT INTO floating VALUES (23e+12), (12e+14), ('a'), (12),"
+            "                            ('12e+5')"),
+      Query("SELECT * FROM floating WHERE x = '23e+12'"),
+      Query("SELECT * FROM floating"),
+      Query("DROP TABLE floating"),
       Query("DROP TABLE crawlies"),
       Query("DROP TABLE enums"),
       Query("DROP TABLE bugs"),
@@ -1064,7 +1070,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 504/523
+    //      TOTAL RESULT: 508/528
     // ###############################
 
     std::vector<Score> scores;
@@ -1129,7 +1135,8 @@ RunTest(const TestConfig &tc) {
     // Pass 28/28
     scores.push_back(CheckQueryList(tc, DDL));
 
-    // Pass 28/29
+    // Pass 32/34
+    // > FIXME: the control database is acting unexpectedly
     scores.push_back(CheckQueryList(tc, MiscBugs));
 
     // Pass 12/12

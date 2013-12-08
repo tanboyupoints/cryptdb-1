@@ -53,29 +53,53 @@ AbstractMySQLFloatMetaData<id>::intoItem(const std::string &value) const
         Item_float(value.c_str(), value.size());
 }
 
+/*
+    For arguments that have no fixed number of decimals, the
+    `decimals' value is set to 31, which is 1 more than the maximum
+    number of decimals permitted for the `DECIMAL':
+    numeric-types,  `FLOAT': numeric-types, and `DOUBLE':
+    numeric-types. data types. As of MySQL 5.5.3, this value is
+    available as the constant `NOT_FIXED_DEC' in the `mysql_com.h'
+    header file.
+
+    in short; 'real' is encoded as an invalid floating point type.
+*/
+
+const std::string
+MySQLFloatMetaData::humanReadable(const Create_field &f) const
+{
+    if (isRealEncoded(f)) {
+        return "REAL";
+    }
+
+    return "FLOAT";
+}
+
 const std::string
 MySQLDoubleMetaData::humanReadable(const Create_field &f) const
 {
-    // HACK:
-    /*
-        For arguments that have no fixed number of decimals, the
-        `decimals' value is set to 31, which is 1 more than the maximum
-        number of decimals permitted for the `DECIMAL':
-        numeric-types,  `FLOAT': numeric-types, and `DOUBLE':
-        numeric-types. data types. As of MySQL 5.5.3, this value is
-        available as the constant `NOT_FIXED_DEC' in the `mysql_com.h'
-        header file.
-
-        in short; 'real' is encoded as an invalid DOUBLE type.
-    */
-    if (NOT_FIXED_DEC == f.decimals
-        && (DBL_DIG + 7) == f.length) {
+    if (isRealEncoded(f)) {
         return "REAL";
     }
 
     return "DOUBLE";
 }
 
+bool isRealEncoded(const Create_field &f)
+{
+    switch (f.sql_type) {
+        case MYSQL_TYPE_FLOAT:
+            return NOT_FIXED_DEC == f.decimals &&
+                ((FLT_DIG + 6) == f.length
+                 || MAX_FLOAT_STR_LENGTH == f.length);
+        case MYSQL_TYPE_DOUBLE:
+            return NOT_FIXED_DEC == f.decimals &&
+                ((DBL_DIG + 6) == f.length
+                 || MAX_DOUBLE_STR_LENGTH == f.length);
+        default:
+            return false;
+    }
+}
 
 // ########################################
 // ########################################

@@ -171,9 +171,7 @@ operator<<(std::ostream &out, Create_field &f)
     // optional (length, decimal) cases
     case MYSQL_TYPE_FLOAT:
     case MYSQL_TYPE_DOUBLE:
-        // HACK: to get 'real' type support
-        if (NOT_FIXED_DEC == f.decimals
-            && (DBL_DIG + 7) == f.length) {
+        if (isRealEncoded(f)) {
             break;
         }
 

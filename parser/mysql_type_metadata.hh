@@ -138,8 +138,7 @@ public:
 class MySQLFloatMetaData :
     public AbstractMySQLFloatMetaData<MYSQL_TYPE_FLOAT> {
 public:
-    const std::string humanReadable(const Create_field &) const
-        {return "FLOAT";}
+    const std::string humanReadable(const Create_field &) const;
 };
 
 class MySQLDoubleMetaData :
@@ -148,6 +147,7 @@ public:
     const std::string humanReadable(const Create_field &f) const;
 };
 
+bool isRealEncoded(const Create_field &f);
 
 // ########################################
 // ########################################

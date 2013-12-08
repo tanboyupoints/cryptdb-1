@@ -80,6 +80,34 @@ static class ANON : public CItemSubtypeIT<Item_string,
     }
 } ANON;
 
+static class ANON : public CItemSubtypeIT<Item_float,
+                                          Item::Type::REAL_ITEM> {
+    virtual RewritePlan *
+    do_gather_type(const Item_float &i, Analysis &a) const
+    {
+        LOG(cdb_v) << " Float item do_gather " << i << std::endl;
+        const std::string why = "is a float constant";
+        reason rsn(PLAIN_EncSet, why, i);
+        return new RewritePlan(PLAIN_EncSet, rsn);
+    }
+
+    virtual Item *
+    do_rewrite_type(const Item_float &i, const OLK &constr,
+                    const RewritePlan &rp, Analysis &a) const
+    {
+        LOG(cdb_v) << "do_rewrite_type Float item " << i << std::endl;
+        return encrypt_item(i, constr, a);
+    }
+
+    virtual void
+    do_rewrite_insert_type(const Item_float &i, const FieldMeta &fm,
+                           Analysis &a, std::vector<Item *> *l) const
+    {
+        typical_rewrite_insert_type(i, fm, a, l);
+    }
+} ANON;
+
+
 static class ANON : public CItemSubtypeIT<Item_int, Item::Type::INT_ITEM> {
     virtual RewritePlan *
     do_gather_type(const Item_int &i, Analysis &a) const

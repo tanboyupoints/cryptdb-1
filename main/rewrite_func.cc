@@ -712,9 +712,6 @@ static class ANON : public CItemSubtypeFT<Item_func_like, Item_func::Functype::L
     virtual RewritePlan *
     do_gather_type(const Item_func_like &i, Analysis &a) const
     {
-        // SUPPORT
-        FAIL_TextMessageError("cryptdb does not currently support LIKE");
-
         TEST_BadItemArgumentCount(i.type(), 2, i.argument_count());
         const std::string why = "like";
         return allPlainIterateGather(i, why, a);
