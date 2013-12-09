@@ -462,6 +462,7 @@ do_create_table(std::ostream &out, LEX &lex)
             out << " " << lex.select_lex;
         }
 
+        out << " AUTO_INCREMENT=" << lex.create_info.auto_increment_value;
         if (lex.create_info.db_type) {
             out << " ENGINE=" << lex.create_info.db_type->db_type;
         }

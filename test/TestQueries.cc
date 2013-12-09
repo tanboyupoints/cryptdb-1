@@ -327,9 +327,13 @@ static QueryList UserGroupForum = QueryList("UserGroupForum",
 
 static QueryList Auto = QueryList("AutoInc",
     { Query("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)"),
+      Query("CREATE TABLE moremore (x INTEGER,"
+            "                       y integer PRIMARY KEY AUTO_INCREMENT)"
+            "AUTO_INCREMENT=456"),
       Query("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world', 100)"),
       Query("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world2', 21)"),
       Query("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world3', 10909)"),
+      Query("INSERT INTO moremore (x) VALUES (1), (2), (3), (4)"),
       Query("SELECT msgtext FROM msgs WHERE msgid=1"),
       Query("SELECT msgtext FROM msgs WHERE msgid=2"),
       Query("SELECT msgtext FROM msgs WHERE msgid=3"),
@@ -354,7 +358,10 @@ static QueryList Auto = QueryList("AutoInc",
       Query("INSERT INTO msgs (msgtext, zooanimals) VALUES"
             "   ('sharks', 12)"),
       Query("SELECT * FROM msgs"),
-      Query("DROP TABLE msgs") });
+      Query("SELECT * FROM moremore"),
+      Query("DROP TABLE msgs"),
+      Query("DROP TABLE moremore")
+    });
 
 static QueryList Negative = QueryList("Negative",
     { Query("CREATE TABLE negs (a integer, b integer, c integer)"),
@@ -1070,7 +1077,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 508/528
+    //      TOTAL RESULT: 512/532
     // ###############################
 
     std::vector<Score> scores;
@@ -1113,7 +1120,7 @@ RunTest(const TestConfig &tc) {
         scores.push_back(CheckQueryList(tc, BestEffort));
     }
 
-    // Pass 24/27
+    // Pass 28/31
     scores.push_back(CheckQueryList(tc, Auto));
 
     // Pass 8/10
