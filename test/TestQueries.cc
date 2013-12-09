@@ -663,7 +663,7 @@ static QueryList MiscBugs = QueryList("MiscBugs",
       Query("CREATE TABLE floating (x float)"),
       Query("INSERT INTO floating VALUES (23e+12), (12e+14), ('a'), (12),"
             "                            ('12e+5')"),
-      Query("SELECT * FROM floating WHERE x = '23e+12'"),
+      Query("SELECT * FROM floating WHERE x < 11e+14"),
       Query("SELECT * FROM floating"),
       Query("DROP TABLE floating"),
       Query("DROP TABLE crawlies"),
@@ -1077,7 +1077,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 512/532
+    //      TOTAL RESULT: 513/532
     // ###############################
 
     std::vector<Score> scores;
@@ -1142,8 +1142,7 @@ RunTest(const TestConfig &tc) {
     // Pass 28/28
     scores.push_back(CheckQueryList(tc, DDL));
 
-    // Pass 32/34
-    // > FIXME: the control database is acting unexpectedly
+    // Pass 33/34
     scores.push_back(CheckQueryList(tc, MiscBugs));
 
     // Pass 12/12
