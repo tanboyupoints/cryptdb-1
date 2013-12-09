@@ -112,12 +112,19 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
             throw OnionAdjustExcept(tm, fm, constr.o, constr.l);
         }
 
+        bool is_alias;
         const std::string anon_table_name =
-            a.getAnonTableName(db_name, plain_table_name);
+            a.getAnonTableName(db_name, plain_table_name, &is_alias);
         const std::string anon_field_name = om.getAnonOnionName();
 
         Item_field * const res =
             make_item_field(i, anon_table_name, anon_field_name);
+
+        // HACK: to get aliases to work in DELETE FROM statements
+        if (a.inject_alias && is_alias) {
+            res->db_name = NULL;
+        }
+
         // This information is only relevant if it comes from a
         // HAVING clause.
         // FIXME: Enforce this semantically.

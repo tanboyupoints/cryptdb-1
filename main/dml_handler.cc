@@ -281,6 +281,103 @@ class DeleteHandler : public DMLHandler {
     }
 };
 
+class MultiDeleteHandler : public DMLHandler {
+    virtual void gather(Analysis &a, LEX *const lex, const ProxyState &ps)
+        const
+    {
+        process_select_lex(lex->select_lex, a);
+    }
+
+    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+        const
+    {
+        LEX *const new_lex = copyWithTHD(lex);
+        // the multidelete looks like this
+        //  $ DELETE <LEX::auxiliary_...> FROM <LEX::query_tables>;
+        // if query_tablez doesn't have an alias for a value it's going
+        // to rewrite the table name (and also put this rewritten value
+        // in the alias); the auxlist must then also rewrite it's value
+        //
+        // if query_tablez does have an alias it will leave the alias
+        // and rewrite the real table name; the auxlist then needs to
+        // leave it's value as _is_ because it's already the alias (in a
+        // well formed query)
+        //
+        // the auxlist doesn't ``correctly'' set the TABLE_LIST::is_alias
+        // parameter; we ``fix'' that here
+        //
+        // the corner case is when a table is aliased as it's real name
+        //  $ DELETE a FROM a AS A
+        // we resolve this by looking up the alias in Analysis
+        //
+        // our goal is to use aliases in the initial DELETE form, ON
+        // clauses and WHERE clauses; while not using it in the JOIN
+        // clauses; the JOIN clause should print the full field
+        // (db.field.table) as well as the alias
+        //
+        // the problem is further complicated by a peculiarity of the
+        // initial DELETE form; in most other clauses we can safely
+        // do db.alias.field but in the DELETE form we _must_ do
+        // alias.field.  therefore we have to tell the rewrite function
+        // for Item_field that it should ``inject'' the alias name
+        for (TABLE_LIST *tbl = lex->auxiliary_table_list.first;
+             tbl;
+             tbl = tbl->next_local) {
+
+            assert(false == tbl->is_alias);
+            if (strcmp(tbl->alias, tbl->table_name)) {
+                tbl->is_alias = true;
+            } else {
+                const std::string &db =
+                    std::string(tbl->db, tbl->db_length);
+                TEST_DatabaseDiscrepancy(db, a.getDatabaseName());
+
+                tbl->is_alias = a.isAlias(db, tbl->alias);
+            }
+        }
+        // rewrite the DELETE form
+        new_lex->auxiliary_table_list =
+            rewrite_table_list(lex->auxiliary_table_list, a);
+
+        // rewrite the ON/JOIN forms
+        TABLE_LIST *new_query_tables = NULL;
+        for (TABLE_LIST *tbl = lex->query_tables;
+             tbl;
+             tbl = tbl->next_local) {
+            // JOIN form
+            TABLE_LIST *const new_t = rewrite_table_list(tbl, a);
+
+            // FIXME: look at rewrite_table_list and determine if we
+            // can support
+            TEST_TextMessageError(NULL == tbl->nested_join,
+                                  "No nested joins in DELETE FROM");
+
+            // ON form
+            if (tbl->on_expr) {
+                ScopedAssignment<bool>(&a.inject_alias, true,
+                    [&new_t, &tbl, &a] ()
+                    {
+                        new_t->on_expr =
+                            ::rewrite(*tbl->on_expr, PLAIN_EncSet, a);
+                    });
+            }
+
+            // first iteration?
+            if (NULL == new_query_tables) {
+                new_query_tables = new_t;
+            } else {
+                new_query_tables->next_local = new_t;
+            }
+        }
+        new_lex->query_tables = new_query_tables;
+
+        set_select_lex(new_lex,
+                       rewrite_select_lex(new_lex->select_lex, a));
+
+        return new_lex;
+    }
+};
+
 class SelectHandler : public DMLHandler {
     virtual void gather(Analysis &a, LEX *const lex, const ProxyState &ps)
         const
@@ -593,7 +690,6 @@ rewrite_select_lex(const st_select_lex &select_lex, Analysis &a)
                      a, &newList);
     }
 
-    // TODO(stephentu): investigate whether or not this is a memory leak
     new_select_lex->item_list = newList;
 
     return new_select_lex;
@@ -982,6 +1078,9 @@ SQLDispatcher *buildDMLDispatcher()
 
     h = new DeleteHandler;
     dispatcher->addHandler(SQLCOM_DELETE, h);
+
+    h = new MultiDeleteHandler;
+    dispatcher->addHandler(SQLCOM_DELETE_MULTI, h);
 
     h = new SelectHandler;
     dispatcher->addHandler(SQLCOM_SELECT, h);

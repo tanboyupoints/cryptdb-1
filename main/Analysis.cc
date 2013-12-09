@@ -1289,8 +1289,14 @@ Analysis::databaseMetaExists(const std::string &db) const
 }
 
 std::string Analysis::getAnonTableName(const std::string &db,
-                                       const std::string &table) const
+                                       const std::string &table,
+                                       bool *const is_alias) const
 {
+    // tell the caller if you are giving him an alias
+    if (is_alias) {
+        *is_alias = this->isAlias(db, table);
+    }
+
     if (this->isAlias(db, table)) {
         return table;
     }

@@ -218,6 +218,38 @@ static QueryList Delete = QueryList("SingleDelete",
       Query("SELECT * FROM test_delete"),
       Query("DROP TABLE test_delete") });
 
+static QueryList MultiDelete = QueryList("MultiDelete",
+    { Query("CREATE TABLE gasoline (x integer)"),
+      Query("CREATE TABLE coal (y integer)"),
+      Query("CREATE TABLE nuclear (z integer)"),
+      Query("INSERT INTO gasoline VALUES (1), (100), (1000), (10000)"),
+      Query("INSERT INTO coal VALUES (1), (101), (1001), (10000)"),
+      Query("INSERT INTO nuclear VALUES (2), (200), (2000), (20000)"),
+      // no aliases
+      Query("DELETE gasoline, coal"
+            " FROM gasoline INNER JOIN coal ON gasoline.x = coal.y"),
+      Query("SELECT * FROM gasoline, coal, nuclear"),
+      // alias
+      Query("DELETE g, nuclear FROM gasoline g, nuclear"),
+      Query("SELECT * FROM gasoline, coal, nuclear"),
+
+      // repopulate with data
+      Query("INSERT INTO gasoline VALUES (16), (116), (1016), (10016)"),
+      Query("INSERT INTO coal VALUES (16), (116), (1016), (10016)"),
+      Query("INSERT INTO nuclear VALUES (16), (216), (2016), (20016)"),
+      Query("SELECT count(*) FROM gasoline, coal, nuclear"),
+
+      // alias with where clause
+      Query("DELETE g, nuclear FROM gasoline g, nuclear"
+            " WHERE nuclear.z < g.x"),
+      Query("SELECT * FROM gasoline, coal, nuclear"),
+      // alias with same name as table
+      Query("DELETE coal, gasoline FROM coal coal, gasoline"),
+      Query("SELECT * FROM gasoline, coal, nuclear"),
+      Query("DROP TABLE gasoline"),
+      Query("DROP TABLE coal"),
+      Query("DROP TABLE nuclear") });
+
 static QueryList Basic = QueryList("MultiBasic",
     { Query("CREATE TABLE t1 (id integer, post text, age bigint)"),
       Query("CREATE TABLE u_basic (id integer, username text)"),
@@ -670,7 +702,8 @@ static QueryList MiscBugs = QueryList("MiscBugs",
       Query("DROP TABLE enums"),
       Query("DROP TABLE bugs"),
       Query("DROP TABLE more_bugs"),
-      Query("DROP TABLE real_type_bug")
+      Query("DROP TABLE real_type_bug"),
+      Query("DROP TABLE crawlers")
     });
 
 static QueryList QuotedSchemaObjects = QueryList("QuotedSchemaObjects",
@@ -1029,8 +1062,8 @@ CheckQuery(const TestConfig &tc, const Query &query)
                     for (auto o_it = os.begin(); o_it != os.end(); ++o_it) {
                         const std::string &o_name =
                             TypeText<onion>::toText(o_it->first.getValue());
-                        const std::string &level = 
-	  	            TypeText<SECLEVEL>::toText(o_it->second->getLayerBack()->level());
+                        const std::string &level =
+        TypeText<SECLEVEL>::toText(o_it->second->getLayerBack()->level());
                         if (dbos[t_name][f_name][o_name] != level) {
                           return false;
                         }
@@ -1077,7 +1110,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 513/532
+    //      TOTAL RESULT: 535/554
     // ###############################
 
     std::vector<Score> scores;
@@ -1104,6 +1137,9 @@ RunTest(const TestConfig &tc) {
 
     // Pass 24/24
     scores.push_back(CheckQueryList(tc, Delete));
+
+    // Pass 21/21
+    scores.push_back(CheckQueryList(tc, MultiDelete));
 
     // Pass 14/14
     scores.push_back(CheckQueryList(tc, PrivMessages));
@@ -1142,7 +1178,7 @@ RunTest(const TestConfig &tc) {
     // Pass 28/28
     scores.push_back(CheckQueryList(tc, DDL));
 
-    // Pass 33/34
+    // Pass 34/35
     scores.push_back(CheckQueryList(tc, MiscBugs));
 
     // Pass 12/12

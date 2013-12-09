@@ -430,7 +430,8 @@ public:
                              NO_CHANGE_META_DDL};
 
     Analysis(const std::string &default_db, const SchemaInfo &schema)
-        : pos(0), special_query(SpecialQuery::NOT_SPECIAL),
+        : pos(0), inject_alias(false),
+          special_query(SpecialQuery::NOT_SPECIAL),
           db_name(default_db), schema(schema) {}
 
     unsigned int pos; // > a counter indicating how many projection
@@ -444,6 +445,7 @@ public:
     // information for decrypting results
     ReturnMeta rmeta;
 
+    bool inject_alias;
     SpecialQuery special_query;
 
     // These functions are prefered to their lower level counterparts.
@@ -467,7 +469,8 @@ public:
                                  const std::string &table) const;
     bool databaseMetaExists(const std::string &db) const;
     std::string getAnonTableName(const std::string &db,
-                                 const std::string &table) const;
+                                 const std::string &table,
+                                 bool *const is_alias=NULL) const;
     std::string
         translateNonAliasPlainToAnonTableName(const std::string &db,
                                               const std::string &table)
@@ -488,6 +491,9 @@ public:
     std::vector<std::unique_ptr<Delta> > deltas;
 
     std::string getDatabaseName() const {return db_name;}
+
+    // access to isAlias(...)
+    friend class MultiDeleteHandler;
 
 private:
     const std::string db_name;

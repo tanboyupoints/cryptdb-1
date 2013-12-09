@@ -718,22 +718,55 @@ operator<<(std::ostream &out, LEX &lex)
                 out << s0;
             }
         } else {
-            TABLE_LIST *tbl = lex.auxiliary_table_list.first;
-            for (bool f = true; tbl; tbl = tbl->next_local, f = false) {
-                String s0;
-                tbl->print(t, &s0, QT_ORDINARY);
-                out << (f ? "" : ", ") << s0;
+            assert(SQLCOM_DELETE_MULTI == lex.sql_command);
+
+            // the alias hackery is necesary because we don't want to
+            // print a table with it's alias; we want to print _either_
+            // the real table name or the alias;
+            // TABLE_LIST::print(...) will print both together
+            {
+                TABLE_LIST *tbl = lex.auxiliary_table_list.first;
+                for (bool f = true; tbl; tbl = tbl->next_local,f = false) {
+                    out << (f ? "" : ", ");
+                    if (true == tbl->is_alias) {
+                        out << quoteText(tbl->alias);
+                    } else {
+                        String s0;
+                        tbl->print(t, &s0, QT_ORDINARY);
+                        out << s0;
+                    }
+                }
             }
             out << " from ";
 
             {
                 String s0;
-                TABLE_LIST tl;
-                st_nested_join nj;
-                tl.nested_join = &nj;
-                nj.join_list = lex.select_lex.top_join_list;
-                tl.print(t, &s0, QT_ORDINARY);
-                out << s0;
+
+                // code ripped then mutilated from print_join(...)
+                // in sql/sql_select.cc
+                TABLE_LIST *table = lex.query_tables;
+                // print the first table
+                table->print(current_thd, &s0, QT_ORDINARY);
+                while ((table = table->next_local)) {
+                    // print join type
+                    if (table->outer_join)
+                        s0.append(STRING_WITH_LEN(" left join "));
+                    else if (table->straight)
+                        s0.append(STRING_WITH_LEN(" straight_join "));
+                    else
+                        s0.append(STRING_WITH_LEN(" join "));
+
+                    table->print(current_thd, &s0, QT_ORDINARY);
+
+                    // print on clause
+                    if (table->on_expr)  {
+                      s0.append(STRING_WITH_LEN(" on("));
+                      table->on_expr->print(&s0, QT_ORDINARY);
+                      s0.append(')');
+                    }
+                }
+
+               out << s0;
             }
 
             if (lex.select_lex.where)

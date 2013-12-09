@@ -634,6 +634,12 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
     switch (action) {
         case QueryAction::AGAIN: {
             std::unique_ptr<SchemaCache> schema_cache(new SchemaCache());
+            // onion adjustments that come from multideletes which use
+            // table aliases make the current database go to
+            // NULL; rectification
+            TEST_Text(lowLevelSetCurrentDatabase(ps.getConn(),
+                                                 default_db),
+                      "failed to set current db after onion adjustment");
             const EpilogueResult &epi_res =
                 executeQuery(ps, query, default_db, schema_cache.get(),
                              pp);

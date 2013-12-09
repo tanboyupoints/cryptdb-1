@@ -572,6 +572,27 @@ private:
     const std::function<void(void)> fn;
 };
 
+template <typename Type>
+class ScopedAssignment {
+    ScopedAssignment() = delete;
+    ScopedAssignment(const ScopedAssignment &a) = delete;
+    ScopedAssignment(ScopedAssignment &&a) = delete;
+    ScopedAssignment &operator=(const ScopedAssignment &a) = delete;
+    ScopedAssignment &operator=(ScopedAssignment &&a) = delete;
+
+    Type *const addr;
+    Type &old_value;
+
+public:
+    ScopedAssignment(Type *const addr, Type &&temp_value,
+                     std::function<void(void)> lambda) :
+        addr(addr), old_value(*addr)
+    {
+        *addr = temp_value;
+        lambda();
+        *addr = old_value;
+    }
+};
 
 // Taken from jsmith @ cplusplus.com
 template <typename T>

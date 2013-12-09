@@ -166,7 +166,7 @@ query_parse::query_parse(const std::string &db, const std::string &q)
         if (open_normal_and_derived_tables(t, lex->query_tables, 0))
             throw CryptDBError("open_normal_and_derived_tables");
 
-        if (lex->sql_command == SQLCOM_SELECT) {
+        if (SQLCOM_SELECT == lex->sql_command) {
             if (!lex->select_lex.master_unit()->is_union() &&
                 !lex->select_lex.master_unit()->fake_select_lex)
             {
@@ -186,23 +186,29 @@ query_parse::query_parse(const std::string &db, const std::string &q)
                                &lex->unit))
                     throw CryptDBError("JOIN::prepare");
             } else {
-                thrower() << "skip unions for now (union=" << lex->select_lex.master_unit()->is_union()
-                          << ", fake_select_lex=" << lex->select_lex.master_unit()->fake_select_lex << ")";
+                thrower() << "skip unions for now (union="
+                          << lex->select_lex.master_unit()->is_union()
+                          << ", fake_select_lex="
+                          << lex->select_lex.master_unit()->fake_select_lex
+                          << ")";
                 if (lex->unit.prepare(t, 0, 0))
                     throw CryptDBError("UNIT::prepare");
 
                 /* XXX unit->cleanup()? */
 
                 /* XXX
-                 * for unions, it is insufficient to just print lex->select_lex,
-                 * because there are other select_lex's in the unit..
+                 * for unions, it is insufficient to just print
+                 * lex->select_lex, because there are other
+                 * select_lex's in the unit..
                  */
             }
-        } else if (lex->sql_command == SQLCOM_DELETE) {
-            if (mysql_prepare_delete(t, lex->query_tables, &lex->select_lex.where))
+        } else if (SQLCOM_DELETE == lex->sql_command) {
+            if (mysql_prepare_delete(t, lex->query_tables,
+                                     &lex->select_lex.where))
                 throw CryptDBError("mysql_prepare_delete");
 
-            if (lex->select_lex.setup_ref_array(t, lex->select_lex.order_list.elements))
+            if (lex->select_lex.setup_ref_array(t,
+                                    lex->select_lex.order_list.elements))
                 throw CryptDBError("setup_ref_array");
 
             List<Item> fields;
@@ -211,12 +217,22 @@ query_parse::query_parse(const std::string &db, const std::string &q)
                             lex->query_tables, fields, all_fields,
                             lex->select_lex.order_list.first))
                 throw CryptDBError("setup_order");
-        } else if (SQLCOM_INSERT == lex->sql_command
-                   || SQLCOM_REPLACE == lex->sql_command) {
+        } else if (SQLCOM_DELETE_MULTI == lex->sql_command) {
+            if (mysql_multi_delete_prepare(t)
+                || t->is_fatal_error)
+                throw CryptDBError("mysql_multi_delete_prepare");
+
+            if (setup_conds(t, lex->auxiliary_table_list.first,
+                            lex->select_lex.leaf_tables,
+                            &lex->select_lex.where))
+                throw CryptDBError("setup_conds");
+        } else if (lex->sql_command ==  SQLCOM_INSERT
+                   || lex->sql_command == SQLCOM_REPLACE) {
             List_iterator_fast<List_item> its(lex->many_values);
             List_item *values = its++;
 
-            if (mysql_prepare_insert(t, lex->query_tables, lex->query_tables->table,
+            if (mysql_prepare_insert(t, lex->query_tables,
+                                     lex->query_tables->table,
                                      lex->field_list, values,
                                      lex->update_list, lex->value_list,
                                      lex->duplicates,
@@ -233,8 +249,9 @@ query_parse::query_parse(const std::string &db, const std::string &q)
                 if (setup_fields(t, 0, *values, MARK_COLUMNS_NONE, 0, 0))
                     throw CryptDBError("setup_fields");
             }
-        } else if (lex->sql_command == SQLCOM_UPDATE) {
-            if (mysql_prepare_update(t, lex->query_tables, &lex->select_lex.where,
+        } else if (lex->sql_command ==  SQLCOM_UPDATE) {
+            if (mysql_prepare_update(t, lex->query_tables,
+                                     &lex->select_lex.where,
                                      lex->select_lex.order_list.elements,
                                      lex->select_lex.order_list.first))
                 throw CryptDBError("mysql_prepare_update");
@@ -252,12 +269,12 @@ query_parse::query_parse(const std::string &db, const std::string &q)
                                lex->select_lex.ref_pointer_array))
                 throw CryptDBError("fix_inner_refs");
         } else {
-            thrower() << "don't know how to prepare command " << lex->sql_command;
+            thrower() << "don't know how to prepare command "
+                      << lex->sql_command;
         }
     } catch (...) {
         cleanup();
         throw;
     }
-
 }
 
