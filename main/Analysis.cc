@@ -592,9 +592,9 @@ bool DeleteDelta::apply(const std::unique_ptr<Connect> &e_conn,
 
         const std::string query =
             " DELETE " + table_name + " "
-            "   FROM " + table_name + 
+            "   FROM " + table_name +
             "  WHERE " + table_name + ".id" +
-            "      = "     + std::to_string(object_id) + 
+            "      = "     + std::to_string(object_id) +
             "    AND " + table_name + ".parent_id" +
             "      = "     + std::to_string(parent_id) + ";";
         RETURN_FALSE_IF_FALSE(e_c->execute(query));
@@ -606,8 +606,7 @@ bool DeleteDelta::apply(const std::unique_ptr<Connect> &e_conn,
         return object.applyToChildren(localDestroyHandler);
     };
 
-    helper(meta, parent_meta); 
-    return true;
+    return helper(meta, parent_meta);
 }
 
 RewriteOutput::~RewriteOutput()
