@@ -548,7 +548,7 @@ lowLevelGetCurrentStaleness(const std::unique_ptr<Connect> &e_conn,
     return string_to_bool(std::string(row[0], l[0]));
 }
 
-const SchemaInfo &
+std::shared_ptr<const SchemaInfo>
 SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
                        const std::unique_ptr<Connect> &e_conn)
 {
@@ -564,15 +564,14 @@ SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
                               " usage!");
         this->no_loads = false;
     }
-    const bool stale = lowLevelGetCurrentStaleness(e_conn, this->id);
 
-    if (true == stale) {
+    if (true == lowLevelGetCurrentStaleness(e_conn, this->id)) {
         this->schema =
-            std::unique_ptr<SchemaInfo>(loadSchemaInfo(conn, e_conn));
+            std::shared_ptr<SchemaInfo>(loadSchemaInfo(conn, e_conn));
     }
 
     assert(this->schema);
-    return *this->schema.get();
+    return this->schema;
 }
 
 static void

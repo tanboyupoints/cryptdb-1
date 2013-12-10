@@ -9,13 +9,13 @@
 
 #include <main/rewrite_main.hh>
 #include <main/rewrite_util.hh>
+#include <main/schema.hh>
 
 #include <parser/sql_utils.hh>
 #include <parser/mysql_type_metadata.hh>
 
 __thread ProxyState *thread_ps = NULL;
 
-// FIXME: Ownership semantics.
 class WrapperState {
     WrapperState(const WrapperState &other);
     WrapperState &operator=(const WrapperState &rhs);
@@ -38,6 +38,33 @@ public:
     }
 
     std::unique_ptr<ProxyState> ps;
+    // we are running cryptdb in a threaded environment without proper
+    // locking; this leads to crashes during onion adjustment unless we
+    // take some minimal precautions
+    // > everytime we process a query we take a reference to the SchemaInfo
+    //   so that we know the same SchemaInfo (and it's children) will be
+    //   available on the backend for Deltaz; this handles the following
+    //   known bad cases.
+    //   a. thread A marks the cache as stale; thread B sees that it is
+    //      stale and updates the cache; thread A crashes while
+    //      trying to do onion adjustment
+    //   b. we must take the reference at the same time we get the schema
+    //      from the cache, otherwise ...
+    //      + thread A takes the reference to SchemaInfo when the cache is
+    //        already stale, now he ``gets'' his SchemaInfo; because the
+    //        cache is stale the second SchemaInfo is a new object and the
+    //        reference doesn't protect it. now when thread B gets his
+    //        SchemaInfo the cache is still stale so he deletes the only
+    //        reference to the SchemaInfo thread A is using
+    //      + this case only applies if we aren't using the lock on each
+    //        function (connect, disonnect, rewrite, envoi); thread A
+    //        takes a reference to SchemaInfo then before he can ``get''
+    //        the SchemaInfo thread B stales the cache. now thread A
+    //        gets the SchemaInfo and his reference doesn't protect it.
+    //        when thread C gets his SchemaInfo the cache is stale so
+    //        he deletes the only reference to the SchemaInfo thread A
+    //        is using
+    std::vector<SchemaInfoRef> schema_info_refs;
 
 private:
     std::unique_ptr<QueryRewrite> qr;
@@ -248,8 +275,12 @@ rewrite(lua_State *const L)
                                                           ps->getConn(),
                                             &c_wrapper->default_db),
                             "proxy failed to retrieve default database!");
+            // save a reference so a second thread won't eat objects
+            // that DeltaOuput wants later
+            SchemaInfoRef schema_info_ref;
             queryPreamble(*ps, query, &qr, &new_queries, &schema_cache,
-                          c_wrapper->default_db);
+                          c_wrapper->default_db, &schema_info_ref);
+            c_wrapper->schema_info_refs.push_back(schema_info_ref);
             assert(qr);
 
             c_wrapper->setQueryRewrite(qr.release());

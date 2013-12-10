@@ -546,13 +546,14 @@ queryPreamble(const ProxyState &ps, const std::string &q,
               std::unique_ptr<QueryRewrite> *const qr,
               std::list<std::string> *const out_queryz,
               SchemaCache *const schema_cache,
-              const std::string &default_db)
+              const std::string &default_db,
+              SchemaInfoRef *const schema_info_ref)
 {
-    const SchemaInfo &schema =
+    const std::shared_ptr<const SchemaInfo> schema =
         schema_cache->getSchema(ps.getConn(), ps.getEConn());
 
     *qr = std::unique_ptr<QueryRewrite>(
-            new QueryRewrite(Rewriter::rewrite(ps, q, schema,
+            new QueryRewrite(Rewriter::rewrite(ps, q, *schema.get(),
                                                default_db)));
 
     // We handle before any queries because a failed query
@@ -575,7 +576,13 @@ queryPreamble(const ProxyState &ps, const std::string &q,
     }
 
     (*qr)->output->beforeQuery(ps.getConn(), ps.getEConn());
-    (*qr)->output->getQuery(out_queryz, schema);
+    (*qr)->output->getQuery(out_queryz, *schema.get());
+
+    // give the caller a reference to his SchemaInfo because the objects
+    // may be used in Deltaz
+    if (schema_info_ref) {
+        *schema_info_ref = schema;
+    }
 
     return;
 }

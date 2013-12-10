@@ -230,8 +230,9 @@ public:
         : schema(std::move(cache.schema)), no_loads(cache.no_loads),
           id(cache.id) {}
 
-    const SchemaInfo &getSchema(const std::unique_ptr<Connect> &conn,
-                                const std::unique_ptr<Connect> &e_conn);
+    std::shared_ptr<const SchemaInfo>
+        getSchema(const std::unique_ptr<Connect> &conn,
+                  const std::unique_ptr<Connect> &e_conn);
     void updateStaleness(const std::unique_ptr<Connect> &e_conn,
                          bool staleness);
     bool initialStaleness(const std::unique_ptr<Connect> &e_conn);
@@ -240,8 +241,9 @@ public:
     void lowLevelCurrentUnstale(const std::unique_ptr<Connect> &e_conn);
 
 private:
-    std::unique_ptr<const SchemaInfo> schema;
+    std::shared_ptr<const SchemaInfo> schema;
     bool no_loads;
     const unsigned int id;
 };
 
+typedef std::shared_ptr<const SchemaInfo> SchemaInfoRef;

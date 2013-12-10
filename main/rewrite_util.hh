@@ -5,6 +5,7 @@
 #include <main/rewrite_main.hh>
 #include <main/Analysis.hh>
 #include <main/rewrite_ds.hh>
+#include <main/schema.hh>
 
 #include <sql_list.h>
 #include <sql_table.h>
@@ -138,7 +139,8 @@ queryPreamble(const ProxyState &ps, const std::string &q,
               std::unique_ptr<QueryRewrite> *qr,
               std::list<std::string> *const out_queryz,
               SchemaCache *const schema,
-              const std::string &default_db);
+              const std::string &default_db,
+              SchemaInfoRef *const schema_info_ref=NULL);
 
 bool
 queryHandleRollback(const ProxyState &ps, const std::string &query,
