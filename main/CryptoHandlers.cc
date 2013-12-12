@@ -518,7 +518,7 @@ RND_str::decryptUDF(Item * const col, Item * const ivcol) const
 
 class DET_abstract_number : public EncLayer {
 public:
-    DET_abstract_number(const std::string &key, int64_t shift);
+    DET_abstract_number(const std::string &key);
     DET_abstract_number(unsigned int id, const std::string &serial);
 
     virtual std::string name() const = 0;
@@ -537,12 +537,10 @@ public:
 protected:
     const std::string key;
     const blowfish bf;
-    const int64_t shift;
     static const int bf_key_size = 16;
 
 private:
     std::string getKeyFromSerial(const std::string &serial);
-    static int64_t getShift(const std::string &serial);
 };
 
 class DET_abstract_integer : public DET_abstract_number {
@@ -550,9 +548,6 @@ public:
     DET_abstract_integer(Create_field *const cf,
                          const std::string &seed_key);
     DET_abstract_integer(unsigned int id, const std::string &serial);
-
-private:
-    static int64_t getShift(const Create_field *const f);
 };
 
 /*
@@ -668,20 +663,18 @@ DETFactory::deserialize(unsigned int id, const SerialLayer &sl)
     }
 }
 
-DET_abstract_number::DET_abstract_number(const std::string &key,
-                                         int64_t shift)
-    : EncLayer(), key(key), bf(key), shift(shift)
+DET_abstract_number::DET_abstract_number(const std::string &key)
+    : EncLayer(), key(key), bf(key)
 {}
 
 DET_abstract_number::DET_abstract_number(unsigned int id,
                                          const std::string &serial)
-    : EncLayer(id), key(getKeyFromSerial(serial)), bf(key),
-      shift(getShift(serial))
+    : EncLayer(id), key(getKeyFromSerial(serial)), bf(key)
 {}
 
 std::string DET_abstract_number::doSerialize() const
 {
-    return std::to_string(shift) + " " + key;
+    return " " + key;
 }
 
 Create_field *
@@ -700,7 +693,7 @@ DET_abstract_number::encrypt(const Item &ptext, uint64_t IV) const
     // assert(!stringItem(ptext));
     const ulonglong value = RiboldMYSQL::val_uint(ptext);
 
-    const ulonglong res = static_cast<ulonglong>(bf.encrypt(value+shift));
+    const ulonglong res = static_cast<ulonglong>(bf.encrypt(value));
     LOG(encl) << "DET_int enc " << value << "--->" << res;
     return new (current_thd->mem_root) Item_int(res);
 }
@@ -709,17 +702,7 @@ Item *
 DET_abstract_number::decrypt(Item *const ctext, uint64_t IV) const
 {
     const ulonglong value = static_cast<Item_int *>(ctext)->value;
-
-    if (shift) {
-        //std::cout << "value: " << value <<  " shift: " << shift << "\n";
-
-        longlong retdec = static_cast<longlong>(bf.decrypt(value));
-        retdec -= shift;
-        LOG(encl) << "DET_int dec " << value << "--->" << retdec;
-        return new (current_thd->mem_root) Item_int(retdec);
-    }
-
-    const ulonglong retdec = bf.decrypt(value) - shift;
+    const ulonglong retdec = bf.decrypt(value);
     LOG(encl) << "DET_int dec " << value << "--->" << retdec;
     return new (current_thd->mem_root) Item_int(retdec);
 }
@@ -732,18 +715,11 @@ DET_abstract_number::decryptUDF(Item *const col, Item *const ivcol)
     l.push_back(col);
 
     l.push_back(get_key_item(key));
-    // Only used for signed columns, otherwise zero.
-    l.push_back(new (current_thd->mem_root)
-                    Item_int(static_cast<ulonglong>(shift)));
 
-    Item *const udfdec = new (current_thd->mem_root)
-                             Item_func_udf_int(&u_decDETInt, l);
+    Item *const udfdec = new Item_func_udf_int(&u_decDETInt, l);
     udfdec->name = NULL;
 
-    Item *const udf = 0 == shift ? new (current_thd->mem_root)
-                                       Item_func_unsigned(udfdec)
-                                 : new (current_thd->mem_root)
-                                       Item_func_signed(udfdec);
+    Item *const udf = new Item_func_unsigned(udfdec);
     udf->name = NULL;
 
     return udf;
@@ -755,45 +731,15 @@ DET_abstract_number::getKeyFromSerial(const std::string &serial)
     return serial.substr(serial.find(' ')+1, std::string::npos);
 }
 
-int64_t
-DET_abstract_number::getShift(const std::string &serial)
-{
-    return atol(serial.substr(0, serial.find(' ')).c_str());
-}
-
 DET_abstract_integer::DET_abstract_integer(Create_field *const cf,
                                            const std::string &seed_key)
-    : DET_abstract_number(prng_expand(seed_key, bf_key_size),
-                          getShift(cf))
+    : DET_abstract_number(prng_expand(seed_key, bf_key_size))
 {}
 
 DET_abstract_integer::DET_abstract_integer(unsigned int id,
                                            const std::string &serial)
     : DET_abstract_number(id, serial)
 {}
-
-int64_t
-DET_abstract_integer::getShift(const Create_field * const cf)
-{
-    if (cf->flags & UNSIGNED_FLAG) {
-        return 0x00;
-    } else {
-        switch (cf->sql_type) {
-            case MYSQL_TYPE_TINY:
-                return 0x80;
-            case MYSQL_TYPE_SHORT:
-                return 0x8000;
-            case MYSQL_TYPE_INT24:
-                return 0x800000;
-            case MYSQL_TYPE_LONG:
-                return 0x80000000;
-            case MYSQL_TYPE_LONGLONG:
-                return 0x8000000000000000;
-            default:
-                FAIL_TextMessageError("unknown int type!");
-        }
-    }
-}
 
 DET_int::DET_int(Create_field *const f, const std::string &seed_key)
     : DET_abstract_integer(f, seed_key)

@@ -211,10 +211,9 @@ my_bool
 cryptdb_decrypt_int_det_init(UDF_INIT *const initid, UDF_ARGS *const args,
                              char *const message)
 {
-    if (args->arg_count != 3 ||
+    if (args->arg_count != 2 ||
         args->arg_type[0] != INT_RESULT ||
-        args->arg_type[1] != STRING_RESULT ||
-        args->arg_type[2] != INT_RESULT)
+        args->arg_type[1] != STRING_RESULT)
     {
         strcpy(message, "Usage: cryptdb_decrypt_int_det(int ciphertext, string key)");
         return 1;
@@ -240,16 +239,13 @@ cryptdb_decrypt_int_det(UDF_INIT *const initid, UDF_ARGS *const args,
             char *const keyBytes = getba(args, 1, keyLen);
             const std::string key = std::string(keyBytes, keyLen);
 
-            const uint64_t shift = getui(args, 2);
-
             blowfish bf(key);
-            value = bf.decrypt(eValue) - shift;
+            value = bf.decrypt(eValue);
         } catch (const CryptoError &e) {
             std::cerr << e.msg << std::endl;
             value = 0;
         }
     }
-
 
     return static_cast<ulonglong>(value.get());
 }
