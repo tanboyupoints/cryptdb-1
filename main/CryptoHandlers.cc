@@ -274,6 +274,62 @@ get_key_item(const std::string &key)
 
 
 
+class CryptedInteger {
+public:
+    CryptedInteger(const Create_field &cf, const std::string &key)
+        : key(key), field_type(cf.sql_type) {}
+    static CryptedInteger
+        deserialize(const std::string &serial);
+    CryptedInteger(const std::string &key, enum enum_field_types type,
+                   int64_t inclusiveMinimum, uint64_t inclusiveMaximum)
+        : key(key), field_type(type), inclusiveMinimum(inclusiveMinimum),
+          inclusiveMaximum(inclusiveMaximum) {}
+    std::string serialize() const;
+    bool validInput(const Item &i) const;
+    std::string getKey() const {return key;}
+
+private:
+    const std::string key;
+    enum enum_field_types field_type;
+    int64_t inclusiveMinimum;
+    uint64_t inclusiveMaximum;
+};
+
+CryptedInteger
+CryptedInteger::deserialize(const std::string &serial)
+{
+    const std::vector<std::string> &vec = unserialize_string(serial);
+    const std::string &key = vec[0];
+    const enum enum_field_types field_type =
+        TypeText<enum enum_field_types>::toType(vec[1]);
+    const int64_t inclusiveMinimum = strtoll(vec[2].c_str(), NULL, 0);
+    const int64_t inclusiveMaximum = strtoull(vec[3].c_str(), NULL, 0);
+
+    return CryptedInteger(key, field_type, inclusiveMinimum,
+                          inclusiveMaximum);
+}
+
+static std::string
+serializeStrings(std::initializer_list<std::string> inputs)
+{
+    std::string out;
+    for (auto it : inputs) {
+        out += serialize_string(it);
+    }
+
+    return out;
+}
+
+std::string
+CryptedInteger::serialize() const
+{
+    return serializeStrings({key,
+            TypeText<enum enum_field_types>::toText(field_type),
+            std::to_string(inclusiveMinimum),
+            std::to_string(inclusiveMaximum)});
+}
+
+
 /*********************** RND ************************************************/
 
 class RND_int : public EncLayer {
@@ -516,15 +572,19 @@ RND_str::decryptUDF(Item * const col, Item * const ivcol) const
 /********** DET ************************/
 
 
-class DET_abstract_number : public EncLayer {
+class DET_abstract_integer : public EncLayer {
 public:
-    DET_abstract_number(const std::string &key);
-    DET_abstract_number(unsigned int id, const std::string &serial);
+    DET_abstract_integer(Create_field *const f, const std::string &key);
+    DET_abstract_integer(unsigned int id, CryptedInteger &cinteger);
 
     virtual std::string name() const = 0;
     virtual SECLEVEL level() const = 0;
 
     std::string doSerialize() const;
+    template <typename Type>
+        static std::unique_ptr<Type>
+        deserialize(unsigned int id, const std::string &serial);
+
     Create_field *newCreateField(const Create_field *const cf,
                                  const std::string &anonname = "")
         const;
@@ -535,19 +595,12 @@ public:
     Item *decryptUDF(Item *const col, Item *const ivcol = NULL) const;
 
 protected:
-    const std::string key;
+    CryptedInteger cinteger;
     const blowfish bf;
     static const int bf_key_size = 16;
 
 private:
     std::string getKeyFromSerial(const std::string &serial);
-};
-
-class DET_abstract_integer : public DET_abstract_number {
-public:
-    DET_abstract_integer(Create_field *const cf,
-                         const std::string &seed_key);
-    DET_abstract_integer(unsigned int id, const std::string &serial);
 };
 
 /*
@@ -570,9 +623,11 @@ protected:
 
 class DET_int : public DET_abstract_integer {
 public:
-    DET_int(Create_field *const cf, const std::string &seed_key);
+    DET_int(Create_field *const cf, const std::string &seed_key)
+        : DET_abstract_integer(cf, seed_key) {}
     // create object from serialized contents
-    DET_int(unsigned int id, const std::string &serial);
+    DET_int(unsigned int id, CryptedInteger &cinteger)
+        : DET_abstract_integer(id, cinteger) {}
 
     virtual SECLEVEL level() const {return SECLEVEL::DET;}
     std::string name() const {return "DET_int";}
@@ -653,7 +708,8 @@ std::unique_ptr<EncLayer>
 DETFactory::deserialize(unsigned int id, const SerialLayer &sl)
 {
     if ("DET_int" == sl.name) {
-        return std::unique_ptr<EncLayer>(new DET_int(id, sl.layer_info));
+        return DET_abstract_integer::deserialize<DET_int>(id,
+                                                       sl.layer_info);
     } else if ("DET_dec" == sl.name) {
         FAIL_TextMessageError("decimal support broken");
     } else if ("DET_str" == sl.name) {
@@ -663,23 +719,38 @@ DETFactory::deserialize(unsigned int id, const SerialLayer &sl)
     }
 }
 
-DET_abstract_number::DET_abstract_number(const std::string &key)
-    : EncLayer(), key(key), bf(key)
+DET_abstract_integer::DET_abstract_integer(Create_field *const cf,
+                                           const std::string &key)
+    : EncLayer(), cinteger(CryptedInteger(*cf, key)), bf(key)
 {}
 
-DET_abstract_number::DET_abstract_number(unsigned int id,
-                                         const std::string &serial)
-    : EncLayer(id), key(getKeyFromSerial(serial)), bf(key)
+DET_abstract_integer::DET_abstract_integer(unsigned int id,
+                                           CryptedInteger &cinteger)
+    : EncLayer(id), cinteger(cinteger), bf(cinteger.getKey())
 {}
 
-std::string DET_abstract_number::doSerialize() const
+template <typename Type>
+std::unique_ptr<Type>
+DET_abstract_integer::deserialize(unsigned int id,
+                                  const std::string &serial)
 {
-    return " " + key;
+    /* if the concrete DET integer classes need to serialize data that
+     * is not in CryptedInteger; write a deserialize function for them
+     * as well and let them handle the serialized data that is not
+     * CryptedInteger */
+    CryptedInteger cint = CryptedInteger::deserialize(serial);
+    return std::unique_ptr<Type>(new Type(id, cint));
+}
+
+std::string
+DET_abstract_integer::doSerialize() const
+{
+    return cinteger.serialize();
 }
 
 Create_field *
-DET_abstract_number::newCreateField(const Create_field * const cf,
-                                    const std::string &anonname) const
+DET_abstract_integer::newCreateField(const Create_field * const cf,
+                                     const std::string &anonname) const
 {
     const int64_t ciph_size = 8;
     // MYSQL_TYPE_LONGLONG because blowfish works on 64 bit blocks.
@@ -688,7 +759,7 @@ DET_abstract_number::newCreateField(const Create_field * const cf,
 }
 
 Item *
-DET_abstract_number::encrypt(const Item &ptext, uint64_t IV) const
+DET_abstract_integer::encrypt(const Item &ptext, uint64_t IV) const
 {
     // assert(!stringItem(ptext));
     const ulonglong value = RiboldMYSQL::val_uint(ptext);
@@ -699,7 +770,7 @@ DET_abstract_number::encrypt(const Item &ptext, uint64_t IV) const
 }
 
 Item *
-DET_abstract_number::decrypt(Item *const ctext, uint64_t IV) const
+DET_abstract_integer::decrypt(Item *const ctext, uint64_t IV) const
 {
     const ulonglong value = static_cast<Item_int *>(ctext)->value;
     const ulonglong retdec = bf.decrypt(value);
@@ -708,13 +779,13 @@ DET_abstract_number::decrypt(Item *const ctext, uint64_t IV) const
 }
 
 Item *
-DET_abstract_number::decryptUDF(Item *const col, Item *const ivcol)
+DET_abstract_integer::decryptUDF(Item *const col, Item *const ivcol)
     const
 {
     List<Item> l;
     l.push_back(col);
 
-    l.push_back(get_key_item(key));
+    l.push_back(get_key_item(cinteger.getKey()));
 
     Item *const udfdec = new Item_func_udf_int(&u_decDETInt, l);
     udfdec->name = NULL;
@@ -726,28 +797,10 @@ DET_abstract_number::decryptUDF(Item *const col, Item *const ivcol)
 }
 
 std::string
-DET_abstract_number::getKeyFromSerial(const std::string &serial)
+DET_abstract_integer::getKeyFromSerial(const std::string &serial)
 {
     return serial.substr(serial.find(' ')+1, std::string::npos);
 }
-
-DET_abstract_integer::DET_abstract_integer(Create_field *const cf,
-                                           const std::string &seed_key)
-    : DET_abstract_number(prng_expand(seed_key, bf_key_size))
-{}
-
-DET_abstract_integer::DET_abstract_integer(unsigned int id,
-                                           const std::string &serial)
-    : DET_abstract_number(id, serial)
-{}
-
-DET_int::DET_int(Create_field *const f, const std::string &seed_key)
-    : DET_abstract_integer(f, seed_key)
-{}
-
-DET_int::DET_int(unsigned int id, const std::string &serial)
-    : DET_abstract_integer(id, serial)
-{}
 
 /*
 DET_abstract_decimal::DET_abstract_decimal(Create_field *const cf,
@@ -897,13 +950,12 @@ DET_str::decryptUDF(Item * const col, Item * const ivcol) const
 
 
 class DETJOIN_int : public DET_abstract_integer {
-    //TODO
 public:
     DETJOIN_int(Create_field *const cf, const std::string &seed_key)
         : DET_abstract_integer(cf, seed_key) {}
     // serialize from parent;  unserialize:
-    DETJOIN_int(unsigned int id, const std::string &serial)
-        : DET_abstract_integer(id, serial) {}
+    DETJOIN_int(unsigned int id, CryptedInteger &cinteger)
+        : DET_abstract_integer(id, cinteger) {}
 
     SECLEVEL level() const {return SECLEVEL::DETJOIN;}
     std::string name() const {return "DETJOIN_int";}
@@ -961,8 +1013,8 @@ std::unique_ptr<EncLayer>
 DETJOINFactory::deserialize(unsigned int id, const SerialLayer &sl)
 {
     if  ("DETJOIN_int" == sl.name) {
-        return std::unique_ptr<EncLayer>(new DETJOIN_int(id,
-                                                         sl.layer_info));
+        return DET_abstract_integer::deserialize<DETJOIN_int>(id,
+                                                    sl.layer_info);
     } else if ("DETJOIN_dec" == sl.name) {
         FAIL_TextMessageError("decimal support broken");
     } else if ("DETJOIN_str" == sl.name) {
