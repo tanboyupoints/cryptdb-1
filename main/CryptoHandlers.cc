@@ -136,6 +136,7 @@ serial_unpack(std::string serial)
     return sl;
 }
 
+/*
 static uint
 getDecimals(const std::string &serial)
 {
@@ -148,6 +149,7 @@ underSerial(const std::string &serial)
     const uint pos = serial.find(" ");
     return serial.substr(pos + 1, std::string::npos);
 }
+*/
 
 // ============================ Factory implementations ====================//
 
@@ -553,6 +555,7 @@ private:
     static int64_t getShift(const Create_field *const f);
 };
 
+/*
 class DET_abstract_decimal : public DET_abstract_number {
 public:
     DET_abstract_decimal(Create_field *const cf,
@@ -567,6 +570,7 @@ public:
 protected:
     const uint decimals;      // number of decimals
 };
+*/
 
 
 class DET_int : public DET_abstract_integer {
@@ -593,6 +597,7 @@ static udf_func u_decDETInt = {
     0L,
 };
 
+/*
 class DET_dec : public DET_abstract_decimal {
 public:
     DET_dec(Create_field *const cf, const std::string &seed_key);
@@ -604,6 +609,7 @@ public:
     SECLEVEL level() const {return SECLEVEL::DET;}
     std::string name() const {return "DET_dec";}
 };
+*/
 
 class DET_str : public EncLayer {
 public:
@@ -639,7 +645,7 @@ DETFactory::create(Create_field * const cf, const std::string &key)
     if (isMySQLTypeNumeric(*cf)) {
         if (cf->sql_type == MYSQL_TYPE_DECIMAL
             || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
-            return std::unique_ptr<EncLayer>(new DET_dec(cf, key));
+            FAIL_TextMessageError("decimal support is broken");
         } else {
             return std::unique_ptr<EncLayer>(new DET_int(cf, key));
         }
@@ -654,7 +660,7 @@ DETFactory::deserialize(unsigned int id, const SerialLayer &sl)
     if ("DET_int" == sl.name) {
         return std::unique_ptr<EncLayer>(new DET_int(id, sl.layer_info));
     } else if ("DET_dec" == sl.name) {
-        return std::unique_ptr<EncLayer>(new DET_dec(id, sl.layer_info));
+        FAIL_TextMessageError("decimal support broken");
     } else if ("DET_str" == sl.name) {
         return std::unique_ptr<EncLayer>(new DET_str(id, sl.layer_info));
     } else {
@@ -789,6 +795,15 @@ DET_abstract_integer::getShift(const Create_field * const cf)
     }
 }
 
+DET_int::DET_int(Create_field *const f, const std::string &seed_key)
+    : DET_abstract_integer(f, seed_key)
+{}
+
+DET_int::DET_int(unsigned int id, const std::string &serial)
+    : DET_abstract_integer(id, serial)
+{}
+
+/*
 DET_abstract_decimal::DET_abstract_decimal(Create_field *const cf,
                                            const std::string &seed_key)
     : DET_abstract_number(seed_key, pow(10, cf->decimals)),
@@ -850,14 +865,6 @@ Item *DET_abstract_decimal::decrypt(Item *const ctext, uint64_t IV) const
     return res;
 }
 
-DET_int::DET_int(Create_field *const f, const std::string &seed_key)
-    : DET_abstract_integer(f, seed_key)
-{}
-
-DET_int::DET_int(unsigned int id, const std::string &serial)
-    : DET_abstract_integer(id, serial)
-{}
-
 DET_dec::DET_dec(Create_field * const cf, const std::string &seed_key)
     : DET_abstract_decimal(cf, seed_key)
 {}
@@ -865,6 +872,7 @@ DET_dec::DET_dec(Create_field * const cf, const std::string &seed_key)
 DET_dec::DET_dec(unsigned int id, const std::string &serial)
     : DET_abstract_decimal(id, serial)
 {}
+*/
 
 DET_str::DET_str(Create_field * const f, const std::string &seed_key)
     : rawkey(prng_expand(seed_key, key_bytes)),
@@ -970,6 +978,7 @@ private:
  
 };
 
+/*
 class DETJOIN_dec : public DET_abstract_decimal {
     //TODO
 public:
@@ -984,6 +993,7 @@ public:
     SECLEVEL level() const {return SECLEVEL::DETJOIN;}
     std::string name() const {return "DETJOIN_dec";}
 };
+*/
 
 std::unique_ptr<EncLayer>
 DETJOINFactory::create(Create_field * const cf,
@@ -992,7 +1002,7 @@ DETJOINFactory::create(Create_field * const cf,
     if (isMySQLTypeNumeric(*cf)) {
         if (cf->sql_type == MYSQL_TYPE_DECIMAL
             || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
-            return std::unique_ptr<EncLayer>(new DETJOIN_dec(cf, key));
+            FAIL_TextMessageError("decimal support is broken");
         } else {
             return std::unique_ptr<EncLayer>(new DETJOIN_int(cf, key));
         }
@@ -1008,8 +1018,7 @@ DETJOINFactory::deserialize(unsigned int id, const SerialLayer &sl)
         return std::unique_ptr<EncLayer>(new DETJOIN_int(id,
                                                          sl.layer_info));
     } else if ("DETJOIN_dec" == sl.name) {
-        return std::unique_ptr<EncLayer>(new DETJOIN_dec(id,
-                                                         sl.layer_info));
+        FAIL_TextMessageError("decimal support broken");
     } else if ("DETJOIN_str" == sl.name) {
         return std::unique_ptr<EncLayer>(new DETJOIN_str(id,
                                                          sl.layer_info));
@@ -1162,6 +1171,7 @@ private:
 };
 
 
+/*
 class OPE_dec : public OPE_int {
 public:
     OPE_dec(Create_field * const cf, const std::string &seed_key);
@@ -1179,6 +1189,7 @@ private:
     uint const decimals;
     ulonglong const shift;
 };
+*/
 
 
 
@@ -1188,7 +1199,7 @@ OPEFactory::create(Create_field * const cf, const std::string &key)
     if (isMySQLTypeNumeric(*cf)) { 
         if (cf->sql_type == MYSQL_TYPE_DECIMAL
             || cf->sql_type ==  MYSQL_TYPE_NEWDECIMAL) {
-            return std::unique_ptr<EncLayer>(new OPE_dec(cf, key));
+            FAIL_TextMessageError("decimal support is broken");
         } else if (cf->sql_type == MYSQL_TYPE_TINY) { 
             return std::unique_ptr<EncLayer>(new OPE_tinyint(cf, key));
         } else if (cf->sql_type == MYSQL_TYPE_INT24) { 
@@ -1214,10 +1225,11 @@ OPEFactory::deserialize(unsigned int id, const SerialLayer &sl)
     } else if (sl.name == "OPE_str") {
         return std::unique_ptr<EncLayer>(new OPE_str(id, sl.layer_info));
     } else {
-        return std::unique_ptr<EncLayer>(new OPE_dec(id, sl.layer_info));
+        FAIL_TextMessageError("decimal support broken");
     }
 }
 
+/*
 OPE_dec::OPE_dec(Create_field * const cf, const std::string &seed_key)
     : OPE_int(cf, seed_key), decimals(cf->decimals),
       shift(pow(10, decimals))
@@ -1261,6 +1273,7 @@ OPE_dec::decrypt(Item * const ctext, uint64_t IV) const
 
     return res;
 }
+*/
 
 
 OPE_int::OPE_int(Create_field * const f, const std::string &seed_key)
@@ -1364,6 +1377,7 @@ OPE_str::decrypt(Item * const ctext, uint64_t IV) const
 
 /**************** HOM ***************************/
 
+/*
 class HOM_dec : public HOM {
 public:
     HOM_dec(Create_field * const cf, const std::string &seed_key);
@@ -1389,6 +1403,7 @@ private:
 
     std::string doSerialize() const;
 };
+*/
 
 
 std::unique_ptr<EncLayer>
@@ -1396,7 +1411,7 @@ HOMFactory::create(Create_field * const cf, const std::string &key)
 {
     if (cf->sql_type == MYSQL_TYPE_DECIMAL
         || cf->sql_type == MYSQL_TYPE_NEWDECIMAL) {
-        return std::unique_ptr<EncLayer>(new HOM_dec(cf, key));
+        FAIL_TextMessageError("decimal support is broken");
     }
 
     return std::unique_ptr<EncLayer>(new HOM(cf, key));
@@ -1406,8 +1421,7 @@ std::unique_ptr<EncLayer>
 HOMFactory::deserialize(unsigned int id, const SerialLayer &serial)
 {
     if (serial.name == "HOM_dec") {
-        return std::unique_ptr<EncLayer>(new HOM_dec(id,
-                                                     serial.layer_info));
+        FAIL_TextMessageError("decimal support broken");
     }
     return std::unique_ptr<EncLayer>(new HOM(id, serial.layer_info));
 }
@@ -1446,6 +1460,7 @@ ItemStrToZZ(Item *const i)
     return ZZFromString(res);
 }
 
+/*
 HOM_dec::HOM_dec(Create_field * const cf, const std::string &seed_key)
     : HOM(cf, seed_key), decimals(cf->decimals),
       shift(power(to_ZZ(10), decimals))
@@ -1523,6 +1538,7 @@ HOM_dec::decrypt(Item * const ctext, uint64_t IV) const
 
     return ZZToItemDec(dec, shift);
 }
+*/
 
 
 
