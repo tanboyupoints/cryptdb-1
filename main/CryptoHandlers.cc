@@ -1057,90 +1057,6 @@ private:
     static const size_t ciph_size = 8;
 };
 
-class OPE_tinyint : public OPE_int {
-public:
-    OPE_tinyint(Create_field * const cf, const std::string &seed_key);
-
-    // create object from serialized contents
-    OPE_tinyint(unsigned int id, const std::string &serial);
-
-    std::string name() const {return "OPE_tinyint";}
-
-    Item *encrypt(const Item &p, uint64_t IV) const;
-    Item * decrypt(Item * const c, uint64_t IV) const;
-};
-
-OPE_tinyint::OPE_tinyint(Create_field * const cf,
-                         const std::string &seed_key)
-    : OPE_int(cf, seed_key)
-{}
-
-OPE_tinyint::OPE_tinyint(unsigned int id, const std::string &serial)
-    : OPE_int(id, serial)
-{}
-
-Item *
-OPE_tinyint::encrypt(const Item &ptext, uint64_t IV) const
-{
-    const ulonglong val = RiboldMYSQL::val_uint(ptext);
-
-    static const ulonglong tiny_max = 0xff;
-    TEST_TextMessageError(tiny_max > val,
-                          "Backend storage unit it not TINYINT,"
-                          " won't floor. ");
-
-    LOG(encl) << "OPE_tinyint encrypt " << val << " IV " << IV << "--->";
-    return OPE_int::encrypt(ptext, static_cast<const ulong>(val));
-}
-
-Item *
-OPE_tinyint::decrypt(Item * const ctext, uint64_t IV) const
-{
-    return OPE_int::decrypt(ctext, IV);
-}
-
-class OPE_mediumint : public OPE_int {
-public:
-    OPE_mediumint(Create_field * const cf, const std::string &seed_key);
-
-    // create object from serialized contents
-    OPE_mediumint(unsigned int id, const std::string &serial);
-
-    std::string name() const {return "OPE_mediumint";}
-
-    Item *encrypt(const Item &p, uint64_t IV) const;
-    Item * decrypt(Item * const c, uint64_t IV) const;
-};
-
-OPE_mediumint::OPE_mediumint(Create_field * const cf,
-                             const std::string &seed_key)
-    : OPE_int(cf, seed_key)
-{}
-
-OPE_mediumint::OPE_mediumint(unsigned int id, const std::string &serial)
-    : OPE_int(id, serial)
-{}
-
-Item *
-OPE_mediumint::encrypt(const Item &ptext, uint64_t IV) const
-{
-    const ulonglong val = RiboldMYSQL::val_uint(ptext);
-
-    static const ulonglong medium_max = 0xffffff;
-    TEST_TextMessageError(medium_max > val,
-                          "Backend storage unit it not MEDIUMINT,"
-                          " won't floor. ");
-
-    LOG(encl) << "OPE_mediumint encrypt " << val << " IV " << IV << "--->";
-    return OPE_int::encrypt(ptext, static_cast<const ulong>(val));
-}
-
-Item *
-OPE_mediumint::decrypt(Item * const ctext, uint64_t IV) const
-{
-    return OPE_int::decrypt(ctext, IV);
-}
-
 class OPE_str : public EncLayer {
 public:
     OPE_str(Create_field * const cf, const std::string &seed_key);
@@ -1198,10 +1114,6 @@ OPEFactory::create(Create_field * const cf, const std::string &key)
         if (cf->sql_type == MYSQL_TYPE_DECIMAL
             || cf->sql_type ==  MYSQL_TYPE_NEWDECIMAL) {
             FAIL_TextMessageError("decimal support is broken");
-        } else if (cf->sql_type == MYSQL_TYPE_TINY) { 
-            return std::unique_ptr<EncLayer>(new OPE_tinyint(cf, key));
-        } else if (cf->sql_type == MYSQL_TYPE_INT24) { 
-            return std::unique_ptr<EncLayer>(new OPE_mediumint(cf, key));
         }
         return std::unique_ptr<EncLayer>(new OPE_int(cf, key));
     }
@@ -1214,12 +1126,6 @@ OPEFactory::deserialize(unsigned int id, const SerialLayer &sl)
     if (sl.name == "OPE_int") {
         return std::unique_ptr<EncLayer>(new OPE_int(id,
                                                      sl.layer_info));
-    } else if (sl.name == "OPE_tinyint") {
-        return std::unique_ptr<EncLayer>(new OPE_tinyint(id,
-                                                         sl.layer_info));
-    } else if (sl.name == "OPE_mediumint") {
-        return std::unique_ptr<EncLayer>(new OPE_mediumint(id,
-                                                          sl.layer_info));
     } else if (sl.name == "OPE_str") {
         return std::unique_ptr<EncLayer>(new OPE_str(id, sl.layer_info));
     } else {
