@@ -325,6 +325,8 @@ class MultiDeleteHandler : public DMLHandler {
              tbl = tbl->next_local) {
 
             assert(false == tbl->is_alias);
+            // it's useful to do this style of alias check as well
+            // because it doesn't require the database name
             if (strcmp(tbl->alias, tbl->table_name)) {
                 tbl->is_alias = true;
             } else {
