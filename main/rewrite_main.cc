@@ -1381,7 +1381,7 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
     LOG(cdb_v) << "rows in result " << rows << "\n";
     const unsigned int cols = dbres.names.size();
 
-    ResType res;
+    ResType res(dbres.ok);
 
     // un-anonymize the names
     for (auto it = dbres.names.begin();
@@ -1447,6 +1447,12 @@ mysql_noop_res(const ProxyState &ps)
     return ResType(noop_dbres->unpack());
 }
 
+static EpilogueResult
+genericFailureEpilogueResult()
+{
+    return EpilogueResult(QueryAction::NO_DECRYPT, ResType(false));
+}
+
 EpilogueResult
 executeQuery(const ProxyState &ps, const std::string &q,
              const std::string &default_db,
@@ -1454,37 +1460,40 @@ executeQuery(const ProxyState &ps, const std::string &q,
 {
     assert(schema_cache);
 
-    std::unique_ptr<QueryRewrite> qr;
-    // out_queryz: queries intended to be run against remote server.
-    std::list<std::string> out_queryz;
-    queryPreamble(ps, q, &qr, &out_queryz, schema_cache, default_db);
-    assert(qr);
+    try {
+        std::unique_ptr<QueryRewrite> qr;
+        // out_queryz: queries intended to be run against remote server.
+        std::list<std::string> out_queryz;
+        queryPreamble(ps, q, &qr, &out_queryz, schema_cache, default_db);
+        assert(qr);
 
-    std::unique_ptr<DBResult> dbres;
-    for (auto it : out_queryz) {
-        if (true == pp) {
-            prettyPrintQuery(it);
+        std::unique_ptr<DBResult> dbres;
+        for (auto it : out_queryz) {
+            if (true == pp) {
+                prettyPrintQuery(it);
+            }
+
+            TEST_Sync(ps.getConn()->execute(it, &dbres,
+                                        qr->output->multipleResultSets()),
+                      "failed to execute query!");
+            // XOR: Either we have one result set, or we were expecting
+            // multiple result sets and we threw them all away.
+            assert(!!dbres != !!qr->output->multipleResultSets());
         }
 
-        TEST_Sync(ps.getConn()->execute(it, &dbres,
-                                    qr->output->multipleResultSets()),
-                  "failed to execute query!");
-        // XOR: Either we have one result set, or we were expecting
-        // multiple result sets and we threw them all away.
-        assert(!!dbres != !!qr->output->multipleResultSets());
+        // ----------------------------------
+        //       Post Query Processing
+        // ----------------------------------
+        const ResType &res =
+            dbres ? ResType(dbres->unpack()) : mysql_noop_res(ps);
+        return queryEpilogue(ps, *qr.get(), res, q, default_db, pp);
+    } catch (const SynchronizationException &e) {
+        return genericFailureEpilogueResult();
+    } catch (const AbstractException &e) {
+        return genericFailureEpilogueResult();
+    } catch (const CryptDBError &e) {
+        return genericFailureEpilogueResult();
     }
-
-    // ----------------------------------
-    //       Post Query Processing
-    // ----------------------------------
-    const ResType &res =
-        dbres ? ResType(dbres->unpack()) : mysql_noop_res(ps);
-    assert(res.success());
-    const EpilogueResult epi_result =
-        queryEpilogue(ps, *qr.get(), res, q, default_db, pp);
-    assert(epi_result.res_type.success());
-
-    return epi_result;
 }
 
 void

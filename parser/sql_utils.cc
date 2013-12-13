@@ -60,12 +60,3 @@ ItemToString(const Item &i) {
     return s0;
 }
 
-string
-ItemToStringWithQuotes(const Item &i) {
-    const std::string &s = ItemToString(i);
-    if (i.type() != Item::Type::STRING_ITEM) {
-        return s;
-    }
-
-    return "\"" + s + "\"";
-}

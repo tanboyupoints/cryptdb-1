@@ -99,6 +99,14 @@ std::string vector_join(std::vector<T> v, const std::string &delim,
     return output.get();
 }
 
+static std::string identity(std::string s) {return s;}
+
+inline std::string
+vector_join(std::vector<std::string> v, const std::string &delim)
+{
+    return vector_join<std::string>(v, delim, identity);
+}
+
 std::string
 escapeString(const std::unique_ptr<Connect> &c,
              const std::string &escape_me);

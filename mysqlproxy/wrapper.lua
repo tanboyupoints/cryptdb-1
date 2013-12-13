@@ -114,6 +114,8 @@ function read_query_result_real(inj)
     elseif inj.id == RES_DECRYPT then
         local resultset = inj.resultset
 
+        -- note that queries which result in an error are never handed back
+        -- to cryptdb ``proper''
         if resultset.query_status == proxy.MYSQLD_PACKET_ERR then
             local err = proto.from_err_packet(resultset.raw)
             proxy.response.type = proxy.MYSQLD_PACKET_ERR

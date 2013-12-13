@@ -258,6 +258,9 @@ init_onions_layout(const AES_KEY *const m_key,
         return false;
     }
 
+    // we only support the creation of UNSIGNED fields
+    cf->flags = cf->flags | UNSIGNED_FLAG;
+
     for (auto it: onion_layout) {
         const onion o = it.first;
         const std::vector<SECLEVEL> levels = it.second;
@@ -265,7 +268,7 @@ init_onions_layout(const AES_KEY *const m_key,
         // we never have to build Deltaz for our OnionMetaz.
         std::unique_ptr<OnionMeta>
             om(new OnionMeta(o, levels, m_key, cf, fm->leaseIncUniq()));
-        const std::string onion_name = om->getAnonOnionName();
+        const std::string &onion_name = om->getAnonOnionName();
         fm->addChild(OnionMetaKey(o), std::move(om));
 
         LOG(cdb_v) << "adding onion layer " << onion_name

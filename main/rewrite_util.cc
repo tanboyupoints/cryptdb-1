@@ -224,11 +224,9 @@ rewrite_create_field(const FieldMeta * const fm,
         Create_field * const f0 = f->clone(thd->mem_root);
         f0->field_name          = thd->strdup(fm->getSaltName().c_str());
         // Salt is unsigned and is not AUTO_INCREMENT.
-        // > NOT_NULL_FLAG is useful for debugging if mysql strict mode
-        //   (ie, STRICT_ALL_TABLES) is turned on.
-        f0->flags               =
-            (f0->flags | UNSIGNED_FLAG | NOT_NULL_FLAG)
-            & ~AUTO_INCREMENT_FLAG;
+        // > salt can only be NOT NULL if column is NOT NULL
+        f0->flags               = (f0->flags | UNSIGNED_FLAG)
+                                  & ~AUTO_INCREMENT_FLAG;
         f0->sql_type            = MYSQL_TYPE_LONGLONG;
         f0->length              = 8;
 
@@ -628,11 +626,15 @@ prettyPrintQueryResult(const ResType &res)
     std::cout << std::endl;
 }
 
+// returning the QueryAction is useful for sanity checking and for allowing
+// the proxy to determine if a ROLLBACK occurred
 EpilogueResult
 queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
               const ResType &res, const std::string &query,
               const std::string &default_db, bool pp)
 {
+    TEST_Sync(res.success(), "query did not produce good result");
+
     std::pair<bool, std::unique_ptr<DBResult>> after_out =
         qr.output->afterQuery(ps.getEConn());
     assert(!!after_out.first == !!after_out.second);
@@ -669,6 +671,10 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
     if (pp) {
         printEmbeddedState(ps);
         prettyPrintQueryResult(res);
+    }
+
+    if (false == res.success()) {
+        return EpilogueResult(QueryAction::NO_DECRYPT, ResType(false));
     }
 
     if (QueryAction::DECRYPT == action) {

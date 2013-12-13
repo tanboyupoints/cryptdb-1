@@ -712,34 +712,50 @@ SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     }
     this->do_nothing = false;
 
-    const auto pullItemPtr = [](std::shared_ptr<Item> p) -> const Item &
-    {
-        return *p;
-    };
-    const std::function<std::string(std::shared_ptr<Item>)>
-        sharedItemToStringWithQuotes =
-            fnCompose<std::shared_ptr<Item>, const Item &,
-                      std::string>(ItemToStringWithQuotes, pullItemPtr);
-    const auto itemJoin =
-        [&sharedItemToStringWithQuotes]
-            (std::vector<std::shared_ptr<Item> > row) -> std::string
-    {
-        return "(" +
-               vector_join<std::shared_ptr<Item> >(row, ",",
-                                        sharedItemToStringWithQuotes) +
-               ")";
-    };
+    const auto itemToNiceString =
+        [&e_conn] (const std::shared_ptr<Item> &p_item)
+        {
+            const std::string &s = ItemToString(*p_item.get());
 
-    const std::string values_string =
-        vector_join<std::vector<std::shared_ptr<Item> > >(
-                                            select_res_type.rows, ",",
-                                            itemJoin);
+            if (Item::Type::STRING_ITEM != p_item->type()) {
+                return s;
+            }
 
-    // Do the query on the embedded database inside of a transaction
+            // escaping and quoting the string creates a value that can
+            // actually be used in an INSERT statement
+            return "'" + escapeString(e_conn, s) + "'";
+        };
+
+    // We must take these items and convert them into quoted, escaped
+    // strings
+    //  > Item -> std::string -> escaped -> quoted
+    // then we join the results into a single comma seperated values list
+    const auto pItemVectorToNiceValueList =
+        [&itemToNiceString]
+            (const std::vector<std::vector<std::shared_ptr<Item>>> &vec)
+        {
+            std::vector<std::string> esses;
+            for (auto row_it : vec) {
+                std::vector<std::string> nice_values(row_it.size());
+                std::transform(row_it.begin(), row_it.end(),
+                               nice_values.begin(), itemToNiceString);
+                esses.push_back("("+ vector_join(nice_values, ",") + ")");
+            }
+
+            return vector_join(esses, ",");
+        };
+
+    const std::string &values_string =
+        pItemVectorToNiceValueList(select_res_type.rows);
+    // do the query on the embedded database inside of a transaction
     // so that we can prevent failure artifacts from populating the
-    // embedded dabase.
+    // embedded database
     TEST_Sync(e_conn->execute("START TRANSACTION;"),
               "failed to start transaction");
+
+    // turn on strict mode so we can determine if we have bad values
+    // > ie trying to insert 256 into a TINYINT UNSIGNED column
+    SYNC_IF_FALSE(strictMode(e_conn.get()), e_conn);
 
     // Push the plaintext rows to the embedded database.
     const std::string push_q =
@@ -751,6 +767,9 @@ SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     // database.
     SYNC_IF_FALSE(e_conn->execute(this->original_query), e_conn);
 
+    // strict mode off
+    SYNC_IF_FALSE(e_conn->execute("SET SESSION sql_mode = ''"), e_conn);
+
     // > Collect the results from the embedded database.
     // > This code relies on single threaded access to the database
     //   and on the fact that the database is cleaned up after
@@ -760,10 +779,9 @@ SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
         " SELECT * FROM " + this->plain_table + ";";
     SYNC_IF_FALSE(e_conn->execute(select_results_q, &dbres), e_conn);
     const ResType interim_res = ResType(dbres->unpack());
-    this->output_values =
-        vector_join<std::vector<std::shared_ptr<Item> > >(
-                                        interim_res.rows, ",",
-                                        itemJoin);
+    this->escaped_output_values =
+        pItemVectorToNiceValueList(interim_res.rows);
+
     // Cleanup the embedded database.
     const std::string cleanup_q =
         "DELETE FROM " + this->plain_table + ";";
@@ -801,7 +819,7 @@ SpecialUpdate::getQuery(std::list<std::string> * const queryz,
     // > Add each row from the embedded database to the data database.
     const std::string insert_q =
         " INSERT INTO " + this->plain_table +
-        " VALUES " + this->output_values.get() + ";";
+        " VALUES " + this->escaped_output_values.get() + ";";
     const std::string re_insert =
         rewriteAndGetSingleQuery(ps, insert_q, schema, this->default_db);
 

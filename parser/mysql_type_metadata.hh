@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <memory>
 
+enum class signage {SIGNED, UNSIGNED};
+
 class AbstractMySQLTypeMetaData {
     AbstractMySQLTypeMetaData(const AbstractMySQLTypeMetaData &a) = delete;
     AbstractMySQLTypeMetaData(AbstractMySQLTypeMetaData &&a) = delete;
@@ -28,19 +30,29 @@ public:
         buildMySQLTypeMetaData();
 };
 
+/*
 template <enum enum_field_types id>
 class MySQLTypeMetaData : public AbstractMySQLTypeMetaData {
 public:
     MySQLTypeMetaData() {}
     ~MySQLTypeMetaData() {}
 };
+*/
 
 const std::string MySQLTypeToText(const Create_field &f);
 bool encryptionSupported(const Create_field &f);
 bool isMySQLTypeNumeric(const Create_field &f);
 bool isMySQLTypeNumeric(enum enum_field_types type);
+
+std::pair<int64_t, uint64_t>
+supportsRange(const Create_field &f);
+
+std::pair<bool, enum enum_field_types>
+getTypeForRange(std::pair<int64_t, uint64_t> inclusiveRange);
+
 Item *MySQLFieldTypeToItem(enum enum_field_types type,
                            const std::string &value);
+
 std::pair<enum enum_field_types, unsigned long>
 AESTypeAndLength(const Create_field &f, bool pad);
 
@@ -49,8 +61,17 @@ AESTypeAndLength(const Create_field &f, bool pad);
 //             integer types
 // ########################################
 // ########################################
+class AbstractMySQLIntegerMetaData : public AbstractMySQLTypeMetaData {
+public:
+    virtual std::pair<int64_t, uint64_t>
+        supportsRange(const Create_field &f) const = 0;
+    virtual bool
+        isRangeSupported(std::pair<int64_t, uint64_t> inclusiveRange)
+        const = 0;
+};
+
 template <enum enum_field_types id>
-class MySQLIntegerMetaData : public MySQLTypeMetaData<id> {
+class MySQLIntegerMetaData : public AbstractMySQLIntegerMetaData {
 public:
     bool encryptionSupported() const {return true;}
     bool isNumeric() const {return true;}
@@ -65,24 +86,40 @@ public:
     MySQLTinyMetaData() {}
     const std::string humanReadable(const Create_field &) const
         {return "TINYINT";}
+    std::pair<int64_t, uint64_t>
+        supportsRange(const Create_field &f) const;
+    bool isRangeSupported(std::pair<int64_t, uint64_t> inclusiveRange)
+        const;
 };
 
 class MySQLShortMetaData : public MySQLIntegerMetaData<MYSQL_TYPE_SHORT> {
 public:
     const std::string humanReadable(const Create_field &) const
         {return "SMALLINT";}
+    std::pair<int64_t, uint64_t>
+        supportsRange(const Create_field &f) const;
+    bool isRangeSupported(std::pair<int64_t, uint64_t> inclusiveRange)
+        const;
 };
 
 class MySQLInt24MetaData : public MySQLIntegerMetaData<MYSQL_TYPE_INT24> {
 public:
     const std::string humanReadable(const Create_field &) const
         {return "MEDIUMINT";}
+    std::pair<int64_t, uint64_t>
+        supportsRange(const Create_field &f) const;
+    bool isRangeSupported(std::pair<int64_t, uint64_t> inclusiveRange)
+        const;
 };
 
 class MySQLLongMetaData : public MySQLIntegerMetaData<MYSQL_TYPE_LONG> {
 public:
     const std::string humanReadable(const Create_field &) const
         {return "INT";}
+    std::pair<int64_t, uint64_t>
+        supportsRange(const Create_field &f) const;
+    bool isRangeSupported(std::pair<int64_t, uint64_t> inclusiveRange)
+        const;
 };
 
 class MySQLLongLongMetaData :
@@ -91,6 +128,10 @@ class MySQLLongLongMetaData :
 public:
     const std::string humanReadable(const Create_field &) const
         {return "BIGINT";}
+    std::pair<int64_t, uint64_t>
+        supportsRange(const Create_field &f) const;
+    bool isRangeSupported(std::pair<int64_t, uint64_t> inclusiveRange)
+        const;
 };
 
 
@@ -100,7 +141,7 @@ public:
 // ########################################
 // ########################################
 template <enum enum_field_types id>
-class AbstractMySQLDecimalMetaData : public MySQLTypeMetaData<id> {
+class AbstractMySQLDecimalMetaData : public AbstractMySQLTypeMetaData {
 public:
     bool encryptionSupported() const {return true;}
     bool isNumeric() const {return true;}
@@ -125,7 +166,7 @@ class MySQLNewDecimalMetaData :
 // ########################################
 // ########################################
 template <enum enum_field_types id>
-class AbstractMySQLFloatMetaData : public MySQLTypeMetaData<id> {
+class AbstractMySQLFloatMetaData : public AbstractMySQLTypeMetaData {
 public:
     bool encryptionSupported() const {return false;}
     bool isNumeric() const {return true;}
@@ -155,7 +196,7 @@ bool isRealEncoded(const Create_field &f);
 // ########################################
 // ########################################
 template <enum enum_field_types id>
-class AbstractMySQLStringMetaData : public MySQLTypeMetaData<id> {
+class AbstractMySQLStringMetaData : public AbstractMySQLTypeMetaData {
 public:
     AbstractMySQLStringMetaData() {}
 
@@ -194,7 +235,7 @@ public:
 // ########################################
 // ########################################
 template <enum enum_field_types id>
-class AbstractMySQLDateMetaData : public MySQLTypeMetaData<id> {
+class AbstractMySQLDateMetaData : public AbstractMySQLTypeMetaData {
 public:
     AbstractMySQLDateMetaData() {}
 
@@ -245,7 +286,7 @@ public:
 //               enum types
 // ########################################
 // ########################################
-class MySQLEnumMetaData : public MySQLTypeMetaData<MYSQL_TYPE_ENUM> {
+class MySQLEnumMetaData : public AbstractMySQLTypeMetaData {
 public:
     MySQLEnumMetaData() {}
 
@@ -266,7 +307,7 @@ public:
 // ########################################
 // ########################################
 template <enum enum_field_types id>
-class AbstractMySQLBlobMetaData : public MySQLTypeMetaData<id> {
+class AbstractMySQLBlobMetaData : public AbstractMySQLTypeMetaData {
 public:
     bool encryptionSupported() const {return true;}
     bool isNumeric() const {return false;}

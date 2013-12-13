@@ -698,6 +698,14 @@ static QueryList MiscBugs = QueryList("MiscBugs",
       Query("SELECT * FROM floating WHERE x < 11e+14"),
       Query("SELECT * FROM floating"),
       Query("DROP TABLE floating"),
+
+      // SpecialUpdate must correctly handle escaped chars
+      Query("CREATE TABLE su (x integer, y text)"),
+      Query("INSERT INTO su VALUES (1, 'some\\'text')"),
+      Query("UPDATE su SET x = x + 1"),
+      Query("SELECT * FROM su"),
+      Query("DROP TABLE su"),
+
       Query("DROP TABLE crawlies"),
       Query("DROP TABLE enums"),
       Query("DROP TABLE bugs"),
@@ -808,6 +816,77 @@ static QueryList Directives = QueryList("Directives",
       Query("DROP TABLE directives")
     });
 
+// FIXME: write tests for bigint column
+static QueryList Range = QueryList("Range",
+      // we must run the control database in strict mode in order to
+      // match semantics
+    { Query("SET SESSION sql_mode = 'ANSI,TRADITIONAL'"),
+      Query("CREATE TABLE t (t TINYINT UNSIGNED DEFAULT 0,"
+            "                s SMALLINT UNSIGNED DEFAULT 0,"
+            "                m MEDIUMINT UNSIGNED DEFAULT 0,"
+            "                i INT UNSIGNED DEFAULT 0,"
+            "                b BIGINT UNSIGNED DEFAULT 0)"),
+      /*
+      // lets take a look at the largest value
+      Query("INSERT INTO t (b) VALUES (18446744073709551615)"),
+      Query("SELECT * FROM t"),
+      Query("SELECT SUM(b) FROM t"),
+      Query("SELECT * FROM t WHERE b > 18446744073709551614"
+            "                  AND b <= 18446744073709551615"),
+      */
+      // unsigned minimum
+      Query("INSERT INTO t VALUES (0, 0, 0, 0, 0)"),
+      Query("SELECT * FROM t"),
+      // largest single value that will fit in each row
+      Query("INSERT INTO t VALUES (255, 255, 255, 255, 255)"),
+      Query("SELECT * FROM t"),
+      // largest value each field will support
+      Query("INSERT INTO t VALUES (255, 65535, 16777215,"
+            "                      4294967295, 4294967295)"),
+      Query("SELECT * FROM t"),
+      // should fail on both because 5000 can't go in tiny
+      Query("INSERT INTO t VALUES (5000, 5000, 5000, 5000, 5000)"),
+      Query("SELECT * FROM t"),
+      Query("SELECT SUM(t), SUM(s), SUM(m), SUM(i), SUM(b) FROM t"),
+      // one more than maximum, should fail on both
+      Query("INSERT INTO t (t) VALUES (256)"),
+      Query("INSERT INTO t (s) VALUES (65536)"),
+      Query("INSERT INTO t (m) VALUES (16777217)"),
+      Query("INSERT INTO t (i) VALUES (4294967296)"),
+      Query("SELECT * FROM t"),
+      Query("SELECT SUM(t), SUM(s), SUM(m), SUM(i), SUM(b) FROM t"),
+      // will fail on cryptdb and succeed on the control database
+      // Query("INSERT INTO t (b) VALUES (4294967296)"),
+      // Query("SELECT * FROM t"),
+      // should fail on both
+      Query("UPDATE t SET t = t + 5"),
+      Query("UPDATE t SET s = s + 5"),
+      Query("UPDATE t SET m = m + 5"),
+      Query("UPDATE t SET i = i + 5"),
+      Query("SELECT SUM(t), SUM(s), SUM(m), SUM(i) FROM t"),
+      // will on cryptdb and succeed on control database
+      // Query("UPDATE t SET b = b + 5"),
+      // Query("SELECT SUM(b) FROM t"),
+      Query("SELECT * FROM t"),
+      // conditional selections
+      Query("SELECT t, s FROM t WHERE t >= 255 AND s < 65535"),
+      Query("SELECT m, i FROM t WHERE m < 1677215"),
+      Query("SELECT m, i FROM t WHERE m > 1677215"),
+      Query("SELECT t, s, i FROM t WHERE i = 16777215"),
+      Query("SELECT * from t"),
+      /*
+      // the comparisons fail because the constants are out of range
+      Query("SELECT m, t, s FROM t WHERE s = 65536"),
+      Query("SELECT m, i FROM t WHERE m > 4294967290"),
+      Query("SELECT i FROM t WHERE i > 99999999999999999999"),
+      Query("SELECT t, i FROM t WHERE t < 99999999999999999999"),
+      Query("SELECT t, s, m, i FROM t"),
+      */
+      Query("SELECT t, s, m FROM t WHERE s = m AND b = i"),
+      // Query("SELECT SUM(t), SUM(s), SUM(m), SUM(i), SUM(b) FROM t"),
+      Query("DROP TABLE t"),
+      Query("SET SESSION sql_mode = ''")});
+
 //-----------------------------------------------------------------------
 
 Connection::Connection(const TestConfig &input_tc, test_mode input_type) {
@@ -846,6 +925,7 @@ Connection::start() {
         {
             Connect *const c = 
                 new Connect(tc.host, tc.user, tc.pass, tc.port);
+            // assert(strictMode(c));
             conn_set.insert(c);
             this->conn = conn_set.begin();
             break;
@@ -1010,17 +1090,17 @@ CheckQuery(const TestConfig &tc, const Query &query)
         // > ie, if an INSERT throws an exception we want the SELECTs
         //   coming afterwards to fail as well
         const ResType control_res = control->execute(query);
-        AssignOnce<ResType> test_res;
+        ResType test_res(false);
         try {
             test_res = test->execute(query);
-        } catch (AbstractException &e) {
+        } catch (const AbstractException &e) {
             std::cout << e << std::endl;
-            return false;
+            return !control_res.ok;
         }
 
-        if (control_res.ok != test_res.get().ok) {
+        if (control_res.ok != test_res.ok) {
             LOG(warn) << "control " << control_res.ok
-                << ", test " << test_res.get().ok
+                << ", test " << test_res.ok
                 << " for query: " << query.query;
 
             if (tc.stop_if_fail) {
@@ -1028,14 +1108,14 @@ CheckQuery(const TestConfig &tc, const Query &query)
             }
 
             return false;
-        } 
+        }
 
-        if (!match(test_res.get(), control_res)) {
+        if (!match(test_res, control_res)) {
             LOG(warn) << "result mismatch for query: " << query.query;
             LOG(warn) << "control is:";
             printRes(control_res);
             LOG(warn) << "test is:";
-            printRes(test_res.get());
+            printRes(test_res);
 
             if (tc.stop_if_fail) {
                 thrower() << "stop on failure";
@@ -1110,7 +1190,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 527/544
+    //      TOTAL RESULT: 563/580
     // ###############################
 
     std::vector<Score> scores;
@@ -1159,10 +1239,8 @@ RunTest(const TestConfig &tc) {
     // Pass 28/31
     scores.push_back(CheckQueryList(tc, Auto));
 
-    /*
     // Pass 8/10
-    scores.push_back(CheckQueryList(tc, Negative));
-    */
+    // scores.push_back(CheckQueryList(tc, Negative));
 
     // Pass 19/19
     scores.push_back(CheckQueryList(tc, DefaultValue));
@@ -1180,7 +1258,7 @@ RunTest(const TestConfig &tc) {
     // Pass 28/28
     scores.push_back(CheckQueryList(tc, DDL));
 
-    // Pass 34/35
+    // Pass 39/40
     scores.push_back(CheckQueryList(tc, MiscBugs));
 
     // Pass 12/12
@@ -1188,6 +1266,9 @@ RunTest(const TestConfig &tc) {
 
     // Pass 24/35
     scores.push_back(CheckQueryList(tc, Directives));
+
+    // Pass 31/31
+    scores.push_back(CheckQueryList(tc, Range));
 
     int npass = 0;
     int ntest = 0;

@@ -335,10 +335,11 @@ itemNullVector(unsigned int count)
     return out;
 }
 
-static void
+static ResType
 getResTypeFromLuaTable(lua_State *const L, int fields_index,
-                       int rows_index, ResType *const out_res)
+                       int rows_index)
 {
+    ResType out_res(true);
     /* iterate over the fields argument */
     lua_pushnil(L);
     while (lua_next(L, fields_index)) {
@@ -349,9 +350,9 @@ getResTypeFromLuaTable(lua_State *const L, int fields_index,
         while (lua_next(L, -2)) {
             const std::string k = xlua_tolstring(L, -2);
             if ("name" == k) {
-                out_res->names.push_back(xlua_tolstring(L, -1));
+                out_res.names.push_back(xlua_tolstring(L, -1));
             } else if ("type" == k) {
-                out_res->types.push_back(static_cast<enum_field_types>(luaL_checkint(L, -1)));
+                out_res.types.push_back(static_cast<enum_field_types>(luaL_checkint(L, -1)));
             } else {
                 LOG(warn) << "unknown key " << k;
             }
@@ -361,7 +362,7 @@ getResTypeFromLuaTable(lua_State *const L, int fields_index,
         lua_pop(L, 1);
     }
 
-    assert(out_res->names.size() == out_res->types.size());
+    assert(out_res.names.size() == out_res.types.size());
 
     /* iterate over the rows argument */
     lua_pushnil(L);
@@ -372,17 +373,17 @@ getResTypeFromLuaTable(lua_State *const L, int fields_index,
         /* initialize all items to NULL, since Lua skips
            nil array entries */
         std::vector<std::shared_ptr<Item> > row =
-            itemNullVector(out_res->types.size());
+            itemNullVector(out_res.types.size());
 
         lua_pushnil(L);
         while (lua_next(L, -2)) {
             const int key = luaL_checkint(L, -2) - 1;
 
             assert(key >= 0
-                   && static_cast<uint>(key) < out_res->types.size());
+                   && static_cast<uint>(key) < out_res.types.size());
             const std::string data = xlua_tolstring(L, -1);
             Item *const value =
-                MySQLFieldTypeToItem(out_res->types[key], data);
+                MySQLFieldTypeToItem(out_res.types[key], data);
             row[key] = std::shared_ptr<Item>(value);
 
             lua_pop(L, 1);
@@ -390,11 +391,13 @@ getResTypeFromLuaTable(lua_State *const L, int fields_index,
         // We can not use this assert because rows that contain many
         // NULLs don't return their columns in a strictly increasing
         // order.
-        // assert((unsigned int)key == out_res->names.size() - 1);
+        // assert((unsigned int)key == out_res.names.size() - 1);
 
-        out_res->rows.push_back(row);
+        out_res.rows.push_back(row);
         lua_pop(L, 1);
     }
+
+    return out_res;
 }
 
 static int
@@ -416,8 +419,7 @@ envoi(lua_State *const L)
     assert(ps);
     ps->safeCreateEmbeddedTHD();
 
-    ResType res;
-    getResTypeFromLuaTable(L, 2, 3, &res);
+    const ResType &res = getResTypeFromLuaTable(L, 2, 3);
     const std::unique_ptr<QueryRewrite> &qr = c_wrapper->getQueryRewrite();
     try {
         const EpilogueResult &epi_result =

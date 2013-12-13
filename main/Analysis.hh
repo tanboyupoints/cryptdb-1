@@ -304,7 +304,7 @@ private:
     const std::string default_db;
     const ProxyState &ps;
 
-    AssignOnce<std::string> output_values;
+    AssignOnce<std::string> escaped_output_values;
     AssignOnce<bool> do_nothing;
 };
 

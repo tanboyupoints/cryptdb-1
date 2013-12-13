@@ -181,22 +181,22 @@ testSlowMatch()
         {sp("box"), sp("candy"), sp("rocks")};
     const std::vector<std::string> fields({"red", "green", "black"});
 
-    ResType expected0;
-    ResType res0;
+    ResType expected0(true);
+    ResType res0(true);
     res0.names = expected0.names = fields;
     res0.rows = expected0.rows =
         std::vector<std::vector<std::shared_ptr<Item> > > ({
             row0, row1, row2});
 
-    ResType expected1;
-    ResType res1;
+    ResType expected1(true);
+    ResType res1(true);
     res1.names = expected1.names = fields;
     res1.rows = expected1.rows =
         std::vector<std::vector<std::shared_ptr<Item> > > ({
             row0, row1, row0});
 
-    ResType expected2;
-    ResType res2;
+    ResType expected2(true);
+    ResType res2(true);
     res2.names = expected2.names = fields;
     expected2.rows =
         std::vector<std::vector<std::shared_ptr<Item> > > ({
@@ -205,8 +205,8 @@ testSlowMatch()
         std::vector<std::vector<std::shared_ptr<Item> > > ({
             row0, row1, row1});
 
-    ResType expected3;
-    ResType res3;
+    ResType expected3(true);
+    ResType res3(true);
     res3.names = expected3.names = fields;
     expected3.rows =
         std::vector<std::vector<std::shared_ptr<Item> > > ({
@@ -215,8 +215,8 @@ testSlowMatch()
         std::vector<std::vector<std::shared_ptr<Item> > > ({
             row2, row1, row0});
 
-    ResType expected4;
-    ResType res4;
+    ResType expected4(true);
+    ResType res4(true);
     res4.names = expected4.names = fields;
     expected4.rows =
         std::vector<std::vector<std::shared_ptr<Item> > > ({

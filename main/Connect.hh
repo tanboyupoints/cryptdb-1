@@ -18,17 +18,22 @@ typedef MYSQL_RES DBResult_native;
 extern "C" void *create_embedded_thd(int client_flag);
 
 class DBResult {
- private:
-    DBResult();
-
  public:
+    DBResult(DBResult_native *const n, bool success)
+        : n(n), success(success) {}
+
     ~DBResult();
     DBResult_native *n;
 
     //returns data from this db result
     ResType unpack();
 
-    static DBResult *wrap(DBResult_native *);
+    static DBResult *store(MYSQL *const mysql);
+
+    bool getSuccess() const {return success;}
+
+ private:
+    const bool success;
 };
 
 class Connect {
@@ -65,3 +70,6 @@ class Connect {
 
     bool close_on_destroy;
 };
+
+bool strictMode(Connect *const c);
+

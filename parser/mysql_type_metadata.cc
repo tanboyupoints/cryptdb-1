@@ -17,6 +17,8 @@ genericVarCharCrypto(unsigned long len, bool pad);
 //             integer types
 // ########################################
 // ########################################
+// ::isRangeSupported(...) assumes fields are unsigned
+
 template <enum enum_field_types id>
 Item *
 MySQLIntegerMetaData<id>::intoItem(const std::string &value) const
@@ -25,6 +27,130 @@ MySQLIntegerMetaData<id>::intoItem(const std::string &value) const
         Item_int(static_cast<long long>(valFromStr(value)));
 }
 
+static uint64_t
+inclusiveUpperBound(unsigned bits)
+{
+    if (64 == bits) {
+        return UINT64_MAX;
+    }
+
+    return (1LL << bits) - 1;
+}
+
+static std::pair<int64_t, uint64_t>
+supportsRangeHelper(const Create_field &field, unsigned bytes)
+{
+    assert(bytes <= 8);
+
+    const unsigned int bits = 8 * bytes;
+    const signage s = (field.sql_type & UNSIGNED_FLAG) == UNSIGNED_FLAG
+        ? signage::SIGNED : signage::UNSIGNED;
+    AssignOnce<bool> status;
+    if (signage::UNSIGNED == s) {
+        return std::make_pair(0, inclusiveUpperBound(bits));
+    }
+
+    assert(signage::SIGNED == s);
+    const uint64_t edge = inclusiveUpperBound(bits - 1);
+    return std::make_pair(-static_cast<int64_t>(edge + 1), edge);
+}
+
+std::pair<int64_t, uint64_t>
+MySQLTinyMetaData::supportsRange(const Create_field &field) const
+{
+    // 1 byte
+    const unsigned int bytes = 1;
+    return supportsRangeHelper(field, bytes);
+}
+
+bool
+MySQLTinyMetaData::isRangeSupported(std::pair<int64_t, uint64_t> inclusiveRange) const
+{
+    // signed   : -128  127
+    // unsigned : 0     255
+    const int64_t minimum  = 0;
+    const uint64_t maximum = 255;
+    return inclusiveRange.first >= minimum
+        && inclusiveRange.second <= maximum;
+}
+
+std::pair<int64_t, uint64_t>
+MySQLShortMetaData::supportsRange(const Create_field &field) const
+{
+    // 2 bytes
+    const unsigned int bytes = 2;
+    return supportsRangeHelper(field, bytes);
+}
+
+bool
+MySQLShortMetaData::isRangeSupported(std::pair<int64_t, uint64_t> inclusiveRange) const
+{
+    // signed   : -32768    32767
+    // unsigned : 0         65535
+    const int64_t minimum  = 0;
+    const uint64_t maximum = 65535;
+    return inclusiveRange.first >= minimum
+        && inclusiveRange.second <= maximum;
+}
+
+std::pair<int64_t, uint64_t>
+MySQLInt24MetaData::supportsRange(const Create_field &field) const
+{
+    // 3 bytes
+    const unsigned int bytes = 3;
+    return supportsRangeHelper(field, bytes);
+}
+
+bool
+MySQLInt24MetaData::isRangeSupported(std::pair<int64_t, uint64_t> inclusiveRange) const
+{
+    // signed   : -8388608  8388607
+    // unsigned : 0         16777215
+    const int64_t minimum  = 0;
+    const uint64_t maximum = 16777215L;
+    return inclusiveRange.first >= minimum
+        && inclusiveRange.second <= maximum;
+}
+
+std::pair<int64_t, uint64_t>
+MySQLLongMetaData::supportsRange(const Create_field &field) const
+{
+    // 4 bytes
+    const unsigned int bytes = 4;
+    return supportsRangeHelper(field, bytes);
+}
+
+bool
+MySQLLongMetaData::isRangeSupported(std::pair<int64_t, uint64_t> inclusiveRange) const
+{
+    // signed   : -2147483648   2147483647
+    // unsigned : 0             4294967295
+    const int64_t minimum  = 0;
+    const uint64_t maximum = 4294967295L;
+    return inclusiveRange.first >= minimum
+        && inclusiveRange.second <= maximum;
+}
+
+std::pair<int64_t, uint64_t>
+MySQLLongLongMetaData::supportsRange(const Create_field &field) const
+{
+    // 8 bytes
+    const unsigned int bytes = 8;
+    return supportsRangeHelper(field, bytes);
+}
+
+bool
+MySQLLongLongMetaData::isRangeSupported(std::pair<int64_t, uint64_t> inclusiveRange) const
+{
+    // signed   : -9223372036854775808      9223372036854775807
+    // unsigned : 0                         18446744073709551615
+    const int64_t minimum  = 0;
+    const uint64_t maximum = 18446744073709551615ULL;
+    return inclusiveRange.first >= minimum
+        && inclusiveRange.second <= maximum;
+}
+
+#undef RANGE_TEST
 
 // ########################################
 // ########################################
@@ -311,6 +437,22 @@ fetch(enum enum_field_types type)
     return it->second;
 }
 
+static const AbstractMySQLIntegerMetaData &
+fetchInt(enum enum_field_types type)
+{
+    const std::unique_ptr<AbstractMySQLTypeMetaData> &abstract =
+        fetch(type);
+    if (!abstract->isNumeric()) {
+        thrower() << "bad type to supportsRange";
+    }
+
+    // bad things are about to happen if you tried to fetch a numeric
+    // non integer type (ie decimal)
+    const AbstractMySQLIntegerMetaData *const integer_meta =
+        static_cast<AbstractMySQLIntegerMetaData *>(abstract.get());
+    return *integer_meta;
+}
+
 const std::string
 MySQLTypeToText(const Create_field &f)
 {
@@ -333,6 +475,31 @@ bool
 isMySQLTypeNumeric(const Create_field &f)
 {
     return isMySQLTypeNumeric(f.sql_type);
+}
+
+std::pair<int64_t, uint64_t>
+supportsRange(const Create_field &f)
+{
+    return fetchInt(f.sql_type).supportsRange(f);
+}
+
+std::pair<bool, enum enum_field_types>
+getTypeForRange(std::pair<int64_t, uint64_t> inclusiveRange)
+{
+    // FIXME: find easier to maintain way to do this
+    // > list must be in order from small to large
+    static std::vector<enum enum_field_types>
+        integer_types({MYSQL_TYPE_TINY, MYSQL_TYPE_SHORT, MYSQL_TYPE_INT24,
+                       MYSQL_TYPE_LONG, MYSQL_TYPE_LONGLONG});
+    for (auto it : integer_types) {
+        const AbstractMySQLIntegerMetaData &integer_meta =
+            fetchInt(it);
+        if (integer_meta.isRangeSupported(inclusiveRange)) {
+            return std::make_pair(true, it);
+        }
+    }
+
+    return std::make_pair(false, static_cast<enum enum_field_types>(-1));
 }
 
 Item *
