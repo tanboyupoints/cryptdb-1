@@ -612,17 +612,17 @@ printEmbeddedState(const ProxyState &ps) {
 std::string
 terminalEscape(const std::string &s)
 {
-  std::string out;
-  for (auto it : s) {
-      if (isprint(it)) {
-          out.push_back(it);
-          continue;
-      }
+    std::string out;
+    for (auto it : s) {
+        if (isprint(it)) {
+            out.push_back(it);
+            continue;
+        }
 
-      out.push_back('*');
-  }
+        out.push_back('*');
+    }
 
-  return out;
+    return out;
 }
 
 void
