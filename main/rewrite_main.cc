@@ -742,7 +742,7 @@ removeOnionLayer(const Analysis &a, const TableMeta &tm,
           << "    SET " << fieldanon  << " = " << *decUDF
           << ";";
 
-    std::cerr << "\nADJUST: \n" << query.str() << std::endl;
+    std::cerr << "\nADJUST: \n" << terminalEscape(query.str()) << std::endl;
 
     //execute decryption query
 
@@ -1508,7 +1508,7 @@ printRes(const ResType &r) {
         snprintf(buf, sizeof(buf), "%-25s", r.names[i].c_str());
         ssn << buf;
     }
-    std::cerr << ssn.str() << std::endl;
+    std::cerr << terminalEscape(ssn.str()) << std::endl;
     //LOG(edb_v) << ssn.str();
 
     /* next, print out the rows */
@@ -1521,7 +1521,7 @@ printRes(const ResType &r) {
             snprintf(buf, sizeof(buf), "%-25s", sstr.str().c_str());
             ss << buf;
         }
-        std::cerr << ss.str() << std::endl;
+        std::cerr << terminalEscape(ss.str()) << std::endl;
         //LOG(edb_v) << ss.str();
     }
 }

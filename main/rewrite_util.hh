@@ -154,6 +154,8 @@ bool
 queryHandleRollback(const ProxyState &ps, const std::string &query,
                     SchemaInfo const &schema);
 
+std::string terminalEscape(const std::string &s);
+
 void
 prettyPrintQuery(const std::string &query);
 

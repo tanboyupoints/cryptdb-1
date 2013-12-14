@@ -609,12 +609,27 @@ printEmbeddedState(const ProxyState &ps) {
 */
 }
 
+std::string
+terminalEscape(const std::string &s)
+{
+  std::string out;
+  for (auto it : s) {
+      if (isprint(it)) {
+          out.push_back(it);
+          continue;
+      }
+
+      out.push_back('*');
+  }
+
+  return out;
+}
 
 void
 prettyPrintQuery(const std::string &query)
 {
     std::cout << std::endl << RED_BEGIN
-              << "QUERY: " << COLOR_END << query << std::endl;
+              << "QUERY: " << COLOR_END << terminalEscape(query) << std::endl;
 }
 
 static void
