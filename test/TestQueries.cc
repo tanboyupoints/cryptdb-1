@@ -1196,6 +1196,7 @@ RunTest(const TestConfig &tc) {
     std::vector<Score> scores;
 
     assert(testSlowMatch());
+    assert(test64bitZZConversions());
 
     // Pass 51/51
     scores.push_back(CheckQueryList(tc, Select));

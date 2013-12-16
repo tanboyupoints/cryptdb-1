@@ -28,6 +28,16 @@
 #include <util/errstream.hh>
 #include <util/params.hh>
 
+#define RETURN_FALSE_IF_FALSE(status)       \
+{                                           \
+    if (!(status)) {                        \
+        return false;                       \
+    }                                       \
+}
+
+#define RFIF RETURN_FALSE_IF_FALSE
+
+
 // ==== CONSTANTS ============== //
 
 #define SVAL2(s) #s
@@ -624,3 +634,5 @@ destructThenFree(void *const p)
         free(static_cast<T *>(p));
     }
 }
+
+bool test64bitZZConversions();

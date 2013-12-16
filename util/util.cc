@@ -110,14 +110,9 @@ IntFromBytes(const unsigned char * bytes, unsigned int noBytes)
 uint64_t
 uint64FromZZ(ZZ val)
 {
-    uint64_t res = 0;
-    uint64_t mul = 1;
-    while (val > 0) {
-        res = res + mul*(to_int(val % 10));
-        mul = mul * 10;
-        val = val / 10;
-    }
-    return res;
+    uint64_t out;
+    conv(out, val);
+    return out;
 }
 
 
@@ -227,19 +222,7 @@ void ZZFromBytesFast(ZZ& x, const unsigned char *p, long n) {
 ZZ
 ZZFromUint64 (uint64_t value)
 {
-    unsigned int unit = 256;
-    ZZ power;
-    power = 1;
-    ZZ res;
-    res = 0;
-
-    while (value > 0) {
-        res = res + ((long int)value % unit) * power;
-        power = power * unit;
-        value = value / unit;
-    }
-    return res;
-
+    return to_ZZ(value);
 };
 
 char *
@@ -469,3 +452,31 @@ equalsIgnoreCase(const std::string &s1, const std::string &s2)
     return toLowerCase(s1) == toLowerCase(s2);
 }
 
+// quick n dirty unit testing
+bool
+test64bitZZConversions()
+{
+    // there was a problem with numbers larger than 0x7FFFFFFFFFFFFFFF; they
+    // were too small by 256 after conversions
+    const uint64_t low_bad = 0x7FFFFFFFFFFFFFF0;
+    for (uint64_t i = low_bad; i <= low_bad + 50; ++i) {
+        RFIF(i == uint64FromZZ(ZZFromUint64(i)));
+    }
+
+    // try some other value
+    const uint64_t other_start = 0x9ABCD00012340000;
+    for (uint64_t i = other_start; i <= other_start + 50; ++i) {
+        RFIF(i == uint64FromZZ(ZZFromUint64(i)));
+    }
+
+    // try the biggest values
+    {
+        const uint64_t high_bad = 0xFFFFFFFFFFFFFFC0;
+        uint64_t i = high_bad;
+        do {
+            RFIF(i == uint64FromZZ(ZZFromUint64(i)));
+        } while (i++ < 0xFFFFFFFFFFFFFFFF);
+    }
+
+    return true;
+}

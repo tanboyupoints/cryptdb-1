@@ -8,15 +8,6 @@
     static std::string instanceTypeName() {return (value);}
 
 
-#define RETURN_FALSE_IF_FALSE(status)       \
-{                                           \
-    if (!(status)) {                        \
-        return false;                       \
-    }                                       \
-}
-
-#define RFIF RETURN_FALSE_IF_FALSE
-
 #define RETURN_NULL_IF_NULL(p)              \
     (p);                                    \
     if (!(p)) {                             \
