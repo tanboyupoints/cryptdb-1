@@ -452,6 +452,34 @@ equalsIgnoreCase(const std::string &s1, const std::string &s2)
     return toLowerCase(s1) == toLowerCase(s2);
 }
 
+std::string
+leadingZeros(const std::string &input, size_t count)
+{
+    assert(count >= input.length());
+
+    // add leading zeros until the length matches count
+    std::string zeros;
+    while (zeros.length() < (count - input.length())) {
+        zeros.push_back(0);
+    }
+
+    return zeros + input;
+}
+
+std::string
+trailingZeros(const std::string &input, size_t count)
+{
+    assert(count >= input.length());
+
+    // add trailing zeros until the length matches count
+    std::string zeros;
+    while (zeros.length() < (count - input.length())) {
+        zeros.push_back(0);
+    }
+
+    return input + zeros;
+}
+
 // quick n dirty unit testing
 bool
 test64bitZZConversions()

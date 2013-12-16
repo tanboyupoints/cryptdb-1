@@ -70,30 +70,24 @@ struct Query {
     std::string query;
     CrashPoint * crash_point;
     DBOnionState * onion_states;
+    enum class WHERE_EXEC {TEST, CONTROL, BOTH};
+    WHERE_EXEC where_exec;
 
-    Query(const std::string &q) {
-        query = q;
-        crash_point = NULL;
-        onion_states = NULL;
-    }
+    Query(const std::string &q, WHERE_EXEC where_exec=WHERE_EXEC::BOTH)
+        : query(q), crash_point(NULL), onion_states(NULL),
+          where_exec(where_exec) {}
 
-    Query(const std::string &q, CrashPoint * cp) {
-        query = q;
-        crash_point = cp;
-        onion_states = NULL;
-    }
+    Query(const std::string &q, CrashPoint *const cp)
+        : query(q), crash_point(cp), onion_states(NULL),
+          where_exec(WHERE_EXEC::BOTH) {}
 
-    Query(const std::string &q, DBOnionState * os) {
-        query = q;
-        crash_point = NULL;
-        onion_states = os;
-    }
+    Query(const std::string &q, DBOnionState *const os)
+        : query(q), crash_point(NULL), onion_states(os),
+          where_exec(WHERE_EXEC::BOTH) {}
 
-    Query(const std::string &q, CrashPoint * cp, DBOnionState * os) {
-        query = q;
-        crash_point = cp;
-        onion_states = os;
-    }
+    Query(const std::string &q, CrashPoint *const cp, DBOnionState *const os)
+        : query(q), crash_point(cp), onion_states(os),
+          where_exec(WHERE_EXEC::BOTH) {}
 };
 
 #define PLAIN 0

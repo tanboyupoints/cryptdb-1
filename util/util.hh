@@ -384,6 +384,9 @@ std::string toUpperCase(const std::string &token);
 
 bool equalsIgnoreCase(const std::string &s1, const std::string &s2);
 
+std::string leadingZeros(const std::string &input, size_t count);
+std::string trailingZeros(const std::string &input, size_t count);
+
 //performs a case insensitive search
 template<class T>
 bool contains(const std::string &token, const T &values)

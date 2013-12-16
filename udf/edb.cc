@@ -103,7 +103,7 @@ decrypt_SEM(const unsigned char *const eValueBytes, uint64_t eValueLen,
     std::string c(reinterpret_cast<const char *>(eValueBytes),
                   static_cast<unsigned int>(eValueLen));
     return decrypt_AES_CBC(c, aesKey, BytesFromInt(salt, SALT_LEN_BYTES),
-                           false);
+                           true);
 }
 
 
@@ -296,9 +296,9 @@ cryptdb_decrypt_text_sem(UDF_INIT *const initid, UDF_ARGS *const args,
 
             uint64_t keyLen;
             char *const keyBytes = getba(args, 1, keyLen);
-            const std::string key = std::string(keyBytes, keyLen);
+            const std::string &key = std::string(keyBytes, keyLen);
 
-            uint64_t salt = getui(args, 2);
+            const uint64_t salt = getui(args, 2);
 
             const std::unique_ptr<AES_KEY> aesKey(get_AES_dec_key(key));
             value =

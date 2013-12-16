@@ -43,8 +43,8 @@ supportsRangeHelper(const Create_field &field, unsigned bytes)
     assert(bytes <= 8);
 
     const unsigned int bits = 8 * bytes;
-    const signage s = (field.sql_type & UNSIGNED_FLAG) == UNSIGNED_FLAG
-        ? signage::SIGNED : signage::UNSIGNED;
+    const signage s = (field.flags & UNSIGNED_FLAG) == UNSIGNED_FLAG
+        ? signage::UNSIGNED : signage::SIGNED;
     AssignOnce<bool> status;
     if (signage::UNSIGNED == s) {
         return std::make_pair(0, inclusiveUpperBound(bits));
@@ -229,21 +229,6 @@ bool isRealEncoded(const Create_field &f)
 
 // ########################################
 // ########################################
-//              string types
-// ########################################
-// ########################################
-const std::string
-MySQLVarCharMetaData::humanReadable(const Create_field &f) const
-{
-    if (f.charset == &my_charset_bin) {
-        return "VARBINARY";
-    } else {
-        return "VARCHAR";
-    }
-}
-
-// ########################################
-// ########################################
 //             string(*) types
 // ########################################
 // ########################################
@@ -264,6 +249,25 @@ AbstractMySQLStringMetaData<id>::intoItem(const std::string &value) const
                     &my_charset_bin);
 }
 
+const std::string
+MySQLVarCharMetaData::humanReadable(const Create_field &f) const
+{
+    if (f.charset == &my_charset_bin) {
+        return "VARBINARY";
+    } else {
+        return "VARCHAR";
+    }
+}
+
+const std::string
+MySQLStringMetaData::humanReadable(const Create_field &f) const
+{
+    if (f.charset == &my_charset_bin) {
+        return "BINARY";
+    } else {
+        return "CHAR";
+    }
+}
 
 // ########################################
 // ########################################

@@ -224,8 +224,7 @@ public:
 class MySQLStringMetaData :
     public AbstractMySQLStringMetaData<MYSQL_TYPE_STRING> {
 public:
-    const std::string humanReadable(const Create_field &) const
-        {return "CHAR";}
+    const std::string humanReadable(const Create_field &) const;
 };
 
 

@@ -1192,8 +1192,8 @@ AdjustOnionOutput::queryAction(const std::unique_ptr<Connect> &conn)
               " be reissued!");
     assert(1 == mysql_num_rows(db_res->n));
 
-    MYSQL_ROW row = mysql_fetch_row(db_res->n);
-    unsigned long *const l = mysql_fetch_lengths(db_res->n);
+    const MYSQL_ROW row = mysql_fetch_row(db_res->n);
+    const unsigned long *const l = mysql_fetch_lengths(db_res->n);
     assert(l != NULL);
 
     const bool reissue = string_to_bool(std::string(row[0], l[0]));

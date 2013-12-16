@@ -15,6 +15,8 @@
 #include <memory>
 
 #define LEXSTRING(cstr) { (char*) cstr, sizeof(cstr) }
+#define BITS_PER_BYTE 8
+
 
 using namespace NTL;
 
@@ -55,7 +57,7 @@ using namespace NTL;
 
     -HOMFactory: outputs a HOM layer
          - HOM layers: HOM (for integers), HOM_dec (for decimals)
-  
+
  */
 
 
@@ -192,16 +194,16 @@ EncLayerFactory::deserializeLayer(unsigned int id,
     const SerialLayer li = serial_unpack(serial);
 
     switch (li.l) {
-        case SECLEVEL::RND: 
+        case SECLEVEL::RND:
             return RNDFactory::deserialize(id, li);
 
-        case SECLEVEL::DET: 
+        case SECLEVEL::DET:
             return DETFactory::deserialize(id, li);
 
-        case SECLEVEL::DETJOIN: 
+        case SECLEVEL::DETJOIN:
             return DETJOINFactory::deserialize(id, li);
 
-        case SECLEVEL::OPE: 
+        case SECLEVEL::OPE:
             return OPEFactory::deserialize(id, li);
 
         case SECLEVEL::HOM:
@@ -227,14 +229,6 @@ EncLayerFactory::serializeLayer(EncLayer * el, DBMeta *parent) {
 
 /* ========================= other helpers ============================*/
 
-/*
-static bool
-stringItem(Item * const i)
-{
-    return i->type() == Item::Type::STRING_ITEM;
-}
-*/
-
 static
 std::string prng_expand(const std::string &seed_key, uint key_bytes)
 {
@@ -244,11 +238,11 @@ std::string prng_expand(const std::string &seed_key, uint key_bytes)
 
 //TODO: remove above newcreatefield
 static Create_field*
-createFieldHelper(const Create_field * const f,
-                  unsigned long field_length,
-                  enum enum_field_types type,
-                  const std::string &anonname = "",
-                  CHARSET_INFO * const charset = NULL)
+lowLevelcreateFieldHelper(const Create_field * const f,
+                          unsigned long field_length,
+                          enum enum_field_types type,
+                          const std::string &anonname = "",
+                          CHARSET_INFO * const charset = NULL)
 {
     const THD * const thd = current_thd;
     Create_field * const f0 = f->clone(thd->mem_root);
@@ -267,6 +261,25 @@ createFieldHelper(const Create_field * const f,
 
 }
 
+static Create_field*
+integerCreateFieldHelper(const Create_field * const f,
+                         enum enum_field_types type,
+                         const std::string &anonname = "",
+                         CHARSET_INFO * const charset = NULL)
+{
+    return lowLevelcreateFieldHelper(f, 0, type, anonname, charset);
+}
+
+static Create_field*
+arrayCreateFieldHelper(const Create_field * const f,
+                       unsigned long field_length,
+                       enum enum_field_types type,
+                       const std::string &anonname = "",
+                       CHARSET_INFO * const charset = NULL)
+{
+    return lowLevelcreateFieldHelper(f, field_length, type, anonname, charset);
+}
+
 static Item *
 get_key_item(const std::string &key)
 {
@@ -277,6 +290,7 @@ get_key_item(const std::string &key)
     return keyI;
 }
 
+// Can only check unsigned values
 static bool
 rangeCheck(uint64_t value, std::pair<int64_t, uint64_t> inclusiveRange)
 {
@@ -284,7 +298,7 @@ rangeCheck(uint64_t value, std::pair<int64_t, uint64_t> inclusiveRange)
     const uint64_t maximum = inclusiveRange.second;
 
     // test lower bound
-    bool b = minimum < 0 || static_cast<uint64_t>(minimum) <= value;
+    const bool b = minimum < 0 || static_cast<uint64_t>(minimum) <= value;
 
     // test upper bound
     return b && value <= maximum;
@@ -304,6 +318,7 @@ public:
 
     void checkValue(uint64_t value) const;
     std::string getKey() const {return key;}
+    enum enum_field_types getFieldType() const {return field_type;}
     std::pair<int64_t, uint64_t> getInclusiveRange() const
         { return inclusiveRange; }
 
@@ -312,6 +327,41 @@ private:
     enum enum_field_types field_type;
     std::pair<int64_t, uint64_t> inclusiveRange;
 };
+
+static CryptedInteger
+overrideCreateFieldCryptedIntegerFactory(const Create_field &cf,
+                                         const std::string &key,
+                                         signage s,
+                                         enum enum_field_types field_type)
+{
+    // the override (@s and @field_type) should support the default range
+    // in @cf
+
+    // create a Create_field object so we can build metadata
+    Create_field *const override_cf = cf.clone(current_thd->mem_root);
+    override_cf->sql_type = field_type;
+    override_cf->flags    =
+        override_cf->flags
+        & (signage::UNSIGNED == s ? UNSIGNED_FLAG : ~UNSIGNED_FLAG);
+
+    // get the range for the field constructed by the user
+    const std::pair<int64_t, uint64_t> userInclusiveRange =
+        supportsRange(cf);
+
+    // get the range for the overriding type
+    const std::pair<int64_t, uint64_t> overrideInclusiveRange =
+        supportsRange(*override_cf);
+
+    // do we have a fit?
+    TEST_Text(userInclusiveRange.first >= overrideInclusiveRange.first
+           && userInclusiveRange.second <= overrideInclusiveRange.second,
+              "The field you are trying to create with type "
+              + TypeText<enum enum_field_types>::toText(cf.sql_type)
+              + " could not be overridden properly");
+
+    return CryptedInteger(key, override_cf->sql_type,
+                          overrideInclusiveRange);
+}
 
 CryptedInteger
 CryptedInteger::deserialize(const std::string &serial)
@@ -361,16 +411,11 @@ CryptedInteger::serialize() const
 class RND_int : public EncLayer {
 public:
     RND_int(Create_field * const cf, const std::string &seed_key);
+    RND_int(unsigned int id, const CryptedInteger &cinteger);
 
-    // serialize and deserialize
-    std::string doSerialize() const
-    {
-        return serializeStrings({key,
-                                 std::to_string(inclusiveRange.first),
-                                 std::to_string(inclusiveRange.second)});
-    }
-    RND_int(unsigned int id, const std::string &serial,
-            int64_t inclusiveMin, uint64_t inclusiveMax);
+    std::string doSerialize() const;
+    static std::unique_ptr<RND_int>
+        deserialize(unsigned int id, const std::string &serial);
 
     SECLEVEL level() const {return SECLEVEL::RND;}
     std::string name() const {return "RND_int";}
@@ -384,11 +429,9 @@ public:
     Item * decryptUDF(Item * const col, Item * const ivcol) const;
 
 private:
-    std::string const key;
+    CryptedInteger cinteger;
     blowfish const bf;
     static int const key_bytes = 16;
-    static int const ciph_size = 8;
-    std::pair<int64_t, uint64_t> inclusiveRange;
 };
 
 class RND_str : public EncLayer {
@@ -410,29 +453,24 @@ public:
     Item * decryptUDF(Item * const col, Item * const ivcol) const;
 
 private:
-    std::string const rawkey;
-    static int const key_bytes = 16;
+    const std::string rawkey;
+    static const int key_bytes = 16;
+    static const bool do_pad   = true;
     const std::unique_ptr<const AES_KEY> enckey;
     const std::unique_ptr<const AES_KEY> deckey;
 
 };
 
 static unsigned long long
-strtoll_(std::string &s)
+strtoul_(const std::string &s)
 {
-    return strtoll(s.c_str(), NULL, 0);
-}
-
-static unsigned long long
-strtoull_(std::string &s)
-{
-    return strtoull(s.c_str(), NULL, 0);
+    return strtoul(s.c_str(), NULL, 0);
 }
 
 std::unique_ptr<EncLayer>
 RNDFactory::create(Create_field * const cf, const std::string &key)
 {
-    if (isMySQLTypeNumeric(*cf)) { // the ope case as well 
+    if (isMySQLTypeNumeric(*cf)) {
         return std::unique_ptr<EncLayer>(new RND_int(cf, key));
     } else {
         return std::unique_ptr<EncLayer>(new RND_str(cf, key));
@@ -443,11 +481,7 @@ std::unique_ptr<EncLayer>
 RNDFactory::deserialize(unsigned int id, const SerialLayer &sl)
 {
     if (sl.name == "RND_int") {
-        std::vector<std::string> args =
-            unserialize_string(sl.layer_info);
-        return std::unique_ptr<EncLayer>(
-                new RND_int(id, args[0], strtoll_(args[1]),
-                            strtoull_(args[2])));
+        return RND_int::deserialize(id, sl.layer_info);
     } else {
         return std::unique_ptr<EncLayer>(new RND_str(id, sl.layer_info));
     }
@@ -455,34 +489,45 @@ RNDFactory::deserialize(unsigned int id, const SerialLayer &sl)
 
 
 RND_int::RND_int(Create_field * const f, const std::string &seed_key)
-    : key(prng_expand(seed_key, key_bytes)),
-      bf(key), inclusiveRange(supportsRange(*f))
+    : EncLayer(),
+      cinteger(overrideCreateFieldCryptedIntegerFactory(*f,
+                                         prng_expand(seed_key, key_bytes),
+                                         signage::UNSIGNED,
+                                         MYSQL_TYPE_LONGLONG)),
+      bf(cinteger.getKey())
 {}
 
-RND_int::RND_int(unsigned int id, const std::string &key,
-                 int64_t inclusiveMin, uint64_t inclusiveMax)
-    : EncLayer(id), key(key), bf(key),
-      inclusiveRange(std::make_pair(inclusiveMin, inclusiveMax))
+RND_int::RND_int(unsigned int id, const CryptedInteger &cinteger)
+    : EncLayer(id), cinteger(cinteger), bf(cinteger.getKey())
 {}
+
+std::string
+RND_int::doSerialize() const
+{
+    return cinteger.serialize();
+}
+
+std::unique_ptr<RND_int>
+RND_int::deserialize(unsigned int id, const std::string &serial)
+{
+    const CryptedInteger cint = CryptedInteger::deserialize(serial);
+    return std::unique_ptr<RND_int>(new RND_int(id, cint));
+}
 
 Create_field *
 RND_int::newCreateField(const Create_field * const cf,
                         const std::string &anonname) const
 {
-    // MYSQL_TYPE_LONGLONG because blowfish works on 64 bit blocks.
-    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG,
-                             anonname);
+    return integerCreateFieldHelper(cf, cinteger.getFieldType(), anonname);
 }
 
 //TODO: may want to do more specialized crypto for lengths
 Item *
 RND_int::encrypt(const Item &ptext, uint64_t IV) const
 {
-    // assert(!stringItem(ptext));
     //TODO: should have encrypt_SEM work for any length
     const uint64_t p = RiboldMYSQL::val_uint(ptext);
-    TEST_Text(rangeCheck(p, this->inclusiveRange),
-              "RND_int can not handle out of range value!");
+    cinteger.checkValue(p);
 
     const uint64_t c = bf.encrypt(p ^ IV);
     LOG(encl) << "RND_int encrypt " << p << " IV " << IV << "-->" << c;
@@ -523,7 +568,7 @@ RND_int::decryptUDF(Item * const col, Item * const ivcol) const
     List<Item> l;
     l.push_back(col);
 
-    l.push_back(get_key_item(key));
+    l.push_back(get_key_item(cinteger.getKey()));
 
     l.push_back(ivcol);
 
@@ -556,17 +601,17 @@ Create_field *
 RND_str::newCreateField(const Create_field * const cf,
                         const std::string &anonname) const
 {
-    const auto typelen = AESTypeAndLength(*cf, false);
-    return createFieldHelper(cf, typelen.second, typelen.first,
-                             anonname, &my_charset_bin);
+    const auto typelen = AESTypeAndLength(*cf, do_pad);
+    return arrayCreateFieldHelper(cf, typelen.second, typelen.first,
+                                  anonname, &my_charset_bin);
 }
 
 Item *
 RND_str::encrypt(const Item &ptext, uint64_t IV) const
 {
-    const std::string enc =
+    const std::string &enc =
         encrypt_AES_CBC(ItemToString(ptext), enckey.get(),
-                        BytesFromInt(IV, SALT_LEN_BYTES), false);
+                        BytesFromInt(IV, SALT_LEN_BYTES), do_pad);
 
     LOG(encl) << "RND_str encrypt " << ItemToString(ptext) << " IV "
               << IV << "--->" << "len of enc " << enc.length()
@@ -580,9 +625,9 @@ RND_str::encrypt(const Item &ptext, uint64_t IV) const
 Item *
 RND_str::decrypt(Item * const ctext, uint64_t IV) const
 {
-    const std::string dec =
+    const std::string &dec =
         decrypt_AES_CBC(ItemToString(*ctext), deckey.get(),
-                        BytesFromInt(IV, SALT_LEN_BYTES), false);
+                        BytesFromInt(IV, SALT_LEN_BYTES), do_pad);
     LOG(encl) << "RND_str decrypt " << ItemToString(*ctext) << " IV "
               << IV << "-->" << "len of dec " << dec.length()
               << " dec: " << dec;
@@ -628,7 +673,7 @@ RND_str::decryptUDF(Item * const col, Item * const ivcol) const
 class DET_abstract_integer : public EncLayer {
 public:
     DET_abstract_integer(Create_field *const f, const std::string &key);
-    DET_abstract_integer(unsigned int id, CryptedInteger &cinteger);
+    DET_abstract_integer(unsigned int id, const CryptedInteger &cinteger);
 
     virtual std::string name() const = 0;
     virtual SECLEVEL level() const = 0;
@@ -679,7 +724,7 @@ public:
     DET_int(Create_field *const cf, const std::string &seed_key)
         : DET_abstract_integer(cf, seed_key) {}
     // create object from serialized contents
-    DET_int(unsigned int id, CryptedInteger &cinteger)
+    DET_int(unsigned int id, const CryptedInteger &cinteger)
         : DET_abstract_integer(id, cinteger) {}
 
     virtual SECLEVEL level() const {return SECLEVEL::DET;}
@@ -734,8 +779,9 @@ public:
     Item * decryptUDF(Item * const col, Item * const ivcol = NULL) const;
 
 protected:
-    std::string const rawkey;
+    const std::string rawkey;
     static const int key_bytes = 16;
+    static const bool do_pad   = true;
     const std::unique_ptr<const AES_KEY> enckey;
     const std::unique_ptr<const AES_KEY> deckey;
 
@@ -772,15 +818,28 @@ DETFactory::deserialize(unsigned int id, const SerialLayer &sl)
     }
 }
 
+// blowfish always produces 64 bit output so we should always use
+// unsigned MYSQL_TYPE_LONGLONG
 DET_abstract_integer::DET_abstract_integer(Create_field *const cf,
-                                           const std::string &key)
-    : EncLayer(), cinteger(CryptedInteger(*cf, key)), bf(key)
+                                           const std::string &seed_key)
+    : EncLayer(),
+      cinteger(overrideCreateFieldCryptedIntegerFactory(*cf,
+                                       prng_expand(seed_key, bf_key_size),
+                                       signage::UNSIGNED,
+                                       MYSQL_TYPE_LONGLONG)),
+      bf(cinteger.getKey())
 {}
 
 DET_abstract_integer::DET_abstract_integer(unsigned int id,
-                                           CryptedInteger &cinteger)
+                                           const CryptedInteger &cinteger)
     : EncLayer(id), cinteger(cinteger), bf(cinteger.getKey())
 {}
+
+std::string
+DET_abstract_integer::doSerialize() const
+{
+    return cinteger.serialize();
+}
 
 template <typename Type>
 std::unique_ptr<Type>
@@ -791,30 +850,21 @@ DET_abstract_integer::deserialize(unsigned int id,
      * is not in CryptedInteger; write a deserialize function for them
      * as well and let them handle the serialized data that is not
      * CryptedInteger */
-    CryptedInteger cint = CryptedInteger::deserialize(serial);
+    const CryptedInteger cint = CryptedInteger::deserialize(serial);
     return std::unique_ptr<Type>(new Type(id, cint));
-}
-
-std::string
-DET_abstract_integer::doSerialize() const
-{
-    return cinteger.serialize();
 }
 
 Create_field *
 DET_abstract_integer::newCreateField(const Create_field * const cf,
                                      const std::string &anonname) const
 {
-    const int64_t ciph_size = 8;
-    // MYSQL_TYPE_LONGLONG because blowfish works on 64 bit blocks.
-    return createFieldHelper(cf, ciph_size, MYSQL_TYPE_LONGLONG,
-                             anonname);
+    return integerCreateFieldHelper(cf, cinteger.getFieldType(),
+                                    anonname);
 }
 
 Item *
 DET_abstract_integer::encrypt(const Item &ptext, uint64_t IV) const
 {
-    // assert(!stringItem(ptext));
     const ulonglong value = RiboldMYSQL::val_uint(ptext);
     cinteger.checkValue(value);
 
@@ -942,16 +992,16 @@ Create_field *
 DET_str::newCreateField(const Create_field * const cf,
                         const std::string &anonname) const
 {
-    const auto typelen = AESTypeAndLength(*cf, true);
-    return createFieldHelper(cf, typelen.second, typelen.first, anonname,
-                             &my_charset_bin);
+    const auto typelen = AESTypeAndLength(*cf, do_pad);
+    return arrayCreateFieldHelper(cf, typelen.second, typelen.first,
+                                  anonname, &my_charset_bin);
 }
 
 Item *
 DET_str::encrypt(const Item &ptext, uint64_t IV) const
 {
     const std::string plain = ItemToString(ptext);
-    const std::string enc = encrypt_AES_CMC(plain, enckey.get(), true);
+    const std::string enc = encrypt_AES_CMC(plain, enckey.get(), do_pad);
     LOG(encl) << " DET_str encrypt " << plain  << " IV " << IV << " ---> "
               << " enc len " << enc.length() << " enc " << enc;
 
@@ -964,7 +1014,7 @@ Item *
 DET_str::decrypt(Item * const ctext, uint64_t IV) const
 {
     const std::string enc = ItemToString(*ctext);
-    const std::string dec = decrypt_AES_CMC(enc, deckey.get(), true);
+    const std::string dec = decrypt_AES_CMC(enc, deckey.get(), do_pad);
     LOG(encl) << " DET_str decrypt enc len " << enc.length()
               << " enc " << enc << " IV " << IV << " ---> "
               << " dec len " << dec.length() << " dec " << dec;
@@ -1008,7 +1058,7 @@ public:
     DETJOIN_int(Create_field *const cf, const std::string &seed_key)
         : DET_abstract_integer(cf, seed_key) {}
     // serialize from parent;  unserialize:
-    DETJOIN_int(unsigned int id, CryptedInteger &cinteger)
+    DETJOIN_int(unsigned int id, const CryptedInteger &cinteger)
         : DET_abstract_integer(id, cinteger) {}
 
     SECLEVEL level() const {return SECLEVEL::DETJOIN;}
@@ -1026,8 +1076,6 @@ public:
 
     SECLEVEL level() const {return SECLEVEL::DETJOIN;}
     std::string name() const {return "DETJOIN_str";}
-private:
- 
 };
 
 /*
@@ -1087,7 +1135,10 @@ DETJOINFactory::deserialize(unsigned int id, const SerialLayer &sl)
 class OPE_int : public EncLayer {
 public:
     OPE_int(Create_field * const cf, const std::string &seed_key);
-    OPE_int(unsigned int id, CryptedInteger &cinteger);
+    OPE_int(unsigned int id, const CryptedInteger &cinteger,
+            size_t plain_size, size_t ciph_size);
+    CryptedInteger opeHelper(const Create_field &f,
+                             const std::string &key);
 
     SECLEVEL level() const {return SECLEVEL::OPE;}
     std::string name() const {return "OPE_int";}
@@ -1105,11 +1156,10 @@ public:
 
 private:
     CryptedInteger cinteger;
-    // HACK
-    mutable OPE ope;
     static const size_t key_bytes = 16;
-    static const size_t plain_size = 4;
-    static const size_t ciph_size = 8;
+    size_t plain_size;
+    size_t ciph_size;
+    mutable OPE ope;                      // HACK
 };
 
 class OPE_str : public EncLayer {
@@ -1233,9 +1283,21 @@ OPE_dec::decrypt(Item * const ctext, uint64_t IV) const
 }
 */
 
+static size_t
+toMultiple(size_t n, size_t multiple)
+{
+    assert(multiple > 0);
 
-static CryptedInteger
-opeHelper(const Create_field &f, const std::string &key)
+    const size_t remainder = n % multiple;
+    if (0 == remainder) {
+        return n;
+    }
+
+    return n + (multiple - remainder);
+}
+
+CryptedInteger
+OPE_int::opeHelper(const Create_field &f, const std::string &key)
 {
     const auto plain_inclusive_range = supportsRange(f);
     assert(0 == plain_inclusive_range.first);
@@ -1245,106 +1307,149 @@ opeHelper(const Create_field &f, const std::string &key)
     // 0xFFFF * (0xFFFF + 2)
     // => 0xFFFF * 0x10001
     // => 0xFFFFFFFF
+    // initialize members used by OPE(...) primitive
+    this->plain_size =
+        toMultiple(log2(plain_inclusive_range.second),
+                   BITS_PER_BYTE)
+        / BITS_PER_BYTE;
+    this->ciph_size  = 2 * this->plain_size;
 
-    // these values can not be represented with 64 bits; HACK
+    // these fields can not be represented with 64 bits; HACK
     if (plain_inclusive_range.second > 0xFFFFFFFF) {
-        return CryptedInteger(key, MYSQL_TYPE_LONGLONG,
-                              std::make_pair(0x00000000, 0xFFFFFFFF));
+        return CryptedInteger(key, MYSQL_TYPE_VARCHAR,
+                              plain_inclusive_range);
     }
 
     const auto crypto_inclusive_range =
         std::make_pair(0, plain_inclusive_range.second
                           * (2 + plain_inclusive_range.second));
+    // FIXME: pass Create_field object so we can account for signage
     const std::pair<bool, enum enum_field_types> field_type =
         getTypeForRange(crypto_inclusive_range);
-    if (false == field_type.first) {
-        // unable to actually support a column large enough; we'll use
-        // the largest column size and limit our acceptable inputs
-        // > FIXME: mysql type data shouldn't be hardcoded here
-        return CryptedInteger(key, MYSQL_TYPE_LONGLONG,
-                              std::make_pair(0x00000000, 0xFFFFFFFF));
-    } else {
-        return CryptedInteger(key, field_type.second,
-                              plain_inclusive_range);
-    }
+    TEST_Text(true == field_type.first,
+              "could not build an OPE onion for field type: "
+              + TypeText<enum enum_field_types>::toText(f.sql_type) + "\n");
+
+    return CryptedInteger(key, field_type.second, plain_inclusive_range);
 }
 
 OPE_int::OPE_int(Create_field * const f, const std::string &seed_key)
+    // opeHelper initializes plain_size and ciph_size
     : cinteger(opeHelper(*f, prng_expand(seed_key, key_bytes))),
-      // FIXME: remove hardcoded plain_size/ciph_size
-      ope(OPE(cinteger.getKey(), plain_size * 8, ciph_size * 8))
+      ope(OPE(cinteger.getKey(), plain_size * BITS_PER_BYTE,
+              ciph_size * BITS_PER_BYTE))
 {}
 
-OPE_int::OPE_int(unsigned int id, CryptedInteger &cinteger)
-    : EncLayer(id),
-      cinteger(cinteger),
-      ope(OPE(cinteger.getKey(), plain_size * 8, ciph_size * 8))
+OPE_int::OPE_int(unsigned int id, const CryptedInteger &cinteger,
+                 size_t plain_size, size_t ciph_size)
+    : EncLayer(id), cinteger(cinteger), plain_size(plain_size),
+      ciph_size(ciph_size),
+      ope(OPE(cinteger.getKey(), plain_size * BITS_PER_BYTE,
+              ciph_size * BITS_PER_BYTE))
 {}
 
 std::unique_ptr<OPE_int>
 OPE_int::deserialize(unsigned int id, const std::string &serial)
 {
-    CryptedInteger cint = CryptedInteger::deserialize(serial);
-    return std::unique_ptr<OPE_int>(new OPE_int(id, cint));
+    const std::vector<std::string> vec = unserialize_string(serial);
+    const size_t plain_bytes = strtoul_(vec[0]);
+    const size_t ciph_bytes  = strtoul_(vec[1]);
+    const CryptedInteger cint = CryptedInteger::deserialize(vec[2]);
+    return std::unique_ptr<OPE_int>(new OPE_int(id, cint, plain_bytes,
+                                                ciph_bytes));
 }
 
 std::string
 OPE_int::doSerialize() const
 {
-    return cinteger.serialize();
+    return serializeStrings({std::to_string(plain_size),
+                             std::to_string(ciph_size),
+                             cinteger.serialize()});
 }
 
 Create_field *
 OPE_int::newCreateField(const Create_field * const cf,
                         const std::string &anonname) const
 {
-    return createFieldHelper(cf, cf->length, MYSQL_TYPE_LONGLONG,
-                             anonname);
+    if (isMySQLTypeNumeric(cinteger.getFieldType())) {
+        return integerCreateFieldHelper(cf, cinteger.getFieldType(),
+                                        anonname);
+    }
+
+    // create a varbinary column because we could not map the user's
+    // desired field type into an integer column
+    assert(MYSQL_TYPE_VARCHAR == cinteger.getFieldType());
+    return arrayCreateFieldHelper(cf, ciph_size, cinteger.getFieldType(),
+                                  anonname, &my_charset_bin);
+}
+
+static std::string
+reverse(const std::string &s)
+{
+    return std::string(s.rbegin(), s.rend());
 }
 
 Item *
 OPE_int::encrypt(const Item &ptext, uint64_t IV) const
 {
-    // assert(!stringItem(ptext));
     const uint64_t pval = RiboldMYSQL::val_uint(ptext);
     cinteger.checkValue(pval);
 
-    const ulonglong enc = uint64FromZZ(ope.encrypt(to_ZZ(pval)));
-    LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV
-              << "--->" << enc;
+    LOG(encl) << "OPE_int encrypt " << pval << " IV " << IV << std::endl;
 
-    return new (current_thd->mem_root) Item_int(enc);
+    if (MYSQL_TYPE_VARCHAR != this->cinteger.getFieldType()) {
+        const ulonglong enc = uint64FromZZ(ope.encrypt(ZZFromUint64(pval)));
+        return new Item_int(enc);
+    }
+
+    // > the result of the encryption could be larger than 64 bits so
+    //   don't try to handle with an integer
+    // > the ``stringd'' ZZ must be reversed because we want the string to go
+    //   from high to low order bytes
+    // > leading zeros must be added because not all numbers will span the
+    //   allotted bytes and we don't want mysql to do a misaligned comparison
+    const std::string &enc_string =
+        leadingZeros(reverse(StringFromZZ(ope.encrypt(ZZFromUint64(pval)))),
+                     this->ciph_size);
+
+
+    return new Item_string(make_thd_string(enc_string),
+                           enc_string.length(),
+                           &my_charset_bin);
 }
 
 Item *
 OPE_int::decrypt(Item * const ctext, uint64_t IV) const
 {
-    const ulonglong cval =
-        static_cast<ulonglong>(static_cast<Item_int *>(ctext)->value);
-    const ulonglong dec = uint64FromZZ(ope.decrypt(ZZFromUint64(cval)));
-    LOG(encl) << "OPE_int decrypt " << cval << " IV " << IV
-              << "--->" << dec << std::endl;
+    LOG(encl) << "OPE_int decrypt " << ItemToString(*ctext) << " IV " << IV
+              << std::endl;
 
-    return new (current_thd->mem_root) Item_int(dec);
+    if (MYSQL_TYPE_VARCHAR != this->cinteger.getFieldType()) {
+        const ulonglong cval = RiboldMYSQL::val_uint(*ctext);
+        return new Item_int((ulonglong)uint64FromZZ(ope.decrypt(ZZFromUint64(cval))));
+    }
+
+    // undo the reversal from encryption
+    return new Item_int((ulonglong)uint64FromZZ(ope.decrypt(ZZFromString(reverse(ItemToString(*ctext))))));
 }
 
 
 OPE_str::OPE_str(Create_field * const f, const std::string &seed_key)
     : key(prng_expand(seed_key, key_bytes)),
-      ope(OPE(key, plain_size * 8, ciph_size * 8))
+      ope(OPE(key, plain_size * BITS_PER_BYTE, ciph_size * BITS_PER_BYTE))
 {}
 
 OPE_str::OPE_str(unsigned int id, const std::string &serial)
     : EncLayer(id), key(serial),
-    ope(OPE(key, plain_size * 8, ciph_size * 8))
+    ope(OPE(key, plain_size * BITS_PER_BYTE, ciph_size * BITS_PER_BYTE))
 {}
 
 Create_field *
 OPE_str::newCreateField(const Create_field * const cf,
                         const std::string &anonname) const
 {
-    return createFieldHelper(cf, cf->length, MYSQL_TYPE_LONGLONG,
-                             anonname, &my_charset_bin);
+    return arrayCreateFieldHelper(cf, cf->length, MYSQL_TYPE_LONGLONG,
+                                  anonname, &my_charset_bin);
 }
 
 /*
@@ -1456,7 +1561,7 @@ ZZToItemStr(const ZZ &val)
     Item * const newit =
         new (current_thd->mem_root) Item_string(make_thd_string(str),
                                                 str.length(),
-                        &my_charset_bin);
+                                                &my_charset_bin);
     newit->name = NULL; //no alias
 
     return newit;
@@ -1563,8 +1668,9 @@ Create_field *
 HOM::newCreateField(const Create_field * const cf,
                     const std::string &anonname) const
 {
-    return createFieldHelper(cf, 2*nbits/8, MYSQL_TYPE_VARCHAR,
-                             anonname, &my_charset_bin);
+    return arrayCreateFieldHelper(cf, 2*nbits/BITS_PER_BYTE,
+                                  MYSQL_TYPE_VARCHAR, anonname,
+                                  &my_charset_bin);
 }
 
 void
@@ -1666,7 +1772,7 @@ Search::Search(Create_field * const f, const std::string &seed_key)
     : key(prng_expand(seed_key, key_bytes))
 {}
 
-Search::Search(unsigned int id, const std::string &serial) 
+Search::Search(unsigned int id, const std::string &serial)
     : EncLayer(id), key(prng_expand(serial, key_bytes))
 {}
 
@@ -1674,8 +1780,8 @@ Create_field *
 Search::newCreateField(const Create_field * const cf,
                        const std::string &anonname) const
 {
-    return createFieldHelper(cf, cf->length, MYSQL_TYPE_BLOB, anonname,
-                             &my_charset_bin);
+    return arrayCreateFieldHelper(cf, cf->length, MYSQL_TYPE_BLOB,
+                                  anonname, &my_charset_bin);
 }
 
 

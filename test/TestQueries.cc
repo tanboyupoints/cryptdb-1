@@ -491,9 +491,9 @@ static QueryList BestEffort = QueryList("BestEffort",
       Query("SELECT 2+x+2 FROM t"),
       Query("SELECT x+y+3+4 FROM t"),
       Query("SELECT 2*x*2*y FROM t"),
-      Query("SELECT x, y FROM t WHERE x AND y"), 
-      Query("SELECT x, y FROM t WHERE x = 1 AND y < 200"), 
-      Query("SELECT x, y FROM t WHERE x AND y = 15"), 
+      Query("SELECT x, y FROM t WHERE x AND y"),
+      Query("SELECT x, y FROM t WHERE x = 1 AND y < 200"),
+      Query("SELECT x, y FROM t WHERE x AND y = 15"),
       Query("SELECT 10, x+y FROM t WHERE x"),
       Query("DROP TABLE t") });
 
@@ -566,7 +566,7 @@ static QueryList NonStrictMode = QueryList("NonStrictMode",
       Query("DROP TABLE not_strict") });
 
 static QueryList Transactions = QueryList("Transactions",
-    { Query("CREATE TABLE trans (a integer, b integer, c integer)ENGINE=InnoDB"),
+    { Query("CREATE TABLE trans (a integer, b integer, c integer)"),
       Query("INSERT INTO trans VALUES (1, 2, 3)"),
       Query("INSERT INTO trans VALUES (33, 22, 11)"),
       Query("SELECT * FROM trans"),
@@ -588,12 +588,12 @@ static QueryList Transactions = QueryList("Transactions",
       Query("SELECT * FROM trans"),
       Query("START TRANSACTION"),
       Query("UPDATE trans SET a = a + 1, c = 50 WHERE a < 50000"),
-      Query("COMMIT"),  // commit required for control database
+      Query("ROLLBACK", Query::WHERE_EXEC::CONTROL),
       Query("SELECT * FROM trans"),
       Query("START TRANSACTION"),
       Query("INSERT INTO trans VALUES (1, 50, 150)"),
       Query("UPDATE trans SET b = b + 10 WHERE c = 50"),
-      Query("COMMIT"),  // commit required for control database
+      Query("ROLLBACK", Query::WHERE_EXEC::CONTROL),
       Query("SELECT * FROM trans"),
       Query("DROP TABLE trans") });
 
@@ -654,11 +654,11 @@ static QueryList DDL = QueryList("DDL",
       Query("ALTER TABLE ddl_test DROP INDEX i"),
       Query("DROP TABLE ddl_test")});
 
-// the oDET column will encrypt three times and two of these will pad;
-// the maximum field size if 2**32 - 1; so the maximum field size
-// we support is 2**32 - 1 - (2 * AES_BLOCK_BYTES)
+// the oDET column will encrypt three times and all three of these will pad;
+// the mysql's maximum field size is 2**32 - 1; so the maximum field size
+// we support is 2**32 - 1 - (3 * AES_BLOCK_BYTES)
 static QueryList MiscBugs = QueryList("MiscBugs",
-    { Query("CREATE TABLE crawlies (purple VARCHAR(4294967263),"
+    { Query("CREATE TABLE crawlies (purple VARCHAR(4294967247),"
             "                       pink VARCHAR(0))"),
       Query("CREATE TABLE enums (x enum('this', 'that'))"),
       Query("CREATE TABLE bugs (spider TEXT)"),
@@ -692,6 +692,7 @@ static QueryList MiscBugs = QueryList("MiscBugs",
       // we don't currently support; but it shouldn't crash the system
       Query("CREATE TABLE jjj SELECT * FROM enums"),
       Query("SHOW ENGINES"),
+
       Query("CREATE TABLE floating (x float)"),
       Query("INSERT INTO floating VALUES (23e+12), (12e+14), ('a'), (12),"
             "                            ('12e+5')"),
@@ -816,24 +817,31 @@ static QueryList Directives = QueryList("Directives",
       Query("DROP TABLE directives")
     });
 
-// FIXME: write tests for bigint column
+// FIXME: write summation tests for bigint column
 static QueryList Range = QueryList("Range",
       // we must run the control database in strict mode in order to
       // match semantics
-    { Query("SET SESSION sql_mode = 'ANSI,TRADITIONAL'"),
+    { Query("SET SESSION sql_mode = 'ANSI,TRADITIONAL'",
+            Query::WHERE_EXEC::CONTROL),
       Query("CREATE TABLE t (t TINYINT UNSIGNED DEFAULT 0,"
             "                s SMALLINT UNSIGNED DEFAULT 0,"
             "                m MEDIUMINT UNSIGNED DEFAULT 0,"
             "                i INT UNSIGNED DEFAULT 0,"
             "                b BIGINT UNSIGNED DEFAULT 0)"),
-      /*
       // lets take a look at the largest value
       Query("INSERT INTO t (b) VALUES (18446744073709551615)"),
+      // lets also force the UDF to handle some other values
+      Query("INSERT INTO t (b) VALUES (18446), (1001), (2), (2000009)"),
       Query("SELECT * FROM t"),
-      Query("SELECT SUM(b) FROM t"),
+      // Query("SELECT SUM(b) FROM t"),
       Query("SELECT * FROM t WHERE b > 18446744073709551614"
             "                  AND b <= 18446744073709551615"),
-      */
+      Query("SELECT MAX(b) FROM t"),
+      // look at the largest value without server side decryption
+      Query("INSERT INTO t (b) VALUES (18446744073709551615)"),
+      Query("SELECT * FROM t WHERE b > 18446744073709551614"
+            "                  AND b <= 18446744073709551615"),
+      Query("SELECT MAX(b) FROM t"),
       // unsigned minimum
       Query("INSERT INTO t VALUES (0, 0, 0, 0, 0)"),
       Query("SELECT * FROM t"),
@@ -843,18 +851,20 @@ static QueryList Range = QueryList("Range",
       // largest value each field will support
       Query("INSERT INTO t VALUES (255, 65535, 16777215,"
             "                      4294967295, 4294967295)"),
-      Query("SELECT * FROM t"),
+      // are leading zeros playing nice?
+      Query("SELECT * FROM t ORDER BY b"),
+      Query("SELECT MIN(b) FROM t"),
       // should fail on both because 5000 can't go in tiny
       Query("INSERT INTO t VALUES (5000, 5000, 5000, 5000, 5000)"),
       Query("SELECT * FROM t"),
-      Query("SELECT SUM(t), SUM(s), SUM(m), SUM(i), SUM(b) FROM t"),
+      Query("SELECT SUM(t), SUM(s), SUM(m), SUM(i) FROM t"),
       // one more than maximum, should fail on both
       Query("INSERT INTO t (t) VALUES (256)"),
       Query("INSERT INTO t (s) VALUES (65536)"),
       Query("INSERT INTO t (m) VALUES (16777217)"),
       Query("INSERT INTO t (i) VALUES (4294967296)"),
       Query("SELECT * FROM t"),
-      Query("SELECT SUM(t), SUM(s), SUM(m), SUM(i), SUM(b) FROM t"),
+      Query("SELECT SUM(t), SUM(s), SUM(m), SUM(i) FROM t"),
       // will fail on cryptdb and succeed on the control database
       // Query("INSERT INTO t (b) VALUES (4294967296)"),
       // Query("SELECT * FROM t"),
@@ -863,6 +873,8 @@ static QueryList Range = QueryList("Range",
       Query("UPDATE t SET s = s + 5"),
       Query("UPDATE t SET m = m + 5"),
       Query("UPDATE t SET i = i + 5"),
+      Query("SELECT MAX(t), MAX(s), MAX(m), MAX(i), MAX(b) FROM t"),
+      Query("SELECT MIN(t), MIN(s), MIN(m), MIN(i), MIN(b) FROM t"),
       Query("SELECT SUM(t), SUM(s), SUM(m), SUM(i) FROM t"),
       // will on cryptdb and succeed on control database
       // Query("UPDATE t SET b = b + 5"),
@@ -874,6 +886,7 @@ static QueryList Range = QueryList("Range",
       Query("SELECT m, i FROM t WHERE m > 1677215"),
       Query("SELECT t, s, i FROM t WHERE i = 16777215"),
       Query("SELECT * from t"),
+      Query("SELECT MAX(t), MAX(s), MAX(m), MAX(i), MAX(b) FROM t"),
       /*
       // the comparisons fail because the constants are out of range
       Query("SELECT m, t, s FROM t WHERE s = 65536"),
@@ -882,10 +895,10 @@ static QueryList Range = QueryList("Range",
       Query("SELECT t, i FROM t WHERE t < 99999999999999999999"),
       Query("SELECT t, s, m, i FROM t"),
       */
-      Query("SELECT t, s, m FROM t WHERE s = m AND b = i"),
+      // Query("SELECT t, s, m FROM t WHERE s = m AND b = i"),
       // Query("SELECT SUM(t), SUM(s), SUM(m), SUM(i), SUM(b) FROM t"),
       Query("DROP TABLE t"),
-      Query("SET SESSION sql_mode = ''")});
+      Query("SET SESSION sql_mode = ''", Query::WHERE_EXEC::CONTROL)});
 
 //-----------------------------------------------------------------------
 
@@ -923,9 +936,8 @@ Connection::start() {
         //plain -- new connection straight to the DB
         case UNENCRYPTED:
         {
-            Connect *const c = 
+            Connect *const c =
                 new Connect(tc.host, tc.user, tc.pass, tc.port);
-            // assert(strictMode(c));
             conn_set.insert(c);
             this->conn = conn_set.begin();
             break;
@@ -1068,7 +1080,9 @@ CheckQuery(const TestConfig &tc, const Query &query)
 {
     LOG(test) << "query: " << query.query;
 
+    // FIXME: this code must be reworked, don't duplicate query execution logic
     if (query.crash_point != NULL) {
+        // FIXME: doesn't have support for differential execution
         global_crash_point = query.crash_point->name;
         LOG(test) << "crash point: " << global_crash_point;
 
@@ -1089,14 +1103,22 @@ CheckQuery(const TestConfig &tc, const Query &query)
         //   database throws an exception
         // > ie, if an INSERT throws an exception we want the SELECTs
         //   coming afterwards to fail as well
-        const ResType control_res = control->execute(query);
-        ResType test_res(false);
-        try {
-            test_res = test->execute(query);
-        } catch (const AbstractException &e) {
-            std::cout << e << std::endl;
-            return !control_res.ok;
+        ResType control_res(false);
+        if (Query::WHERE_EXEC::TEST != query.where_exec) {
+            control_res = control->execute(query);
+            if (Query::WHERE_EXEC::CONTROL == query.where_exec) {
+                return control_res.ok;
+            }
         }
+
+        ResType test_res(false);
+        if (Query::WHERE_EXEC::CONTROL != query.where_exec) {
+            test_res = test->execute(query);
+            if (Query::WHERE_EXEC::TEST == query.where_exec) {
+                return test_res.ok;
+            }
+        }
+        assert(Query::WHERE_EXEC::BOTH == query.where_exec);
 
         if (control_res.ok != test_res.ok) {
             LOG(warn) << "control " << control_res.ok
@@ -1190,7 +1212,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 563/580
+    //      TOTAL RESULT: 576/591
     // ###############################
 
     std::vector<Score> scores;
@@ -1249,8 +1271,7 @@ RunTest(const TestConfig &tc) {
     // Pass 17/17
     scores.push_back(CheckQueryList(tc, NonStrictMode));
 
-    // Pass 28/30
-    // NOTE: two queries should fail
+    // Pass 30/30
     scores.push_back(CheckQueryList(tc, Transactions));
 
     // Pass 13/13
@@ -1268,7 +1289,7 @@ RunTest(const TestConfig &tc) {
     // Pass 24/35
     scores.push_back(CheckQueryList(tc, Directives));
 
-    // Pass 31/31
+    // Pass 42/42
     scores.push_back(CheckQueryList(tc, Range));
 
     int npass = 0;
