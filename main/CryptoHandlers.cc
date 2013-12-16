@@ -1426,11 +1426,11 @@ OPE_int::decrypt(Item * const ctext, uint64_t IV) const
 
     if (MYSQL_TYPE_VARCHAR != this->cinteger.getFieldType()) {
         const ulonglong cval = RiboldMYSQL::val_uint(*ctext);
-        return new Item_int((ulonglong)uint64FromZZ(ope.decrypt(ZZFromUint64(cval))));
+        return new Item_int(static_cast<ulonglong>(uint64FromZZ(ope.decrypt(ZZFromUint64(cval)))));
     }
 
     // undo the reversal from encryption
-    return new Item_int((ulonglong)uint64FromZZ(ope.decrypt(ZZFromString(reverse(ItemToString(*ctext))))));
+    return new Item_int(static_cast<ulonglong>(uint64FromZZ(ope.decrypt(ZZFromString(reverse(ItemToString(*ctext)))))));
 }
 
 
@@ -1557,7 +1557,7 @@ ZZToItemInt(const ZZ &val)
 static Item *
 ZZToItemStr(const ZZ &val)
 {
-    const std::string str = StringFromZZ(val);
+    const std::string &str = StringFromZZ(val);
     Item * const newit =
         new (current_thd->mem_root) Item_string(make_thd_string(str),
                                                 str.length(),
@@ -1703,6 +1703,8 @@ HOM::decrypt(Item * const ctext, uint64_t IV) const
     const ZZ enc = ItemStrToZZ(ctext);
     const ZZ dec = sk->decrypt(enc);
     LOG(encl) << "HOM ciph " << enc << "---->" << dec;
+    TEST_Text(NumBytes(dec) <= 8,
+              "Summation produced an integer larger than 64 bits");
     return ZZToItemInt(dec);
 }
 
