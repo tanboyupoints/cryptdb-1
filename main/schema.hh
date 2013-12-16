@@ -15,9 +15,6 @@
 #include <sstream>
 #include <functional>
 
-// > FIXME: We are Memleaking
-// SchemaInfo/TableMeta/FieldMeta/OnionMeta/EncLayer and the keys.
-
 class Analysis;
 class FieldMeta;
 
@@ -80,9 +77,7 @@ private:
 } OnionMeta;
 
 class TableMeta;
-//TODO: FieldMeta and TableMeta are partly duplicates with the original
-// FieldMetadata an TableMetadata
-// which contains data we want to add to this structure soon
+
 typedef class FieldMeta : public MappedDBMeta<OnionMeta, OnionMetaKey> {
 public:
     const std::string fname;

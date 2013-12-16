@@ -229,8 +229,7 @@ public:
     const std::unique_ptr<Analysis> a;
     RewritePlanWithAnalysis(const EncSet &es_out, reason r,
                             std::unique_ptr<Analysis> a);
-    // FIXME:
-    // ~RewritePlanWithAnalysis() {}
+    ~RewritePlanWithAnalysis();
 };
 
 std::ostream&
