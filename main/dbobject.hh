@@ -7,7 +7,7 @@
 #include <main/serializers.hh>
 
 // FIXME: Maybe should inherit from DBObject.
-class AbstractMetaKey {
+class AbstractMetaKey : public NormalAlloc {
 public:
     AbstractMetaKey() {;}
     virtual ~AbstractMetaKey() {;}
@@ -137,14 +137,11 @@ class Connect;
  *  read SchemaInfo from database.
  *  > Logic is in SQL.
  */
-class DBMeta : public DBObject {
+class DBMeta : public DBObject, public NormalAlloc {
 public:
     DBMeta() {}
     explicit DBMeta(unsigned int id) : DBObject(id) {}
     virtual ~DBMeta() {;}
-
-    void *operator new(size_t n);
-    void operator delete(void *p);
 
     // FIXME: Use rtti.
     virtual std::string typeName() const = 0;

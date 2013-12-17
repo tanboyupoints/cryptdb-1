@@ -12,27 +12,6 @@
 #include <main/metadata_tables.hh>
 #include <main/macro_util.hh>
 
-void *
-DBMeta::operator new(size_t n)
-{
-    void *const p = malloc(n);
-    if (NULL == p) {
-        throw std::bad_alloc();
-    }
-
-    return p;
-}
-
-void
-DBMeta::operator delete(void *p)
-{
-    if (p) {
-        free(p);
-    }
-
-    return;
-}
-
 std::vector<DBMeta *>
 DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
                         std::function<DBMeta *(const std::string &,

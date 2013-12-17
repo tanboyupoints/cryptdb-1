@@ -480,6 +480,27 @@ trailingZeros(const std::string &input, size_t count)
     return input + zeros;
 }
 
+void *
+NormalAlloc::operator new(size_t n)
+{
+    void *const p = malloc(n);
+    if (NULL == p) {
+        throw std::bad_alloc();
+    }
+
+    return p;
+}
+
+void
+NormalAlloc::operator delete(void *const p)
+{
+    if (p) {
+        free(p);
+    }
+
+    return;
+}
+
 // quick n dirty unit testing
 bool
 test64bitZZConversions()

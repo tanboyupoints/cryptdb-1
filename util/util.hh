@@ -607,6 +607,15 @@ public:
     }
 };
 
+class NormalAlloc {
+public:
+    NormalAlloc() {}
+    virtual ~NormalAlloc() {}
+
+    void *operator new(size_t n);
+    void operator delete(void *const p);
+};
+
 // Taken from jsmith @ cplusplus.com
 template <typename T>
 std::vector<T> vectorDifference(const std::vector<T> &model,
