@@ -30,7 +30,7 @@ static DBOnionState insert_os =
     {{"test_insert", {{"id", num_os}, {"age", num_os}, {"salary", num_os}, {"address", str_os}, {"name", str_os}}}};
 
 static QueryList Insert = QueryList("SingleInsert",
-    { Query("CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)", &insert_os),
+    { Query("CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)"),
       Query("INSERT INTO test_insert VALUES (1, 21, 100, '24 Rosedale, Toronto, ONT', 'Pat Carlson')"),
       Query("SELECT * FROM test_insert"),
       Query("INSERT INTO test_insert (id, age, salary, address, name) VALUES (2, 23, 101, '25 Rosedale, Toronto, ONT', 'Pat Carlson2')"),
@@ -101,8 +101,14 @@ static QueryList Select = QueryList("SingleSelect",
 
 static QueryList SubQuery = QueryList("SubQuery",
     { Query("CREATE TABLE subqueryphun (morse integer, code integer)"),
+      Query("CREATE TABLE numerouno (uno integer, dos integer, tres integer)"),
       Query("INSERT INTO subqueryphun VALUES (100, 200), (1000, 2000),"
             "                                (200, 100), (25, 25), (50, 50)"),
+      Query("INSERT INTO numerouno VALUES (1, 2, 3), (100, 200, 300),"
+            "                             (1000, 2000, 3000)"),
+      // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      //     single row subqueries
+      // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
       // bad query, subquery returns multiple rows
       Query("SELECT * FROM subqueryphun"
             " WHERE (SELECT code FROM subqueryphun)"),
@@ -112,6 +118,32 @@ static QueryList SubQuery = QueryList("SubQuery",
             " WHERE morse IN (SELECT morse FROM subqueryphun)"),
       Query("SELECT * FROM subqueryphun"
             " wHERE morse IN (SELECT 100 FROM subqueryphun)"),
+      Query("SELECT * FROM subqueryphun"
+            " WHERE (SELECT 1 FROM subqueryphun AS q WHERE q.morse"
+            "         LIMIT 1)"),
+      // use a table from higher level select in subquery
+      Query("SELECT * FROM numerouno"
+            " WHERE (SELECT dos FROM subqueryphun"
+            "         WHERE subqueryphun.morse = numerouno.uno"
+            "         LIMIT 1)"),
+      // use an alias from higher level select in subquery
+      Query("SELECT * FROM numerouno AS n1"
+            " WHERE (SELECT tres FROM subqueryphun"
+            "         WHERE subqueryphun.morse = n1.uno"
+            "         LIMIT 1)"),
+      // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      //         IN subqueries
+      // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      Query("SELECT * FROM subqueryphun"
+            " WHERE morse IN (SELECT morse FROM subqueryphun)"),
+      // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      //       EXISTS subqueries
+      // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      Query("SELECT * FROM subqueryphun"
+            " WHERE EXISTS(SELECT * FROM subqueryphun)"),
+      Query("SELECT * FROM numerouno as n1"
+            " WHERE EXISTS(SELECT * FROM subqueryphun"
+            "               WHERE subqueryphun.morse = n1.uno)"),
       Query("DROP TABLE subqueryphun")
     });
 
@@ -831,7 +863,6 @@ static QueryList Directives = QueryList("Directives",
       Query("DROP TABLE directives")
     });
 
-// FIXME: write summation tests for bigint column
 static QueryList Range = QueryList("Range",
       // we must run the control database in strict mode in order to
       // match semantics
@@ -909,8 +940,9 @@ static QueryList Range = QueryList("Range",
       Query("SELECT t, i FROM t WHERE t < 99999999999999999999"),
       Query("SELECT t, s, m, i FROM t"),
       */
-      // Query("SELECT t, s, m FROM t WHERE s = m AND b = i"),
-      // Query("SELECT SUM(t), SUM(s), SUM(m), SUM(i), SUM(b) FROM t"),
+      Query("SELECT t, s, m FROM t WHERE s = m AND b = i"),
+      // fails because we don't handle summations larger than 64 bits
+      Query("SELECT SUM(b) FROM t"),
       Query("DROP TABLE t"),
       Query("SET SESSION sql_mode = ''", Query::WHERE_EXEC::CONTROL)});
 
@@ -1226,7 +1258,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 581/596
+    //      TOTAL RESULT: 590/606
     // ###############################
 
     std::vector<Score> scores;
@@ -1237,7 +1269,7 @@ RunTest(const TestConfig &tc) {
     // Pass 49/49
     scores.push_back(CheckQueryList(tc, Select));
 
-    // Pass 7/7
+    // Pass 15/15
     scores.push_back(CheckQueryList(tc, SubQuery));
 
     // Pass 27/27
@@ -1279,7 +1311,7 @@ RunTest(const TestConfig &tc) {
     // Pass 28/31
     scores.push_back(CheckQueryList(tc, Auto));
 
-    // Pass 8/10
+    // Pass ?/?
     // scores.push_back(CheckQueryList(tc, Negative));
 
     // Pass 19/19
@@ -1306,7 +1338,7 @@ RunTest(const TestConfig &tc) {
     // Pass 24/35
     scores.push_back(CheckQueryList(tc, Directives));
 
-    // Pass 42/42
+    // Pass 43/44
     scores.push_back(CheckQueryList(tc, Range));
 
     int npass = 0;

@@ -950,10 +950,14 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
     {
         const std::string why = "subselect";
 
-        // Gather subquery.
+        // create an Analysis object for subquery gathering/rewriting
         std::unique_ptr<Analysis>
             subquery_analysis(new Analysis(a.getDatabaseName(),
                                            a.getSchema()));
+        // aliases should be available to the subquery as well
+        subquery_analysis->table_aliases = a.table_aliases;
+
+        // Gather subquery.
         const st_select_lex *const select_lex =
             RiboldMYSQL::get_select_lex(i);
         process_select_lex(*select_lex, *subquery_analysis);
@@ -983,7 +987,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
             case Item_subselect::subs_type::SINGLEROW_SUBS:
                 break;
             case Item_subselect::subs_type::EXISTS_SUBS:
-                assert(false);
+                break;
             case Item_subselect::subs_type::IN_SUBS: {
                 const Item *const left_expr =
                     getLeftExpr(static_cast<const Item_in_subselect &>(i));
@@ -1025,6 +1029,12 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
         // ------------------------------
         st_select_lex *const new_select_lex =
             rewrite_select_lex(*select_lex, *rp_w_analysis.a.get());
+
+        // Rewrite table names.
+        new_select_lex->top_join_list =
+            rewrite_table_list(select_lex->top_join_list,
+                               *rp_w_analysis.a.get());
+
         /* printing a single row subquery looks like this
          * ...
          * Item_singlerow_subselect::print(...) <--- defers to base class
@@ -1056,11 +1066,6 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
          * sql/item_subselect.{cc,hh} has all the details should you care
          */
         new_select_lex->master_unit()->item = NULL;
-
-        // Rewrite table names.
-        new_select_lex->top_join_list =
-            rewrite_table_list(select_lex->top_join_list,
-                               *rp_w_analysis.a.get());
 
         // ------------------------------
         //   Specific Subquery Rewrite
@@ -1100,7 +1105,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
                     return new_item_single;
                 }
                 case Item_subselect::subs_type::EXISTS_SUBS:
-                    assert(false);
+                    return new Item_exists_subselect(new_select_lex);
                 case Item_subselect::subs_type::IN_SUBS: {
                     const Item *const left_expr =
                         getLeftExpr(static_cast<const Item_in_subselect &>(i));
@@ -1540,6 +1545,7 @@ executeQuery(const ProxyState &ps, const std::string &q,
     } catch (const SynchronizationException &e) {
         return genericFailureEpilogueResult();
     } catch (const AbstractException &e) {
+        std::cout << "exception: " << e;
         return genericFailureEpilogueResult();
     } catch (const CryptDBError &e) {
         return genericFailureEpilogueResult();
