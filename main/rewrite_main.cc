@@ -976,8 +976,8 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
             item_rp->es_out = PLAIN_EncSet;
         }
 
-        const EncSet out_es = PLAIN_EncSet;
-        const reason rsn = reason(out_es, why, i);
+        const EncSet &out_es = PLAIN_EncSet;
+        const reason &rsn = reason(out_es, why, i);
 
         switch (RiboldMYSQL::substype(i)) {
             case Item_subselect::subs_type::SINGLEROW_SUBS:
@@ -1025,30 +1025,80 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
         // ------------------------------
         st_select_lex *const new_select_lex =
             rewrite_select_lex(*select_lex, *rp_w_analysis.a.get());
+        /* printing a single row subquery looks like this
+         * ...
+         * Item_singlerow_subselect::print(...) <--- defers to base class
+         *   Item_subselect::print(...)
+         *     subselect_engine::print(...)     <--- pure virtual
+         *       subselect_single_select_engine::print(...)
+         *         st_select_lex::print(...) on the engine ``st_select_lex'' member variable
+         *
+         * if you can get the engine in the ``Item_subselect'' object to point to
+         * our rewritten ``st_select_lex'' you will get the desired results
+         *
+         * the next step is to properly build a new ``Item_singlerow_subselect'';
+         * the constructor for ``Item_singlerow_subselect'' will either create a
+         * new engine or use an old one from the ``st_select_lex'' parameter.
+         * we want it to use a new one, otherwise it will be the engine from
+         * the original Item_subselect.  setting master_unit()->item on our
+         * rewritten ``st_select_lex'' to NULL will give us this behavior.
+         *
+         * the ``Item_singlerow_subselect'' constructor calls
+         * Item_subselect::init(...) which takes the ``st_select_lex'' as a
+         * parameter. provided the aforementioned NULL condition holds,
+         * init(...) then constructs the new ``subselect_single_select_engine''
+         * and our rewritten ``Item_singlerow_subselect'' keeps it as a member
+         * pointer. The ``subselect_single_select_engine'' constructor then
+         * takes the ``st_select_lex'' as a parameter and sets
+         * st_select_lex::master_unit()->item as a backpointer to the
+         * ``Item_singlerow_subselect'' that owns the engine.
+         *
+         * sql/item_subselect.{cc,hh} has all the details should you care
+         */
+        new_select_lex->master_unit()->item = NULL;
 
         // Rewrite table names.
         new_select_lex->top_join_list =
             rewrite_table_list(select_lex->top_join_list,
                                *rp_w_analysis.a.get());
 
-        // Rewrite SELECT params.
-        // HACK: The engine inside of the Item_subselect _can_ have a
-        // pointer back to the Item_subselect that contains it.
-        // > ie, subselect_single_select_engine::join::select_lex
-        // > The way this is done varies from engine to engine thus a
-        //   general solution seems difficuly.
-        // > set_select_lex() attemps to rectify this problem in other
-        //   cases
-        memcpy(const_cast<st_select_lex *>(select_lex), new_select_lex,
-               sizeof(st_select_lex));
-
         // ------------------------------
         //   Specific Subquery Rewrite
         // ------------------------------
         {
             switch (RiboldMYSQL::substype(i)) {
-                case Item_subselect::subs_type::SINGLEROW_SUBS:
-                    return new Item_singlerow_subselect(new_select_lex);
+                case Item_subselect::subs_type::SINGLEROW_SUBS: {
+                    Item_singlerow_subselect *const new_item_single =
+                        new Item_singlerow_subselect(new_select_lex);
+                    // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                    //          sanity check
+                    // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                    // did the old engine get replaced?
+                    subselect_single_select_engine *const old_engine =
+                        static_cast<subselect_single_select_engine *>(
+                                i.*rob<Item_subselect, subselect_engine*,
+                                       &Item_subselect::engine>::ptr());
+                    subselect_single_select_engine *const rewrite_engine =
+                        static_cast<subselect_single_select_engine *>(
+                                new_item_single->*rob<Item_subselect, subselect_engine*,
+                                                      &Item_subselect::engine>::ptr());
+                    assert(old_engine != rewrite_engine);
+                    // does the new engine have a backpointer to our
+                    // rewritten Item?
+                    st_select_lex *const old_select_lex =
+                        old_engine->*rob<subselect_single_select_engine,
+                                         st_select_lex *,
+                                         &subselect_single_select_engine::select_lex>::ptr();
+                    st_select_lex *const rewrite_select_lex =
+                        rewrite_engine->*rob<subselect_single_select_engine,
+                                             st_select_lex *,
+                                             &subselect_single_select_engine::select_lex>::ptr();
+                    assert(old_select_lex == select_lex);
+                    assert(rewrite_select_lex == new_select_lex);
+                    assert(rewrite_select_lex->master_unit()->item == new_item_single);
+
+                    return new_item_single;
+                }
                 case Item_subselect::subs_type::EXISTS_SUBS:
                     assert(false);
                 case Item_subselect::subs_type::IN_SUBS: {

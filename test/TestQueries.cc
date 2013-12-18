@@ -97,9 +97,23 @@ static QueryList Select = QueryList("SingleSelect",
       Query("SELECT t.address AS b FROM test_select t"),
       Query("SELECT * FROM test_select HAVING age"),
       Query("SELECT * FROM test_select HAVING age && id"),
-      Query("SELECT * FROM test_select WHERE id IN (SELECT id FROM test_select)"),
-      Query("SELECT * FROM test_select WHERE id IN (SELECT 1 FROM test_select)"),
       Query("DROP TABLE test_select") });
+
+static QueryList SubQuery = QueryList("SubQuery",
+    { Query("CREATE TABLE subqueryphun (morse integer, code integer)"),
+      Query("INSERT INTO subqueryphun VALUES (100, 200), (1000, 2000),"
+            "                                (200, 100), (25, 25), (50, 50)"),
+      // bad query, subquery returns multiple rows
+      Query("SELECT * FROM subqueryphun"
+            " WHERE (SELECT code FROM subqueryphun)"),
+      Query("SELECT * FROM subqueryphun"
+            " WHERE (SELECT code FROM subqueryphun LIMIT 1)"),
+      Query("SELECT * FROM subqueryphun"
+            " WHERE morse IN (SELECT morse FROM subqueryphun)"),
+      Query("SELECT * FROM subqueryphun"
+            " wHERE morse IN (SELECT 100 FROM subqueryphun)"),
+      Query("DROP TABLE subqueryphun")
+    });
 
 static QueryList Join = QueryList("SingleJoin",
     { Query("CREATE TABLE test_join1 (id integer, age integer, salary integer, address text, name text)"),
@@ -1212,7 +1226,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 576/591
+    //      TOTAL RESULT: 581/596
     // ###############################
 
     std::vector<Score> scores;
@@ -1220,8 +1234,11 @@ RunTest(const TestConfig &tc) {
     assert(testSlowMatch());
     assert(test64bitZZConversions());
 
-    // Pass 51/51
+    // Pass 49/49
     scores.push_back(CheckQueryList(tc, Select));
+
+    // Pass 7/7
+    scores.push_back(CheckQueryList(tc, SubQuery));
 
     // Pass 27/27
     scores.push_back(CheckQueryList(tc, HOM));
