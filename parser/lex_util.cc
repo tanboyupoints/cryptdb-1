@@ -58,6 +58,12 @@ dup_item(const Item_float &i)
                                                 i.decimals, i.max_length);
 }
 
+Item_field *
+dup_item(const Item_field &i)
+{
+    return new Item_field(current_thd, &const_cast<Item_field &>(i));
+}
+
 Item *
 dup_item(const Item &i)
 {
@@ -75,6 +81,8 @@ dup_item(const Item &i)
         case Item::Type::REAL_ITEM:
             assert(i.field_type() == MYSQL_TYPE_DOUBLE);
             return dup_item(static_cast<const Item_float &>(i));
+        case Item::Type::FIELD_ITEM:
+            return dup_item(static_cast<const Item_field &>(i));
         default:
             throw CryptDBError("Unable to clone: " +
                                std::to_string(i.type()));
@@ -216,9 +224,15 @@ bool RiboldMYSQL::is_null(const Item &i)
     return const_cast<Item &>(i).is_null();
 }
 
-Item *RiboldMYSQL::clone_item(const Item &i)
+// this will only work for constants
+Item *
+RiboldMYSQL::clone_item(const Item &i)
 {
-    return const_cast<Item &>(i).clone_item();
+    Item *const out_i = const_cast<Item &>(i).clone_item();
+    if (NULL == out_i) {
+        thrower() << "attempted to clone a non constant Item";
+    }
+    return out_i;
 }
 
 const List<Item> *RiboldMYSQL::argument_list(const Item_cond &i)

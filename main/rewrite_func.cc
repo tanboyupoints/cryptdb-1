@@ -1106,6 +1106,9 @@ static class ANON : public CItemSubtypeFN<Item_func_case, str_case> {
     virtual RewritePlan *
     do_gather_type(const Item_func_case &i, Analysis &a) const
     {
+        const std::string &why = str_case;
+        return allPlainIterateGather(i, why, a);
+
 	/*     Item **args = i->arguments();
         int first_expr_num = i->*rob<Item_func_case, int,
                 &Item_func_case::first_expr_num>::ptr();
@@ -1137,6 +1140,14 @@ static class ANON : public CItemSubtypeFN<Item_func_case, str_case> {
     virtual Item * do_optimize_type(Item_func_case *i, Analysis & a) const
     {
         return do_optimize_type_self_and_args(i, a);
+    }
+
+    virtual Item *
+    do_rewrite_type(const Item_func_case &i, const OLK &constr,
+                    const RewritePlan &rp, Analysis &a) const
+    {
+        return rewrite_args_FN(i, constr,
+                               static_cast<const RewritePlanOneOLK &>(rp), a);
     }
 } ANON;
 

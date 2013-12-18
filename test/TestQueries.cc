@@ -144,6 +144,12 @@ static QueryList SubQuery = QueryList("SubQuery",
       Query("SELECT * FROM numerouno as n1"
             " WHERE EXISTS(SELECT * FROM subqueryphun"
             "               WHERE subqueryphun.morse = n1.uno)"),
+      // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      //      misc subquery bugs
+      // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      // summation in subquery was causing segfault
+      Query("SELECT (SELECT SUM(uno) FROM numerouno)"),
+      Query("SELECT * FROM numerouno WHERE (SELECT SUM(uno) FROM numerouno)"),
       Query("DROP TABLE subqueryphun")
     });
 
@@ -236,6 +242,7 @@ static QueryList HOM = QueryList("HOMAdd",
       Query("SELECT COUNT(*) FROM test_HOM WHERE age <= 100"),
       Query("SELECT COUNT(*) FROM test_HOM WHERE age >= 100"),
       Query("SELECT COUNT(*) FROM test_HOM WHERE age = 100"),
+      Query("SELECT SUM(address) FROM test_HOM"),
       Query("DROP TABLE test_HOM") });
 
 static QueryList Delete = QueryList("SingleDelete",
@@ -1258,7 +1265,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 590/606
+    //      TOTAL RESULT: 593/609
     // ###############################
 
     std::vector<Score> scores;
@@ -1269,10 +1276,10 @@ RunTest(const TestConfig &tc) {
     // Pass 49/49
     scores.push_back(CheckQueryList(tc, Select));
 
-    // Pass 15/15
+    // Pass 17/17
     scores.push_back(CheckQueryList(tc, SubQuery));
 
-    // Pass 27/27
+    // Pass 28/28
     scores.push_back(CheckQueryList(tc, HOM));
 
     // Pass 17/17

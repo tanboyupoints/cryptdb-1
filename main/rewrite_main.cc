@@ -943,6 +943,9 @@ static Item *getLeftExpr(const Item_in_subselect &i)
 }
 
 // HACK: Forces query down to PLAINVAL.
+// if more complicated subqueries begin to give us problems,
+// subselect_engine::prepare(...) and Item_subselect::fix_fields(...) may be
+// worth investigating
 static class ANON : public CItemSubtypeIT<Item_subselect,
                                           Item::Type::SUBSELECT_ITEM> {
     virtual RewritePlan *
