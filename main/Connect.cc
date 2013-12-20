@@ -85,10 +85,7 @@ Connect *Connect::getEmbedded(const std::string &embed_db)
         thrower() << "mysql_real_connect: " << mysql_error(m);
     }
 
-    Connect *const conn = new Connect(m);
-    conn->close_on_destroy = true;
-
-    return conn;
+    return new Connect(m);
 }
 
 // @multiple_resultsets causes us to ignore query results.
