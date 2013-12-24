@@ -891,7 +891,7 @@ Item *
 decrypt_item_layers(Item *const i, const FieldMeta *const fm, onion o,
                     uint64_t IV)
 {
-    assert(!i->is_null());
+    assert(i && !i->is_null());
 
     Item *dec = i;
 
@@ -900,6 +900,7 @@ decrypt_item_layers(Item *const i, const FieldMeta *const fm, onion o,
     const auto &enc_layers = om->layers;
     for (auto it = enc_layers.rbegin(); it != enc_layers.rend(); ++it) {
         dec = (*it)->decrypt(dec, IV);
+        assert(dec);
         LOG(cdb_v) << "dec okay";
     }
 
@@ -907,25 +908,6 @@ decrypt_item_layers(Item *const i, const FieldMeta *const fm, onion o,
 }
 
 
-// returns the intersection of the es and fm.encdesc
-// by also taking into account what onions are stale
-// on fm
-/*static OnionLevelFieldMap
-intersect(const EncSet & es, FieldMeta * fm) {
-    OnionLevelFieldMap res;
-
-    for (auto it : es.osl) {
-        onion o = it.first;
-        auto ed_it = fm->encdesc.olm.find(o);
-        if ((ed_it != fm->encdesc.olm.end()) && (!fm->onions[o]->stale)) {
-            //an onion to keep
-            res[o] = LevelFieldPair(min(it.second.first, ed_it->second), fm);
-        }
-    }
-
-    return res;
-}
-*/
 /*
  * Actual item handlers.
  */
