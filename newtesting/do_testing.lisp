@@ -65,7 +65,7 @@
       seq)))
 
 (defun str-assoc (key alist)
-  (assoc key alist :test #'string=))
+  (assoc key alist :test #'string-equal))
 
 ;;; returns (did-the-lookup-complete? completed-portion-of-lookup unmatched-keys)
 (defun many-str-assoc (keys nested-alists)
@@ -78,6 +78,13 @@
         (when (null found-alist)
           (return (values nil alist (subseq keys i))))
         (setf alist found-alist)))))
+
+;;; apply fn to each node
+(defun map-tree (fn tree)
+  (cond ((null tree) '())
+        ((atom (car tree))
+         (cons (funcall fn (car tree)) (map-tree fn (cdr tree))))
+        (t (cons (map-tree fn (car tree)) (map-tree fn (cdr tree))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -99,7 +106,7 @@
 
 ;;; take possibly shorthand onion-checks and produce full length checks
 ;;; > return nil if `dirty-onion-checks` are invalid
-(defun fixup-onion-checks (dirty-onion-checks default-database)
+(defun low-level-fixup-onion-checks (dirty-onion-checks default-database)
   (cond ((atom dirty-onion-checks)
          (when (eq dirty-onion-checks :check)
            `(,dirty-onion-checks)))
@@ -139,6 +146,12 @@
                  ;; (:update (<database> (<table> ...)) (<database> ...))
                  ((every #'proper-onion-update? (cdr dirty-onion-checks))
                   dirty-onion-checks)))))
+
+(defun fixup-onion-checks (dirty-onion-checks default-database)
+  (let ((fixed (low-level-fixup-onion-checks dirty-onion-checks default-database)))
+    ;; convert symbols to strings except for the initial directive
+    (when fixed
+      (cons (car fixed) (map-tree #'string (cdr fixed))))))
 
 (defun fixup-execution-target (dirty-execution-target)
   (cond ((null dirty-execution-target) :both)
@@ -202,9 +215,9 @@
                   `(,(nest-unmatched-keys unmatched-keys seclevel))))))
 
 (defun max-level? (onion seclevel)
-  (cond ((member onion '("oDET" "oOPE" "oPLAIN") :test #'string=)
-         (string= "RND" seclevel))
-        ((string= "oAGG" onion) (string= "HOM" seclevel))))
+  (cond ((member onion '("oDET" "oOPE" "oPLAIN") :test #'string-equal)
+         (string-equal "RND" seclevel))
+        ((string-equal "oAGG" onion) (string-equal "HOM" seclevel))))
 
 ;;; change our local copy of the onion state
 (defmethod update-onion-state! ((onions onion-state) onion-check)
@@ -236,8 +249,8 @@
       (dolist (row results output)
         (destructuring-bind (database table field onion seclevel id) row
           (declare (ignore id))
-          (unless (or (not (string= max-database database))
-                      (not (string= max-table table))
+          (unless (or (not (string-equal max-database database))
+                      (not (string-equal max-table table))
                       (max-level? onion seclevel))
             (setf output nil))
           ;; update our local copy of onion state
@@ -253,7 +266,8 @@
       (dolist (row results output)
         (destructuring-bind (database table field onion seclevel id) row
           (declare (ignore id))
-          (unless (string= seclevel (lookup-seclevel onions database table field onion))
+          (unless (string-equal seclevel (lookup-seclevel onions database table field onion))
+            (break)
             (setf output nil))
           (setf (lookup-seclevel onions database table field onion) seclevel))))))
 
@@ -506,11 +520,18 @@
                 (string= "l1" (lookup-seclevel onions "db0" "t0" "f1" "o1"))
                 (string= "l2" (lookup-seclevel onions "db0" "t1" "f2" "o1")))))))
 
+(defun test-map-tree ()
+  (and (equal '((2 3) (4 ((5))) 6)
+              (map-tree #'(lambda (n) (1+ n)) '((1 2) (3 ((4))) 5)))
+       (equal '()
+              (map-tree #'(lambda (n) (declare (ignore n)) (assert nil)) '()))))
+
 (defun test-all-units ()
   (and (test-fixup-onion-checks)
        (test-fixup-execution-target)
        (test-lookup-seclevel)
        (test-update-onion-state!)
        (test-many-str-assoc)
+       (test-map-tree)
        (test-add-onion!)))
 
