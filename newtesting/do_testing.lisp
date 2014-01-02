@@ -339,6 +339,9 @@
                          row))
           results))
 
+(defun valid-group-default? (group-default)
+  (or (equal t group-default) (equal nil group-default) (stringp group-default)))
+
 (defun run-test-group (connections test-group)
   (let* ((score (make-group-score))
          (*score* score)
@@ -347,6 +350,7 @@
          (group-default (cadr test-group))
          (test-list (cddr test-group)))
     (declare (special *score*) (ignore group-name))
+    (assert (valid-group-default? group-default))
     (dolist (test-case test-list score)
       (let* ((query (car test-case))
              (onion-checks (fixup-onion-checks (cadr test-case) group-default))
