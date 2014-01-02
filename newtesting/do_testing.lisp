@@ -1,11 +1,12 @@
 (proclaim '(optimize (debug 3)))
 
 ; (defconstant +default-tests-path+ "./tests.sexpr")
-(defparameter +default-tests-path+  "./tests.sexpr")
-(defparameter +default-ip+          "127.0.0.1")
-(defparameter +default-username+    "root")
-(defparameter +default-password+    "letmein")
-(defparameter +default-database+    "cryptdbtest")
+(defparameter +default-tests-path+       "./tests.sexpr")
+(defparameter +default-ip+               "127.0.0.1")
+(defparameter +default-username+         "root")
+(defparameter +default-password+         "letmein")
+(defparameter +default-database+         "cryptdbtest")
+(defparameter +default-control-database+ "cryptdbtest_control")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -26,9 +27,12 @@
   (handler-case
         (let ((results (clsql:query query :database database)))
           (if just-return-status 'query-success results))
-    (sql-database-error (e)
+    (clsql:sql-database-error (e)
       (declare (ignore e))
       'query-error)))
+
+(defun must-succeed-query (query database)
+  (assert (eq 'query-success (issue-query query database t))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -63,6 +67,18 @@
 (defun str-assoc (key alist)
   (assoc key alist :test #'string=))
 
+;;; returns (did-the-lookup-complete? completed-portion-of-lookup unmatched-keys)
+(defun many-str-assoc (keys nested-alists)
+  (let ((alist nested-alists)
+        (keys-len (length keys)))
+    (do ((i 0 (1+ i)))
+        ((= keys-len i) (values t alist '()))
+      (let* ((k (elt keys i))
+             (found-alist (str-assoc k (if (zerop i) alist (cdr alist)))))
+        (when (null found-alist)
+          (return (values nil alist (subseq keys i))))
+        (setf alist found-alist)))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -71,7 +87,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun load-tests (&optional (path +default-tests-path+))
-  (read-file path))
+  (read-from-string (read-file path)))
 
 ;; FIXME: implement
 (defun proper-onion-update? (onion-check)
@@ -164,6 +180,27 @@
   (setf (car (low-level-lookup-seclevel onions database table field onion))
         seclevel))
 
+(defun nest-unmatched-keys (unmatched-keys seclevel)
+  (assert (not (null unmatched-keys)))
+  (cond ((null (cdr unmatched-keys)) `(,(car unmatched-keys) ,seclevel))
+        (t `(,(car unmatched-keys) ,(nest-unmatched-keys (cdr unmatched-keys) seclevel)))))
+
+(defmethod add-onion! ((onions onion-state) database table field onion seclevel)
+  ;; don't try to look anything up if we don't have any onion data
+  (when (null (onion-state-databases onions))
+    (setf (onion-state-databases onions)
+          `((,database (,table (,field (,onion ,seclevel))))))
+    (return-from add-onion!))
+  (multiple-value-bind (success lookup unmatched-keys)
+        (many-str-assoc `(,database ,table ,field ,onion)
+                        (onion-state-databases onions))
+    ;; we should never get a match past `field`
+    (assert (and (null success) (>= (length unmatched-keys) 1)))
+    (assert (not (null lookup)))
+    (setf (cdr lookup)
+          (append (cdr lookup)
+                  `(,(nest-unmatched-keys unmatched-keys seclevel))))))
+
 (defun max-level? (onion seclevel)
   (cond ((member onion '("DET" "OPE") :test #'string=)
          (string= "RND" seclevel))
@@ -197,13 +234,16 @@
           (results      (get-cryptdb-show connections))
           (output       nil))
       (dolist (row results output)
-        (destructuring-bind (database table field onion seclevel) row
+        (destructuring-bind (database table field onion seclevel id) row
+          (declare (ignore id))
           (unless (or (not (string= max-database database))
                       (not (string= max-table table))
                       (max-level? onion seclevel))
             (setf output nil))
           ;; update our local copy of onion state
-          (setf (lookup-seclevel onions database table field onion) seclevel)))))
+          ;; > we cannot use (setf lookup-seclevel) because the local onion state
+          ;;   may be nil
+          (add-onion! onions database table field onion seclevel)))))
   (:method (connections (onions onion-state) (type (eql :update)) onion-check)
     (update-onion-state! onions onion-check)
     (handle-check connections onions :check onion-check))
@@ -211,7 +251,8 @@
     (let ((results (get-cryptdb-show connections))
           (output  t))
       (dolist (row results output)
-        (destructuring-bind (database table field onion seclevel) row
+        (destructuring-bind (database table field onion seclevel id) row
+          (declare (ignore id))
           (unless (string= seclevel (lookup-seclevel onions database table field onion))
             (setf output nil))
           (setf (lookup-seclevel onions database table field onion) seclevel))))))
@@ -220,7 +261,9 @@
 ;;; then compare this new onion state to the state reported by cryptdb for
 ;;; each testing onion
 (defmethod handle-onion-checks (connections (onions onion-state) onion-check)
-  (handle-check connections onions (car onion-check) onion-check))
+  (if (null onion-check)
+      t
+      (handle-check connections onions (car onion-check) onion-check)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -254,7 +297,8 @@
 
 (defun slow-compare (results-a results-b)
   (declare (ignore results-a results-b))
-  (error "implement slow-compare"))
+  nil)
+  ; (error "implement slow-compare"))
 
 (defun compare-results (results-a results-b)
   (or (fast-compare results-a results-b) (slow-compare results-a results-b)))
@@ -265,7 +309,7 @@
          (onions (make-onion-state))
          (group-name (car test-group))
          (group-default (cadr test-group))
-         (test-list (caddr test-group)))
+         (test-list (cddr test-group)))
     (declare (special *score*) (ignore group-name))
     (dolist (test-case test-list score)
       (let* ((query (car test-case))
@@ -273,6 +317,7 @@
              (execution-target (fixup-execution-target (caddr test-case)))
              (cryptdb (connection-state-cryptdb connections))
              (control (connection-state-plain connections)))
+        (assert (eq (null (cadr test-case)) (null onion-checks)))
         (case execution-target
           (:cryptdb (update-score (issue-query query cryptdb t)))
           (:control (update-score (issue-query query control t)))
@@ -287,14 +332,35 @@
           (otherwise (error "unknown execution-target!")))))))
 
 (defun run-tests (all-test-groups)
-  (let ((connections
-          (make-connection-state :cryptdb (db-connect nil 3307)
-                                 :plain   (db-connect nil 3306)))
-        (results '()))
+  (let* ((connections
+           (make-connection-state :cryptdb (db-connect nil 3307)
+                                  :plain   (db-connect nil 3306)))
+         (cryptdb (connection-state-cryptdb connections))
+         (plain (connection-state-plain connections))
+         (results '()))
+    ;; remove artefacts
+    (issue-query (format nil "DROP DATABASE ~A" +default-database+) cryptdb t)
+    (issue-query (format nil "DROP DATABASE ~A" +default-control-database+) plain t)
+    ;; create default database
+    (must-succeed-query (format nil "CREATE DATABASE ~A" +default-database+) cryptdb)
+    (must-succeed-query (format nil "CREATE DATABASE ~A" +default-control-database+) plain)
+    ;; set proper default database
+    (must-succeed-query (format nil "USE ~A" +default-database+) cryptdb)
+    (must-succeed-query (format nil "USE ~A" +default-control-database+) plain)
+    ;; begin testing
     (dolist (test-group all-test-groups results)
       (push (run-test-group connections test-group) results))
     (setf results (reverse results))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;   commence cryptdb testing
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun main ()
+  (let ((tests (load-tests)))
+    (run-tests tests)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -365,9 +431,77 @@
     (string= "newlevel"
              (lookup-seclevel onions "database" "table1" "field1" "onion1"))))
 
+(defun test-multiple-update-onion-state! ()
+  nil)
+
+(defun test-many-str-assoc ()
+  (and (multiple-value-bind (success lookup unmatched-keys)
+            (many-str-assoc '(a b c) '((a (b (x y)
+                                             (c d)))))
+         (and success
+              (equal '(c d) lookup)
+              (null unmatched-keys)))
+       (let ((test (copy-list
+                     '((a (b (c d)
+                             (e f))
+                          (c (c d)))))))
+         (multiple-value-bind (success lookup unmatched-keys)
+            (many-str-assoc '(a c c) test)
+           (and success
+                (equal '(c d) lookup)
+                (null unmatched-keys)
+                (multiple-value-bind (success-2 lookup-2 unmatched-keys-2)
+                    (many-str-assoc '(a c c) test)
+                  (declare (ignore unmatched-keys-2))
+                  (assert success-2)
+                  (setf (cdr lookup-2) '(g))
+                  (equal '((a (b (c d)
+                                 (e f))
+                              (c (c g))))
+                         test)))))
+       (multiple-value-bind (success lookup unmatched-keys)
+            (many-str-assoc '(x y z) '((x (y)
+                                          (z))))
+         (and (not success)
+              (equal '(y) lookup)
+              (equal '(z) unmatched-keys)))
+       (multiple-value-bind (success lookup unmatched-keys)
+            (many-str-assoc '(x y z)  '((x (y (q)
+                                              (p)
+                                              (r)))))
+         (and (not success)
+              (equal '(y (q)
+                         (p)
+                         (r))
+                     lookup)
+              (equal '(z) unmatched-keys)))
+       (multiple-value-bind (success lookup unmatched-keys)
+            (many-str-assoc '(a b c) '((x (y))))
+         (and (not success)
+              (equal '((x (y))) lookup)
+              (equal '(a b c) unmatched-keys)))))
+
+(defun test-add-onion! ()
+  (let ((onions (make-onion-state)))
+    (add-onion! onions "db0" "t0" "f0" "o0" "l0")
+    (and (equal '(("db0" ("t0" ("f0" ("o0" "l0")))))
+                (onion-state-databases onions))
+         (string= "l0" (lookup-seclevel onions "db0" "t0" "f0" "o0"))
+         (progn
+           (add-onion! onions "db0" "t0" "f1" "o1" "l1")
+           (and (string= "l0" (lookup-seclevel onions "db0" "t0" "f0" "o0"))
+                (string= "l1" (lookup-seclevel onions "db0" "t0" "f1" "o1"))))
+         (progn
+           (add-onion! onions "db0" "t1" "f2" "o1" "l2")
+           (and (string= "l0" (lookup-seclevel onions "db0" "t0" "f0" "o0"))
+                (string= "l1" (lookup-seclevel onions "db0" "t0" "f1" "o1"))
+                (string= "l2" (lookup-seclevel onions "db0" "t1" "f2" "o1")))))))
+
 (defun test-all-units ()
   (and (test-fixup-onion-checks)
        (test-fixup-execution-target)
        (test-lookup-seclevel)
-       (test-update-onion-state!)))
+       (test-update-onion-state!)
+       (test-many-str-assoc)
+       (test-add-onion!)))
 
