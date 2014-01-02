@@ -202,9 +202,9 @@
                   `(,(nest-unmatched-keys unmatched-keys seclevel))))))
 
 (defun max-level? (onion seclevel)
-  (cond ((member onion '("oDET" "oOPE") :test #'string=)
-         (string= "oRND" seclevel))
-        ((string= "oAGG" onion) (string= "oHOM" seclevel))))
+  (cond ((member onion '("oDET" "oOPE" "oPLAIN") :test #'string=)
+         (string= "RND" seclevel))
+        ((string= "oAGG" onion) (string= "HOM" seclevel))))
 
 ;;; change our local copy of the onion state
 (defmethod update-onion-state! ((onions onion-state) onion-check)
@@ -232,7 +232,7 @@
     (let ((max-database (cadr onion-check))
           (max-table    (caddr onion-check))
           (results      (get-cryptdb-show connections))
-          (output       nil))
+          (output       t))
       (dolist (row results output)
         (destructuring-bind (database table field onion seclevel id) row
           (declare (ignore id))
@@ -303,6 +303,15 @@
 (defun compare-results (results-a results-b)
   (or (fast-compare results-a results-b) (slow-compare results-a results-b)))
 
+(defun all-strings (results)
+  (mapcar #'(lambda (row)
+              (mapcar #'(lambda (e)
+                          (if (null e)
+                              "NULL"
+                             (format nil "~A" e)))
+                         row))
+          results))
+
 (defun run-test-group (connections test-group)
   (let* ((score (make-group-score))
          (*score* score)
@@ -327,7 +336,7 @@
                   (plain-results
                     (clsql:query query :database (connection-state-plain connections))))
               (update-score
-                (and (compare-results cryptdb-results plain-results)
+                (and (compare-results cryptdb-results (all-strings plain-results))
                      (handle-onion-checks connections onions onion-checks)))))
           (otherwise (error "unknown execution-target!")))))))
 
