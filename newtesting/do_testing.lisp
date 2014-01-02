@@ -5,6 +5,7 @@
 (defparameter +default-ip+          "127.0.0.1")
 (defparameter +default-username+    "root")
 (defparameter +default-password+    "letmein")
+(defparameter +default-database+    "cryptdbtest")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -77,9 +78,12 @@
   (assert (listp onion-check))
   t)
 
+(defun build-update-1 (database table field onion seclevel)
+  `(:update (,database (,table (,field (,onion ,seclevel))))))
+
 ;;; take possibly shorthand onion-checks and produce full length checks
 ;;; > return nil if `dirty-onion-checks` are invalid
-(defun fixup-onion-checks (dirty-onion-checks)
+(defun fixup-onion-checks (dirty-onion-checks default-database)
   (cond ((atom dirty-onion-checks)
          (when (eq dirty-onion-checks :check)
            `(,dirty-onion-checks)))
@@ -87,19 +91,38 @@
          (when (= 1 (length dirty-onion-checks))
            dirty-onion-checks))
         ((eq :all-max (car dirty-onion-checks))
-         (when (and (= 3 (length dirty-onion-checks))
-                    (every #'atom dirty-onion-checks))
-           dirty-onion-checks))
+         (when (every #'atom dirty-onion-checks)
+                 ;; (:check <table>)
+           (cond ((= 2 (length dirty-onion-checks))
+                  (cond ((stringp default-database)         ;; default database from test group
+                         `(:all-max
+                           ,default-database
+                           ,(cadr dirty-onion-checks)))
+                        ((eq t default-database)            ;; hardcoded default database
+                         `(:all-max
+                           ,+default-database+
+                           ,(cadr dirty-onion-checks)))))
+                 ;; (:check <database> <table>)
+                 ((= 3 (length dirty-onion-checks))
+                  ;; don't support overriding the test group default because it's
+                  ;; a pain to implement the same behavior for :update
+                  (when (null default-database)
+                    dirty-onion-checks)))))
         ((eq :update (car dirty-onion-checks))
-         (cond ((and (every #'atom dirty-onion-checks)
-                     (= 5 (length (cdr dirty-onion-checks))))
-                `(:update (,(second dirty-onion-checks)             ;; database
-                           (,(third dirty-onion-checks)             ;; table
-                            (,(fourth dirty-onion-checks)           ;; field
-                             (,(fifth dirty-onion-checks)           ;; onion
-                              ,(sixth dirty-onion-checks)))))))     ;; seclevel
-               ((every #'proper-onion-update? (cdr dirty-onion-checks))
-                dirty-onion-checks)))))
+         (cond ((every #'atom dirty-onion-checks)
+                 ;; (:update <table> <field> <onion> <seclevel>)
+                (cond ((= 4 (length (cdr dirty-onion-checks)))
+                       (cond ((stringp default-database)         ;; default database from test group
+                              (apply #'build-update-1 default-database (cdr dirty-onion-checks)))
+                             ((eq t default-database)            ;; hardcoded default database
+                              (apply #'build-update-1 +default-database+ (cdr dirty-onion-checks)))))
+                      ;; (:update <database> <table> <field> <onion> <seclevel>)
+                      ((= 5 (length (cdr dirty-onion-checks)))
+                       (when (null default-database)
+                         (apply #'build-update-1 (cdr dirty-onion-checks))))))
+                 ;; (:update (<database> (<table> ...)) (<database> ...))
+                 ((every #'proper-onion-update? (cdr dirty-onion-checks))
+                  dirty-onion-checks)))))
 
 (defun fixup-execution-target (dirty-execution-target)
   (cond ((null dirty-execution-target) :both)
@@ -239,11 +262,14 @@
 (defun run-test-group (connections test-group)
   (let* ((score (make-group-score))
          (*score* score)
-         (onions (make-onion-state)))
-    (declare (special *score*))
-    (dolist (test-case test-group score)
+         (onions (make-onion-state))
+         (group-name (car test-group))
+         (group-default (cadr test-group))
+         (test-list (caddr test-group)))
+    (declare (special *score*) (ignore group-name))
+    (dolist (test-case test-list score)
       (let* ((query (car test-case))
-             (onion-checks (fixup-onion-checks (cadr test-case)))
+             (onion-checks (fixup-onion-checks (cadr test-case) group-default))
              (execution-target (fixup-execution-target (caddr test-case)))
              (cryptdb (connection-state-cryptdb connections))
              (control (connection-state-plain connections)))
@@ -282,20 +308,30 @@
   (and (let ((line '(:update ("database0" ("table0" ("field0" ("onion0" "seclevel0")
                                                               ("onion1" "seclevel1"))
                                                     ("field1" (("onion2" "seclevel2"))))))))
-         (equal line (fixup-onion-checks line)))
+         (equal line (fixup-onion-checks line nil)))
        ;; a single check does not require nesting
        (equal '(:update ("database" ("table" ("field" ("onion" "seclevel")))))
-              (fixup-onion-checks '(:update "database" "table" "field" "onion" "seclevel")))
-       (equal '(:update ())
-              (fixup-onion-checks '(:update ())))
-       (null (fixup-onion-checks  :update))
+              (fixup-onion-checks '(:update "database" "table" "field" "onion" "seclevel") nil))
+       (equal nil
+              (fixup-onion-checks '(:update ()) nil))
+       (null (fixup-onion-checks  :update nil))
        (equal '(:check)
-              (fixup-onion-checks '(:check)))
+              (fixup-onion-checks '(:check) nil))
        (equal '(:check)
-              (fixup-onion-checks :check))
-       (null (fixup-onion-checks  :all-max))
+              (fixup-onion-checks :check nil))
+       (null (fixup-onion-checks  :all-max nil))
        (equal '(:all-max "db" "table")
-              (fixup-onion-checks '(:all-max "db" "table")))))
+              (fixup-onion-checks '(:all-max "db" "table") nil))
+       ;; use hardcoded default database
+       (equal `(:all-max ,+default-database+ "table")
+              (fixup-onion-checks '(:all-max "table") t))
+       (equal `(:update (,+default-database+ ("table" ("field" ("onion" "seclevel")))))
+              (fixup-onion-checks '(:update "table" "field" "onion" "seclevel") t))
+       ;; use default database from test group
+       (equal '(:all-max "some-default" "table")
+              (fixup-onion-checks '(:all-max "table") "some-default"))
+       (equal '(:update ("a-default" ("table" ("field" ("onion" "seclevel")))))
+              (fixup-onion-checks '(:update "table" "field" "onion" "seclevel") "a-default"))))
 
 (defun test-fixup-execution-target ()
   (and (eq :both (fixup-execution-target :both))
