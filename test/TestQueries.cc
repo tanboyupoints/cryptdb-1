@@ -150,7 +150,8 @@ static QueryList SubQuery = QueryList("SubQuery",
       // summation in subquery was causing segfault
       Query("SELECT (SELECT SUM(uno) FROM numerouno)"),
       Query("SELECT * FROM numerouno WHERE (SELECT SUM(uno) FROM numerouno)"),
-      Query("DROP TABLE subqueryphun")
+      Query("DROP TABLE subqueryphun"),
+      Query("DROP TABLE numerouno")
     });
 
 static QueryList Join = QueryList("SingleJoin",
@@ -1265,7 +1266,7 @@ CheckQueryList(const TestConfig &tc, const QueryList &queries) {
 static void
 RunTest(const TestConfig &tc) {
     // ###############################
-    //      TOTAL RESULT: 593/609
+    //      TOTAL RESULT: 594/610
     // ###############################
 
     std::vector<Score> scores;
@@ -1276,7 +1277,7 @@ RunTest(const TestConfig &tc) {
     // Pass 49/49
     scores.push_back(CheckQueryList(tc, Select));
 
-    // Pass 17/17
+    // Pass 18/18
     scores.push_back(CheckQueryList(tc, SubQuery));
 
     // Pass 28/28
