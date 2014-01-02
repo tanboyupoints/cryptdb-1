@@ -1,0 +1,28 @@
+;; ((<test group name> <use default database?>
+;;   (<test0>)
+;;   (<test1>)))
+(("SingleInsert" t
+  ("CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)"
+   (:all-max "test_insert"))
+  ("INSERT INTO test_insert VALUES (1, 21, 100, '24 Rosedale, Toronto, ONT', 'Pat Carlson')"
+   :check)
+  ("SELECT * FROM test_insert")
+  ("INSERT INTO test_insert (id, age, salary, address, name)
+         VALUES (2, 23, 101, '25 Rosedale, Toronto, ONT', 'Pat Carlson2')")
+  ("SELECT * FROM test_insert")
+  ("INSERT INTO test_insert (age, address, salary, name, id)
+                     VALUES (25, '26 Rosedale, Toronto, ONT', 102, 'Pat2 Carlson', 3)")
+  ("SELECT * FROM test_insert")
+  ("INSERT INTO test_insert (age, address, salary, name) VALUES (26, 'test address', 30, 'test name')")
+  ("SELECT * FROM test_insert")
+  ("INSERT INTO test_insert (age, address, salary, name) VALUES (27, 'test address2', 31, 'test name')")
+  ("INSERT INTO test_insert (age) VALUES (40)")
+  ("SELECT age FROM test_insert")
+  ("INSERT INTO test_insert (name) VALUES ('Wendy')")
+  ("SELECT name FROM test_insert WHERE id=10"
+   (:update "test_insert" "id" "oDET" "DET"))
+  ("INSERT INTO test_insert (name, address, id, age)
+                     VALUES ('Peter Pan', 'first star to the right and straight on till morning', 42, 10)")
+  ("SELECT name, address, age FROM test_insert WHERE id=42")
+  ("DROP TABLE test_insert")))
+
