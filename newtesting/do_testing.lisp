@@ -86,6 +86,16 @@
          (cons (funcall fn (car tree)) (map-tree fn (cdr tree))))
         (t (cons (map-tree fn (car tree)) (map-tree fn (cdr tree))))))
 
+(defun list-depth (list)
+  (assert (listp list))
+  (cond ((null list) 1)
+        (t (apply
+             #'max
+             (mapcar
+               #'(lambda (e)
+                   (cond ((atom e) 1)
+                         (t (1+ (list-depth e)))))
+               list)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -145,7 +155,13 @@
                          (apply #'build-update-1 (cdr dirty-onion-checks))))))
                  ;; (:update (<database> (<table> ...)) (<database> ...))
                  ((every #'proper-onion-update? (cdr dirty-onion-checks))
-                  dirty-onion-checks)))))
+                  (cond ((= 4 (list-depth (cdr dirty-onion-checks)))
+                         (cond ((stringp default-database)
+                                `(:update (,default-database ,@(cdr dirty-onion-checks))))
+                               ((eq t default-database)
+                                `(:update (,+default-database+ ,@(cdr dirty-onion-checks))))))
+                        ((= 5 (list-depth (cdr dirty-onion-checks)))
+                         dirty-onion-checks)))))))
 
 (defun fixup-onion-checks (dirty-onion-checks default-database)
   (let ((fixed (low-level-fixup-onion-checks dirty-onion-checks default-database)))
@@ -207,8 +223,11 @@
   (multiple-value-bind (success lookup unmatched-keys)
         (many-str-assoc `(,database ,table ,field ,onion)
                         (onion-state-databases onions))
-    ;; we should never get a match past `field`
-    (assert (and (null success) (>= (length unmatched-keys) 1)))
+    ;; a total match should only occur when we max back to back tables
+    (when success
+      (assert (zerop (length unmatched-keys)))
+      (assert (string-equal seclevel (cadr lookup)))
+      (return-from add-onion! t))
     (assert (not (null lookup)))
     (setf (cdr lookup)
           (append (cdr lookup)
@@ -406,14 +425,13 @@
        ;; a fully specifed check should be returned as is
   (and (let ((line '(:update ("database0" ("table0" ("field0" ("onion0" "seclevel0")
                                                               ("onion1" "seclevel1"))
-                                                    ("field1" (("onion2" "seclevel2"))))))))
+                                                    ("field1" ("onion2" "seclevel2")))))))
          (equal line (fixup-onion-checks line nil)))
        ;; a single check does not require nesting
        (equal '(:update ("database" ("table" ("field" ("onion" "seclevel")))))
               (fixup-onion-checks '(:update "database" "table" "field" "onion" "seclevel") nil))
-       (equal nil
-              (fixup-onion-checks '(:update ()) nil))
-       (null (fixup-onion-checks  :update nil))
+       (null (fixup-onion-checks '(:update ()) nil))
+       (null (fixup-onion-checks :update nil))
        (equal '(:check)
               (fixup-onion-checks '(:check) nil))
        (equal '(:check)
@@ -431,6 +449,11 @@
               (fixup-onion-checks '(:all-max "table") "some-default"))
        (equal '(:update ("a-default" ("table" ("field" ("onion" "seclevel")))))
               (fixup-onion-checks '(:update "table" "field" "onion" "seclevel") "a-default"))))
+
+(defun test-fixup-onion-checks-multiple-update-default-bug ()
+  (let ((line '(:update ("t" ("f"  ("o"  "l"))
+                             ("f2" ("o2" "l2"))))))
+    (fixup-onion-checks line t)))
 
 (defun test-fixup-execution-target ()
   (and (eq :both (fixup-execution-target :both))
@@ -464,8 +487,15 @@
     (string= "newlevel"
              (lookup-seclevel onions "database" "table1" "field1" "onion1"))))
 
+#|
 (defun test-multiple-update-onion-state! ()
+  (let ((onions
+          (make-onion-state
+            :databases '(("d" ("t" ("f"  ("o"  "l"))
+                                   ("f2" ("o2" "l2"))))))))
+    (update-onion-state! onions '(:update ("d" 
   nil)
+|#
 
 (defun test-many-str-assoc ()
   (and (multiple-value-bind (success lookup unmatched-keys)
@@ -536,12 +566,20 @@
        (equal '()
               (map-tree #'(lambda (n) (declare (ignore n)) (assert nil)) '()))))
 
+(defun test-list-depth ()
+  (and (= 1 (list-depth '()))
+       (= 1 (list-depth '(2 3 4)))
+       (= 2 (list-depth '(1 (2) (4) 7)))
+       (= 3 (list-depth '(1 (2) 3 4 (5 (6) 7))))))
+
 (defun test-all-units ()
   (and (test-fixup-onion-checks)
+       (test-fixup-onion-checks-multiple-update-default-bug)
        (test-fixup-execution-target)
        (test-lookup-seclevel)
        (test-update-onion-state!)
        (test-many-str-assoc)
+       (test-add-onion!)
        (test-map-tree)
-       (test-add-onion!)))
+       (test-list-depth)))
 
