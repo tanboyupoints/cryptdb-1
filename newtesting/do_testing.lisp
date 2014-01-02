@@ -202,9 +202,9 @@
                   `(,(nest-unmatched-keys unmatched-keys seclevel))))))
 
 (defun max-level? (onion seclevel)
-  (cond ((member onion '("DET" "OPE") :test #'string=)
-         (string= "RND" seclevel))
-        ((string= "AGG" onion) (string= "HOM" seclevel))))
+  (cond ((member onion '("oDET" "oOPE") :test #'string=)
+         (string= "oRND" seclevel))
+        ((string= "oAGG" onion) (string= "oHOM" seclevel))))
 
 ;;; change our local copy of the onion state
 (defmethod update-onion-state! ((onions onion-state) onion-check)
