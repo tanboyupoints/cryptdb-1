@@ -1,6 +1,10 @@
 ;; ((<test group name> <use default database?>
 ;;   (<test0>)
 ;;   (<test1>)))
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;;       single insert
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (("SingleInsert" t
   ("CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)"
    (:all-max "test_insert"))
@@ -25,6 +29,9 @@
                      VALUES ('Peter Pan', 'first star to the right and straight on till morning', 42, 10)")
   ("SELECT name, address, age FROM test_insert WHERE id=42")
   ("DROP TABLE test_insert"))
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;;      single select
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ("SingleSelect" t
   ("CREATE TABLE IF NOT EXISTS test_select (id integer, age integer, salary integer, address text, name text)"
    (:all-max "test_select"))
@@ -78,8 +85,7 @@
   ("SELECT sum(age) FROM test_select GROUP BY address ORDER BY address")
   ("SELECT salary, max(id) FROM test_select GROUP BY salary ORDER BY salary")
   ("SELECT * FROM test_select GROUP BY age ORDER BY age")
-  ("SELECT * FROM test_select ORDER BY age ASC")
-  ("SELECT * FROM test_select ORDER BY address DESC")
+  ("SELECT * FROM test_select ORDER BY age ASC") ("SELECT * FROM test_select ORDER BY address DESC")
   ("SELECT sum(age) as z FROM test_select")
   ("SELECT sum(age) z FROM test_select")
   ("SELECT min(t.id) a FROM test_select AS t")
@@ -88,6 +94,62 @@
    (:update test_select age oPLAIN PLAINVAL))
   ("SELECT * FROM test_select HAVING age && id"
    (:check))
-  ("DROP TABLE test_select")))
+  ("DROP TABLE test_select"))
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;;         subquery
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ("SubQuery" t
+  ("CREATE TABLE subqueryphun (morse integer, code integer)")
+  ("CREATE TABLE numerouno (uno integer, dos integer, tres integer)")
+  ("INSERT INTO subqueryphun VALUES (100, 200), (1000, 2000),
+                                    (200, 100), (25, 25), (50, 50)")
+  ("INSERT INTO numerouno VALUES (1, 2, 3), (100, 200, 300),
+                                 (1000, 2000, 3000)")
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;;;  single row subqueries
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;; bad query, subquery returns multiple rows
+  ("SELECT * FROM subqueryphun
+     WHERE (SELECT code FROM subqueryphun)")
+  ("SELECT * FROM subqueryphun
+     WHERE (SELECT code FROM subqueryphun LIMIT 1)")
+  ("SELECT * FROM subqueryphun
+     WHERE morse IN (SELECT morse FROM subqueryphun)")
+  ("SELECT * FROM subqueryphun
+     wHERE morse IN (SELECT 100 FROM subqueryphun)")
+  ("SELECT * FROM subqueryphun
+     WHERE (SELECT 1 FROM subqueryphun AS q WHERE q.morse
+             LIMIT 1)")
+  ;; use a table from higher level select in subquery
+  ("SELECT * FROM numerouno
+     WHERE (SELECT dos FROM subqueryphun
+             WHERE subqueryphun.morse = numerouno.uno
+             LIMIT 1)")
+  ;; use an alias from higher level select in subquery
+  ("SELECT * FROM numerouno AS n1
+     WHERE (SELECT tres FROM subqueryphun
+             WHERE subqueryphun.morse = n1.uno
+             LIMIT 1)")
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;;;      IN subqueries
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ("SELECT * FROM subqueryphun
+     WHERE morse IN (SELECT morse FROM subqueryphun)")
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;;;    EXISTS subqueries
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ("SELECT * FROM subqueryphun
+     WHERE EXISTS(SELECT * FROM subqueryphun)")
+  ("SELECT * FROM numerouno as n1
+     WHERE EXISTS(SELECT * FROM subqueryphun
+                   WHERE subqueryphun.morse = n1.uno)")
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;;;    misc subquery bugs
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;; summation in subquery was causing segfault
+  ("SELECT (SELECT SUM(uno) FROM numerouno)")
+  ("SELECT * FROM numerouno WHERE (SELECT SUM(uno) FROM numerouno)")
+  ("DROP TABLE subqueryphun")))
+
 
 

@@ -267,7 +267,6 @@
         (destructuring-bind (database table field onion seclevel id) row
           (declare (ignore id))
           (unless (string-equal seclevel (lookup-seclevel onions database table field onion))
-            (break)
             (setf output nil))
           (setf (lookup-seclevel onions database table field onion) seclevel))))))
 
@@ -314,8 +313,19 @@
   nil)
   ; (error "implement slow-compare"))
 
-(defun compare-results (results-a results-b)
-  (or (fast-compare results-a results-b) (slow-compare results-a results-b)))
+(defgeneric compare-results (results-a results-b)
+  (:method ((results-a list) (results-b list))
+    ;; cryptdb returns all results as strings while the normal database
+    ;; uses numbers and such
+    (let ((results-a (all-strings results-a))
+          (results-b (all-strings results-b)))
+      (or (fast-compare results-a results-b) (slow-compare results-a results-b))))
+  (:method ((results-a (eql 'query-error)) (results-b (eql 'query-error)))
+    t)
+  (:method ((results-a (eql 'query-success)) (results-b (eql 'query-success)))
+    t)
+  (:method (results-a results-b)
+    nil))
 
 (defun all-strings (results)
   (mapcar #'(lambda (row)
@@ -346,11 +356,11 @@
           (:control (update-score (issue-query query control t)))
           (:both
             (let ((cryptdb-results
-                    (clsql:query query :database (connection-state-cryptdb connections)))
+                    (issue-query query (connection-state-cryptdb connections)))
                   (plain-results
-                    (clsql:query query :database (connection-state-plain connections))))
+                    (issue-query query (connection-state-plain connections))))
               (update-score
-                (and (compare-results cryptdb-results (all-strings plain-results))
+                (and (compare-results cryptdb-results plain-results)
                      (handle-onion-checks connections onions onion-checks)))))
           (otherwise (error "unknown execution-target!")))))))
 
