@@ -24,5 +24,70 @@
   ("INSERT INTO test_insert (name, address, id, age)
                      VALUES ('Peter Pan', 'first star to the right and straight on till morning', 42, 10)")
   ("SELECT name, address, age FROM test_insert WHERE id=42")
-  ("DROP TABLE test_insert")))
+  ("DROP TABLE test_insert"))
+ ("SingleSelect" t
+  ("CREATE TABLE IF NOT EXISTS test_select (id integer, age integer, salary integer, address text, name text)"
+   (:all-max "test_select"))
+  ("INSERT INTO test_select
+         VALUES (1, 10, 0, 'first star to the right and straight on till morning', 'Peter Pan')")
+  ("INSERT INTO test_select VALUES (2, 16, 1000, 'Green Gables', 'Anne Shirley')")
+  ("INSERT INTO test_select VALUES (3, 8, 0, 'London', 'Lucy')")
+  ("INSERT INTO test_select VALUES (4, 10, 0, 'London', 'Edmund')")
+  ("INSERT INTO test_select VALUES (5, 30, 100000, '221B Baker Street', 'Sherlock Holmes')")
+  ("SELECT * FROM test_select WHERE id IN (1, 2, 10, 20, 30)"
+   (:update "test_select" "id" "oDET" "DET"))
+  ("SELECT * FROM test_select WHERE id BETWEEN 3 AND 5"
+   (:update "test_select" "id" "oOPE" "OPE"))
+  ("SELECT NULLIF(1, id) FROM test_select")
+  ("SELECT NULLIF(id, 1) FROM test_select")
+  ("SELECT NULLIF(id, id) FROM test_select")
+  ("SELECT NULLIF(1, 2) FROM test_select")
+  ("SELECT NULLIF(1, 1) FROM test_select")
+  ("SELECT * FROM test_select")
+  ("SELECT max(id) FROM test_select")
+  ("SELECT max(salary) FROM test_select"
+   (:update "test_select" "salary" "oOPE" "OPE"))
+  ("SELECT COUNT(*) FROM test_select")
+  ("SELECT COUNT(DISTINCT age) FROM test_select"
+   (:update "test_select" "age" "oDET" "DET"))
+  ("SELECT COUNT(DISTINCT(address)) FROM test_select"
+   (:update "test_select" "address" "oDET" "DET"))
+  ("SELECT name FROM test_select")
+  ("SELECT address FROM test_select")
+  ("SELECT * FROM test_select WHERE id>3")
+  ("SELECT * FROM test_select WHERE age = 8")
+  ("SELECT * FROM test_select WHERE salary=15"
+   (:update "test_select" "salary" "oDET" "DET"))
+  ("SELECT * FROM test_select WHERE age > 10"
+   (:update "test_select" "age" "oOPE" "OPE"))
+  ("SELECT * FROM test_select WHERE age = 10 AND salary = 0")
+  ("SELECT * FROM test_select WHERE age = 10 OR salary = 0")
+  ("SELECT * FROM test_select WHERE name = 'Peter Pan'"
+   (:update "test_select" "name" "oDET" "DET"))
+  ("SELECT * FROM test_select WHERE address='Green Gables'")
+  ("SELECT * FROM test_select WHERE address <= '221C'"
+   (:update "test_select" "address" "oOPE" "OPE"))
+  ("SELECT * FROM test_select WHERE address >= 'Green Gables' AND age > 9")
+  ("SELECT * FROM test_select WHERE address >= 'Green Gables' OR age > 9")
+  ("SELECT * FROM test_select WHERE address < 'ffFFF'")
+  ("SELECT * FROM test_select ORDER BY id")
+  ("SELECT * FROM test_select ORDER BY salary")
+  ("SELECT * FROM test_select ORDER BY name"
+   (:update "test_select" "name" "oOPE" "OPE"))
+  ("SELECT * FROM test_select ORDER BY address")
+  ("SELECT sum(age) FROM test_select GROUP BY address ORDER BY address")
+  ("SELECT salary, max(id) FROM test_select GROUP BY salary ORDER BY salary")
+  ("SELECT * FROM test_select GROUP BY age ORDER BY age")
+  ("SELECT * FROM test_select ORDER BY age ASC")
+  ("SELECT * FROM test_select ORDER BY address DESC")
+  ("SELECT sum(age) as z FROM test_select")
+  ("SELECT sum(age) z FROM test_select")
+  ("SELECT min(t.id) a FROM test_select AS t")
+  ("SELECT t.address AS b FROM test_select t")
+  ("SELECT * FROM test_select HAVING age"
+   (:update "test_select" "age" "oPLAIN" "PLAINVAL"))
+  ("SELECT * FROM test_select HAVING age && id"
+   (:check))
+  ("DROP TABLE test_select")))
+
 
