@@ -604,7 +604,8 @@
    ("SELECT * FROM not_strict WHERE z = ''")
    ("SELECT * FROM not_strict WHERE x < 110"
     (:update not_strict x oOPE OPE))
-   ("SELECT * FROM not_strict")
+   ("SELECT * FROM not_strict"
+    :check)
    ("DROP TABLE not_strict"))
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;        transactions
@@ -657,7 +658,8 @@
    :ignore)
   ;; freeze things in case something went wrong
   ("COMMIT")
-  ("SELECT * FROM trans")
+  ("SELECT * FROM trans"
+   :check)
   ("DROP TABLE trans"))
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;        table aliases
@@ -802,15 +804,19 @@
  ("QuotedSchemaObjects" t
   ("CREATE DATABASE IF NOT EXISTS `over+there`")
   ("USE `over+there`")
-  ("CREATE TABLE `over+there`.`more+quotes` (`quoted-+as*well` integer)")
-  ("CREATE TABLE `hard/\\quotes` (`!@abc` text, `$$eda` integer)")
-  ("INSERT INTO `hard/\\quotes`
+  ("CREATE TABLE `over+there`.`more+quotes` (`quoted-+as*well` integer)"
+   (:all-max "over+there" "more+quotes"))
+  ("CREATE TABLE `hard-+=quotes` (`!@abc` text, `$$eda` integer)"
+   (:all-max "over+there" "hard-+=quotes"))
+  ("INSERT INTO `hard-+=quotes`
          VALUES (1, 'quoting'), (12, 'shouldn;tbe'), (100, 'hard')")
-  ("SELECT * FROM `hard/\\quotes`")
-  ("SELECT * FROM `hard/\\quotes` WHERE `!@abc` < 1200")
-  ("SELECT * FROM `hard/\\quotes`")
+  ("SELECT * FROM `hard-+=quotes`")
+  ("SELECT * FROM `hard-+=quotes` WHERE `!@abc` < 1200"
+   (:update "over+there" "hard-+=quotes" "!@abc" oOPE OPE))
+  ("SELECT * FROM `hard-+=quotes`")
   ("SELECT * FROM `more+quotes`")
-  ("SELECT * FROM `over+there`.`more+quotes`")
+  ("SELECT * FROM `over+there`.`more+quotes`"
+   :check)
   ("DROP DATABASE IF EXISTS `over+there`")
   ("USE cryptdbtest"))
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
