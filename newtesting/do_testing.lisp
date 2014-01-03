@@ -417,8 +417,10 @@
                   (plain-results
                     (issue-query query (connection-state-plain connections))))
               (update-score
-                (and (compare-results cryptdb-results plain-results)
-                     (handle-onion-checks connections onions onion-checks)))))
+                ;; do handle-onion-checks(...) first because we want to update
+                ;; our local onions even if the results don't match
+                (and (handle-onion-checks connections onions onion-checks)
+                     (compare-results cryptdb-results plain-results)))))
           (otherwise (error "unknown execution-target!")))))))
 
 (defun run-tests (all-test-groups)
