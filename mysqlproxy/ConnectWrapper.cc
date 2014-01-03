@@ -426,7 +426,8 @@ envoi(lua_State *const L)
             queryEpilogue(*ps, *qr.get(), res, c_wrapper->last_query,
                           c_wrapper->default_db, false);
         if (QueryAction::ROLLBACK == epi_result.action) {
-            lua_pushboolean(L, true);           // success
+            assert(epi_result.res_type.ok);
+            lua_pushboolean(L, true);           // status
             lua_pushboolean(L, true);           // rollback
             lua_pushnil(L);                     // error message
             lua_pushnil(L);                     // plaintext fields
@@ -464,6 +465,15 @@ envoi(lua_State *const L)
 static int
 returnResultSet(lua_State *const L, const ResType &rd)
 {
+    if (false == rd.ok) {
+        const std::string &generic_error = "something bad happened";
+        lua_pushboolean(L, false);              // status
+        lua_pushboolean(L, false);              // rollback
+        xlua_pushlstring(L, generic_error);     // error message
+        lua_pushnil(L);                         // plaintext fields
+        lua_pushnil(L);                         // plaintext rows
+    }
+
     lua_pushboolean(L, true);                   // status
     lua_pushboolean(L, false);                  // rollback
     lua_pushnil(L);                             // error message
