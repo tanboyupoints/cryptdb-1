@@ -1,3 +1,8 @@
+;; TODO
+;; > 'USE' the default database for each test group
+;; > handle floating point comparisons
+;; > support onion checks on columns that don't start maxed
+;; > support queries that should fail
 (proclaim '(optimize (debug 3)))
 
 ; (defconstant +default-tests-path+ "./tests.sexpr")
@@ -23,16 +28,27 @@
     :if-exists     :new
     :make-default  nil))
 
-(defun issue-query (query database &optional just-return-status)
+(defstruct query-result
+  status
+  fields
+  rows)
+
+(defun issue-query (query database)
   (handler-case
-        (let ((results (clsql:query query :database database)))
-          (if just-return-status 'query-success results))
+        (multiple-value-bind (rows fields) (clsql:query query :database database)
+          (make-query-result
+            :status t
+            :fields fields
+            :rows   rows))
     (clsql:sql-database-error (e)
       (declare (ignore e))
-      'query-error)))
+      (make-query-result
+        :status nil
+        :fields nil
+        :rows   nil))))
 
 (defun must-succeed-query (query database)
-  (assert (eq 'query-success (issue-query query database t))))
+  (assert (query-result-status (issue-query query database))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -240,8 +256,20 @@
   cryptdb
   plain)
 
+(defmethod destroy-connections ((connections connection-state))
+  (clsql:disconnect :database (connection-state-cryptdb connections))
+  (setf (connection-state-cryptdb connections) nil)
+  (clsql:disconnect :database (connection-state-plain connections))
+  (setf (connection-state-plain connections) nil))
+
+
 (defun get-cryptdb-show (connections)
-  (issue-query "SET @cryptdb='show'" (connection-state-cryptdb connections)))
+  (let ((results (issue-query "SET @cryptdb='show'"
+                              (connection-state-cryptdb connections))))
+    (assert (query-result-status results))
+    (assert (equal '("_database" "_table" "_field" "_onion" "_level" "id")
+                   (query-result-fields results)))
+    (query-result-rows results)))
 
 (defgeneric handle-check (connections onions type onion-check)
   (:method (connections (onions onion-state) (type (eql :all-max)) onion-check)
@@ -255,6 +283,7 @@
           (unless (or (not (string-equal max-database database))
                       (not (string-equal max-table table))
                       (max-level? onion seclevel))
+            ; (break)
             (setf output nil))
           ;; update our local copy of onion state
           ;; > we cannot use (setf lookup-seclevel) because the local onion state
@@ -270,6 +299,7 @@
         (destructuring-bind (database table field onion seclevel id) row
           (declare (ignore id))
           (unless (string-equal seclevel (lookup-seclevel onions database table field onion))
+            ; (break)
             (setf output nil))
           (setf (lookup-seclevel onions database table field onion) seclevel))))))
 
@@ -292,47 +322,68 @@
   (wins 0)
   (fails 0))
 
-(defmethod update-score ((value (eql 'query-error)))
-  (declare (special *score*))
-  (incf (group-score-fails *score*)))
-
-(defmethod update-score ((value (eql 'query-success)))
-  (declare (special *score*))
-  (incf (group-score-wins *score*)))
-
-(defmethod update-score ((value (eql t)))
-  (declare (special *score*))
-  (incf (group-score-wins *score*)))
-
-(defmethod update-score ((value (eql nil)))
-  (declare (special *score*))
-  (incf (group-score-fails *score*)))
+(defgeneric update-score (value)
+  (:method ((result query-result))
+    (declare (special *score*))
+    (case (query-result-status result)
+      (t   (incf (group-score-wins *score*)))
+      (nil (incf (group-score-fails *score*)))
+      (otherwise (error "unknown query result status!"))))
+  (:method ((value (eql t)))
+    (declare (special *score*))
+    (incf (group-score-wins *score*)))
+  (:method ((value (eql nil)))
+    (declare (special *score*))
+    (incf (group-score-fails *score*))))
 
 (defun fast-compare (results-a results-b)
   (equal results-a results-b))
 
 (defun slow-compare (results-a results-b)
-  (declare (ignore results-a results-b))
-  nil)
-  ; (error "implement slow-compare"))
+  (when (not (= (length results-a) (length results-b)))
+    (return-from slow-compare nil))
+  (let ((results-a (copy-list results-a))
+        (results-b (copy-list results-b)))
+    (dolist (a results-a (zerop (length results-b)))
+      (let ((new-results-b (remove a results-b :test #'equal :count 1)))
+        (when (equal new-results-b results-b)
+          ; (break)
+          (return nil))
+        (setf results-b new-results-b)))))
 
 (defgeneric compare-results (results-a results-b)
-  (:method ((results-a list) (results-b list))
-    ;; cryptdb returns all results as strings while the normal database
-    ;; uses numbers and such
-    (let ((results-a (all-strings results-a))
-          (results-b (all-strings results-b)))
-      (or (fast-compare results-a results-b) (slow-compare results-a results-b))))
+  (:method ((results-a query-result) (results-b query-result))
+    (cond ((and (not (query-result-status results-a))
+                (not (query-result-status results-b)))
+           t)
+          ((or (not (query-result-status results-a))
+               (not (query-result-status results-b)))
+           ; (break)
+           nil)
+          ((not (equal (query-result-fields results-a)
+                       (query-result-fields results-b)))
+           ; (break)
+           nil)
+          (t ;; cryptdb returns all results as strings while the normal
+             ;; database uses numbers and such
+             (let ((rows-a (all-strings (query-result-rows results-a)))
+                   (rows-b (all-strings (query-result-rows results-b))))
+               (or (fast-compare rows-a rows-b)
+                   (slow-compare rows-a rows-b))))))
   (:method ((results-a (eql 'query-error)) (results-b (eql 'query-error)))
     t)
   (:method ((results-a (eql 'query-success)) (results-b (eql 'query-success)))
     t)
   (:method (results-a results-b)
+    ; (format t "NA:~A~%~%NB:~A~%~%~%" results-a results-b)
+    ; (break)
     nil))
 
 (defun all-strings (results)
   (mapcar #'(lambda (row)
               (mapcar #'(lambda (e)
+                          ; (unless (or (stringp e) (integerp e) (null e))
+                            ; (break))
                           (if (null e)
                               "NULL"
                              (format nil "~A" e)))
@@ -359,8 +410,8 @@
              (control (connection-state-plain connections)))
         (assert (eq (null (cadr test-case)) (null onion-checks)))
         (case execution-target
-          (:cryptdb (update-score (issue-query query cryptdb t)))
-          (:control (update-score (issue-query query control t)))
+          (:cryptdb (update-score (issue-query query cryptdb)))
+          (:control (update-score (issue-query query control)))
           (:both
             (let ((cryptdb-results
                     (issue-query query (connection-state-cryptdb connections)))
@@ -379,8 +430,8 @@
          (plain (connection-state-plain connections))
          (results '()))
     ;; remove artefacts
-    (issue-query (format nil "DROP DATABASE ~A" +default-database+) cryptdb t)
-    (issue-query (format nil "DROP DATABASE ~A" +default-control-database+) plain t)
+    (issue-query (format nil "DROP DATABASE ~A" +default-database+) cryptdb)
+    (issue-query (format nil "DROP DATABASE ~A" +default-control-database+) plain)
     ;; create default database
     (must-succeed-query (format nil "CREATE DATABASE ~A" +default-database+) cryptdb)
     (must-succeed-query (format nil "CREATE DATABASE ~A" +default-control-database+) plain)
@@ -390,7 +441,8 @@
     ;; begin testing
     (dolist (test-group all-test-groups results)
       (push (run-test-group connections test-group) results))
-    (setf results (reverse results))))
+    (destroy-connections connections)
+    (reverse results)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -554,6 +606,14 @@
        (equal '()
               (map-tree #'(lambda (n) (declare (ignore n)) (assert nil)) '()))))
 
+(defun test-slow-compare ()
+  (and (slow-compare '((a b c)) '((a b c)))
+       (not (slow-compare '((a b c)) '((a b c) (a b c))))
+       (not (slow-compare '((a b)) '((a b c))))
+       (slow-compare '((a b c) (d e f)) '((d e f) (a b c)))
+       (slow-compare '((a b c) (d e f) (g h i)) '((d e f) (a b c) (g h i)))
+       (not (slow-compare '((a b c) (d e f) (g h i)) '((d e f) (a b c))))))
+
 (defun test-list-depth ()
   (and (= 1 (list-depth '()))
        (= 1 (list-depth '(2 3 4)))
@@ -569,5 +629,6 @@
        (test-many-str-assoc)
        (test-add-onion!)
        (test-map-tree)
+       (test-slow-compare)
        (test-list-depth)))
 
