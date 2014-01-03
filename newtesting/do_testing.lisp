@@ -1,3 +1,10 @@
+;; NOTES
+;; > the testing interface does not support mysql identifiers
+;;   (tables, fields, etc) with leading or trailing spaces
+;;   + in queries like, ``SELECT a + b FROM t'' mysql returns the field as
+;;     'a + b ' (note the trailing space); this behavior is not replicated by
+;;     cryptdb hence the tests use a generic string trim operation on
+;;     all fields
 ;; TODO
 ;; > 'USE' the default database for each test group
 ;; > support onion checks on columns that don't start maxed
@@ -37,7 +44,7 @@
         (multiple-value-bind (rows fields) (clsql:query query :database database)
           (make-query-result
             :status t
-            :fields fields
+            :fields (mapcar #'(lambda (f) (string-trim '(#\Space) f)) fields)
             :rows   rows))
     (clsql:sql-database-error (e)
       (declare (ignore e))
@@ -399,7 +406,8 @@
          (group-name (car test-group))
          (group-default (cadr test-group))
          (test-list (cddr test-group)))
-    (declare (special *score*) (ignore group-name))
+    (declare (special *score*) (ignorable group-name))
+    (format t "~A~%" group-name)
     (assert (valid-group-default? group-default))
     (dolist (test-case test-list score)
       (let* ((query (car test-case))
