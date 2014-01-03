@@ -234,10 +234,6 @@ DBResult::unpack()
     }
 
     const size_t rows = static_cast<size_t>(mysql_num_rows(n));
-    if (0 == rows) {
-        return ResType(this->success);
-    }
-
     const int cols = mysql_num_fields(n);
 
     ResType res(this->success);
@@ -245,6 +241,7 @@ DBResult::unpack()
     for (int j = 0;; j++) {
         MYSQL_FIELD *const field = mysql_fetch_field(n);
         if (!field) {
+            assert(cols == j);
             break;
         }
 
@@ -252,9 +249,10 @@ DBResult::unpack()
         res.types.push_back(field->type);
     }
 
-    for (int index = 0;; index++) {
+    for (size_t index = 0;; index++) {
         MYSQL_ROW row = mysql_fetch_row(n);
         if (!row) {
+            assert(rows == index);
             break;
         }
         unsigned long *const lengths = mysql_fetch_lengths(n);
