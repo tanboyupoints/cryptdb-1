@@ -1,6 +1,5 @@
 ;; TODO
 ;; > 'USE' the default database for each test group
-;; > handle floating point comparisons
 ;; > support onion checks on columns that don't start maxed
 ;; > support queries that should fail
 (proclaim '(optimize (debug 3)))
@@ -339,11 +338,11 @@
 (defun fast-compare (results-a results-b)
   (equal results-a results-b))
 
-(defun slow-compare (results-a results-b)
-  (when (not (= (length results-a) (length results-b)))
+(defun slow-compare (results-aye results-bee)
+  (when (not (= (length results-aye) (length results-bee)))
     (return-from slow-compare nil))
-  (let ((results-a (copy-list results-a))
-        (results-b (copy-list results-b)))
+  (let ((results-a (copy-list results-aye))
+        (results-b (copy-list results-bee)))
     (dolist (a results-a (zerop (length results-b)))
       (let ((new-results-b (remove a results-b :test #'equal :count 1)))
         (when (equal new-results-b results-b)
@@ -351,43 +350,43 @@
           (return nil))
         (setf results-b new-results-b)))))
 
-(defgeneric compare-results (results-a results-b)
-  (:method ((results-a query-result) (results-b query-result))
-    (cond ((and (not (query-result-status results-a))
-                (not (query-result-status results-b)))
-           t)
-          ((or (not (query-result-status results-a))
-               (not (query-result-status results-b)))
-           ; (break)
-           nil)
-          ((not (equal (query-result-fields results-a)
-                       (query-result-fields results-b)))
-           ; (break)
-           nil)
-          (t ;; cryptdb returns all results as strings while the normal
-             ;; database uses numbers and such
-             (let ((rows-a (all-strings (query-result-rows results-a)))
-                   (rows-b (all-strings (query-result-rows results-b))))
-               (or (fast-compare rows-a rows-b)
-                   (slow-compare rows-a rows-b))))))
-  (:method ((results-a (eql 'query-error)) (results-b (eql 'query-error)))
-    t)
-  (:method ((results-a (eql 'query-success)) (results-b (eql 'query-success)))
-    t)
-  (:method (results-a results-b)
-    ; (format t "NA:~A~%~%NB:~A~%~%~%" results-a results-b)
-    ; (break)
-    nil))
+(defmethod compare-results ((results-a query-result) (results-b query-result))
+  (cond ((and (not (query-result-status results-a))
+              (not (query-result-status results-b)))
+         t)
+        ((or (not (query-result-status results-a))
+             (not (query-result-status results-b)))
+         ; (break)
+         nil)
+        ((not (equal (query-result-fields results-a)
+                     (query-result-fields results-b)))
+         ; (break)
+         nil)
+        (t ;; cryptdb returns all results as strings while the normal
+           ;; database uses numbers and such
+           (let ((rows-a (all-strings (query-result-rows results-a)))
+                 (rows-b (all-strings (query-result-rows results-b))))
+             (or (fast-compare rows-a rows-b)
+                 (slow-compare rows-a rows-b))))))
+
+;; HACK: cryptdb returns integers for SUM(...) of integers while vanilla
+;;       mysql returns floating points with no decimals
+(defun float-to-string (float)
+  (assert (typep float 'float))
+  (let ((rational (rationalize float)))
+    (if (= 1 (denominator rational))
+        (write-to-string (numerator rational))
+        (format t "~A" float))))
 
 (defun all-strings (results)
   (mapcar #'(lambda (row)
               (mapcar #'(lambda (e)
-                          ; (unless (or (stringp e) (integerp e) (null e))
-                            ; (break))
-                          (if (null e)
-                              "NULL"
-                             (format nil "~A" e)))
-                         row))
+                          (etypecase e
+                            (string  e)
+                            (integer (write-to-string e))
+                            (null    "NULL")
+                            (float   (float-to-string e))))
+                      row))
           results))
 
 (defun valid-group-default? (group-default)
@@ -614,6 +613,10 @@
        (slow-compare '((a b c) (d e f) (g h i)) '((d e f) (a b c) (g h i)))
        (not (slow-compare '((a b c) (d e f) (g h i)) '((d e f) (a b c))))))
 
+(defun test-all-strings ()
+  (and (equal '(("1" "2" "3" "4.00"))
+              (all-strings '((1 2.0 3.000 "4.00"))))))
+
 (defun test-list-depth ()
   (and (= 1 (list-depth '()))
        (= 1 (list-depth '(2 3 4)))
@@ -630,5 +633,6 @@
        (test-add-onion!)
        (test-map-tree)
        (test-slow-compare)
+       (test-all-strings)
        (test-list-depth)))
 
