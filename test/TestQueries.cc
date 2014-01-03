@@ -1167,7 +1167,11 @@ CheckQuery(const TestConfig &tc, const Query &query)
 
         ResType test_res(false);
         if (Query::WHERE_EXEC::CONTROL != query.where_exec) {
-            test_res = test->execute(query);
+            try {
+              test_res = test->execute(query);
+            } catch (...) {
+                return false == control_res.ok;
+            }
             if (Query::WHERE_EXEC::TEST == query.where_exec) {
                 return test_res.ok;
             }

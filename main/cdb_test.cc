@@ -102,6 +102,15 @@ static bool handle_line(ProxyState& ps, const std::string& q, bool pp=true)
                     << std::endl;
       }
       return epi_result.res_type.success();
+  }  catch (const SynchronizationException &e) {
+      std::cout << e;
+      return false;
+  } catch (const AbstractException &e) {
+      std::cout << "exception: " << e;
+      return true;
+  } catch (const CryptDBError &e) {
+      std::cout << "low level exception: " << e.msg << std::endl;
+      return true;
   } catch (const std::runtime_error &e) {
       std::cout << "Unexpected Error: " << e.what() << std::endl;
       return false;
