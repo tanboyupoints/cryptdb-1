@@ -176,10 +176,14 @@
       (cons (car fixed) (map-tree #'string (cdr fixed))))))
 
 (defun fixup-execution-target (dirty-execution-target)
-  (cond ((null dirty-execution-target) :both)
-        ((member dirty-execution-target '(:cryptdb :control :both))
-         dirty-execution-target)
-        (t nil)))
+  (case dirty-execution-target
+    ((nil) :both)
+    ((:cryptdb :control :both) dirty-execution-target)))
+
+(defun fixup-testing-strategy (dirty-testing-strategy)
+  (case dirty-testing-strategy
+    ((nil) :compare)
+    ((:compare :must-succeed :must-fail :ignore) dirty-testing-strategy)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -329,12 +333,6 @@
   (fails 0))
 
 (defgeneric update-score (value)
-  (:method ((result query-result))
-    (declare (special *score*))
-    (case (query-result-status result)
-      (t   (incf (group-score-wins *score*)))
-      (nil (incf (group-score-fails *score*)))
-      (otherwise (error "unknown query result status!"))))
   (:method ((value (eql t)))
     (declare (special *score*))
     (incf (group-score-wins *score*)))
@@ -399,6 +397,21 @@
 (defun valid-group-default? (group-default)
   (or (equal t group-default) (equal nil group-default) (stringp group-default)))
 
+(defun valid-execution-target-and-testing-strategy? (execution-target testing-strategy)
+  (case testing-strategy
+    ((:must-succeed :must-fail) (member execution-target '(:both :cryptdb)))
+    (:compare   (eq :both execution-target))
+    (:ignore    t)))
+
+(defmethod execute-test-query ((connections connection-state) query execution-target)
+  (let ((cryptdb (connection-state-cryptdb connections))
+        (control (connection-state-plain connections)))
+    (ecase execution-target
+      (:cryptdb (issue-query query cryptdb))
+      (:control (values nil (issue-query query control)))
+      (:both    (values (issue-query query cryptdb)
+                        (issue-query query control))))))
+
 (defun run-test-group (connections test-group)
   (let* ((score (make-group-score))
          (*score* score)
@@ -413,23 +426,22 @@
       (let* ((query (car test-case))
              (onion-checks (fixup-onion-checks (cadr test-case) group-default))
              (execution-target (fixup-execution-target (caddr test-case)))
-             (cryptdb (connection-state-cryptdb connections))
-             (control (connection-state-plain connections)))
+             (testing-strategy (fixup-testing-strategy (cadddr test-case))))
         (assert (eq (null (cadr test-case)) (null onion-checks)))
-        (case execution-target
-          (:cryptdb (update-score (issue-query query cryptdb)))
-          (:control (update-score (issue-query query control)))
-          (:both
-            (let ((cryptdb-results
-                    (issue-query query (connection-state-cryptdb connections)))
-                  (plain-results
-                    (issue-query query (connection-state-plain connections))))
-              (update-score
-                ;; do handle-onion-checks(...) first because we want to update
-                ;; our local onions even if the results don't match
-                (and (handle-onion-checks connections onions onion-checks)
-                     (compare-results cryptdb-results plain-results)))))
-          (otherwise (error "unknown execution-target!")))))))
+        (assert (valid-execution-target-and-testing-strategy?
+                  execution-target testing-strategy))
+        (multiple-value-bind (cryptdb-results plain-results)
+            (execute-test-query connections query execution-target)
+          (update-score
+            (ecase testing-strategy
+              (:must-succeed (query-result-status cryptdb-results))
+              (:must-fail (not (query-result-status cryptdb-results)))
+              (:ignore t)
+              (:compare ;; do handle-onion-checks(...) first because we
+                        ;; want to update our local onions even if the
+                        ;; results don't match
+                        (and (handle-onion-checks connections onions onion-checks)
+                             (compare-results cryptdb-results plain-results))))))))))
 
 (defun run-tests (all-test-groups)
   (let* ((connections
@@ -502,7 +514,9 @@
 (defun test-fixup-onion-checks-multiple-update-default-bug ()
   (let ((line '(:update ("t" ("f"  ("o"  "l"))
                              ("f2" ("o2" "l2"))))))
-    (fixup-onion-checks line t)))
+    (equal `(:update (,+default-database+ ("t" ("f"  ("o"  "l"))
+                                               ("f2" ("o2" "l2")))))
+           (fixup-onion-checks line t))))
 
 (defun test-fixup-execution-target ()
   (and (eq :both (fixup-execution-target :both))
@@ -510,6 +524,14 @@
        (eq :control (fixup-execution-target :control))
        (eq :cryptdb (fixup-execution-target :cryptdb))
        (eq nil (fixup-execution-target 'whatever))))
+
+(defun test-fixup-testing-strategy ()
+  (and (eq :compare (fixup-testing-strategy :compare))
+       (eq :must-succeed (fixup-testing-strategy :must-succeed))
+       (eq :must-fail (fixup-testing-strategy :must-fail))
+       (eq :ignore (fixup-testing-strategy :ignore))
+       (eq :compare (fixup-testing-strategy nil))
+       (null (fixup-testing-strategy 'whatever))))
 
 (defun test-lookup-seclevel ()
   (let ((onions
@@ -637,6 +659,7 @@
   (and (test-fixup-onion-checks)
        (test-fixup-onion-checks-multiple-update-default-bug)
        (test-fixup-execution-target)
+       (test-fixup-testing-strategy)
        (test-lookup-seclevel)
        (test-update-onion-state!)
        (test-many-str-assoc)
