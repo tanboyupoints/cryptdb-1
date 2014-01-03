@@ -1,11 +1,11 @@
 ;; ((<test group name> <use default database?>
+;;                     <where-to-execute-test>
+;;                     <how-to-evaluate-results>
 ;;   (<test0>)
 ;;   (<test1>)))
-
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;;       single insert
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-#|
 (("SingleInsert" t
   ("CREATE TABLE test_insert (id integer , age integer, salary integer, address text, name text)"
    (:all-max "test_insert"))
@@ -110,6 +110,7 @@
   ;;;  single row subqueries
   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   ;; bad query, subquery returns multiple rows
+  ;; > forces cryptdb to propagate an error on a query after onion adjustment
   ("SELECT * FROM subqueryphun
      WHERE (SELECT code FROM subqueryphun)")
   ("SELECT * FROM subqueryphun
@@ -197,7 +198,8 @@
  ("SingleUpdate" t
   ("CREATE TABLE test_update (id integer, age integer, salary integer, address text, name text)"
    (:all-max test_update))
-  ("INSERT INTO test_update VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')")
+  ("INSERT INTO test_update
+         VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')")
   ("INSERT INTO test_update VALUES (2, 16, 1000, 'Green Gables', 'Anne Shirley')")
   ("INSERT INTO test_update VALUES (3, 8, 0, 'London', 'Lucy')")
   ("INSERT INTO test_update VALUES (4, 10, 0, 'London', 'Edmund')")
@@ -342,8 +344,8 @@
    ;; alias with where clause
    ("DELETE g, nuclear FROM gasoline g, nuclear
       WHERE nuclear.z < g.x"
-    (:update (gasoline (x (oOPE OPE)))
-             (nuclear  (z (oOPE OPE)))))
+    (:update (gasoline (x (oPLAIN PLAINVAL)))
+             (nuclear  (z (oPLAIN PLAINVAL)))))
    ("SELECT * FROM gasoline, coal, nuclear")
    ;; alias with same name as table
    ("DELETE coal, gasoline FROM coal coal, gasoline")
@@ -352,8 +354,6 @@
    ("DROP TABLE gasoline")
    ("DROP TABLE coal")
    ("DROP TABLE nuclear"))
- |#
-( 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;      auto incremement
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -361,25 +361,21 @@
  ("AutoInc" t
    ("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)"
     (:all-max msgs))
-#|
-    (:update (msgs (msgid (oPLAIN PLAINVAL))
-                   (zooanimals (oDET RND)
-                               (oOPE RND)
-                               (oAGG HOM))
-                   (msgtext (oDET RND)
-                            (oOPE RND)
-                            (oAGG HOM)))))
-|#
+    ; (:update (msgs (msgid (oPLAIN PLAINVAL))
+                   ; (zooanimals (oDET RND)
+                               ; (oOPE RND)
+                               ; (oAGG HOM))
+                   ; (msgtext (oDET RND)
+                            ; (oOPE RND)
+                            ; (oAGG HOM)))))
    ("CREATE TABLE moremore (x INTEGER,
                             y integer PRIMARY KEY AUTO_INCREMENT)
                  AUTO_INCREMENT=456"
     (:all-max moremore))
-#|
-    (:update (moremore (x (oDET RND)
-                          (oOPE RND)
-                          (oAGG HOM))
-                       (y (oPLAIN PLAINVAL)))))
-|#
+    ; (:update (moremore (x (oDET RND)
+                          ; (oOPE RND)
+                          ; (oAGG HOM))
+                       ; (y (oPLAIN PLAINVAL)))))
    ("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world', 100)")
    ("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world2', 21)")
    ("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world3', 10909)")
@@ -407,35 +403,34 @@
           ON DUPLICATE KEY UPDATE zooanimals = VALUES(zooanimals), msgtext = VALUES(msgtext)")
    ("SELECT * FROM msgs")
    ("SELECT SUM(zooanimals) FROM msgs")
+   ;; FAIL: not supported
    ("ALTER TABLE msgs AUTO_INCREMENT = 555")
    ("INSERT INTO msgs (msgtext, zooanimals) VALUES
                       ('dolphins', 12)")
+   ;; FAIL: auto_increment
    ("SELECT * FROM msgs")
    ("INSERT INTO msgs (msgtext, zooanimals)
           VALUES ('sharks', 12)")
+   ;; FAIL: auto_increment
    ("SELECT * FROM msgs")
    ("SELECT * FROM moremore"
     :check)
    ("DROP TABLE msgs")
    ("DROP TABLE moremore"))
-
-#|
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;         negatives
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
- ("Negative" t
-  ("CREATE TABLE negs (a integer, b integer, c integer)")
-  ("INSERT INTO negs (a, b, c) VALUES (10, -20, -100)")
-  ("INSERT INTO negs (a, b, c) VALUES (-100, 50, -12)")
-  ("INSERT INTO negs (a, b, c) VALUES (-8, -50, -18)")
-  ("SELECT a FROM negs WHERE b = -50 OR b = 50")
-  ("SELECT a FROM negs WHERE c = -100 OR b = -20")
-  ("INSERT INTO negs (c) VALUES (-1009)")
-  ("INSERT INTO negs (c) VALUES (1009)")
-  ("SELECT * FROM negs WHERE c = -1009")
-  ("DROP TABLE negs"))
-|#
-
+ ; ("Negative" t
+  ; ("CREATE TABLE negs (a integer, b integer, c integer)")
+  ; ("INSERT INTO negs (a, b, c) VALUES (10, -20, -100)")
+  ; ("INSERT INTO negs (a, b, c) VALUES (-100, 50, -12)")
+  ; ("INSERT INTO negs (a, b, c) VALUES (-8, -50, -18)")
+  ; ("SELECT a FROM negs WHERE b = -50 OR b = 50")
+  ; ("SELECT a FROM negs WHERE c = -100 OR b = -20")
+  ; ("INSERT INTO negs (c) VALUES (-1009)")
+  ; ("INSERT INTO negs (c) VALUES (1009)")
+  ; ("SELECT * FROM negs WHERE c = -1009")
+  ; ("DROP TABLE negs"))
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;           null
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -560,32 +555,28 @@
     :check)
    ("DROP TABLE def_0")
    ("DROP TABLE def_1"))
-
-#|
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;           decimal
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
- ("Decimal" t
-   ("CREATE TABLE dec_0 (x DECIMAL(10, 5),
-                         y DECIMAL(10, 5) NOT NULL DEFAULT 12.125)")
-   ("CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))")
-   ("INSERT INTO dec_0 VALUES (50, 100.5)")
-   ("INSERT INTO dec_0 VALUES (20.50, 1000.5)")
-   ("INSERT INTO dec_0 VALUES (50, 100.59)")
-   ("INSERT INTO dec_0 (x) VALUES (1.1)")
-   ("INSERT INTO dec_1 VALUES (8, 1000.5)")
-   ("SELECT * FROM dec_0 WHERE x = 50"
-   ("SELECT * FROM dec_0 WHERE x < 50")
-   ("SELECT * FROM dec_0 WHERE y = 100.5")
-   ("SELECT * FROM dec_0")
-   ("INSERT INTO dec_0 VALUES (19, 100.5)")
-   ("SELECT * FROM dec_0 WHERE y = 100.5")
-   ("SELECT * FROM dec_1")
-   ("SELECT * FROM dec_0, dec_1 WHERE dec_0.y = dec_1.b")
-   ("DROP TABLE dec_0")
-   ("DROP TABLE dec_1"))
-|#
-
+ ; ("Decimal" t
+   ; ("CREATE TABLE dec_0 (x DECIMAL(10, 5),
+                         ; y DECIMAL(10, 5) NOT NULL DEFAULT 12.125)")
+   ; ("CREATE TABLE dec_1 (a INTEGER, b DECIMAL(4, 2))")
+   ; ("INSERT INTO dec_0 VALUES (50, 100.5)")
+   ; ("INSERT INTO dec_0 VALUES (20.50, 1000.5)")
+   ; ("INSERT INTO dec_0 VALUES (50, 100.59)")
+   ; ("INSERT INTO dec_0 (x) VALUES (1.1)")
+   ; ("INSERT INTO dec_1 VALUES (8, 1000.5)")
+   ; ("SELECT * FROM dec_0 WHERE x = 50"
+   ; ("SELECT * FROM dec_0 WHERE x < 50")
+   ; ("SELECT * FROM dec_0 WHERE y = 100.5")
+   ; ("SELECT * FROM dec_0")
+   ; ("INSERT INTO dec_0 VALUES (19, 100.5)")
+   ; ("SELECT * FROM dec_0 WHERE y = 100.5")
+   ; ("SELECT * FROM dec_1")
+   ; ("SELECT * FROM dec_0, dec_1 WHERE dec_0.y = dec_1.b")
+   ; ("DROP TABLE dec_0")
+   ; ("DROP TABLE dec_1"))
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;       non strict mode
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -639,19 +630,31 @@
   ("ROLLBACK")
   ("SELECT * FROM trans")
   ("START TRANSACTION")
+  ;; query should fail as it's onion adjustment inside a transaction
   ("UPDATE trans SET a = a + 1, c = 50 WHERE a < 50000"
-   (:update trans a oOPE OPE))
+   (:update trans a oOPE OPE)
+   :both
+   :must-fail)
   ("ROLLBACK"
    ()
-   :control)
+   :control
+   :ignore)
+  ;; freeze things in case something went wrong
+  ("COMMIT")
   ("SELECT * FROM trans")
   ("START TRANSACTION")
   ("INSERT INTO trans VALUES (1, 50, 150)")
+  ;; query should fail as it's onion adjustment inside a transaction
   ("UPDATE trans SET b = b + 10 WHERE c = 50"
-   (:update trans c oDET DET))
+   (:update trans c oDET DET)
+   :both
+   :must-fail)
   ("ROLLBACK"
    ()
-   :control)
+   :control
+   :ignore)
+  ;; freeze things in case something went wrong
+  ("COMMIT")
   ("SELECT * FROM trans")
   ("DROP TABLE trans"))
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -727,7 +730,6 @@
   ("ALTER TABLE ddl_test DROP INDEX i, ADD INDEX i(b)")
   ("ALTER TABLE ddl_test DROP INDEX i")
   ("DROP TABLE ddl_test"))
-
  ;;; the oDET column will encrypt three times and all three of these will pad;
  ;;; the mysql's maximum field size is 2**32 - 1; so the maximum field size
  ;;; we support is 2**32 - 1 - (3 * AES_BLOCK_BYTES)
@@ -767,7 +769,7 @@
   ("INSERT INTO real_type_bug VALUES (1, 2, 3)")
   ("SELECT * FROM real_type_bug")
   ("UPDATE real_type_bug SET a = a + 1, b = b + 1")
-  ;; we don't currently support; but it shouldn't crash the system
+  ;; FAIL: we don't currently support; but it shouldn't crash the system
   ("CREATE TABLE jjj SELECT * FROM enums")
   ("SHOW ENGINES")
 
@@ -775,6 +777,7 @@
   ("INSERT INTO floating VALUES (23e+12), (12e+14), ('a'), (12),
                                 ('12e+5')")
   ("SELECT * FROM floating WHERE x < 11e+14")
+  ;; FAIL: floating point comparison broke
   ("SELECT * FROM floating")
   ("DROP TABLE floating")
 
@@ -808,7 +811,6 @@
   ("SELECT * FROM `over+there`.`more+quotes`")
   ("DROP DATABASE IF EXISTS `over+there`")
   ("USE cryptdbtest"))
-
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;          directives
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -817,93 +819,133 @@
  ;; FIXME: catch and handle the intentional fails
  ("Directives" t
   ("CREATE TABLE directives (x integer, y text, z integer)")
-   ("INSERT INTO directives VALUES (1, 'school learnin`', 7),
+  ("INSERT INTO directives VALUES (1, 'school learnin`', 7),
                                    (2, 'book learnin`', 8),
                                    (3, 'skool', 9)")
-   ("SELECT * FROM directives")
-   ;; try to do non-existent directive
-   ("SET @cryptdb='wontwork', @other='that'")
-   ;; try to do multiple directives
-   ("SET @cryptdb='adjust', @cryptdb='adjust', @and='that'")
-      ;; try to adjust on a non existent database
-   ("SET @cryptdb='adjust', @database='notreal',
-         @field='wontmatter', @table='irrelevant',
-         @oHOM='OPE'")
-   ("SELECT * FROM directives")
-      ;; try to adjust a non existent table
-   ("SET @cryptdb='adjust', @table='notrealnotreal',
-         @database='cryptdbtest', @field='doesntmatter',
-         @oOPE='OPE'")
-   ("SELECT * FROM directives")
-      ;; try to adjust a non existent field
-   ("SET @cryptdb='adjust', @database='cryptdbtest',
-         @oOPE='OPE', @table='directives',
-         @field='made-up'")
-   ("SELECT * FROM directives")
-      ;; try to adjust a non existent onion
-   ("SET @field='x', @cryptdb='adjust', @database='cryptdbtest',
-         @table='directives',
-         @badbad='OPE'")
-   ("SELECT * FROM directives")
-      ;; try to adjust to non existent level
-   ("SET @database='cryptdbtest'
-         @table='directives', @field='x',
-         @oOPE='unreality', @cryptdb='adjust'")
-   ("SELECT * FROM directives")
-      ;; try to adjust onion to real level it doesnt support
-      ;; > FIXME: handling of this is not nice
-   ("SET @cryptdb='adjust', @database='cryptdbtest',
-         @table='directives', @field='x',
-         @oOPE='HOM'")
-   ("SELECT * FROM directives")
-      ;; do real adjustment
-   ("SET @table='directives', @database='cryptdbtest',
-         @cryptdb='adjust', @field='x',
-         @oOPE='OPE'")
-   ("SELECT * FROM directives WHERE x < 100")
-      ;; do it again (adjust to current level)
-   ("SET @cryptdb='adjust', @database='cryptdbtest',
-         @table='directives', @field='x',
-         @oOPE='OPE'")
-   ("SELECT * FROM directives WHERE x < 100")
-   ("SET @cryptdb='show', @random='stuff', @nothing='nothing'")
-      ;; try to adjust upwards
-   ("SET @cryptdb='adjust', @database='cryptdbtest',
-         @table='directives', @field='x',
-         @oOPE='RND'")
-   ("SELECT * FROM directives WHERE x < 100")
-      ;; do multiple adjustments to same onion
-      ;; NOTE: unsupported
-   ("SET @cryptdb='adjust', @database='cryptdbtest',
-         @oDET='DETJOIN', @table='directives', @field='x',
-         @oDET='DET'")
-   ("SELECT * FROM directives")
-      ;; adjust down multiple layers
-   ("SET @cryptdb='adjust', @database='cryptdbtest',
-         @oDET='DETJOIN', @table='directives', @field='x'")
-   ("SELECT * FROM directives WHERE x = 1")
-      ;; multiple adjustments to different onions
-   ("SET @cryptdb='adjust', @database='cryptdbtest',
-         @table='directives', @field='y',
-         @oDET='DET', @oOPE='OPE'")
-   ("SELECT * FROM directives WHERE y < 'somerandomtext'")
-   ("SELECT * FROM directives WHERE y = 'moretext'")
-      ;; do a good adjustment and one that won't do anything
-   ("SET @cryptdb='adjust', @database='cryptdbtest',
-         @table='directives', @field='z',
-         @oDET='DET', @oOPE='RND'")
-   ("SELECT * FROM directives WHERE z = 8")
-   ("SET @more='less', @cryptdb='show', @nothing='short'")
-   ("DROP TABLE directives")))
+  ("SELECT * FROM directives")
+  ;; try to do non-existent directive
+  ("SET @cryptdb='wontwork', @other='that'"
+   ()
+   :cryptdb
+   :must-fail)
+  ;; try to do multiple directives
+  ("SET @cryptdb='adjust', @cryptdb='adjust', @and='that'"
+   ()
+   :cryptdb
+   :must-fail)
+  ;; try to adjust on a non existent database
+  ("SET @cryptdb='adjust', @database='notreal',
+        @field='wontmatter', @table='irrelevant',
+        @oHOM='OPE'"
+   ()
+   :cryptdb
+   :must-fail)
+  ("SELECT * FROM directives")
+  ;; try to adjust a non existent table
+  ("SET @cryptdb='adjust', @table='notrealnotreal',
+        @database='cryptdbtest', @field='doesntmatter',
+        @oOPE='OPE'"
+   ()
+   :cryptdb
+   :must-fail)
+  ("SELECT * FROM directives")
+  ;; try to adjust a non existent field
+  ("SET @cryptdb='adjust', @database='cryptdbtest',
+        @oOPE='OPE', @table='directives',
+        @field='made-up'"
+   ()
+   :cryptdb
+   :must-fail)
+  ("SELECT * FROM directives")
+  ;; try to adjust a non existent onion
+  ("SET @field='x', @cryptdb='adjust', @database='cryptdbtest',
+        @table='directives',
+        @badbad='OPE'"
+   ()
+   :cryptdb
+   :must-fail)
+  ("SELECT * FROM directives")
+  ;; try to adjust to non existent level
+  ("SET @database='cryptdbtest'
+        @table='directives', @field='x',
+        @oOPE='unreality', @cryptdb='adjust'"
+   ()
+   :cryptdb
+   :must-fail)
+  ("SELECT * FROM directives")
+  ;; try to adjust onion to real level it doesnt support
+  ;; > FIXME: handling of this is not nice
+  ("SET @cryptdb='adjust', @database='cryptdbtest',
+        @table='directives', @field='x',
+        @oOPE='HOM'"
+   ()
+   :cryptdb
+   :must-fail)
+  ("SELECT * FROM directives")
+  ;; do real adjustment
+  ("SET @table='directives', @database='cryptdbtest',
+        @cryptdb='adjust', @field='x',
+        @oOPE='OPE'")
+  ("SELECT * FROM directives WHERE x < 100")
+  ;; do it again (adjust to current level)
+  ("SET @cryptdb='adjust', @database='cryptdbtest',
+        @table='directives', @field='x',
+        @oOPE='OPE'")
+  ("SELECT * FROM directives WHERE x < 100")
+  ("SET @cryptdb='show', @random='stuff', @nothing='nothing'"
+   ()
+   :cryptdb
+   :must-succeed)
+  ;; try to adjust upwards
+  ;; FAIL: cryptdb should report error
+  ("SET @cryptdb='adjust', @database='cryptdbtest',
+        @table='directives', @field='x',
+        @oOPE='RND'"
+   ()
+   :cryptdb
+   :must-fail)
+  ("SELECT * FROM directives WHERE x < 100")
+  ;; do multiple adjustments to same onion
+  ;; NOTE: unsupported
+  ("SET @cryptdb='adjust', @database='cryptdbtest',
+        @oDET='DETJOIN', @table='directives', @field='x',
+        @oDET='DET'"
+   ()
+   :cryptdb
+   :must-fail)
+  ("SELECT * FROM directives")
+  ;; adjust down multiple layers
+  ("SET @cryptdb='adjust', @database='cryptdbtest',
+        @oDET='DETJOIN', @table='directives', @field='x'")
+  ("SELECT * FROM directives WHERE x = 1")
+  ;; multiple adjustments to different onions
+  ("SET @cryptdb='adjust', @database='cryptdbtest',
+        @table='directives', @field='y',
+        @oDET='DET', @oOPE='OPE'")
+  ("SELECT * FROM directives WHERE y < 'somerandomtext'")
+  ("SELECT * FROM directives WHERE y = 'moretext'")
+  ;; do a good adjustment and one that won't do anything
+  ("SET @cryptdb='adjust', @database='cryptdbtest',
+        @table='directives', @field='z',
+        @oDET='DET', @oOPE='RND'")
+  ("SELECT * FROM directives WHERE z = 8")
+  ("SET @more='less', @cryptdb='show', @nothing='short'"
+   ()
+   :cryptdb
+   :must-succeed)
+  ("DROP TABLE directives"))
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;           range
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;; FIXME: larget 64 bit value being misrepresented as -1, possibly a bug
+ ;;        in sql library
  ("Range" t
-      // we must run the control database in strict mode in order to
-      // match semantics
+  ;; we must run the control database in strict mode in order to
+  ;; match semantics
   ("SET SESSION sql_mode = 'ANSI,TRADITIONAL'"
    ()
-   :control)
+   :control
+   :ignore)
   ("CREATE TABLE t (t TINYINT UNSIGNED DEFAULT 0,
                     s SMALLINT UNSIGNED DEFAULT 0,
                     m MEDIUMINT UNSIGNED DEFAULT 0,
@@ -968,23 +1010,18 @@
   ("SELECT t, s, i FROM t WHERE i = 16777215")
   ("SELECT * from t")
   ("SELECT MAX(t), MAX(s), MAX(m), MAX(i), MAX(b) FROM t")
-#|
   ;; the comparisons fail because the constants are out of range
-  ("SELECT m, t, s FROM t WHERE s = 65536")
-  ("SELECT m, i FROM t WHERE m > 4294967290")
-  ("SELECT i FROM t WHERE i > 99999999999999999999")
-  ("SELECT t, i FROM t WHERE t < 99999999999999999999")
-  ("SELECT t, s, m, i FROM t")
-|#
+  ; ("SELECT m, t, s FROM t WHERE s = 65536")
+  ; ("SELECT m, i FROM t WHERE m > 4294967290")
+  ; ("SELECT i FROM t WHERE i > 99999999999999999999")
+  ; ("SELECT t, i FROM t WHERE t < 99999999999999999999")
+  ; ("SELECT t, s, m, i FROM t")
   ("SELECT t, s, m FROM t WHERE s = m AND b = i")
   ;; fails because we don't handle summations larger than 64 bits
   ("SELECT SUM(b) FROM t")
   ("DROP TABLE t")
   ("SET SESSION sql_mode = ''"
    ()
-   :control)))
-
-
-
-
+   :control
+   :ignore)))
 
