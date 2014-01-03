@@ -357,25 +357,25 @@
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;      auto incremement
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
- ;; FIXME: :update won't work on nil
  ("AutoInc" t
    ("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)"
-    (:all-max msgs))
-    ; (:update (msgs (msgid (oPLAIN PLAINVAL))
-                   ; (zooanimals (oDET RND)
-                               ; (oOPE RND)
-                               ; (oAGG HOM))
-                   ; (msgtext (oDET RND)
-                            ; (oOPE RND)
-                            ; (oAGG HOM)))))
+    (:set (msgs (msgid (oPLAIN PLAINVAL))
+                (zooanimals (oDET RND)
+                            (oOPE RND)
+                            (oAGG HOM)
+                            (oPLAIN RND))
+                (msgtext (oDET RND)
+                         (oOPE RND)
+                         (oAGG HOM)
+                         (oPLAIN RND)))))
    ("CREATE TABLE moremore (x INTEGER,
                             y integer PRIMARY KEY AUTO_INCREMENT)
                  AUTO_INCREMENT=456"
-    (:all-max moremore))
-    ; (:update (moremore (x (oDET RND)
-                          ; (oOPE RND)
-                          ; (oAGG HOM))
-                       ; (y (oPLAIN PLAINVAL)))))
+    (:set (moremore (x (oDET RND)
+                       (oOPE RND)
+                       (oAGG HOM)
+                       (oPLAIN RND))
+                    (y (oPLAIN PLAINVAL)))))
    ("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world', 100)")
    ("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world2', 21)")
    ("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world3', 10909)")
@@ -393,10 +393,12 @@
    ("SELECT SUM(zooanimals) FROM msgs")
    ("INSERT INTO msgs VALUES (9, 105, 'message for alice from bob')")
    ("INSERT INTO msgs VALUES (9, 201, 'whatever') ON DUPLICATE KEY UPDATE msgid = msgid + 10")
-   ("SELECT * FROM msgs")
+   ("SELECT * FROM msgs"
+    (:check))
    ("INSERT INTO msgs
                VALUES (1, 9001, 'lights are on')
-               ON DUPLICATE KEY UPDATE msgid = zooanimals + 99, zooanimals=VALUES(zooanimals)")
+               ON DUPLICATE KEY UPDATE msgid = zooanimals + 99, zooanimals=VALUES(zooanimals)"
+    (:update "msgs" "zooanimals" "oPLAIN" "PLAINVAL"))
    ("SELECT * FROM msgs")
    ("INSERT INTO msgs
           VALUES (2, 1998, 'stacksondeck')
