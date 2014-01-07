@@ -904,7 +904,6 @@
    :cryptdb
    :must-succeed)
   ;; try to adjust upwards
-  ;; FAIL: cryptdb should report error
   ("SET @cryptdb='adjust', @database='cryptdbtest',
         @table='directives', @field='x',
         @oOPE='RND'"
