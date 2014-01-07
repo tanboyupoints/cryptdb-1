@@ -7,11 +7,14 @@
 ;;     all fields
 ;; TODO
 ;; > 'USE' the default database for each test group
-;; > support onion checks on columns that don't start maxed
-;; > support queries that should fail
+
+(defpackage :cryptdb-testing
+  (:use :cl :clsql)
+  (:export :main))
+(in-package :cryptdb-testing)
+
 (proclaim '(optimize (debug 3)))
 
-; (defconstant +default-tests-path+ "./tests.sexpr")
 (defparameter +default-tests-path+       "./tests.sexpr")
 (defparameter +default-ip+               "127.0.0.1")
 (defparameter +default-username+         "root")
@@ -236,6 +239,7 @@
         (many-str-assoc `(,database ,table ,field ,onion)
                         (onion-state-databases onions))
     ;; a total match should only occur when we max back to back tables
+    ;; > ie, consecutive CREATE TABLE queries
     (when success
       (assert (zerop (length unmatched-keys)))
       (assert (string-equal seclevel (cadr lookup)))
@@ -298,8 +302,8 @@
             ; (break)
             (setf output nil))
           ;; update our local copy of onion state
-          ;; > we cannot use (setf lookup-seclevel) because the local onion state
-          ;;   may be nil
+          ;; > we cannot use (setf lookup-seclevel) because the local onion
+          ;;   state may be nil
           (add-onion! onions database table field onion seclevel)))))
   (:method (connections (onions onion-state) (type (eql :set)) onion-check)
     (dolist (checks (cdr onion-check) t)
@@ -429,7 +433,6 @@
          (group-default (cadr test-group))
          (test-list (cddr test-group)))
     (declare (special *score*) (ignorable group-name))
-    (format t "~A~%" group-name)
     (assert (valid-group-default? group-default))
     (dolist (test-case test-list score)
       (let* ((query (car test-case))
@@ -441,16 +444,18 @@
                   execution-target testing-strategy))
         (multiple-value-bind (cryptdb-results plain-results)
             (execute-test-query connections query execution-target)
-          (update-score
-            (ecase testing-strategy
-              (:must-succeed (query-result-status cryptdb-results))
-              (:must-fail (not (query-result-status cryptdb-results)))
-              (:ignore t)
-              (:compare ;; do handle-onion-checks(...) first because we
-                        ;; want to update our local onions even if the
-                        ;; results don't match
-                        (and (handle-onion-checks connections onions onion-checks)
-                             (compare-results cryptdb-results plain-results))))))))))
+          ;; do handle-onion-checks(...) first because we want to update our
+          ;; local onions even if the results don't match
+          (let ((onion-check-result
+                 (handle-onion-checks connections onions onion-checks)))
+            (update-score
+              (ecase testing-strategy
+                (:must-succeed (query-result-status cryptdb-results))
+                (:must-fail    (not (query-result-status cryptdb-results)))
+                (:ignore       t)
+                (:compare      (and onion-check-result
+                                    (compare-results cryptdb-results
+                                                     plain-results)))))))))))
 
 (defun run-tests (all-test-groups)
   (let* ((connections
@@ -470,7 +475,11 @@
     (must-succeed-query (format nil "USE ~A" +default-control-database+) plain)
     ;; begin testing
     (dolist (test-group all-test-groups results)
-      (push (run-test-group connections test-group) results))
+      (let ((score (run-test-group connections test-group)))
+        (format t "~A:~25T~A failures~%"
+                  (car test-group)
+                  (group-score-fails score))
+        (push score results)))
     (destroy-connections connections)
     (reverse results)))
 
@@ -480,9 +489,19 @@
 ;;;;   commence cryptdb testing
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; give *filter-tests* the names of test groups to be run
+;; > no names indicates that all tests should be run
+(defparameter *filter-tests* '())
+
 (defun main ()
   (let ((tests (load-tests)))
-    (run-tests tests)))
+    (run-tests (remove-if-not #'(lambda (name)
+                                  (or (null *filter-tests*)
+                                      (member name *filter-tests*
+                                              :test #'string-equal)))
+                              tests
+                              :key #'car))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

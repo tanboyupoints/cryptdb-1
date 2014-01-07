@@ -822,9 +822,8 @@
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;          directives
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
- ;; NOTE: These tests are not very effective at determining if things are
- ;;       functional; need to compare levels and exceptions
- ;; FIXME: catch and handle the intentional fails
+ ;; NOTE: Difficult to test functionality because we use this technique to
+ ;;       to get onion level
  ("Directives" t
   ("CREATE TABLE directives (x integer, y text, z integer)")
   ("INSERT INTO directives VALUES (1, 'school learnin`', 7),
@@ -1025,7 +1024,7 @@
   ; ("SELECT t, i FROM t WHERE t < 99999999999999999999")
   ; ("SELECT t, s, m, i FROM t")
   ("SELECT t, s, m FROM t WHERE s = m AND b = i")
-  ;; fails because we don't handle summations larger than 64 bits
+  ;; FAIL: we don't handle summations larger than 64 bits
   ("SELECT SUM(b) FROM t")
   ("DROP TABLE t")
   ("SET SESSION sql_mode = ''"
