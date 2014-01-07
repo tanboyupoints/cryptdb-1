@@ -10,7 +10,8 @@
 
 (defpackage :cryptdb-testing
   (:use :cl :clsql)
-  (:export :main))
+  (:export :main
+           :test-all-units))
 (in-package :cryptdb-testing)
 
 (proclaim '(optimize (debug 3)))
@@ -359,14 +360,10 @@
 (defun slow-compare (results-aye results-bee)
   (when (not (= (length results-aye) (length results-bee)))
     (return-from slow-compare nil))
-  (let ((results-a (copy-list results-aye))
-        (results-b (copy-list results-bee)))
-    (dolist (a results-a (zerop (length results-b)))
-      (let ((new-results-b (remove a results-b :test #'equal :count 1)))
-        (when (equal new-results-b results-b)
-          ; (break)
-          (return nil))
-        (setf results-b new-results-b)))))
+  (every #'(lambda (a)
+             (= (count a results-aye :test #'equal)
+                (count a results-bee :test #'equal)))
+         results-aye))
 
 (defmethod compare-results ((results-a query-result) (results-b query-result))
   (cond ((and (not (query-result-status results-a))
