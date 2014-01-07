@@ -1048,7 +1048,7 @@ private:
                 const FieldMeta &fm = a.getFieldMeta(tm, field);
                 throw OnionAdjustExcept(tm, fm, o.get(), l.get());
             } else if (l.get() > current_level) {
-                FAIL_TextMessageError("it is not possible to add onions; only remove them");
+                FAIL_TextMessageError("it is not possible to add layers; only remove them");
             }
         }
 
