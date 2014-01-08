@@ -22,6 +22,28 @@
 #include <util/enum_text.hh>
 #include <parser/lex_util.hh>
 
+#define PLAIN_FUNCTION(type, name)                                      \
+namespace {                                                             \
+    extern const char __str_name_##name[] = #name;                      \
+    static class ANON : public CItemSubtypeFN<type, __str_name_##name> {\
+        virtual RewritePlan *                                           \
+        do_gather_type(const type &i, Analysis &a) const                \
+        {                                                               \
+            const std::string &why = #name;                             \
+            return allPlainIterateGather(i, why, a);                    \
+        }                                                               \
+                                                                        \
+        virtual Item *                                                  \
+        do_rewrite_type(const type &i, const OLK &constr,               \
+                        const RewritePlan &rp, Analysis &a) const       \
+        {                                                               \
+            return rewrite_args_FN(i, constr,                           \
+                                   static_cast<const RewritePlanOneOLK &>(rp),  \
+                                   a);                                  \
+        }                                                               \
+    } ANON;                                                             \
+};
+
 // gives names to classes and objects we don't care to know the name of 
 #define ANON                ANON_NAME(__anon_id_func_)
 
@@ -1378,4 +1400,6 @@ static class ANON : public CItemSubtypeFN<Item_func_current_user,
     }
 } ANON;
 
+PLAIN_FUNCTION(Item_func_connection_id, connection_id);
 
+#undef PLAIN_FUNCTION
