@@ -623,12 +623,20 @@
   ("INSERT INTO trans VALUES (45, 22, 15)")
   ("UPDATE trans SET a = a + 1, b = c + 1")
   ("START TRANSACTION")
-  ("UPDATE trans SET a = a + a, b = b + 12")
+  ;; no special update in transaction
+  ("UPDATE trans SET a = a + a, b = b + 12"
+   ()
+   :cryptdb
+   :must-fail)
   ("SELECT * FROM trans")
   ("ROLLBACK")
   ("SELECT * FROM trans")
   ("START TRANSACTION")
-  ("UPDATE trans SET a = c + 1, b = a + 1")
+  ;; no special update in transaction
+  ("UPDATE trans SET a = c + 1, b = a + 1"
+   ()
+   :cryptdb
+   :must-fail)
   ("COMMIT")
   ("ROLLBACK")
   ("SELECT * FROM trans")
@@ -636,12 +644,8 @@
   ;; query should fail as it's onion adjustment inside a transaction
   ("UPDATE trans SET a = a + 1, c = 50 WHERE a < 50000"
    (:update trans a oOPE OPE)
-   :both
+   :cryptdb
    :must-fail)
-  ("ROLLBACK"
-   ()
-   :control
-   :ignore)
   ;; freeze things in case something went wrong
   ("COMMIT")
   ("SELECT * FROM trans")
@@ -650,7 +654,7 @@
   ;; query should fail as it's onion adjustment inside a transaction
   ("UPDATE trans SET b = b + 10 WHERE c = 50"
    (:update trans c oDET DET)
-   :both
+   :cryptdb
    :must-fail)
   ("ROLLBACK"
    ()
@@ -1029,5 +1033,66 @@
   ("SET SESSION sql_mode = ''"
    ()
    :control
-   :ignore)))
+   :ignore))
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;        update bugs
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;; > we were issuing the DELETE but failing to ROLLBACK when our INSERT failed
+("UpdateBugs" t
+ ;; SCENARIO 1: onion adjustment during UPDATE
+ ("CREATE TABLE ubug (x integer primary key)"
+  (:all-max "ubug"))
+ ("INSERT INTO ubug VALUES (1), (2)")
+ ;; this must happen _before_ onion adjustment
+ ("UPDATE ubug SET x = x + 1 WHERE x < 2"
+  (:update ubug x oOPE OPE)
+  :both
+  :must-fail)
+ ("SELECT * FROM ubug")
+ ;; was causing deadlock
+ ("UPDATE ubug SET x = 15"
+  :check)
+ ("DROP TABLE ubug")
+
+ ;; SCENARIO 2: onion adjustment before UPDATE
+ ("CREATE TABLE ubug2 (x integer primary key)"
+  (:all-max ubug2))
+ ("INSERT INTO ubug2 VALUES (1), (2)")
+ ;; onion adjust before we do the bad update
+ ("SELECT * FROM ubug2 WHERE x < 2"
+  (:update ubug2 x oOPE OPE))
+ ("UPDATE ubug2 SET x = x + 1 WHERE x < 2"
+  ()
+  :both
+  :must-fail)
+ ;; '1' was missing from database
+ ("SELECT * FROM ubug2"
+  :check)
+ ("DROP TABLE ubug2")
+
+ ;; SCENARIO 1 WITH TRANSACTION can't happen because onion adjustments can't
+ ;; happen in a transaction
+
+ ;; SCENARIO 2 WITH TRANSACTION
+ ("CREATE TABLE ubug_trx (x integer primary key)"
+  (:all-max "ubug_trx"))
+ ("SELECT * FROM ubug_trx WHERE x < 2"
+  (:update ubug_trx x oOPE OPE))
+ ("INSERT INTO ubug_trx VALUES (0)")
+ ("START TRANSACTION")
+ ("INSERT INTO ubug_trx VALUES (1), (2)")
+ ;; we can not issue special updates inside of a transaction
+ ;; > transaction should remain open
+ ("UPDATE ubug_trx SET x = x + 1 WHERE x < 2"
+  ()
+  :cryptdb
+  :must-fail)
+ ("SELECT * FROM ubug_trx")
+ ;; make sure the transaction is still active
+ ("INSERT INTO ubug_trx VALUES (3)")
+ ("SELECT * FROM ubug_trx")
+ ("ROLLBACK")
+ ("SELECT * FROM ubug_trx"
+  :check)
+ ("DROP TABLE ubug_trx")))
 

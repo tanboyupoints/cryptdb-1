@@ -686,6 +686,10 @@ DMLOutput::afterQuery(const std::unique_ptr<Connect> &) const
     return std::make_pair(false, std::unique_ptr<DBResult>(nullptr));
 }
 
+// we can not successfully issue a special update while inside of a transaction
+// as our attempt to retrieve rows from the database will fail to recover
+// data inserted during the current transaction
+// > this failure will occur in the stored procedure
 void
 SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
                            const std::unique_ptr<Connect> &e_conn)

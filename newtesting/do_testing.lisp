@@ -11,12 +11,23 @@
 (defpackage :cryptdb-testing
   (:use :cl :clsql)
   (:export :main
-           :test-all-units))
+           :test-all-units
+           :compare-results
+           :db-connect
+           :issue-query
+           :execute-test-query
+           :make-connection-state
+           :connection-state-cryptdb
+           :connection-state-plain
+           :destroy-connections
+           :read-file))
 (in-package :cryptdb-testing)
 
 (proclaim '(optimize (debug 3)))
 
-(defparameter +default-tests-path+       "./tests.sexpr")
+(defparameter +default-tests-path+       (concatenate 'string
+                                           (sb-unix::posix-getenv "EDBDIR")
+                                           "/newtesting/tests.sexpr"))
 (defparameter +default-ip+               "127.0.0.1")
 (defparameter +default-username+         "root")
 (defparameter +default-password+         "letmein")
@@ -28,6 +39,16 @@
 ;;;;     database helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defstruct connection-state
+  cryptdb
+  plain)
+
+(defmethod destroy-connections ((connections connection-state))
+  (clsql:disconnect :database (connection-state-cryptdb connections))
+  (setf (connection-state-cryptdb connections) nil)
+  (clsql:disconnect :database (connection-state-plain connections))
+  (setf (connection-state-plain connections) nil))
 
 (defun db-connect (db port &optional (ip       +default-ip+)
                                      (username +default-username+)
@@ -268,17 +289,6 @@
 ;;;;    onion check handling
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defstruct connection-state
-  cryptdb
-  plain)
-
-(defmethod destroy-connections ((connections connection-state))
-  (clsql:disconnect :database (connection-state-cryptdb connections))
-  (setf (connection-state-cryptdb connections) nil)
-  (clsql:disconnect :database (connection-state-plain connections))
-  (setf (connection-state-plain connections) nil))
-
 
 (defun get-cryptdb-show (connections)
   (let ((results (issue-query "SET @cryptdb='show'"
