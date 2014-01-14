@@ -176,6 +176,7 @@ static const char *luaToCharp(lua_State *const L, int index);
 void *nullFail(void *p);
 bool validBox(Box b);
 bool saneLuaQuery(struct LuaQuery *const lua_query);
+void writeQueryErrorToSecondaryLog(const char *const error);
 
 unsigned global_timeouts = 0;
 
@@ -621,6 +622,7 @@ commandHandler(void *const lq)
 
         if (false == query_succeeded) {
             // query failed
+            writeQueryErrorToSecondaryLog(mysql_error(conn));
             lua_pushboolean(lua_query->persist.ell, false);
             completeLuaQuery(lua_query, 1);
             continue;
@@ -1074,6 +1076,49 @@ saneLuaQuery(struct LuaQuery *const lua_query)
 {
     return !!validBox(lua_query->thread)
        != !!(DEAD == lua_query->state || SELF_OWNING == lua_query->state);
+}
+
+// fails silently
+// > not thread safe
+void
+writeQueryErrorToSecondaryLog(const char *const error)
+{
+    const char *const cryptdb_path = getenv("EDBDIR");
+    if (NULL == cryptdb_path) {
+        return;
+    }
+
+    char *const secondary_log_path =
+        calloc(strlen(cryptdb_path) + 100, sizeof(char));
+    if (NULL == secondary_log_path) {
+        return;
+    }
+
+    if (0 > sprintf(secondary_log_path, "%s/logs/secondary.log", cryptdb_path)) {
+        free(secondary_log_path);
+        return;
+    }
+
+    FILE *const f = fopen(secondary_log_path, "a");
+    if (NULL == f) {
+        free(secondary_log_path);
+        return;
+    }
+
+    time_t rawtime;
+    char current_time[100] = {0};
+
+    time (&rawtime);
+    struct tm *const timeinfo = localtime(&rawtime);
+    if (0 == strftime(current_time, 100, "%D  %T", timeinfo)) {
+        fclose(f);
+        free(secondary_log_path);
+        return;
+    }
+
+    fprintf(f, "cryptdb error[%s]\n%s\n\n", current_time, error);
+    fclose(f);
+    free(secondary_log_path);
 }
 
 #include "threaded_query_tests.c"
