@@ -229,15 +229,11 @@
   databases)
 
 (defmethod low-level-lookup-seclevel ((onions onion-state) database table field onion)
-  (let ((table-data (cdr (str-assoc database (onion-state-databases onions)))))
-    (assert table-data)
-    (let ((field-data (cdr (str-assoc table table-data))))
-      (assert field-data)
-      (let ((onion-data (cdr (str-assoc field field-data))))
-        (assert onion-data)
-        (let ((seclevel (cdr (str-assoc onion onion-data))))
-          (assert seclevel)
-          seclevel)))))
+  (multiple-value-bind (success lookup unmatched-keys)
+        (many-str-assoc `(,database ,table ,field ,onion)
+                        (onion-state-databases onions))
+    (assert (and success (null unmatched-keys)))
+    (cdr lookup)))
 
 (defmethod lookup-seclevel ((onions onion-state) database table field onion)
   (car (low-level-lookup-seclevel onions database table field onion)))
@@ -263,7 +259,7 @@
     ;; a total match should only occur when we max back to back tables
     ;; > ie, consecutive CREATE TABLE queries
     (when success
-      (assert (zerop (length unmatched-keys)))
+      (assert (null unmatched-keys))
       (assert (string-equal seclevel (cadr lookup)))
       (return-from add-onion! t))
     (assert (not (null lookup)))
