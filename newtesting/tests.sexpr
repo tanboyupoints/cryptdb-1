@@ -844,6 +844,12 @@
    ()
    :cryptdb
    :must-fail)
+  ;; specity duplicate directive parameters for one directive
+  ("SET @cryptdb='adjust', @database='cryptdbtest', @table='directives',
+        @field='x', @oOPE='OPE', @field='z'"
+   ()
+   :cryptdb
+   :must-fail)
   ;; try to adjust on a non existent database
   ("SET @cryptdb='adjust', @database='notreal',
         @field='wontmatter', @table='irrelevant',
@@ -944,6 +950,64 @@
    :cryptdb
    :must-succeed)
   ("DROP TABLE directives"))
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;      sensitive directives
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ("SensitiveDirectives" t
+  ("CREATE TABLE sense (x integer, y integer)"
+   (:all-max sense))
+  ("INSERT INTO sense VALUES (100, 'crayolacrayons'),
+                             (1212, 'jjjjjjj')")
+  ("SELECT * FROM sense")
+  ;; try multiple sensitives
+  ("SET @cryptdb='sensitive', @cryptdb='sensitive',
+        @database='cryptdbtest', @table='sense', @field='x'"
+   ()
+   :cryptdb
+   :must-fail)
+  ;; try multiple unsensitives
+  ("SET @cryptdb='unsensitive', @cryptdb='unsensitive', @cryptdb='unsensitive',
+        @database='cryptdbtest', @table='sense', @field='x'"
+   ()
+   :cryptdb
+   :must-fail)
+  ;; try sensitive and unsensitive simultaneously
+  ("SET @cryptdb='sensitive', @cryptdb='unsensitive',
+        @database='cryptdbtest', @table='sense', @field='x'"
+   ()
+   :cryptdb
+   :must-fail)
+  ;; make a field sensitive
+  ("SET @cryptdb='sensitive',
+        @database='cryptdbtest', @table='sense', @field='x'")
+  ;; make the same field unsensitive
+  ("SET @cryptdb='unsensitive',
+        @database='cryptdbtest', @table='sense', @field='x'")
+  ;; and back to sensitive
+  ("SET @cryptdb='sensitive',
+        @database='cryptdbtest', @table='sense', @field='x'")
+  ;; try to take it to plain
+  ("SELECT * FROM sense WHERE x * 100 < 10"
+   ()
+   :cryptdb
+   :must-fail)
+  ;; make the other field unsensitive
+  ("SET @cryptdb='unsensitive',
+        @database='cryptdbtest', @table='sense', @field='y'")
+  ;; now take it to plain
+  ("SELECT * FROM sense WHERE y * 4 < 10"
+   (:update sense y oPLAIN PLAINVAL))
+  ;; try to make it sensitive
+  ("SET @cryptdb='sensitive',
+        @database='cryptdbtest', @table='sense', @field='y'"
+   ()
+   :cryptdb
+   :must-fail)
+  ;; and we can still (redundantly) make it unsensitive
+  ("SET @cryptdb='unsensitive',
+        @database='cryptdbtest', @table='sense', @field='y'")
+  ("SELECT * FROM sense"
+   :check))
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;           range
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

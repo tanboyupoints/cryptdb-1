@@ -79,6 +79,7 @@ OnionMeta::deserialize(unsigned int id, const std::string &serial)
 {
     assert(id != 0);
     const auto vec = unserialize_string(serial); 
+    assert(2 == vec.size());
 
     const std::string onionname = vec[0];
     const unsigned int uniq_count = atoi(vec[1].c_str());
@@ -204,6 +205,7 @@ FieldMeta::deserialize(unsigned int id, const std::string &serial)
 {
     assert(id != 0);
     const auto vec = unserialize_string(serial);
+    assert(10 == vec.size());
 
     const std::string fname = vec[0];
     const bool has_salt = string_to_bool(vec[1]);
@@ -215,11 +217,12 @@ FieldMeta::deserialize(unsigned int id, const std::string &serial)
     const unsigned int counter = atoi(vec[6].c_str());
     const bool has_default = string_to_bool(vec[7]);
     const std::string default_value = vec[8];
+    const bool sensitive = string_to_bool(vec[9]);
 
     return std::unique_ptr<FieldMeta>
         (new FieldMeta(id, fname, has_salt, salt_name, onion_layout,
                        sec_rating, uniq_count, counter, has_default,
-                       default_value));
+                       default_value, sensitive));
 }
 
 // If mkey == NULL, the field is not encrypted
@@ -267,7 +270,8 @@ FieldMeta::FieldMeta(const std::string &name, Create_field * const field,
               && onion_layout != PLAIN_ONION_LAYOUT),
       sec_rating(sec_rating), uniq_count(uniq_count), counter(0),
       has_default(determineHasDefault(field)),
-      default_value(determineDefaultValue(has_default, field))
+      default_value(determineDefaultValue(has_default, field)),
+      sensitive(false)
 {
     TEST_TextMessageError(init_onions_layout(m_key, this, field),
                           "Failed to build onions for new FieldMeta!");
@@ -287,7 +291,8 @@ std::string FieldMeta::serialize(const DBObject &parent) const
         serialize_string(std::to_string(uniq_count)) +
         serialize_string(std::to_string(counter)) +
         serialize_string(bool_to_string(has_default)) +
-        serialize_string(default_value);
+        serialize_string(default_value) +
+        serialize_string(bool_to_string(sensitive));
 
    return serial;
 }
@@ -418,6 +423,7 @@ TableMeta::deserialize(unsigned int id, const std::string &serial)
 {
     assert(id != 0);
     const auto vec = unserialize_string(serial);
+    assert(5 == vec.size());
 
     const std::string anon_table_name = vec[0];
     const bool hasSensitive = string_to_bool(vec[1]);

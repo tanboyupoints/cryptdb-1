@@ -555,6 +555,8 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
     return helper(*meta.get(), parent_meta, &key, NULL);
 }
 
+// FIXME: used incorrectly, as we should be doing copy construction
+// on the original object; not modifying it in place
 bool ReplaceDelta::apply(const std::unique_ptr<Connect> &e_conn,
                          TableType table_type)
 {
@@ -1390,6 +1392,15 @@ EncLayer &Analysis::getBackEncLayer(const OnionMeta &om)
 SECLEVEL Analysis::getOnionLevel(const OnionMeta &om)
 {
     return om.getSecLevel();
+}
+
+SECLEVEL Analysis::getOnionLevel(const FieldMeta &fm, onion o)
+{
+    if (false == fm.hasOnion(o)) {
+        return SECLEVEL::INVALID;
+    }
+
+    return Analysis::getOnionLevel(this->getOnionMeta(fm, o));
 }
 
 const std::vector<std::unique_ptr<EncLayer> > &

@@ -484,6 +484,7 @@ public:
                                  onion o) const;
     static EncLayer &getBackEncLayer(const OnionMeta &om);
     static SECLEVEL getOnionLevel(const OnionMeta &om);
+    SECLEVEL getOnionLevel(const FieldMeta &fm, onion o);
     static const std::vector<std::unique_ptr<EncLayer> > &
         getEncLayers(const OnionMeta &om);
     const SchemaInfo &getSchema() {return schema;}

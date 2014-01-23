@@ -766,6 +766,11 @@ static std::pair<std::vector<std::unique_ptr<Delta> >,
 adjustOnion(const Analysis &a, onion o, const TableMeta &tm,
             const FieldMeta &fm, SECLEVEL tolevel)
 {
+    TEST_Text(!(fm.getSensitive()
+                && (oPLAIN == o || SECLEVEL::PLAINVAL >= tolevel)),
+              "This field has been set to sensitive and your query requires"
+              " plain data!");
+
     std::cout << "onion: " << TypeText<onion>::toText(o) << std::endl;
     // Make a copy of the onion meta for the purpose of making
     // modifications during removeOnionLayer(...)

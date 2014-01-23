@@ -1,3 +1,5 @@
+#include <functional>
+
 #include <main/dml_handler.hh>
 #include <main/rewrite_main.hh>
 #include <main/rewrite_util.hh>
@@ -933,7 +935,21 @@ class SetHandler : public DMLHandler {
     virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
-        bool show_directive = false, adjust_directive = false;
+        #define DIRECTIVE_HANDLER(function)                         \
+            std::bind(function, this, std::placeholders::_1,        \
+                      std::placeholders::_2)
+        typedef std::function<void(std::map<std::string, std::string> &,
+                                   Analysis &a)> DirectiveHandler;
+
+        static const std::map<std::string, DirectiveHandler> directive_handlers
+            {{"show", DIRECTIVE_HANDLER(&SetHandler::handleShowDirective)},
+             {"adjust", DIRECTIVE_HANDLER(&SetHandler::handleAdjustDirective)},
+             {"sensitive",
+              DIRECTIVE_HANDLER(&SetHandler::handleSensitiveDirective)},
+             {"unsensitive",
+              DIRECTIVE_HANDLER(&SetHandler::handleUnsensitiveDirective)}};
+
+        DirectiveHandler dhandler = nullptr;
         std::map<std::string, std::string> var_pairs;
         auto var_it =
             List_iterator<set_var_base>(lex->var_list);
@@ -947,7 +963,8 @@ class SetHandler : public DMLHandler {
                 const set_var_user *user_v =
                     static_cast<const set_var_user *>(v);
                 Item_func_set_user_var *const i =
-                    user_v->*rob<set_var_user, Item_func_set_user_var *, &set_var_user::user_var_item>::ptr();
+                    user_v->*rob<set_var_user, Item_func_set_user_var *,
+                                 &set_var_user::user_var_item>::ptr();
                 const std::string &var_name = convert_lex_str(i->name);
                 const Item *const *const args =
                     i->*rob<Item_func, Item **,
@@ -965,18 +982,14 @@ class SetHandler : public DMLHandler {
                                       " not what you meant");
                 var_value = var_value.substr(1, var_value.length() - 2);
                 if (equalsIgnoreCase("cryptdb", var_name)) {
-                    TEST_TextMessageError(false == show_directive
-                                          && false == adjust_directive,
+                    // cryptdb=<directive> ; get <directive> 
+                    TEST_TextMessageError(nullptr == dhandler,
                                           "only one directive per query");
+                    auto enc = directive_handlers.find(toLowerCase(var_value));
+                    TEST_Text(directive_handlers.end() != enc,
+                              "unsupported directive: " + var_value);
 
-                    if (equalsIgnoreCase("show", var_value)) {
-                        show_directive = true;
-                    } else if (equalsIgnoreCase("adjust", var_value)) {
-                        adjust_directive = true;
-                    } else {
-                        FAIL_TextMessageError("unsupported directive: " +
-                                                var_value);
-                    }
+                    dhandler = enc->second;
                     continue;
                 }
 
@@ -990,40 +1003,22 @@ class SetHandler : public DMLHandler {
             }
         }
 
-        if (false == show_directive && false == adjust_directive) {
+        if (nullptr == dhandler) {
             return lex;
         }
-        assert(show_directive != adjust_directive);
 
-        if (show_directive) {
-            handleShowDirective(var_pairs, a);
-        } else if (adjust_directive) {
-            handleAdjustDirective(var_pairs, a);
-        }
-
+        dhandler(var_pairs, a);
         return lex;
+
+        #undef DIRECTIVE_HANDLER
     }
 
 private:
     void
-    handleAdjustDirective(std::map<std::string, std::string> var_pairs,
+    handleAdjustDirective(std::map<std::string, std::string> &var_pairs,
                           Analysis &a) const
     {
-        std::function<std::string(std::string)> getAndDestroy(
-            [&var_pairs] (const std::string &key)
-        {
-            auto it = var_pairs.find(key);
-            TEST_TextMessageError(it != var_pairs.end(),
-                                  "must supply a " + key);
-            const std::string value = it->second;
-            var_pairs.erase(it);
-
-            return value;
-        });
-
-        const std::string &database = getAndDestroy("database");
-        const std::string &table    = getAndDestroy("table");
-        const std::string &field    = getAndDestroy("field");
+        const ParameterCollection &params = collectParameters(var_pairs, a);
 
         // the remaining values are <onion>=<level> pairs
         for (auto it : var_pairs) {
@@ -1040,15 +1035,14 @@ private:
                                       str_level);
             }
 
-            const OnionMeta &om =
-                a.getOnionMeta(database, table, field, o.get());
+            const OnionMeta &om = a.getOnionMeta(params.fm, o.get());
             const SECLEVEL current_level = a.getOnionLevel(om);
             if (l.get() < current_level) {
-                const TableMeta &tm = a.getTableMeta(database, table);
-                const FieldMeta &fm = a.getFieldMeta(tm, field);
-                throw OnionAdjustExcept(tm, fm, o.get(), l.get());
+                throw OnionAdjustExcept(params.tm, params.fm, o.get(),
+                                        l.get());
             } else if (l.get() > current_level) {
-                FAIL_TextMessageError("it is not possible to add layers; only remove them");
+                FAIL_TextMessageError("it is not possible to add layers;"
+                                      " only remove them");
             }
         }
 
@@ -1056,11 +1050,86 @@ private:
     }
 
     void
-    handleShowDirective(std::map<std::string, std::string> var_pairs,
+    handleShowDirective(std::map<std::string, std::string> &var_pairs,
                         Analysis &a) const
     {
         a.special_query = Analysis::SpecialQuery::SHOW_LEVELS;
         return;
+    }
+
+    void
+    handleSensitiveDirective(std::map<std::string, std::string> &var_pairs,
+                             Analysis &a) const
+    {
+        const ParameterCollection &params = collectParameters(var_pairs, a);
+        TEST_Text(0 == var_pairs.size(),
+                  "extraneous directive parameter, indicate a single database,"
+                  " table and field!");
+            
+        if (params.fm.hasOnion(oPLAIN)) {
+            TEST_Text(SECLEVEL::PLAINVAL < a.getOnionLevel(params.fm, oPLAIN),
+                      "can't set field to sensitive after it's gone to plain!");
+        }
+
+        params.fm.setSensitive(true);
+        a.deltas.push_back(std::unique_ptr<Delta>(new ReplaceDelta(params.fm,
+                                                                   params.tm)));
+    }
+
+    void
+    handleUnsensitiveDirective(std::map<std::string, std::string> &var_pairs,
+                               Analysis &a) const
+    {
+        const ParameterCollection &params = collectParameters(var_pairs, a);
+        TEST_Text(0 == var_pairs.size(),
+                  "extraneous directive parameter, indicate a single database,"
+                  " table and field!");
+
+        TEST_Text(true == params.fm.hasOnion(oPLAIN),
+                  "field doesn't have plain so it can't be made unsensitive");
+
+        params.fm.setSensitive(false);
+        a.deltas.push_back(std::unique_ptr<Delta>(new ReplaceDelta(params.fm,
+                                                                   params.tm)));
+    }
+
+    struct ParameterCollection {
+        ParameterCollection(const Analysis &a,
+                            const std::string &database,
+                            const std::string &table,
+                            const std::string &field)
+            : database(database), table(table), field(field),
+              tm(a.getTableMeta(database, table)),
+              fm(a.getFieldMeta(tm, field)) {}
+        const std::string database;
+        const std::string table;
+        const std::string field;
+
+        TableMeta &tm;
+        FieldMeta &fm;
+    };
+
+    // destructively modifies var_pairs by removing database, table and field
+    ParameterCollection
+    collectParameters(std::map<std::string, std::string> &var_pairs,
+                      Analysis &a) const
+    {
+        std::function<std::string(std::string)> getAndDestroy(
+            [&var_pairs] (const std::string &key)
+        {
+            auto it = var_pairs.find(key);
+            TEST_TextMessageError(it != var_pairs.end(),
+                                  "must supply a " + key);
+            const std::string value = it->second;
+            var_pairs.erase(it);
+
+            return value;
+        });
+
+        return ParameterCollection(a,
+                                   getAndDestroy("database"),
+                                   getAndDestroy("table"),
+                                   getAndDestroy("field"));
     }
 };
 

@@ -11,6 +11,7 @@
 (defpackage :cryptdb-testing
   (:use :cl :clsql)
   (:export :main
+           :*filter-tests*
            :test-all-units
            :compare-results
            :db-connect
@@ -327,8 +328,11 @@
       (dolist (row results output)
         (destructuring-bind (database table field onion seclevel id) row
           (declare (ignore id))
-          (unless (string-equal seclevel (lookup-seclevel onions database table field onion))
+          (unless (string-equal seclevel
+                                (lookup-seclevel onions database table field onion))
             ; (break)
+            ;; setting a flag instead of shortcircuiting causes us to continue
+            ;; updating seclevel's after failure
             (setf output nil))
           (setf (lookup-seclevel onions database table field onion) seclevel))))))
 
@@ -442,6 +446,7 @@
              (onion-checks (fixup-onion-checks (cadr test-case) group-default))
              (execution-target (fixup-execution-target (caddr test-case)))
              (testing-strategy (fixup-testing-strategy (cadddr test-case))))
+        ; (format t "~A~%~A~%~A~%~%" query test-case onion-checks)
         (assert (eq (null (cadr test-case)) (null onion-checks)))
         (assert (valid-execution-target-and-testing-strategy?
                   execution-target testing-strategy))
