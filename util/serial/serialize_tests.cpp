@@ -1,4 +1,7 @@
+#include <memory>
+
 #include "testing.hh"
+#include "serialize.hh"
 
 // check that there is one encoding and one graph entry for each first clas
 // citizen; and check that the parent ID stack is empty

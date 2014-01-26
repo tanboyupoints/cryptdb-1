@@ -41,8 +41,7 @@
 void test();
 
 
-// FIXME: integrate testing with cryptdb
-#if 0
+#ifdef ISLAND
 int
 main()
 {

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <string>
 
 #define COLOR_END       "\033[0m"

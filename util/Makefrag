@@ -22,4 +22,7 @@ $(OBJDIR)/util/version.cc: always
 	  echo "const char* cryptdb_version_string = \"$$REL\";" >> $@.tmp )
 	cmp -s $@.tmp $@ || mv $@.tmp $@
 
+island:
+	$(CXX) -D ISLAND $(CXXFLAGS) util/serial/serialize.cc -o obj/util/serial/island
+
 # vim: set noexpandtab:

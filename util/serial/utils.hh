@@ -1,3 +1,5 @@
+#pragma once
+
 #include <typeinfo>
 #include <iostream>
 
@@ -140,17 +142,6 @@ using MemberTListToTuple =
     TypeListToTuple<typename MemberTListToSimpleTList<MemberTList>::type >;
 // -------------------------------------------------
 // -------------------------------------------------
-class TrueType {
-public:
-    constexpr static bool value = true;
-};
-
-class FalseType {
-public:
-    constexpr static bool value = false;
-};
-// -------------------------------------------------
-// -------------------------------------------------
 // @AttemptName should be an identifier that @TList will be scanned for
 // @TList should be a simple TypeList of identifiers
 template <typename AttemptName,
@@ -160,7 +151,7 @@ public:
     typedef
         typename IfElse<std::is_same<AttemptName,
                                      typename SimpleTList::car>::value,
-                        TrueType,
+                        std::true_type,
                         typename Haz<AttemptName,
                                      typename SimpleTList::cdr>::type_>::type
         type_;
@@ -170,7 +161,7 @@ public:
 template <typename AttemptName>
 class Haz<AttemptName, Nil> {
 public:
-    typedef FalseType type_;
+    typedef std::false_type type_;
     static const bool value = type_::value;
 };
 // -------------------------------------------------
