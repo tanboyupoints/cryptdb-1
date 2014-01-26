@@ -76,8 +76,9 @@ random64()
 }
 
 class ID {
-public:
     const uint64_t value;
+
+public:
     explicit ID(uint64_t value) : value(value) {}
     ID() : value(random64()) {}
     // uint64_t get() {return this->value;}
@@ -148,8 +149,9 @@ public:
 
     Serializable() {}         // FIXME: should this remain?
     // used for deserialization and arbitrary first time construction
-    Serializable(typename MemberTListToTuple<MemberTList>::type &&t)
-        : Serializable<Derived, typename MemberTList::cdr >(tuple_cdr(t)),
+    Serializable(typename MemberTListToTuple<MemberTList>::type &&t,
+                 const ID &id = ID())
+        : Serializable<Derived, typename MemberTList::cdr >(tuple_cdr(t), id),
           member_pair(std::move(std::get<0>(t))) {}
     // used for deserialization
     // WARN: unsafe -- double move
@@ -220,13 +222,16 @@ public:
 
 template <typename Derived>
 class Serializable<Derived, Nil> {
+    const ID id;
+
 public:
     typedef Nil member_type_list;
 
-    ID id;
-
     Serializable() {}
-    Serializable(std::tuple<> &&) {}
+    Serializable(std::tuple<> &&, const ID &id)
+        : id(id) {}
+
+    const ID &getID() const {return id;}
 };
 
 // FIXME: doesn't handle case where T = Serializable<Type, Nil> correctly

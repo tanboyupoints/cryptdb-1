@@ -141,7 +141,7 @@ testSerialize()
 
     const auto &graph_pair = sdata.graph.begin();
     // std::cout << graph_pair->first << "\t" << t.id << std::endl;
-    if (graph_pair->first != t.id || (false == graph_pair->second.empty())) {
+    if (graph_pair->first != t.getID() || (false == graph_pair->second.empty())) {
         return false;
     }
 
@@ -151,8 +151,8 @@ testSerialize()
         const auto &cork = serialEncode(atKey<TestMember::Cork>(t));
 
         const std::string serial_t = foo + bar + cork;
-        if (sdata.encodings.find(t.id) == sdata.encodings.end()
-            || serial_t != sdata.encodings.find(t.id)->second) {
+        if (sdata.encodings.find(t.getID()) == sdata.encodings.end()
+            || serial_t != sdata.encodings.find(t.getID())->second) {
             return false;
         }
     }
@@ -178,13 +178,13 @@ testSerializePointer()
     SERIALIZATION_CHECK(sdata, 1);
 
     const auto &graph_pair = sdata.graph.begin();
-    if (graph_pair->first != t.id || (false == graph_pair->second.empty())) {
+    if (graph_pair->first != t.getID() || (false == graph_pair->second.empty())) {
         return false;
     }
 
     const std::string &serial_t = serialEncode(std::to_string(*n));
-    if (sdata.encodings.find(t.id) == sdata.encodings.end()
-        || serial_t != sdata.encodings.find(t.id)->second) {
+    if (sdata.encodings.find(t.getID()) == sdata.encodings.end()
+        || serial_t != sdata.encodings.find(t.getID())->second) {
         return false;
     }
 
@@ -216,19 +216,22 @@ testSecondClassNull()
     // -------------------------
     auto sdata = t.serialize();
     const auto &graph_pair = sdata.graph.begin();
-    if (graph_pair->first != t.id || (false == graph_pair->second.empty())) {
+    if (graph_pair->first != t.getID() || (false == graph_pair->second.empty())) {
         return false;
     }
 
-    if (sdata.encodings.find(t.id) == sdata.encodings.end()
-        || serializeNull() != sdata.encodings.find(t.id)->second) {
+    if (sdata.encodings.find(t.getID()) == sdata.encodings.end()
+        || serializeNull() != sdata.encodings.find(t.getID())->second) {
         return false;
     }
 
     // -------------------------
     //       deserialize
     // -------------------------
-    TestNull *const new_t = TestNull::deserialize(t.id, sdata.encodings);
+    TestNull *const new_t = TestNull::deserialize(t.getID(), sdata.encodings);
+    if (new_t->getID() != t.getID()) {
+        return false;
+    }
     if (atKey<TestMember::Foo>(*new_t) != nullptr) {
         std::cout << atKey<TestMember::Foo>(*new_t).get() << std::endl;
         return false;
@@ -259,15 +262,15 @@ testNestedSerializable()
         return false;
     }
 
-    auto t_encoding = sdata.encodings.find(t.id);
+    auto t_encoding = sdata.encodings.find(t.getID());
     if (sdata.encodings.end() == t_encoding) {
         return false;
     }
-    if (serialEncode(nested->id.to_string()) != t_encoding->second) {
+    if (serialEncode(nested->getID().to_string()) != t_encoding->second) {
         return false;
     }
 
-    auto nested_encoding = sdata.encodings.find(nested->id);
+    auto nested_encoding = sdata.encodings.find(nested->getID());
     if (sdata.encodings.end() == nested_encoding) {
         return false;
     }
@@ -282,17 +285,17 @@ testNestedSerializable()
         return false;
     }
 
-    auto t_graph = sdata.graph.find(t.id);
+    auto t_graph = sdata.graph.find(t.getID());
     if (sdata.graph.end() == t_graph) {
         return false;
     }
     // 't' should have one child, 'nested'
     if (t_graph->second.size() != 1
-        || t_graph->second.front() != nested->id) {
+        || t_graph->second.front() != nested->getID()) {
         return false;
     }
 
-    auto nested_graph = sdata.graph.find(nested->id);
+    auto nested_graph = sdata.graph.find(nested->getID());
     if (sdata.graph.end() == nested_graph) {
         return false;
     }
@@ -334,6 +337,10 @@ testDeserialize()
     encodings.insert(std::make_pair(id, serial));
 
     TestDes *const td = TestDes::deserialize(id, encodings);
+    if (id != td->getID()) {
+        return false;
+    }
+
     if (foo != atKey<TestMember::Foo>(*td)) {
         return false;
     }
@@ -378,8 +385,11 @@ testRoundTrip()
     const SerializationData &sdata = round.serialize();
 
     // deserialize
-    TestRoundTrip *new_round =
-        TestRoundTrip::deserialize(round.id, sdata.encodings);
+    TestRoundTrip *const new_round =
+        TestRoundTrip::deserialize(round.getID(), sdata.encodings);
+    if (new_round->getID() != round.getID()) {
+        return false;
+    }
     if (atKey<TestMember::Foo>(*new_round) != atKey<TestMember::Foo>(round)
         || atKey<TestMember::Foo>(*new_round) != foo) {
         return false;
@@ -428,8 +438,8 @@ testVectorTrivial()
     const std::string &control_serial =
         serialEncode(serialEncode(std::to_string(1))
                      + serialEncode(std::to_string(5)));
-    if (sdata.encodings.find(trivial.id) == sdata.encodings.end()
-        || sdata.encodings.find(trivial.id)->second != control_serial) {
+    if (sdata.encodings.find(trivial.getID()) == sdata.encodings.end()
+        || sdata.encodings.find(trivial.getID())->second != control_serial) {
         return false;
     }
 
@@ -437,8 +447,10 @@ testVectorTrivial()
     //       deserialize
     // -------------------------
     TestTrivial *const new_trivial =
-        TestTrivial::deserialize(trivial.id, sdata.encodings);
-
+        TestTrivial::deserialize(trivial.getID(), sdata.encodings);
+    if (new_trivial->getID() != trivial.getID()) {
+        return false;
+    }
     if (atKey<TestMember::Foo>(*new_trivial) != vec) {
         return false;
     }
@@ -461,7 +473,8 @@ public:
     // FIXME: make pretty
     bool operator==(const Simple &rhs) const
     {
-        return this->member_pair.value == rhs.member_pair.value
+        return this->getID() == rhs.getID()
+        && this->member_pair.value == rhs.member_pair.value
         && static_cast<const std::decay<decltype(*this)>::type::next *>(this)->member_pair.value
            == static_cast<const std::decay<decltype(rhs)>::type::next &>(rhs).member_pair.value;
     }
@@ -483,29 +496,29 @@ public:
 static bool
 testVector()
 {
-    Simple s1, s1_control;
-    atKey<TestMember::Foo>(s1_control) = atKey<TestMember::Foo>(s1) = "dead";
-    atKey<TestMember::Bar>(s1_control) = atKey<TestMember::Bar>(s1) = 0xBEEF;
+    Simple s1;
+    atKey<TestMember::Foo>(s1) = "dead";
+    atKey<TestMember::Bar>(s1) = 0xBEEF;
 
-    Simple s2, s2_control;
-    atKey<TestMember::Foo>(s2_control) = atKey<TestMember::Foo>(s2) = "homerun";
-    atKey<TestMember::Bar>(s2_control) = atKey<TestMember::Bar>(s2) = 0x1337;
+    Simple s2;
+    atKey<TestMember::Foo>(s2) = "homerun";
+    atKey<TestMember::Bar>(s2) = 0x1337;
 
-    std::vector<Simple> v, v_control;
-    v.push_back(std::move(s1)); v_control.push_back(std::move(s1_control));
-    v.push_back(std::move(s2)); v_control.push_back(std::move(s2_control));
+    std::vector<Simple> v;
+    v.push_back(s1);
+    v.push_back(s2);
 
     TestVector tvec;
-    atKey<TestMember::Foo>(tvec) = std::move(v);
+    atKey<TestMember::Foo>(tvec) = std::vector<Simple>(v);
 
     const SerializationData &sdata = tvec.serialize();
     SERIALIZATION_CHECK(sdata, 3);
 
     const std::string control_serial =
-        serialEncode(serialEncode(s1.id.to_string())
-                     + serialEncode(s2.id.to_string()));
-    if (sdata.encodings.find(tvec.id) == sdata.encodings.end()
-        || sdata.encodings.find(tvec.id)->second != control_serial) {
+        serialEncode(serialEncode(s1.getID().to_string())
+                     + serialEncode(s2.getID().to_string()));
+    if (sdata.encodings.find(tvec.getID()) == sdata.encodings.end()
+        || sdata.encodings.find(tvec.getID())->second != control_serial) {
         return false;
     }
 
@@ -513,10 +526,11 @@ testVector()
     //     now deserialize
     // -------------------------
     TestVector *const new_tvec =
-        TestVector::deserialize(tvec.id, sdata.encodings);
-    assert(new_tvec);
-
-    if (atKey<TestMember::Foo>(*new_tvec) != v_control) {
+        TestVector::deserialize(tvec.getID(), sdata.encodings);
+    if (new_tvec->getID() != tvec.getID()) {
+        return false;
+    }
+    if (atKey<TestMember::Foo>(*new_tvec) != v) {
         return false;
     }
 
@@ -554,8 +568,10 @@ testMapTrivial()
     //       deserialize
     // -------------------------
     TestMap *const new_trivial =
-        TestMap::deserialize(trivial_map.id, sdata.encodings);
-
+        TestMap::deserialize(trivial_map.getID(), sdata.encodings);
+    if (new_trivial->getID() != trivial_map.getID()) {
+        return false;
+    }
     if (atKey<TestMember::Foo>(*new_trivial) != m) {
         return false;
     }
@@ -629,8 +645,10 @@ testVectorFirstClassPointers()
     SERIALIZATION_CHECK(sdata, 3);
 
     TestVector1stPtrz *const new_tvec =
-        TestVector1stPtrz::deserialize(tvec.id, sdata.encodings);
-    assert(new_tvec);
+        TestVector1stPtrz::deserialize(tvec.getID(), sdata.encodings);
+    if (new_tvec->getID() != tvec.getID()) {
+        return false;
+    }
 
     const auto &new_v = atKey<TestMember::Foo>(*new_tvec);
     if (2 != new_v.size() || nullptr == new_v[0] || nullptr == new_v[1]

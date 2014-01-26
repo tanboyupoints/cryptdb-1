@@ -156,23 +156,23 @@ serializeType(const Serializable<Derived, Cons<MemberPairs...> > &s,
 {
     // register as a child of some other citizen
     sdata.parent_id.fn(
-        [&sdata, &s] (const ID &id) -> void {sdata.graph[id].push_back(s.id);});
+        [&sdata, &s] (const ID &id) -> void {sdata.graph[id].push_back(s.getID());});
 
     // graph: add new first class citizen
-    assert(sdata.graph.end() == sdata.graph.find(s.id));
-    sdata.graph.insert(std::make_pair(s.id, std::list<ID>()));
+    assert(sdata.graph.end() == sdata.graph.find(s.getID()));
+    sdata.graph.insert(std::make_pair(s.getID(), std::list<ID>()));
 
     // serialize the fields
     // > make this current object the 'parent' object
-    sdata.parent_id.push(s.id);
+    sdata.parent_id.push(s.getID());
     const std::string &field_encoding = serializeHelper(s, sdata);
     sdata.parent_id.pop();
 
     // encodings: add new first class citizen
-    assert(sdata.encodings.end() == sdata.encodings.find(s.id));
-    sdata.encodings.insert(std::make_pair(s.id, field_encoding));
+    assert(sdata.encodings.end() == sdata.encodings.find(s.getID()));
+    sdata.encodings.insert(std::make_pair(s.getID(), field_encoding));
 
-    return serialEncode(s.id.to_string());
+    return serialEncode(s.getID().to_string());
 }
 
 template <typename Derived, typename MemberTList>
@@ -200,7 +200,7 @@ std::string
 atKeyID(Serializable<Derived,
                      Cons<MemberPair<MemberName, MemberType>, Cdr> > &s)
 {
-    return s.member_pair.id.to_string();
+    return s.member_pair.getID().to_string();
 }
 
 // ##########################
@@ -354,7 +354,7 @@ deserializeType(const std::string &serial,
     auto t = doDeserialization<DerivedBase>(vec, encodings);
 
     // use the tuple constructor and the move constructor
-    return Type(DerivedBase(std::move(t)));
+    return Type(DerivedBase(std::move(t), id));
 }
 // -------------------------------------------------
 
