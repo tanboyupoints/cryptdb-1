@@ -11,7 +11,7 @@ simpleSerializationCheck(const SerializationData &sdata,
 {
     if (first_class_count != sdata.graph.size()
         || first_class_count != sdata.encodings.size()
-        || sdata.parent_id.ids.size() != 0) {
+        || sdata.parent_id.getIDs().size() != 0) {
         return false;
     }
 

@@ -96,9 +96,9 @@ public:
 };
 
 class IDWrapper {
-public:
-    std::list<ID> ids;      // FIXME: private
+    std::list<ID> ids;
 
+public:
     IDWrapper() {}
     void fn(std::function<void(ID &id)> fn) {
         if (ids.size() > 0) fn(this->ids.front());
@@ -109,6 +109,7 @@ public:
     void pop() {
         ids.pop_front();
     }
+    const std::list<ID> &getIDs() const {return ids;}
 };
 
 struct SerializationData {
