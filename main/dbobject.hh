@@ -205,8 +205,10 @@ public:
     virtual std::vector<DBMeta *>
         fetchChildren(const std::unique_ptr<Connect> &e_conn);
     bool applyToChildren(std::function<bool(const DBMeta &)> fn) const;
+    const std::map<KeyType, std::unique_ptr<ChildType> > &
+        getChildren() const {return children;}
 
-    // FIXME: Make protected.
+private:
     std::map<KeyType, std::unique_ptr<ChildType> > children;
 };
 

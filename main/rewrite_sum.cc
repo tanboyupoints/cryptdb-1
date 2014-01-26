@@ -307,7 +307,7 @@ static class ANON : public CItemSubtypeIT<Item_null, Item::Type::NULL_ITEM> {
     do_rewrite_insert_type(const Item_null &i, const FieldMeta &fm,
                            Analysis &a, std::vector<Item *> *l) const
     {
-        for (uint j = 0; j < fm.children.size(); ++j) {
+        for (uint j = 0; j < fm.getChildren().size(); ++j) {
             l->push_back(RiboldMYSQL::clone_item(i));
         }
         if (fm.getHasSalt()) {

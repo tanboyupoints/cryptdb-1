@@ -135,8 +135,8 @@ bool
 OnionMeta::applyToChildren(std::function<bool(const DBMeta &)>
     fn) const
 {
-    for (auto it = layers.begin(); it != layers.end(); it++) {
-        if (false == fn(*(*it).get())) {
+    for (const auto &it : layers) {
+        if (false == fn(*it.get())) {
             return false;
         }
     }
@@ -169,8 +169,8 @@ EncLayer *OnionMeta::getLayerBack() const
 
 bool OnionMeta::hasEncLayer(const SECLEVEL &sl) const
 {
-    for (auto it = layers.begin(); it != layers.end(); it++) {
-        if ((*it)->level() == sl) {
+    for (const auto &it : layers) {
+        if (it->level() == sl) {
             return true;
         }
     }
@@ -184,9 +184,9 @@ EncLayer *OnionMeta::getLayer(const SECLEVEL &sl) const
                           "Tried getting EncLayer when there are none!");
 
     AssignOnce<EncLayer *> out;
-    for (auto it = layers.begin(); it != layers.end(); it++) {
-        if ((*it)->level() == sl) {
-            out = (*it).get();
+    for (const auto &it : layers) {
+        if (it->level() == sl) {
+            out = it.get();
         }
     }
 
@@ -236,7 +236,7 @@ init_onions_layout(const AES_KEY *const m_key,
         return false;
     }
 
-    if (0 != fm->children.size()) {
+    if (0 != fm->getChildren().size()) {
         return false;
     }
 
@@ -307,8 +307,8 @@ std::vector<std::pair<const OnionMetaKey *, OnionMeta *>>
 FieldMeta::orderedOnionMetas() const
 {
     std::vector<std::pair<const OnionMetaKey *, OnionMeta *>> v;
-    for (auto it = children.begin(); it != children.end(); it++) {
-        v.push_back(std::make_pair(&(*it).first, (*it).second.get()));
+    for (const auto &it : this->getChildren()) {
+        v.push_back(std::make_pair(&it.first, it.second.get()));
     }
 
     std::sort(v.begin(), v.end(),
@@ -460,8 +460,8 @@ std::string TableMeta::getAnonTableName() const
 std::vector<FieldMeta *> TableMeta::orderedFieldMetas() const
 {
     std::vector<FieldMeta *> v;
-    for (auto it = children.begin(); it != children.end(); it++) {
-        v.push_back((*it).second.get());
+    for (const auto &it : this->getChildren()) {
+        v.push_back(it.second.get());
     }
 
     std::sort(v.begin(), v.end(),
@@ -475,8 +475,8 @@ std::vector<FieldMeta *> TableMeta::orderedFieldMetas() const
 std::vector<FieldMeta *> TableMeta::defaultedFieldMetas() const
 {
     std::vector<FieldMeta *> v;
-    for (auto it = children.begin(); it != children.end(); it++) {
-        v.push_back((*it).second.get());
+    for (const auto &it : this->getChildren()) {
+        v.push_back(it.second.get());
     }
 
     std::vector<FieldMeta *> out_v;

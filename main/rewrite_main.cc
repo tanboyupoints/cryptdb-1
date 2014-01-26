@@ -72,10 +72,9 @@ extract_fieldname(Item_field *const i)
 static bool
 sanityCheck(FieldMeta &fm)
 {
-    for (auto it = fm.children.begin(); it != fm.children.end();
-         it++) {
-        OnionMeta *const om = (*it).second.get();
-        const onion o = (*it).first.getValue();
+    for (const auto &it : fm.getChildren()) {
+        OnionMeta *const om = it.second.get();
+        const onion o = it.first.getValue();
         const std::vector<SECLEVEL> &secs = fm.getOnionLayout().at(o);
         const auto &layers = om->getLayers();
         for (size_t i = 0; i < layers.size(); ++i) {
@@ -89,8 +88,8 @@ sanityCheck(FieldMeta &fm)
 static bool
 sanityCheck(TableMeta &tm)
 {
-    for (auto it = tm.children.begin(); it != tm.children.end(); it++) {
-        const auto &fm = (*it).second;
+    for (const auto &it : tm.getChildren()) {
+        const auto &fm = it.second;
         assert(sanityCheck(*fm.get()));
     }
     return true;
@@ -99,8 +98,8 @@ sanityCheck(TableMeta &tm)
 static bool
 sanityCheck(DatabaseMeta &dm)
 {
-    for (auto it = dm.children.begin(); it != dm.children.end(); it++) {
-        const auto &tm = (*it).second;
+    for (const auto &it : dm.getChildren()) {
+        const auto &tm = it.second;
         assert(sanityCheck(*tm.get()));
     }
     return true;
@@ -109,9 +108,8 @@ sanityCheck(DatabaseMeta &dm)
 static bool
 sanityCheck(SchemaInfo &schema)
 {
-    for (auto it = schema.children.begin(); it != schema.children.end();
-         it++) {
-        const auto &tm = (*it).second;
+    for (const auto &it : schema.getChildren()) {
+        const auto &tm = it.second;
         assert(sanityCheck(*tm.get()));
     }
     return true;

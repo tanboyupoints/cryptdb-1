@@ -25,7 +25,6 @@
 #define ANON                ANON_NAME(__anon_id_const)
 
 // encrypts a constant item based on the information in a
-// FIXME: @i should be const ref.
 static Item *
 encrypt_item(const Item &i, const OLK &olk, Analysis &a)
 {
@@ -39,7 +38,7 @@ encrypt_item(const Item &i, const OLK &olk, Analysis &a)
     assert(fm);
 
     const onion o = olk.o;
-    LOG(cdb_v) << fm->getFieldName() << " " << fm->children.size();
+    LOG(cdb_v) << fm->getFieldName() << " " << fm->getChildren().size();
 
     const auto it = a.salts.find(fm);
     const salt_type IV = (it == a.salts.end()) ? 0 : it->second;

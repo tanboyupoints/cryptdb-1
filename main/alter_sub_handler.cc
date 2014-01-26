@@ -74,10 +74,9 @@ class DropColumnSubHandler : public AlterSubHandler {
         THD *thd = current_thd;
 
         // Rewrite each onion column.
-        for (auto om_it = fm.children.begin(); om_it != fm.children.end();
-             om_it++) {
+        for (const auto &om_it : fm.getChildren()) {
             Alter_drop * const new_adrop = adrop->clone(thd->mem_root);
-            OnionMeta *const om = (*om_it).second.get();
+            OnionMeta *const om = om_it.second.get();
             new_adrop->name =
                 thd->strdup(om->getAnonOnionName().c_str());
             out_list.push_back(new_adrop);

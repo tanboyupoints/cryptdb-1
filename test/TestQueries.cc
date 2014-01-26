@@ -1210,15 +1210,15 @@ CheckQuery(const TestConfig &tc, const Query &query)
 
         ProxyState *const ps = test->getProxyState();
         auto si = loadSchemaInfo(ps->getConn(), ps->getEConn());
-        const auto &dbs = si->children;
+        const auto &dbs = si->getChildren();
         for (auto db_it = dbs.begin(); db_it != dbs.end(); ++db_it) {
-            const auto &ts = db_it->second->children;
+            const auto &ts = db_it->second->getChildren();
             for (auto t_it = ts.begin(); t_it != ts.end(); ++t_it) {
                 const std::string &t_name = t_it->first.getValue();
-                const auto &fs = t_it->second->children;
+                const auto &fs = t_it->second->getChildren();
                 for (auto f_it = fs.begin(); f_it != fs.end(); ++f_it) {
                     const std::string &f_name = f_it->first.getValue();
-                    const auto &os = f_it->second->children;
+                    const auto &os = f_it->second->getChildren();
                     for (auto o_it = os.begin(); o_it != os.end(); ++o_it) {
                         const std::string &o_name =
                             TypeText<onion>::toText(o_it->first.getValue());
