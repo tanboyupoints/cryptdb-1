@@ -67,8 +67,13 @@ Convention : When this document uses syntax like
            on encrypted data at the DB server!
 
     III. Tests
+        + sudo apt-get install sbcl
+        + install quicklisp http://www.quicklisp.org/beta/
         > To Start:
-            obj/test/test queries plain proxy-single
+            % sbcl
+            % (ql:quickload "clsql")
+            % (load "newtesting/do_testing.lisp")
+            % (cryptdb-testing:main)
 
 
 #########################################
