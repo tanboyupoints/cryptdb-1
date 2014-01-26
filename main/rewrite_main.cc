@@ -69,7 +69,7 @@ extract_fieldname(Item_field *const i)
     return fieldtemp.str();
 }
 
-bool
+static bool
 sanityCheck(FieldMeta &fm)
 {
     for (auto it = fm.children.begin(); it != fm.children.end();
@@ -77,8 +77,9 @@ sanityCheck(FieldMeta &fm)
         OnionMeta *const om = (*it).second.get();
         const onion o = (*it).first.getValue();
         const std::vector<SECLEVEL> &secs = fm.getOnionLayout().at(o);
-        for (size_t i = 0; i < om->layers.size(); ++i) {
-            const auto &layer = om->layers[i];
+        const auto &layers = om->getLayers();
+        for (size_t i = 0; i < layers.size(); ++i) {
+            const auto &layer = layers[i];
             assert(layer->level() == secs[i]);
         }
     }
@@ -892,7 +893,7 @@ do_optimize_const_item(T *i, Analysis &a) {
     */
 }
 
-Item *
+static Item *
 decrypt_item_layers(Item *const i, const FieldMeta *const fm, onion o,
                     uint64_t IV)
 {
@@ -902,7 +903,7 @@ decrypt_item_layers(Item *const i, const FieldMeta *const fm, onion o,
 
     const OnionMeta *const om = fm->getOnionMeta(o);
     assert(om);
-    const auto &enc_layers = om->layers;
+    const auto &enc_layers = om->getLayers();
     for (auto it = enc_layers.rbegin(); it != enc_layers.rend(); ++it) {
         dec = (*it)->decrypt(dec, IV);
         assert(dec);
@@ -1592,9 +1593,9 @@ OnionMetaAdjustor::pullCopyLayers(OnionMeta const &om)
 {
     std::vector<EncLayer *> v;
 
-    auto const &enc_layers = om.layers;
-    for (auto it = enc_layers.begin(); it != enc_layers.end(); it++) {
-        v.push_back((*it).get());
+    auto const &enc_layers = om.getLayers();
+    for (const auto &it : enc_layers) {
+        v.push_back(it.get());
     }
 
     return v;

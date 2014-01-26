@@ -482,7 +482,7 @@ public:
     std::string getAnonIndexName(const TableMeta &tm,
                                  const std::string &index_name,
                                  onion o) const;
-    static EncLayer &getBackEncLayer(const OnionMeta &om);
+    static const EncLayer &getBackEncLayer(const OnionMeta &om);
     static SECLEVEL getOnionLevel(const OnionMeta &om);
     SECLEVEL getOnionLevel(const FieldMeta &fm, onion o);
     static const std::vector<std::unique_ptr<EncLayer> > &

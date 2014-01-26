@@ -55,16 +55,10 @@ public:
     EncLayer *getLayerBack() const;
     EncLayer *getLayer(const SECLEVEL &sl) const;
     bool hasEncLayer(const SECLEVEL &sl) const;
+    SECLEVEL getSecLevel() const;
     unsigned long getUniq() const {return uniq_count;}
-
-    // Need access to layers.
-    friend class Analysis;
-    friend class FieldMeta;
-    friend class OnionMetaAdjustor;
-    friend class UseAfterQueryResultOutput;
-    friend bool sanityCheck(FieldMeta &);
-    friend Item *decrypt_item_layers(Item *const, const FieldMeta *const,
-                                     onion, uint64_t);
+    const std::vector<std::unique_ptr<EncLayer> > &getLayers() const
+        {return layers;}
 
 private:
     // first in list is lowest layer
@@ -72,17 +66,12 @@ private:
     const std::string onionname;
     unsigned long uniq_count;
     mutable std::list<std::unique_ptr<UIntMetaKey>> generated_keys;
-
-    SECLEVEL getSecLevel() const;
 } OnionMeta;
 
 class TableMeta;
 
 typedef class FieldMeta : public MappedDBMeta<OnionMeta, OnionMetaKey> {
 public:
-    const std::string fname;
-    const std::string salt_name;
-
     // New.
     FieldMeta(const std::string &name, Create_field * const field,
               const AES_KEY * const mKey, SECURITY_RATING sec_rating,
@@ -125,8 +114,11 @@ public:
     bool getHasSalt() const {return has_salt;}
     bool getSensitive() const {return sensitive;}
     void setSensitive(bool sensitive) {this->sensitive = sensitive;}
+    const std::string getFieldName() const {return fname;}
 
 private:
+    const std::string fname;
+    const std::string salt_name;
     const onionlayout onion_layout;
     const bool has_salt; //whether this field has its own salt
     const SECURITY_RATING sec_rating;
@@ -147,11 +139,6 @@ private:
 
 typedef class TableMeta : public MappedDBMeta<FieldMeta, IdentityMetaKey> {
 public:
-    const bool hasSensitive;
-    const bool has_salt;
-    const std::string salt_name;
-    const std::string anon_table_name;
-
     // New TableMeta.
     TableMeta(bool has_sensitive, bool has_salt)
         : hasSensitive(has_sensitive), has_salt(has_salt),
@@ -176,14 +163,15 @@ public:
     TYPENAME("tableMeta")
     unsigned long leaseIncUniq() {return counter++;}
     unsigned long getCurrentUniqCounter() {return counter;}
-
-    friend class Analysis;
-
-private:
-    unsigned int counter;
-
     std::string getAnonIndexName(const std::string &index_name,
                                  onion o) const;
+
+private:
+    const bool hasSensitive;
+    const bool has_salt;
+    const std::string salt_name;
+    const std::string anon_table_name;
+    unsigned int counter;
 } TableMeta;
 
 class DatabaseMeta : public MappedDBMeta<TableMeta, IdentityMetaKey> {

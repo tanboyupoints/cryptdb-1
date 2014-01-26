@@ -84,7 +84,7 @@ operator<<(std::ostream &out, const EncSet &es)
     for (auto it : es.osl) {
         out << "(onion " << it.first
             << ", level " << TypeText<SECLEVEL>::toText(it.second.first)
-            << ", field `" << (it.second.second == NULL ? "*" : it.second.second->fname) << "`"
+            << ", field `" << (it.second.second == NULL ? "*" : it.second.second->getFieldName()) << "`"
             << ") ";
     }
     return out;
@@ -1384,9 +1384,9 @@ std::string Analysis::unAliasTable(const std::string &db,
     return alias_pair->second;
 }
 
-EncLayer &Analysis::getBackEncLayer(const OnionMeta &om)
+const EncLayer &Analysis::getBackEncLayer(const OnionMeta &om)
 {
-    return *om.layers.back().get();
+    return *om.getLayers().back().get();
 }
 
 SECLEVEL Analysis::getOnionLevel(const OnionMeta &om)
@@ -1406,7 +1406,7 @@ SECLEVEL Analysis::getOnionLevel(const FieldMeta &fm, onion o)
 const std::vector<std::unique_ptr<EncLayer> > &
 Analysis::getEncLayers(const OnionMeta &om)
 {
-    return om.layers;
+    return om.getLayers();
 }
 
 RewritePlanWithAnalysis::RewritePlanWithAnalysis(const EncSet &es_out,

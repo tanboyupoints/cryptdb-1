@@ -140,24 +140,6 @@ class ANON : public CItemSubtypeIT<Item_field, Item::Type::FIELD_ITEM> {
 
         return res;
     }
-/*
-    static OLK
-    chooseProj(FieldMeta * fm)
-    {
-        SECLEVEL l;
-        if (contains_get(fm->encdesc.olm, oDET, l)) {
-            return OLK(oDET, l, fm);
-        }
-        if (contains_get(fm->encdesc.olm, oOPE, l)) {
-            return OLK(oOPE, l, fm);
-        }
-        if (contains_get(fm->encdesc.olm, oAGG, l)) {
-            return OLK(oAGG, l, fm);
-        }
-        assert_s(false, "field " + fm->fname + " does not have any decryptable onions for projection");
-        return OLK();
-    }
-*/
 
     virtual void
     do_rewrite_insert_type(const Item_field &i, const FieldMeta &fm,

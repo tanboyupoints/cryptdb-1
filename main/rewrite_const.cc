@@ -39,7 +39,7 @@ encrypt_item(const Item &i, const OLK &olk, Analysis &a)
     assert(fm);
 
     const onion o = olk.o;
-    LOG(cdb_v) << fm->fname << " " << fm->children.size();
+    LOG(cdb_v) << fm->getFieldName() << " " << fm->children.size();
 
     const auto it = a.salts.find(fm);
     const salt_type IV = (it == a.salts.end()) ? 0 : it->second;

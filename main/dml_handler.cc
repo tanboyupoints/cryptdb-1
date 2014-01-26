@@ -129,7 +129,7 @@ class InsertHandler : public DMLHandler {
                 // Get default fields.
                 const Item_field *const item_field =
                     make_item_field(*seed_item_field, table,
-                                    implicit_it->fname);
+                                    implicit_it->getFieldName());
                 rewriteInsertHelper(*item_field, *implicit_it, a,
                                     &newList);
 
@@ -799,7 +799,7 @@ determineUpdateType(const Item &value_item, const FieldMeta &fm,
         } else {
             const std::string &item_field_name =
                 static_cast<const Item_field &>(value_item).field_name;
-            assert(equalsIgnoreCase(fm.fname, item_field_name));
+            assert(equalsIgnoreCase(fm.getFieldName(), item_field_name));
             return SIMPLE_UPDATE_TYPE::SAME_VALUE;
         }
     }

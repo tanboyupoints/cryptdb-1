@@ -254,7 +254,7 @@ init_onions_layout(const AES_KEY *const m_key,
         fm->addChild(OnionMetaKey(o), std::move(om));
 
         LOG(cdb_v) << "adding onion layer " << onion_name
-                   << " for " << fm->fname;
+                   << " for " << fm->getFieldName();
     }
 
     return true;
