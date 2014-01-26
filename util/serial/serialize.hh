@@ -235,7 +235,6 @@ public:
     const ID &getID() const {return id;}
 };
 
-// FIXME: doesn't handle case where T = Serializable<Type, Nil> correctly
 template <typename Type>
 class is_serializable {
 public:
