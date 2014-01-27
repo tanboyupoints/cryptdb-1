@@ -15,9 +15,6 @@
 #include <sstream>
 #include <functional>
 
-class Analysis;
-class FieldMeta;
-
 /*
  * The name must be unique as it is used as a unique identifier when
  * generating the encryption layers.
@@ -31,7 +28,7 @@ class FieldMeta;
  * > Also note that like FieldMeta, OnionMeta's children have an explicit
  *   order that must be encoded.
  */
-typedef class OnionMeta : public DBMeta {
+class OnionMeta : public DBMeta {
 public:
     // New.
     OnionMeta(onion o, std::vector<SECLEVEL> levels,
@@ -66,11 +63,9 @@ private:
     const std::string onionname;
     unsigned long uniq_count;
     mutable std::list<std::unique_ptr<UIntMetaKey>> generated_keys;
-} OnionMeta;
+};
 
-class TableMeta;
-
-typedef class FieldMeta : public MappedDBMeta<OnionMeta, OnionMetaKey> {
+class FieldMeta : public MappedDBMeta<OnionMeta, OnionMetaKey> {
 public:
     // New.
     FieldMeta(const std::string &name, Create_field * const field,
@@ -135,9 +130,9 @@ private:
     static bool determineHasDefault(const Create_field *const cf);
     static std::string determineDefaultValue(bool has_default,
                                              const Create_field *const cf);
-} FieldMeta;
+};
 
-typedef class TableMeta : public MappedDBMeta<FieldMeta, IdentityMetaKey> {
+class TableMeta : public MappedDBMeta<FieldMeta, IdentityMetaKey> {
 public:
     // New TableMeta.
     TableMeta(bool has_sensitive, bool has_salt)
@@ -172,7 +167,7 @@ private:
     const std::string salt_name;
     const std::string anon_table_name;
     unsigned int counter;
-} TableMeta;
+};
 
 class DatabaseMeta : public MappedDBMeta<TableMeta, IdentityMetaKey> {
 public:
@@ -191,8 +186,7 @@ public:
 
 // AWARE: Table/Field aliases __WILL NOT__ be looked up when calling from
 // this level or below. Use Analysis::* if you need aliasing.
-typedef class SchemaInfo : public MappedDBMeta<DatabaseMeta,
-                                               IdentityMetaKey> {
+class SchemaInfo : public MappedDBMeta<DatabaseMeta, IdentityMetaKey> {
 public:
     SchemaInfo() : MappedDBMeta(0) {}
     ~SchemaInfo() {}
@@ -204,7 +198,7 @@ private:
     {
         FAIL_TextMessageError("SchemaInfo can not be serialized!");
     }
-} SchemaInfo;
+};
 
 class SchemaCache {
     SchemaCache(const SchemaCache &cache) = delete;
