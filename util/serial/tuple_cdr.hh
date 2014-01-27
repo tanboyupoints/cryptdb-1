@@ -1,3 +1,5 @@
+#pragma once
+
 #include <tuple>
 
 // the key is that each function returns type 'Target'; as opposed to returning

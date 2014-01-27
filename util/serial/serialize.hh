@@ -295,4 +295,18 @@ typename std::enable_if<is_serializable<Type>::value, Type>::type
 deserializeType(const std::string &serial,
                 const std::map<ID, std::string> &encodings);
 
+template <typename Derived, typename MemberName, typename MemberType,
+          typename Cdr>
+using IndexedSerial =
+    Serializable<Derived, Cons<MemberPair<MemberName, MemberType>, Cdr> >;
+
+template <typename MemberName, typename MemberType, typename Derived,
+          typename Cdr>
+MemberType &
+atKey(IndexedSerial<Derived, MemberName, MemberType, Cdr> &s);
+
+template <typename MemberName, typename MemberType, typename Derived,
+          typename Cdr>
+const MemberType &
+atKey(const IndexedSerial<Derived, MemberName, MemberType, Cdr> &s);
 

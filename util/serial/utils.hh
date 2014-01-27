@@ -53,20 +53,22 @@ public:
 };
 
 template <typename... All>
-class TypeList;
+class TypeList_;
 
 template <typename Head, typename... Tail>
-class TypeList<Head, Tail...> {
+class TypeList_<Head, Tail...> {
 public:
-    typedef Cons<Head, typename TypeList<Tail... >::type > type;
+    typedef Cons<Head, typename TypeList_<Tail... >::type > type;
 };
 
 template <>
-class TypeList<> {
+class TypeList_<> {
 public:
     typedef Nil type;
 };
 
+template <typename... All>
+using TypeList = typename TypeList_<All...>::type;
 // -------------------------------------------------
 // -------------------------------------------------
 // compute the length of a TypeList
