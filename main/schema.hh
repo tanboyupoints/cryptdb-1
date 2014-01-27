@@ -88,7 +88,7 @@ public:
     FieldMeta(unsigned int id, const std::string &fname, bool has_salt,
               const std::string &salt_name, onionlayout onion_layout,
               SECURITY_RATING sec_rating, unsigned long uniq_count,
-              unsigned long counter, bool has_default,
+              uint64_t counter, bool has_default,
               const std::string &default_value,
               bool sensitive)
         : MappedDBMeta(id), fname(fname), salt_name(salt_name),
@@ -125,7 +125,7 @@ private:
     const bool has_salt; //whether this field has its own salt
     const SECURITY_RATING sec_rating;
     const unsigned long uniq_count;
-    unsigned long counter;
+    uint64_t counter;
     const bool has_default;
     const std::string default_value;
     bool sensitive;
