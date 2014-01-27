@@ -324,8 +324,8 @@ public:
 
 private:
     const std::string key;
-    enum enum_field_types field_type;
-    std::pair<int64_t, uint64_t> inclusiveRange;
+    const enum enum_field_types field_type;
+    const std::pair<int64_t, uint64_t> inclusiveRange;
 };
 
 static CryptedInteger
@@ -429,7 +429,7 @@ public:
     Item * decryptUDF(Item * const col, Item * const ivcol) const;
 
 private:
-    CryptedInteger cinteger;
+    const CryptedInteger cinteger;
     blowfish const bf;
     static int const key_bytes = 16;
 };
@@ -693,7 +693,7 @@ public:
     Item *decryptUDF(Item *const col, Item *const ivcol = NULL) const;
 
 protected:
-    CryptedInteger cinteger;
+    const CryptedInteger cinteger;
     const blowfish bf;
     static const int bf_key_size = 16;
 
@@ -1155,7 +1155,7 @@ public:
     Item *decrypt(Item * const c, uint64_t IV) const;
 
 private:
-    CryptedInteger cinteger;
+    const CryptedInteger cinteger;
     static const size_t key_bytes = 16;
     size_t plain_size;
     size_t ciph_size;
