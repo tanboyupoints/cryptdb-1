@@ -61,11 +61,21 @@ private:
     // first in list is lowest layer
     std::vector<std::unique_ptr<EncLayer> > layers;
     const std::string onionname;
-    unsigned long uniq_count;
+    const unsigned long uniq_count;
     mutable std::list<std::unique_ptr<UIntMetaKey>> generated_keys;
 };
 
-class FieldMeta : public MappedDBMeta<OnionMeta, OnionMetaKey> {
+class UniqueCounter {
+public:
+    uint64_t leaseCount() {return getCounter_()++;}
+    uint64_t currentCount() {return getCounter_();}
+
+private:
+    virtual uint64_t &getCounter_() = 0;
+};
+
+class FieldMeta : public MappedDBMeta<OnionMeta, OnionMetaKey>,
+                  public UniqueCounter {
 public:
     // New.
     FieldMeta(const std::string &name, Create_field * const field,
@@ -100,8 +110,6 @@ public:
 
     SECURITY_RATING getSecurityRating() const {return sec_rating;}
     unsigned long leaseIncUniq() {return counter++;}
-    // FIXME: Change name.
-    unsigned long getCurrentUniqCounter() const {return counter;}
     bool hasOnion(onion o) const;
     bool hasDefault() const {return has_default;}
     std::string defaultValue() const {return default_value;}
@@ -117,7 +125,7 @@ private:
     const onionlayout onion_layout;
     const bool has_salt; //whether this field has its own salt
     const SECURITY_RATING sec_rating;
-    unsigned long uniq_count;
+    const unsigned long uniq_count;
     unsigned long counter;
     const bool has_default;
     const std::string default_value;
@@ -130,9 +138,11 @@ private:
     static bool determineHasDefault(const Create_field *const cf);
     static std::string determineDefaultValue(bool has_default,
                                              const Create_field *const cf);
+    uint64_t &getCounter_() final {return counter;}
 };
 
-class TableMeta : public MappedDBMeta<FieldMeta, IdentityMetaKey> {
+class TableMeta : public MappedDBMeta<FieldMeta, IdentityMetaKey>,
+                  public UniqueCounter {
 public:
     // New TableMeta.
     TableMeta(bool has_sensitive, bool has_salt)
@@ -156,8 +166,6 @@ public:
     std::vector<FieldMeta *> orderedFieldMetas() const;
     std::vector<FieldMeta *> defaultedFieldMetas() const;
     TYPENAME("tableMeta")
-    unsigned long leaseIncUniq() {return counter++;}
-    unsigned long getCurrentUniqCounter() {return counter;}
     std::string getAnonIndexName(const std::string &index_name,
                                  onion o) const;
 
@@ -166,7 +174,9 @@ private:
     const bool has_salt;
     const std::string salt_name;
     const std::string anon_table_name;
-    unsigned int counter;
+    uint64_t counter;
+
+    uint64_t &getCounter_() final {return counter;}
 };
 
 class DatabaseMeta : public MappedDBMeta<TableMeta, IdentityMetaKey> {

@@ -371,8 +371,7 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
             const ProxyState &ps, TableMeta *const tm)
     {
         return new FieldMeta(name, cf, ps.getMasterKey().get(),
-                             ps.defaultSecurityRating(),
-                             tm->leaseIncUniq());
+                             ps.defaultSecurityRating(), tm->leaseCount());
     };
     std::unique_ptr<FieldMeta> fm(buildFieldMeta(name, cf, ps, tm));
 

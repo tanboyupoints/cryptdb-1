@@ -249,7 +249,7 @@ init_onions_layout(const AES_KEY *const m_key,
         // A new OnionMeta will only occur with a new FieldMeta so
         // we never have to build Deltaz for our OnionMetaz.
         std::unique_ptr<OnionMeta>
-            om(new OnionMeta(o, levels, m_key, cf, fm->leaseIncUniq()));
+            om(new OnionMeta(o, levels, m_key, cf, fm->leaseCount()));
         const std::string &onion_name = om->getAnonOnionName();
         fm->addChild(OnionMetaKey(o), std::move(om));
 
