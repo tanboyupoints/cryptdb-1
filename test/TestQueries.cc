@@ -25,7 +25,7 @@ static Connection * test;
 static FieldOnionState num_os =
     {{"oDET", "RND"}, {"oOPE", "RND"}, {"oAGG", "HOM"}, {"oPLAIN", "RND"}};
 static FieldOnionState str_os =
-    {{"oDET", "RND"}, {"oOPE", "RND"}, {"oPLAIN", "RND"}};
+    {{"oDET", "RND"}, {"oOrder", "RND"}, {"oPLAIN", "RND"}};
 static DBOnionState insert_os =
     {{"test_insert", {{"id", num_os}, {"age", num_os}, {"salary", num_os}, {"address", str_os}, {"name", str_os}}}};
 
@@ -807,11 +807,11 @@ static QueryList Directives = QueryList("Directives",
       // try to adjust a non existent table
       Query("SET @cryptdb='adjust', @table='notrealnotreal',"
             "    @database='cryptdbtest', @field='doesntmatter',"
-            "    @oOPE='OPE'"),
+            "    @oOrder='OPE'"),
       Query("SELECT * FROM directives"),
       // try to adjust a non existent field
       Query("SET @cryptdb='adjust', @database='cryptdbtest',"
-            "    @oOPE='OPE', @table='directives',"
+            "    @oOrder='OPE', @table='directives',"
             "    @field='made-up'"),
       Query("SELECT * FROM directives"),
       // try to adjust a non existent onion
@@ -822,29 +822,29 @@ static QueryList Directives = QueryList("Directives",
       // try to adjust to non existent level
       Query("SET @database='cryptdbtest',"
             "    @table='directives', @field='x',"
-            "    @oOPE='unreality', @cryptdb='adjust'"),
+            "    @oOrder='unreality', @cryptdb='adjust'"),
       Query("SELECT * FROM directives"),
       // try to adjust onion to real level it doesnt support
       // > FIXME: handling of this is not nice
       Query("SET @cryptdb='adjust', @database='cryptdbtest',"
             "    @table='directives', @field='x',"
-            "    @oOPE='HOM'"),
+            "    @oOrder='HOM'"),
       Query("SELECT * FROM directives"),
       // do real adjustment
       Query("SET @table='directives', @database='cryptdbtest',"
             "    @cryptdb='adjust', @field='x',"
-            "    @oOPE='OPE'"),
+            "    @oOrder='OPE'"),
       Query("SELECT * FROM directives WHERE x < 100"),
       // do it again (adjust to current level)
       Query("SET @cryptdb='adjust', @database='cryptdbtest',"
             "    @table='directives', @field='x',"
-            "    @oOPE='OPE'"),
+            "    @oOrder='OPE'"),
       Query("SELECT * FROM directives WHERE x < 100"),
       Query("SET @cryptdb='show', @random='stuff', @nothing='nothing'"),
       // try to adjust upwards
       Query("SET @cryptdb='adjust', @database='cryptdbtest',"
             "    @table='directives', @field='x',"
-            "    @oOPE='RND'"),
+            "    @oOrder='RND'"),
       Query("SELECT * FROM directives WHERE x < 100"),
       // do multiple adjustments to same onion
       // NOTE: unsupported
@@ -859,13 +859,13 @@ static QueryList Directives = QueryList("Directives",
       // multiple adjustments to different onions
       Query("SET @cryptdb='adjust', @database='cryptdbtest',"
             "    @table='directives', @field='y',"
-            "    @oDET='DET', @oOPE='OPE'"),
+            "    @oDET='DET', @oOrder='OPE'"),
       Query("SELECT * FROM directives WHERE y < 'somerandomtext'"),
       Query("SELECT * FROM directives WHERE y = 'moretext'"),
       // do a good adjustment and one that won't do anything
       Query("SET @cryptdb='adjust', @database='cryptdbtest',"
             "    @table='directives', @field='z',"
-            "    @oDET='DET', @oOPE='RND'"),
+            "    @oDET='DET', @oOrder='RND'"),
       Query("SELECT * FROM directives WHERE z = 8"),
       Query("SET @more='less', @cryptdb='show', @nothing='short'"),
       Query("DROP TABLE directives")

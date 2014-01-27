@@ -523,7 +523,7 @@ buildTypeTextTranslator()
     // Onions.
     const std::vector<std::string> onion_strings
     {
-        "oINVALID", "oPLAIN", "oDET", "oOPE", "oAGG", "oSWP"
+        "oINVALID", "oPLAIN", "oDET", "oOrder", "oAGG", "oSWP"
     };
     const std::vector<onion> onions
     {

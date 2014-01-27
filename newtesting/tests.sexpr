@@ -45,7 +45,7 @@
   ("SELECT * FROM test_select WHERE id IN (1, 2, 10, 20, 30)"
    (:update test_select id oDET DET))
   ("SELECT * FROM test_select WHERE id BETWEEN 3 AND 5"
-   (:update test_select id oOPE OPE))
+   (:update test_select id oOrder OPE))
   ("SELECT NULLIF(1, id) FROM test_select")
   ("SELECT NULLIF(id, 1) FROM test_select")
   ("SELECT NULLIF(id, id) FROM test_select")
@@ -54,7 +54,7 @@
   ("SELECT * FROM test_select")
   ("SELECT max(id) FROM test_select")
   ("SELECT max(salary) FROM test_select"
-   (:update test_select salary oOPE OPE))
+   (:update test_select salary oOrder OPE))
   ("SELECT COUNT(*) FROM test_select")
   ("SELECT COUNT(DISTINCT age) FROM test_select"
    (:update test_select age oDET DET))
@@ -67,21 +67,21 @@
   ("SELECT * FROM test_select WHERE salary=15"
    (:update test_select salary oDET DET))
   ("SELECT * FROM test_select WHERE age > 10"
-   (:update test_select age oOPE OPE))
+   (:update test_select age oOrder OPE))
   ("SELECT * FROM test_select WHERE age = 10 AND salary = 0")
   ("SELECT * FROM test_select WHERE age = 10 OR salary = 0")
   ("SELECT * FROM test_select WHERE name = 'Peter Pan'"
    (:update test_select name oDET DET))
   ("SELECT * FROM test_select WHERE address='Green Gables'")
   ("SELECT * FROM test_select WHERE address <= '221C'"
-   (:update test_select address oOPE OPE))
+   (:update test_select address oOrder OPE))
   ("SELECT * FROM test_select WHERE address >= 'Green Gables' AND age > 9")
   ("SELECT * FROM test_select WHERE address >= 'Green Gables' OR age > 9")
   ("SELECT * FROM test_select WHERE address < 'ffFFF'")
   ("SELECT * FROM test_select ORDER BY id")
   ("SELECT * FROM test_select ORDER BY salary")
   ("SELECT * FROM test_select ORDER BY name"
-   (:update test_select name oOPE OPE))
+   (:update test_select name oOrder OPE))
   ("SELECT * FROM test_select ORDER BY address")
   ("SELECT sum(age) FROM test_select GROUP BY address ORDER BY address")
   ("SELECT salary, max(id) FROM test_select GROUP BY salary ORDER BY salary")
@@ -224,7 +224,7 @@
    (:update test_update address oDET DET))
   ("SELECT * FROM test_update")
   ("SELECT age FROM test_update WHERE age > 20"
-   (:update test_update age oOPE OPE))
+   (:update test_update age oOrder OPE))
   ("SELECT id FROM test_update")
   ("SELECT sum(age) FROM test_update")
   ("UPDATE test_update SET age=20 WHERE name='Elizabeth Darcy'"
@@ -237,7 +237,7 @@
      WHERE address = 'London'")
   ("SELECT * FROM test_update")
   ("SELECT * FROM test_update WHERE address < 'fml'"
-   (:update test_update address oOPE OPE))
+   (:update test_update address oOrder OPE))
   ("UPDATE test_update SET address = 'Neverland' WHERE id=1")
   ("SELECT * FROM test_update")
   ("DROP TABLE test_update"))
@@ -270,7 +270,7 @@
   ("SELECT * FROM test_HOM WHERE age = 100"
    (:update test_HOM age oDET DET))
   ("SELECT COUNT(*) FROM test_HOM WHERE age > 100"
-   (:update test_HOM age oOPE OPE))
+   (:update test_HOM age oOrder OPE))
   ("SELECT COUNT(*) FROM test_HOM WHERE age < 100")
   ("SELECT COUNT(*) FROM test_HOM WHERE age <= 100")
   ("SELECT COUNT(*) FROM test_HOM WHERE age >= 100")
@@ -361,18 +361,18 @@
    ("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)"
     (:set (msgs (msgid (oPLAIN PLAINVAL))
                 (zooanimals (oDET RND)
-                            (oOPE RND)
+                            (oOrder RND)
                             (oAGG HOM)
                             (oPLAIN RND))
                 (msgtext (oDET RND)
-                         (oOPE RND)
+                         (oOrder RND)
                          (oAGG HOM)
                          (oPLAIN RND)))))
    ("CREATE TABLE moremore (x INTEGER,
                             y integer PRIMARY KEY AUTO_INCREMENT)
                  AUTO_INCREMENT=456"
     (:set (moremore (x (oDET RND)
-                       (oOPE RND)
+                       (oOrder RND)
                        (oAGG HOM)
                        (oPLAIN RND))
                     (y (oPLAIN PLAINVAL)))))
@@ -462,15 +462,15 @@
   ("SELECT * FROM test_null WHERE uid = 1"
    (:update test_null uid oDET DET))
   ("SELECT * FROM test_null WHERE age < 50"
-   (:update test_null age oOPE OPE))
+   (:update test_null age oOrder OPE))
   ("SELECT SUM(uid) FROM test_null")
   ("SELECT MAX(uid) FROM test_null"
-   (:update test_null uid oOPE OPE))
+   (:update test_null uid oOrder OPE))
   ("SELECT * FROM test_null")
   ("SELECT * FROM test_null WHERE address = 'cookies'"
    (:update test_null address oDET DET))
   ("SELECT * FROM test_null WHERE address < 'amber'"
-   (:update test_null address oOPE OPE))
+   (:update test_null address oOrder OPE))
   ("SELECT * FROM test_null WHERE address LIKE 'aaron'"
    (:update test_null address oPLAIN PLAINVAL))
   ("SELECT * FROM test_null LEFT JOIN u_null
@@ -517,7 +517,7 @@
     (:update ("t" (x (oDET DET))
                   (y (oDET DET)))))
    ("SELECT x, y FROM t WHERE x = 1 AND y < 200"
-    (:update ("t" (y (oOPE OPE)))))
+    (:update ("t" (y (oOrder OPE)))))
    ("SELECT x, y FROM t WHERE x AND y = 15"
     (:update "t" y oDET DET))
    ("SELECT 10, x+y FROM t WHERE x"
@@ -603,7 +603,7 @@
    ("SELECT * FROM not_strict WHERE x = 0")
    ("SELECT * FROM not_strict WHERE z = ''")
    ("SELECT * FROM not_strict WHERE x < 110"
-    (:update not_strict x oOPE OPE))
+    (:update not_strict x oOrder OPE))
    ("SELECT * FROM not_strict"
     :check)
    ("DROP TABLE not_strict"))
@@ -643,7 +643,7 @@
   ("START TRANSACTION")
   ;; query should fail as it's onion adjustment inside a transaction
   ("UPDATE trans SET a = a + 1, c = 50 WHERE a < 50000"
-   (:update trans a oOPE OPE)
+   (:update trans a oOrder OPE)
    :cryptdb
    :must-fail)
   ;; freeze things in case something went wrong
@@ -682,7 +682,7 @@
         ON s.a = e.a
      WHERE s.c < 100"
    (:update (star (a (oDET DETJOIN))
-                  (c (oOPE OPE)))
+                  (c (oOrder OPE)))
             (mercury (a (oDET DETJOIN)))))
   ("SELECT * FROM mercury INNER JOIN mercury AS e
         ON mercury.a = e.a")
@@ -816,7 +816,7 @@
          VALUES (1, 'quoting'), (12, 'shouldn;tbe'), (100, 'hard')")
   ("SELECT * FROM `hard-+=quotes`")
   ("SELECT * FROM `hard-+=quotes` WHERE `!@abc` < 1200"
-   (:update "over+there" "hard-+=quotes" "!@abc" oOPE OPE))
+   (:update "over+there" "hard-+=quotes" "!@abc" oOrder OPE))
   ("SELECT * FROM `hard-+=quotes`")
   ("SELECT * FROM `more+quotes`")
   ("SELECT * FROM `over+there`.`more+quotes`"
@@ -846,7 +846,7 @@
    :must-fail)
   ;; specity duplicate directive parameters for one directive
   ("SET @cryptdb='adjust', @database='cryptdbtest', @table='directives',
-        @field='x', @oOPE='OPE', @field='z'"
+        @field='x', @oOrder='OPE', @field='z'"
    ()
    :cryptdb
    :must-fail)
@@ -861,14 +861,14 @@
   ;; try to adjust a non existent table
   ("SET @cryptdb='adjust', @table='notrealnotreal',
         @database='cryptdbtest', @field='doesntmatter',
-        @oOPE='OPE'"
+        @oOrder='OPE'"
    ()
    :cryptdb
    :must-fail)
   ("SELECT * FROM directives")
   ;; try to adjust a non existent field
   ("SET @cryptdb='adjust', @database='cryptdbtest',
-        @oOPE='OPE', @table='directives',
+        @oOrder='OPE', @table='directives',
         @field='made-up'"
    ()
    :cryptdb
@@ -885,7 +885,7 @@
   ;; try to adjust to non existent level
   ("SET @database='cryptdbtest'
         @table='directives', @field='x',
-        @oOPE='unreality', @cryptdb='adjust'"
+        @oOrder='unreality', @cryptdb='adjust'"
    ()
    :cryptdb
    :must-fail)
@@ -894,7 +894,7 @@
   ;; > FIXME: handling of this is not nice
   ("SET @cryptdb='adjust', @database='cryptdbtest',
         @table='directives', @field='x',
-        @oOPE='HOM'"
+        @oOrder='HOM'"
    ()
    :cryptdb
    :must-fail)
@@ -902,12 +902,12 @@
   ;; do real adjustment
   ("SET @table='directives', @database='cryptdbtest',
         @cryptdb='adjust', @field='x',
-        @oOPE='OPE'")
+        @oOrder='OPE'")
   ("SELECT * FROM directives WHERE x < 100")
   ;; do it again (adjust to current level)
   ("SET @cryptdb='adjust', @database='cryptdbtest',
         @table='directives', @field='x',
-        @oOPE='OPE'")
+        @oOrder='OPE'")
   ("SELECT * FROM directives WHERE x < 100")
   ("SET @cryptdb='show', @random='stuff', @nothing='nothing'"
    ()
@@ -916,7 +916,7 @@
   ;; try to adjust upwards
   ("SET @cryptdb='adjust', @database='cryptdbtest',
         @table='directives', @field='x',
-        @oOPE='RND'"
+        @oOrder='RND'"
    ()
    :cryptdb
    :must-fail)
@@ -937,13 +937,13 @@
   ;; multiple adjustments to different onions
   ("SET @cryptdb='adjust', @database='cryptdbtest',
         @table='directives', @field='y',
-        @oDET='DET', @oOPE='OPE'")
+        @oDET='DET', @oOrder='OPE'")
   ("SELECT * FROM directives WHERE y < 'somerandomtext'")
   ("SELECT * FROM directives WHERE y = 'moretext'")
   ;; do a good adjustment and one that won't do anything
   ("SET @cryptdb='adjust', @database='cryptdbtest',
         @table='directives', @field='z',
-        @oDET='DET', @oOPE='RND'")
+        @oDET='DET', @oOrder='RND'")
   ("SELECT * FROM directives WHERE z = 8")
   ("SET @more='less', @cryptdb='show', @nothing='short'"
    ()
@@ -1109,7 +1109,7 @@
  ("INSERT INTO ubug VALUES (1), (2)")
  ;; this must happen _before_ onion adjustment
  ("UPDATE ubug SET x = x + 1 WHERE x < 2"
-  (:update ubug x oOPE OPE)
+  (:update ubug x oOrder OPE)
   :both
   :must-fail)
  ("SELECT * FROM ubug")
@@ -1124,7 +1124,7 @@
  ("INSERT INTO ubug2 VALUES (1), (2)")
  ;; onion adjust before we do the bad update
  ("SELECT * FROM ubug2 WHERE x < 2"
-  (:update ubug2 x oOPE OPE))
+  (:update ubug2 x oOrder OPE))
  ("UPDATE ubug2 SET x = x + 1 WHERE x < 2"
   ()
   :both
@@ -1141,7 +1141,7 @@
  ("CREATE TABLE ubug_trx (x integer primary key)"
   (:all-max "ubug_trx"))
  ("SELECT * FROM ubug_trx WHERE x < 2"
-  (:update ubug_trx x oOPE OPE))
+  (:update ubug_trx x oOrder OPE))
  ("INSERT INTO ubug_trx VALUES (0)")
  ("START TRANSACTION")
  ("INSERT INTO ubug_trx VALUES (1), (2)")
