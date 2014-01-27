@@ -109,7 +109,6 @@ public:
     TYPENAME("fieldMeta");
 
     SECURITY_RATING getSecurityRating() const {return sec_rating;}
-    unsigned long leaseIncUniq() {return counter++;}
     bool hasOnion(onion o) const;
     bool hasDefault() const {return has_default;}
     std::string defaultValue() const {return default_value;}
