@@ -382,11 +382,11 @@
          t)
         ((or (not (query-result-status results-a))
              (not (query-result-status results-b)))
-         ; (break)
+         ;(break)
          nil)
         ((not (equal (query-result-fields results-a)
                      (query-result-fields results-b)))
-         ; (break)
+         ;(break)
          nil)
         (t ;; cryptdb returns all results as strings while the normal
            ;; database uses numbers and such
@@ -457,6 +457,10 @@
           ;; local onions even if the results don't match
           (let ((onion-check-result
                  (handle-onion-checks connections onions onion-checks)))
+	    ;(format t "~%~%Onion-check-result ~A~%~%" onion-check-result)
+	    ;(format t "cryptdb results~A~%" cryptdb-results)
+	    ;(format t "plain results~A~%" plain-results)
+	    ;(break)
             (update-score
               (ecase testing-strategy
                 (:must-succeed (query-result-status cryptdb-results))
