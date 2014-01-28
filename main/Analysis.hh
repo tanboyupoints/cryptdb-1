@@ -164,11 +164,8 @@ public:
                 IdentityMetaKey key)
         : AbstractCreateDelta(parent_meta, key), meta(std::move(meta)) {}
 
-    bool save(const std::unique_ptr<Connect> &e_conn,
-              unsigned long * const delta_output_id);
     bool apply(const std::unique_ptr<Connect> &e_conn,
                TableType table_type);
-    bool destroyRecord(const std::unique_ptr<Connect> &e_conn);
 
 private:
     const std::unique_ptr<DBMeta> meta;
@@ -192,11 +189,8 @@ public:
     ReplaceDelta(const DBMeta &meta, const DBMeta &parent_meta)
         : DerivedKeyDelta(meta, parent_meta) {}
 
-    bool save(const std::unique_ptr<Connect> &e_conn,
-              unsigned long * const delta_output_id);
     bool apply(const std::unique_ptr<Connect> &e_conn,
                TableType table_type);
-    bool destroyRecord(const std::unique_ptr<Connect> &e_conn);
 };
 
 class DeleteDelta : public DerivedKeyDelta {
@@ -204,11 +198,8 @@ public:
     DeleteDelta(const DBMeta &meta, const DBMeta &parent_meta)
         : DerivedKeyDelta(meta, parent_meta) {}
 
-    bool save(const std::unique_ptr<Connect> &e_conn,
-              unsigned long * const delta_output_id);
     bool apply(const std::unique_ptr<Connect> &e_conn,
                TableType table_type);
-    bool destroyRecord(const std::unique_ptr<Connect> &e_conn);
 };
 
 class Rewriter;
