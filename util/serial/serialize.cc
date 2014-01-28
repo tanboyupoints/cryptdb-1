@@ -56,6 +56,23 @@ main()
 //        serialization
 // ##########################
 
+template <typename Derived, typename MemberTList>
+template <typename MemberName>
+typename Get<MemberName, MemberTList>::type &
+Serializable<Derived, MemberTList>::G()
+{
+    return atKey<MemberName>(*this);
+}
+
+template <typename Derived, typename MemberTList>
+template <typename MemberName>
+const typename Get<MemberName, MemberTList>::type &
+Serializable<Derived, MemberTList>::G() const
+{
+    return const_cast<Serializable<Derived,
+                                   MemberTList> *>(this)->G<MemberName>();
+}
+
 // taken from cryptdb
 static std::string
 serialEncode(const std::string &s)

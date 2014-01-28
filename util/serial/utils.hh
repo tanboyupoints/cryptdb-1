@@ -167,4 +167,29 @@ public:
     static const bool value = type_::value;
 };
 // -------------------------------------------------
+// -------------------------------------------------
+template <typename AttemptName,
+          typename MemberTList,
+          typename HazMatch = void>
+class Get;
+
+template <typename AttemptName, typename MemberTList>
+class Get<AttemptName, MemberTList,
+          typename
+            std::enable_if<std::is_same<AttemptName,
+                                typename MemberTList::car::name>::value>::type> {
+public:
+    typedef typename MemberTList::car::type type;
+};
+
+template <typename AttemptName, typename MemberTList>
+class Get<AttemptName, MemberTList,
+          typename
+            std::enable_if<false ==
+                           std::is_same<AttemptName,
+                                typename MemberTList::car::name>::value>::type> {
+public:
+    typedef typename Get<AttemptName, typename MemberTList::cdr>::type type;
+};
+// -------------------------------------------------
 

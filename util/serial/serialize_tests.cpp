@@ -650,7 +650,7 @@ testVectorFirstClassPointers()
         return false;
     }
 
-    const auto &new_v = atKey<TestMember::Foo>(*new_tvec);
+    const auto &new_v = new_tvec->G<TestMember::Foo>();
     if (2 != new_v.size() || nullptr == new_v[0] || nullptr == new_v[1]
         || !(*new_v[0] == s1) || !(*new_v[1] == s2)) {
         return false;
