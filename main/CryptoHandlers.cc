@@ -324,8 +324,8 @@ public:
 
 private:
     const std::string key;
-    enum enum_field_types field_type;
-    std::pair<int64_t, uint64_t> inclusiveRange;
+    const enum enum_field_types field_type;
+    const std::pair<int64_t, uint64_t> inclusiveRange;
 };
 
 static CryptedInteger
@@ -429,7 +429,7 @@ public:
     Item * decryptUDF(Item * const col, Item * const ivcol) const;
 
 private:
-    CryptedInteger cinteger;
+    const CryptedInteger cinteger;
     blowfish const bf;
     static int const key_bytes = 16;
 };
@@ -672,8 +672,9 @@ RND_str::decryptUDF(Item * const col, Item * const ivcol) const
 
 class DET_abstract_integer : public EncLayer {
 public:
-    DET_abstract_integer(Create_field *const f, const std::string &key);
-    DET_abstract_integer(unsigned int id, const CryptedInteger &cinteger);
+    DET_abstract_integer() : EncLayer() {}
+    DET_abstract_integer(unsigned int id)
+        : EncLayer(id) {}
 
     virtual std::string name() const = 0;
     virtual SECLEVEL level() const = 0;
@@ -693,12 +694,12 @@ public:
     Item *decryptUDF(Item *const col, Item *const ivcol = NULL) const;
 
 protected:
-    CryptedInteger cinteger;
-    const blowfish bf;
     static const int bf_key_size = 16;
 
 private:
     std::string getKeyFromSerial(const std::string &serial);
+    virtual const CryptedInteger &getCInteger_() const = 0;
+    virtual const blowfish &getBlowfish_() const = 0;
 };
 
 /*
@@ -722,13 +723,26 @@ protected:
 class DET_int : public DET_abstract_integer {
 public:
     DET_int(Create_field *const cf, const std::string &seed_key)
-        : DET_abstract_integer(cf, seed_key) {}
+        : DET_abstract_integer(),
+          cinteger(overrideCreateFieldCryptedIntegerFactory(*cf,
+                                       prng_expand(seed_key, bf_key_size),
+                                       signage::UNSIGNED,
+                                       MYSQL_TYPE_LONGLONG)),
+          bf(cinteger.getKey()) {}
+
     // create object from serialized contents
     DET_int(unsigned int id, const CryptedInteger &cinteger)
-        : DET_abstract_integer(id, cinteger) {}
+        : DET_abstract_integer(id), cinteger(cinteger), bf(cinteger.getKey()) {}
 
     virtual SECLEVEL level() const {return SECLEVEL::DET;}
     std::string name() const {return "DET_int";}
+
+private:
+    const CryptedInteger cinteger;
+    const blowfish bf;
+
+    const CryptedInteger &getCInteger_() const {return cinteger;}
+    const blowfish &getBlowfish_() const {return bf;}
 };
 
 static udf_func u_decDETInt = {
@@ -818,27 +832,10 @@ DETFactory::deserialize(unsigned int id, const SerialLayer &sl)
     }
 }
 
-// blowfish always produces 64 bit output so we should always use
-// unsigned MYSQL_TYPE_LONGLONG
-DET_abstract_integer::DET_abstract_integer(Create_field *const cf,
-                                           const std::string &seed_key)
-    : EncLayer(),
-      cinteger(overrideCreateFieldCryptedIntegerFactory(*cf,
-                                       prng_expand(seed_key, bf_key_size),
-                                       signage::UNSIGNED,
-                                       MYSQL_TYPE_LONGLONG)),
-      bf(cinteger.getKey())
-{}
-
-DET_abstract_integer::DET_abstract_integer(unsigned int id,
-                                           const CryptedInteger &cinteger)
-    : EncLayer(id), cinteger(cinteger), bf(cinteger.getKey())
-{}
-
 std::string
 DET_abstract_integer::doSerialize() const
 {
-    return cinteger.serialize();
+    return getCInteger_().serialize();
 }
 
 template <typename Type>
@@ -850,7 +847,7 @@ DET_abstract_integer::deserialize(unsigned int id,
      * is not in CryptedInteger; write a deserialize function for them
      * as well and let them handle the serialized data that is not
      * CryptedInteger */
-    const CryptedInteger cint = CryptedInteger::deserialize(serial);
+    const CryptedInteger &cint = CryptedInteger::deserialize(serial);
     return std::unique_ptr<Type>(new Type(id, cint));
 }
 
@@ -858,7 +855,7 @@ Create_field *
 DET_abstract_integer::newCreateField(const Create_field * const cf,
                                      const std::string &anonname) const
 {
-    return integerCreateFieldHelper(cf, cinteger.getFieldType(),
+    return integerCreateFieldHelper(cf, getCInteger_().getFieldType(),
                                     anonname);
 }
 
@@ -866,9 +863,9 @@ Item *
 DET_abstract_integer::encrypt(const Item &ptext, uint64_t IV) const
 {
     const ulonglong value = RiboldMYSQL::val_uint(ptext);
-    cinteger.checkValue(value);
+    getCInteger_().checkValue(value);
 
-    const ulonglong res = static_cast<ulonglong>(bf.encrypt(value));
+    const ulonglong res = static_cast<ulonglong>(getBlowfish_().encrypt(value));
     LOG(encl) << "DET_int enc " << value << "--->" << res;
     return new (current_thd->mem_root) Item_int(res);
 }
@@ -877,7 +874,7 @@ Item *
 DET_abstract_integer::decrypt(Item *const ctext, uint64_t IV) const
 {
     const ulonglong value = static_cast<Item_int *>(ctext)->value;
-    const ulonglong retdec = bf.decrypt(value);
+    const ulonglong retdec = getBlowfish_().decrypt(value);
     LOG(encl) << "DET_int dec " << value << "--->" << retdec;
     return new (current_thd->mem_root) Item_int(retdec);
 }
@@ -889,7 +886,7 @@ DET_abstract_integer::decryptUDF(Item *const col, Item *const ivcol)
     List<Item> l;
     l.push_back(col);
 
-    l.push_back(get_key_item(cinteger.getKey()));
+    l.push_back(get_key_item(getCInteger_().getKey()));
 
     Item *const udfdec = new Item_func_udf_int(&u_decDETInt, l);
     udfdec->name = NULL;
@@ -1055,14 +1052,29 @@ DET_str::decryptUDF(Item * const col, Item * const ivcol) const
 
 class DETJOIN_int : public DET_abstract_integer {
 public:
+    // blowfish always produces 64 bit output so we should always use
+    // unsigned MYSQL_TYPE_LONGLONG
     DETJOIN_int(Create_field *const cf, const std::string &seed_key)
-        : DET_abstract_integer(cf, seed_key) {}
+    : DET_abstract_integer(),
+      cinteger(overrideCreateFieldCryptedIntegerFactory(*cf,
+                                       prng_expand(seed_key, bf_key_size),
+                                       signage::UNSIGNED,
+                                       MYSQL_TYPE_LONGLONG)),
+      bf(cinteger.getKey()) {}
+
     // serialize from parent;  unserialize:
     DETJOIN_int(unsigned int id, const CryptedInteger &cinteger)
-        : DET_abstract_integer(id, cinteger) {}
+        : DET_abstract_integer(id), cinteger(cinteger), bf(cinteger.getKey()) {}
 
     SECLEVEL level() const {return SECLEVEL::DETJOIN;}
     std::string name() const {return "DETJOIN_int";}
+
+private:
+    const CryptedInteger cinteger;
+    const blowfish bf;
+
+    const CryptedInteger &getCInteger_() const {return cinteger;}
+    const blowfish &getBlowfish_() const {return bf;}
 };
 
 class DETJOIN_str : public DET_str {
@@ -1155,7 +1167,7 @@ public:
     Item *decrypt(Item * const c, uint64_t IV) const;
 
 private:
-    CryptedInteger cinteger;
+    const CryptedInteger cinteger;
     static const size_t key_bytes = 16;
     size_t plain_size;
     size_t ciph_size;

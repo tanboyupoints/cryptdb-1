@@ -53,20 +53,22 @@ public:
 };
 
 template <typename... All>
-class TypeList;
+class TypeList_;
 
 template <typename Head, typename... Tail>
-class TypeList<Head, Tail...> {
+class TypeList_<Head, Tail...> {
 public:
-    typedef Cons<Head, typename TypeList<Tail... >::type > type;
+    typedef Cons<Head, typename TypeList_<Tail... >::type > type;
 };
 
 template <>
-class TypeList<> {
+class TypeList_<> {
 public:
     typedef Nil type;
 };
 
+template <typename... All>
+using TypeList = typename TypeList_<All...>::type;
 // -------------------------------------------------
 // -------------------------------------------------
 // compute the length of a TypeList
@@ -163,6 +165,31 @@ class Haz<AttemptName, Nil> {
 public:
     typedef std::false_type type_;
     static const bool value = type_::value;
+};
+// -------------------------------------------------
+// -------------------------------------------------
+template <typename AttemptName,
+          typename MemberTList,
+          typename HazMatch = void>
+class Get;
+
+template <typename AttemptName, typename MemberTList>
+class Get<AttemptName, MemberTList,
+          typename
+            std::enable_if<std::is_same<AttemptName,
+                                typename MemberTList::car::name>::value>::type> {
+public:
+    typedef typename MemberTList::car::type type;
+};
+
+template <typename AttemptName, typename MemberTList>
+class Get<AttemptName, MemberTList,
+          typename
+            std::enable_if<false ==
+                           std::is_same<AttemptName,
+                                typename MemberTList::car::name>::value>::type> {
+public:
+    typedef typename Get<AttemptName, typename MemberTList::cdr>::type type;
 };
 // -------------------------------------------------
 

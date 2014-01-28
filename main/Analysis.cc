@@ -8,14 +8,13 @@
 
 // FIXME: Wrong interfaces.
 EncSet::EncSet(Analysis &a, FieldMeta * const fm) {
-    TEST_TextMessageError(0 != fm->children.size(),
+    TEST_TextMessageError(0 != fm->getChildren().size(),
                          "FieldMeta has no children!");
 
     osl.clear();
-    for (auto pair = fm->children.begin(); pair != fm->children.end();
-         pair++) {
-        OnionMeta *const om = (*pair).second.get();
-        OnionMetaKey const &key = (*pair).first;
+    for (const auto &pair : fm->getChildren()) {
+        OnionMeta *const om = pair.second.get();
+        OnionMetaKey const &key = pair.first;
         osl[key.getValue()] = LevelFieldPair(a.getOnionLevel(*om), fm);
     }
 }
@@ -915,23 +914,23 @@ UseAfterQueryResultOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) co
     TEST_TextMessageError(deleteAllShowDirectiveEntries(e_conn),
                           "failed to initialize show directives table");
 
-    const auto &databases = schema.children;
+    const auto &databases = schema.getChildren();
     for (auto db_it = databases.begin(); db_it != databases.end();
          ++db_it) {
         const std::string &db_name = db_it->first.getValue();
         const auto &dm = db_it->second;
-        const auto &tables = dm->children;
+        const auto &tables = dm->getChildren();
         for (auto table_it = tables.begin(); table_it != tables.end();
              ++table_it) {
             const std::string &table_name = table_it->first.getValue();
             const auto &tm = table_it->second;
-            const auto &fields = tm->children;
+            const auto &fields = tm->getChildren();
             for (auto field_it = fields.begin(); field_it != fields.end();
                  ++field_it) {
                 const std::string &field_name =
                     field_it->first.getValue();
                 const auto &fm = field_it->second;
-                const auto &onions = fm->children;
+                const auto &onions = fm->getChildren();
                 for (auto onion_it = onions.begin();
                      onion_it != onions.end();
                      ++onion_it) {

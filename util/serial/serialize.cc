@@ -33,6 +33,7 @@
 #include <memory>
 #include <iomanip>
 #include <type_traits>
+#include <string>
 
 #include "utils.hh"
 #include "tuple_cdr.hh"
@@ -54,6 +55,23 @@ main()
 // ##########################
 //        serialization
 // ##########################
+
+template <typename Derived, typename MemberTList>
+template <typename MemberName>
+typename Get<MemberName, MemberTList>::type &
+Serializable<Derived, MemberTList>::G()
+{
+    return atKey<MemberName>(*this);
+}
+
+template <typename Derived, typename MemberTList>
+template <typename MemberName>
+const typename Get<MemberName, MemberTList>::type &
+Serializable<Derived, MemberTList>::G() const
+{
+    return const_cast<Serializable<Derived,
+                                   MemberTList> *>(this)->G<MemberName>();
+}
 
 // taken from cryptdb
 static std::string
@@ -188,19 +206,17 @@ Serializable<Derived, MemberTList>::serialize() const
 template <typename MemberName, typename MemberType, typename Derived,
           typename Cdr>
 MemberType &
-atKey(Serializable<Derived,
-                   Cons<MemberPair<MemberName, MemberType>, Cdr> > &s)
+atKey(IndexedSerial<Derived, MemberName, MemberType, Cdr> &s)
 {
     return s.member_pair.value;
 }
 
 template <typename MemberName, typename MemberType, typename Derived,
           typename Cdr>
-std::string
-atKeyID(Serializable<Derived,
-                     Cons<MemberPair<MemberName, MemberType>, Cdr> > &s)
+const MemberType &
+atKey(const IndexedSerial<Derived, MemberName, MemberType, Cdr> &s)
 {
-    return s.member_pair.getID().to_string();
+    return s.member_pair.value;
 }
 
 // ##########################

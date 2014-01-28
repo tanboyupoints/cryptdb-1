@@ -33,7 +33,7 @@ namespace TestMember {
 
 typedef TypeList<MemberPair<TestMember::Foo,  int>,
                  MemberPair<TestMember::Bar,  int>,
-                 MemberPair<TestMember::Cork, std::string> >::type
+                 MemberPair<TestMember::Cork, std::string> >
     TestTypes;
 
 class Test;
@@ -75,7 +75,7 @@ testAtKey()
     // -----------------------------
     static_cast<Serializable<Test,
                              TypeList<MemberPair<TestMember::Cork,
-                                                 std::string> >::type > &>
+                                                 std::string> > > &>
         (t).member_pair.value = "howdy";
 
     if ("howdy" != atKey<TestMember::Cork>(t)) {
@@ -163,7 +163,7 @@ testSerialize()
 class TestPointer
     : public Serializable<TestPointer,
                           TypeList<MemberPair<TestMember::Bar,
-                                              std::unique_ptr<int> > >::type> {
+                                              std::unique_ptr<int> > > > {
 };
 
 static bool
@@ -194,7 +194,7 @@ testSerializePointer()
 class TestNull;
 typedef Serializable<TestNull,
                         TypeList<MemberPair<TestMember::Foo,
-                                            std::unique_ptr<int> > >::type>
+                                            std::unique_ptr<int> > > >
     TestNullBase;
 
 class TestNull : public TestNullBase {
@@ -243,7 +243,7 @@ testSecondClassNull()
 class NestedSerializable :
     public Serializable<NestedSerializable,
                         TypeList<MemberPair<TestMember::Foo,
-                                            std::unique_ptr<TestNull> > >::type> {};
+                                            std::unique_ptr<TestNull> > > > {};
 
 static bool
 testNestedSerializable()
@@ -312,7 +312,7 @@ class TestDes;
 typedef Serializable<TestDes,
                      TypeList<MemberPair<TestMember::Foo, int>,
                               MemberPair<TestMember::Bar, int>,
-                              MemberPair<TestMember::Cork, std::string> >::type>
+                              MemberPair<TestMember::Cork, std::string> > >
     TestDesBase;
 
 class TestDes : public TestDesBase {
@@ -360,7 +360,7 @@ typedef Serializable<TestRoundTrip,
                      TypeList<MemberPair<TestMember::Foo, int>,
                               MemberPair<TestMember::Bar, std::string>,
                               MemberPair<TestMember::Cork,
-                                         std::unique_ptr<std::string> > >::type>
+                                         std::unique_ptr<std::string> > > >
     TestRoundTripBase;
 
 class TestRoundTrip : public TestRoundTripBase {
@@ -409,7 +409,7 @@ testRoundTrip()
 class TestTrivial;
 typedef Serializable<TestTrivial,
                      TypeList<MemberPair<TestMember::Foo,
-                                         std::vector<int> > >::type>
+                                         std::vector<int> > > >
     TestTrivialBase;
 
 class TestTrivial : public TestTrivialBase {
@@ -460,7 +460,7 @@ testVectorTrivial()
 class Simple;
 typedef Serializable<Simple,
                      TypeList<MemberPair<TestMember::Foo, std::string>,
-                              MemberPair<TestMember::Bar, unsigned long> >::type >
+                              MemberPair<TestMember::Bar, unsigned long> > >
     SimpleBase;
 class Simple : public SimpleBase {
 public:
@@ -483,7 +483,7 @@ public:
 class TestVector;
 typedef Serializable<TestVector,
                      TypeList<MemberPair<TestMember::Foo,
-                                         std::vector<Simple> > >::type>
+                                         std::vector<Simple> > > >
     TestVectorBase;
 
 class TestVector : public TestVectorBase {
@@ -540,7 +540,7 @@ testVector()
 class TestMap;
 typedef Serializable<TestMap,
                      TypeList<MemberPair<TestMember::Foo,
-                                    std::map<std::string, uint16_t> > >::type>
+                                    std::map<std::string, uint16_t> > > >
     TestMapBase;
 
 class TestMap : public TestMapBase {
@@ -583,14 +583,14 @@ class TestFirstTime;
 typedef Serializable<TestFirstTime,
                      TypeList<MemberPair<TestMember::Foo, std::string>,
                               MemberPair<TestMember::Bar, std::string>,
-                              MemberPair<TestMember::Cork, uint32_t> >::type>
+                              MemberPair<TestMember::Cork, uint32_t> > >
     TestFirstTimeBase;
 
 class TestFirstTime : public TestFirstTimeBase {
 public:
     TestFirstTime(const std::string &foo, uint32_t cork)
         : TestFirstTimeBase(Serializable::expandAndTuple<TypeList<TestMember::Foo,
-                                       TestMember::Cork>::type>(foo, cork)) {}
+                                       TestMember::Cork> >(foo, cork)) {}
 };
 
 static bool
@@ -614,7 +614,7 @@ testFirstTimeConstructor()
 class TestVector1stPtrz;
 typedef Serializable<TestVector1stPtrz,
                      TypeList<MemberPair<TestMember::Foo,
-                                std::vector<std::unique_ptr<Simple> > > >::type>
+                                std::vector<std::unique_ptr<Simple> > > > >
     TestVector1stPtrzBase;
 class TestVector1stPtrz : public TestVector1stPtrzBase {
 public:
@@ -650,7 +650,7 @@ testVectorFirstClassPointers()
         return false;
     }
 
-    const auto &new_v = atKey<TestMember::Foo>(*new_tvec);
+    const auto &new_v = new_tvec->G<TestMember::Foo>();
     if (2 != new_v.size() || nullptr == new_v[0] || nullptr == new_v[1]
         || !(*new_v[0] == s1) || !(*new_v[1] == s2)) {
         return false;

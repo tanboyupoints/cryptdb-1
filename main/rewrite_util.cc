@@ -202,7 +202,7 @@ rewrite_create_field(const FieldMeta * const fm,
 {
     LOG(cdb_v) << "in rewrite create field for " << *f;
 
-    assert(fm->children.size() > 0);
+    assert(fm->getChildren().size() > 0);
 
     std::vector<Create_field *> output_cfields;
 
@@ -371,8 +371,7 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
             const ProxyState &ps, TableMeta *const tm)
     {
         return new FieldMeta(name, cf, ps.getMasterKey().get(),
-                             ps.defaultSecurityRating(),
-                             tm->leaseIncUniq());
+                             ps.defaultSecurityRating(), tm->leaseCount());
     };
     std::unique_ptr<FieldMeta> fm(buildFieldMeta(name, cf, ps, tm));
 

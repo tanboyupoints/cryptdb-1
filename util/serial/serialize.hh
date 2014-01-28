@@ -2,6 +2,8 @@
 
 #include <random>
 
+#include <util/serial/utils.hh>
+
 // ##########################
 //    conditional typing
 // ##########################
@@ -139,6 +141,9 @@ public:
     typedef Name name;
 };
 
+template <typename Name, typename Type>
+using MP = MemberPair<Name, Type>;
+
 template <typename Derived, typename MemberTList = Nil>
 class Serializable : public Serializable<Derived, typename MemberTList::cdr> {
 public:
@@ -163,6 +168,12 @@ public:
         : Serializable<Derived, typename MemberTList::cdr>(s),
           member_pair(s.member_pair) {}
     virtual ~Serializable();
+
+    // generic getter/setter
+    template <typename MemberName>
+        typename Get<MemberName, MemberTList>::type &G();
+    template <typename MemberName>
+        const typename Get<MemberName, MemberTList>::type &G() const;
 
     SerializationData serialize() const;
     static Derived *deserialize(const ID &id,
@@ -295,4 +306,18 @@ typename std::enable_if<is_serializable<Type>::value, Type>::type
 deserializeType(const std::string &serial,
                 const std::map<ID, std::string> &encodings);
 
+template <typename Derived, typename MemberName, typename MemberType,
+          typename Cdr>
+using IndexedSerial =
+    Serializable<Derived, Cons<MemberPair<MemberName, MemberType>, Cdr> >;
+
+template <typename MemberName, typename MemberType, typename Derived,
+          typename Cdr>
+MemberType &
+atKey(IndexedSerial<Derived, MemberName, MemberType, Cdr> &s);
+
+template <typename MemberName, typename MemberType, typename Derived,
+          typename Cdr>
+const MemberType &
+atKey(const IndexedSerial<Derived, MemberName, MemberType, Cdr> &s);
 

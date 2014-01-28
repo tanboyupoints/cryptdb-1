@@ -774,9 +774,8 @@ process_table_list(const List<TABLE_LIST> &tll, Analysis & a)
 static bool
 invalidates(const FieldMeta &fm, const EncSet & es)
 {
-    for (auto om_it = fm.children.begin(); om_it != fm.children.end();
-         om_it++) {
-        onion const o = (*om_it).first.getValue();
+    for (const auto &om_it : fm.getChildren()) {
+        onion const o = om_it.first.getValue();
         if (es.osl.find(o) == es.osl.end()) {
             return true;
         }

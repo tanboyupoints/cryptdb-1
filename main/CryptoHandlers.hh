@@ -81,7 +81,6 @@ public:
 
 protected:
      friend class EncLayerFactory;
-     enum enum_field_types field_type;
 };
 
 class HOM : public EncLayer {

@@ -70,6 +70,7 @@ Convention : When this document uses syntax like
         + sudo apt-get install sbcl
         + install quicklisp http://www.quicklisp.org/beta/
         > To Start:
+            % <start cryptdb proxy>
             % sbcl
             % (ql:quickload "clsql")
             % (load "newtesting/do_testing.lisp")
