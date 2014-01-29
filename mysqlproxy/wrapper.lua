@@ -53,6 +53,18 @@ end
 RES_IGNORE   = 1
 RES_DECRYPT  = 2
 
+
+COLOR_END = '\027[00m'
+
+function redtext(x)
+    return '\027[00;31m' .. x .. COLOR_END
+end
+
+function greentext(x)
+    return '\027[1;92m'.. x .. COLOR_END
+end
+
+
 function dprint(x)
     if os.getenv("CRYPTDB_PROXY_DEBUG") then
         print(x)
@@ -61,7 +73,8 @@ end
 
 function read_query_real(packet)
     local query = string.sub(packet, 2)
-    print("read_query: " .. query)
+    print("================================================")
+    print(redtext("QUERY: ") .. query)
 
     if string.byte(packet) == proxy.COM_INIT_DB then
         query = "USE `" .. query .. "`"
@@ -86,7 +99,7 @@ function read_query_real(packet)
 
         dprint(" ")
         for i, v in pairs(new_queries) do
-            print("rewritten query[" .. i .. "]: " .. v)
+            print(greentext("NEW QUERY: ")..v)
             local result_key
             if i == table.maxn(new_queries) then
                 result_key = RES_DECRYPT
@@ -114,6 +127,7 @@ function read_query_result_real(inj)
     elseif inj.id == RES_DECRYPT then
         local resultset = inj.resultset
 
+
         -- note that queries which result in an error are never handed back
         -- to cryptdb ``proper''
         if resultset.query_status == proxy.MYSQLD_PACKET_ERR then
@@ -135,12 +149,17 @@ function read_query_result_real(inj)
                               name = resfields[i].name }
             end
 
+	    print(resfields)
+
             local resrows = resultset.rows
             if resrows then
                 for row in resrows do
                     table.insert(rows, row)
+		    print(row)
                 end
             end
+
+
 
             -- Handle the backend of the query.
             status, rollbackd, error_msg, dfields, drows =
