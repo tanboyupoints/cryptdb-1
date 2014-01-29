@@ -23,9 +23,9 @@ static Connection * test;
 
 
 static FieldOnionState num_os =
-    {{"oDET", "RND"}, {"oOPE", "RND"}, {"oAGG", "HOM"}, {"oPLAIN", "RND"}};
+    {{"oEq", "RND"}, {"oOrder", "RND"}, {"oAGG", "HOM"}, {"oPLAIN", "RND"}};
 static FieldOnionState str_os =
-    {{"oDET", "RND"}, {"oOrder", "RND"}, {"oPLAIN", "RND"}};
+    {{"oEq", "RND"}, {"oOrder", "RND"}, {"oPLAIN", "RND"}};
 static DBOnionState insert_os =
     {{"test_insert", {{"id", num_os}, {"age", num_os}, {"salary", num_os}, {"address", str_os}, {"name", str_os}}}};
 
@@ -708,7 +708,7 @@ static QueryList DDL = QueryList("DDL",
       Query("ALTER TABLE ddl_test DROP INDEX i"),
       Query("DROP TABLE ddl_test")});
 
-// the oDET column will encrypt three times and all three of these will pad;
+// the oEq column will encrypt three times and all three of these will pad;
 // the mysql's maximum field size is 2**32 - 1; so the maximum field size
 // we support is 2**32 - 1 - (3 * AES_BLOCK_BYTES)
 static QueryList MiscBugs = QueryList("MiscBugs",
@@ -849,23 +849,23 @@ static QueryList Directives = QueryList("Directives",
       // do multiple adjustments to same onion
       // NOTE: unsupported
       Query("SET @cryptdb='adjust', @database='cryptdbtest',"
-            "    @oDET='DETJOIN', @table='directives', @field='x',"
-            "    @oDET='DET'"),
+            "    @oEq='DETJOIN', @table='directives', @field='x',"
+            "    @oEq='DET'"),
       Query("SELECT * FROM directives"),
       // adjust down multiple layers
       Query("SET @cryptdb='adjust', @database='cryptdbtest',"
-            "    @oDET='DETJOIN', @table='directives', @field='x'"),
+            "    @oEq='DETJOIN', @table='directives', @field='x'"),
       Query("SELECT * FROM directives WHERE x = 1"),
       // multiple adjustments to different onions
       Query("SET @cryptdb='adjust', @database='cryptdbtest',"
             "    @table='directives', @field='y',"
-            "    @oDET='DET', @oOrder='OPE'"),
+            "    @oEq='DET', @oOrder='OPE'"),
       Query("SELECT * FROM directives WHERE y < 'somerandomtext'"),
       Query("SELECT * FROM directives WHERE y = 'moretext'"),
       // do a good adjustment and one that won't do anything
       Query("SET @cryptdb='adjust', @database='cryptdbtest',"
             "    @table='directives', @field='z',"
-            "    @oDET='DET', @oOrder='RND'"),
+            "    @oEq ='DET', @oOrder='RND'"),
       Query("SELECT * FROM directives WHERE z = 8"),
       Query("SET @more='less', @cryptdb='show', @nothing='short'"),
       Query("DROP TABLE directives")

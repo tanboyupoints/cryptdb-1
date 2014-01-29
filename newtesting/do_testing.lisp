@@ -269,7 +269,7 @@
                   `(,(nest-unmatched-keys unmatched-keys seclevel))))))
 
 (defun max-level? (onion seclevel)
-  (cond ((member onion '("oDET" "oOrder" "oPLAIN") :test #'string-equal)
+  (cond ((member onion '("oEq" "oOrder" "oPLAIN") :test #'string-equal)
          (string-equal "RND" seclevel))
         ((string-equal "oAGG" onion) (string-equal "HOM" seclevel))))
 
@@ -457,9 +457,9 @@
           ;; local onions even if the results don't match
           (let ((onion-check-result
                  (handle-onion-checks connections onions onion-checks)))
-	    ;(format t "~%~%Onion-check-result ~A~%~%" onion-check-result)
-	    ;(format t "cryptdb results~A~%" cryptdb-results)
-	    ;(format t "plain results~A~%" plain-results)
+	    (format t "~%~%Onion-check-result ~A~%~%" onion-check-result)
+	    (format t "cryptdb results~A~%" cryptdb-results)
+	    (format t "plain results~A~%" plain-results)
 	    ;(break)
             (update-score
               (ecase testing-strategy
