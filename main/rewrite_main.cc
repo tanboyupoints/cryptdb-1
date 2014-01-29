@@ -446,8 +446,9 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
         "    AND aborted != TRUE;";
     RETURN_FALSE_IF_FALSE(e_conn->execute(unfinished_deltas, &dbres));
     const unsigned long long unfinished_count = mysql_num_rows(dbres->n);
-    std::cerr << GREEN_BEGIN << "there are " << unfinished_count
-              << " unfinished deltas" << COLOR_END << std::endl;
+    if (!PRETTY_DEMO)
+	std::cerr << GREEN_BEGIN << "there are " << unfinished_count
+		  << " unfinished deltas" << COLOR_END << std::endl;
 
     if (0 == unfinished_count) {
         return true;
@@ -521,7 +522,7 @@ buildTypeTextTranslator()
     // Onions.
     const std::vector<std::string> onion_strings
     {
-        "oINVALID", "oPLAIN", "oEq", "oOrder", "oAGG", "oSWP"
+        "oINVALID", "oPLAIN", "oEq", "oOrder", "oADD", "oSWP"
     };
     const std::vector<onion> onions
     {
@@ -741,7 +742,7 @@ removeOnionLayer(const Analysis &a, const TableMeta &tm,
           << "    SET " << fieldanon  << " = " << *decUDF
           << ";";
 
-    std::cerr << "\nADJUST: \n" << terminalEscape(query.str()) << std::endl;
+    std::cerr << RED_BEGIN << "\nADJUST: \n" << COLOR_END << terminalEscape(query.str()) << std::endl;
 
     //execute decryption query
 
@@ -770,7 +771,7 @@ adjustOnion(const Analysis &a, onion o, const TableMeta &tm,
               "This field has been set to sensitive and your query requires"
               " plain data!");
 
-    std::cout << "onion: " << TypeText<onion>::toText(o) << std::endl;
+    std::cout << GREEN_BEGIN << "onion: " << TypeText<onion>::toText(o) << COLOR_END << std::endl;
     // Make a copy of the onion meta for the purpose of making
     // modifications during removeOnionLayer(...)
     OnionMetaAdjustor om_adjustor(*fm.getOnionMeta(o));
@@ -1302,7 +1303,8 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
             out_lex = handler.transformLex(a, lex, ps);
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
-            std::cout << "Adjusting onion!" << std::endl;
+            std::cout << GREEN_BEGIN << "Adjusting onion!" << COLOR_END << std::endl;
+	    
             std::pair<std::vector<std::unique_ptr<Delta> >,
                       std::list<std::string> >
                 out_data = adjustOnion(a, e.o, e.tm, e.fm, e.tolevel);

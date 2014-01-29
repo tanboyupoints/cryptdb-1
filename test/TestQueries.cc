@@ -23,7 +23,7 @@ static Connection * test;
 
 
 static FieldOnionState num_os =
-    {{"oEq", "RND"}, {"oOrder", "RND"}, {"oAGG", "HOM"}, {"oPLAIN", "RND"}};
+    {{"oEq", "RND"}, {"oOrder", "RND"}, {"oADD", "HOM"}, {"oPLAIN", "RND"}};
 static FieldOnionState str_os =
     {{"oEq", "RND"}, {"oOrder", "RND"}, {"oPLAIN", "RND"}};
 static DBOnionState insert_os =

@@ -618,7 +618,7 @@ terminalEscape(const std::string &s)
             continue;
         }
 
-        out.push_back('*');
+        out.push_back('?');
     }
 
     return out;
