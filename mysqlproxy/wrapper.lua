@@ -46,12 +46,52 @@ function read_query_result(inj)
     end
 end
 
+
+--
+-- Pretty printing
+--
+
+
+COLOR_END = '\027[00m'
+
+function redtext(x)
+    return '\027[1;31m' .. x .. COLOR_END
+end
+
+function greentext(x)
+    return '\027[1;92m'.. x .. COLOR_END
+end
+
+function orangetext(x)
+    return '\027[01;33m'.. x .. COLOR_END
+end
+
+function printred(x)
+     print(redtext(x), COLOR_END)
+end
+
+function printline(n)
+    -- pretty printing
+    if (n) then
+       io.write("+")
+    end
+    for i = 1, n do
+    	io.write("--------------------+")
+    end
+    print()
+end
+
+
+
+
 --
 -- Helper functions
 --
 
 RES_IGNORE   = 1
 RES_DECRYPT  = 2
+
+
 
 function dprint(x)
     if os.getenv("CRYPTDB_PROXY_DEBUG") then
@@ -61,7 +101,8 @@ end
 
 function read_query_real(packet)
     local query = string.sub(packet, 2)
-    print("read_query: " .. query)
+    print("================================================")
+    printred("QUERY: ".. query)
 
     if string.byte(packet) == proxy.COM_INIT_DB then
         query = "USE `" .. query .. "`"
@@ -86,7 +127,7 @@ function read_query_real(packet)
 
         dprint(" ")
         for i, v in pairs(new_queries) do
-            print("rewritten query[" .. i .. "]: " .. v)
+            print(greentext("NEW QUERY: ")..v)
             local result_key
             if i == table.maxn(new_queries) then
                 result_key = RES_DECRYPT
@@ -114,6 +155,7 @@ function read_query_result_real(inj)
     elseif inj.id == RES_DECRYPT then
         local resultset = inj.resultset
 
+
         -- note that queries which result in an error are never handed back
         -- to cryptdb ``proper''
         if resultset.query_status == proxy.MYSQLD_PACKET_ERR then
@@ -127,20 +169,39 @@ function read_query_result_real(inj)
             local rows = {}
             local query = inj.query:sub(2)
 
+	    print(greentext("ENCRYPTED RESULTS:"))
+
             -- mysqlproxy doesn't return real lua arrays, so re-package
             local resfields = resultset.fields
-            for i = 1, #resfields do
+
+	    printline(#resfields)
+	    if (#resfields) then
+	       io.write("|")
+	    end
+	    for i = 1, #resfields do
                 rfi = resfields[i]
                 fields[i] = { type = resfields[i].type,
                               name = resfields[i].name }
+		io.write(string.format("%-20s|",rfi.name))
             end
 
+	    print()
+	    printline(#resfields)
+	    
             local resrows = resultset.rows
             if resrows then
                 for row in resrows do
                     table.insert(rows, row)
+		    io.write("|")
+		    for key,value in pairs(row) do
+		    	io.write(string.format("%-20s|", value))
+		    end
+		    print()
+		    printline(#resfields)
                 end
             end
+
+
 
             -- Handle the backend of the query.
             status, rollbackd, error_msg, dfields, drows =

@@ -10,6 +10,7 @@
 #include <sql_list.h>
 #include <sql_table.h>
 
+const bool PRETTY_DEMO = true;
 const std::string BOLD_BEGIN = "\033[1m";
 const std::string RED_BEGIN = "\033[1;31m";
 const std::string GREEN_BEGIN = "\033[1;92m";

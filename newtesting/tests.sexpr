@@ -25,7 +25,7 @@
   ("SELECT age FROM test_insert")
   ("INSERT INTO test_insert (name) VALUES ('Wendy')")
   ("SELECT name FROM test_insert WHERE id=10"
-   (:update test_insert id oDET DET))
+   (:update test_insert id oEq DET))
   ("INSERT INTO test_insert (name, address, id, age)
                      VALUES ('Peter Pan', 'first star to the right and straight on till morning', 42, 10)")
   ("SELECT name, address, age FROM test_insert WHERE id=42")
@@ -43,9 +43,9 @@
   ("INSERT INTO test_select VALUES (4, 10, 0, 'London', 'Edmund')")
   ("INSERT INTO test_select VALUES (5, 30, 100000, '221B Baker Street', 'Sherlock Holmes')")
   ("SELECT * FROM test_select WHERE id IN (1, 2, 10, 20, 30)"
-   (:update test_select id oDET DET))
+   (:update test_select id oEq DET))
   ("SELECT * FROM test_select WHERE id BETWEEN 3 AND 5"
-   (:update test_select id oOPE OPE))
+   (:update test_select id oOrder OPE))
   ("SELECT NULLIF(1, id) FROM test_select")
   ("SELECT NULLIF(id, 1) FROM test_select")
   ("SELECT NULLIF(id, id) FROM test_select")
@@ -54,34 +54,34 @@
   ("SELECT * FROM test_select")
   ("SELECT max(id) FROM test_select")
   ("SELECT max(salary) FROM test_select"
-   (:update test_select salary oOPE OPE))
+   (:update test_select salary oOrder OPE))
   ("SELECT COUNT(*) FROM test_select")
   ("SELECT COUNT(DISTINCT age) FROM test_select"
-   (:update test_select age oDET DET))
+   (:update test_select age oEq DET))
   ("SELECT COUNT(DISTINCT(address)) FROM test_select"
-   (:update test_select address oDET DET))
+   (:update test_select address oEq DET))
   ("SELECT name FROM test_select")
   ("SELECT address FROM test_select")
   ("SELECT * FROM test_select WHERE id>3")
   ("SELECT * FROM test_select WHERE age = 8")
   ("SELECT * FROM test_select WHERE salary=15"
-   (:update test_select salary oDET DET))
+   (:update test_select salary oEq DET))
   ("SELECT * FROM test_select WHERE age > 10"
-   (:update test_select age oOPE OPE))
+   (:update test_select age oOrder OPE))
   ("SELECT * FROM test_select WHERE age = 10 AND salary = 0")
   ("SELECT * FROM test_select WHERE age = 10 OR salary = 0")
   ("SELECT * FROM test_select WHERE name = 'Peter Pan'"
-   (:update test_select name oDET DET))
+   (:update test_select name oEq DET))
   ("SELECT * FROM test_select WHERE address='Green Gables'")
   ("SELECT * FROM test_select WHERE address <= '221C'"
-   (:update test_select address oOPE OPE))
+   (:update test_select address oOrder OPE))
   ("SELECT * FROM test_select WHERE address >= 'Green Gables' AND age > 9")
   ("SELECT * FROM test_select WHERE address >= 'Green Gables' OR age > 9")
   ("SELECT * FROM test_select WHERE address < 'ffFFF'")
   ("SELECT * FROM test_select ORDER BY id")
   ("SELECT * FROM test_select ORDER BY salary")
   ("SELECT * FROM test_select ORDER BY name"
-   (:update test_select name oOPE OPE))
+   (:update test_select name oOrder OPE))
   ("SELECT * FROM test_select ORDER BY address")
   ("SELECT sum(age) FROM test_select GROUP BY address ORDER BY address")
   ("SELECT salary, max(id) FROM test_select GROUP BY salary ORDER BY salary")
@@ -172,19 +172,19 @@
   ("INSERT INTO test_join2 VALUES (4, 7, 'Edmund')")
   ("INSERT INTO test_join2 VALUES (10, 4, '221B Baker Street')")
   ("SELECT address FROM test_join1, test_join2 WHERE test_join1.id=test_join2.id"
-   (:update (test_join1 (id (oDET DETJOIN)))
-            (test_join2 (id (oDET DETJOIN)))))
+   (:update (test_join1 (id (oEq DETJOIN)))
+            (test_join2 (id (oEq DETJOIN)))))
   ("SELECT test_join1.id, test_join2.id, age, books, test_join2.name FROM test_join1, test_join2
      WHERE test_join1.id = test_join2.id")
   ("SELECT test_join1.name, age, salary, test_join2.name, books FROM test_join1, test_join2
      WHERE test_join1.age=test_join2.books"
-   (:update (test_join1 (age (oDET DETJOIN)))
-            (test_join2 (books (oDET DETJOIN)))))
+   (:update (test_join1 (age (oEq DETJOIN)))
+            (test_join2 (books (oEq DETJOIN)))))
   ("SELECT * FROM test_join1, test_join2 WHERE test_join1.name=test_join2.name"
-   (:update (test_join1 (name (oDET DETJOIN)))
-            (test_join2 (name (oDET DETJOIN)))))
+   (:update (test_join1 (name (oEq DETJOIN)))
+            (test_join2 (name (oEq DETJOIN)))))
   ("SELECT * FROM test_join1, test_join2 WHERE test_join1.address=test_join2.name"
-   (:update (test_join1 (address (oDET DETJOIN)))))
+   (:update (test_join1 (address (oEq DETJOIN)))))
   ("SELECT address FROM test_join1 AS a, test_join2 WHERE a.id=test_join2.id")
   ("SELECT a.id, b.id, age, books, b.name FROM test_join1 a, test_join2 AS b WHERE a.id=b.id")
   ("SELECT test_join1.name, age, salary, b.name, books FROM test_join1, test_join2 b
@@ -213,22 +213,22 @@
   ("UPDATE test_update SET salary=0")
   ("SELECT * FROM test_update")
   ("UPDATE test_update SET age=21 WHERE id = 6"
-   (:update test_update id oDET DET))
+   (:update test_update id oEq DET))
   ("SELECT * FROM test_update")
   ("UPDATE test_update SET address='Pemberly', name='Elizabeth Darcy' WHERE id=6")
   ("SELECT * FROM test_update")
   ("UPDATE test_update SET salary=55000 WHERE age=30"
-   (:update test_update age oDET DET))
+   (:update test_update age oEq DET))
   ("SELECT * FROM test_update")
   ("UPDATE test_update SET salary=20000 WHERE address='Pemberly'"
-   (:update test_update address oDET DET))
+   (:update test_update address oEq DET))
   ("SELECT * FROM test_update")
   ("SELECT age FROM test_update WHERE age > 20"
-   (:update test_update age oOPE OPE))
+   (:update test_update age oOrder OPE))
   ("SELECT id FROM test_update")
   ("SELECT sum(age) FROM test_update")
   ("UPDATE test_update SET age=20 WHERE name='Elizabeth Darcy'"
-   (:update test_update name oDET DET))
+   (:update test_update name oEq DET))
   ("SELECT * FROM test_update WHERE age > 20")
   ("SELECT sum(age) FROM test_update")
   ("UPDATE test_update SET age = age + 2")
@@ -237,7 +237,7 @@
      WHERE address = 'London'")
   ("SELECT * FROM test_update")
   ("SELECT * FROM test_update WHERE address < 'fml'"
-   (:update test_update address oOPE OPE))
+   (:update test_update address oOrder OPE))
   ("UPDATE test_update SET address = 'Neverland' WHERE id=1")
   ("SELECT * FROM test_update")
   ("DROP TABLE test_update"))
@@ -264,13 +264,13 @@
   ("SELECT SUM(age) FROM test_HOM")
   ("SELECT * FROM test_HOM")
   ("UPDATE test_HOM SET age = age + 3 WHERE id=1"
-   (:update test_HOM id oDET DET))
+   (:update test_HOM id oEq DET))
   ("SELECT * FROM test_HOM")
   ("UPDATE test_HOM SET age = 100 WHERE id = 1")
   ("SELECT * FROM test_HOM WHERE age = 100"
-   (:update test_HOM age oDET DET))
+   (:update test_HOM age oEq DET))
   ("SELECT COUNT(*) FROM test_HOM WHERE age > 100"
-   (:update test_HOM age oOPE OPE))
+   (:update test_HOM age oOrder OPE))
   ("SELECT COUNT(*) FROM test_HOM WHERE age < 100")
   ("SELECT COUNT(*) FROM test_HOM WHERE age <= 100")
   ("SELECT COUNT(*) FROM test_HOM WHERE age >= 100")
@@ -293,19 +293,19 @@
    ("INSERT INTO test_delete VALUES (7, 10000, 1, 'Mordor', 'Sauron')")
    ("INSERT INTO test_delete VALUES (8, 25, 100, 'The Heath', 'Eustacia Vye')")
    ("DELETE FROM test_delete WHERE id=1"
-    (:update test_delete id oDET DET))
+    (:update test_delete id oEq DET))
    ("SELECT * FROM test_delete")
    ("DELETE FROM test_delete WHERE age=30"
-    (:update test_delete age oDET DET))
+    (:update test_delete age oEq DET))
    ("SELECT * FROM test_delete")
    ("DELETE FROM test_delete WHERE name='Eustacia Vye'"
-    (:update test_delete name oDET DET))
+    (:update test_delete name oEq DET))
    ("SELECT * FROM test_delete")
    ("DELETE FROM test_delete WHERE address='London'"
-    (:update test_delete address oDET DET))
+    (:update test_delete address oEq DET))
    ("SELECT * FROM test_delete")
    ("DELETE FROM test_delete WHERE salary = 1"
-    (:update test_delete salary oDET DET))
+    (:update test_delete salary oEq DET))
    ("SELECT * FROM test_delete")
    ("INSERT INTO test_delete
           VALUES (1, 10, 0, 'first star to the right and straight on till morning','Peter Pan')")
@@ -330,8 +330,8 @@
    ;; no aliases
    ("DELETE gasoline, coal
        FROM gasoline INNER JOIN coal ON gasoline.x = coal.y"
-    (:update (gasoline (x (oDET DETJOIN)))
-             (coal     (y (oDET DETJOIN)))))
+    (:update (gasoline (x (oEq DETJOIN)))
+             (coal     (y (oEq DETJOIN)))))
    ("SELECT * FROM gasoline, coal, nuclear")
    ;; alias
    ("DELETE g, nuclear FROM gasoline g, nuclear")
@@ -360,20 +360,20 @@
  ("AutoInc" t
    ("CREATE TABLE msgs (msgid integer PRIMARY KEY AUTO_INCREMENT, zooanimals integer, msgtext text)"
     (:set (msgs (msgid (oPLAIN PLAINVAL))
-                (zooanimals (oDET RND)
-                            (oOPE RND)
-                            (oAGG HOM)
+                (zooanimals (oEq RND)
+                            (oOrder RND)
+                            (oADD HOM)
                             (oPLAIN RND))
-                (msgtext (oDET RND)
-                         (oOPE RND)
-                         (oAGG HOM)
+                (msgtext (oEq RND)
+                         (oOrder RND)
+                         (oADD HOM)
                          (oPLAIN RND)))))
    ("CREATE TABLE moremore (x INTEGER,
                             y integer PRIMARY KEY AUTO_INCREMENT)
                  AUTO_INCREMENT=456"
-    (:set (moremore (x (oDET RND)
-                       (oOPE RND)
-                       (oAGG HOM)
+    (:set (moremore (x (oEq RND)
+                       (oOrder RND)
+                       (oADD HOM)
                        (oPLAIN RND))
                     (y (oPLAIN PLAINVAL)))))
    ("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world', 100)")
@@ -460,31 +460,31 @@
   ("INSERT INTO test_null VALUES (1, 25, 'Australia')")
   ("SELECT * FROM test_null")
   ("SELECT * FROM test_null WHERE uid = 1"
-   (:update test_null uid oDET DET))
+   (:update test_null uid oEq DET))
   ("SELECT * FROM test_null WHERE age < 50"
-   (:update test_null age oOPE OPE))
+   (:update test_null age oOrder OPE))
   ("SELECT SUM(uid) FROM test_null")
   ("SELECT MAX(uid) FROM test_null"
-   (:update test_null uid oOPE OPE))
+   (:update test_null uid oOrder OPE))
   ("SELECT * FROM test_null")
   ("SELECT * FROM test_null WHERE address = 'cookies'"
-   (:update test_null address oDET DET))
+   (:update test_null address oEq DET))
   ("SELECT * FROM test_null WHERE address < 'amber'"
-   (:update test_null address oOPE OPE))
+   (:update test_null address oOrder OPE))
   ("SELECT * FROM test_null WHERE address LIKE 'aaron'"
    (:update test_null address oPLAIN PLAINVAL))
   ("SELECT * FROM test_null LEFT JOIN u_null
         ON test_null.uid = u_null.uid"
-   (:update (test_null (uid (oDET DETJOIN)))
-            (u_null (uid (oDET DETJOIN)))))
+   (:update (test_null (uid (oEq DETJOIN)))
+            (u_null (uid (oEq DETJOIN)))))
   ("SELECT * FROM test_null, u_null")
   ("SELECT * FROM test_null RIGHT JOIN u_null
         ON test_null.uid = u_null.uid")
   ("SELECT * FROM test_null, u_null")
   ("SELECT * FROM test_null RIGHT JOIN u_null
         ON test_null.address = u_null.username"
-   (:update (test_null (address (oDET DETJOIN)))
-            (u_null (username (oDET DETJOIN)))))
+   (:update (test_null (address (oEq DETJOIN)))
+            (u_null (username (oEq DETJOIN)))))
   ("SELECT * FROM test_null, u_null")
   ("SELECT * FROM test_null LEFT JOIN u_null
         ON u_null.username = test_null.address")
@@ -514,12 +514,12 @@
    ("SELECT 2*x*2*y FROM t"
     :check)
    ("SELECT x, y FROM t WHERE x AND y"
-    (:update ("t" (x (oDET DET))
-                  (y (oDET DET)))))
+    (:update ("t" (x (oEq DET))
+                  (y (oEq DET)))))
    ("SELECT x, y FROM t WHERE x = 1 AND y < 200"
-    (:update ("t" (y (oOPE OPE)))))
+    (:update ("t" (y (oOrder OPE)))))
    ("SELECT x, y FROM t WHERE x AND y = 15"
-    (:update "t" y oDET DET))
+    (:update "t" y oEq DET))
    ("SELECT 10, x+y FROM t WHERE x"
     :check)
    ("DROP TABLE t"))
@@ -546,11 +546,11 @@
                                      (99, 'happybday!')")
    ("SELECT * FROM def_0, def_1")
    ("SELECT * FROM def_0 WHERE x = 10"
-    (:update def_0 x oDET DET)) 
+    (:update def_0 x oEq DET)) 
    ("INSERT INTO def_0 (z) VALUES (500), (12), (19)")
    ("SELECT * FROM def_0 WHERE x = 10")
    ("SELECT * FROM def_0 WHERE y = 'purpflowers'"
-    (:update def_0 y oDET DET)) 
+    (:update def_0 y oEq DET)) 
    ("INSERT INTO def_0 (z) VALUES (450), (200), (300)")
    ("SELECT * FROM def_0 WHERE y = 'purpflowers'")
    ("SELECT * FROM def_0, def_1"
@@ -591,9 +591,9 @@
    ("INSERT INTO not_strict VALUES (850, 930, 'rainbow')")
    ("INSERT INTO not_strict (y) VALUES (11930)")
    ("SELECT * FROM not_strict WHERE x = 0"
-    (:update not_strict x oDET DET))
+    (:update not_strict x oEq DET))
    ("SELECT * FROM not_strict WHERE z = ''"
-    (:update not_strict z oDET DET))
+    (:update not_strict z oEq DET))
    ("INSERT INTO not_strict (y) VALUES (1212)")
    ("SELECT * FROM not_strict WHERE x = 0")
    ("SELECT * FROM not_strict WHERE z = ''")
@@ -603,7 +603,7 @@
    ("SELECT * FROM not_strict WHERE x = 0")
    ("SELECT * FROM not_strict WHERE z = ''")
    ("SELECT * FROM not_strict WHERE x < 110"
-    (:update not_strict x oOPE OPE))
+    (:update not_strict x oOrder OPE))
    ("SELECT * FROM not_strict"
     :check)
    ("DROP TABLE not_strict"))
@@ -643,7 +643,7 @@
   ("START TRANSACTION")
   ;; query should fail as it's onion adjustment inside a transaction
   ("UPDATE trans SET a = a + 1, c = 50 WHERE a < 50000"
-   (:update trans a oOPE OPE)
+   (:update trans a oOrder OPE)
    :cryptdb
    :must-fail)
   ;; freeze things in case something went wrong
@@ -653,7 +653,7 @@
   ("INSERT INTO trans VALUES (1, 50, 150)")
   ;; query should fail as it's onion adjustment inside a transaction
   ("UPDATE trans SET b = b + 10 WHERE c = 50"
-   (:update trans c oDET DET)
+   (:update trans c oEq DET)
    :cryptdb
    :must-fail)
   ("ROLLBACK"
@@ -681,20 +681,20 @@
   ("SELECT s.a, e.b FROM star AS s INNER JOIN mercury AS e
         ON s.a = e.a
      WHERE s.c < 100"
-   (:update (star (a (oDET DETJOIN))
-                  (c (oOPE OPE)))
-            (mercury (a (oDET DETJOIN)))))
+   (:update (star (a (oEq DETJOIN))
+                  (c (oOrder OPE)))
+            (mercury (a (oEq DETJOIN)))))
   ("SELECT * FROM mercury INNER JOIN mercury AS e
         ON mercury.a = e.a")
   ("SELECT o.x, o.y FROM moon AS o INNER JOIN moon AS o2
         ON o.x = o2.y"
-   (:update (moon (x (oDET DETJOIN))
-                  (y (oDET DETJOIN)))))
+   (:update (moon (x (oEq DETJOIN))
+                  (y (oEq DETJOIN)))))
   ("SELECT mercury.a, mercury.b, e.a
       FROM star AS mercury
      INNER JOIN mercury AS e ON (mercury.a = e.a)
      WHERE mercury.b <> 18 AND mercury.b <> 15"
-   (:update star b oDET DET))
+   (:update star b oEq DET))
   ;; throws an exception
   ; ("SELECT * FROM star AS q
   ;    WHERE a IN (SELECT a FROM mercury)")
@@ -738,7 +738,7 @@
   ("ALTER TABLE ddl_test DROP INDEX i, ADD INDEX i(b)")
   ("ALTER TABLE ddl_test DROP INDEX i")
   ("DROP TABLE ddl_test"))
- ;;; the oDET column will encrypt three times and all three of these will pad;
+ ;;; the oEq column will encrypt three times and all three of these will pad;
  ;;; the mysql's maximum field size is 2**32 - 1; so the maximum field size
  ;;; we support is 2**32 - 1 - (3 * AES_BLOCK_BYTES)
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -816,7 +816,7 @@
          VALUES (1, 'quoting'), (12, 'shouldn;tbe'), (100, 'hard')")
   ("SELECT * FROM `hard-+=quotes`")
   ("SELECT * FROM `hard-+=quotes` WHERE `!@abc` < 1200"
-   (:update "over+there" "hard-+=quotes" "!@abc" oOPE OPE))
+   (:update "over+there" "hard-+=quotes" "!@abc" oOrder OPE))
   ("SELECT * FROM `hard-+=quotes`")
   ("SELECT * FROM `more+quotes`")
   ("SELECT * FROM `over+there`.`more+quotes`"
@@ -846,7 +846,7 @@
    :must-fail)
   ;; specity duplicate directive parameters for one directive
   ("SET @cryptdb='adjust', @database='cryptdbtest', @table='directives',
-        @field='x', @oOPE='OPE', @field='z'"
+        @field='x', @oOrder='OPE', @field='z'"
    ()
    :cryptdb
    :must-fail)
@@ -861,14 +861,14 @@
   ;; try to adjust a non existent table
   ("SET @cryptdb='adjust', @table='notrealnotreal',
         @database='cryptdbtest', @field='doesntmatter',
-        @oOPE='OPE'"
+        @oOrder='OPE'"
    ()
    :cryptdb
    :must-fail)
   ("SELECT * FROM directives")
   ;; try to adjust a non existent field
   ("SET @cryptdb='adjust', @database='cryptdbtest',
-        @oOPE='OPE', @table='directives',
+        @oOrder='OPE', @table='directives',
         @field='made-up'"
    ()
    :cryptdb
@@ -885,7 +885,7 @@
   ;; try to adjust to non existent level
   ("SET @database='cryptdbtest'
         @table='directives', @field='x',
-        @oOPE='unreality', @cryptdb='adjust'"
+        @oOrder='unreality', @cryptdb='adjust'"
    ()
    :cryptdb
    :must-fail)
@@ -894,7 +894,7 @@
   ;; > FIXME: handling of this is not nice
   ("SET @cryptdb='adjust', @database='cryptdbtest',
         @table='directives', @field='x',
-        @oOPE='HOM'"
+        @oOrder='HOM'"
    ()
    :cryptdb
    :must-fail)
@@ -902,12 +902,12 @@
   ;; do real adjustment
   ("SET @table='directives', @database='cryptdbtest',
         @cryptdb='adjust', @field='x',
-        @oOPE='OPE'")
+        @oOrder='OPE'")
   ("SELECT * FROM directives WHERE x < 100")
   ;; do it again (adjust to current level)
   ("SET @cryptdb='adjust', @database='cryptdbtest',
         @table='directives', @field='x',
-        @oOPE='OPE'")
+        @oOrder='OPE'")
   ("SELECT * FROM directives WHERE x < 100")
   ("SET @cryptdb='show', @random='stuff', @nothing='nothing'"
    ()
@@ -916,7 +916,7 @@
   ;; try to adjust upwards
   ("SET @cryptdb='adjust', @database='cryptdbtest',
         @table='directives', @field='x',
-        @oOPE='RND'"
+        @oOrder='RND'"
    ()
    :cryptdb
    :must-fail)
@@ -924,26 +924,26 @@
   ;; do multiple adjustments to same onion
   ;; NOTE: unsupported
   ("SET @cryptdb='adjust', @database='cryptdbtest',
-        @oDET='DETJOIN', @table='directives', @field='x',
-        @oDET='DET'"
+        @oEq='DETJOIN', @table='directives', @field='x',
+        @oEq='DET'"
    ()
    :cryptdb
    :must-fail)
   ("SELECT * FROM directives")
   ;; adjust down multiple layers
   ("SET @cryptdb='adjust', @database='cryptdbtest',
-        @oDET='DETJOIN', @table='directives', @field='x'")
+        @oEq='DETJOIN', @table='directives', @field='x'")
   ("SELECT * FROM directives WHERE x = 1")
   ;; multiple adjustments to different onions
   ("SET @cryptdb='adjust', @database='cryptdbtest',
         @table='directives', @field='y',
-        @oDET='DET', @oOPE='OPE'")
+        @oEq='DET', @oOrder='OPE'")
   ("SELECT * FROM directives WHERE y < 'somerandomtext'")
   ("SELECT * FROM directives WHERE y = 'moretext'")
   ;; do a good adjustment and one that won't do anything
   ("SET @cryptdb='adjust', @database='cryptdbtest',
         @table='directives', @field='z',
-        @oDET='DET', @oOPE='RND'")
+        @oEq='DET', @oOrder='RND'")
   ("SELECT * FROM directives WHERE z = 8")
   ("SET @more='less', @cryptdb='show', @nothing='short'"
    ()
@@ -1113,7 +1113,7 @@
  ("INSERT INTO ubug VALUES (1), (2)")
  ;; this must happen _before_ onion adjustment
  ("UPDATE ubug SET x = x + 1 WHERE x < 2"
-  (:update ubug x oOPE OPE)
+  (:update ubug x oOrder OPE)
   :both
   :must-fail)
  ("SELECT * FROM ubug")
@@ -1131,7 +1131,7 @@
  ("INSERT INTO ubug2 VALUES (1), (2)")
  ;; onion adjust before we do the bad update
  ("SELECT * FROM ubug2 WHERE x < 2"
-  (:update ubug2 x oOPE OPE))
+  (:update ubug2 x oOrder OPE))
  ("UPDATE ubug2 SET x = x + 1 WHERE x < 2"
   ()
   :both
@@ -1151,7 +1151,7 @@
                       (oAGG HOM)
                       (oPLAIN RND)))))
  ("SELECT * FROM ubug_trx WHERE x < 2"
-  (:update ubug_trx x oOPE OPE))
+  (:update ubug_trx x oOrder OPE))
  ("INSERT INTO ubug_trx VALUES (0)")
  ("START TRANSACTION")
  ("INSERT INTO ubug_trx VALUES (1), (2)")

@@ -14,7 +14,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_commentmeta" "comment_id" "oDET" "DET"))
+                 DB '("wp_commentmeta" "comment_id" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -30,7 +30,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_commentmeta" "meta_key" "oDET" "DET"))
+                 DB '("wp_commentmeta" "meta_key" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -38,7 +38,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_commentmeta" "meta_value" "oOPE" "OPE"))
+                 DB '("wp_commentmeta" "meta_value" "oOrder" "OPE"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -54,7 +54,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_comments" "comment_approved" "oDET" "DET"))
+                 DB '("wp_comments" "comment_approved" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -62,7 +62,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_comments" "comment_author" "oDET" "DET"))
+                 DB '("wp_comments" "comment_author" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -70,7 +70,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_comments" "comment_author_email" "oDET" "DET"))
+                 DB '("wp_comments" "comment_author_email" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -78,7 +78,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_comments" "comment_author_url" "oDET" "DET"))
+                 DB '("wp_comments" "comment_author_url" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -86,7 +86,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_comments" "comment_content" "oDET" "DET"))
+                 DB '("wp_comments" "comment_content" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -110,7 +110,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_comments" "comment_parent" "oDET" "DET"))
+                 DB '("wp_comments" "comment_parent" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -118,7 +118,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_comments" "comment_post_ID" "oDET" "DET"))
+                 DB '("wp_comments" "comment_post_ID" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -134,7 +134,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_comments" "user_id" "oDET" "DET"))
+                 DB '("wp_comments" "user_id" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -158,7 +158,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_options" "autoload" "oDET" "DET"))
+                 DB '("wp_options" "autoload" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -174,7 +174,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_options" "option_name" "oDET" "DET"))
+                 DB '("wp_options" "option_name" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -198,7 +198,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_postmeta" "meta_key" "oDET" "DET"))
+                 DB '("wp_postmeta" "meta_key" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -206,7 +206,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_postmeta" "meta_key" "oOPE" "OPE"))
+                 DB '("wp_postmeta" "meta_key" "oOrder" "OPE"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -222,7 +222,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_postmeta" "meta_value" "oDET" "DET"))
+                 DB '("wp_postmeta" "meta_value" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -230,7 +230,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_postmeta" "meta_value" "oOPE" "OPE"))
+                 DB '("wp_postmeta" "meta_value" "oOrder" "OPE"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -238,7 +238,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_postmeta" "post_id" "oDET" "DET"))
+                 DB '("wp_postmeta" "post_id" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -262,7 +262,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_posts" "menu_order" "oOPE" "OPE"))
+                 DB '("wp_posts" "menu_order" "oOrder" "OPE"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -270,7 +270,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_posts" "post_author" "oDET" "DET"))
+                 DB '("wp_posts" "post_author" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -294,7 +294,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_posts" "post_mime_type" "oDET" "DET"))
+                 DB '("wp_posts" "post_mime_type" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -318,7 +318,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_posts" "post_name" "oDET" "DET"))
+                 DB '("wp_posts" "post_name" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -334,7 +334,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_posts" "post_parent" "oDET" "DET"))
+                 DB '("wp_posts" "post_parent" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -342,7 +342,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_posts" "post_parent" "oOPE" "OPE"))
+                 DB '("wp_posts" "post_parent" "oOrder" "OPE"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -350,7 +350,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_posts" "post_status" "oDET" "DET"))
+                 DB '("wp_posts" "post_status" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -358,7 +358,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_posts" "post_title" "oOPE" "OPE"))
+                 DB '("wp_posts" "post_title" "oOrder" "OPE"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -366,7 +366,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_posts" "post_type" "oDET" "DET"))
+                 DB '("wp_posts" "post_type" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -374,7 +374,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_posts" "to_ping" "oDET" "DET"))
+                 DB '("wp_posts" "to_ping" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -382,7 +382,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_term_relationships" "object_id" "oDET" "DET"))
+                 DB '("wp_term_relationships" "object_id" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -398,7 +398,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_term_relationships" "term_taxonomy_id" "oDET" "DET"))
+                 DB '("wp_term_relationships" "term_taxonomy_id" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -406,7 +406,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_term_relationships" "term_taxonomy_id" "oOPE" "OPE"))
+                 DB '("wp_term_relationships" "term_taxonomy_id" "oOrder" "OPE"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -424,7 +424,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_term_taxonomy" "count" "oOPE" "OPE"))
+                 DB '("wp_term_taxonomy" "count" "oOrder" "OPE"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -432,7 +432,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_term_taxonomy" "taxonomy" "oDET" "DET"))
+                 DB '("wp_term_taxonomy" "taxonomy" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -440,7 +440,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_term_taxonomy" "term_id" "oDET" "DET"))
+                 DB '("wp_term_taxonomy" "term_id" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -465,7 +465,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_terms" "name" "oDET" "DET"))
+                 DB '("wp_terms" "name" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -473,7 +473,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_terms" "name" "oOPE" "OPE"))
+                 DB '("wp_terms" "name" "oOrder" "OPE"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -481,7 +481,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_terms" "slug" "oDET" "DET"))
+                 DB '("wp_terms" "slug" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -497,7 +497,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_usermeta" "meta_key" "oDET" "DET"))
+                 DB '("wp_usermeta" "meta_key" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -521,7 +521,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_usermeta" "user_id" "oDET" "DET"))
+                 DB '("wp_usermeta" "user_id" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -545,7 +545,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_users" "display_name" "oOPE" "OPE"))
+                 DB '("wp_users" "display_name" "oOrder" "OPE"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -553,7 +553,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_users" "user_email" "oDET" "DET"))
+                 DB '("wp_users" "user_email" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -561,7 +561,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_users" "user_login" "oDET" "DET"))
+                 DB '("wp_users" "user_login" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -569,7 +569,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_users" "user_login" "oOPE" "OPE"))
+                 DB '("wp_users" "user_login" "oOrder" "OPE"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',
@@ -577,7 +577,7 @@
                                          @table='~A',
                                          @field='~A',
                                          @~A='~A'"
-                 DB '("wp_users" "user_nicename" "oDET" "DET"))
+                 DB '("wp_users" "user_nicename" "oEq" "DET"))
           :DATABASE CONN)
          (CLSQL-SYS:QUERY
           (APPLY #'FORMAT NIL "SET @cryptdb='adjust',

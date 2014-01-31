@@ -269,9 +269,9 @@
                   `(,(nest-unmatched-keys unmatched-keys seclevel))))))
 
 (defun max-level? (onion seclevel)
-  (cond ((member onion '("oDET" "oOPE" "oPLAIN") :test #'string-equal)
+  (cond ((member onion '("oEq" "oOrder" "oPLAIN") :test #'string-equal)
          (string-equal "RND" seclevel))
-        ((string-equal "oAGG" onion) (string-equal "HOM" seclevel))))
+        ((string-equal "oADD" onion) (string-equal "HOM" seclevel))))
 
 ;;; change our local copy of the onion state
 (defmethod update-onion-state! ((onions onion-state) onion-check)
@@ -307,7 +307,8 @@
           (unless (or (not (string-equal max-database database))
                       (not (string-equal max-table table))
                       (max-level? onion seclevel))
-            ; (break)
+	    
+	    ;(break)
             (setf output nil))
           ;; update our local copy of onion state
           ;; > we cannot use (setf lookup-seclevel) because the local onion
@@ -317,7 +318,7 @@
     (dolist (checks (cdr onion-check) t)
       (do-structure ((database table field onion seclevel) checks)
         (unless (add-onion! onions database table field onion seclevel)
-          ; (break)
+          ;(break)
           (return nil)))))
   (:method (connections (onions onion-state) (type (eql :update)) onion-check)
     (update-onion-state! onions onion-check)
@@ -330,7 +331,7 @@
           (declare (ignore id))
           (unless (string-equal seclevel
                                 (lookup-seclevel onions database table field onion))
-            ; (break)
+            ;(break)
             ;; setting a flag instead of shortcircuiting causes us to continue
             ;; updating seclevel's after failure
             (setf output nil))
@@ -361,7 +362,7 @@
     (incf (group-score-wins *score*)))
   (:method ((value (eql nil)))
     (declare (special *score*))
-    ; (break)
+    ;(break)
     (incf (group-score-fails *score*))))
 
 (defun fast-compare (results-a results-b)
@@ -381,11 +382,11 @@
          t)
         ((or (not (query-result-status results-a))
              (not (query-result-status results-b)))
-         ; (break)
+         ;(break)
          nil)
         ((not (equal (query-result-fields results-a)
                      (query-result-fields results-b)))
-         ; (break)
+         ;(break)
          nil)
         (t ;; cryptdb returns all results as strings while the normal
            ;; database uses numbers and such
@@ -456,6 +457,10 @@
           ;; local onions even if the results don't match
           (let ((onion-check-result
                  (handle-onion-checks connections onions onion-checks)))
+	    ;(format t "~%~%Onion-check-result ~A~%~%" onion-check-result)
+	    ;(format t "cryptdb results~A~%" cryptdb-results)
+	    ;(format t "plain results~A~%" plain-results)
+	    ;(break)
             (update-score
               (ecase testing-strategy
                 (:must-succeed (query-result-status cryptdb-results))
