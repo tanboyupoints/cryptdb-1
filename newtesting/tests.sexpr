@@ -1007,7 +1007,8 @@
   ("SET @cryptdb='unsensitive',
         @database='cryptdbtest', @table='sense', @field='y'")
   ("SELECT * FROM sense"
-   :check))
+   :check)
+  ("DROP TABLE sense"))
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;           range
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1105,7 +1106,10 @@
 ("UpdateBugs" t
  ;; SCENARIO 1: onion adjustment during UPDATE
  ("CREATE TABLE ubug (x integer primary key)"
-  (:all-max "ubug"))
+  (:set (ubug (x (oDET DET)
+                 (oOPE RND)
+                 (oAGG HOM)
+                 (oPLAIN RND)))))
  ("INSERT INTO ubug VALUES (1), (2)")
  ;; this must happen _before_ onion adjustment
  ("UPDATE ubug SET x = x + 1 WHERE x < 2"
@@ -1120,7 +1124,10 @@
 
  ;; SCENARIO 2: onion adjustment before UPDATE
  ("CREATE TABLE ubug2 (x integer primary key)"
-  (:all-max ubug2))
+  (:set (ubug2 (x (oDET DET)
+                  (oOPE RND)
+                  (oAGG HOM)
+                  (oPLAIN RND)))))
  ("INSERT INTO ubug2 VALUES (1), (2)")
  ;; onion adjust before we do the bad update
  ("SELECT * FROM ubug2 WHERE x < 2"
@@ -1139,7 +1146,10 @@
 
  ;; SCENARIO 2 WITH TRANSACTION
  ("CREATE TABLE ubug_trx (x integer primary key)"
-  (:all-max "ubug_trx"))
+   (:set (ubug_trx (x (oDET DET)
+                      (oOPE RND)
+                      (oAGG HOM)
+                      (oPLAIN RND)))))
  ("SELECT * FROM ubug_trx WHERE x < 2"
   (:update ubug_trx x oOPE OPE))
  ("INSERT INTO ubug_trx VALUES (0)")

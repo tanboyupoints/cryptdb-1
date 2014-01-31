@@ -25,11 +25,11 @@ DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
     std::vector<DBMeta *> out_vec;
     std::unique_ptr<DBResult> db_res;
     const std::string parent_id = std::to_string(this->getDatabaseID());
-    const std::string serials_query = 
+    const std::string serials_query =
         " SELECT " + table_name + ".serial_object,"
         "        " + table_name + ".serial_key,"
         "        " + table_name + ".id"
-        " FROM " + table_name + 
+        " FROM " + table_name +
         " WHERE " + table_name + ".parent_id"
         "   = " + parent_id + ";";
     TEST_TextMessageError(e_conn->execute(serials_query, &db_res),
@@ -53,11 +53,12 @@ DBMeta::doFetchChildren(const std::unique_ptr<Connect> &e_conn,
 
 OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels,
                      const AES_KEY * const m_key,
-                     Create_field * const cf, unsigned long uniq_count)
+                     const Create_field &cf, unsigned long uniq_count,
+                     SECLEVEL minimum_seclevel)
     : onionname(getpRandomName() + TypeText<onion>::toText(o)),
-      uniq_count(uniq_count)
+      uniq_count(uniq_count), minimum_seclevel(minimum_seclevel)
 {
-    Create_field * newcf = cf;
+    const Create_field * newcf = &cf;
     //generate enclayers for encrypted field
     const std::string uniqueFieldName = this->getAnonOnionName();
     for (auto l: levels) {
@@ -65,9 +66,9 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels,
             m_key ? getLayerKey(m_key, uniqueFieldName, l)
                   : "plainkey";
         std::unique_ptr<EncLayer>
-            el(EncLayerFactory::encLayer(o, l, newcf, key));
+            el(EncLayerFactory::encLayer(o, l, *newcf, key));
 
-        Create_field * const oldcf = newcf;
+        const Create_field &oldcf = *newcf;
         newcf = el->newCreateField(oldcf);
 
         this->layers.push_back(std::move(el));
@@ -78,21 +79,23 @@ std::unique_ptr<OnionMeta>
 OnionMeta::deserialize(unsigned int id, const std::string &serial)
 {
     assert(id != 0);
-    const auto vec = unserialize_string(serial); 
-    assert(2 == vec.size());
+    const auto vec = unserialize_string(serial);
+    assert(3 == vec.size());
 
     const std::string onionname = vec[0];
     const unsigned int uniq_count = atoi(vec[1].c_str());
+    const SECLEVEL minimum_seclevel = TypeText<SECLEVEL>::toType(vec[2]);
 
     return std::unique_ptr<OnionMeta>
-        (new OnionMeta(id, onionname, uniq_count));
+        (new OnionMeta(id, onionname, uniq_count, minimum_seclevel));
 }
 
 std::string OnionMeta::serialize(const DBObject &parent) const
 {
     const std::string &serial =
         serialize_string(this->onionname) +
-        serialize_string(std::to_string(this->uniq_count));
+        serialize_string(std::to_string(this->uniq_count)) +
+        serialize_string(TypeText<SECLEVEL>::toText(this->minimum_seclevel));
 
     return serial;
 }
@@ -225,10 +228,42 @@ FieldMeta::deserialize(unsigned int id, const std::string &serial)
                        default_value, sensitive));
 }
 
+// first element is the levels that the onionmeta should implement
+// second element is the minimum level that should be gone down too
+static std::pair<std::vector<SECLEVEL>, SECLEVEL>
+determineSecLevelData(onion o, std::vector<SECLEVEL> levels, bool unique)
+{
+    if (false == unique) {
+        return std::make_pair(levels, levels.front());
+    }
+
+    // the oDET onion should start at DET and stay at DET
+    if (oDET == o) {
+        assert(SECLEVEL::RND == levels.back());
+        levels.pop_back();
+        assert(SECLEVEL::DET == levels.back());
+        return std::make_pair(levels, levels.back());
+    }
+
+    // oPLAIN may be starting at PLAINVAL if we have an autoincrement column
+    if (oPLAIN == o) {
+        assert(SECLEVEL::PLAINVAL == levels.back()
+               || SECLEVEL::RND == levels.back());
+    } else if (oOPE == o) {
+        assert(SECLEVEL::RND == levels.back());
+    } else if (oAGG == o) {
+        assert(SECLEVEL::HOM == levels.back());
+    } else {
+        assert(false);
+    }
+
+    return std::make_pair(levels, levels.back());
+}
+
 // If mkey == NULL, the field is not encrypted
 static bool
-init_onions_layout(const AES_KEY *const m_key,
-                   FieldMeta *const fm, Create_field *const cf)
+init_onions_layout(const AES_KEY *const m_key, FieldMeta *const fm,
+                   const Create_field &cf, bool unique)
 {
     const onionlayout onion_layout = fm->getOnionLayout();
     if (fm->getHasSalt() != (static_cast<bool>(m_key)
@@ -240,16 +275,17 @@ init_onions_layout(const AES_KEY *const m_key,
         return false;
     }
 
-    // we only support the creation of UNSIGNED fields
-    cf->flags = cf->flags | UNSIGNED_FLAG;
-
     for (auto it: onion_layout) {
         const onion o = it.first;
-        const std::vector<SECLEVEL> levels = it.second;
+        const std::vector<SECLEVEL> &levels = it.second;
+
+        const std::pair<std::vector<SECLEVEL>, SECLEVEL> level_data =
+            determineSecLevelData(o, levels, unique);
         // A new OnionMeta will only occur with a new FieldMeta so
         // we never have to build Deltaz for our OnionMetaz.
         std::unique_ptr<OnionMeta>
-            om(new OnionMeta(o, levels, m_key, cf, fm->leaseCount()));
+            om(new OnionMeta(o, std::get<0>(level_data), m_key, cf,
+                             fm->leaseCount(), std::get<1>(level_data)));
         const std::string &onion_name = om->getAnonOnionName();
         fm->addChild(OnionMetaKey(o), std::move(om));
 
@@ -260,11 +296,13 @@ init_onions_layout(const AES_KEY *const m_key,
     return true;
 }
 
-FieldMeta::FieldMeta(const std::string &name, Create_field * const field,
+FieldMeta::FieldMeta(const Create_field &field,
                      const AES_KEY * const m_key,
                      SECURITY_RATING sec_rating,
-                     unsigned long uniq_count)
-    : fname(name), salt_name(BASE_SALT_NAME + getpRandomName()),
+                     unsigned long uniq_count,
+                     bool unique)
+    : fname(std::string(field.field_name)),
+      salt_name(BASE_SALT_NAME + getpRandomName()),
       onion_layout(determineOnionLayout(m_key, field, sec_rating)),
       has_salt(static_cast<bool>(m_key)
               && onion_layout != PLAIN_ONION_LAYOUT),
@@ -273,7 +311,7 @@ FieldMeta::FieldMeta(const std::string &name, Create_field * const field,
       default_value(determineDefaultValue(has_default, field)),
       sensitive(false)
 {
-    TEST_TextMessageError(init_onions_layout(m_key, this, field),
+    TEST_TextMessageError(init_onions_layout(m_key, this, field, unique),
                           "Failed to build onions for new FieldMeta!");
 }
 
@@ -343,7 +381,7 @@ OnionMeta *FieldMeta::getOnionMeta(onion o) const
 }
 
 onionlayout FieldMeta::determineOnionLayout(const AES_KEY *const m_key,
-                                            const Create_field *const f,
+                                            const Create_field &f,
                                             SECURITY_RATING sec_rating)
 {
     if (sec_rating == SECURITY_RATING::PLAIN) {
@@ -354,7 +392,7 @@ onionlayout FieldMeta::determineOnionLayout(const AES_KEY *const m_key,
     TEST_TextMessageError(m_key,
                           "Should be using SECURITY_RATING::PLAIN!");
 
-    if (false == encryptionSupported(*f)) {
+    if (false == encryptionSupported(f)) {
         TEST_TextMessageError(SECURITY_RATING::SENSITIVE != sec_rating,
                               "A SENSITIVE security rating requires the"
                               " field to be supported with cryptography!");
@@ -362,18 +400,18 @@ onionlayout FieldMeta::determineOnionLayout(const AES_KEY *const m_key,
     }
 
     // Don't encrypt AUTO_INCREMENT.
-    if (Field::NEXT_NUMBER == f->unireg_check) {
+    if (Field::NEXT_NUMBER == f.unireg_check) {
         return PLAIN_ONION_LAYOUT;
     }
 
     if (SECURITY_RATING::SENSITIVE == sec_rating) {
-        if (true == isMySQLTypeNumeric(*f)) {
+        if (true == isMySQLTypeNumeric(f)) {
             return NUM_ONION_LAYOUT;
         } else {
             return STR_ONION_LAYOUT;
         }
     } else if (SECURITY_RATING::BEST_EFFORT == sec_rating) {
-        if (true == isMySQLTypeNumeric(*f)) {
+        if (true == isMySQLTypeNumeric(f)) {
             return BEST_EFFORT_NUM_ONION_LAYOUT;
         } else {
             return BEST_EFFORT_STR_ONION_LAYOUT;
@@ -386,13 +424,13 @@ onionlayout FieldMeta::determineOnionLayout(const AES_KEY *const m_key,
 
 // mysql is handling default values for fields with implicit defaults that
 // allow NULL; these implicit defaults being NULL.
-bool FieldMeta::determineHasDefault(const Create_field *const cf)
+bool FieldMeta::determineHasDefault(const Create_field &cf)
 {
-    return cf->def || cf->flags & NOT_NULL_FLAG;
+    return cf.def || cf.flags & NOT_NULL_FLAG;
 }
 
 std::string FieldMeta::determineDefaultValue(bool has_default,
-                                             const Create_field *const cf)
+                                             const Create_field &cf)
 {
     const static std::string zero_string = "'0'";
     const static std::string empty_string = "";
@@ -402,10 +440,10 @@ std::string FieldMeta::determineDefaultValue(bool has_default,
         return empty_string;
     }
 
-    if (cf->def) {
-        return ItemToString(*cf->def);
+    if (cf.def) {
+        return ItemToString(*cf.def);
     } else {
-        if (true == isMySQLTypeNumeric(*cf)) {
+        if (true == isMySQLTypeNumeric(cf)) {
             return zero_string;
         } else {
             return empty_string;

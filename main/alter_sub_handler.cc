@@ -17,16 +17,20 @@ class AddColumnSubHandler : public AlterSubHandler {
     {
         TableMeta &tm = a.getTableMeta(preamble.dbname, preamble.table);
 
+        // collect the keys (and their types) as they may affect the onion
+        // layout we use
+        const auto &key_data = collectKeyData(*lex);
+
         // Create *Meta objects.
         auto add_it =
             List_iterator<Create_field>(lex->alter_info.create_list);
         lex->alter_info.create_list =
             accumList<Create_field>(add_it,
-                [&a, &ps, &tm] (List<Create_field> out_list,
-                                Create_field *cf)
+                [&a, &ps, &tm, &key_data] (List<Create_field> out_list,
+                                           Create_field *cf)
             {
                     return createAndRewriteField(a, ps, cf, &tm,
-                                                 false, out_list);
+                                                 false, key_data, out_list);
             });
 
         return lex;
