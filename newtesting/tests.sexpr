@@ -1118,6 +1118,8 @@
  ;;        update bugs
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; > we were issuing the DELETE but failing to ROLLBACK when our INSERT failed
+ ;;   + the failure occurs becase the update causes duplicate entries on a 
+ ;;     PRIMARY KEY
 ("UpdateBugs" t
  ;; SCENARIO 1: onion adjustment during UPDATE
  ("CREATE TABLE ubug (x integer primary key)"
@@ -1125,6 +1127,9 @@
                  (oOrder RND)
                  (oAdd HOM)
                  (oPLAIN RND)))))
+ ("SET @cryptdb='sensitive',
+       @database='cryptdbtest', @table='ubug', @field='x',
+       @oOrder='OPE'")
  ("INSERT INTO ubug VALUES (1), (2)")
  ;; this must happen _before_ onion adjustment
  ("UPDATE ubug SET x = x + 1 WHERE x < 2"
@@ -1143,6 +1148,9 @@
                   (oOrder RND)
                   (oAdd HOM)
                   (oPLAIN RND)))))
+ ("SET @cryptdb='sensitive',
+       @database='cryptdbtest', @table='ubug2', @field='x',
+       @oOrder='OPE'")
  ("INSERT INTO ubug2 VALUES (1), (2)")
  ;; onion adjust before we do the bad update
  ("SELECT * FROM ubug2 WHERE x < 2"
@@ -1165,6 +1173,9 @@
                       (oOrder RND)
                       (oAdd HOM)
                       (oPLAIN RND)))))
+ ("SET @cryptdb='sensitive',
+       @database='cryptdbtest', @table='ubug_trx', @field='x',
+       @oOrder='OPE'")
  ("SELECT * FROM ubug_trx WHERE x < 2"
   (:update ubug_trx x oOrder OPE))
  ("INSERT INTO ubug_trx VALUES (0)")
