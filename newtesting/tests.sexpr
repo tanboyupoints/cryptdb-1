@@ -961,51 +961,66 @@
   ("SELECT * FROM sense")
   ;; try multiple sensitives
   ("SET @cryptdb='sensitive', @cryptdb='sensitive',
-        @database='cryptdbtest', @table='sense', @field='x'"
+        @database='cryptdbtest', @table='sense', @field='x',
+        @oOrder='OPE'"
    ()
    :cryptdb
    :must-fail)
-  ;; try multiple unsensitives
-  ("SET @cryptdb='unsensitive', @cryptdb='unsensitive', @cryptdb='unsensitive',
-        @database='cryptdbtest', @table='sense', @field='x'"
-   ()
-   :cryptdb
-   :must-fail)
-  ;; try sensitive and unsensitive simultaneously
-  ("SET @cryptdb='sensitive', @cryptdb='unsensitive',
-        @database='cryptdbtest', @table='sense', @field='x'"
-   ()
-   :cryptdb
-   :must-fail)
-  ;; make a field sensitive
+  ;; prevent the field from adjusting down oORDER
   ("SET @cryptdb='sensitive',
-        @database='cryptdbtest', @table='sense', @field='x'")
-  ;; make the same field unsensitive
-  ("SET @cryptdb='unsensitive',
-        @database='cryptdbtest', @table='sense', @field='x'")
-  ;; and back to sensitive
-  ("SET @cryptdb='sensitive',
-        @database='cryptdbtest', @table='sense', @field='x'")
-  ;; try to take it to plain
-  ("SELECT * FROM sense WHERE x * 100 < 10"
+        @database='cryptdbtest', @table='sense', @field='x',
+        @oOrder='RND'")
+  ;; attempt adjustment
+  ("SELECT * FROM sense WHERE x < 100"
    ()
    :cryptdb
    :must-fail)
-  ;; make the other field unsensitive
-  ("SET @cryptdb='unsensitive',
-        @database='cryptdbtest', @table='sense', @field='y'")
-  ;; now take it to plain
-  ("SELECT * FROM sense WHERE y * 4 < 10"
-   (:update sense y oPLAIN PLAINVAL))
-  ;; try to make it sensitive
+  ;; let the adjustment happen
   ("SET @cryptdb='sensitive',
-        @database='cryptdbtest', @table='sense', @field='y'"
+        @database='cryptdbtest', @table='sense', @field='x',
+        @oOrder='OPE'")
+  ;; attempt adjustment
+  ("SELECT * FROM sense WHERE x < 100"
+   (:update sense x oOrder OPE))
+  ;; make two onions unadjustable
+  ("SET @cryptdb='sensitive',
+        @database='cryptdbtest', @table='sense', @field='y',
+        @oOrder='RND', @oEq='RND'")
+  ("SELECT * FROM sense WHERE y = 20"
    ()
    :cryptdb
    :must-fail)
-  ;; and we can still (redundantly) make it unsensitive
-  ("SET @cryptdb='unsensitive',
-        @database='cryptdbtest', @table='sense', @field='y'")
+  ("SELECT * FROM sense WHERE y > 560"
+   ()
+   :cryptdb
+   :must-fail)
+  ;; do an invalid sensitize
+  ("SET @cryptdb='sensitive',
+        @database='cryptdbtest', @table='sense', @field='x',
+        @oOrder='notreal'"
+   ()
+   :cryptdb
+   :must-fail)
+  ;; make three onions adjustable
+  ("SET @cryptdb='sensitive',
+        @database='cryptdbtest', @table='sense', @field='y',
+        @oOrder='OPE', @oEq='DET', @oAdd='HOM'")
+  ("SELECT SUM(y) FROM sense")
+  ("SELECT * FROM sense WHERE y < 200"
+   (:update sense y oOrder OPE))
+  ("SELECT * FROM sense WHERE y = 100"
+   (:update sense y oEq DET))
+  ;; try to sensitize upwards
+  ("SET @cryptdb='sensitive',
+        @database='cryptdbtest', @table='sense', @field='y',
+        @oOrder='RND'"
+   ()
+   :cryptdb
+   :must-fail)
+  ;; sensitize to current level
+  ("SET @cryptdb='sensitive',
+        @database='cryptdbtest', @table='sense', @field='y',
+        @oOrder='OPE'")
   ("SELECT * FROM sense"
    :check)
   ("DROP TABLE sense"))

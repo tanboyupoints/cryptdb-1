@@ -93,13 +93,12 @@ public:
               const std::string &salt_name, onionlayout onion_layout,
               SECURITY_RATING sec_rating, unsigned long uniq_count,
               uint64_t counter, bool has_default,
-              const std::string &default_value,
-              bool sensitive)
+              const std::string &default_value)
         : MappedDBMeta(id), fname(fname), salt_name(salt_name),
           onion_layout(onion_layout), has_salt(has_salt),
           sec_rating(sec_rating), uniq_count(uniq_count),
           counter(counter), has_default(has_default),
-          default_value(default_value), sensitive(sensitive) {}
+          default_value(default_value) {}
     ~FieldMeta() {;}
 
     std::string serialize(const DBObject &parent) const;
@@ -118,8 +117,6 @@ public:
     std::string defaultValue() const {return default_value;}
     const onionlayout &getOnionLayout() const {return onion_layout;}
     bool getHasSalt() const {return has_salt;}
-    bool getSensitive() const {return sensitive;}
-    void setSensitive(bool sensitive) {this->sensitive = sensitive;}
     const std::string getFieldName() const {return fname;}
 
 private:
@@ -132,7 +129,6 @@ private:
     uint64_t counter;
     const bool has_default;
     const std::string default_value;
-    bool sensitive;
 
     SECLEVEL getOnionLevel(onion o) const;
     static onionlayout determineOnionLayout(const AES_KEY *const m_key,

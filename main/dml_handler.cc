@@ -944,9 +944,7 @@ class SetHandler : public DMLHandler {
             {{"show", DIRECTIVE_HANDLER(&SetHandler::handleShowDirective)},
              {"adjust", DIRECTIVE_HANDLER(&SetHandler::handleAdjustDirective)},
              {"sensitive",
-              DIRECTIVE_HANDLER(&SetHandler::handleSensitiveDirective)},
-             {"unsensitive",
-              DIRECTIVE_HANDLER(&SetHandler::handleUnsensitiveDirective)}};
+              DIRECTIVE_HANDLER(&SetHandler::handleSensitiveDirective)}};
 
         DirectiveHandler dhandler = nullptr;
         std::map<std::string, std::string> var_pairs;
@@ -981,7 +979,7 @@ class SetHandler : public DMLHandler {
                                       " not what you meant");
                 var_value = var_value.substr(1, var_value.length() - 2);
                 if (equalsIgnoreCase("cryptdb", var_name)) {
-                    // cryptdb=<directive> ; get <directive> 
+                    // cryptdb=<directive> ; get <directive>
                     TEST_TextMessageError(nullptr == dhandler,
                                           "only one directive per query");
                     auto enc = directive_handlers.find(toLowerCase(var_value));
@@ -1018,28 +1016,17 @@ private:
                           Analysis &a) const
     {
         const ParameterCollection &params = collectParameters(var_pairs, a);
+        TEST_Text(0 == var_pairs.size() && params.onions.size() > 0,
+                  "extraneous directive parameter, indicate a single database,"
+                  " table and field; and then onion-seclevel pairs");
 
-        // the remaining values are <onion>=<level> pairs
-        for (auto it : var_pairs) {
-            const std::string &str_onion = it.first;
-            const std::string &str_level = it.second;
-
-            AssignOnce<onion> o;
-            AssignOnce<SECLEVEL> l;
-            try {
-                o = TypeText<onion>::noCaseToType(str_onion);
-                l = TypeText<SECLEVEL>::noCaseToType(str_level);
-            } catch (CryptDBError &e) {
-                FAIL_TextMessageError("bad param; " + str_onion + "=" +
-                                      str_level);
-            }
-
-            const OnionMeta &om = a.getOnionMeta(params.fm, o.get());
+        for (const auto &it : params.onions) {
+            const OnionMeta &om = a.getOnionMeta(params.fm, it.first);
             const SECLEVEL current_level = a.getOnionLevel(om);
-            if (l.get() < current_level) {
-                throw OnionAdjustExcept(params.tm, params.fm, o.get(),
-                                        l.get());
-            } else if (l.get() > current_level) {
+            if (it.second < current_level) {
+                throw OnionAdjustExcept(params.tm, params.fm, it.first,
+                                        it.second);
+            } else if (it.second > current_level) {
                 FAIL_TextMessageError("it is not possible to add layers;"
                                       " only remove them");
             }
@@ -1061,48 +1048,36 @@ private:
                              Analysis &a) const
     {
         const ParameterCollection &params = collectParameters(var_pairs, a);
-        TEST_Text(0 == var_pairs.size(),
+        TEST_Text(0 == var_pairs.size() && params.onions.size() > 0,
                   "extraneous directive parameter, indicate a single database,"
-                  " table and field!");
-            
-        if (params.fm.hasOnion(oPLAIN)) {
-            TEST_Text(SECLEVEL::PLAINVAL < a.getOnionLevel(params.fm, oPLAIN),
-                      "can't set field to sensitive after it's gone to plain!");
+                  " table and field; and then onion-seclevel pairs");
+        for (const auto &it : params.onions) {
+            OnionMeta &om = a.getOnionMeta(params.fm, it.first);
+            const SECLEVEL current_level = a.getOnionLevel(om);
+            if (it.second <= current_level) {
+                om.setMinimumSecLevel(it.second);
+            } else {
+                FAIL_TextMessageError("it is not possible to set a minimum level"
+                                      " above the current level!");
+            }
+            a.deltas.push_back(std::unique_ptr<Delta>(new ReplaceDelta(om,
+                                                                     params.fm)));
         }
-
-        params.fm.setSensitive(true);
-        a.deltas.push_back(std::unique_ptr<Delta>(new ReplaceDelta(params.fm,
-                                                                   params.tm)));
-    }
-
-    void
-    handleUnsensitiveDirective(std::map<std::string, std::string> &var_pairs,
-                               Analysis &a) const
-    {
-        const ParameterCollection &params = collectParameters(var_pairs, a);
-        TEST_Text(0 == var_pairs.size(),
-                  "extraneous directive parameter, indicate a single database,"
-                  " table and field!");
-
-        TEST_Text(true == params.fm.hasOnion(oPLAIN),
-                  "field doesn't have plain so it can't be made unsensitive");
-
-        params.fm.setSensitive(false);
-        a.deltas.push_back(std::unique_ptr<Delta>(new ReplaceDelta(params.fm,
-                                                                   params.tm)));
     }
 
     struct ParameterCollection {
         ParameterCollection(const Analysis &a,
                             const std::string &database,
                             const std::string &table,
-                            const std::string &field)
-            : database(database), table(table), field(field),
+                            const std::string &field,
+                            const std::vector<std::pair<onion, SECLEVEL> > onions)
+            : database(database), table(table), field(field), onions(onions),
               tm(a.getTableMeta(database, table)),
               fm(a.getFieldMeta(tm, field)) {}
         const std::string database;
         const std::string table;
         const std::string field;
+        const std::vector<std::pair<onion, SECLEVEL> > onions;
 
         TableMeta &tm;
         FieldMeta &fm;
@@ -1125,10 +1100,31 @@ private:
             return value;
         });
 
-        return ParameterCollection(a,
-                                   getAndDestroy("database"),
-                                   getAndDestroy("table"),
-                                   getAndDestroy("field"));
+        const std::string &database = getAndDestroy("database");
+        const std::string &table    = getAndDestroy("table");
+        const std::string &field    = getAndDestroy("field");
+
+        // the remaining values are <onion>=<level> pairs
+        std::vector<std::pair<onion, SECLEVEL> > onions;
+        for (auto it = var_pairs.begin(); it != var_pairs.end();) {
+            const std::string &str_onion = it->first;
+            const std::string &str_level = it->second;
+
+            AssignOnce<onion> o;
+            AssignOnce<SECLEVEL> l;
+            try {
+                o = TypeText<onion>::noCaseToType(str_onion);
+                l = TypeText<SECLEVEL>::noCaseToType(str_level);
+            } catch (CryptDBError &e) {
+                FAIL_TextMessageError("bad param; " + str_onion + "=" +
+                                      str_level);
+            }
+
+            onions.push_back(std::make_pair(o.get(), l.get()));
+            var_pairs.erase(it++);
+        }
+
+        return ParameterCollection(a, database, table, field, onions);
     }
 };
 
