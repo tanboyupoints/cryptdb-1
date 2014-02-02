@@ -59,7 +59,7 @@ public:
 
     // returns a rewritten create field to include in rewritten query
     virtual Create_field *
-        newCreateField(const Create_field * const cf,
+        newCreateField(const Create_field &cf,
                        const std::string &anonname = "") const = 0;
 
     virtual Item *encrypt(const Item &ptext, uint64_t IV) const = 0;
@@ -85,7 +85,7 @@ protected:
 
 class HOM : public EncLayer {
 public:
-    HOM(Create_field * const cf, const std::string &seed_key);
+    HOM(const Create_field &cf, const std::string &seed_key);
 
     // serialize and deserialize
     std::string doSerialize() const {return seed_key;}
@@ -94,7 +94,7 @@ public:
 
     SECLEVEL level() const {return SECLEVEL::HOM;}
     std::string name() const {return "HOM";}
-    Create_field * newCreateField(const Create_field * const cf,
+    Create_field * newCreateField(const Create_field &cf,
                                   const std::string &anonname = "")
         const;
 
@@ -119,7 +119,7 @@ private:
 
 class Search : public EncLayer {
 public:
-    Search(Create_field * const cf, const std::string &seed_key);
+    Search(const Create_field &cf, const std::string &seed_key);
 
     // serialize and deserialize
     std::string doSerialize() const {return key;}
@@ -127,7 +127,7 @@ public:
 
     SECLEVEL level() const {return SECLEVEL::SEARCH;}
     std::string name() const {return "SEARCH";}
-    Create_field * newCreateField(const Create_field * const cf,
+    Create_field * newCreateField(const Create_field &cf,
                                   const std::string &anonname = "")
         const;
 
@@ -148,7 +148,7 @@ extern const std::vector<udf_func*> udf_list;
 class EncLayerFactory {
 public:
     static std::unique_ptr<EncLayer>
-        encLayer(onion o, SECLEVEL sl, Create_field * const cf,
+        encLayer(onion o, SECLEVEL sl, const Create_field &cf,
                  const std::string &key);
 
     // creates EncLayer from its serialization
@@ -167,7 +167,7 @@ public:
     virtual SECLEVEL level() const {return SECLEVEL::PLAINVAL;}
     virtual std::string name() const {return "PLAINTEXT";}
 
-    virtual Create_field *newCreateField(const Create_field * const cf,
+    virtual Create_field *newCreateField(const Create_field &cf,
                                          const std::string &anonname = "")
         const;
     Item *encrypt(const Item &ptext, uint64_t IV) const;

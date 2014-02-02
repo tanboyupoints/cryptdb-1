@@ -18,7 +18,7 @@
 /*
  * The name must be unique as it is used as a unique identifier when
  * generating the encryption layers.
- * 
+ *
  * OnionMeta is a bit different than the other AbstractMeta derivations.
  * > It's children aren't of the same class.  Each EncLayer does
  *   inherit from EncLayer, but they are still distinct classes. This
@@ -32,15 +32,16 @@ class OnionMeta : public DBMeta {
 public:
     // New.
     OnionMeta(onion o, std::vector<SECLEVEL> levels,
-              const AES_KEY * const m_key, Create_field * const cf,
-              unsigned long uniq_count);
+              const AES_KEY * const m_key, const Create_field &cf,
+              unsigned long uniq_count, SECLEVEL minimum_seclevel);
 
     // Restore.
     static std::unique_ptr<OnionMeta>
         deserialize(unsigned int id, const std::string &serial);
     OnionMeta(unsigned int id, const std::string &onionname,
-              unsigned long uniq_count)
-        : DBMeta(id), onionname(onionname), uniq_count(uniq_count) {}
+              unsigned long uniq_count, SECLEVEL minimum_seclevel)
+        : DBMeta(id), onionname(onionname), uniq_count(uniq_count),
+          minimum_seclevel(minimum_seclevel) {}
 
     std::string serialize(const DBObject &parent) const;
     std::string getAnonOnionName() const;
@@ -56,12 +57,15 @@ public:
     unsigned long getUniq() const {return uniq_count;}
     const std::vector<std::unique_ptr<EncLayer> > &getLayers() const
         {return layers;}
+    SECLEVEL getMinimumSecLevel() const {return minimum_seclevel;}
+    void setMinimumSecLevel(SECLEVEL seclevel) {this->minimum_seclevel = seclevel;}
 
 private:
     // first in list is lowest layer
     std::vector<std::unique_ptr<EncLayer> > layers;
     const std::string onionname;
     const unsigned long uniq_count;
+    SECLEVEL minimum_seclevel;
     mutable std::list<std::unique_ptr<UIntMetaKey>> generated_keys;
 };
 
@@ -78,9 +82,9 @@ class FieldMeta : public MappedDBMeta<OnionMeta, OnionMetaKey>,
                   public UniqueCounter {
 public:
     // New.
-    FieldMeta(const std::string &name, Create_field * const field,
-              const AES_KEY * const mKey, SECURITY_RATING sec_rating,
-              unsigned long uniq_count);
+    FieldMeta(const Create_field &field, const AES_KEY * const mKey,
+              SECURITY_RATING sec_rating, unsigned long uniq_count,
+              bool unique);
     // Restore (WARN: Creates an incomplete type as it will not have it's
     // OnionMetas until they are added by the caller).
     static std::unique_ptr<FieldMeta>
@@ -89,13 +93,12 @@ public:
               const std::string &salt_name, onionlayout onion_layout,
               SECURITY_RATING sec_rating, unsigned long uniq_count,
               uint64_t counter, bool has_default,
-              const std::string &default_value,
-              bool sensitive)
+              const std::string &default_value)
         : MappedDBMeta(id), fname(fname), salt_name(salt_name),
           onion_layout(onion_layout), has_salt(has_salt),
           sec_rating(sec_rating), uniq_count(uniq_count),
           counter(counter), has_default(has_default),
-          default_value(default_value), sensitive(sensitive) {}
+          default_value(default_value) {}
     ~FieldMeta() {;}
 
     std::string serialize(const DBObject &parent) const;
@@ -114,8 +117,6 @@ public:
     std::string defaultValue() const {return default_value;}
     const onionlayout &getOnionLayout() const {return onion_layout;}
     bool getHasSalt() const {return has_salt;}
-    bool getSensitive() const {return sensitive;}
-    void setSensitive(bool sensitive) {this->sensitive = sensitive;}
     const std::string getFieldName() const {return fname;}
 
 private:
@@ -128,15 +129,14 @@ private:
     uint64_t counter;
     const bool has_default;
     const std::string default_value;
-    bool sensitive;
 
     SECLEVEL getOnionLevel(onion o) const;
     static onionlayout determineOnionLayout(const AES_KEY *const m_key,
-                                            const Create_field *const f,
+                                            const Create_field &f,
                                             SECURITY_RATING sec_rating);
-    static bool determineHasDefault(const Create_field *const cf);
+    static bool determineHasDefault(const Create_field &cf);
     static std::string determineDefaultValue(bool has_default,
-                                             const Create_field *const cf);
+                                             const Create_field &cf);
     uint64_t &getCounter_() final {return counter;}
 };
 

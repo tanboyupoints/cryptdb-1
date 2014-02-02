@@ -1,5 +1,5 @@
 OBJDIRS += util
-UTILSRC := onions.cc cryptdb_log.cc ctr.cc util.cc version.cc serial/serialize.cc
+UTILSRC := onions.cc cryptdb_log.cc ctr.cc util.cc version.cc
 
 all:    $(OBJDIR)/libedbutil.so $(OBJDIR)/libedbutil.a
 
@@ -21,8 +21,5 @@ $(OBJDIR)/util/version.cc: always
 	( REL="$$(git describe --always --long --dirty=+dirty)" ; \
 	  echo "const char* cryptdb_version_string = \"$$REL\";" >> $@.tmp )
 	cmp -s $@.tmp $@ || mv $@.tmp $@
-
-island:
-	$(CXX) -D ISLAND $(CXXFLAGS) util/serial/serialize.cc -o obj/util/serial/island
 
 # vim: set noexpandtab:

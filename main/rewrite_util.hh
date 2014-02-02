@@ -42,11 +42,8 @@ gatherAndAddAnalysisRewritePlan(const Item &i, Analysis &a);
 void
 optimize(Item ** const i, Analysis &a);
 
-LEX *
-begin_transaction_lex(const std::string &dbname);
-
-LEX *
-commit_transaction_lex(const std::string &dbname);
+std::vector<std::tuple<std::vector<std::string>, Key::Keytype> >
+collectKeyData(const LEX &lex);
 
 std::vector<Create_field *>
 rewrite_create_field(const FieldMeta * const fm, Create_field * const f,
@@ -65,6 +62,8 @@ List<Create_field>
 createAndRewriteField(Analysis &a, const ProxyState &ps,
                       Create_field * const cf,
                       TableMeta *const tm, bool new_table,
+                      const std::vector<std::tuple<std::vector<std::string>, Key::Keytype> >
+                          &key_data,
                       List<Create_field> &rewritten_cfield_list);
 
 Item *

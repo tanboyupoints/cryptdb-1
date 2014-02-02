@@ -546,11 +546,11 @@
                                      (99, 'happybday!')")
    ("SELECT * FROM def_0, def_1")
    ("SELECT * FROM def_0 WHERE x = 10"
-    (:update def_0 x oEq DET)) 
+    (:update def_0 x oEq DET))
    ("INSERT INTO def_0 (z) VALUES (500), (12), (19)")
    ("SELECT * FROM def_0 WHERE x = 10")
    ("SELECT * FROM def_0 WHERE y = 'purpflowers'"
-    (:update def_0 y oEq DET)) 
+    (:update def_0 y oEq DET))
    ("INSERT INTO def_0 (z) VALUES (450), (200), (300)")
    ("SELECT * FROM def_0 WHERE y = 'purpflowers'")
    ("SELECT * FROM def_0, def_1"
@@ -961,53 +961,69 @@
   ("SELECT * FROM sense")
   ;; try multiple sensitives
   ("SET @cryptdb='sensitive', @cryptdb='sensitive',
-        @database='cryptdbtest', @table='sense', @field='x'"
+        @database='cryptdbtest', @table='sense', @field='x',
+        @oOrder='OPE'"
    ()
    :cryptdb
    :must-fail)
-  ;; try multiple unsensitives
-  ("SET @cryptdb='unsensitive', @cryptdb='unsensitive', @cryptdb='unsensitive',
-        @database='cryptdbtest', @table='sense', @field='x'"
-   ()
-   :cryptdb
-   :must-fail)
-  ;; try sensitive and unsensitive simultaneously
-  ("SET @cryptdb='sensitive', @cryptdb='unsensitive',
-        @database='cryptdbtest', @table='sense', @field='x'"
-   ()
-   :cryptdb
-   :must-fail)
-  ;; make a field sensitive
+  ;; prevent the field from adjusting down oORDER
   ("SET @cryptdb='sensitive',
-        @database='cryptdbtest', @table='sense', @field='x'")
-  ;; make the same field unsensitive
-  ("SET @cryptdb='unsensitive',
-        @database='cryptdbtest', @table='sense', @field='x'")
-  ;; and back to sensitive
-  ("SET @cryptdb='sensitive',
-        @database='cryptdbtest', @table='sense', @field='x'")
-  ;; try to take it to plain
-  ("SELECT * FROM sense WHERE x * 100 < 10"
+        @database='cryptdbtest', @table='sense', @field='x',
+        @oOrder='RND'")
+  ;; attempt adjustment
+  ("SELECT * FROM sense WHERE x < 100"
    ()
    :cryptdb
    :must-fail)
-  ;; make the other field unsensitive
-  ("SET @cryptdb='unsensitive',
-        @database='cryptdbtest', @table='sense', @field='y'")
-  ;; now take it to plain
-  ("SELECT * FROM sense WHERE y * 4 < 10"
-   (:update sense y oPLAIN PLAINVAL))
-  ;; try to make it sensitive
+  ;; let the adjustment happen
   ("SET @cryptdb='sensitive',
-        @database='cryptdbtest', @table='sense', @field='y'"
+        @database='cryptdbtest', @table='sense', @field='x',
+        @oOrder='OPE'")
+  ;; attempt adjustment
+  ("SELECT * FROM sense WHERE x < 100"
+   (:update sense x oOrder OPE))
+  ;; make two onions unadjustable
+  ("SET @cryptdb='sensitive',
+        @database='cryptdbtest', @table='sense', @field='y',
+        @oOrder='RND', @oEq='RND'")
+  ("SELECT * FROM sense WHERE y = 20"
    ()
    :cryptdb
    :must-fail)
-  ;; and we can still (redundantly) make it unsensitive
-  ("SET @cryptdb='unsensitive',
-        @database='cryptdbtest', @table='sense', @field='y'")
+  ("SELECT * FROM sense WHERE y > 560"
+   ()
+   :cryptdb
+   :must-fail)
+  ;; do an invalid sensitize
+  ("SET @cryptdb='sensitive',
+        @database='cryptdbtest', @table='sense', @field='x',
+        @oOrder='notreal'"
+   ()
+   :cryptdb
+   :must-fail)
+  ;; make three onions adjustable
+  ("SET @cryptdb='sensitive',
+        @database='cryptdbtest', @table='sense', @field='y',
+        @oOrder='OPE', @oEq='DET', @oAdd='HOM'")
+  ("SELECT SUM(y) FROM sense")
+  ("SELECT * FROM sense WHERE y < 200"
+   (:update sense y oOrder OPE))
+  ("SELECT * FROM sense WHERE y = 100"
+   (:update sense y oEq DET))
+  ;; try to sensitize upwards
+  ("SET @cryptdb='sensitive',
+        @database='cryptdbtest', @table='sense', @field='y',
+        @oOrder='RND'"
+   ()
+   :cryptdb
+   :must-fail)
+  ;; sensitize to current level
+  ("SET @cryptdb='sensitive',
+        @database='cryptdbtest', @table='sense', @field='y',
+        @oOrder='OPE'")
   ("SELECT * FROM sense"
-   :check))
+   :check)
+  ("DROP TABLE sense"))
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;           range
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1102,10 +1118,18 @@
  ;;        update bugs
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; > we were issuing the DELETE but failing to ROLLBACK when our INSERT failed
+ ;;   + the failure occurs becase the update causes duplicate entries on a 
+ ;;     PRIMARY KEY
 ("UpdateBugs" t
  ;; SCENARIO 1: onion adjustment during UPDATE
  ("CREATE TABLE ubug (x integer primary key)"
-  (:all-max "ubug"))
+  (:set (ubug (x (oEq DET)
+                 (oOrder RND)
+                 (oAdd HOM)
+                 (oPLAIN RND)))))
+ ("SET @cryptdb='sensitive',
+       @database='cryptdbtest', @table='ubug', @field='x',
+       @oOrder='OPE'")
  ("INSERT INTO ubug VALUES (1), (2)")
  ;; this must happen _before_ onion adjustment
  ("UPDATE ubug SET x = x + 1 WHERE x < 2"
@@ -1120,7 +1144,13 @@
 
  ;; SCENARIO 2: onion adjustment before UPDATE
  ("CREATE TABLE ubug2 (x integer primary key)"
-  (:all-max ubug2))
+  (:set (ubug2 (x (oEq DET)
+                  (oOrder RND)
+                  (oAdd HOM)
+                  (oPLAIN RND)))))
+ ("SET @cryptdb='sensitive',
+       @database='cryptdbtest', @table='ubug2', @field='x',
+       @oOrder='OPE'")
  ("INSERT INTO ubug2 VALUES (1), (2)")
  ;; onion adjust before we do the bad update
  ("SELECT * FROM ubug2 WHERE x < 2"
@@ -1139,7 +1169,13 @@
 
  ;; SCENARIO 2 WITH TRANSACTION
  ("CREATE TABLE ubug_trx (x integer primary key)"
-  (:all-max "ubug_trx"))
+   (:set (ubug_trx (x (oEq DET)
+                      (oOrder RND)
+                      (oAdd HOM)
+                      (oPLAIN RND)))))
+ ("SET @cryptdb='sensitive',
+       @database='cryptdbtest', @table='ubug_trx', @field='x',
+       @oOrder='OPE'")
  ("SELECT * FROM ubug_trx WHERE x < 2"
   (:update ubug_trx x oOrder OPE))
  ("INSERT INTO ubug_trx VALUES (0)")

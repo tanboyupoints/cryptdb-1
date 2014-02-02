@@ -569,7 +569,7 @@ bool ReplaceDelta::apply(const std::unique_ptr<Connect> &e_conn,
     const std::string serial_key = key.getSerial();
     const std::string esc_serial_key = escapeString(e_conn, serial_key);
 
-    const std::string query = 
+    const std::string query =
         " UPDATE " + table_name +
         "    SET serial_object = '" + esc_child_serial + "', "
         "        serial_key = '" + esc_serial_key + "'"

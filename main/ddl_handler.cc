@@ -27,7 +27,7 @@ class CreateTableHandler : public DDLHandler {
             std::unique_ptr<TableMeta> tm(new TableMeta(true, true));
 
             // -----------------------------
-            //         Rewrite TABLE       
+            //         Rewrite TABLE
             // -----------------------------
             // HACK.
             // > We know that there is only one table.
@@ -49,14 +49,18 @@ class CreateTableHandler : public DDLHandler {
             new_lex->select_lex.table_list =
                 *oneElemListWithTHD<TABLE_LIST>(tbl);
 
+            // collect the keys (and their types) as they may affect the onion
+            // layout we use
+            const auto &key_data = collectKeyData(*lex);
+
             auto it =
                 List_iterator<Create_field>(lex->alter_info.create_list);
             new_lex->alter_info.create_list =
                 accumList<Create_field>(it,
-                    [&a, &ps, &tm] (List<Create_field> out_list,
-                                    Create_field *const cf) {
+                    [&a, &ps, &tm, &key_data] (List<Create_field> out_list,
+                                               Create_field *const cf) {
                         return createAndRewriteField(a, ps, cf, tm.get(),
-                                                     true, out_list);
+                                                     true, key_data, out_list);
                 });
 
             // -----------------------------
@@ -102,7 +106,7 @@ class CreateTableHandler : public DDLHandler {
 };
 
 // mysql does not support indiscriminate add-drops
-// ie, 
+// ie,
 //      mysql> create table pk (x integer);
 //      Query OK, 0 rows affected (0.09 sec)
 //

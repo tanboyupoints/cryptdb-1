@@ -169,6 +169,38 @@ gatherAndAddAnalysisRewritePlan(const Item &i, Analysis &a)
     a.rewritePlans[&i] = std::unique_ptr<RewritePlan>(gather(i, a));
 }
 
+std::vector<std::tuple<std::vector<std::string>, Key::Keytype> >
+collectKeyData(const LEX &lex)
+{
+    std::vector<std::tuple<std::vector<std::string>, Key::Keytype> > output;
+
+    auto key_it =
+        RiboldMYSQL::constList_iterator<Key>(lex.alter_info.key_list);
+    for (;;) {
+        const Key *const key = key_it++;
+        if (nullptr == key) {
+            break;
+        }
+
+        // collect columns
+        std::vector<std::string> columns;
+        auto col_it =
+            RiboldMYSQL::constList_iterator<Key_part_spec>(key->columns);
+        for (;;) {
+            const Key_part_spec *const key_part = col_it++;
+            if (nullptr == key_part) {
+                break;
+            }
+
+            columns.push_back(convert_lex_str(key_part->field_name));
+        }
+
+        output.push_back(std::make_tuple(columns, key->type));
+    }
+
+    return output;
+}
+
 //TODO(raluca) : figure out how to create Create_field from scratch
 // and avoid this chaining and passing f as an argument
 static Create_field *
@@ -180,13 +212,13 @@ get_create_field(const Analysis &a, Create_field * const f,
 
     // Default value is handled during INSERTion.
     auto save_default = f->def;
-    f->def = NULL;
+    f->def = nullptr;
 
     const auto &enc_layers = a.getEncLayers(om);
     assert(enc_layers.size() > 0);
     for (auto it = enc_layers.begin(); it != enc_layers.end(); it++) {
         const Create_field * const old_cf = new_cf;
-        new_cf = (*it)->newCreateField(old_cf, name);
+        new_cf = (*it)->newCreateField(*old_cf, name);
     }
 
     // Restore the default so we don't memleak it.
@@ -359,30 +391,50 @@ string_to_bool(const std::string &s)
     }
 }
 
+static bool
+isUnique(const std::string &name,
+         const std::vector<std::tuple<std::vector<std::string>, Key::Keytype> > &
+             key_data)
+{
+    bool unique = false;
+    for (const auto &it : key_data) {
+        const auto &found =
+            std::find(std::get<0>(it).begin(), std::get<0>(it).end(), name);
+        if (found != std::get<0>(it).end()
+            && (std::get<1>(it) == Key::PRIMARY || std::get<1>(it) == Key::UNIQUE)) {
+            unique = true;
+            break;
+        }
+    }
+
+    return unique;
+}
+
 List<Create_field>
 createAndRewriteField(Analysis &a, const ProxyState &ps,
                       Create_field * const cf,
                       TableMeta *const tm, bool new_table,
+                      const std::vector<std::tuple<std::vector<std::string>,
+                                        Key::Keytype> >
+                          &key_data,
                       List<Create_field> &rewritten_cfield_list)
 {
-    const std::string name = std::string(cf->field_name);
-    auto buildFieldMeta =
-        [] (const std::string name, Create_field * const cf,
-            const ProxyState &ps, TableMeta *const tm)
-    {
-        return new FieldMeta(name, cf, ps.getMasterKey().get(),
-                             ps.defaultSecurityRating(), tm->leaseCount());
-    };
-    std::unique_ptr<FieldMeta> fm(buildFieldMeta(name, cf, ps, tm));
+    // we only support the creation of UNSIGNED fields
+    cf->flags = cf->flags | UNSIGNED_FLAG;
+
+    const std::string &name = std::string(cf->field_name);
+    std::unique_ptr<FieldMeta>
+        fm(new FieldMeta(*cf, ps.getMasterKey().get(), ps.defaultSecurityRating(),
+                         tm->leaseCount(), isUnique(name, key_data)));
 
     // -----------------------------
-    //         Rewrite FIELD       
+    //         Rewrite FIELD
     // -----------------------------
     const auto new_fields = rewrite_create_field(fm.get(), cf, a);
     rewritten_cfield_list.concat(vectorToListWithTHD(new_fields));
 
     // -----------------------------
-    //         Update FIELD       
+    //         Update FIELD
     // -----------------------------
 
     // Here we store the key name for the first time. It will be applied
