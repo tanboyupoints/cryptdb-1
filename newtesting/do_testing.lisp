@@ -297,7 +297,7 @@
 
 ;; should we fail when presented with onion data for a database not in our
 ;; local cache?
-(defparameter *break-errant-database* t)
+(defparameter *break-errant-database* nil)
 
 (defgeneric handle-check (connections onions type onion-check)
   (:method (connections (onions onion-state) (type (eql :all-max)) onion-check)
