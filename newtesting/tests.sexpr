@@ -91,11 +91,12 @@
   ("SELECT sum(age) z FROM test_select")
   ("SELECT min(t.id) a FROM test_select AS t")
   ("SELECT t.address AS b FROM test_select t")
-  ("SELECT * FROM test_select HAVING age"
-   (:update test_select age oPLAIN PLAINVAL))
+  ; ("SELECT * FROM test_select HAVING age"
+   ; (:update test_select age oPLAIN PLAINVAL))
   ("SELECT * FROM test_select HAVING age && id"
    :check)
   ("DROP TABLE test_select"))
+#|
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;;         subquery
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -153,6 +154,7 @@
   ("SELECT * FROM numerouno WHERE (SELECT SUM(uno) FROM numerouno)")
   ("DROP TABLE subqueryphun")
   ("DROP TABLE numerouno"))
+|#
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;         single join
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -275,10 +277,8 @@
   ("SELECT COUNT(*) FROM test_HOM WHERE age <= 100")
   ("SELECT COUNT(*) FROM test_HOM WHERE age >= 100")
   ("SELECT COUNT(*) FROM test_HOM WHERE age = 100")
-  ("SELECT SUM(address) FROM test_HOM"
-   (:update test_HOM address oPLAIN PLAINVAL))
-  ("SELECT * FROM test_HOM"
-   :check)
+  ; ("SELECT SUM(address) FROM test_HOM"
+   ; (:update test_HOM address oPLAIN PLAINVAL))
   ("DROP TABLE test_HOM"))
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;        single delete
@@ -345,10 +345,10 @@
    ("INSERT INTO nuclear VALUES (16), (216), (2016), (20016)")
    ("SELECT count(*) FROM gasoline, coal, nuclear")
    ;; alias with where clause
-   ("DELETE g, nuclear FROM gasoline g, nuclear
-      WHERE nuclear.z < g.x"
-    (:update (gasoline (x (oPLAIN PLAINVAL)))
-             (nuclear  (z (oPLAIN PLAINVAL)))))
+   ; ("DELETE g, nuclear FROM gasoline g, nuclear
+      ; WHERE nuclear.z < g.x"
+    ; (:update (gasoline (x (oPLAIN PLAINVAL)))
+             ; (nuclear  (z (oPLAIN PLAINVAL)))))
    ("SELECT * FROM gasoline, coal, nuclear")
    ;; alias with same name as table
    ("DELETE coal, gasoline FROM coal coal, gasoline")
@@ -365,19 +365,16 @@
     (:set (msgs (msgid (oPLAIN PLAINVAL))
                 (zooanimals (oEq RND)
                             (oOrder RND)
-                            (oADD HOM)
-                            (oPLAIN RND))
+                            (oADD HOM))
                 (msgtext (oEq RND)
                          (oOrder RND)
-                         (oADD HOM)
-                         (oPLAIN RND)))))
+                         (oADD HOM)))))
    ("CREATE TABLE moremore (x INTEGER,
                             y integer PRIMARY KEY AUTO_INCREMENT)
                  AUTO_INCREMENT=456"
     (:set (moremore (x (oEq RND)
                        (oOrder RND)
-                       (oADD HOM)
-                       (oPLAIN RND))
+                       (oADD HOM))
                     (y (oPLAIN PLAINVAL)))))
    ("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world', 100)")
    ("INSERT INTO msgs (msgtext, zooanimals) VALUES ('hello world2', 21)")
@@ -402,11 +399,11 @@
      ON DUPLICATE KEY UPDATE msgid = msgid + 10")
    ("SELECT * FROM msgs"
     :check)
-   ("INSERT INTO msgs
-          VALUES (1, 9001, 'lights are on')
-     ON DUPLICATE KEY UPDATE msgid = zooanimals + 99,
-                             zooanimals=VALUES(zooanimals)"
-    (:update "msgs" "zooanimals" "oPLAIN" "PLAINVAL"))
+   ; ("INSERT INTO msgs
+          ; VALUES (1, 9001, 'lights are on')
+     ; ON DUPLICATE KEY UPDATE msgid = zooanimals + 99,
+                             ; zooanimals=VALUES(zooanimals)"
+    ; (:update "msgs" "zooanimals" "oPLAIN" "PLAINVAL"))
    ("SELECT * FROM msgs")
    ("INSERT INTO msgs
           VALUES (2, 1998, 'stacksondeck')
@@ -414,6 +411,7 @@
                                 msgtext = VALUES(msgtext)")
    ("SELECT * FROM msgs")
    ("SELECT SUM(zooanimals) FROM msgs")
+#|
    ;; FAIL: not supported
    ("ALTER TABLE msgs AUTO_INCREMENT = 555")
    ("INSERT INTO msgs (msgtext, zooanimals) VALUES
@@ -424,6 +422,7 @@
           VALUES ('sharks', 12)")
    ;; FAIL: auto_increment
    ("SELECT * FROM msgs")
+|#
    ("SELECT * FROM moremore"
     :check)
    ("DROP TABLE msgs")
@@ -480,8 +479,8 @@
    (:update test_null address oEq DET))
   ("SELECT * FROM test_null WHERE address < 'amber'"
    (:update test_null address oOrder OPE))
-  ("SELECT * FROM test_null WHERE address LIKE 'aaron'"
-   (:update test_null address oPLAIN PLAINVAL))
+  ; ("SELECT * FROM test_null WHERE address LIKE 'aaron'"
+   ; (:update test_null address oPLAIN PLAINVAL))
   ("SELECT * FROM test_null LEFT JOIN u_null
         ON test_null.uid = u_null.uid"
    (:update (test_null (uid (oEq DETJOIN)))
@@ -504,6 +503,7 @@
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;         best effort
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+#|
  ("BestEffort" t
    ("CREATE TABLE t (x integer, y integer)"
     (:all-max "t"))
@@ -532,6 +532,7 @@
    ("SELECT 10, x+y FROM t WHERE x"
     :check)
    ("DROP TABLE t"))
+|#
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;       default value
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -757,6 +758,7 @@
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; FIXME: support for non maxed columns
  ;; FIXME: floating point comparisons
+#|
  ("MiscBugs" t
   ("CREATE TABLE crawlies (purple VARCHAR(4294967247),
                            pink VARCHAR(0))")
@@ -813,6 +815,7 @@
   ("DROP TABLE more_bugs")
   ("DROP TABLE real_type_bug")
   ("DROP TABLE crawlers"))
+|#
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;    quoted schema objects
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1119,7 +1122,7 @@
   ; ("SELECT t, s, m, i FROM t")
   ("SELECT t, s, m FROM t WHERE s = m AND b = i")
   ;; FAIL: we don't handle summations larger than 64 bits
-  ("SELECT SUM(b) FROM t")
+  ; ("SELECT SUM(b) FROM t")
   ("DROP TABLE t")
   ("SET SESSION sql_mode = ''"
    ()
@@ -1136,8 +1139,7 @@
  ("CREATE TABLE ubug (x integer primary key)"
   (:set (ubug (x (oEq DET)
                  (oOrder RND)
-                 (oAdd HOM)
-                 (oPLAIN RND)))))
+                 (oAdd HOM)))))
  ("SET @cryptdb='sensitive',
        @database='cryptdbtest', @table='ubug', @field='x',
        @oOrder='OPE'")
@@ -1157,8 +1159,7 @@
  ("CREATE TABLE ubug2 (x integer primary key)"
   (:set (ubug2 (x (oEq DET)
                   (oOrder RND)
-                  (oAdd HOM)
-                  (oPLAIN RND)))))
+                  (oAdd HOM)))))
  ("SET @cryptdb='sensitive',
        @database='cryptdbtest', @table='ubug2', @field='x',
        @oOrder='OPE'")
@@ -1182,8 +1183,7 @@
  ("CREATE TABLE ubug_trx (x integer primary key)"
    (:set (ubug_trx (x (oEq DET)
                       (oOrder RND)
-                      (oAdd HOM)
-                      (oPLAIN RND)))))
+                      (oAdd HOM)))))
  ("SET @cryptdb='sensitive',
        @database='cryptdbtest', @table='ubug_trx', @field='x',
        @oOrder='OPE'")
