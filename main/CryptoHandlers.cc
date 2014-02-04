@@ -1168,8 +1168,8 @@ public:
 private:
     const CryptedInteger cinteger;
     static const size_t key_bytes = 16;
-    size_t plain_size;
-    size_t ciph_size;
+    const size_t plain_size;
+    const size_t ciph_size;
     mutable OPE ope;                      // HACK
 };
 
@@ -1313,18 +1313,6 @@ OPE_int::opeHelper(const Create_field &f, const std::string &key)
     const auto plain_inclusive_range = supportsRange(f);
     assert(0 == plain_inclusive_range.first);
 
-    // we need twice as many bytes for the cipher; this means that we
-    // don't actually use the field type that the user specified
-    // 0xFFFF * (0xFFFF + 2)
-    // => 0xFFFF * 0x10001
-    // => 0xFFFFFFFF
-    // initialize members used by OPE(...) primitive
-    this->plain_size =
-        toMultiple(log2(plain_inclusive_range.second),
-                   BITS_PER_BYTE)
-        / BITS_PER_BYTE;
-    this->ciph_size  = 2 * this->plain_size;
-
     // these fields can not be represented with 64 bits; HACK
     if (plain_inclusive_range.second > 0xFFFFFFFF) {
         return CryptedInteger(key, MYSQL_TYPE_VARCHAR,
@@ -1344,9 +1332,25 @@ OPE_int::opeHelper(const Create_field &f, const std::string &key)
     return CryptedInteger(key, field_type.second, plain_inclusive_range);
 }
 
+static size_t
+opePlainSize(const CryptedInteger &cinteger)
+{
+    return toMultiple(log2(cinteger.getInclusiveRange().second),
+                           BITS_PER_BYTE)
+           / BITS_PER_BYTE;
+}
+
+// we need twice as many bytes for the cipher; this means that we
+// don't actually use the field type that the user specified
+static size_t
+opeCiphSize(const CryptedInteger &cinteger)
+{
+    return 2 * opePlainSize(cinteger);
+}
+
 OPE_int::OPE_int(const Create_field &f, const std::string &seed_key)
-    // opeHelper initializes plain_size and ciph_size
     : cinteger(opeHelper(f, prng_expand(seed_key, key_bytes))),
+      plain_size(opePlainSize(cinteger)), ciph_size(opeCiphSize(cinteger)),
       ope(OPE(cinteger.getKey(), plain_size * BITS_PER_BYTE,
               ciph_size * BITS_PER_BYTE))
 {}
