@@ -149,6 +149,9 @@ def fn(cdb_path, in_make_v=nil, in_gcc_v=nil)
 
     # Give the user access to all the stuff we created.
     cryptdb_shell.>("chown -R #{Etc.getlogin} #{cryptdb_path}")
+
+    # remind the user about EDBDIR
+    p_puts "You must do: export EDBDIR=/full/path/to/cryptdb/ before running cryptdb; we recommend putting it into your .bashrc"
 end
 
 class ShellDoer
