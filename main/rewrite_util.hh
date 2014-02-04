@@ -82,9 +82,8 @@ std::string vector_join(std::vector<T> v, const std::string &delim,
                         const std::function<std::string(T)> &finalize)
 {
     std::string accum;
-    for (typename std::vector<T>::iterator it = v.begin();
-         it != v.end(); ++it) {
-        const std::string &element = finalize(static_cast<T>(*it));
+    for (const auto &it : v) {
+        const std::string &element = finalize(static_cast<T>(it));
         accum.append(element);
         accum.append(delim);
     }
