@@ -137,7 +137,7 @@ private:
     static bool determineHasDefault(const Create_field &cf);
     static std::string determineDefaultValue(bool has_default,
                                              const Create_field &cf);
-    uint64_t &getCounter_() final {return counter;}
+    uint64_t &getCounter_() {return counter;}
 };
 
 class TableMeta : public MappedDBMeta<FieldMeta, IdentityMetaKey>,
@@ -175,7 +175,7 @@ private:
     const std::string anon_table_name;
     uint64_t counter;
 
-    uint64_t &getCounter_() final {return counter;}
+    uint64_t &getCounter_() {return counter;}
 };
 
 class DatabaseMeta : public MappedDBMeta<TableMeta, IdentityMetaKey> {
