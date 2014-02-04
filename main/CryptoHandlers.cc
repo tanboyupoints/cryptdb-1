@@ -424,7 +424,7 @@ public:
         const;
 
     Item *encrypt(const Item &ptext, uint64_t IV) const;
-    Item * decrypt(Item * const ctext, uint64_t IV) const;
+    Item *decrypt(const Item &ctext, uint64_t IV) const;
     Item * decryptUDF(Item * const col, Item * const ivcol) const;
 
 private:
@@ -448,7 +448,7 @@ public:
         const;
 
     Item * encrypt(const Item &ptext, uint64_t IV) const;
-    Item * decrypt(Item * const ctext, uint64_t IV) const;
+    Item * decrypt(const Item &ctext, uint64_t IV) const;
     Item * decryptUDF(Item * const col, Item * const ivcol) const;
 
 private:
@@ -536,9 +536,9 @@ RND_int::encrypt(const Item &ptext, uint64_t IV) const
 }
 
 Item *
-RND_int::decrypt(Item * const ctext, uint64_t IV) const
+RND_int::decrypt(const Item &ctext, uint64_t IV) const
 {
-    const uint64_t c = static_cast<Item_int*>(ctext)->value;
+    const uint64_t c = static_cast<const Item_int &>(ctext).value;
     const uint64_t p = bf.decrypt(c) ^ IV;
     LOG(encl) << "RND_int decrypt " << c << " IV " << IV << " --> " << p;
 
@@ -622,12 +622,12 @@ RND_str::encrypt(const Item &ptext, uint64_t IV) const
 }
 
 Item *
-RND_str::decrypt(Item * const ctext, uint64_t IV) const
+RND_str::decrypt(const Item &ctext, uint64_t IV) const
 {
     const std::string &dec =
-        decrypt_AES_CBC(ItemToString(*ctext), deckey.get(),
+        decrypt_AES_CBC(ItemToString(ctext), deckey.get(),
                         BytesFromInt(IV, SALT_LEN_BYTES), do_pad);
-    LOG(encl) << "RND_str decrypt " << ItemToString(*ctext) << " IV "
+    LOG(encl) << "RND_str decrypt " << ItemToString(ctext) << " IV "
               << IV << "-->" << "len of dec " << dec.length()
               << " dec: " << dec;
 
@@ -689,7 +689,7 @@ public:
 
     // FIXME: final
     Item *encrypt(const Item &ptext, uint64_t IV) const;
-    Item *decrypt(Item *const ctext, uint64_t IV) const;
+    Item *decrypt(const Item &ctext, uint64_t IV) const;
     Item *decryptUDF(Item *const col, Item *const ivcol = NULL) const;
 
 protected:
@@ -788,7 +788,7 @@ public:
         const;
 
     Item *encrypt(const Item &ptext, uint64_t IV) const;
-    Item * decrypt(Item * const ctext, uint64_t IV) const;
+    Item *decrypt(const Item &ctext, uint64_t IV) const;
     Item * decryptUDF(Item * const col, Item * const ivcol = NULL) const;
 
 protected:
@@ -870,9 +870,9 @@ DET_abstract_integer::encrypt(const Item &ptext, uint64_t IV) const
 }
 
 Item *
-DET_abstract_integer::decrypt(Item *const ctext, uint64_t IV) const
+DET_abstract_integer::decrypt(const Item &ctext, uint64_t IV) const
 {
-    const ulonglong value = static_cast<Item_int *>(ctext)->value;
+    const ulonglong value = static_cast<const Item_int &>(ctext).value;
     const ulonglong retdec = getBlowfish_().decrypt(value);
     LOG(encl) << "DET_int dec " << value << "--->" << retdec;
     return new (current_thd->mem_root) Item_int(retdec);
@@ -1007,9 +1007,9 @@ DET_str::encrypt(const Item &ptext, uint64_t IV) const
 }
 
 Item *
-DET_str::decrypt(Item * const ctext, uint64_t IV) const
+DET_str::decrypt(const Item &ctext, uint64_t IV) const
 {
-    const std::string enc = ItemToString(*ctext);
+    const std::string enc = ItemToString(ctext);
     const std::string dec = decrypt_AES_CMC(enc, deckey.get(), do_pad);
     LOG(encl) << " DET_str decrypt enc len " << enc.length()
               << " enc " << enc << " IV " << IV << " ---> "
@@ -1163,7 +1163,7 @@ public:
         const;
 
     Item *encrypt(const Item &p, uint64_t IV) const;
-    Item *decrypt(Item * const c, uint64_t IV) const;
+    Item *decrypt(const Item &c, uint64_t IV) const;
 
 private:
     const CryptedInteger cinteger;
@@ -1188,7 +1188,7 @@ public:
         const;
 
     Item *encrypt(const Item &p, uint64_t IV) const;
-    Item * decrypt(Item * const c, uint64_t IV) const
+    Item *decrypt(const Item &c, uint64_t IV) const
         __attribute__((noreturn));
 
 private:
@@ -1430,18 +1430,18 @@ OPE_int::encrypt(const Item &ptext, uint64_t IV) const
 }
 
 Item *
-OPE_int::decrypt(Item * const ctext, uint64_t IV) const
+OPE_int::decrypt(const Item &ctext, uint64_t IV) const
 {
-    LOG(encl) << "OPE_int decrypt " << ItemToString(*ctext) << " IV " << IV
+    LOG(encl) << "OPE_int decrypt " << ItemToString(ctext) << " IV " << IV
               << std::endl;
 
     if (MYSQL_TYPE_VARCHAR != this->cinteger.getFieldType()) {
-        const ulonglong cval = RiboldMYSQL::val_uint(*ctext);
+        const ulonglong cval = RiboldMYSQL::val_uint(ctext);
         return new Item_int(static_cast<ulonglong>(uint64FromZZ(ope.decrypt(ZZFromUint64(cval)))));
     }
 
     // undo the reversal from encryption
-    return new Item_int(static_cast<ulonglong>(uint64FromZZ(ope.decrypt(ZZFromString(reverse(ItemToString(*ctext)))))));
+    return new Item_int(static_cast<ulonglong>(uint64FromZZ(ope.decrypt(ZZFromString(reverse(ItemToString(ctext)))))));
 }
 
 
@@ -1494,7 +1494,7 @@ OPE_str::encrypt(const Item &ptext, uint64_t IV) const
 }
 
 Item *
-OPE_str::decrypt(Item * const ctext, uint64_t IV) const
+OPE_str::decrypt(const Item &ctext, uint64_t IV) const
 {
     thrower() << "cannot decrypt string from OPE";
 }
@@ -1579,10 +1579,9 @@ ZZToItemStr(const ZZ &val)
 }
 
 static ZZ
-ItemStrToZZ(Item *const i)
+ItemStrToZZ(const Item &i)
 {
-    const std::string res = ItemToString(*i);
-    return ZZFromString(res);
+    return ZZFromString(ItemToString(i));
 }
 
 /*
@@ -1705,7 +1704,7 @@ HOM::encrypt(const Item &ptext, uint64_t IV) const
 }
 
 Item *
-HOM::decrypt(Item * const ctext, uint64_t IV) const
+HOM::decrypt(const Item &ctext, uint64_t IV) const
 {
     if (true == waiting) {
         this->unwait();
@@ -1880,7 +1879,7 @@ Search::encrypt(const Item &ptext, uint64_t IV) const
 }
 
 Item *
-Search::decrypt(Item * const ctext, uint64_t IV) const
+Search::decrypt(const Item &ctext, uint64_t IV) const
 {
     thrower() << "decryption from SWP not supported \n";
 }
@@ -1959,9 +1958,9 @@ PlainText::encrypt(const Item &ptext, uint64_t IV) const
 }
 
 Item *
-PlainText::decrypt(Item *const ctext, uint64_t IV) const
+PlainText::decrypt(const Item &ctext, uint64_t IV) const
 {
-    return dup_item(*ctext);
+    return dup_item(ctext);
 }
 
 Item *

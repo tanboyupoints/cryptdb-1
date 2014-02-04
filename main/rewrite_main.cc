@@ -892,23 +892,26 @@ do_optimize_const_item(T *i, Analysis &a) {
 }
 
 static Item *
-decrypt_item_layers(Item *const i, const FieldMeta *const fm, onion o,
+decrypt_item_layers(const Item &i, const FieldMeta *const fm, onion o,
                     uint64_t IV)
 {
-    assert(i && !i->is_null());
+    assert(!RiboldMYSQL::is_null(i));
 
-    Item *dec = i;
+    const Item *dec = &i;
+    Item *out_i = NULL;
 
     const OnionMeta *const om = fm->getOnionMeta(o);
     assert(om);
     const auto &enc_layers = om->getLayers();
     for (auto it = enc_layers.rbegin(); it != enc_layers.rend(); ++it) {
-        dec = (*it)->decrypt(dec, IV);
-        assert(dec);
+        out_i = (*it)->decrypt(*dec, IV);
+        assert(out_i);
+        dec = out_i;
         LOG(cdb_v) << "dec okay";
     }
 
-    return dec;
+    assert(out_i && out_i != &i);
+    return out_i;
 }
 
 
@@ -1472,7 +1475,7 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
                 }
 
                 std::shared_ptr<Item> dec_item(
-                    decrypt_item_layers(dbres.rows[r][c].get(),
+                    decrypt_item_layers(*dbres.rows[r][c].get(),
                                         fm, rf.getOLK().o, salt));
                 res.rows[r][col_index] = dec_item;
             }
