@@ -241,7 +241,7 @@ determineSecLevelData(onion o, std::vector<SECLEVEL> levels, bool unique)
         assert(SECLEVEL::RND == levels.back());
         levels.pop_back();
         assert(SECLEVEL::DET == levels.back());
-        return std::make_pair(levels, levels.back());
+        return std::make_pair(levels, levels.front());
     }
 
     // oPLAIN may be starting at PLAINVAL if we have an autoincrement column
@@ -256,7 +256,7 @@ determineSecLevelData(onion o, std::vector<SECLEVEL> levels, bool unique)
         assert(false);
     }
 
-    return std::make_pair(levels, levels.back());
+    return std::make_pair(levels, levels.front());
 }
 
 // If mkey == NULL, the field is not encrypted
