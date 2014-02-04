@@ -68,7 +68,11 @@ def fn(cdb_path, in_make_v=nil, in_gcc_v=nil)
     # untar
     proxy_path = File.join(cryptdb_path, PROXY_NAME)
     proxy_tar_path = File.join(bins_path, PROXY_NAME) + TAR_GZ
-    cryptdb_shell.>("tar zxf #{proxy_tar_path}") 
+    cryptdb_shell.>("rm -rf #{proxy_path}")
+    cryptdb_shell.>("tar zxf #{proxy_tar_path}")
+
+=begin
+    # only applicable to 0.9 proxy
 
     # automake compatibility fix
     # https://www.flameeyes.eu/autotools-mythbuster/forwardporting/automake.html
@@ -81,13 +85,14 @@ def fn(cdb_path, in_make_v=nil, in_gcc_v=nil)
         little = File.join(proxy_path, "little_configure.in")
         FileUtils.copy(little, config_path)
     end
+=end
 
+    mp_shell = ShellDoer.new(proxy_path)
     proxy_install_path = File.join(bins_path, "proxy-bin")
     mp_shell.>("./autogen.sh")
     mp_shell.>("./configure --enable-maintainer-mode --with-lua=lua5.1 --prefix=\"#{proxy_install_path}\"")
     mp_shell.>("make")
     mp_shell.>("make install")
-    File.delete(config_path)
     mp_shell.>("rm -rf #{proxy_path}")
 
     #############################
@@ -119,6 +124,7 @@ def fn(cdb_path, in_make_v=nil, in_gcc_v=nil)
     # untar
     mysql_path = File.join(cryptdb_path, MYSQL_NAME)
     mysql_tar_path = File.join(bins_path, MYSQL_NAME) + TAR_GZ
+    cryptdb_shell.>("rm -rf #{mysql_path}")
     cryptdb_shell.>("tar zxf #{mysql_tar_path}")
 
     mysql_build_path = File.join(mysql_path, "/build")
