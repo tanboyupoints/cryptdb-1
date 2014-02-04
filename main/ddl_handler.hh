@@ -16,7 +16,8 @@ public:
 
 private:
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps) const = 0;
+                                  const ProxyState &ps,
+                                  const Preamble &pre) const = 0;
 
 protected:
     DDLHandler() {;}

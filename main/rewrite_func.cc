@@ -22,6 +22,28 @@
 #include <util/enum_text.hh>
 #include <parser/lex_util.hh>
 
+#define PLAIN_FUNCTION(type, name)                                      \
+namespace {                                                             \
+    extern const char __str_name_##name[] = #name;                      \
+    static class ANON : public CItemSubtypeFN<type, __str_name_##name> {\
+        virtual RewritePlan *                                           \
+        do_gather_type(const type &i, Analysis &a) const                \
+        {                                                               \
+            const std::string &why = #name;                             \
+            return allPlainIterateGather(i, why, a);                    \
+        }                                                               \
+                                                                        \
+        virtual Item *                                                  \
+        do_rewrite_type(const type &i, const OLK &constr,               \
+                        const RewritePlan &rp, Analysis &a) const       \
+        {                                                               \
+            return rewrite_args_FN(i, constr,                           \
+                                   static_cast<const RewritePlanOneOLK &>(rp),  \
+                                   a);                                  \
+        }                                                               \
+    } ANON;                                                             \
+};
+
 // gives names to classes and objects we don't care to know the name of 
 #define ANON                ANON_NAME(__anon_id_func_)
 
@@ -1106,6 +1128,9 @@ static class ANON : public CItemSubtypeFN<Item_func_case, str_case> {
     virtual RewritePlan *
     do_gather_type(const Item_func_case &i, Analysis &a) const
     {
+        const std::string &why = str_case;
+        return allPlainIterateGather(i, why, a);
+
 	/*     Item **args = i->arguments();
         int first_expr_num = i->*rob<Item_func_case, int,
                 &Item_func_case::first_expr_num>::ptr();
@@ -1137,6 +1162,14 @@ static class ANON : public CItemSubtypeFN<Item_func_case, str_case> {
     virtual Item * do_optimize_type(Item_func_case *i, Analysis & a) const
     {
         return do_optimize_type_self_and_args(i, a);
+    }
+
+    virtual Item *
+    do_rewrite_type(const Item_func_case &i, const OLK &constr,
+                    const RewritePlan &rp, Analysis &a) const
+    {
+        return rewrite_args_FN(i, constr,
+                               static_cast<const RewritePlanOneOLK &>(rp), a);
     }
 } ANON;
 
@@ -1237,7 +1270,7 @@ extern const char str_regexp[] = "regexp";
 static CItemStrconv<str_regexp> ANON;
  
 extern const char str_date_add_interval[] = "date_add_interval";
-// Use encryption/rewriting.
+// FIXME: Use encryption/rewriting.
 static class ANON : public CItemSubtypeFN<Item_date_add_interval, str_date_add_interval> {
     virtual RewritePlan *
     do_gather_type(const Item_date_add_interval &i, Analysis &a) const
@@ -1343,3 +1376,30 @@ static CItemFuncMiscPlain<str_cast_as_unsigned> ANON;
 
 extern const char str_cast_as_signed[] = "cast_as_signed";
 static CItemFuncMiscPlain<str_cast_as_signed> ANON;
+
+extern const char str_current_user[] = "current_user";
+static class ANON : public CItemSubtypeFN<Item_func_current_user,
+                                          str_current_user> {
+    virtual RewritePlan *
+    do_gather_type(const Item_func_current_user &i, Analysis &a) const
+    {
+        const EncSet out_es = PLAIN_EncSet;
+        const EncSet child_es = PLAIN_EncSet;
+        const std::string why = str_current_user;
+
+        return allPlainIterateGather(i, why, a);
+    }
+
+    virtual Item *
+    do_rewrite_type(const Item_func_current_user &i, const OLK &constr,
+                    const RewritePlan &rp, Analysis &a) const
+    {
+        return rewrite_args_FN(i, constr,
+                               static_cast<const RewritePlanOneOLK &>(rp),
+                               a);
+    }
+} ANON;
+
+PLAIN_FUNCTION(Item_func_connection_id, connection_id);
+
+#undef PLAIN_FUNCTION

@@ -22,14 +22,10 @@ public:
     std::vector<enum_field_types> types;
     std::vector<std::vector<std::shared_ptr<Item> > > rows;
 
-    explicit ResType(bool okflag = true) : ok(okflag) {}
+    explicit ResType(bool okflag) : ok(okflag) {}
     bool success() const {return this->ok;}
 };
-
-bool isTableField(std::string token);
-std::string fullName(std::string field, std::string name);
 
 char * make_thd_string(const std::string &s, size_t *lenp = 0);
 
 std::string ItemToString(const Item &i);
-std::string ItemToStringWithQuotes(const Item &i);

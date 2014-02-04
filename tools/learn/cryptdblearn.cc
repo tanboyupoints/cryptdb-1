@@ -146,7 +146,8 @@ int main(int argc, char **argv)
     
     ConnectionInfo ci("localhost", username, password);
     const std::string master_key = "2392834";
-    ProxyState ps(ci, "/var/lib/shadow-mysql", master_key);
+    SharedProxyState shared_ps(ci, "/var/lib/shadow-mysql", master_key);
+    ProxyState ps(shared_ps);
 
     Learn *learn; 
     

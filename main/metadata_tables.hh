@@ -15,6 +15,7 @@ namespace MetaData {
         std::string bleedingMetaObject();
         std::string embeddedQueryCompletion();
         std::string staleness();
+        std::string showDirective();
         std::string remoteQueryCompletion();
     };
 

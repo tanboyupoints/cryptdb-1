@@ -7,6 +7,7 @@
  *  TODO: need to integrate it with util.h: some declarations are repeated
  */
 
+#include <exception>
 #include <map>
 
 #include <main/Translator.hh>
@@ -35,6 +36,8 @@ extern std::string global_crash_point;
 
 void
 crashTest(const std::string &current_point);
+
+class CrashTestException: public std::exception {};
 
 class FieldReturned {
 public:
@@ -94,9 +97,9 @@ executeQuery(const ProxyState &ps, const std::string &q,
              const std::string &default_db,
              SchemaCache *const schema_cache, bool pp=true);
 
-#define UNIMPLEMENTED \
-        throw std::runtime_error(std::string("Unimplemented: ") + \
-                        std::string(__PRETTY_FUNCTION__))
+#define UNIMPLEMENTED                                               \
+    FAIL_TextMessageError(std::string("Unimplemented: ") +          \
+                            std::string(__PRETTY_FUNCTION__))
 
 class reason;
 class OLK;
@@ -312,7 +315,7 @@ public:
     CItemSubtypeFN() { funcNames.reg(std::string(TYPE), *this); }
 };
 
-SchemaInfo *
+std::unique_ptr<SchemaInfo>
 loadSchemaInfo(const std::unique_ptr<Connect> &conn,
                const std::unique_ptr<Connect> &e_conn);
 

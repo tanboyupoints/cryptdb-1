@@ -5,10 +5,12 @@
 #include <main/rewrite_main.hh>
 #include <main/Analysis.hh>
 #include <main/rewrite_ds.hh>
+#include <main/schema.hh>
 
 #include <sql_list.h>
 #include <sql_table.h>
 
+const bool PRETTY_DEMO = true;
 const std::string BOLD_BEGIN = "\033[1m";
 const std::string RED_BEGIN = "\033[1;31m";
 const std::string GREEN_BEGIN = "\033[1;92m";
@@ -40,18 +42,16 @@ gatherAndAddAnalysisRewritePlan(const Item &i, Analysis &a);
 void
 optimize(Item ** const i, Analysis &a);
 
-LEX *
-begin_transaction_lex(const std::string &dbname);
-
-LEX *
-commit_transaction_lex(const std::string &dbname);
+std::vector<std::tuple<std::vector<std::string>, Key::Keytype> >
+collectKeyData(const LEX &lex);
 
 std::vector<Create_field *>
 rewrite_create_field(const FieldMeta * const fm, Create_field * const f,
                      const Analysis &a);
 
-std::vector<Key *>
-rewrite_key(const TableMeta &tm, Key * const key, const Analysis &a);
+void
+highLevelRewriteKey(const TableMeta &tm, const LEX &seed_lex,
+                    LEX *const out_lex, const Analysis &a);
 
 std::string
 bool_to_string(bool b);
@@ -62,6 +62,8 @@ List<Create_field>
 createAndRewriteField(Analysis &a, const ProxyState &ps,
                       Create_field * const cf,
                       TableMeta *const tm, bool new_table,
+                      const std::vector<std::tuple<std::vector<std::string>, Key::Keytype> >
+                          &key_data,
                       List<Create_field> &rewritten_cfield_list);
 
 Item *
@@ -95,6 +97,14 @@ std::string vector_join(std::vector<T> v, const std::string &delim,
     }
 
     return output.get();
+}
+
+static std::string identity(std::string s) {return s;}
+
+inline std::string
+vector_join(std::vector<std::string> v, const std::string &delim)
+{
+    return vector_join<std::string>(v, delim, identity);
 }
 
 std::string
@@ -137,11 +147,14 @@ queryPreamble(const ProxyState &ps, const std::string &q,
               std::unique_ptr<QueryRewrite> *qr,
               std::list<std::string> *const out_queryz,
               SchemaCache *const schema,
-              const std::string &default_db);
+              const std::string &default_db,
+              SchemaInfoRef *const schema_info_ref=NULL);
 
 bool
 queryHandleRollback(const ProxyState &ps, const std::string &query,
                     SchemaInfo const &schema);
+
+std::string terminalEscape(const std::string &s);
 
 void
 prettyPrintQuery(const std::string &query);
@@ -160,24 +173,8 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
               const ResType &res, const std::string &query,
               const std::string &default_db, bool pp);
 
-class SchemaCache {
-public:
-    SchemaCache() : no_loads(true), id(randomValue() % UINT_MAX) {}
-
-    const SchemaInfo &getSchema(const std::unique_ptr<Connect> &conn,
-                                const std::unique_ptr<Connect> &e_conn);
-    void updateStaleness(const std::unique_ptr<Connect> &e_conn,
-                         bool staleness);
-    bool initialStaleness(const std::unique_ptr<Connect> &e_conn);
-    bool cleanupStaleness(const std::unique_ptr<Connect> &e_conn);
-    void lowLevelCurrentStale(const std::unique_ptr<Connect> &e_conn);
-    void lowLevelCurrentUnstale(const std::unique_ptr<Connect> &e_conn);
-
-private:
-    std::unique_ptr<const SchemaInfo> schema;
-    bool no_loads;
-    const unsigned int id;
-};
+SECURITY_RATING
+determineSecurityRating();
 
 template <typename InType, typename InterimType, typename OutType>
 std::function<OutType(InType in)>

@@ -60,29 +60,41 @@ getStoredProcedures()
         "       (IN delete_query VARBINARY(50000),\n"
         "        IN insert_query VARBINARY(50000))\n"
         " BEGIN\n"
-        "   DECLARE old_transaction_id VARCHAR(20);\n\n"
+        "   DECLARE old_transaction_id VARCHAR(20);\n"
+        "   DECLARE haz_transaction_id BOOLEAN DEFAULT FALSE;\n\n"
 
-        "   CALL " + current_transaction_id + " (old_transaction_id);\n\n"
+        "   DECLARE EXIT HANDLER\n"
+        "       FOR SQLEXCEPTION\n"
+        "   BEGIN\n"
+                // don't leave the database in a halfbaked state
+        "       IF haz_transaction_id AND old_transaction_id IS NULL THEN\n"
+        "           ROLLBACK;\n"
+        "       END IF;\n"
+        "       RESIGNAL;\n"
+        "   END;\n\n"
 
-            // Start a transaction if necessary.
-        "   IF old_transaction_id IS NULL THEN\n"
-        "       START TRANSACTION;\n"
+        "   CALL " + current_transaction_id + " (old_transaction_id);\n"
+        "   SET haz_transaction_id = TRUE;\n\n"
+
+            // throw an exception if we are in a transaction as we have no
+            // way of accessing rows inserted from within the transaction
+        "   IF old_transaction_id IS NOT NULL THEN\n"
+        "       SIGNAL SQLSTATE '45000';\n"
         "   END IF;\n\n"
+
+        "   START TRANSACTION;\n\n"
 
             // DELETE old values pertaining to WHERE clause
         "   SET @query = delete_query;\n"
         "   PREPARE dq FROM @query;\n"
         "   EXECUTE dq;\n\n"
 
-            // INSERT new values using subquery from temp table.
+            // INSERT new values
         "   SET @query = insert_query;\n"
         "   PREPARE iq FROM @query;\n"
         "   EXECUTE iq;\n\n"
 
-            // Close our transaction if we started one.
-        "   IF old_transaction_id IS NULL THEN\n"
-        "       COMMIT;\n\n"
-        "   END IF;\n"
+        "   COMMIT;\n"
         " END\n",
 
         // ---------------------------------------
@@ -97,6 +109,19 @@ getStoredProcedures()
         " BEGIN\n"
         "   DECLARE old_transaction_id VARCHAR(20);\n"
         "   DECLARE b_reissue BOOLEAN;\n\n"
+
+        // if an error occurs, we want to avoid a partly stripped onion so
+        // always issue a ROLLBACK on failure
+        // > ie first adjustment succeeds and the second one fails
+        // > if we fail before starting the transaction then we will possibly
+        // ROLLBACK an existing transaction; this is fine as it was our
+        // intention to do so anyways
+        "   DECLARE EXIT HANDLER\n"
+        "       FOR SQLEXCEPTION\n"
+        "   BEGIN\n"
+        "       ROLLBACK;\n"
+        "       RESIGNAL;\n"
+        "   END;\n\n"
 
             // Are we in a transaction?
         "   CALL " + current_transaction_id + "(old_transaction_id);\n\n"

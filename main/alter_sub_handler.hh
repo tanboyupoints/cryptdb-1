@@ -7,13 +7,6 @@
 
 #include <sql_lex.h>
 
-struct Preamble {
-    Preamble(const std::string &dbname, const std::string &table)
-        : dbname(dbname), table(table) {}
-    const std::string dbname;
-    const std::string table;
-};
-
 class AlterSubHandler : public SQLHandler {
 public:
     virtual LEX *transformLex(Analysis &a, LEX *lex,

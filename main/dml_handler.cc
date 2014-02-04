@@ -1,9 +1,12 @@
+#include <functional>
+
 #include <main/dml_handler.hh>
 #include <main/rewrite_main.hh>
 #include <main/rewrite_util.hh>
 #include <main/dispatcher.hh>
 #include <main/macro_util.hh>
 #include <parser/lex_util.hh>
+#include <util/onions.hh>
 
 extern CItemTypesDir itemTypes;
 
@@ -126,7 +129,7 @@ class InsertHandler : public DMLHandler {
                 // Get default fields.
                 const Item_field *const item_field =
                     make_item_field(*seed_item_field, table,
-                                    implicit_it->fname);
+                                    implicit_it->getFieldName());
                 rewriteInsertHelper(*item_field, *implicit_it, a,
                                     &newList);
 
@@ -172,11 +175,10 @@ class InsertHandler : public DMLHandler {
                     auto fmVecIt = fmVec.begin();
                     for (;;) {
                         const Item *const i = it0++;
+                        assert(!!i == (fmVec.end() != fmVecIt));
                         if (!i) {
-                            assert(fmVec.end() == fmVecIt);
                             break;
                         }
-                        assert(fmVec.end() != fmVecIt);
                         rewriteInsertHelper(*i, **fmVecIt, a, newList0);
                         ++fmVecIt;
                     }
@@ -196,8 +198,11 @@ class InsertHandler : public DMLHandler {
             auto fd_it = List_iterator<Item>(lex->update_list);
             auto val_it = List_iterator<Item>(lex->value_list);
             List<Item> res_fields, res_values;
-            assert(rewrite_field_value_pairs(fd_it, val_it, a, &res_fields,
-                                             &res_values));
+            TEST_TextMessageError(
+                rewrite_field_value_pairs(fd_it, val_it, a, &res_fields,
+                                          &res_values),
+                "rewrite_field_value_pairs failed in ON DUPLICATE KEY"
+                " UPDATE");
             new_lex->update_list = res_fields;
             new_lex->value_list = res_values;
         }
@@ -248,9 +253,11 @@ class UpdateHandler : public DMLHandler {
         auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
         auto val_it = List_iterator<Item>(lex->value_list);
         List<Item> res_fields, res_values;
-        a.special_update =
+        a.special_query =
             false == rewrite_field_value_pairs(fd_it, val_it, a, 
-                                               &res_fields, &res_values);
+                                               &res_fields, &res_values)
+                ? Analysis::SpecialQuery::SPECIAL_UPDATE
+                : Analysis::SpecialQuery::NOT_SPECIAL;
         new_lex->select_lex.item_list = res_fields;
         new_lex->value_list = res_values;
         return new_lex;
@@ -269,6 +276,105 @@ class DeleteHandler : public DMLHandler {
     {
         LEX *const new_lex = copyWithTHD(lex);
         new_lex->query_tables = rewrite_table_list(lex->query_tables, a);
+        set_select_lex(new_lex,
+                       rewrite_select_lex(new_lex->select_lex, a));
+
+        return new_lex;
+    }
+};
+
+class MultiDeleteHandler : public DMLHandler {
+    virtual void gather(Analysis &a, LEX *const lex, const ProxyState &ps)
+        const
+    {
+        process_select_lex(lex->select_lex, a);
+    }
+
+    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+        const
+    {
+        LEX *const new_lex = copyWithTHD(lex);
+        // the multidelete looks like this
+        //  $ DELETE <LEX::auxiliary_...> FROM <LEX::query_tables>;
+        // if query_tablez doesn't have an alias for a value it's going
+        // to rewrite the table name (and also put this rewritten value
+        // in the alias); the auxlist must then also rewrite it's value
+        //
+        // if query_tablez does have an alias it will leave the alias
+        // and rewrite the real table name; the auxlist then needs to
+        // leave it's value as _is_ because it's already the alias (in a
+        // well formed query)
+        //
+        // the auxlist doesn't ``correctly'' set the TABLE_LIST::is_alias
+        // parameter; we ``fix'' that here
+        //
+        // the corner case is when a table is aliased as it's real name
+        //  $ DELETE a FROM a AS A
+        // we resolve this by looking up the alias in Analysis
+        //
+        // our goal is to use aliases in the initial DELETE form, ON
+        // clauses and WHERE clauses; while not using it in the JOIN
+        // clauses; the JOIN clause should print the full field
+        // (db.field.table) as well as the alias
+        //
+        // the problem is further complicated by a peculiarity of the
+        // initial DELETE form; in most other clauses we can safely
+        // do db.alias.field but in the DELETE form we _must_ do
+        // alias.field.  therefore we have to tell the rewrite function
+        // for Item_field that it should ``inject'' the alias name
+        for (TABLE_LIST *tbl = lex->auxiliary_table_list.first;
+             tbl;
+             tbl = tbl->next_local) {
+
+            assert(false == tbl->is_alias);
+            // it's useful to do this style of alias check as well
+            // because it doesn't require the database name
+            if (strcmp(tbl->alias, tbl->table_name)) {
+                tbl->is_alias = true;
+            } else {
+                const std::string &db =
+                    std::string(tbl->db, tbl->db_length);
+                TEST_DatabaseDiscrepancy(db, a.getDatabaseName());
+
+                tbl->is_alias = a.isAlias(db, tbl->alias);
+            }
+        }
+        // rewrite the DELETE form
+        new_lex->auxiliary_table_list =
+            rewrite_table_list(lex->auxiliary_table_list, a);
+
+        // rewrite the ON/JOIN forms
+        TABLE_LIST *new_query_tables = NULL;
+        for (TABLE_LIST *tbl = lex->query_tables;
+             tbl;
+             tbl = tbl->next_local) {
+            // JOIN form
+            TABLE_LIST *const new_t = rewrite_table_list(tbl, a);
+
+            // FIXME: look at rewrite_table_list and determine if we
+            // can support
+            TEST_TextMessageError(NULL == tbl->nested_join,
+                                  "No nested joins in DELETE FROM");
+
+            // ON form
+            if (tbl->on_expr) {
+                ScopedAssignment<bool>(&a.inject_alias, true,
+                    [&new_t, &tbl, &a] ()
+                    {
+                        new_t->on_expr =
+                            ::rewrite(*tbl->on_expr, PLAIN_EncSet, a);
+                    });
+            }
+
+            // first iteration?
+            if (NULL == new_query_tables) {
+                new_query_tables = new_t;
+            } else {
+                new_query_tables->next_local = new_t;
+            }
+        }
+        new_lex->query_tables = new_query_tables;
+
         set_select_lex(new_lex,
                        rewrite_select_lex(new_lex->select_lex, a));
 
@@ -360,11 +466,10 @@ process_field_value_pairs(List_iterator<Item> fd_it,
     for (;;) {
         const Item *const field_item = fd_it++;
         const Item *const value_item = val_it++;
+        assert(!!field_item == !!value_item);
         if (!field_item) {
-            assert(!value_item);
             break;
         }
-        assert(value_item != NULL);
         assert(field_item->type() == Item::FIELD_ITEM);
         const Item_field *const ifd =
             static_cast<const Item_field *>(field_item);
@@ -405,16 +510,7 @@ rewrite_order(Analysis &a, const SQL_I_List<ORDER> &lst,
     ORDER * prev = NULL;
     for (ORDER *o = lst.first; o; o = o->next) {
         const Item &i = **o->item;
-        const std::unique_ptr<RewritePlan> &rp =
-            constGetAssert(a.rewritePlans, &i);
-        const EncSet es = constr.intersect(rp->es_out);
-        // FIXME: Add version that will take a second EncSet of what
-        // we had available (ie, rp->es_out).
-        TEST_NoAvailableEncSet(es, i.type(), constr, rp->r.why,
-                            std::vector<std::shared_ptr<RewritePlan> >());
-        const OLK olk = es.chooseOne();
-
-        Item *const new_item = itemTypes.do_rewrite(i, olk, *rp.get(), a);
+        Item *const new_item = rewrite(i, constr, a);
         ORDER *const neworder = make_order(o, new_item);
         if (NULL == prev) {
             *new_lst = *oneElemListWithTHD(neworder);
@@ -468,11 +564,10 @@ rewrite_field_value_pairs(List_iterator<Item> fd_it,
     for (;;) {
         const Item *const field_item = fd_it++;
         const Item *const value_item = val_it++;
+        assert(!!field_item == !!value_item);
         if (!field_item) {
-            assert(NULL == value_item);
             break;
         }
-        assert(NULL != value_item);
 
         assert(field_item->type() == Item::FIELD_ITEM);
         const Item_field *const ifd =
@@ -532,13 +627,13 @@ addSaltToReturn(ReturnMeta *const rm, int pos)
 
 static void
 rewrite_proj(const Item &i, const RewritePlan &rp, Analysis &a,
-             List<Item> *newList)
+             List<Item> *const newList)
 {
     AssignOnce<OLK> olk;
     AssignOnce<Item *> ir;
     if (i.type() == Item::Type::FIELD_ITEM) {
         const Item_field &field_i = static_cast<const Item_field &>(i);
-        const auto cached_rewritten_i = a.item_cache.find(&field_i);
+        const auto &cached_rewritten_i = a.item_cache.find(&field_i);
         if (cached_rewritten_i != a.item_cache.end()) {
             ir = cached_rewritten_i->second.first;
             olk = cached_rewritten_i->second.second;
@@ -559,9 +654,12 @@ rewrite_proj(const Item &i, const RewritePlan &rp, Analysis &a,
     addToReturn(&a.rmeta, a.pos++, olk.get(), use_salt, i.name);
 
     if (use_salt) {
-        const std::string anon_table_name =
+        TEST_TextMessageError(Item::Type::FIELD_ITEM == ir.get()->type(),
+            "a projection requires a salt and is not a field; cryptdb"
+            " does not currently support such behavior");
+        const std::string &anon_table_name =
             static_cast<Item_field *>(ir.get())->table_name;
-        const std::string anon_field_name = olk.get().key->getSaltName();
+        const std::string &anon_field_name = olk.get().key->getSaltName();
         Item_field *const ir_field =
             make_item_field(*static_cast<Item_field *>(ir.get()),
                             anon_table_name, anon_field_name);
@@ -596,7 +694,6 @@ rewrite_select_lex(const st_select_lex &select_lex, Analysis &a)
                      a, &newList);
     }
 
-    // TODO(stephentu): investigate whether or not this is a memory leak
     new_select_lex->item_list = newList;
 
     return new_select_lex;
@@ -614,7 +711,9 @@ process_table_aliases(const List<TABLE_LIST> &tll, Analysis &a)
         if (t->is_alias) {
             TEST_TextMessageError(t->db == a.getDatabaseName(),
                                   "Database discrepancry!");
-            assert(a.addAlias(t->alias, t->db, t->table_name));
+            TEST_TextMessageError(
+                a.addAlias(t->alias, t->db, t->table_name),
+                "failed to add alias " + std::string(t->alias));
         }
 
         if (t->nested_join) {
@@ -675,9 +774,8 @@ process_table_list(const List<TABLE_LIST> &tll, Analysis & a)
 static bool
 invalidates(const FieldMeta &fm, const EncSet & es)
 {
-    for (auto om_it = fm.children.begin(); om_it != fm.children.end();
-         om_it++) {
-        onion const o = (*om_it).first.getValue();
+    for (const auto &om_it : fm.getChildren()) {
+        onion const o = om_it.first.getValue();
         if (es.osl.find(o) == es.osl.end()) {
             return true;
         }
@@ -700,7 +798,7 @@ determineUpdateType(const Item &value_item, const FieldMeta &fm,
         } else {
             const std::string &item_field_name =
                 static_cast<const Item_field &>(value_item).field_name;
-            assert(equalsIgnoreCase(fm.fname, item_field_name));
+            assert(equalsIgnoreCase(fm.getFieldName(), item_field_name));
             return SIMPLE_UPDATE_TYPE::SAME_VALUE;
         }
     }
@@ -721,7 +819,7 @@ doPairRewrite(FieldMeta &fm, const EncSet &es,
         constGetAssert(a.rewritePlans, &value_item);
 
     for (auto pair : es.osl) {
-        const OLK olk = {pair.first, pair.second.first, &fm};
+        const OLK &olk = {pair.first, pair.second.first, &fm};
 
         Item *const re_field =
             itemTypes.do_rewrite(field_item, olk, *field_rp, a);
@@ -805,7 +903,7 @@ handleUpdateType(SIMPLE_UPDATE_TYPE update_type, const EncSet &es,
                 {
                     const Item_insert_value &insert_value_item =
                        static_cast<const Item_insert_value &>(value_item);
-                    const std::string anon_table_name =
+                    const std::string &anon_table_name =
                         rew_fd.table_name;
                     Item_field *const res_field =
                         make_item_field(rew_fd, anon_table_name,
@@ -819,19 +917,223 @@ handleUpdateType(SIMPLE_UPDATE_TYPE update_type, const EncSet &es,
 
         case SIMPLE_UPDATE_TYPE::UNSUPPORTED:
         default :
-            TEST_TextMessageError(false,
-                                  "UNSUPPORTED or UNRECOGNIZED"
+            FAIL_TextMessageError("UNSUPPORTED or unrecognized"
                                   " SIMPLE_UPDATE_TYPE!");
     }
 
     return;
 }
 
+class SetHandler : public DMLHandler {
+    virtual void gather(Analysis &a, LEX *const lex, const ProxyState &ps)
+        const
+    {
+        // no-op
+    }
+
+    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+        const
+    {
+        #define DIRECTIVE_HANDLER(function)                         \
+            std::bind(function, this, std::placeholders::_1,        \
+                      std::placeholders::_2)
+        typedef std::function<void(std::map<std::string, std::string> &,
+                                   Analysis &a)> DirectiveHandler;
+
+        static const std::map<std::string, DirectiveHandler> directive_handlers
+            {{"show", DIRECTIVE_HANDLER(&SetHandler::handleShowDirective)},
+             {"adjust", DIRECTIVE_HANDLER(&SetHandler::handleAdjustDirective)},
+             {"sensitive",
+              DIRECTIVE_HANDLER(&SetHandler::handleSensitiveDirective)}};
+
+        DirectiveHandler dhandler = nullptr;
+        std::map<std::string, std::string> var_pairs;
+        auto var_it =
+            List_iterator<set_var_base>(lex->var_list);
+        for (;;) {
+            const set_var_base *const v = var_it++;
+            if (!v) {
+                break;
+            }
+
+            if (v->is_user_var()) {
+                const set_var_user *user_v =
+                    static_cast<const set_var_user *>(v);
+                Item_func_set_user_var *const i =
+                    user_v->*rob<set_var_user, Item_func_set_user_var *,
+                                 &set_var_user::user_var_item>::ptr();
+                const std::string &var_name = convert_lex_str(i->name);
+                const Item *const *const args =
+                    i->*rob<Item_func, Item **,
+                            &Item_func_set_user_var::args>::ptr();
+                assert(args && args[0]);
+                // skip non string sets, ie
+                //   SET @this = @@that
+                if (Item::Type::STRING_ITEM != args[0]->type()) {
+                    continue;
+                }
+
+                std::string var_value = printItem(*args[0]);
+                TEST_TextMessageError(var_value.length() > 2,
+                                      "this " + var_value + " is probably"
+                                      " not what you meant");
+                var_value = var_value.substr(1, var_value.length() - 2);
+                if (equalsIgnoreCase("cryptdb", var_name)) {
+                    // cryptdb=<directive> ; get <directive>
+                    TEST_TextMessageError(nullptr == dhandler,
+                                          "only one directive per query");
+                    auto enc = directive_handlers.find(toLowerCase(var_value));
+                    TEST_Text(directive_handlers.end() != enc,
+                              "unsupported directive: " + var_value);
+
+                    dhandler = enc->second;
+                    continue;
+                }
+
+                // using the same key twice is not permitted
+                TEST_TextMessageError(var_pairs.end()
+                                        == var_pairs.find(var_name),
+                                      "you double specified: `"
+                                      + var_name + "`");
+
+                var_pairs[var_name] = var_value;
+            }
+        }
+
+        if (nullptr == dhandler) {
+            return lex;
+        }
+
+        dhandler(var_pairs, a);
+        return lex;
+
+        #undef DIRECTIVE_HANDLER
+    }
+
+private:
+    void
+    handleAdjustDirective(std::map<std::string, std::string> &var_pairs,
+                          Analysis &a) const
+    {
+        const ParameterCollection &params = collectParameters(var_pairs, a);
+        TEST_Text(0 == var_pairs.size() && params.onions.size() > 0,
+                  "extraneous directive parameter, indicate a single database,"
+                  " table and field; and then onion-seclevel pairs");
+
+        for (const auto &it : params.onions) {
+            const OnionMeta &om = a.getOnionMeta(params.fm, it.first);
+            const SECLEVEL current_level = a.getOnionLevel(om);
+            if (it.second < current_level) {
+                throw OnionAdjustExcept(params.tm, params.fm, it.first,
+                                        it.second);
+            } else if (it.second > current_level) {
+                FAIL_TextMessageError("it is not possible to add layers;"
+                                      " only remove them");
+            }
+        }
+
+        return;
+    }
+
+    void
+    handleShowDirective(std::map<std::string, std::string> &var_pairs,
+                        Analysis &a) const
+    {
+        a.special_query = Analysis::SpecialQuery::SHOW_LEVELS;
+        return;
+    }
+
+    void
+    handleSensitiveDirective(std::map<std::string, std::string> &var_pairs,
+                             Analysis &a) const
+    {
+        const ParameterCollection &params = collectParameters(var_pairs, a);
+        TEST_Text(0 == var_pairs.size() && params.onions.size() > 0,
+                  "extraneous directive parameter, indicate a single database,"
+                  " table and field; and then onion-seclevel pairs");
+        for (const auto &it : params.onions) {
+            OnionMeta &om = a.getOnionMeta(params.fm, it.first);
+            const SECLEVEL current_level = a.getOnionLevel(om);
+            if (it.second <= current_level) {
+                om.setMinimumSecLevel(it.second);
+            } else {
+                FAIL_TextMessageError("it is not possible to set a minimum level"
+                                      " above the current level!");
+            }
+            a.deltas.push_back(std::unique_ptr<Delta>(new ReplaceDelta(om,
+                                                                     params.fm)));
+        }
+    }
+
+    struct ParameterCollection {
+        ParameterCollection(const Analysis &a,
+                            const std::string &database,
+                            const std::string &table,
+                            const std::string &field,
+                            const std::vector<std::pair<onion, SECLEVEL> > onions)
+            : database(database), table(table), field(field), onions(onions),
+              tm(a.getTableMeta(database, table)),
+              fm(a.getFieldMeta(tm, field)) {}
+        const std::string database;
+        const std::string table;
+        const std::string field;
+        const std::vector<std::pair<onion, SECLEVEL> > onions;
+
+        TableMeta &tm;
+        FieldMeta &fm;
+    };
+
+    // destructively modifies var_pairs by removing database, table and field
+    ParameterCollection
+    collectParameters(std::map<std::string, std::string> &var_pairs,
+                      Analysis &a) const
+    {
+        std::function<std::string(std::string)> getAndDestroy(
+            [&var_pairs] (const std::string &key)
+        {
+            auto it = var_pairs.find(key);
+            TEST_TextMessageError(it != var_pairs.end(),
+                                  "must supply a " + key);
+            const std::string value = it->second;
+            var_pairs.erase(it);
+
+            return value;
+        });
+
+        const std::string &database = getAndDestroy("database");
+        const std::string &table    = getAndDestroy("table");
+        const std::string &field    = getAndDestroy("field");
+
+        // the remaining values are <onion>=<level> pairs
+        std::vector<std::pair<onion, SECLEVEL> > onions;
+        for (auto it = var_pairs.begin(); it != var_pairs.end();) {
+            const std::string &str_onion = it->first;
+            const std::string &str_level = it->second;
+
+            AssignOnce<onion> o;
+            AssignOnce<SECLEVEL> l;
+            try {
+                o = TypeText<onion>::noCaseToType(str_onion);
+                l = TypeText<SECLEVEL>::noCaseToType(str_level);
+            } catch (CryptDBError &e) {
+                FAIL_TextMessageError("bad param; " + str_onion + "=" +
+                                      str_level);
+            }
+
+            onions.push_back(std::make_pair(o.get(), l.get()));
+            var_pairs.erase(it++);
+        }
+
+        return ParameterCollection(a, database, table, field, onions);
+    }
+};
+
+
 // FIXME: Add test to make sure handlers added successfully.
 SQLDispatcher *buildDMLDispatcher()
 {
     DMLHandler *h;
-    SQLDispatcher *dispatcher = new SQLDispatcher();
+    SQLDispatcher *const dispatcher = new SQLDispatcher();
 
     h = new InsertHandler();
     dispatcher->addHandler(SQLCOM_INSERT, h);
@@ -845,8 +1147,14 @@ SQLDispatcher *buildDMLDispatcher()
     h = new DeleteHandler;
     dispatcher->addHandler(SQLCOM_DELETE, h);
 
+    h = new MultiDeleteHandler;
+    dispatcher->addHandler(SQLCOM_DELETE_MULTI, h);
+
     h = new SelectHandler;
     dispatcher->addHandler(SQLCOM_SELECT, h);
+
+    h = new SetHandler;
+    dispatcher->addHandler(SQLCOM_SET_OPTION, h);
 
     return dispatcher;
 }

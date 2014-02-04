@@ -4,6 +4,12 @@
 #include <parser/lex_util.hh>
 #include <util/enum_text.hh>
 
+// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+//     These handlers expect a LEX that they
+//            can update in place.
+// ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 class AddColumnSubHandler : public AlterSubHandler {
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
                                   const ProxyState &ps,
@@ -11,16 +17,20 @@ class AddColumnSubHandler : public AlterSubHandler {
     {
         TableMeta &tm = a.getTableMeta(preamble.dbname, preamble.table);
 
+        // collect the keys (and their types) as they may affect the onion
+        // layout we use
+        const auto &key_data = collectKeyData(*lex);
+
         // Create *Meta objects.
         auto add_it =
             List_iterator<Create_field>(lex->alter_info.create_list);
         lex->alter_info.create_list =
             accumList<Create_field>(add_it,
-                [&a, &ps, &tm] (List<Create_field> out_list,
-                                Create_field *cf)
+                [&a, &ps, &tm, &key_data] (List<Create_field> out_list,
+                                           Create_field *cf)
             {
                     return createAndRewriteField(a, ps, cf, &tm,
-                                                 false, out_list);
+                                                 false, key_data, out_list);
             });
 
         return lex;
@@ -49,11 +59,9 @@ class DropColumnSubHandler : public AlterSubHandler {
                 [preamble, &a, this] (List<Alter_drop> out_list,
                                             Alter_drop *adrop)
         {
-            FieldMeta const &fm =
-                a.getFieldMeta(preamble.dbname, preamble.table,
-                               adrop->name);
             TableMeta const &tm =
                 a.getTableMeta(preamble.dbname, preamble.table);
+            FieldMeta const &fm = a.getFieldMeta(tm, adrop->name);
             List<Alter_drop> lst = this->rewrite(fm, adrop);
             out_list.concat(&lst);
             a.deltas.push_back(std::unique_ptr<Delta>(
@@ -70,10 +78,9 @@ class DropColumnSubHandler : public AlterSubHandler {
         THD *thd = current_thd;
 
         // Rewrite each onion column.
-        for (auto om_it = fm.children.begin(); om_it != fm.children.end();
-             om_it++) {
+        for (const auto &om_it : fm.getChildren()) {
             Alter_drop * const new_adrop = adrop->clone(thd->mem_root);
-            OnionMeta *const om = (*om_it).second.get();
+            OnionMeta *const om = om_it.second.get();
             new_adrop->name =
                 thd->strdup(om->getAnonOnionName().c_str());
             out_list.push_back(new_adrop);
@@ -96,7 +103,7 @@ class ChangeColumnSubHandler : public AlterSubHandler {
                                   const ProxyState &ps,
                                   const Preamble &preamble) const
     {
-        assert(false);
+        FAIL_TextMessageError("implement ChangeColumnSubHandler");
     }
 };
 
@@ -105,7 +112,7 @@ class ForeignKeySubHandler : public AlterSubHandler {
                                   const ProxyState &ps,
                                   const Preamble &preamble) const
     {
-        throw CryptDBError("implement ForeignKeySubHandler!");
+        FAIL_TextMessageError("implement ForeignKeySubHandler");
     }
 };
 
@@ -117,20 +124,7 @@ class AddIndexSubHandler : public AlterSubHandler {
         TableMeta const &tm =
             a.getTableMeta(preamble.dbname, preamble.table);
 
-        // Add each new index.
-        auto key_it =
-            List_iterator<Key>(lex->alter_info.key_list);
-        lex->alter_info.key_list =
-            accumList<Key>(key_it,
-                [&tm, &a] (List<Key> out_list, Key *const key) {
-                    // -----------------------------
-                    //         Rewrite INDEX
-                    // -----------------------------
-                    auto new_keys = rewrite_key(tm, key, a);
-                    out_list.concat(vectorToListWithTHD(new_keys));
-
-                    return out_list;    /* lambda */
-            });
+        highLevelRewriteKey(tm, *lex, lex, a);
 
         return lex;
     }

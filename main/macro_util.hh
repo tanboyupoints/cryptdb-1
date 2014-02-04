@@ -3,14 +3,16 @@
 #include <main/rewrite_ds.hh>
 #include <main/error.hh>
 
-#define RETURN_FALSE_IF_FALSE(status)       \
-{                                           \
-    if (!(status)) {                        \
-        return false;                       \
-    }                                       \
-}
+#define TYPENAME(value)                                         \
+    std::string typeName() const {return (value);}              \
+    static std::string instanceTypeName() {return (value);}
 
-#define RFIF RETURN_FALSE_IF_FALSE
+
+#define RETURN_NULL_IF_NULL(p)              \
+    (p);                                    \
+    if (!(p)) {                             \
+        return NULL;                        \
+    }
 
 #define ROLLBACK_AND_RFIF(status, conn)                 \
 {                                                       \
@@ -100,6 +102,8 @@ testTextMessageError(const std::string &file_name,
     testTextMessageError(__FILE__, __LINE__, (test), (message));    \
 }                                                                   \
 
+#define TEST_Text TEST_TextMessageError
+
 #define FAIL_TextMessageError(message)                              \
 {                                                                   \
     throw TextMessageError(__FILE__, __LINE__, (message));          \
@@ -167,4 +171,3 @@ testSync(const std::string &file_name, unsigned int line_number,
 {                                                                   \
     testSync(__FILE__, __LINE__, false, (identifier_name));         \
 }
-
