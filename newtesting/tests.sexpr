@@ -384,25 +384,31 @@
    ("SELECT msgtext FROM msgs WHERE msgid=2")
    ("SELECT msgtext FROM msgs WHERE msgid=3")
    ("INSERT INTO msgs
-          VALUES (3, 2012, 'sandman') ON DUPLICATE KEY UPDATE zooanimals = VALUES(zooanimals), zooanimals = 22")
+          VALUES (3, 2012, 'sandman')
+     ON DUPLICATE KEY UPDATE zooanimals = VALUES(zooanimals), zooanimals = 22")
    ("SELECT * FROM msgs")
    ("SELECT SUM(zooanimals) FROM msgs")
    ("INSERT INTO msgs
-          VALUES (3, 777, 'golfpants') ON DUPLICATE KEY UPDATE zooanimals = 16, zooanimals = VALUES(zooanimals)")
+          VALUES (3, 777, 'golfpants')
+     ON DUPLICATE KEY UPDATE zooanimals = 16,
+                             zooanimals = VALUES(zooanimals)")
    ("SELECT * FROM msgs")
    ("SELECT SUM(zooanimals) FROM msgs")
    ("INSERT INTO msgs VALUES (9, 105, 'message for alice from bob')")
-   ("INSERT INTO msgs VALUES (9, 201, 'whatever') ON DUPLICATE KEY UPDATE msgid = msgid + 10")
+   ("INSERT INTO msgs VALUES (9, 201, 'whatever')
+     ON DUPLICATE KEY UPDATE msgid = msgid + 10")
    ("SELECT * FROM msgs"
-    (:check))
+    :check)
    ("INSERT INTO msgs
-               VALUES (1, 9001, 'lights are on')
-               ON DUPLICATE KEY UPDATE msgid = zooanimals + 99, zooanimals=VALUES(zooanimals)"
+          VALUES (1, 9001, 'lights are on')
+     ON DUPLICATE KEY UPDATE msgid = zooanimals + 99,
+                             zooanimals=VALUES(zooanimals)"
     (:update "msgs" "zooanimals" "oPLAIN" "PLAINVAL"))
    ("SELECT * FROM msgs")
    ("INSERT INTO msgs
           VALUES (2, 1998, 'stacksondeck')
-          ON DUPLICATE KEY UPDATE zooanimals = VALUES(zooanimals), msgtext = VALUES(msgtext)")
+     ON DUPLICATE KEY UPDATE zooanimals = VALUES(zooanimals),
+                                msgtext = VALUES(msgtext)")
    ("SELECT * FROM msgs")
    ("SELECT SUM(zooanimals) FROM msgs")
    ;; FAIL: not supported

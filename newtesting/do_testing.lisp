@@ -295,6 +295,10 @@
                    (query-result-fields results)))
     (query-result-rows results)))
 
+;; should we fail when presented with onion data for a database not in our
+;; local cache?
+(defparameter *break-errant-database* t)
+
 (defgeneric handle-check (connections onions type onion-check)
   (:method (connections (onions onion-state) (type (eql :all-max)) onion-check)
     (let ((max-database (cadr onion-check))
@@ -304,15 +308,14 @@
       (dolist (row results output)
         (destructuring-bind (database table field onion seclevel id) row
           (declare (ignore id))
-          (unless (or (not (string-equal max-database database))
-                      (not (string-equal max-table table))
-                      (max-level? onion seclevel))
-            ; (break)
-            (setf output nil))
-          ;; update our local copy of onion state
-          ;; > we cannot use (setf lookup-seclevel) because the local onion
-          ;;   state may be nil
-          (add-onion! onions database table field onion seclevel)))))
+          (when (and (string-equal max-database database)
+                     (string-equal max-table table))
+            (when (not (max-level? onion seclevel))
+              (setf output nil))
+            ;; update our local copy of onion state
+            ;; > we cannot use (setf lookup-seclevel) because the
+            ;;   local onion state may be nil
+            (add-onion! onions database table field onion seclevel))))))
   (:method (connections (onions onion-state) (type (eql :set)) onion-check)
     (dolist (checks (cdr onion-check) t)
       (do-structure ((database table field onion seclevel) checks)
@@ -328,13 +331,17 @@
       (dolist (row results output)
         (destructuring-bind (database table field onion seclevel id) row
           (declare (ignore id))
-          (unless (string-equal seclevel
-                                (lookup-seclevel onions database table field onion))
-            ; (break)
-            ;; setting a flag instead of shortcircuiting causes us to continue
-            ;; updating seclevel's after failure
-            (setf output nil))
-          (setf (lookup-seclevel onions database table field onion) seclevel))))))
+          (cond ((not (str-assoc database (onion-state-databases onions)))
+                 (assert (not *break-errant-database*)))
+                ((unless (string-equal
+                           seclevel
+                           (lookup-seclevel
+                             onions database table field onion)))
+                 ; (break)
+                 ;; setting a flag instead of shortcircuiting causes us to
+                 ;; continue updating seclevel's after failure
+                 (setf output nil
+                       (lookup-seclevel onions database table field onion) seclevel))))))))
 
 ;;; take the per query onion checks and use them to update our onion state;
 ;;; then compare this new onion state to the state reported by cryptdb for
