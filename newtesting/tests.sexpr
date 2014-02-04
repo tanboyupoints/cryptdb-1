@@ -94,7 +94,7 @@
   ("SELECT * FROM test_select HAVING age"
    (:update test_select age oPLAIN PLAINVAL))
   ("SELECT * FROM test_select HAVING age && id"
-   (:check))
+   :check)
   ("DROP TABLE test_select"))
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;;         subquery
@@ -275,7 +275,10 @@
   ("SELECT COUNT(*) FROM test_HOM WHERE age <= 100")
   ("SELECT COUNT(*) FROM test_HOM WHERE age >= 100")
   ("SELECT COUNT(*) FROM test_HOM WHERE age = 100")
-  ("SELECT SUM(address) FROM test_HOM")
+  ("SELECT SUM(address) FROM test_HOM"
+   (:update test_HOM address oPLAIN PLAINVAL))
+  ("SELECT * FROM test_HOM"
+   :check)
   ("DROP TABLE test_HOM"))
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;        single delete
@@ -704,6 +707,8 @@
   ;; throws an exception
   ; ("SELECT * FROM star AS q
   ;    WHERE a IN (SELECT a FROM mercury)")
+  ("SELECT * FROM star, mercury, moon"
+   :check)
   ("DROP TABLE star")
   ("DROP TABLE mercury")
   ("DROP TABLE moon"))

@@ -333,15 +333,16 @@
           (declare (ignore id))
           (cond ((not (str-assoc database (onion-state-databases onions)))
                  (assert (not *break-errant-database*)))
-                ((unless (string-equal
-                           seclevel
-                           (lookup-seclevel
-                             onions database table field onion)))
-                 ; (break)
-                 ;; setting a flag instead of shortcircuiting causes us to
-                 ;; continue updating seclevel's after failure
-                 (setf output nil
-                       (lookup-seclevel onions database table field onion) seclevel))))))))
+                (t
+                  (unless (string-equal seclevel
+                             (lookup-seclevel
+                               onions database table field onion))
+                    ; (break)
+                    ;; setting a flag instead of shortcircuiting causes us to
+                    ;; continue updating seclevel's after failure
+                    (setf output nil))
+                  (setf (lookup-seclevel onions database table field onion)
+                        seclevel))))))))
 
 ;;; take the per query onion checks and use them to update our onion state;
 ;;; then compare this new onion state to the state reported by cryptdb for
