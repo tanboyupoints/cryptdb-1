@@ -757,3 +757,13 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
     return EpilogueResult(action, res);
 }
 
+SECURITY_RATING
+determineSecurityRating()
+{
+    const char *const secure = getenv("SECURE_CRYPTDB");
+    if (secure && equalsIgnoreCase("FALSE", secure)) {
+        return SECURITY_RATING::BEST_EFFORT;
+    }
+    
+    return SECURITY_RATING::SENSITIVE;
+}

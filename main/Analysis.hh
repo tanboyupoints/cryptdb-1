@@ -64,7 +64,6 @@ public:
                    const std::string &p, uint port = 0)
         : server(s), port(port), user(u), passwd(p) {};
     ConnectionInfo() : server(""), port(0), user(""), passwd("") {};
-
 } ConnectionInfo;
 
 class ProxyState;
@@ -73,8 +72,7 @@ class ProxyState;
 typedef struct SharedProxyState {
     SharedProxyState(ConnectionInfo ci, const std::string &embed_dir,
                      const std::string &master_key,
-                     SECURITY_RATING default_sec_rating =
-		     SECURITY_RATING::BEST_EFFORT);//SENSITIVE
+                     SECURITY_RATING default_sec_rating);
     ~SharedProxyState();
     SECURITY_RATING defaultSecurityRating() const
     {

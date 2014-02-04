@@ -141,23 +141,15 @@ connect(lua_State *const L)
                      << "user = " << user << "; "
                      << "password = " << psswd;
 
-        std::string const false_str = "FALSE";
-        const std::string dbname = "cryptdbtest";
-        const std::string mkey = "113341234";  // XXX do not change as
-                                               // it's used for tpcc exps
-        const char * ev = getenv("ENC_BY_DEFAULT");
-        if (ev && equalsIgnoreCase(false_str, ev)) {
-            std::cerr << "\n\n enc by default false " << "\n\n";
-            shared_ps = new SharedProxyState(ci, embed_dir, mkey,
-                                             SECURITY_RATING::PLAIN);
-        } else {
-            std::cerr << "\n\nenc by default true" << "\n\n";
-            shared_ps = new SharedProxyState(ci, embed_dir, mkey,
-                                             SECURITY_RATING::BEST_EFFORT);
-        }
+        const std::string &false_str = "FALSE";
+        const std::string &mkey      = "113341234";  // XXX do not change as
+                                                     // it's used for tpcc exps
+        shared_ps =
+            new SharedProxyState(ci, embed_dir, mkey,
+                                 determineSecurityRating());
 
         //may need to do training
-        ev = getenv("TRAIN_QUERY");
+        const char *ev = getenv("TRAIN_QUERY");
         if (ev) {
             std::cerr << "Deprecated query training!" << std::endl;
         }

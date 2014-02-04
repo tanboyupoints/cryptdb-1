@@ -133,7 +133,7 @@ main(int ac, char **av)
 
     ConnectionInfo ci("localhost", "root", "letmein");
     const std::string master_key = "2392834";
-    SharedProxyState shared_ps(ci, av[1], master_key);
+    SharedProxyState shared_ps(ci, av[1], master_key, determineSecurityRating());
     ProxyState ps(shared_ps);
     const std::string create_db =
         "CREATE DATABASE IF NOT EXISTS " + std::string(av[2]);

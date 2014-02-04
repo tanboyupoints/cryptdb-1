@@ -173,6 +173,9 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
               const ResType &res, const std::string &query,
               const std::string &default_db, bool pp);
 
+SECURITY_RATING
+determineSecurityRating();
+
 template <typename InType, typename InterimType, typename OutType>
 std::function<OutType(InType in)>
 fnCompose(std::function<OutType(InterimType)> outer,

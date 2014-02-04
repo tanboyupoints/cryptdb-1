@@ -1007,7 +1007,8 @@ Connection::start() {
             ConnectionInfo ci(tc.host, tc.user, tc.pass);
             const std::string master_key = "2392834";
             SharedProxyState *const shared_ps =
-                new SharedProxyState(ci, tc.shadowdb_dir, master_key);
+                new SharedProxyState(ci, tc.shadowdb_dir, master_key,
+                                     determineSecurityRating());
             ProxyState *const ps = new ProxyState(*shared_ps);
             re_set.insert(ps);
             this->re_it = re_set.begin();
