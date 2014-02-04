@@ -51,6 +51,7 @@ end
 -- Pretty printing
 --
 
+DEMO = true
 
 COLOR_END = '\027[00m'
 
@@ -81,8 +82,36 @@ function printline(n)
     print()
 end
 
+function makePrintable(s)
+    -- replace nonprintable characters with ?
+    if s == nil then
+       return s
+    end
+    local news = ""
+    for i = 1, #s do
+    	local c = s:sub(i,i)
+        local b = string.byte(c)
+	if (b >= 32) and (b <= 126) then
+	   news = news .. c
+	else
+	   news = news .. '?'
+	end
+    end
 
+    return news
 
+end
+
+function prettyNewQuery(q)
+    if DEMO then
+       if string.find(q, "remote_db") then
+          -- don't print maintenance queries
+       	  return
+       end
+    end
+ 
+    print(greentext("NEW QUERY: ")..makePrintable(q))
+end
 
 --
 -- Helper functions
@@ -127,7 +156,7 @@ function read_query_real(packet)
 
         dprint(" ")
         for i, v in pairs(new_queries) do
-            print(greentext("NEW QUERY: ")..v)
+	    prettyNewQuery(v)
             local result_key
             if i == table.maxn(new_queries) then
                 result_key = RES_DECRYPT
@@ -194,14 +223,13 @@ function read_query_result_real(inj)
                     table.insert(rows, row)
 		    io.write("|")
 		    for key,value in pairs(row) do
-		    	io.write(string.format("%-20s|", value))
+		    	io.write(string.format("%-20s|", makePrintable(value)))
 		    end
 		    print()
-		    printline(#resfields)
                 end
             end
 
-
+	    printline(#resfields)
 
             -- Handle the backend of the query.
             status, rollbackd, error_msg, dfields, drows =
