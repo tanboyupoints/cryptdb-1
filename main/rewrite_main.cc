@@ -1244,6 +1244,7 @@ noRewrite(const LEX &lex) {
     case SQLCOM_SHOW_VARIABLES:
     case SQLCOM_UNLOCK_TABLES:
     case SQLCOM_SHOW_STORAGE_ENGINES:
+    case SQLCOM_SHOW_COLLATIONS:
         return true;
     case SQLCOM_SELECT: {
 
