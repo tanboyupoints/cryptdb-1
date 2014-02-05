@@ -1307,6 +1307,12 @@ toMultiple(size_t n, size_t multiple)
     return n + (multiple - remainder);
 }
 
+/*
+ * OPE_int::opeHelper(...), opePlainSize(...) and opeCiphSize(...) must all
+ * play nice as OPE_int::opeHelper(...) assumes the doubling of field size
+ * when it decides if a VARCHAR field is necessary, but this actual doubling
+ * doesn't occur until opeCiphSize(...).
+ */
 CryptedInteger
 OPE_int::opeHelper(const Create_field &f, const std::string &key)
 {
