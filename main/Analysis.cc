@@ -717,9 +717,9 @@ SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     this->do_nothing = false;
 
     const auto itemToNiceString =
-        [&e_conn] (const std::shared_ptr<Item> &p_item)
+        [&e_conn] (const Item *const p_item)
         {
-            const std::string &s = ItemToString(*p_item.get());
+            const std::string &s = ItemToString(*p_item);
 
             if (Item::Type::STRING_ITEM != p_item->type()) {
                 return s;
@@ -736,7 +736,7 @@ SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     // then we join the results into a single comma seperated values list
     const auto pItemVectorToNiceValueList =
         [&itemToNiceString]
-            (const std::vector<std::vector<std::shared_ptr<Item>>> &vec)
+            (const std::vector<std::vector<Item *> > &vec)
         {
             std::vector<std::string> esses;
             for (auto row_it : vec) {

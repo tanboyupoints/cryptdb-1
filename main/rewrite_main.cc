@@ -1430,27 +1430,24 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
     LOG(cdb_v) << "rows in result " << rows << "\n";
     const unsigned int cols = dbres.names.size();
 
-    ResType res(dbres.ok);
-
     // un-anonymize the names
+    std::vector<std::string> dec_names;
     for (auto it = dbres.names.begin();
         it != dbres.names.end(); it++) {
         const unsigned int index = it - dbres.names.begin();
         const ReturnField &rf = rmeta.rfmeta.at(index);
         if (!rf.getIsSalt()) {
             //need to return this field
-            res.names.push_back(rf.fieldCalled());
-            // switch types to original ones : TODO
-
+            dec_names.push_back(rf.fieldCalled());
         }
     }
 
-    const unsigned int real_cols = res.names.size();
+    const unsigned int real_cols = dec_names.size();
 
     //allocate space in results for decrypted rows
-    res.rows = std::vector<std::vector<std::shared_ptr<Item> > >(rows);
+    std::vector<std::vector<Item *> > dec_rows(rows);
     for (unsigned int i = 0; i < rows; i++) {
-        res.rows[i] = std::vector<std::shared_ptr<Item> >(real_cols);
+        dec_rows[i] = std::vector<Item *>(real_cols);
     }
 
     // decrypt rows
@@ -1464,27 +1461,29 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
         FieldMeta *const fm = rf.getOLK().key;
         for (unsigned int r = 0; r < rows; r++) {
             if (!fm || dbres.rows[r][c]->is_null()) {
-                res.rows[r][col_index] = dbres.rows[r][c];
+                dec_rows[r][col_index] = dbres.rows[r][c];
             } else {
                 uint64_t salt = 0;
                 const int salt_pos = rf.getSaltPosition();
                 if (salt_pos >= 0) {
                     Item_int *const salt_item =
-                        static_cast<Item_int *>(dbres.rows[r][salt_pos].get());
+                        static_cast<Item_int *>(dbres.rows[r][salt_pos]);
                     assert_s(!salt_item->null_value, "salt item is null");
                     salt = salt_item->value;
                 }
 
-                std::shared_ptr<Item> dec_item(
-                    decrypt_item_layers(*dbres.rows[r][c].get(),
-                                        fm, rf.getOLK().o, salt));
-                res.rows[r][col_index] = dec_item;
+                dec_rows[r][col_index] = 
+                    decrypt_item_layers(*dbres.rows[r][c],
+                                        fm, rf.getOLK().o, salt);
             }
         }
         col_index++;
     }
 
-    return res;
+    return ResType(dbres.ok, dbres.affected_rows, dbres.insert_id,
+                   std::move(dec_names),
+                   std::vector<enum_field_types>(dbres.types),
+                   std::move(dec_rows));
 }
 
 static ResType

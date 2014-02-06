@@ -740,7 +740,8 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
     }
 
     if (false == res.success()) {
-        return EpilogueResult(QueryAction::NO_DECRYPT, ResType(false));
+        // 0, 0 is an ugly HACK; will go away with new backend
+        return EpilogueResult(QueryAction::NO_DECRYPT, ResType(false, 0, 0));
     }
 
     if (QueryAction::DECRYPT == action) {
