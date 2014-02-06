@@ -13,7 +13,14 @@ Convention : When this document uses syntax like
                 + 'a second example'
              Such indicates that the reader is to use the value _without_
              the single-quotes.
-	     
+
+             Syntax like
+                less than text greater than
+                + <something>
+                + <else>
+             Indicates that the reader is to remove the angle brackets
+             and replace the text with something contextually appropriate.
+
 #########################################
 #########################################
 ########### Getting started   ###########
@@ -79,6 +86,32 @@ Convention : When this document uses syntax like
             % (load "newtesting/do_testing.lisp")
             % (cryptdb-testing:main)
 
+#########################################
+#########################################
+########## CryptDB Directives ###########
+#########################################
+#########################################
+    CryptDB supports a a few special queries (called directives) that may
+    prove useful. (ignore the single quote convention per the sql queries)
+
+    I. Layer Scraping
+        > SET @cryptdb='show';
+        > that query should show you the status of onions for all of your
+          cryptdb tables; note that if you create a database without
+          populating it with tables you will see no results.
+    II. Forced Onion Adjustment
+        > SET @cryptdb='adjust', @database='<db-name>', @table='<table-name>',
+              @field='<field-name>', @<onion>='<level>';
+        > where <onion> is one of oEq, oOrder or oAdd
+        > issuing this query will pull off layers until the column is at
+          '<level>'
+    III. Sensitivity
+        > SET @cryptdb='sensitive', @database='<db-name>', @table='<table-name>',
+              @field='<field-name>', @<onion>='<level>';
+        > this query will prevent @<onion> from going below '<level>'
+          + ie, if I issue ... @oOrder='RND' my Order onion will not adjust
+            so I will be unable to do operations that require ordered
+            comparison
 
 #########################################
 #########################################
@@ -86,7 +119,7 @@ Convention : When this document uses syntax like
 #########################################
 #########################################
 
-	    
+
     > Queries can fail for a few reasons.
       I) CryptDB can support the query, but we have not yet implemented it.
          This should throw an UNIMPLEMENTED exception.
