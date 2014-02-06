@@ -79,6 +79,16 @@ Convention : When this document uses syntax like
             % (load "newtesting/do_testing.lisp")
             % (cryptdb-testing:main)
 
+#########################################
+#########################################
+######## Onion visualization ############
+#########################################
+#########################################
+
+To view the onion levels of your database, run in the mysql shell:
+
+> SET @cryptdb='show'
+
 
 
 #########################################
