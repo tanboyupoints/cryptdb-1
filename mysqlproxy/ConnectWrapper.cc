@@ -316,12 +316,12 @@ rewrite(lua_State *const L)
     return 3;
 }
 
-inline std::vector<std::shared_ptr<Item> >
+inline std::vector<Item *>
 itemNullVector(unsigned int count)
 {
-    std::vector<std::shared_ptr<Item> > out;
+    std::vector<Item *> out;
     for (unsigned int i = 0; i < count; ++i) {
-        out.push_back(std::shared_ptr<Item>(make_null()));
+        out.push_back(make_null());
     }
 
     return out;
@@ -331,7 +331,8 @@ static ResType
 getResTypeFromLuaTable(lua_State *const L, int fields_index,
                        int rows_index)
 {
-    ResType out_res(true);
+    std::vector<std::string> names;
+    std::vector<enum_field_types> types;
     /* iterate over the fields argument */
     lua_pushnil(L);
     while (lua_next(L, fields_index)) {
@@ -342,9 +343,9 @@ getResTypeFromLuaTable(lua_State *const L, int fields_index,
         while (lua_next(L, -2)) {
             const std::string k = xlua_tolstring(L, -2);
             if ("name" == k) {
-                out_res.names.push_back(xlua_tolstring(L, -1));
+                names.push_back(xlua_tolstring(L, -1));
             } else if ("type" == k) {
-                out_res.types.push_back(static_cast<enum_field_types>(luaL_checkint(L, -1)));
+                types.push_back(static_cast<enum_field_types>(luaL_checkint(L, -1)));
             } else {
                 LOG(warn) << "unknown key " << k;
             }
@@ -354,9 +355,10 @@ getResTypeFromLuaTable(lua_State *const L, int fields_index,
         lua_pop(L, 1);
     }
 
-    assert(out_res.names.size() == out_res.types.size());
+    assert(names.size() == types.size());
 
     /* iterate over the rows argument */
+    std::vector<std::vector<Item *> > rows;
     lua_pushnil(L);
     while (lua_next(L, rows_index)) {
         if (!lua_istable(L, -1))
@@ -364,32 +366,31 @@ getResTypeFromLuaTable(lua_State *const L, int fields_index,
 
         /* initialize all items to NULL, since Lua skips
            nil array entries */
-        std::vector<std::shared_ptr<Item> > row =
-            itemNullVector(out_res.types.size());
+        std::vector<Item *> row = itemNullVector(types.size());
 
         lua_pushnil(L);
         while (lua_next(L, -2)) {
             const int key = luaL_checkint(L, -2) - 1;
 
             assert(key >= 0
-                   && static_cast<uint>(key) < out_res.types.size());
+                   && static_cast<uint>(key) < types.size());
             const std::string data = xlua_tolstring(L, -1);
-            Item *const value =
-                MySQLFieldTypeToItem(out_res.types[key], data);
-            row[key] = std::shared_ptr<Item>(value);
+            row[key] = MySQLFieldTypeToItem(types[key], data);
 
             lua_pop(L, 1);
         }
         // We can not use this assert because rows that contain many
         // NULLs don't return their columns in a strictly increasing
         // order.
-        // assert((unsigned int)key == out_res.names.size() - 1);
+        // assert((unsigned int)key == names.size() - 1);
 
-        out_res.rows.push_back(row);
+        rows.push_back(row);
         lua_pop(L, 1);
     }
 
-    return out_res;
+    // 0, 0 is an ugly HACK; will go away with no backend
+    return ResType(true, 0, 0, std::move(names), std::move(types),
+                   std::move(rows));
 }
 
 static int

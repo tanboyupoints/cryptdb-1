@@ -216,9 +216,9 @@ get_create_field(const Analysis &a, Create_field * const f,
 
     const auto &enc_layers = a.getEncLayers(om);
     assert(enc_layers.size() > 0);
-    for (auto it = enc_layers.begin(); it != enc_layers.end(); it++) {
+    for (const auto &it : enc_layers) {
         const Create_field * const old_cf = new_cf;
-        new_cf = (*it)->newCreateField(*old_cf, name);
+        new_cf = it->newCreateField(*old_cf, name);
     }
 
     // Restore the default so we don't memleak it.
@@ -464,10 +464,10 @@ encrypt_item_layers(const Item &i, onion o, const OnionMeta &om,
     const Item *enc = &i;
     Item *new_enc = NULL;
 
-    for (auto it = enc_layers.begin(); it != enc_layers.end(); it++) {
+    for (const auto &it : enc_layers) {
         LOG(encl) << "encrypt layer "
-                  << TypeText<SECLEVEL>::toText((*it)->level()) << "\n";
-        new_enc = (*it)->encrypt(*enc, IV);
+                  << TypeText<SECLEVEL>::toText(it->level()) << "\n";
+        new_enc = it->encrypt(*enc, IV);
         assert(new_enc);
         enc = new_enc;
     }
@@ -740,7 +740,8 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
     }
 
     if (false == res.success()) {
-        return EpilogueResult(QueryAction::NO_DECRYPT, ResType(false));
+        // 0, 0 is an ugly HACK; will go away with new backend
+        return EpilogueResult(QueryAction::NO_DECRYPT, ResType(false, 0, 0));
     }
 
     if (QueryAction::DECRYPT == action) {

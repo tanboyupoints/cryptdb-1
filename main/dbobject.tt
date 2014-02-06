@@ -40,9 +40,9 @@ template <typename ChildType, typename KeyType>
 ChildType *
 MappedDBMeta<ChildType, KeyType>::getChild(const KeyType &key) const
 {
-    for (auto it = children.begin(); it != children.end(); it++) {
-        if (it->first == key) {
-            return it->second.get();
+    for (const auto &it : children) {
+        if (it.first == key) {
+            return it.second.get();
         }
     }
 
@@ -54,9 +54,9 @@ template <typename ChildType, typename KeyType>
 KeyType const &
 MappedDBMeta<ChildType, KeyType>::getKey(const DBMeta &child) const
 {
-    for (auto it = children.begin(); it != children.end(); ++it) {
-        if (it->second.get() == &child) {
-            return (*it).first;
+    for (const auto &it : children) {
+        if (it.second.get() == &child) {
+            return it.first;
         }
     }
 
@@ -96,8 +96,8 @@ bool
 MappedDBMeta<ChildType, KeyType>::applyToChildren(
                             std::function<bool(const DBMeta &)> fn) const
 {
-    for (auto it = children.begin(); it != children.end(); it++) {
-        if (false == fn(*(*it).second.get())) {
+    for (const auto &it : children) {
+        if (false == fn(*it.second.get())) {
             return false;
         }
     }

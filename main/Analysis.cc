@@ -27,23 +27,22 @@ EncSet
 EncSet::intersect(const EncSet & es2) const
 {
     OnionLevelFieldMap m;
-    for (auto it2 = es2.osl.begin();
-            it2 != es2.osl.end(); ++it2) {
-        auto it = osl.find(it2->first);
+    for (const auto &it2 : es2.osl) {
+        auto it = osl.find(it2.first);
 
         if (it != osl.end()) {
             FieldMeta * const fm = it->second.second;
-            FieldMeta * const fm2 = it2->second.second;
+            FieldMeta * const fm2 = it2.second.second;
 
             const onion o = it->first;
-            const onion o2 = it2->first;
+            const onion o2 = it2.first;
 
             assert(o == o2);
 
             const SECLEVEL sl =
                 static_cast<SECLEVEL>(
                         min(static_cast<int>(it->second.first),
-                            static_cast<int>(it2->second.first)));
+                            static_cast<int>(it2.second.first)));
 
             /*
              * FIXME: Each clause of this if statement should make sure
@@ -462,8 +461,8 @@ ProxyState::safeCreateEmbeddedTHD()
 
 void ProxyState::dumpTHDs()
 {
-    for (auto it = thds.begin(); it != thds.end(); ++it) {
-        it->release();
+    for (auto &it : thds) {
+        it.release();
     }
     thds.clear();
 
@@ -718,9 +717,9 @@ SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     this->do_nothing = false;
 
     const auto itemToNiceString =
-        [&e_conn] (const std::shared_ptr<Item> &p_item)
+        [&e_conn] (const Item *const p_item)
         {
-            const std::string &s = ItemToString(*p_item.get());
+            const std::string &s = ItemToString(*p_item);
 
             if (Item::Type::STRING_ITEM != p_item->type()) {
                 return s;
@@ -737,7 +736,7 @@ SpecialUpdate::beforeQuery(const std::unique_ptr<Connect> &conn,
     // then we join the results into a single comma seperated values list
     const auto pItemVectorToNiceValueList =
         [&itemToNiceString]
-            (const std::vector<std::vector<std::shared_ptr<Item>>> &vec)
+            (const std::vector<std::vector<Item *> > &vec)
         {
             std::vector<std::string> esses;
             for (auto row_it : vec) {
@@ -915,28 +914,23 @@ UseAfterQueryResultOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) co
                           "failed to initialize show directives table");
 
     const auto &databases = schema.getChildren();
-    for (auto db_it = databases.begin(); db_it != databases.end();
-         ++db_it) {
-        const std::string &db_name = db_it->first.getValue();
-        const auto &dm = db_it->second;
+    for (const auto &db_it : databases) {
+        const std::string &db_name = db_it.first.getValue();
+        const auto &dm = db_it.second;
         const auto &tables = dm->getChildren();
-        for (auto table_it = tables.begin(); table_it != tables.end();
-             ++table_it) {
-            const std::string &table_name = table_it->first.getValue();
-            const auto &tm = table_it->second;
+        for (const auto &table_it : tables) {
+            const std::string &table_name = table_it.first.getValue();
+            const auto &tm = table_it.second;
             const auto &fields = tm->getChildren();
-            for (auto field_it = fields.begin(); field_it != fields.end();
-                 ++field_it) {
+            for (const auto &field_it : fields) {
                 const std::string &field_name =
-                    field_it->first.getValue();
-                const auto &fm = field_it->second;
+                    field_it.first.getValue();
+                const auto &fm = field_it.second;
                 const auto &onions = fm->getChildren();
-                for (auto onion_it = onions.begin();
-                     onion_it != onions.end();
-                     ++onion_it) {
+                for (const auto &onion_it : onions) {
                     const std::string &onion_name =
-                      TypeText<onion>::toText(onion_it->first.getValue());
-                    const auto &om = onion_it->second;
+                      TypeText<onion>::toText(onion_it.first.getValue());
+                    const auto &om = onion_it.second;
 
                     // HACK: this behavior is not usually safe, use
                     // Analysis to get state information generally
@@ -997,8 +991,8 @@ DeltaOutput::beforeQuery(const std::unique_ptr<Connect> &conn,
     SYNC_IF_FALSE(e_conn->execute(q_completion), e_conn);
     this->embedded_completion_id = e_conn->last_insert_id();
 
-    for (auto it = deltas.begin(); it != deltas.end(); it++) {
-        const bool b = (*it)->apply(e_conn, Delta::BLEEDING_TABLE);
+    for (const auto &it : deltas) {
+        const bool b = it->apply(e_conn, Delta::BLEEDING_TABLE);
         SYNC_IF_FALSE(b, e_conn);
     }
 
@@ -1020,8 +1014,8 @@ DeltaOutput::afterQuery(const std::unique_ptr<Connect> &e_conn) const
                  std::to_string(this->embedded_completion_id.get()) + ";";
     SYNC_IF_FALSE(e_conn->execute(q_update), e_conn);
 
-    for (auto it = deltas.begin(); it != deltas.end(); it++) {
-        const bool b = (*it)->apply(e_conn, Delta::REGULAR_TABLE);
+    for (const auto &it : deltas) {
+        const bool b = it->apply(e_conn, Delta::REGULAR_TABLE);
         SYNC_IF_FALSE(b, e_conn);
     }
 
