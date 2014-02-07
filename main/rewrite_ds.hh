@@ -196,6 +196,16 @@ public:
 
 };
 
+class RewritePlanWithChildren : public RewritePlan {
+public:
+    std::vector<std::shared_ptr<RewritePlan> > childr_rp;
+
+    RewritePlanWithChildren(const EncSet &es_out, const reason &r,
+                            const std::vector<std::shared_ptr<RewritePlan> >
+                                &childr_rp)
+        : RewritePlan(es_out, r), childr_rp(childr_rp) {}
+};
+
 //rewrite plan in which we only need to remember one olk
 // to know how to rewrite
 class RewritePlanOneOLK : public RewritePlan {

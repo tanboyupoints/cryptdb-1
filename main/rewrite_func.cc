@@ -963,7 +963,6 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
         return do_optimize_type_self_and_args(i, a);
     }
 
-    //FIXME: Cleanup.
     virtual Item *
     do_rewrite_type(const Item_func_min_max &i, const OLK &constr,
                     const RewritePlan &_rp, Analysis &a) const
@@ -988,13 +987,17 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
             i.*rob<Item_func_min_max, int,
                     &Item_func_min_max::cmp_sign>::ptr();
 
-        Item *const cond =
-            cmp_sign ? static_cast<Item *>(new
-                            Item_func_gt(cond_arg0, cond_arg1))
-                     : static_cast<Item *>(new
-                            Item_func_lt(cond_arg0, cond_arg1));
+        AssignOnce<Item *> cond;
+        if (-1 == cmp_sign) {
+            cond = new Item_func_gt(cond_arg0, cond_arg1);
+        } else if (1 == cmp_sign) {
+            cond = new Item_func_lt(cond_arg0, cond_arg1);
+        } else {
+            FAIL_TextMessageError("unknown comparison type with"
+                                  " Item_func_min_max");
+        }
 
-        return new Item_func_if(cond,
+        return new Item_func_if(cond.get(),
                                 itemTypes.do_rewrite(*args[0], constr,
                                                 *rp.childr_rp[0].get(),
                                                 a),
@@ -1003,8 +1006,6 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
                                                 a));
     }
 };
-
-//TODO: do we still need the file analyze.cc?
 
 extern const char str_greatest[] = "greatest";
 static CItemMinMax<str_greatest, Item_func_max> ANON;

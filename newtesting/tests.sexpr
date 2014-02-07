@@ -771,7 +771,7 @@
   ("SELECT * FROM enums")
   ("SELECT spider + spider FROM bugs")
   ("SELECT spider + spider FROM bugs")
-  ;; ("SELECT SUM(spider) FROM bugs")
+  ("SELECT SUM(spider) FROM bugs")
   ;; ("SELECT GREATEST(ant, 5000) FROM more_bugs")
   ;; ("SELECT GREATEST(12, ant, 5000) FROM more_bugs")
   ("CREATE TABLE crawlers (pink DATE)")
@@ -788,9 +788,11 @@
   ("INSERT INTO real_type_bug VALUES (1, 2, 3)")
   ("SELECT * FROM real_type_bug")
   ("UPDATE real_type_bug SET a = a + 1, b = b + 1")
+
+  ("SHOW ENGINES")
+
   ;; FAIL: we don't currently support; but it shouldn't crash the system
   ("CREATE TABLE jjj SELECT * FROM enums")
-  ("SHOW ENGINES")
 
   ("CREATE TABLE floating (x float)")
   ("INSERT INTO floating VALUES (23e+12), (12e+14), ('a'), (12),
@@ -813,6 +815,39 @@
   ("DROP TABLE more_bugs")
   ("DROP TABLE real_type_bug")
   ("DROP TABLE crawlers"))
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;     miscellaneous bugs 2
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ("MiscBugs2" t
+  ("CREATE TABLE t (x integer)"
+   (:all-max "t"))
+  ("INSERT INTO t values (1), (10), (100), (1000)")
+  ("SELECT * FROM t")
+
+  ;; with column: constant first
+  ("SELECT SUM(GREATEST(50, x)) FROM t"
+   (:update "t" x oOrder OPE))
+  ;; with column: column first
+  ("SELECT SUM(GREATEST(x, 101)) FROM t")
+  ;; constants: small first
+  ("SELECT SUM(GREATEST(50, 55)) FROM t")
+  ;; constants: big first
+  ("SELECT SUM(GREATEST(55, 40)) FROM t")
+
+  ;; with column: constant first
+  ("SELECT SUM(LEAST(50, x)) FROM t")
+  ;; with column: column first
+  ("SELECT SUM(LEAST(x, 101)) FROM t")
+  ;; constants: small first
+  ("SELECT SUM(LEAST(505, 3000)) FROM t")
+  ;; constants: big first
+  ("SELECT SUM(LEAST(1000, 4)) FROM t")
+
+  ("SELECT * FROM t"
+   :check)
+  ("DROP TABLE t"))
+
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;    quoted schema objects
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

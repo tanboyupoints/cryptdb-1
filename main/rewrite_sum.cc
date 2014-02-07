@@ -173,13 +173,16 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
                                childr_rp);
 
         reason rsn(solution, why, i);
-        return new RewritePlan(solution, rsn);
+        return new RewritePlanWithChildren(solution, rsn, childr_rp);
     }
 
     virtual Item *
     do_rewrite_type(const Item_sum_sum &i, const OLK &constr,
                     const RewritePlan &rp, Analysis &a) const
     {
+        auto rp_wc = static_cast<const RewritePlanWithChildren &>(rp);
+        assert(rp_wc.childr_rp.size() == 1);
+
         LOG(cdb_v) << "Item_sum_sum rewrite " << i << std::endl;
 
         TEST_Text(rp.es_out.contains(constr),
@@ -187,7 +190,7 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
 
         Item *const new_child =
             itemTypes.do_rewrite(*RiboldMYSQL::get_arg(i, 0), constr,
-                                 rp, a);
+                                 *rp_wc.childr_rp[0].get(), a);
         assert(new_child);
 
         if (oAGG == constr.o) {
