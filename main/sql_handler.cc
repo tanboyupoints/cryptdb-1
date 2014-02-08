@@ -1,4 +1,5 @@
 #include <main/sql_handler.hh>
+#include <util/yield.hpp>
 
 AbstractAnything::~AbstractAnything() {}
 
@@ -28,9 +29,13 @@ genericPreamble(bool staleness, NextParams &nparams)
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *> SimpleExecutor::
 next(const ResType &res, NextParams &nparams)
 {
-    genericPreamble(false, nparams);
+    reenter(this->corot) {
+        genericPreamble(false, nparams);
 
-    crFinishWithQuery(this->query);
+        yield return CR_QUERY_RESULTS(this->query);
+    }
+
+    assert(false);
 }
 
 

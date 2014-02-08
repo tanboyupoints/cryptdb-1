@@ -8,6 +8,7 @@
 #include <main/metadata_tables.hh>
 #include <parser/lex_util.hh>
 #include <util/onions.hh>
+#include <util/yield.hpp>
 
 extern CItemTypesDir itemTypes;
 
@@ -1188,18 +1189,21 @@ SQLDispatcher *buildDMLDispatcher()
     return dispatcher;
 }
 
-// FIXME: decrypt results
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 DMLQueryExecutor::
 next(const ResType &res, NextParams &nparams)
 {
-    crStartBlock
-        genericPreamble(false, nparams);
+    reenter(this->corot) {
+        yield {
+            genericPreamble(false, nparams);
 
-        crYield(std::make_pair(true, this->query));
-    crEndBlock
+            return CR_QUERY_AGAIN(std::make_pair(true, this->query));
+        }
 
-    crFinish(Rewriter::decryptResults(res, this->rmeta));
+        yield return CR_RESULTS(Rewriter::decryptResults(res, this->rmeta));
+    }
+
+    assert(false);
 }
 
 static std::pair<std::string, ReturnMeta>
@@ -1232,157 +1236,158 @@ next(const ResType &res, NextParams &nparams)
     crEndBlock
     */
 
-    crStartBlock
-        genericPreamble(false, nparams);
+    reenter(this->corot) {
+        yield {
+            genericPreamble(false, nparams);
 
-        // Retrieve rows from database.
-        const std::string &select_q =
-            " SELECT * FROM " + this->plain_table +
-            " WHERE " + this->where_clause + ";";
-        // FIXME: should never cause an onion adjustment; put a catch + assert
-        const auto &rewritten_select_q =
-            rewriteAndGetFirstQuery(const_cast<ProxyState &>(ps), select_q,
-                                    nparams.default_db);
-        this->select_rmeta = rewritten_select_q.second;
-        crYield(std::make_pair(true, rewritten_select_q.first));
-    crEndBlock
-
-    crStartBlock
-        assert(res.success());
-        const ResType &dec_res =
-            Rewriter::decryptResults(res, this->select_rmeta.get());
-        assert(dec_res.success());
-        if (dec_res.rows.size() == 0) {
-            crFinish(ResType(true, 0, 0));
+            // Retrieve rows from database.
+            const std::string &select_q =
+                " SELECT * FROM " + this->plain_table +
+                " WHERE " + this->where_clause + ";";
+            // FIXME: should never cause an onion adjustment; put a catch + assert
+            const auto &rewritten_select_q =
+                rewriteAndGetFirstQuery(const_cast<ProxyState &>(ps), select_q,
+                                        nparams.default_db);
+            this->select_rmeta = rewritten_select_q.second;
+            return CR_QUERY_AGAIN(std::make_pair(true, rewritten_select_q.first));
         }
 
-        const auto itemToNiceString =
-            [&nparams] (const Item *const p_item)
-            {
-                const std::string &s = ItemToString(*p_item);
+        assert(res.success());
+        this->dec_res = Rewriter::decryptResults(res, this->select_rmeta.get());
+        assert(this->dec_res.get().success());
+        if (this->dec_res.get().rows.size() == 0) {
+            yield return CR_RESULTS(ResType(true, 0, 0));
+        }
 
-                if (Item::Type::STRING_ITEM != p_item->type()) {
-                    return s;
-                }
+        yield {
+            const auto itemToNiceString =
+                [&nparams] (const Item *const p_item)
+                {
+                    const std::string &s = ItemToString(*p_item);
 
-                // escaping and quoting the string creates a value that can
-                // actually be used in an INSERT statement
-                return "'" + escapeString(nparams.e_conn, s) + "'";
-            };
+                    if (Item::Type::STRING_ITEM != p_item->type()) {
+                        return s;
+                    }
 
-        // We must take these items and convert them into quoted, escaped
-        // strings
-        //  > Item -> std::string -> escaped -> quoted
-        // then we join the results into a single comma seperated values list
-        const auto pItemVectorToNiceValueList =
-            [&itemToNiceString]
-                (const std::vector<std::vector<Item *> > &vec)
-            {
-                std::vector<std::string> esses;
-                for (auto row_it : vec) {
-                    std::vector<std::string> nice_values(row_it.size());
-                    std::transform(row_it.begin(), row_it.end(),
-                                   nice_values.begin(), itemToNiceString);
-                    esses.push_back("("+ vector_join(nice_values, ",") + ")");
-                }
+                    // escaping and quoting the string creates a value that can
+                    // actually be used in an INSERT statement
+                    return "'" + escapeString(nparams.e_conn, s) + "'";
+                };
 
-                return vector_join(esses, ",");
-            };
+            // We must take these items and convert them into quoted, escaped
+            // strings
+            //  > Item -> std::string -> escaped -> quoted
+            // then we join the results into a single comma seperated values list
+            const auto pItemVectorToNiceValueList =
+                [&itemToNiceString]
+                    (const std::vector<std::vector<Item *> > &vec)
+                {
+                    std::vector<std::string> esses;
+                    for (auto row_it : vec) {
+                        std::vector<std::string> nice_values(row_it.size());
+                        std::transform(row_it.begin(), row_it.end(),
+                                       nice_values.begin(), itemToNiceString);
+                        esses.push_back("("+ vector_join(nice_values, ",") + ")");
+                    }
 
-        const std::string &values_string =
-            pItemVectorToNiceValueList(dec_res.rows);
+                    return vector_join(esses, ",");
+                };
 
-        // do the query on the embedded database inside of a transaction
-        // so that we can prevent failure artifacts from populating the
-        // embedded database
-        TEST_Sync(nparams.e_conn->execute("START TRANSACTION;"),
-                  "failed to start transaction");
+            const std::string &values_string =
+                pItemVectorToNiceValueList(dec_res.get().rows);
 
-        // turn on strict mode so we can determine if we have bad values
-        // > ie trying to insert 256 into a TINYINT UNSIGNED column
-        SYNC_IF_FALSE(strictMode(nparams.e_conn.get()), nparams.e_conn);
+            // do the query on the embedded database inside of a transaction
+            // so that we can prevent failure artifacts from populating the
+            // embedded database
+            TEST_Sync(nparams.e_conn->execute("START TRANSACTION;"),
+                      "failed to start transaction");
 
-        // Push the plaintext rows to the embedded database.
-        const std::string &push_q =
-            " INSERT INTO " + this->plain_table +
-            " VALUES " + values_string + ";";
-        SYNC_IF_FALSE(nparams.e_conn->execute(push_q), nparams.e_conn);
+            // turn on strict mode so we can determine if we have bad values
+            // > ie trying to insert 256 into a TINYINT UNSIGNED column
+            SYNC_IF_FALSE(strictMode(nparams.e_conn.get()), nparams.e_conn);
 
-        // Run the original (unmodified) query on the data in the embedded
-        // database.
-        std::unique_ptr<DBResult> original_query_dbres;
-        SYNC_IF_FALSE(nparams.e_conn->execute(this->original_query,
-                                              &original_query_dbres),
-                      nparams.e_conn);
-        assert(original_query_dbres);
-        // HACK
-        this->original_query_dbres = original_query_dbres.release();
+            // Push the plaintext rows to the embedded database.
+            const std::string &push_q =
+                " INSERT INTO " + this->plain_table +
+                " VALUES " + values_string + ";";
+            SYNC_IF_FALSE(nparams.e_conn->execute(push_q), nparams.e_conn);
 
-        // strict mode off
-        SYNC_IF_FALSE(nparams.e_conn->execute("SET SESSION sql_mode = ''"),
-                      nparams.e_conn);
+            // Run the original (unmodified) query on the data in the embedded
+            // database.
+            std::unique_ptr<DBResult> original_query_dbres;
+            SYNC_IF_FALSE(nparams.e_conn->execute(this->original_query,
+                                                  &original_query_dbres),
+                          nparams.e_conn);
+            assert(original_query_dbres);
+            // HACK
+            this->original_query_dbres = original_query_dbres.release();
 
-        // > Collect the results from the embedded database.
-        // > This code relies on single threaded access to the database
-        //   and on the fact that the database is cleaned up after
-        //   every such operation.
-        std::unique_ptr<DBResult> dbres;
-        const std::string &select_results_q =
-            " SELECT * FROM " + this->plain_table + ";";
-        SYNC_IF_FALSE(nparams.e_conn->execute(select_results_q, &dbres),
-                      nparams.e_conn);
-        const ResType interim_res = ResType(dbres->unpack());
-        assert(interim_res.success());
-        this->escaped_output_values =
-            pItemVectorToNiceValueList(interim_res.rows);
+            // strict mode off
+            SYNC_IF_FALSE(nparams.e_conn->execute("SET SESSION sql_mode = ''"),
+                          nparams.e_conn);
 
-        // Cleanup the embedded database.
-        const std::string &cleanup_q =
-            "DELETE FROM " + this->plain_table + ";";
-        SYNC_IF_FALSE(nparams.e_conn->execute(cleanup_q), nparams.e_conn);
+            // > Collect the results from the embedded database.
+            // > This code relies on single threaded access to the database
+            //   and on the fact that the database is cleaned up after
+            //   every such operation.
+            std::unique_ptr<DBResult> dbres;
+            const std::string &select_results_q =
+                " SELECT * FROM " + this->plain_table + ";";
+            SYNC_IF_FALSE(nparams.e_conn->execute(select_results_q, &dbres),
+                          nparams.e_conn);
+            const ResType interim_res = ResType(dbres->unpack());
+            assert(interim_res.success());
+            this->escaped_output_values =
+                pItemVectorToNiceValueList(interim_res.rows);
 
-        SYNC_IF_FALSE(nparams.e_conn->execute("COMMIT;"), nparams.e_conn);
+            // Cleanup the embedded database.
+            const std::string &cleanup_q =
+                "DELETE FROM " + this->plain_table + ";";
+            SYNC_IF_FALSE(nparams.e_conn->execute(cleanup_q), nparams.e_conn);
 
-        // This query is necessary to propagate a transaction into
-        // INFORMATION_SCHEMA.
-        const std::string &propagation_query =
-            "SELECT NULL FROM " + this->crypted_table + ";";
-        crYield(std::make_pair(false, propagation_query));
-    crEndBlock
+            SYNC_IF_FALSE(nparams.e_conn->execute("COMMIT;"), nparams.e_conn);
 
-    // FIXME: return failure to the client when something fails
-    crStartBlock
-        // DELETE the rows matching the WHERE clause from the database.
-        const std::string &delete_q =
-            " DELETE FROM " + this->plain_table +
-            " WHERE " + this->where_clause + ";";
+            // This query is necessary to propagate a transaction into
+            // INFORMATION_SCHEMA.
+            const std::string &propagation_query =
+                "SELECT NULL FROM " + this->crypted_table + ";";
+            return CR_QUERY_AGAIN(std::make_pair(false, propagation_query));
+        }
 
-        const auto &rewritten_delete_q =
-            rewriteAndGetFirstQuery(const_cast<ProxyState &>(ps), delete_q,
-                                    nparams.default_db);
-        crYield(std::make_pair(true, rewritten_delete_q));
-    crEndBlock
+        // FIXME: return failure to the client when something fails
+        yield {
+            // DELETE the rows matching the WHERE clause from the database.
+            const std::string &delete_q =
+                " DELETE FROM " + this->plain_table +
+                " WHERE " + this->where_clause + ";";
 
-    crStartBlock
-        // > Add each row from the embedded database to the data database.
-        const std::string &insert_q =
-            " INSERT INTO " + this->plain_table +
-            " VALUES " + this->escaped_output_values.get() + ";";
-        const auto &rewritten_insert_q =
-            rewriteAndGetFirstQuery(const_cast<ProxyState &>(ps), insert_q,
-                                    nparams.default_db);
-        crYield(std::make_pair(true, rewritten_insert_q));
-    crEndBlock
+            const auto &rewritten_delete_q =
+                rewriteAndGetFirstQuery(const_cast<ProxyState &>(ps), delete_q,
+                                        nparams.default_db);
+            return CR_QUERY_AGAIN(std::make_pair(true, rewritten_delete_q));
+        }
 
-    /*
-    crStartBlock
-        const std::string &cond_trx =
-            "CALL " + MetaData::Table::conditionalCommit();
-        crYield(std::make_pair(true, cond_trx));
-    crEndBlock
-    */
+        yield {
+            // > Add each row from the embedded database to the data database.
+            const std::string &insert_q =
+                " INSERT INTO " + this->plain_table +
+                " VALUES " + this->escaped_output_values.get() + ";";
+            const auto &rewritten_insert_q =
+                rewriteAndGetFirstQuery(const_cast<ProxyState &>(ps), insert_q,
+                                        nparams.default_db);
+            return CR_QUERY_AGAIN(std::make_pair(true, rewritten_insert_q));
+        }
 
-    crFinish(this->original_query_dbres.get()->unpack());
+        /*
+        crStartBlock
+            const std::string &cond_trx =
+                "CALL " + MetaData::Table::conditionalCommit();
+            crYield(std::make_pair(true, cond_trx));
+        crEndBlock
+        */
+
+        return CR_RESULTS(this->original_query_dbres.get()->unpack());
+    }
 
     assert(false);
 }
@@ -1391,51 +1396,57 @@ std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 ShowDirectiveExecutor::
 next(const ResType &res, NextParams &nparams)
 {
-    genericPreamble(false, nparams);
+    reenter(this->corot) {
+        yield {
+            genericPreamble(false, nparams);
 
-    // HACK hack HACK hackity hackhack
-    TEST_TextMessageError(deleteAllShowDirectiveEntries(nparams.e_conn),
-                  "failed to initialize show directives table");
+            // HACK hack HACK hackity hackhack
+            TEST_TextMessageError(deleteAllShowDirectiveEntries(nparams.e_conn),
+                          "failed to initialize show directives table");
 
-    const auto &databases = this->schema.getChildren();
-    for (const auto &db_it : databases) {
-        const std::string &db_name = db_it.first.getValue();
-        const auto &dm = db_it.second;
-        const auto &tables = dm->getChildren();
-        for (const auto &table_it : tables) {
-            const std::string &table_name = table_it.first.getValue();
-            const auto &tm = table_it.second;
-            const auto &fields = tm->getChildren();
-            for (const auto &field_it : fields) {
-                const std::string &field_name =
-                    field_it.first.getValue();
-                const auto &fm = field_it.second;
-                const auto &onions = fm->getChildren();
-                for (const auto &onion_it : onions) {
-                    const std::string &onion_name =
-                      TypeText<onion>::toText(onion_it.first.getValue());
-                    const auto &om = onion_it.second;
+            const auto &databases = this->schema.getChildren();
+            for (const auto &db_it : databases) {
+                const std::string &db_name = db_it.first.getValue();
+                const auto &dm = db_it.second;
+                const auto &tables = dm->getChildren();
+                for (const auto &table_it : tables) {
+                    const std::string &table_name = table_it.first.getValue();
+                    const auto &tm = table_it.second;
+                    const auto &fields = tm->getChildren();
+                    for (const auto &field_it : fields) {
+                        const std::string &field_name =
+                            field_it.first.getValue();
+                        const auto &fm = field_it.second;
+                        const auto &onions = fm->getChildren();
+                        for (const auto &onion_it : onions) {
+                            const std::string &onion_name =
+                              TypeText<onion>::toText(onion_it.first.getValue());
+                            const auto &om = onion_it.second;
 
-                    // HACK: this behavior is not usually safe, use
-                    // Analysis to get state information generally
-                    const std::string &level =
-                        TypeText<SECLEVEL>::toText(om->getSecLevel());
-                    const bool b =
-                        addShowDirectiveEntry(nparams.e_conn, db_name,
-                                              table_name, field_name,
-                                              onion_name, level);
-                    TEST_TextMessageError(true == b,
-                                          "failed producing directive"
-                                          " results");
+                            // HACK: this behavior is not usually safe, use
+                            // Analysis to get state information generally
+                            const std::string &level =
+                                TypeText<SECLEVEL>::toText(om->getSecLevel());
+                            const bool b =
+                                addShowDirectiveEntry(nparams.e_conn, db_name,
+                                                      table_name, field_name,
+                                                      onion_name, level);
+                            TEST_TextMessageError(true == b,
+                                                  "failed producing directive"
+                                                  " results");
+                        }
+                    }
                 }
             }
+
+            std::unique_ptr<DBResult> db_res;
+            TEST_TextMessageError(getAllShowDirectiveEntries(nparams.e_conn,
+                                                             &db_res),
+                                  "failed retrieving directive results");
+            return CR_RESULTS(db_res->unpack());
         }
     }
 
-    std::unique_ptr<DBResult> db_res;
-    TEST_TextMessageError(getAllShowDirectiveEntries(nparams.e_conn, &db_res),
-                          "failed retrieving directive results");
-    crFinish(db_res->unpack());
     assert(false);
 }
 
@@ -1477,22 +1488,24 @@ std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 SensitiveDirectiveExecutor::
 next(const ResType &res, NextParams &nparams)
 {
-    crStartBlock
-        genericPreamble(false, nparams);
+    reenter(this->corot) {
+        yield {
+            genericPreamble(false, nparams);
 
-        TEST_Sync(nparams.e_conn->execute("START TRANSACTION"),
-                  "failed to start transaction for sensitive directive");
+            TEST_Sync(nparams.e_conn->execute("START TRANSACTION"),
+                      "failed to start transaction for sensitive directive");
 
-        SYNC_IF_FALSE(writeDeltas(nparams.e_conn, this->deltas,
-                                  Delta::REGULAR_TABLE),
-                      nparams.e_conn);
+            SYNC_IF_FALSE(writeDeltas(nparams.e_conn, this->deltas,
+                                      Delta::REGULAR_TABLE),
+                          nparams.e_conn);
 
-        SYNC_IF_FALSE(nparams.e_conn->execute("COMMIT"), nparams.e_conn);
+            SYNC_IF_FALSE(nparams.e_conn->execute("COMMIT"), nparams.e_conn);
 
-        const std::string &no_op = "do 0;";
-        crYield(std::make_pair(true, no_op));
-    crEndBlock
+            const std::string &no_op = "do 0;";
+            return CR_QUERY_RESULTS(std::make_pair(true, no_op));
+        }
+    }
 
-    crFinish(res);
+    assert(false);
 }
 

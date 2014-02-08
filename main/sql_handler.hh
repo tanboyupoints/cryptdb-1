@@ -1,63 +1,23 @@
 #pragma once
 
 #include <main/Analysis.hh>
+#include <util/yield.hpp>
 
 #include <sql_lex.h>
 
 #include <map>
 
-// only call yield one time per block
-#define crStartBlock                                                        \
-    if (0 == state_) {
+#define CR_QUERY_AGAIN(value)                                               \
+    std::make_pair(AbstractQueryExecutor::ResultType::QUERY_COME_AGAIN,     \
+                   newAnything(value))
 
-#define crEndBlock                                                          \
-        assert(false);                                                      \
-    }                                                                       \
-    assert(state_ > 0);                                                     \
-    --state_; ++upstate_;
+#define CR_QUERY_RESULTS(value)                                             \
+    std::make_pair(AbstractQueryExecutor::ResultType::QUERY_USE_RESULTS,    \
+                   newAnything(value))
 
-#define crYield(value)                                                      \
-{                                                                           \
-    assert(false == finished_);                                             \
-    assert(0 == state_);                                                    \
-    state_   = ++upstate_;                                                  \
-    upstate_ = 0;                                                           \
-    {                                                                       \
-        auto temp = (value);                                                \
-        return std::make_pair(                                              \
-            AbstractQueryExecutor::ResultType::QUERY_COME_AGAIN,            \
-            new Anything<decltype(temp)>(temp));                            \
-    }                                                                       \
-    assert(false);                                                          \
-}
-
-#define crFinishWithQuery(value)                                            \
-{                                                                           \
-    assert(false == finished_);                                             \
-    assert(0 == state_);                                                    \
-    finished_ = true;                                                       \
-    {                                                                       \
-        auto temp = (value);                                                \
-        return std::make_pair(                                              \
-            AbstractQueryExecutor::ResultType::QUERY_USE_RESULTS,           \
-            new Anything<decltype(temp)>(temp));                            \
-    }                                                                       \
-    assert(false);                                                          \
-}
-
-#define crFinish(value)                                                     \
-{                                                                           \
-    assert(false == finished_);                                             \
-    assert(0 == state_);                                                    \
-    finished_ = true;                                                       \
-    {                                                                       \
-        auto temp = (value);                                                \
-        return std::make_pair(                                              \
-            AbstractQueryExecutor::ResultType::RESULTS,                     \
-            new Anything<decltype(temp)>(temp));                            \
-    }                                                                       \
-    assert(false);                                                          \
-}
+#define CR_RESULTS(value)                                                   \
+    std::make_pair(AbstractQueryExecutor::ResultType::RESULTS,              \
+                   newAnything(value))
 
 template <typename Type>
 class Anything;
@@ -83,6 +43,13 @@ public:
     Type get() const {return value;}
 };
 
+template <typename Type>
+Anything<Type> *
+newAnything(const Type &t)
+{
+    return new Anything<Type>(t);
+}
+
 struct NextParams {
     SchemaCache *const schema_cache;
     const std::string &default_db;
@@ -99,14 +66,12 @@ struct NextParams {
 
 class AbstractQueryExecutor {
 protected:
-    unsigned state_, upstate_;
-    bool finished_;
+    coroutine corot;
 
 public:
     enum class ResultType {RESULTS, QUERY_COME_AGAIN, QUERY_USE_RESULTS};
 
-    AbstractQueryExecutor()
-        : state_(0), upstate_(0), finished_(false) {}
+    AbstractQueryExecutor() {}
     virtual ~AbstractQueryExecutor();
     virtual std::pair<ResultType, AbstractAnything *>
         next(const ResType &res, NextParams &nparams) = 0;
@@ -148,3 +113,4 @@ struct Preamble {
     const std::string table;
 };
 
+#include <util/unyield.hpp>

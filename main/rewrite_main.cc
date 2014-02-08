@@ -16,6 +16,7 @@
 #include <main/rewrite_util.hh>
 #include <util/cryptdb_log.hh>
 #include <util/enum_text.hh>
+#include <util/yield.hpp>
 #include <main/CryptoHandlers.hh>
 #include <parser/lex_util.hh>
 #include <main/sql_handler.hh>
@@ -1556,61 +1557,65 @@ std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 OnionAdjustmentExecutor::
 next(const ResType &res, NextParams &nparams)
 {
-    // FIXME: unnecessary to do all work in stored procedures
-    crStartBlock
-        genericPreamble(true, nparams);
+    reenter(this->corot) {
+        yield {
+            genericPreamble(true, nparams);
 
-        assert(this->adjust_queries.size() == 1
-               || this->adjust_queries.size() == 2);
+            assert(this->adjust_queries.size() == 1
+                   || this->adjust_queries.size() == 2);
 
-        {
-            uint64_t embedded_completion_id;
-            deltaOutputBeforeQuery(nparams.e_conn, this->original_query,
-                                   this->deltas,
-                                   CompletionType::AdjustOnionCompletion,
-                                   &embedded_completion_id);
-            this->embedded_completion_id = embedded_completion_id;
+            {
+                uint64_t embedded_completion_id;
+                deltaOutputBeforeQuery(nparams.e_conn, this->original_query,
+                                       this->deltas,
+                                       CompletionType::AdjustOnionCompletion,
+                                       &embedded_completion_id);
+                this->embedded_completion_id = embedded_completion_id;
+            }
+
+            return CR_QUERY_AGAIN(std::make_pair(true,
+                        "CALL " + MetaData::Proc::activeTransactionP()));
         }
 
-        crYield(std::make_pair(true,
-                    "CALL " + MetaData::Proc::activeTransactionP()));
-    crEndBlock
+        yield {
+            assert(res.success());
+            assert(res.rows.size() == 1);
 
-    crStartBlock
-        assert(res.success());
-        assert(res.rows.size() == 1);
+            const std::string &trx = ItemToString(*res.rows.front().front());
+            assert("1" == trx || "0" == trx);
+            this->in_trx = ("1" == trx);
 
-        const std::string &trx = ItemToString(*res.rows.front().front());
-        assert("1" == trx || "0" == trx);
-        this->in_trx = ("1" == trx);
+            return CR_QUERY_AGAIN(std::make_pair(true,
+                                            this->adjust_queries.front()));
+        }
 
-        crYield(std::make_pair(true, this->adjust_queries.front()));
-    crEndBlock
+        yield {
+            assert(res.success());
 
-    crStartBlock
-        assert(res.success());
+            const std::string &no_op = "DO 0;";
+            return CR_QUERY_AGAIN(std::make_pair(true,
+                    this->adjust_queries.size() == 2 ? this->adjust_queries.back()
+                                                     : no_op));
+        }
 
-        const std::string &no_op = "DO 0;";
-        crYield(std::make_pair(true,
-                this->adjust_queries.size() == 2 ? this->adjust_queries.back()
-                                                 : no_op));
-    crEndBlock
-
-    crStartBlock
         deltaOutputAfterQuery(nparams.e_conn, this->deltas,
                               this->embedded_completion_id.get());
 
         if (false == this->in_trx.get()) {
-            // FIXME: implement query reissue
-            const std::string &no_op = "DO 0;";
-            crFinishWithQuery(no_op);
+            yield {
+                // FIXME: implement query reissue
+                const std::string &no_op = "DO 0;";
+                return CR_QUERY_RESULTS(no_op);
+            }
+        } else {
+            // FIXME: rollback
+            throw ErrorPacketException("proxy did rollback", 1213, "40001");
         }
 
-        // FIXME: rollback
-        throw ErrorPacketException("proxy did rollback", 1213, "40001");
-    crEndBlock
+        // FIXME: deal with reissued query
+        assert(false);
+    }
 
-    // FIXME: deal with reissued query
     assert(false);
 }
 

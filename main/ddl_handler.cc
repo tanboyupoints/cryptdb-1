@@ -9,6 +9,8 @@
 #include <main/metadata_tables.hh>
 #include <parser/lex_util.hh>
 
+#include <util/yield.hpp>
+
 class CreateTableHandler : public DDLHandler {
     virtual AbstractQueryExecutor *
         rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
@@ -363,49 +365,51 @@ std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 DDLQueryExecutor::
 next(const ResType &res, NextParams &nparams)
 {
-    crStartBlock
-        genericPreamble(true, nparams);
+    reenter(this->corot) {
+        yield {
+            genericPreamble(true, nparams);
 
-        {
-            uint64_t embedded_completion_id;
-            deltaOutputBeforeQuery(nparams.e_conn, this->original_query,
-                                   this->deltas,
-                                   CompletionType::DDLCompletion,
-                                   &embedded_completion_id);
-            this->embedded_completion_id = embedded_completion_id;
+            {
+                uint64_t embedded_completion_id;
+                deltaOutputBeforeQuery(nparams.e_conn, this->original_query,
+                                       this->deltas,
+                                       CompletionType::DDLCompletion,
+                                       &embedded_completion_id);
+                this->embedded_completion_id = embedded_completion_id;
+            }
+
+            const std::string &remote_begin =
+                " INSERT INTO " + MetaData::Table::remoteQueryCompletion() +
+                "   (begin, complete, embedded_completion_id, reissue) VALUES"
+                "   (TRUE,  FALSE," +
+                    std::to_string(this->embedded_completion_id.get()) +
+                "    , FALSE);";
+            return CR_QUERY_AGAIN(std::make_pair(true, remote_begin));
         }
 
-        const std::string &remote_begin =
-            " INSERT INTO " + MetaData::Table::remoteQueryCompletion() +
-            "   (begin, complete, embedded_completion_id, reissue) VALUES"
-            "   (TRUE,  FALSE," +
-                std::to_string(this->embedded_completion_id.get()) +
-            "    , FALSE);";
-        crYield(std::make_pair(true, remote_begin));
-    crEndBlock
+        // execute the rewritten query
+        yield {
+            this->ddl_res = res;
+            return CR_QUERY_AGAIN(std::make_pair(true, this->new_query));
+        }
 
-    // execute the rewritten query
-    crStartBlock
-        this->ddl_res = res;
-        crYield(std::make_pair(true, this->new_query));
-    crEndBlock
+        yield {
+            const std::string &remote_complete =
+                " UPDATE " + MetaData::Table::remoteQueryCompletion() +
+                "    SET complete = TRUE"
+                "  WHERE embedded_completion_id = " +
+                     std::to_string(this->embedded_completion_id.get()) + ";";
+            return CR_QUERY_AGAIN(std::make_pair(true, remote_complete));
+        }
 
-    crStartBlock
-        const std::string &remote_complete =
-            " UPDATE " + MetaData::Table::remoteQueryCompletion() +
-            "    SET complete = TRUE"
-            "  WHERE embedded_completion_id = " +
-                 std::to_string(this->embedded_completion_id.get()) + ";";
-        crYield(std::make_pair(true, remote_complete));
-    crEndBlock
+        // this is a ddl query so do not put it into a transaction
+        TEST_Sync(nparams.e_conn->execute(this->original_query),
+                  "Failed to execute DDL query against embedded database!");
+        deltaOutputAfterQuery(nparams.e_conn, this->deltas,
+                              this->embedded_completion_id.get());
 
-    // this is a ddl query so do not put it into a transaction
-    TEST_Sync(nparams.e_conn->execute(this->original_query),
-              "Failed to execute DDL query against embedded database!");
-    deltaOutputAfterQuery(nparams.e_conn, this->deltas,
-                          this->embedded_completion_id.get());
-
-    crFinish(this->ddl_res.get());
+        return CR_RESULTS(this->ddl_res.get());
+    }
 
     assert(false);
 }

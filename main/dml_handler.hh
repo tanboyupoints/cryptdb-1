@@ -42,6 +42,7 @@ private:
     const std::string where_clause;
     const ProxyState &ps;               // FIXME: eliminate after rewrite
 
+    AssignOnce<ResType> dec_res;
     AssignOnce<DBResult *> original_query_dbres;
     AssignOnce<std::string> escaped_output_values;
     AssignOnce<ReturnMeta> select_rmeta;
