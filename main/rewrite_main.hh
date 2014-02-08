@@ -344,6 +344,7 @@ class OnionAdjustmentExecutor : public AbstractQueryExecutor {
     const std::list<std::string> adjust_queries;
 
     AssignOnce<uint64_t> embedded_completion_id;
+    AssignOnce<bool> in_trx;
 
 public:
     OnionAdjustmentExecutor(const std::unique_ptr<Connect> &e_conn,

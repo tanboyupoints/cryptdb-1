@@ -1572,82 +1572,38 @@ next(const ResType &res, NextParams &nparams)
             this->embedded_completion_id = embedded_completion_id;
         }
 
-        // This query is necessary to propagate a transaction into
-        // INFORMATION_SCHEMA.
-        // > This allows consistent behavior even when adjustment is first
-        // query in transaction.
-        const std::string &innodb_table =
-            MetaData::Table::remoteQueryCompletion();
-        crYield(std::make_pair(false, "SELECT NULL FROM " + innodb_table + ";"));
+        crYield(std::make_pair(true,
+                    "CALL " + MetaData::Proc::activeTransactionP()));
     crEndBlock
 
     crStartBlock
-        // are we in a transaction?
-        /*
-        std::list<std::string> r_qz = this->adjust_queries;
-        assert(r_qz.size() == 1 || r_qz.size() == 2);
+        assert(res.success());
+        assert(res.rows.size() == 1);
 
-        if (r_qz.size() == 1) {
-            r_qz.push_back(mysql_noop());
-        }
+        const std::string &trx = ItemToString(*res.rows.front().front());
+        assert("1" == trx || "0" == trx);
+        this->in_trx = ("1" == trx);
 
-        const std::string &q_remote =
-            " CALL " + MetaData::Proc::adjustOnion() + " ("
-            "   "  + std::to_string(this->embedded_completion_id.get()) + ","
-            "   '" + hackEscape(r_qz.front()) + "', "
-            "   '" + hackEscape(r_qz.back()) + "');";
-
-        crYield(std::make_pair(true, q_remote));
-        */
+        crYield(std::make_pair(true, this->adjust_queries.front()));
     crEndBlock
 
     crStartBlock
-        // cancel pending transaction
-        crYield(std::make_pair(false, "ROLLBACK"));
-    crEndBlock
+        assert(res.success());
 
-    crStartBlock
-        // start a new transaction for the adjustment
-        crYield(std::make_pair(false, "START TRANSACTION"));
-    crEndBlock
-
-    crStartBlock
-        crYield(std::make_pair(true, adjust_queries.front()));
-    crEndBlock
-
-    crStartBlock
-        if (adjust_queries.size() == 2) {
-            crYield(std::make_pair(true, adjust_queries.back()));
-        }
-
-        crYield(std::make_pair(true, "do 0"));
+        const std::string &no_op = "DO 0;";
+        crYield(std::make_pair(true,
+                this->adjust_queries.size() == 2 ? this->adjust_queries.back()
+                                                 : no_op));
     crEndBlock
 
     crStartBlock
         deltaOutputAfterQuery(nparams.e_conn, this->deltas,
                               this->embedded_completion_id.get());
 
-        const std::string &q =
-            " SELECT reissue "
-            "   FROM " + MetaData::Table::remoteQueryCompletion() +
-            "  WHERE embedded_completion_id = " +
-                     std::to_string(this->embedded_completion_id.get()) + ";";
-
-        std::unique_ptr<DBResult> db_res;
-        TEST_Text(nparams.conn->execute(q, &db_res),
-                  "failed to determine if an onion adjustmented query should"
-                  " be reissued!");
-        assert(1 == mysql_num_rows(db_res->n));
-
-        const MYSQL_ROW row = mysql_fetch_row(db_res->n);
-        const unsigned long *const l = mysql_fetch_lengths(db_res->n);
-        assert(l != NULL);
-
-        const bool reissue = string_to_bool(std::string(row[0], l[0]));
-
-        if (true == reissue) {
+        if (false == this->in_trx.get()) {
             // FIXME: implement query reissue
-            assert(false);
+            const std::string &no_op = "DO 0;";
+            crFinishWithQuery(no_op);
         }
 
         // FIXME: rollback

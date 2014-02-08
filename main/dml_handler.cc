@@ -1350,10 +1350,7 @@ next(const ResType &res, NextParams &nparams)
         crYield(std::make_pair(false, propagation_query));
     crEndBlock
 
-    // FIXME: doing all of the work in stored procedures is no longer
-    // necessary?
-    // > I think that transactions started in a stored procedure do not
-    //   propagate out correctly
+    // FIXME: return failure to the client when something fails
     crStartBlock
         // DELETE the rows matching the WHERE clause from the database.
         const std::string &delete_q =
@@ -1363,7 +1360,10 @@ next(const ResType &res, NextParams &nparams)
         const auto &rewritten_delete_q =
             rewriteAndGetFirstQuery(const_cast<ProxyState &>(ps), delete_q,
                                     nparams.default_db);
+        crYield(std::make_pair(true, rewritten_delete_q));
+    crEndBlock
 
+    crStartBlock
         // > Add each row from the embedded database to the data database.
         const std::string &insert_q =
             " INSERT INTO " + this->plain_table +
@@ -1371,13 +1371,7 @@ next(const ResType &res, NextParams &nparams)
         const auto &rewritten_insert_q =
             rewriteAndGetFirstQuery(const_cast<ProxyState &>(ps), insert_q,
                                     nparams.default_db);
-
-        const std::string &final_query =
-            " CALL " + MetaData::Proc::homAdditionTransaction() + " ("
-            " '" + escapeString(ps.getConn(), rewritten_delete_q.first) + "', "
-            " '" + escapeString(ps.getConn(), rewritten_insert_q.first) + "');";
-
-        crYield(std::make_pair(true, final_query));
+        crYield(std::make_pair(true, rewritten_insert_q));
     crEndBlock
 
     /*
@@ -1388,7 +1382,6 @@ next(const ResType &res, NextParams &nparams)
     crEndBlock
     */
 
-    // FIXME: fake the correct results
     crFinish(this->original_query_dbres.get()->unpack());
 
     assert(false);
