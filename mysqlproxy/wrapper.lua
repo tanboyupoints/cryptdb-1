@@ -2,6 +2,7 @@ assert(package.loadlib(os.getenv("EDBDIR").."/obj/libexecute.so",
                        "lua_cryptdb_init"))()
 local proto = assert(require("mysql.proto"))
 
+local want_interim = nil
 --
 -- Interception points provided by mysqlproxy
 --
@@ -117,11 +118,6 @@ end
 -- Helper functions
 --
 
-RES_IGNORE   = 1
-RES_DECRYPT  = 2
-
-
-
 function dprint(x)
     if os.getenv("CRYPTDB_PROXY_DEBUG") then
         print(x)
@@ -129,6 +125,12 @@ function dprint(x)
 end
 
 function read_query_real(packet)
+    --[[
+    proxy.queries:append(0, string.char(proxy.COM_QUERY) .. "do 0",
+                         { resultset_is_needed = true } )
+    return proxy.PROXY_SEND_QUERY
+    ]]--
+
     local query = string.sub(packet, 2)
     print("================================================")
     printred("QUERY: ".. query)
@@ -137,11 +139,11 @@ function read_query_real(packet)
         query = "USE `" .. query .. "`"
     end
 
+    local client = proxy.connection.client.src.name 
     if string.byte(packet) == proxy.COM_INIT_DB or
        string.byte(packet) == proxy.COM_QUERY then
-        status, error_msg, new_queries =
-            CryptDB.rewrite(proxy.connection.client.src.name, query,
-                            proxy.connection.server.thread_id)
+        status, error_msg =
+            CryptDB.rewrite(client, query, proxy.connection.server.thread_id)
 
         if false == status then
             proxy.response.type = proxy.MYSQLD_PACKET_ERR
@@ -149,26 +151,41 @@ function read_query_real(packet)
             return proxy.PROXY_SEND_RESULT
         end
 
-        if table.maxn(new_queries) == 0 then
-            proxy.response.type = proxy.MYSQLD_PACKET_OK
+        local control, param0, param1, param2, param3 =
+            CryptDB.next(client, {}, {}, nil, nil)
+        if "again" == control then
+            -- there must be at least one query to execute
+            want_interim    = param0
+            query           = param1
+
+            proxy.queries:append(1, string.char(proxy.COM_QUERY) .. query,
+                                 { resultset_is_needed = true } )
+            return proxy.PROXY_SEND_QUERY
+        elseif "results" == control then
+            local raffected_rows  = param0
+            local rinsert_id      = param1
+            local rfields         = param2
+            local rrows           = param3
+
+            if #rfields > 0 then
+                proxy.response.resultset = { fields = rfields, rows = rrows }
+            end
+
+            proxy.response.type             = proxy.MYSQLD_PACKET_OK
+            proxy.response.affected_rows    = raffected_rows
+            proxy.response.insert_id        = rinsert_id
+
+            return proxy.PROXY_SEND_RESULT
+        elseif "error" == control then
+            proxy.response.type         = proxy.MYSQLD_PACKET_ERR
+            proxy.response.errormsg     = param0
+            proxy.response.errcode      = param1
+            proxy.response.sqlstate     = param2
+
             return proxy.PROXY_SEND_RESULT
         end
 
-        dprint(" ")
-        for i, v in pairs(new_queries) do
-	    prettyNewQuery(v)
-            local result_key
-            if i == table.maxn(new_queries) then
-                result_key = RES_DECRYPT
-            else
-                result_key = RES_IGNORE
-            end
-            proxy.queries:append(result_key,
-                                 string.char(proxy.COM_QUERY) .. v,
-                                 { resultset_is_needed = true })
-        end
-
-        return proxy.PROXY_SEND_QUERY
+        assert(nil)
     elseif string.byte(packet) == proxy.COM_QUIT then
         -- do nothing
     else
@@ -177,91 +194,97 @@ function read_query_real(packet)
 end
 
 function read_query_result_real(inj)
+    local resultset = inj.resultset
+
+    -- note that queries which result in an error are never handed back
+    -- to cryptdb ``proper''
+    if resultset.query_status == proxy.MYSQLD_PACKET_ERR then
+        local err = proto.from_err_packet(resultset.raw)
+        proxy.response.type         = proxy.MYSQLD_PACKET_ERR
+        proxy.response.errmsg       = err.errmsg
+        proxy.response.errcode      = err.errcode
+        proxy.response.sqlstate     = err.sqlstate
+
+        return proxy.PROXY_SEND_RESULT
+    end
+
+    local query = inj.query:sub(2)
+    prettyNewQuery(query)
+
     local client = proxy.connection.client.src.name
+    local interim_fields = {}
+    local interim_rows = {}
 
-    if inj.id == RES_IGNORE then
-        return proxy.PROXY_IGNORE_RESULT
-    elseif inj.id == RES_DECRYPT then
-        local resultset = inj.resultset
-
-
-        -- note that queries which result in an error are never handed back
-        -- to cryptdb ``proper''
-        if resultset.query_status == proxy.MYSQLD_PACKET_ERR then
-            local err = proto.from_err_packet(resultset.raw)
-            proxy.response.type = proxy.MYSQLD_PACKET_ERR
-            proxy.response.errmsg = err.errmsg
-            proxy.response.errcode = err.errcode
-            proxy.response.sqlstate = err.sqlstate
-        else
-            local fields = {}
-            local rows = {}
-            local query = inj.query:sub(2)
-
+    if true == want_interim then
+        -- build up interim result for next(...) calls
 	    print(greentext("ENCRYPTED RESULTS:"))
 
-            -- mysqlproxy doesn't return real lua arrays, so re-package
-            local resfields = resultset.fields
+        -- mysqlproxy doesn't return real lua arrays, so re-package
+        local resfields = resultset.fields
 
 	    printline(#resfields)
 	    if (#resfields) then
 	       io.write("|")
 	    end
 	    for i = 1, #resfields do
-                rfi = resfields[i]
-                fields[i] = { type = resfields[i].type,
-                              name = resfields[i].name }
-		io.write(string.format("%-20s|",rfi.name))
-            end
+            rfi = resfields[i]
+            interim_fields[i] =
+                { type = resfields[i].type,
+                  name = resfields[i].name }
+		    io.write(string.format("%-20s|",rfi.name))
+        end
 
 	    print()
 	    printline(#resfields)
 	    
-            local resrows = resultset.rows
-            if resrows then
-                for row in resrows do
-                    table.insert(rows, row)
-		    io.write("|")
-		    for key,value in pairs(row) do
-		    	io.write(string.format("%-20s|", makePrintable(value)))
-		    end
-		    print()
+        local resrows = resultset.rows
+        if resrows then
+            for row in resrows do
+                table.insert(interim_rows, row)
+                io.write("|")
+                for key,value in pairs(row) do
+                    io.write(string.format("%-20s|", makePrintable(value)))
                 end
-            end
-
-	    printline(#resfields)
-
-            -- Handle the backend of the query.
-            status, rollbackd, error_msg, dfields, drows =
-                CryptDB.envoi(client, fields, rows)
-
-            -- General error
-            if false == status then
-                proxy.response.type = proxy.MYSQLD_PACKET_ERR
-                proxy.response.errmsg = error_msg
-            -- Proxy had to force ROLLBACK
-            elseif true == rollbackd then
-                proxy.response.type = proxy.MYSQLD_PACKET_ERR
-                proxy.response.errmsg = "Proxy did ROLLBACK"
-                -- ER_LOCK_DEADLOCK
-                -- > error    = 1213
-                -- > sqlstate = 40001
-                proxy.response.errcode = 1213
-                proxy.response.sqlstate = 40001
-            -- Results were successfully fetched for client
-            else
-                proxy.response.type = proxy.MYSQLD_PACKET_OK
-                proxy.response.affected_rows = resultset.affected_rows
-                proxy.response.insert_id = resultset.insert_id
-                if table.maxn(dfields) > 0 then
-                    proxy.response.resultset = { fields = dfields,
-                                                 rows = drows }
-                end
+                print()
             end
         end
 
-        return proxy.PROXY_SEND_RESULT
-    else
-        print("unexpected inj.id " .. inj.id)
+	    printline(#resfields)
     end
+
+    local control, param0, param1, param2, param3 =
+        CryptDB.next(client, interim_fields, interim_rows,
+                     resultset.affected_rows, resultset.insert_id)
+    if "again" == control then
+        local want_interim  = param0
+        local query         = param1
+
+        proxy.queries:append(2, string.char(proxy.COM_QUERY) .. query,
+                             { resultset_is_needed = true } )
+        return proxy.PROXY_IGNORE_RESULT
+    elseif "results" == control then
+        local raffected_rows    = param0
+        local rinsert_id        = param1
+        local rfields           = param2
+        local rrows             = param3
+
+        if #rfields > 0 then
+            proxy.response.resultset = { fields = rfields, rows = rrows }
+        end
+
+        proxy.response.type             = proxy.MYSQLD_PACKET_OK
+        proxy.response.affected_rows    = raffected_rows
+        proxy.response.insert_id        = rinsert_id
+
+        return proxy.PROXY_SEND_RESULT
+    elseif "error" == control then
+        proxy.response.type     = proxy.MYSQLD_PACKET_ERR
+        proxy.response.errmsg   = param0
+        proxy.response.errcode  = param1
+        proxy.response.sqlstate = param2
+
+        return proxy.PROXY_SEND_RESULT
+    end
+
+    assert(nil)
 end

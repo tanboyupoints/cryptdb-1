@@ -56,12 +56,14 @@ printRes(const ResType & r);
 // - data structure needed to decrypt results
 class QueryRewrite {
 public:
-    QueryRewrite(bool wasRes, ReturnMeta rmeta, RewriteOutput *output)
-        : rmeta(rmeta), output(std::unique_ptr<RewriteOutput>(output)) {}
+    QueryRewrite(bool wasRes, ReturnMeta rmeta,
+                 AbstractQueryExecutor *const executor)
+        : rmeta(rmeta),
+          executor(std::unique_ptr<AbstractQueryExecutor>(executor)) {}
     QueryRewrite(QueryRewrite &&other_qr) : rmeta(other_qr.rmeta),
-        output(std::move(other_qr.output)) {}
+        executor(std::move(other_qr.executor)) {}
     const ReturnMeta rmeta;
-    std::unique_ptr<RewriteOutput> output;
+    std::unique_ptr<AbstractQueryExecutor> executor;
 };
 
 // Main class processing rewriting
@@ -78,12 +80,9 @@ public:
         decryptResults(const ResType &dbres, const ReturnMeta &rm);
 
 private:
-    static RewriteOutput *
+    static AbstractQueryExecutor *
         dispatchOnLex(Analysis &a, const ProxyState &ps,
                       const std::string &query);
-    static RewriteOutput *
-        handleDirective(Analysis &a, const ProxyState &ps,
-                        const std::string &query);
 
     static const bool translator_dummy;
     static const std::unique_ptr<SQLDispatcher> dml_dispatcher;
@@ -336,4 +335,24 @@ private:
     std::vector<EncLayer *> duped_layers;
 
     static std::vector<EncLayer *> pullCopyLayers(OnionMeta const &om);
+};
+
+class OnionAdjustmentExecutor : public AbstractQueryExecutor {
+    const std::unique_ptr<Connect> &e_conn;
+    const std::string original_query;
+    const std::vector<std::unique_ptr<Delta> > deltas;
+    const std::list<std::string> adjust_queries;
+
+    AssignOnce<uint64_t> embedded_completion_id;
+
+public:
+    OnionAdjustmentExecutor(const std::unique_ptr<Connect> &e_conn,
+                            const std::string &original_query,
+                            std::vector<std::unique_ptr<Delta> > &&deltas,
+                            const std::list<std::string> &adjust_queries)
+        : e_conn(e_conn), original_query(original_query),
+          deltas(std::move(deltas)), adjust_queries(adjust_queries) {}
+
+    std::pair<bool, AbstractAnything *>
+        next(const ResType &res, NextParams &nparams);
 };

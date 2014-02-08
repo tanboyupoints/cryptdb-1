@@ -5,6 +5,7 @@
 #include <main/rewrite_util.hh>
 #include <main/dispatcher.hh>
 #include <main/macro_util.hh>
+#include <main/metadata_tables.hh>
 #include <parser/lex_util.hh>
 #include <util/onions.hh>
 
@@ -73,7 +74,8 @@ class InsertHandler : public DMLHandler {
         return;
     }
 
-    virtual LEX *rewrite(Analysis &a, LEX *const lex, const ProxyState &ps)
+    virtual AbstractQueryExecutor *
+        rewrite(Analysis &a, LEX *const lex, const ProxyState &ps)
         const
     {
         LEX *const new_lex = copyWithTHD(lex);
@@ -207,7 +209,7 @@ class InsertHandler : public DMLHandler {
             new_lex->value_list = res_values;
         }
 
-        return new_lex;
+        return new DMLQueryExecutor(*new_lex, a.rmeta);
     }
 };
 
@@ -228,7 +230,8 @@ class UpdateHandler : public DMLHandler {
         process_filters_lex(lex->select_lex, a);
     }
 
-    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+    virtual AbstractQueryExecutor *
+        rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
         LEX *const new_lex = copyWithTHD(lex);
@@ -253,14 +256,30 @@ class UpdateHandler : public DMLHandler {
         auto fd_it = List_iterator<Item>(lex->select_lex.item_list);
         auto val_it = List_iterator<Item>(lex->value_list);
         List<Item> res_fields, res_values;
-        a.special_query =
-            false == rewrite_field_value_pairs(fd_it, val_it, a, 
-                                               &res_fields, &res_values)
-                ? Analysis::SpecialQuery::SPECIAL_UPDATE
-                : Analysis::SpecialQuery::NOT_SPECIAL;
+        // Special Update?
+        if (false == rewrite_field_value_pairs(fd_it, val_it, a, 
+                                               &res_fields, &res_values)) {
+            const auto plain_table =
+                lex->select_lex.top_join_list.head()->table_name;
+            const auto crypted_table =
+                new_lex->select_lex.top_join_list.head()->table_name;
+            AssignOnce<std::string> where_clause;
+            if (lex->select_lex.where) {
+                std::ostringstream where_stream;
+                where_stream << " " << *lex->select_lex.where << " ";
+                where_clause = where_stream.str();
+            } else {
+                where_clause = " TRUE ";
+            }
+
+            return new SpecialUpdateExecutor(lexToQuery(*lex), plain_table,
+                                             crypted_table, where_clause.get(),
+                                             ps);
+        }
+
         new_lex->select_lex.item_list = res_fields;
         new_lex->value_list = res_values;
-        return new_lex;
+        return new DMLQueryExecutor(*new_lex, a.rmeta);
     }
 };
 
@@ -271,7 +290,8 @@ class DeleteHandler : public DMLHandler {
         process_select_lex(lex->select_lex, a);
     }
 
-    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+    virtual AbstractQueryExecutor *
+        rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
         LEX *const new_lex = copyWithTHD(lex);
@@ -279,7 +299,7 @@ class DeleteHandler : public DMLHandler {
         set_select_lex(new_lex,
                        rewrite_select_lex(new_lex->select_lex, a));
 
-        return new_lex;
+        return new DMLQueryExecutor(*new_lex, a.rmeta);
     }
 };
 
@@ -290,7 +310,8 @@ class MultiDeleteHandler : public DMLHandler {
         process_select_lex(lex->select_lex, a);
     }
 
-    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+    virtual AbstractQueryExecutor *
+        rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
         LEX *const new_lex = copyWithTHD(lex);
@@ -378,7 +399,7 @@ class MultiDeleteHandler : public DMLHandler {
         set_select_lex(new_lex,
                        rewrite_select_lex(new_lex->select_lex, a));
 
-        return new_lex;
+        return new DMLQueryExecutor(*new_lex, a.rmeta);
     }
 };
 
@@ -389,7 +410,8 @@ class SelectHandler : public DMLHandler {
         process_select_lex(lex->select_lex, a);
     }
 
-    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+    virtual AbstractQueryExecutor *
+        rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
         LEX *const new_lex = copyWithTHD(lex);
@@ -398,12 +420,12 @@ class SelectHandler : public DMLHandler {
         set_select_lex(new_lex,
             rewrite_select_lex(new_lex->select_lex, a));
 
-        return new_lex;
+        return new DMLQueryExecutor(*new_lex, a.rmeta);
     }
 };
 
- LEX *DMLHandler::transformLex(Analysis &analysis, LEX *lex,
-                               const ProxyState &ps) const
+AbstractQueryExecutor *DMLHandler::
+transformLex(Analysis &analysis, LEX *lex, const ProxyState &ps) const
 {
     this->gather(analysis, lex, ps);
 
@@ -931,14 +953,17 @@ class SetHandler : public DMLHandler {
         // no-op
     }
 
-    virtual LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
+    virtual AbstractQueryExecutor *
+        rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
         const
     {
         #define DIRECTIVE_HANDLER(function)                         \
             std::bind(function, this, std::placeholders::_1,        \
                       std::placeholders::_2)
-        typedef std::function<void(std::map<std::string, std::string> &,
-                                   Analysis &a)> DirectiveHandler;
+        typedef std::function<AbstractQueryExecutor *(std::map<std::string,
+                                                               std::string> &,
+                                   Analysis &a)>
+            DirectiveHandler;
 
         static const std::map<std::string, DirectiveHandler> directive_handlers
             {{"show", DIRECTIVE_HANDLER(&SetHandler::handleShowDirective)},
@@ -1001,17 +1026,16 @@ class SetHandler : public DMLHandler {
         }
 
         if (nullptr == dhandler) {
-            return lex;
+            return new SimpleExecutor(lexToQuery(*lex));
         }
 
-        dhandler(var_pairs, a);
-        return lex;
+        return dhandler(var_pairs, a);
 
         #undef DIRECTIVE_HANDLER
     }
 
 private:
-    void
+    AbstractQueryExecutor *
     handleAdjustDirective(std::map<std::string, std::string> &var_pairs,
                           Analysis &a) const
     {
@@ -1032,21 +1056,23 @@ private:
             }
         }
 
-        return;
+        return noopExecutor();
     }
 
-    void
+
+    AbstractQueryExecutor *
     handleShowDirective(std::map<std::string, std::string> &var_pairs,
                         Analysis &a) const
     {
-        a.special_query = Analysis::SpecialQuery::SHOW_LEVELS;
-        return;
+        return new ShowDirectiveExecutor(a.getSchema());
     }
 
-    void
+    AbstractQueryExecutor *
     handleSensitiveDirective(std::map<std::string, std::string> &var_pairs,
                              Analysis &a) const
     {
+        assert(a.deltas.size() == 0);
+
         const ParameterCollection &params = collectParameters(var_pairs, a);
         TEST_Text(0 == var_pairs.size() && params.onions.size() > 0,
                   "extraneous directive parameter, indicate a single database,"
@@ -1063,6 +1089,8 @@ private:
             a.deltas.push_back(std::unique_ptr<Delta>(new ReplaceDelta(om,
                                                                      params.fm)));
         }
+
+        return new SensitiveDirectiveExecutor(std::move(a.deltas));
     }
 
     struct ParameterCollection {
@@ -1126,6 +1154,7 @@ private:
 
         return ParameterCollection(a, database, table, field, onions);
     }
+
 };
 
 
@@ -1158,3 +1187,315 @@ SQLDispatcher *buildDMLDispatcher()
 
     return dispatcher;
 }
+
+// FIXME: decrypt results
+std::pair<bool, AbstractAnything *> DMLQueryExecutor::
+next(const ResType &res, NextParams &nparams)
+{
+    crStartBlock
+        genericPreamble(false, nparams);
+
+        crYield(std::make_pair(true, this->query));
+    crEndBlock
+
+    crFinish(Rewriter::decryptResults(res, this->rmeta));
+}
+
+static std::pair<std::string, ReturnMeta>
+rewriteAndGetFirstQuery(ProxyState &ps, const std::string &query,
+                        const std::string &default_db)
+{
+    std::shared_ptr<const SchemaInfo> schema = ps.getSchemaInfo();
+    QueryRewrite delete_rewrite =
+        Rewriter::rewrite(ps, query, *schema.get(), default_db);
+
+    NextParams nparams(ps, default_db);
+    auto results =
+        delete_rewrite.executor->next(ResType(true, 0, 0), nparams);
+    assert(true == results.first);
+
+    return std::make_pair(std::get<1>(results)->extract<std::pair<bool, std::string> >().second,
+                          delete_rewrite.rmeta);
+}
+
+std::pair<bool, AbstractAnything *> SpecialUpdateExecutor::
+next(const ResType &res, NextParams &nparams)
+{
+    // FIXME: implement and remove the CALL later on
+    /*
+    crStartBlock
+        const std::string &cond_trx =
+            "CALL " + MetaData::Table::conditionalTrx();
+        crYield(std::make_pair(true, cond_trx));
+    crEndBlock
+    */
+
+    crStartBlock
+        genericPreamble(false, nparams);
+
+        // Retrieve rows from database.
+        const std::string &select_q =
+            " SELECT * FROM " + this->plain_table +
+            " WHERE " + this->where_clause + ";";
+        // FIXME: should never cause an onion adjustment; put a catch + assert
+        const auto &rewritten_select_q =
+            rewriteAndGetFirstQuery(const_cast<ProxyState &>(ps), select_q,
+                                    nparams.default_db);
+        this->select_rmeta = rewritten_select_q.second;
+        crYield(std::make_pair(true, rewritten_select_q.first));
+    crEndBlock
+
+    crStartBlock
+        assert(res.success());
+        const ResType &dec_res =
+            Rewriter::decryptResults(res, this->select_rmeta.get());
+        assert(dec_res.success());
+        if (dec_res.rows.size() == 0) {
+            FAIL_TextMessageError("nothing to do; write optimization");
+        }
+
+        const auto itemToNiceString =
+            [&nparams] (const Item *const p_item)
+            {
+                const std::string &s = ItemToString(*p_item);
+
+                if (Item::Type::STRING_ITEM != p_item->type()) {
+                    return s;
+                }
+
+                // escaping and quoting the string creates a value that can
+                // actually be used in an INSERT statement
+                return "'" + escapeString(nparams.e_conn, s) + "'";
+            };
+
+        // We must take these items and convert them into quoted, escaped
+        // strings
+        //  > Item -> std::string -> escaped -> quoted
+        // then we join the results into a single comma seperated values list
+        const auto pItemVectorToNiceValueList =
+            [&itemToNiceString]
+                (const std::vector<std::vector<Item *> > &vec)
+            {
+                std::vector<std::string> esses;
+                for (auto row_it : vec) {
+                    std::vector<std::string> nice_values(row_it.size());
+                    std::transform(row_it.begin(), row_it.end(),
+                                   nice_values.begin(), itemToNiceString);
+                    esses.push_back("("+ vector_join(nice_values, ",") + ")");
+                }
+
+                return vector_join(esses, ",");
+            };
+
+        const std::string &values_string =
+            pItemVectorToNiceValueList(dec_res.rows);
+
+        // do the query on the embedded database inside of a transaction
+        // so that we can prevent failure artifacts from populating the
+        // embedded database
+        TEST_Sync(nparams.e_conn->execute("START TRANSACTION;"),
+                  "failed to start transaction");
+
+        // turn on strict mode so we can determine if we have bad values
+        // > ie trying to insert 256 into a TINYINT UNSIGNED column
+        SYNC_IF_FALSE(strictMode(nparams.e_conn.get()), nparams.e_conn);
+
+        // Push the plaintext rows to the embedded database.
+        const std::string &push_q =
+            " INSERT INTO " + this->plain_table +
+            " VALUES " + values_string + ";";
+        SYNC_IF_FALSE(nparams.e_conn->execute(push_q), nparams.e_conn);
+
+        // Run the original (unmodified) query on the data in the embedded
+        // database.
+        std::unique_ptr<DBResult> original_query_dbres;
+        SYNC_IF_FALSE(nparams.e_conn->execute(this->original_query,
+                                              &original_query_dbres),
+                      nparams.e_conn);
+        assert(original_query_dbres);
+        // HACK
+        this->original_query_dbres = original_query_dbres.release();
+
+        // strict mode off
+        SYNC_IF_FALSE(nparams.e_conn->execute("SET SESSION sql_mode = ''"),
+                      nparams.e_conn);
+
+        // > Collect the results from the embedded database.
+        // > This code relies on single threaded access to the database
+        //   and on the fact that the database is cleaned up after
+        //   every such operation.
+        std::unique_ptr<DBResult> dbres;
+        const std::string &select_results_q =
+            " SELECT * FROM " + this->plain_table + ";";
+        SYNC_IF_FALSE(nparams.e_conn->execute(select_results_q, &dbres),
+                      nparams.e_conn);
+        const ResType interim_res = ResType(dbres->unpack());
+        assert(interim_res.success());
+        this->escaped_output_values =
+            pItemVectorToNiceValueList(interim_res.rows);
+
+        // Cleanup the embedded database.
+        const std::string &cleanup_q =
+            "DELETE FROM " + this->plain_table + ";";
+        SYNC_IF_FALSE(nparams.e_conn->execute(cleanup_q), nparams.e_conn);
+
+        SYNC_IF_FALSE(nparams.e_conn->execute("COMMIT;"), nparams.e_conn);
+
+        // This query is necessary to propagate a transaction into
+        // INFORMATION_SCHEMA.
+        const std::string &propagation_query =
+            "SELECT NULL FROM " + this->crypted_table + ";";
+        crYield(std::make_pair(false, propagation_query));
+    crEndBlock
+
+    // FIXME: doing all of the work in stored procedures is no longer
+    // necessary?
+    // > I think that transactions started in a stored procedure do not
+    //   propagate out correctly
+    crStartBlock
+        // DELETE the rows matching the WHERE clause from the database.
+        const std::string &delete_q =
+            " DELETE FROM " + this->plain_table +
+            " WHERE " + this->where_clause + ";";
+
+        const auto &rewritten_delete_q =
+            rewriteAndGetFirstQuery(const_cast<ProxyState &>(ps), delete_q,
+                                    nparams.default_db);
+
+        // > Add each row from the embedded database to the data database.
+        const std::string &insert_q =
+            " INSERT INTO " + this->plain_table +
+            " VALUES " + this->escaped_output_values.get() + ";";
+        const auto &rewritten_insert_q =
+            rewriteAndGetFirstQuery(const_cast<ProxyState &>(ps), insert_q,
+                                    nparams.default_db);
+
+        const std::string &final_query =
+            " CALL " + MetaData::Proc::homAdditionTransaction() + " ("
+            " '" + escapeString(ps.getConn(), rewritten_delete_q.first) + "', "
+            " '" + escapeString(ps.getConn(), rewritten_insert_q.first) + "');";
+
+        crYield(std::make_pair(true, final_query));
+    crEndBlock
+
+    /*
+    crStartBlock
+        const std::string &cond_trx =
+            "CALL " + MetaData::Table::conditionalCommit();
+        crYield(std::make_pair(true, cond_trx));
+    crEndBlock
+    */
+
+    // FIXME: fake the correct results
+    crFinish(this->original_query_dbres.get()->unpack());
+
+    assert(false);
+}
+
+std::pair<bool, AbstractAnything *> ShowDirectiveExecutor::
+next(const ResType &res, NextParams &nparams)
+{
+    genericPreamble(false, nparams);
+
+    // HACK hack HACK hackity hackhack
+    TEST_TextMessageError(deleteAllShowDirectiveEntries(nparams.e_conn),
+                  "failed to initialize show directives table");
+
+    const auto &databases = this->schema.getChildren();
+    for (const auto &db_it : databases) {
+        const std::string &db_name = db_it.first.getValue();
+        const auto &dm = db_it.second;
+        const auto &tables = dm->getChildren();
+        for (const auto &table_it : tables) {
+            const std::string &table_name = table_it.first.getValue();
+            const auto &tm = table_it.second;
+            const auto &fields = tm->getChildren();
+            for (const auto &field_it : fields) {
+                const std::string &field_name =
+                    field_it.first.getValue();
+                const auto &fm = field_it.second;
+                const auto &onions = fm->getChildren();
+                for (const auto &onion_it : onions) {
+                    const std::string &onion_name =
+                      TypeText<onion>::toText(onion_it.first.getValue());
+                    const auto &om = onion_it.second;
+
+                    // HACK: this behavior is not usually safe, use
+                    // Analysis to get state information generally
+                    const std::string &level =
+                        TypeText<SECLEVEL>::toText(om->getSecLevel());
+                    const bool b =
+                        addShowDirectiveEntry(nparams.e_conn, db_name,
+                                              table_name, field_name,
+                                              onion_name, level);
+                    TEST_TextMessageError(true == b,
+                                          "failed producing directive"
+                                          " results");
+                }
+            }
+        }
+    }
+
+    std::unique_ptr<DBResult> db_res;
+    TEST_TextMessageError(getAllShowDirectiveEntries(nparams.e_conn, &db_res),
+                          "failed retrieving directive results");
+    crFinish(db_res->unpack());
+    assert(false);
+}
+
+bool ShowDirectiveExecutor::
+deleteAllShowDirectiveEntries(const std::unique_ptr<Connect> &e_conn)
+{
+    const std::string &query =
+        "DELETE FROM " + MetaData::Table::showDirective() + ";";
+    return e_conn->execute(query);
+}
+
+bool ShowDirectiveExecutor::
+addShowDirectiveEntry(const std::unique_ptr<Connect> &e_conn,
+                      const std::string &database,
+                      const std::string &table,
+                      const std::string &field,
+                      const std::string &onion,
+                      const std::string &level)
+{
+    const std::string &query =
+        "INSERT INTO " + MetaData::Table::showDirective() +
+        " (_database, _table, _field, _onion, _level) VALUES "
+        " ('" + database + "', '" + table + "',"
+        "  '" + field + "', '" + onion + "', '" + level + "')";
+    return e_conn->execute(query);
+}
+
+bool ShowDirectiveExecutor::
+getAllShowDirectiveEntries(const std::unique_ptr<Connect> &e_conn,
+                           std::unique_ptr<DBResult> *db_res)
+{
+    assert(db_res);
+    const std::string &query =
+        "SELECT * FROM " + MetaData::Table::showDirective() + ";";
+    return e_conn->execute(query, db_res);
+}
+
+std::pair<bool, AbstractAnything *> SensitiveDirectiveExecutor::
+next(const ResType &res, NextParams &nparams)
+{
+    crStartBlock
+        genericPreamble(false, nparams);
+
+        TEST_Sync(nparams.e_conn->execute("START TRANSACTION"),
+                  "failed to start transaction for sensitive directive");
+
+        SYNC_IF_FALSE(writeDeltas(nparams.e_conn, this->deltas,
+                                  Delta::REGULAR_TABLE),
+                      nparams.e_conn);
+
+        SYNC_IF_FALSE(nparams.e_conn->execute("COMMIT"), nparams.e_conn);
+
+        const std::string &no_op = "do 0;";
+        crYield(std::make_pair(true, no_op));
+    crEndBlock
+
+    crFinish(res);
+}
+

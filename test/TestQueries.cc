@@ -1081,6 +1081,7 @@ Connection::executeConn(const Query &query) {
 
 ResType
 Connection::executeRewriter(const Query &query) {
+    /*
     //translate the query
     re_it++;
     if (re_it == re_set.end()) {
@@ -1096,6 +1097,8 @@ Connection::executeRewriter(const Query &query) {
 
     return executeQuery(*ps, query.query, default_db,
                         &this->schema_cache).res_type;
+    */
+    return ResType(false, 0, 0);
 }
 
 my_ulonglong

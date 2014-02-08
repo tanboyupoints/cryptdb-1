@@ -70,11 +70,6 @@ Item *
 encrypt_item_layers(const Item &i, onion o, const OnionMeta &om,
                     const Analysis &a, uint64_t IV = 0);
 
-std::string
-rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
-                         SchemaInfo const &schema,
-                         const std::string &default_db);
-
 // FIXME(burrows): Generalize to support any container with next AND end
 // semantics.
 template <typename T>
@@ -157,20 +152,6 @@ std::string terminalEscape(const std::string &s);
 
 void
 prettyPrintQuery(const std::string &query);
-
-class EpilogueResult {
-public:
-    EpilogueResult(QueryAction action, const ResType &res_type)
-        : action(action), res_type(res_type) {}
-
-    const QueryAction action;
-    const ResType res_type;
-};
-
-EpilogueResult
-queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
-              const ResType &res, const std::string &query,
-              const std::string &default_db, bool pp);
 
 SECURITY_RATING
 determineSecurityRating();

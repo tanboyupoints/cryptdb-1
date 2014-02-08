@@ -478,22 +478,6 @@ encrypt_item_layers(const Item &i, onion o, const OnionMeta &om,
 }
 
 std::string
-rewriteAndGetSingleQuery(const ProxyState &ps, const std::string &q,
-                         SchemaInfo const &schema,
-                         const std::string &default_db)
-{
-    const QueryRewrite qr(Rewriter::rewrite(ps, q, schema, default_db));
-    assert(false == qr.output->stalesSchema());
-    assert(QueryAction::DECRYPT == qr.output->queryAction(ps.getConn()));
-
-    std::list<std::string> out_queryz;
-    qr.output->getQuery(&out_queryz, schema);
-    assert(out_queryz.size() == 1);
-
-    return out_queryz.back();
-}
-
-std::string
 escapeString(const std::unique_ptr<Connect> &c,
              const std::string &escape_me)
 {
@@ -605,6 +589,16 @@ queryPreamble(const ProxyState &ps, const std::string &q,
             new QueryRewrite(Rewriter::rewrite(ps, q, *schema.get(),
                                                default_db)));
 
+    // lockless multithreading HACK: give the caller a reference to his
+    // SchemaInfo because the objects may be used in Deltaz
+    if (schema_info_ref) {
+        *schema_info_ref = schema;
+    }
+
+    return;
+
+    /*
+     * FIXME: implement in executors
     // We handle before any queries because a failed query
     // may stale the database during recovery and then
     // we'd have to handle there as well.
@@ -627,13 +621,8 @@ queryPreamble(const ProxyState &ps, const std::string &q,
     (*qr)->output->beforeQuery(ps.getConn(), ps.getEConn());
     (*qr)->output->getQuery(out_queryz, *schema.get());
 
-    // give the caller a reference to his SchemaInfo because the objects
-    // may be used in Deltaz
-    if (schema_info_ref) {
-        *schema_info_ref = schema;
-    }
-
     return;
+    */
 }
 
 /*
@@ -646,9 +635,9 @@ printEC(std::unique_ptr<Connect> e_conn, const std::string & command) {
 }
 */
 
+/*
 static void
 printEmbeddedState(const ProxyState &ps) {
-/*
     printEC(ps.e_conn, "show databases;");
     printEC(ps.e_conn, "show tables from pdb;");
     std::cout << "regular" << std::endl << std::endl;
@@ -657,8 +646,8 @@ printEmbeddedState(const ProxyState &ps) {
     printEC(ps.e_conn, "select * from pdb.BleedingMetaObject;");
     printEC(ps.e_conn, "select * from pdb.Query;");
     printEC(ps.e_conn, "select * from pdb.DeltaOutput;");
-*/
 }
+*/
 
 std::string
 terminalEscape(const std::string &s)
@@ -683,6 +672,7 @@ prettyPrintQuery(const std::string &query)
               << "QUERY: " << COLOR_END << terminalEscape(query) << std::endl;
 }
 
+/*
 static void
 prettyPrintQueryResult(const ResType &res)
 {
@@ -691,7 +681,9 @@ prettyPrintQueryResult(const ResType &res)
     printRes(res);
     std::cout << std::endl;
 }
+*/
 
+/*
 // returning the QueryAction is useful for sanity checking and for allowing
 // the proxy to determine if a ROLLBACK occurred
 EpilogueResult
@@ -757,6 +749,7 @@ queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
 
     return EpilogueResult(action, res);
 }
+*/
 
 SECURITY_RATING
 determineSecurityRating()

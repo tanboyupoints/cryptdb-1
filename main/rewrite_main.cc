@@ -446,9 +446,10 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
         "    AND aborted != TRUE;";
     RETURN_FALSE_IF_FALSE(e_conn->execute(unfinished_deltas, &dbres));
     const unsigned long long unfinished_count = mysql_num_rows(dbres->n);
-    if (!PRETTY_DEMO)
-	std::cerr << GREEN_BEGIN << "there are " << unfinished_count
-		  << " unfinished deltas" << COLOR_END << std::endl;
+    if (!PRETTY_DEMO) {
+        std::cerr << GREEN_BEGIN << "there are " << unfinished_count
+              << " unfinished deltas" << COLOR_END << std::endl;
+    }
 
     if (0 == unfinished_count) {
         return true;
@@ -767,8 +768,7 @@ adjustOnion(const Analysis &a, onion o, const TableMeta &tm,
             const FieldMeta &fm, SECLEVEL tolevel)
 {
     TEST_Text(tolevel >= a.getOnionMeta(fm, o).getMinimumSecLevel(),
-              "This field has been set to sensitive and your query requires"
-              " plain data!");
+              "your query requires to permissive of a security level");
 
     std::cout << GREEN_BEGIN << "onion: " << TypeText<onion>::toText(o) << COLOR_END << std::endl;
     // Make a copy of the onion meta for the purpose of making
@@ -1256,14 +1256,6 @@ noRewrite(const LEX &lex) {
     return false;
 }
 
-static std::string
-lex_to_query(LEX *const lex)
-{
-    std::ostringstream o;
-    o << *lex;
-    return o.str();
-}
-
 const bool Rewriter::translator_dummy = buildTypeTextTranslatorHack();
 const std::unique_ptr<SQLDispatcher> Rewriter::dml_dispatcher =
     std::unique_ptr<SQLDispatcher>(buildDMLDispatcher());
@@ -1271,7 +1263,7 @@ const std::unique_ptr<SQLDispatcher> Rewriter::ddl_dispatcher =
     std::unique_ptr<SQLDispatcher>(buildDDLDispatcher());
 
 // NOTE : This will probably choke on multidatabase queries.
-RewriteOutput *
+AbstractQueryExecutor *
 Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
                         const std::string &query)
 {
@@ -1289,25 +1281,26 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
 
     // optimization: do not process queries that we will not rewrite
     if (noRewrite(*lex)) {
-        return new SimpleOutput(query);
+        return new SimpleExecutor(query);
     } else if (dml_dispatcher->canDo(lex)) {
         // HACK: We don't want to process INFORMATION_SCHEMA queries
         if (lex->select_lex.table_list.first) {
             const std::string &db = lex->select_lex.table_list.first->db;
             if (equalsIgnoreCase("INFORMATION_SCHEMA", db)) {
-                return new SimpleOutput(query);
+                return new SimpleExecutor(query);
             }
         }
 
         const SQLHandler &handler = dml_dispatcher->dispatch(lex);
-        AssignOnce<LEX *> out_lex;
+        AssignOnce<AbstractQueryExecutor *> executor;
 
         try {
-            out_lex = handler.transformLex(a, lex, ps);
+            executor = handler.transformLex(a, lex, ps);
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
-            std::cout << GREEN_BEGIN << "Adjusting onion!" << COLOR_END << std::endl;
-	    
+            std::cout << GREEN_BEGIN << "Adjusting onion!" << COLOR_END
+                      << std::endl;
+
             std::pair<std::vector<std::unique_ptr<Delta> >,
                       std::list<std::string> >
                 out_data = adjustOnion(a, e.o, e.tm, e.fm, e.tolevel);
@@ -1315,77 +1308,32 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
                 out_data.first;
             const std::list<std::string> &adjust_queries =
                 out_data.second;
-            std::function<std::string(const std::string &)>
-                hackEscape = [&ps](const std::string &s)
-            {
-                return escapeString(ps.getConn(), s);
-            };
-            return new AdjustOnionOutput(query, std::move(deltas),
-                                         adjust_queries, hackEscape);
+
+            return new OnionAdjustmentExecutor(ps.getEConn(), query,
+                                               std::move(deltas),
+                                               adjust_queries);
         }
 
-        switch (a.special_query) {
-            case Analysis::SpecialQuery::NOT_SPECIAL:
-                // HACK: until we implement stringification of 'SET'
-                // > this query _should_ be a cryptdb adjust directive
-                if (SQLCOM_SET_OPTION == lex->sql_command) {
-                    return new SimpleOutput(query);
-                }
-
-                return new DMLOutput(query, lex_to_query(out_lex.get()));
-            case Analysis::SpecialQuery::SHOW_LEVELS:
-                return new UseAfterQueryResultOutput(query,
-                                                     a.getSchema());
-            case Analysis::SpecialQuery::SPECIAL_UPDATE:
-                break;
-            default:
-                FAIL_TextMessageError("unknown special query!");
-        }
-        assert(Analysis::SpecialQuery::SPECIAL_UPDATE == a.special_query);
-
-        // Handle HOMorphic UPDATE.
-        const auto plain_table =
-            lex->select_lex.top_join_list.head()->table_name;
-        const auto crypted_table =
-            out_lex.get()->select_lex.top_join_list.head()->table_name;
-        std::string where_clause;
-        if (lex->select_lex.where) {
-            std::ostringstream where_stream;
-            where_stream << " " << *lex->select_lex.where << " ";
-            where_clause = where_stream.str();
-        } else {
-            where_clause = " TRUE ";
-        }
-
-        return new SpecialUpdate(query,  plain_table, crypted_table,
-                                 where_clause, a.getDatabaseName(), ps);
+        return executor.get();
     } else if (ddl_dispatcher->canDo(lex)) {
         const SQLHandler &handler = ddl_dispatcher->dispatch(lex);
-        LEX *const out_lex = handler.transformLex(a, lex, ps);
-        // HACK.
+        AbstractQueryExecutor *const executor =
+            handler.transformLex(a, lex, ps);
+        /*
+        // FIXME: put HACK back
         const std::string &original_query =
             lex->sql_command != SQLCOM_LOCK_TABLES ? query : "do 0";
+        */
 
-        // Optimization so we don't load *Meta if it doesn't change.
-        // > ie, USE <database>.
-        // possible FIXME: just look at the size of the deltas
-        if (Analysis::SpecialQuery::NO_CHANGE_META_DDL==a.special_query) {
-            assert(a.deltas.size() == 0);
-            return new DMLOutput(original_query, lex_to_query(out_lex));
-        }
-        assert(Analysis::SpecialQuery::NOT_SPECIAL == a.special_query);
-
-        return new DDLOutput(original_query, lex_to_query(out_lex),
-                             std::move(a.deltas));
-    } else {
-        return NULL;
+        return executor;
     }
+
+    assert(false);
 }
 
 QueryRewrite
 Rewriter::rewrite(const ProxyState &ps, const std::string &q,
-                  SchemaInfo const &schema,
-                  const std::string &default_db)
+                  SchemaInfo const &schema, const std::string &default_db)
 {
     LOG(cdb_v) << "q " << q;
     assert(0 == mysql_thread_init());
@@ -1394,14 +1342,13 @@ Rewriter::rewrite(const ProxyState &ps, const std::string &q,
 
     // NOTE: Care what data you try to read from Analysis
     // at this height.
-    RewriteOutput *const output =
+    AbstractQueryExecutor *const executor =
         Rewriter::dispatchOnLex(analysis, ps, q);
-    if (!output) {
-        return QueryRewrite(true, analysis.rmeta,
-                            new SimpleOutput(mysql_noop()));
+    if (!executor) {
+        return QueryRewrite(true, analysis.rmeta, noopExecutor());
     }
 
-    return QueryRewrite(true, analysis.rmeta, output);
+    return QueryRewrite(true, analysis.rmeta, executor);
 }
 
 //TODO: replace stringify with <<
@@ -1486,6 +1433,7 @@ Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
                    std::move(dec_rows));
 }
 
+/*
 static ResType
 mysql_noop_res(const ProxyState &ps)
 {
@@ -1531,6 +1479,7 @@ executeQuery(const ProxyState &ps, const std::string &q,
         dbres ? ResType(dbres->unpack()) : mysql_noop_res(ps);
     return queryEpilogue(ps, *qr.get(), res, q, default_db, pp);
 }
+*/
 
 void
 printRes(const ResType &r) {
@@ -1602,3 +1551,109 @@ OnionMetaAdjustor::pullCopyLayers(OnionMeta const &om)
 
     return v;
 }
+
+std::pair<bool, AbstractAnything *> OnionAdjustmentExecutor::
+next(const ResType &res, NextParams &nparams)
+{
+    // FIXME: unnecessary to do all work in stored procedures
+    crStartBlock
+        genericPreamble(true, nparams);
+
+        assert(this->adjust_queries.size() == 1
+               || this->adjust_queries.size() == 2);
+
+        {
+            uint64_t embedded_completion_id;
+            deltaOutputBeforeQuery(nparams.e_conn, this->original_query,
+                                   this->deltas,
+                                   CompletionType::AdjustOnionCompletion,
+                                   &embedded_completion_id);
+            this->embedded_completion_id = embedded_completion_id;
+        }
+
+        // This query is necessary to propagate a transaction into
+        // INFORMATION_SCHEMA.
+        // > This allows consistent behavior even when adjustment is first
+        // query in transaction.
+        const std::string &innodb_table =
+            MetaData::Table::remoteQueryCompletion();
+        crYield(std::make_pair(false, "SELECT NULL FROM " + innodb_table + ";"));
+    crEndBlock
+
+    crStartBlock
+        // are we in a transaction?
+        /*
+        std::list<std::string> r_qz = this->adjust_queries;
+        assert(r_qz.size() == 1 || r_qz.size() == 2);
+
+        if (r_qz.size() == 1) {
+            r_qz.push_back(mysql_noop());
+        }
+
+        const std::string &q_remote =
+            " CALL " + MetaData::Proc::adjustOnion() + " ("
+            "   "  + std::to_string(this->embedded_completion_id.get()) + ","
+            "   '" + hackEscape(r_qz.front()) + "', "
+            "   '" + hackEscape(r_qz.back()) + "');";
+
+        crYield(std::make_pair(true, q_remote));
+        */
+    crEndBlock
+
+    crStartBlock
+        // cancel pending transaction
+        crYield(std::make_pair(false, "ROLLBACK"));
+    crEndBlock
+
+    crStartBlock
+        // start a new transaction for the adjustment
+        crYield(std::make_pair(false, "START TRANSACTION"));
+    crEndBlock
+
+    crStartBlock
+        crYield(std::make_pair(true, adjust_queries.front()));
+    crEndBlock
+
+    crStartBlock
+        if (adjust_queries.size() == 2) {
+            crYield(std::make_pair(true, adjust_queries.back()));
+        }
+
+        crYield(std::make_pair(true, "do 0"));
+    crEndBlock
+
+    crStartBlock
+        deltaOutputAfterQuery(nparams.e_conn, this->deltas,
+                              this->embedded_completion_id.get());
+
+        const std::string &q =
+            " SELECT reissue "
+            "   FROM " + MetaData::Table::remoteQueryCompletion() +
+            "  WHERE embedded_completion_id = " +
+                     std::to_string(this->embedded_completion_id.get()) + ";";
+
+        std::unique_ptr<DBResult> db_res;
+        TEST_Text(nparams.conn->execute(q, &db_res),
+                  "failed to determine if an onion adjustmented query should"
+                  " be reissued!");
+        assert(1 == mysql_num_rows(db_res->n));
+
+        const MYSQL_ROW row = mysql_fetch_row(db_res->n);
+        const unsigned long *const l = mysql_fetch_lengths(db_res->n);
+        assert(l != NULL);
+
+        const bool reissue = string_to_bool(std::string(row[0], l[0]));
+
+        if (true == reissue) {
+            // FIXME: implement query reissue
+            assert(false);
+        }
+
+        // FIXME: rollback
+        throw ErrorPacketException("proxy did rollback", 1213, "40001");
+    crEndBlock
+
+    // FIXME: deal with reissued query
+    assert(false);
+}
+

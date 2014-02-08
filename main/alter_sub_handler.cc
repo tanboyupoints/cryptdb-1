@@ -11,9 +11,9 @@
 
 
 class AddColumnSubHandler : public AlterSubHandler {
-    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const Preamble &preamble) const
+    virtual LEX *
+        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
+                         const Preamble &preamble) const
     {
         TableMeta &tm = a.getTableMeta(preamble.dbname, preamble.table);
 
@@ -38,9 +38,9 @@ class AddColumnSubHandler : public AlterSubHandler {
 };
 
 class DropColumnSubHandler : public AlterSubHandler {
-    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const Preamble &preamble) const
+    virtual LEX *
+        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
+                         const Preamble &preamble) const
     {
         // Get the column drops.
         auto drop_it =
@@ -75,7 +75,7 @@ class DropColumnSubHandler : public AlterSubHandler {
     List<Alter_drop> rewrite(FieldMeta const &fm, Alter_drop *adrop) const
     {
         List<Alter_drop> out_list;
-        THD *thd = current_thd;
+        THD *const thd = current_thd;
 
         // Rewrite each onion column.
         for (const auto &om_it : fm.getChildren()) {
@@ -99,27 +99,27 @@ class DropColumnSubHandler : public AlterSubHandler {
 };
 
 class ChangeColumnSubHandler : public AlterSubHandler {
-    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const Preamble &preamble) const
+    virtual LEX *
+        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
+                         const Preamble &preamble) const
     {
         FAIL_TextMessageError("implement ChangeColumnSubHandler");
     }
 };
 
 class ForeignKeySubHandler : public AlterSubHandler {
-    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const Preamble &preamble) const
+    virtual LEX *
+        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
+                         const Preamble &preamble) const
     {
         FAIL_TextMessageError("implement ForeignKeySubHandler");
     }
 };
 
 class AddIndexSubHandler : public AlterSubHandler {
-    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const Preamble &preamble) const
+    virtual LEX *
+        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
+                         const Preamble &preamble) const
     {
         TableMeta const &tm =
             a.getTableMeta(preamble.dbname, preamble.table);
@@ -131,9 +131,9 @@ class AddIndexSubHandler : public AlterSubHandler {
 };
 
 class DropIndexSubHandler : public AlterSubHandler {
-    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
-                                  const Preamble &preamble) const
+    virtual LEX *
+        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
+                         const Preamble &preamble) const
     {
         TableMeta const &tm =
             a.getTableMeta(preamble.dbname, preamble.table);
@@ -198,16 +198,16 @@ class DropIndexSubHandler : public AlterSubHandler {
 };
 
 class DisableOrEnableKeys : public AlterSubHandler {
-    virtual LEX *rewriteAndUpdate(Analysis &a, LEX *const lex,
-                                  const ProxyState &ps,
-                                  const Preamble &preamble) const
+    virtual LEX *
+        rewriteAndUpdate(Analysis &a, LEX *const lex, const ProxyState &ps,
+                         const Preamble &preamble) const
     {
         return lex;
     }
 };
 
-LEX *AlterSubHandler::transformLex(Analysis &a, LEX *lex,
-                                   const ProxyState &ps) const
+LEX *AlterSubHandler::
+transformLex(Analysis &a, LEX *const lex, const ProxyState &ps) const
 {
     const std::string &db = lex->select_lex.table_list.first->db;
     TEST_DatabaseDiscrepancy(db, a.getDatabaseName());

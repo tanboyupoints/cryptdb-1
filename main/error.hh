@@ -2,6 +2,7 @@
 
 #include <sstream>
 #include <string>
+#include <cassert>
 
 #include <util/onions.hh>
 
@@ -132,4 +133,33 @@ private:
 
 std::ostream &operator<<(std::ostream &out,
                          const SynchronizationException &error);
+
+class ErrorPacketException {
+    const std::string msg;
+    const unsigned int error_code;
+    const std::string sql_state;
+
+public:
+    ErrorPacketException(const std::string &msg, unsigned int error_code,
+                         const std::string &sql_state)
+        : msg(msg), error_code(error_code), sql_state(sql_state)
+    {
+        assert(sql_state.length() == 5);
+    }
+
+    std::string getMessage() const {return msg;}
+    unsigned int getErrorCode() const {return error_code;}
+    std::string getSQLState() const {return sql_state;}
+};
+
+#define TEST_GenericPacketException(test, msg)                  \
+{                                                               \
+    if (false == (test)) {                                      \
+        throw ErrorPacketException((msg), 0xfff, "fail1");      \
+    }                                                           \
+}
+
+#define FAIL_GenericPacketException(msg)                        \
+    TEST_GenericPacketException(false, msg)                     \
+
 
