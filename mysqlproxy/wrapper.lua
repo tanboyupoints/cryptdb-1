@@ -2,7 +2,8 @@ assert(package.loadlib(os.getenv("EDBDIR").."/obj/libexecute.so",
                        "lua_cryptdb_init"))()
 local proto = assert(require("mysql.proto"))
 
-local g_want_interim = nil
+local g_want_interim    = nil
+local skip              = false
 --
 -- Interception points provided by mysqlproxy
 --
@@ -154,6 +155,13 @@ function read_query_real(packet)
 end
 
 function read_query_result_real(inj)
+    if skip == true then
+        skip = false
+        return
+    end
+
+    skip = false
+
     local resultset = inj.resultset
 
     -- note that queries which result in an error are never handed back
@@ -247,7 +255,8 @@ function next_handler(from, client, fields, rows, affected_rows, insert_id)
         local query = param0
 
         proxy.queries:append(get_index(), string.char(proxy.COM_QUERY) .. query,
-                             { resultset_is_needed = false } )
+                             { resultset_is_needed = true } )
+        skip = true
         return handle_from(from)
     elseif "results" == control then
         local raffected_rows    = param0
