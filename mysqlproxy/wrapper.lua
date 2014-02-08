@@ -2,7 +2,7 @@ assert(package.loadlib(os.getenv("EDBDIR").."/obj/libexecute.so",
                        "lua_cryptdb_init"))()
 local proto = assert(require("mysql.proto"))
 
-local want_interim = nil
+local g_want_interim = nil
 --
 -- Interception points provided by mysqlproxy
 --
@@ -125,12 +125,6 @@ function dprint(x)
 end
 
 function read_query_real(packet)
-    --[[
-    proxy.queries:append(0, string.char(proxy.COM_QUERY) .. "do 0",
-                         { resultset_is_needed = true } )
-    return proxy.PROXY_SEND_QUERY
-    ]]--
-
     local query = string.sub(packet, 2)
     print("================================================")
     printred("QUERY: ".. query)
@@ -151,41 +145,7 @@ function read_query_real(packet)
             return proxy.PROXY_SEND_RESULT
         end
 
-        local control, param0, param1, param2, param3 =
-            CryptDB.next(client, {}, {}, nil, nil)
-        if "again" == control then
-            -- there must be at least one query to execute
-            want_interim    = param0
-            query           = param1
-
-            proxy.queries:append(1, string.char(proxy.COM_QUERY) .. query,
-                                 { resultset_is_needed = true } )
-            return proxy.PROXY_SEND_QUERY
-        elseif "results" == control then
-            local raffected_rows  = param0
-            local rinsert_id      = param1
-            local rfields         = param2
-            local rrows           = param3
-
-            if #rfields > 0 then
-                proxy.response.resultset = { fields = rfields, rows = rrows }
-            end
-
-            proxy.response.type             = proxy.MYSQLD_PACKET_OK
-            proxy.response.affected_rows    = raffected_rows
-            proxy.response.insert_id        = rinsert_id
-
-            return proxy.PROXY_SEND_RESULT
-        elseif "error" == control then
-            proxy.response.type         = proxy.MYSQLD_PACKET_ERR
-            proxy.response.errormsg     = param0
-            proxy.response.errcode      = param1
-            proxy.response.sqlstate     = param2
-
-            return proxy.PROXY_SEND_RESULT
-        end
-
-        assert(nil)
+        return next_handler("query", client, {}, {}, nil, nil)
     elseif string.byte(packet) == proxy.COM_QUIT then
         -- do nothing
     else
@@ -215,7 +175,7 @@ function read_query_result_real(inj)
     local interim_fields = {}
     local interim_rows = {}
 
-    if true == want_interim then
+    if true == g_want_interim then
         -- build up interim result for next(...) calls
 	    print(greentext("ENCRYPTED RESULTS:"))
 
@@ -252,16 +212,43 @@ function read_query_result_real(inj)
 	    printline(#resfields)
     end
 
+    return next_handler("results", client, interim_fields, interim_rows,
+                        resultset.affected_rows, resultset.insert_id)
+end
+
+local q_index = 0
+function get_index()
+    i = q_index
+    q_index = q_index + 1
+    return i
+end
+
+function handle_from(from)
+    if "query" == from then
+        return proxy.PROXY_SEND_QUERY
+    elseif "results" == from then
+        return proxy.PROXY_IGNORE_RESULT
+    end
+
+    assert(nil)
+end
+
+function next_handler(from, client, fields, rows, affected_rows, insert_id)
     local control, param0, param1, param2, param3 =
-        CryptDB.next(client, interim_fields, interim_rows,
-                     resultset.affected_rows, resultset.insert_id)
+        CryptDB.next(client, fields, rows, affected_rows, insert_id)
     if "again" == control then
-        local want_interim  = param0
+        g_want_interim      = param0
         local query         = param1
 
-        proxy.queries:append(2, string.char(proxy.COM_QUERY) .. query,
+        proxy.queries:append(get_index(), string.char(proxy.COM_QUERY) .. query,
                              { resultset_is_needed = true } )
-        return proxy.PROXY_IGNORE_RESULT
+        return handle_from(from)
+    elseif "query-results" == control then
+        local query = param0
+
+        proxy.queries:append(get_index(), string.char(proxy.COM_QUERY) .. query,
+                             { resultset_is_needed = false } )
+        return handle_from(from)
     elseif "results" == control then
         local raffected_rows    = param0
         local rinsert_id        = param1

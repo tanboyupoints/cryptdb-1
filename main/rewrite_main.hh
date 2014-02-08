@@ -353,6 +353,6 @@ public:
         : e_conn(e_conn), original_query(original_query),
           deltas(std::move(deltas)), adjust_queries(adjust_queries) {}
 
-    std::pair<bool, AbstractAnything *>
+    std::pair<ResultType, AbstractAnything *>
         next(const ResType &res, NextParams &nparams);
 };

@@ -359,7 +359,8 @@ SQLDispatcher *buildDDLDispatcher()
     return dispatcher;
 }
 
-std::pair<bool, AbstractAnything *> DDLQueryExecutor::
+std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
+DDLQueryExecutor::
 next(const ResType &res, NextParams &nparams)
 {
     crStartBlock

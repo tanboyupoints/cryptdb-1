@@ -7,36 +7,56 @@
 #include <map>
 
 // only call yield one time per block
-#define crStartBlock                                \
-    if (0 == state) {
+#define crStartBlock                                                        \
+    if (0 == state_) {
 
-#define crEndBlock                                  \
-        assert(false);                              \
-    }                                               \
-    assert(state > 0);                              \
-    --state; ++upstate;
+#define crEndBlock                                                          \
+        assert(false);                                                      \
+    }                                                                       \
+    assert(state_ > 0);                                                     \
+    --state_; ++upstate_;
 
-#define crYield(value)                                          \
-{                                                               \
-    state   = ++upstate;                                        \
-    upstate = 0;                                                \
-    {                                                           \
-        auto temp = (value);                                    \
-        return std::make_pair(true,                             \
-                    new Anything<decltype(temp)>(temp));        \
-    }                                                           \
+#define crYield(value)                                                      \
+{                                                                           \
+    assert(false == finished_);                                             \
+    assert(0 == state_);                                                    \
+    state_   = ++upstate_;                                                  \
+    upstate_ = 0;                                                           \
+    {                                                                       \
+        auto temp = (value);                                                \
+        return std::make_pair(                                              \
+            AbstractQueryExecutor::ResultType::QUERY_COME_AGAIN,            \
+            new Anything<decltype(temp)>(temp));                            \
+    }                                                                       \
+    assert(false);                                                          \
 }
 
-#define crFinish(value)                                             \
-{                                                                   \
-    assert(0 == state);                                             \
-    state = upstate;                                                \
-    {                                                               \
-        auto temp = (value);                                        \
-        return std::make_pair(false,                                \
-                    new Anything<decltype(temp)>(temp));            \
-    }                                                               \
-    assert(false);                                                  \
+#define crFinishWithQuery(value)                                            \
+{                                                                           \
+    assert(false == finished_);                                             \
+    assert(0 == state_);                                                    \
+    finished_ = true;                                                       \
+    {                                                                       \
+        auto temp = (value);                                                \
+        return std::make_pair(                                              \
+            AbstractQueryExecutor::ResultType::QUERY_USE_RESULTS,           \
+            new Anything<decltype(temp)>(temp));                            \
+    }                                                                       \
+    assert(false);                                                          \
+}
+
+#define crFinish(value)                                                     \
+{                                                                           \
+    assert(false == finished_);                                             \
+    assert(0 == state_);                                                    \
+    finished_ = true;                                                       \
+    {                                                                       \
+        auto temp = (value);                                                \
+        return std::make_pair(                                              \
+            AbstractQueryExecutor::ResultType::RESULTS,                     \
+            new Anything<decltype(temp)>(temp));                            \
+    }                                                                       \
+    assert(false);                                                          \
 }
 
 template <typename Type>
@@ -79,13 +99,16 @@ struct NextParams {
 
 class AbstractQueryExecutor {
 protected:
-    unsigned state, upstate;
+    unsigned state_, upstate_;
+    bool finished_;
 
 public:
+    enum class ResultType {RESULTS, QUERY_COME_AGAIN, QUERY_USE_RESULTS};
+
     AbstractQueryExecutor()
-        : state(0), upstate(0) {}
+        : state_(0), upstate_(0), finished_(false) {}
     virtual ~AbstractQueryExecutor();
-    virtual std::pair<bool, AbstractAnything *>
+    virtual std::pair<ResultType, AbstractAnything *>
         next(const ResType &res, NextParams &nparams) = 0;
 
     static void genericPreamble(bool staleness, NextParams &nparams);
@@ -99,7 +122,7 @@ public:
         : query(query) {}
     ~SimpleExecutor() {}
 
-    std::pair<bool, AbstractAnything *>
+    std::pair<ResultType, AbstractAnything *>
         next(const ResType &res, NextParams &nparams);
 };
 

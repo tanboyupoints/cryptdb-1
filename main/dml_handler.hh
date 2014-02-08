@@ -13,7 +13,7 @@ public:
     DMLQueryExecutor(const LEX &lex, const ReturnMeta &rmeta)
         : query(lexToQuery(lex)), rmeta(rmeta) {}
     ~DMLQueryExecutor() {}
-    std::pair<bool, AbstractAnything *>
+    std::pair<ResultType, AbstractAnything *>
         next(const ResType &res, NextParams &nparams);
 
 private:
@@ -32,7 +32,7 @@ public:
           crypted_table(crypted_table), where_clause(where_clause),
           ps(ps) {}
     ~SpecialUpdateExecutor() {}
-    std::pair<bool, AbstractAnything *>
+    std::pair<ResultType, AbstractAnything *>
         next(const ResType &res, NextParams &nparams);
 
 private:
@@ -55,7 +55,7 @@ public:
         : schema(schema) {}
     ~ShowDirectiveExecutor() {}
 
-    std::pair<bool, AbstractAnything *>
+    std::pair<ResultType, AbstractAnything *>
         next(const ResType &res, NextParams &nparams);
 
 
@@ -84,7 +84,7 @@ public:
         : deltas(std::move(deltas)) {}
     ~SensitiveDirectiveExecutor() {}
 
-    std::pair<bool, AbstractAnything *>
+    std::pair<ResultType, AbstractAnything *>
         next(const ResType &res, NextParams &nparams);
 };
 

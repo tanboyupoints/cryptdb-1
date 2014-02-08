@@ -25,16 +25,12 @@ genericPreamble(bool staleness, NextParams &nparams)
     return;
 }
 
-std::pair<bool, AbstractAnything *> SimpleExecutor::
+std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *> SimpleExecutor::
 next(const ResType &res, NextParams &nparams)
 {
-    crStartBlock
-        genericPreamble(false, nparams);
+    genericPreamble(false, nparams);
 
-        crYield(std::make_pair(true, this->query));
-    crEndBlock
-
-    crFinish(res);
+    crFinishWithQuery(this->query);
 }
 
 

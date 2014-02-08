@@ -381,6 +381,16 @@ getResTypeFromLuaTable(lua_State *const L, int fields_index,
                    std::move(types), std::move(rows));
 }
 
+static void
+nilBuffer(lua_State *const L, size_t count)
+{
+    while (count--) {
+        lua_pushnil(L);
+    }
+
+    return;
+}
+
 static int
 next(lua_State *const L)
 {
@@ -406,8 +416,9 @@ next(lua_State *const L)
     try {
         NextParams nparams(*ps, c_wrapper->default_db);
         auto new_results = qr->executor->next(res, nparams);
-        const auto &again = std::get<0>(new_results);
-        if (true == again) {
+        const auto &result_type = std::get<0>(new_results);
+        switch (result_type) {
+        case AbstractQueryExecutor::ResultType::QUERY_COME_AGAIN: {
             // more to do before we have the client's results
 
             xlua_pushlstring(L, "again");
@@ -421,24 +432,36 @@ next(lua_State *const L)
             const auto &next_query = output.second;
             lua_pushlstring(L, next_query.c_str(), next_query.length());
 
-            lua_pushnil(L);
-            lua_pushnil(L);
+            nilBuffer(L, 2);
             return 5;
         }
+        case AbstractQueryExecutor::ResultType::QUERY_USE_RESULTS: {
+            // the results of executing this query should be send directly
+            // back to the client
+            xlua_pushlstring(L, "query-results");
+            xlua_pushlstring(L, std::get<1>(new_results)->extract<std::string>());
+            nilBuffer(L, 3);
+            return 5;
+        }
+        case AbstractQueryExecutor::ResultType::RESULTS: {
+            // ready to return results to the client
+            xlua_pushlstring(L, "results");
 
-        // ready to return results to the client
-        xlua_pushlstring(L, "results");
-
-        const auto &res = std::get<1>(new_results)->extract<ResType>();
-        returnResultSet(L, res);        // pushes 4 items on stack
-        return 5;
+            const auto &res = std::get<1>(new_results)->extract<ResType>();
+            returnResultSet(L, res);        // pushes 4 items on stack
+            return 5;
+        }
+        default:
+            assert(false);
+        }
     } catch (const ErrorPacketException &e) {
         // lua_pop(L, lua_gettop(L));
         xlua_pushlstring(L, "error");
         xlua_pushlstring(L, e.getMessage());
         lua_pushinteger(L,  e.getErrorCode());
         xlua_pushlstring(L, e.getSQLState());
-        lua_pushnil(L);
+
+        nilBuffer(L, 1);
         return 5;
     }
 }

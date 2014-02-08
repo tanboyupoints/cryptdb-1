@@ -1552,7 +1552,8 @@ OnionMetaAdjustor::pullCopyLayers(OnionMeta const &om)
     return v;
 }
 
-std::pair<bool, AbstractAnything *> OnionAdjustmentExecutor::
+std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
+OnionAdjustmentExecutor::
 next(const ResType &res, NextParams &nparams)
 {
     // FIXME: unnecessary to do all work in stored procedures

@@ -1189,7 +1189,8 @@ SQLDispatcher *buildDMLDispatcher()
 }
 
 // FIXME: decrypt results
-std::pair<bool, AbstractAnything *> DMLQueryExecutor::
+std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
+DMLQueryExecutor::
 next(const ResType &res, NextParams &nparams)
 {
     crStartBlock
@@ -1212,13 +1213,14 @@ rewriteAndGetFirstQuery(ProxyState &ps, const std::string &query,
     NextParams nparams(ps, default_db);
     auto results =
         delete_rewrite.executor->next(ResType(true, 0, 0), nparams);
-    assert(true == results.first);
+    assert(AbstractQueryExecutor::ResultType::QUERY_COME_AGAIN == results.first);
 
     return std::make_pair(std::get<1>(results)->extract<std::pair<bool, std::string> >().second,
                           delete_rewrite.rmeta);
 }
 
-std::pair<bool, AbstractAnything *> SpecialUpdateExecutor::
+std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
+SpecialUpdateExecutor::
 next(const ResType &res, NextParams &nparams)
 {
     // FIXME: implement and remove the CALL later on
@@ -1251,7 +1253,7 @@ next(const ResType &res, NextParams &nparams)
             Rewriter::decryptResults(res, this->select_rmeta.get());
         assert(dec_res.success());
         if (dec_res.rows.size() == 0) {
-            FAIL_TextMessageError("nothing to do; write optimization");
+            crFinish(ResType(true, 0, 0));
         }
 
         const auto itemToNiceString =
@@ -1392,7 +1394,8 @@ next(const ResType &res, NextParams &nparams)
     assert(false);
 }
 
-std::pair<bool, AbstractAnything *> ShowDirectiveExecutor::
+std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
+ShowDirectiveExecutor::
 next(const ResType &res, NextParams &nparams)
 {
     genericPreamble(false, nparams);
@@ -1477,7 +1480,8 @@ getAllShowDirectiveEntries(const std::unique_ptr<Connect> &e_conn,
     return e_conn->execute(query, db_res);
 }
 
-std::pair<bool, AbstractAnything *> SensitiveDirectiveExecutor::
+std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
+SensitiveDirectiveExecutor::
 next(const ResType &res, NextParams &nparams)
 {
     crStartBlock
