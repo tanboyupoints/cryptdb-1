@@ -368,42 +368,51 @@ next(const ResType &res, NextParams &nparams)
 
             {
                 uint64_t embedded_completion_id;
-                deltaOutputBeforeQuery(nparams.ps.getEConn(), this->original_query,
-                                       this->deltas,
-                                       CompletionType::DDLCompletion,
-                                       &embedded_completion_id);
+                TEST_ErrPkt(
+                    deltaOutputBeforeQuery(nparams.ps.getEConn(),
+                                           this->original_query, this->deltas,
+                                           CompletionType::DDLCompletion,
+                                           &embedded_completion_id),
+                    "deltaOutputBeforeQuery failed for DDL");
                 this->embedded_completion_id = embedded_completion_id;
             }
 
-            const std::string &remote_begin =
+            return CR_QUERY_AGAIN(
                 " INSERT INTO " + MetaData::Table::remoteQueryCompletion() +
                 "   (begin, complete, embedded_completion_id, reissue) VALUES"
                 "   (TRUE,  FALSE," +
                     std::to_string(this->embedded_completion_id.get()) +
-                "    , FALSE);";
-            return CR_QUERY_AGAIN(std::make_pair(true, remote_begin));
+                "    , FALSE);");
+
         }
+
+        TEST_ErrPkt(res.success(), "failed before issuing the ddl query");
 
         // execute the rewritten query
-        yield {
-            this->ddl_res = res;
-            return CR_QUERY_AGAIN(std::make_pair(true, this->new_query));
-        }
+        yield return CR_QUERY_AGAIN(this->new_query);
+
+        // save the results so we can return them to the client
+        this->ddl_res = res;
+
+        TEST_ErrPkt(res.success(), "DDL query failed");
 
         yield {
-            const std::string &remote_complete =
+            return CR_QUERY_AGAIN(
                 " UPDATE " + MetaData::Table::remoteQueryCompletion() +
                 "    SET complete = TRUE"
                 "  WHERE embedded_completion_id = " +
-                     std::to_string(this->embedded_completion_id.get()) + ";";
-            return CR_QUERY_AGAIN(std::make_pair(true, remote_complete));
+                     std::to_string(this->embedded_completion_id.get()) + ";");
         }
 
+        TEST_ErrPkt(res.success(), "failed after issuing the ddl query");
+
         // this is a ddl query so do not put it into a transaction
-        TEST_Sync(nparams.ps.getEConn()->execute(this->original_query),
+        TEST_ErrPkt(nparams.ps.getEConn()->execute(this->original_query),
                   "Failed to execute DDL query against embedded database!");
-        deltaOutputAfterQuery(nparams.ps.getEConn(), this->deltas,
-                              this->embedded_completion_id.get());
+
+        TEST_ErrPkt(deltaOutputAfterQuery(nparams.ps.getEConn(), this->deltas,
+                                          this->embedded_completion_id.get()),
+                    "deltaOuputAfterQuery failed for DDL");
 
         return CR_RESULTS(this->ddl_res.get());
     }

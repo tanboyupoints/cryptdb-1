@@ -210,14 +210,14 @@ bool
 writeDeltas(const std::unique_ptr<Connect> &e_conn,
             const std::vector<std::unique_ptr<Delta> > &deltas,
             Delta::TableType table_type);
-void
+bool
 deltaOutputBeforeQuery(const std::unique_ptr<Connect> &e_conn,
                        const std::string &original_query,
                        const std::vector<std::unique_ptr<Delta> > &deltas,
                        CompletionType completion_type,
                        uint64_t *const embedded_completion_id);
 
-void
+bool
 deltaOutputAfterQuery(const std::unique_ptr<Connect> &e_conn,
                       const std::vector<std::unique_ptr<Delta> > &deltas,
                       uint64_t embedded_completion_id);

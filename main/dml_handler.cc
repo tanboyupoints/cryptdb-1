@@ -1188,7 +1188,7 @@ next(const ResType &res, NextParams &nparams)
         yield {
             genericPreamble(false, nparams);
 
-            return CR_QUERY_AGAIN(std::make_pair(true, this->query));
+            return CR_QUERY_AGAIN(this->query);
         }
 
         yield return CR_RESULTS(Rewriter::decryptResults(res, this->rmeta));
@@ -1228,6 +1228,8 @@ next(const ResType &res, NextParams &nparams)
     */
 
     reenter(this->corot) {
+        assert(res.success());
+
         yield {
             genericPreamble(false, nparams);
 
@@ -1239,10 +1241,12 @@ next(const ResType &res, NextParams &nparams)
             const auto &rewritten_select_q =
                 rewriteAndGetFirstQuery(select_q, nparams);
             this->select_rmeta = rewritten_select_q.second;
-            return CR_QUERY_AGAIN(std::make_pair(true, rewritten_select_q.first));
+            return CR_QUERY_AGAIN(rewritten_select_q.first);
         }
 
-        assert(res.success());
+        TEST_GenericPacketException(res.success(),
+            "initial select query in SpecialUpdate failed");
+
         this->dec_res = Rewriter::decryptResults(res, this->select_rmeta.get());
         assert(this->dec_res.get().success());
         if (this->dec_res.get().rows.size() == 0) {
@@ -1289,8 +1293,8 @@ next(const ResType &res, NextParams &nparams)
             // do the query on the embedded database inside of a transaction
             // so that we can prevent failure artifacts from populating the
             // embedded database
-            TEST_Sync(nparams.ps.getEConn()->execute("START TRANSACTION;"),
-                      "failed to start transaction");
+            TEST_ErrPkt(nparams.ps.getEConn()->execute("START TRANSACTION;"),
+                        "failed to start transaction");
 
             // turn on strict mode so we can determine if we have bad values
             // > ie trying to insert 256 into a TINYINT UNSIGNED column
@@ -1308,14 +1312,15 @@ next(const ResType &res, NextParams &nparams)
             // database.
             std::unique_ptr<DBResult> original_query_dbres;
             SYNC_IF_FALSE(nparams.ps.getEConn()->execute(this->original_query,
-                                                  &original_query_dbres),
+                                                       &original_query_dbres),
                           nparams.ps.getEConn());
             assert(original_query_dbres);
             // HACK
             this->original_query_dbres = original_query_dbres.release();
 
             // strict mode off
-            SYNC_IF_FALSE(nparams.ps.getEConn()->execute("SET SESSION sql_mode = ''"),
+            SYNC_IF_FALSE(nparams.ps.getEConn()->execute(
+                                "SET SESSION sql_mode = ''"),
                           nparams.ps.getEConn());
 
             // > Collect the results from the embedded database.
@@ -1325,7 +1330,8 @@ next(const ResType &res, NextParams &nparams)
             std::unique_ptr<DBResult> dbres;
             const std::string &select_results_q =
                 " SELECT * FROM " + this->plain_table + ";";
-            SYNC_IF_FALSE(nparams.ps.getEConn()->execute(select_results_q, &dbres),
+            SYNC_IF_FALSE(nparams.ps.getEConn()->execute(select_results_q,
+                                                         &dbres),
                           nparams.ps.getEConn());
             const ResType interim_res = ResType(dbres->unpack());
             assert(interim_res.success());
@@ -1335,28 +1341,37 @@ next(const ResType &res, NextParams &nparams)
             // Cleanup the embedded database.
             const std::string &cleanup_q =
                 "DELETE FROM " + this->plain_table + ";";
-            SYNC_IF_FALSE(nparams.ps.getEConn()->execute(cleanup_q), nparams.ps.getEConn());
+            SYNC_IF_FALSE(nparams.ps.getEConn()->execute(cleanup_q),
+                          nparams.ps.getEConn());
 
-            SYNC_IF_FALSE(nparams.ps.getEConn()->execute("COMMIT;"), nparams.ps.getEConn());
+            SYNC_IF_FALSE(nparams.ps.getEConn()->execute("COMMIT;"),
+                          nparams.ps.getEConn());
 
             // This query is necessary to propagate a transaction into
             // INFORMATION_SCHEMA.
-            const std::string &propagation_query =
-                "SELECT NULL FROM " + this->crypted_table + ";";
-            return CR_QUERY_AGAIN(std::make_pair(false, propagation_query));
+            return CR_QUERY_AGAIN(
+                "SELECT NULL FROM " + this->crypted_table + ";");
         }
 
-        // FIXME: return failure to the client when something fails
+        TEST_ErrPkt(res.success(),
+            "transaction propagation query failed in SpecialUpdate");
+
+        yield return CR_QUERY_AGAIN("START TRANSACTION");
+
+        TEST_ErrPkt(res.success(),
+                    "failed to start transaction in SpecialUpdate");
+
         yield {
             // DELETE the rows matching the WHERE clause from the database.
             const std::string &delete_q =
                 " DELETE FROM " + this->plain_table +
                 " WHERE " + this->where_clause + ";";
-
             const auto &rewritten_delete_q =
                 rewriteAndGetFirstQuery(delete_q, nparams);
-            return CR_QUERY_AGAIN(std::make_pair(true, rewritten_delete_q));
+            return CR_QUERY_AGAIN(rewritten_delete_q.first);
         }
+
+        CR_ROLLBACK_AND_FAIL(res, "delete query failed in SpecialUpdate");
 
         yield {
             // > Add each row from the embedded database to the data database.
@@ -1365,8 +1380,14 @@ next(const ResType &res, NextParams &nparams)
                 " VALUES " + this->escaped_output_values.get() + ";";
             const auto &rewritten_insert_q =
                 rewriteAndGetFirstQuery(insert_q, nparams);
-            return CR_QUERY_AGAIN(std::make_pair(true, rewritten_insert_q));
+            return CR_QUERY_AGAIN(rewritten_insert_q.first);
         }
+
+        CR_ROLLBACK_AND_FAIL(res, "insert query failed in SpecialUpdate");
+
+        yield return CR_QUERY_AGAIN("COMMIT");
+
+        CR_ROLLBACK_AND_FAIL(res, "commit failed in SpecialUpdate");
 
         /*
         crStartBlock
@@ -1390,10 +1411,10 @@ next(const ResType &res, NextParams &nparams)
         yield {
             genericPreamble(false, nparams);
 
-            // HACK hack HACK hackity hackhack
-            TEST_TextMessageError(deleteAllShowDirectiveEntries(nparams.ps.getEConn()),
-                          "failed to initialize show directives table");
+            TEST_ErrPkt(deleteAllShowDirectiveEntries(nparams.ps.getEConn()),
+                        "failed to initialize show directives table");
 
+            // HACK hack HACK hackity hackhack
             const auto &databases = this->schema.getChildren();
             for (const auto &db_it : databases) {
                 const std::string &db_name = db_it.first.getValue();
@@ -1422,18 +1443,17 @@ next(const ResType &res, NextParams &nparams)
                                                       db_name, table_name,
                                                       field_name, onion_name,
                                                       level);
-                            TEST_TextMessageError(true == b,
-                                                  "failed producing directive"
-                                                  " results");
+                            TEST_ErrPkt(true == b,
+                                        "failed producing directive results");
                         }
                     }
                 }
             }
 
             std::unique_ptr<DBResult> db_res;
-            TEST_TextMessageError(getAllShowDirectiveEntries(nparams.ps.getEConn(),
-                                                             &db_res),
-                                  "failed retrieving directive results");
+            TEST_ErrPkt(getAllShowDirectiveEntries(nparams.ps.getEConn(),
+                                                   &db_res),
+                        "failed retrieving directive results");
             return CR_RESULTS(db_res->unpack());
         }
     }
@@ -1483,7 +1503,7 @@ next(const ResType &res, NextParams &nparams)
         yield {
             genericPreamble(false, nparams);
 
-            TEST_Sync(nparams.ps.getEConn()->execute("START TRANSACTION"),
+            TEST_ErrPkt(nparams.ps.getEConn()->execute("START TRANSACTION"),
                       "failed to start transaction for sensitive directive");
 
             SYNC_IF_FALSE(writeDeltas(nparams.ps.getEConn(), this->deltas,

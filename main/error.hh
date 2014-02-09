@@ -115,25 +115,6 @@ private:
     const std::string identifier_name;
 };
 
-// Do not derive this from AbstractException; their handling is too
-// divergent and we don't want to miss cases in catch graphs.
-class SynchronizationException {
-public:
-    SynchronizationException(const std::string &file_name,
-                             unsigned long line_number,
-                             const std::string &details)
-        : error(TextMessageError(file_name, line_number, details)) {}
-    ~SynchronizationException() {}
-
-    std::string to_string() const;
-
-private:
-    const TextMessageError error;
-};
-
-std::ostream &operator<<(std::ostream &out,
-                         const SynchronizationException &error);
-
 class ErrorPacketException {
     const std::string msg;
     const unsigned int error_code;
@@ -162,4 +143,6 @@ public:
 #define FAIL_GenericPacketException(msg)                        \
     TEST_GenericPacketException(false, msg)                     \
 
+#define TEST_ErrPkt(test, msg)                                  \
+    TEST_GenericPacketException((test), (msg))
 

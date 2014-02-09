@@ -279,10 +279,6 @@ rewrite(lua_State *const L)
             assert(qr);
 
             c_wrapper->setQueryRewrite(std::move(qr));
-        } catch (const SynchronizationException &e) {
-            lua_pushboolean(L, false);              // status
-            xlua_pushlstring(L, e.to_string());     // error message
-            return 2;
         } catch (const AbstractException &e) {
             lua_pushboolean(L, false);              // status
             xlua_pushlstring(L, e.to_string());     // error message

@@ -622,15 +622,14 @@ writeDeltas(const std::unique_ptr<Connect> &e_conn,
 }
 
 
-void
+bool
 deltaOutputBeforeQuery(const std::unique_ptr<Connect> &e_conn,
                        const std::string &original_query,
                        const std::vector<std::unique_ptr<Delta> > &deltas,
                        CompletionType completion_type,
                        uint64_t *const embedded_completion_id)
 {
-    TEST_Sync(e_conn->execute("START TRANSACTION;"),
-              "failed to start transaction");
+    RFIF(e_conn->execute("START TRANSACTION;"));
 
     // We must save the current default database because recovery
     // may be happening after a restart in which case such state
@@ -644,37 +643,36 @@ deltaOutputBeforeQuery(const std::unique_ptr<Connect> &e_conn,
         "    (SELECT DATABASE()),  FALSE,"
         "    '" + TypeText<CompletionType>::toText(completion_type)
             + "');";
-    SYNC_IF_FALSE(e_conn->execute(q_completion), e_conn);
+    ROLLBACK_AND_RFIF(e_conn->execute(q_completion), e_conn);
     *embedded_completion_id = e_conn->last_insert_id();
     assert(*embedded_completion_id);
 
-    SYNC_IF_FALSE(writeDeltas(e_conn, deltas, Delta::BLEEDING_TABLE), e_conn);
+    ROLLBACK_AND_RFIF(writeDeltas(e_conn, deltas, Delta::BLEEDING_TABLE), e_conn);
 
-    SYNC_IF_FALSE(e_conn->execute("COMMIT;"), e_conn);
+    ROLLBACK_AND_RFIF(e_conn->execute("COMMIT;"), e_conn);
 
-    return;
+    return true;
 }
 
-void
+bool
 deltaOutputAfterQuery(const std::unique_ptr<Connect> &e_conn,
                       const std::vector<std::unique_ptr<Delta> > &deltas,
                       uint64_t embedded_completion_id)
 {
-    TEST_Sync(e_conn->execute("START TRANSACTION;"),
-              "failed to start transaction");
+    RFIF(e_conn->execute("START TRANSACTION;"));
 
     const std::string q_update =
         " UPDATE " + MetaData::Table::embeddedQueryCompletion() +
         "    SET complete = TRUE"
         "  WHERE id=" +
                  std::to_string(embedded_completion_id) + ";";
-    SYNC_IF_FALSE(e_conn->execute(q_update), e_conn);
+    ROLLBACK_AND_RFIF(e_conn->execute(q_update), e_conn);
 
-    SYNC_IF_FALSE(writeDeltas(e_conn, deltas, Delta::REGULAR_TABLE), e_conn);
+    ROLLBACK_AND_RFIF(writeDeltas(e_conn, deltas, Delta::REGULAR_TABLE), e_conn);
 
-    SYNC_IF_FALSE(e_conn->execute("COMMIT;"), e_conn);
+    ROLLBACK_AND_RFIF(e_conn->execute("COMMIT;"), e_conn);
 
-    return;
+    return true;
 }
 
 static bool

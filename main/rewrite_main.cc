@@ -1568,9 +1568,12 @@ next(const ResType &res, NextParams &nparams)
                 this->embedded_completion_id = embedded_completion_id;
             }
 
-            return CR_QUERY_AGAIN(std::make_pair(true,
-                        "CALL " + MetaData::Proc::activeTransactionP()));
+            return CR_QUERY_AGAIN(
+                "CALL " + MetaData::Proc::activeTransactionP());
         }
+
+        TEST_ErrPkt(res.success(),
+                    "failed to determine if there is an active transasction");
 
         yield {
             assert(res.success());
@@ -1581,24 +1584,41 @@ next(const ResType &res, NextParams &nparams)
             this->in_trx = ("1" == trx);
 
             // always rollback
-            const std::string &rollback = "ROLLBACK";
-            return CR_QUERY_AGAIN(std::make_pair(false, rollback));
+            return CR_QUERY_AGAIN("ROLLBACK");
         }
 
-        yield return CR_QUERY_AGAIN(std::make_pair(true,
-                                            this->adjust_queries.front()));
+        TEST_ErrPkt(res.success(), "failed to rollback");
+
+        yield return CR_QUERY_AGAIN("START TRANSACTION");
+
+        TEST_ErrPkt(res.success(), "failed to start transaction");
+
+        yield return CR_QUERY_AGAIN(this->adjust_queries.front());
+
+        CR_ROLLBACK_AND_FAIL(res,
+                        "failed to execute first onion adjustment query!");
 
         yield {
             assert(res.success());
 
             const std::string &no_op = "DO 0;";
-            return CR_QUERY_AGAIN(std::make_pair(true,
+            return CR_QUERY_AGAIN(
                     this->adjust_queries.size() == 2 ? this->adjust_queries.back()
-                                                     : no_op));
+                                                     : no_op);
         }
 
-        deltaOutputAfterQuery(nparams.ps.getEConn(), this->deltas,
-                              this->embedded_completion_id.get());
+        CR_ROLLBACK_AND_FAIL(res,
+                        "failed to execute second onion adjustment query!");
+
+        yield return CR_QUERY_AGAIN("COMMIT");
+
+        TEST_ErrPkt(res.success(), "failed to commit");
+
+        TEST_ErrPkt(deltaOutputAfterQuery(nparams.ps.getEConn(), this->deltas,
+                                          this->embedded_completion_id.get()),
+                    "deltaOutputAfterQuery failed for onion adjustment");
+
+        // use the ROLLBACK error code
         if (true == this->in_trx.get()) {
             throw ErrorPacketException("proxy did rollback", 1213, "40001");
         }
@@ -1620,6 +1640,8 @@ next(const ResType &res, NextParams &nparams)
                 this->first_reissue = false;
                 return result;
             }
+            TEST_ErrPkt(res.success(),
+                        "reissuing query after adjustment failed");
         }
     }
 

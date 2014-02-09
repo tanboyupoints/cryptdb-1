@@ -7,9 +7,9 @@
 
 #include <map>
 
-#define CR_QUERY_AGAIN(value)                                               \
+#define CR_QUERY_AGAIN(query)                                               \
     std::make_pair(AbstractQueryExecutor::ResultType::QUERY_COME_AGAIN,     \
-                   newAnything(value))
+                   newAnything(std::make_pair(true, std::string(query))))
 
 #define CR_QUERY_RESULTS(value)                                             \
     std::make_pair(AbstractQueryExecutor::ResultType::QUERY_USE_RESULTS,    \
@@ -39,7 +39,7 @@ class Anything : public AbstractAnything {
     const Type value;
 
 public:
-    Anything(Type value) : value(value) {}
+    Anything(const Type &value) : value(value) {}
     Type get() const {return value;}
 };
 
