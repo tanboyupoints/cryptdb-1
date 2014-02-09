@@ -1148,6 +1148,15 @@ private:
 
 };
 
+class ShowTablesHandlers : public DMLHandler {
+    virtual void gather(Analysis &a, LEX *const lex) const
+    {}
+
+    virtual AbstractQueryExecutor *rewrite(Analysis &a, LEX *lex) const
+    {
+        return new ShowTablesExecutor();
+    }
+};
 
 // FIXME: Add test to make sure handlers added successfully.
 SQLDispatcher *buildDMLDispatcher()
@@ -1175,6 +1184,9 @@ SQLDispatcher *buildDMLDispatcher()
 
     h = new SetHandler;
     dispatcher->addHandler(SQLCOM_SET_OPTION, h);
+
+    h = new ShowTablesHandlers;
+    dispatcher->addHandler(SQLCOM_SHOW_TABLES, h);
 
     return dispatcher;
 }
@@ -1527,3 +1539,41 @@ nextImpl(const ResType &res, const NextParams &nparams)
     assert(false);
 }
 
+std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
+ShowTablesExecutor::
+nextImpl(const ResType &res, const NextParams &nparams)
+{
+    reenter(this->corot) {
+        yield return CR_QUERY_AGAIN(nparams.original_query);
+        TEST_ErrPkt(res.success(), "show tables failed");
+
+        yield {
+            const std::shared_ptr<const SchemaInfo> &schema =
+                nparams.ps.getSchemaInfo();
+            const DatabaseMeta *const dm =
+                schema->getChild(IdentityMetaKey(nparams.default_db));
+            TEST_ErrPkt(dm, "failed to find the database '"
+                            + nparams.default_db + "'");
+            std::vector<std::vector<Item *> > new_rows;
+
+            for (const auto &it : res.rows) {
+                assert(1 == it.size());
+                for (const auto &table : dm->getChildren()) {
+                    assert(table.second);
+                    if (table.second->getAnonTableName()
+                        == ItemToString(*it.front())) {
+
+                        const IdentityMetaKey plain_table_name
+                            = dm->getKey(*table.second.get());
+                        new_rows.push_back(
+                            std::vector<Item *>{make_item_string(plain_table_name.getValue())});
+                    }
+                }
+            }
+
+            return CR_RESULTS(ResType(res, new_rows));
+        }
+    }
+
+    assert(false);
+}

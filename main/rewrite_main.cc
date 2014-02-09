@@ -1239,7 +1239,6 @@ noRewrite(const LEX &lex) {
     case SQLCOM_BEGIN:
     case SQLCOM_ROLLBACK:
     case SQLCOM_COMMIT:
-    case SQLCOM_SHOW_TABLES:
     case SQLCOM_SHOW_VARIABLES:
     case SQLCOM_UNLOCK_TABLES:
     case SQLCOM_SHOW_STORAGE_ENGINES:
@@ -1282,7 +1281,9 @@ Rewriter::dispatchOnLex(Analysis &a, const std::string &query)
         return new SimpleExecutor();
     } else if (dml_dispatcher->canDo(lex)) {
         // HACK: We don't want to process INFORMATION_SCHEMA queries
-        if (lex->select_lex.table_list.first) {
+        if (SQLCOM_SELECT == lex->sql_command &&
+            lex->select_lex.table_list.first) {
+
             const std::string &db = lex->select_lex.table_list.first->db;
             if (equalsIgnoreCase("INFORMATION_SCHEMA", db)) {
                 return new SimpleExecutor();

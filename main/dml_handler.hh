@@ -94,6 +94,17 @@ private:
     bool usesEmbedded() const {return true;}
 };
 
+class ShowTablesExecutor : public AbstractQueryExecutor {
+    const std::vector<std::unique_ptr<Delta> > deltas;
+
+public:
+    ShowTablesExecutor() {}
+    ~ShowTablesExecutor() {}
+
+    std::pair<ResultType, AbstractAnything *>
+        nextImpl(const ResType &res, const NextParams &nparams);
+};
+
 // Abstract base class for query handler.
 class DMLHandler : public SQLHandler {
 public:
