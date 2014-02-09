@@ -1241,5 +1241,20 @@
  ("ROLLBACK")
  ("SELECT * FROM ubug_trx"
   :check)
- ("DROP TABLE ubug_trx")))
+ ("DROP TABLE ubug_trx")
+
+ ;; SpecialUpdate has a special code path for an update that will affect
+ ;; zero columns
+ ("CREATE TABLE ubug_none (x integer)"
+  (:all-max :ubug_none))
+ ("INSERT INTO ubug_none VALUES (1), (2)")
+ ("SELECT * FROM ubug_none")
+ ;; take the special path from within an onion adjustment
+ ("UPDATE ubug_none SET x = x + 10 WHERE x < 10"
+  (:update ubug_none x oOrder OPE))
+ ("SELECT * FROM ubug_none")
+ ("UPDATE ubug_none SET x = x + 10")
+ ("SELECT * FROM ubug_none"
+  :check)
+ ("DROP TABLE ubug_none")))
 
