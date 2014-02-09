@@ -69,10 +69,16 @@ public:
 
     AbstractQueryExecutor() {}
     virtual ~AbstractQueryExecutor();
-    virtual std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, const NextParams &nparams) = 0;
+    std::pair<ResultType, AbstractAnything *>
+        next(const ResType &res, const NextParams &nparams);
 
-    static void genericPreamble(bool staleness, const NextParams &nparams);
+    virtual std::pair<ResultType, AbstractAnything *>
+        nextImpl(const ResType &res, const NextParams &nparams) = 0;
+    virtual bool stales() const {return false;}
+    virtual bool usesEmbedded() const {return false;}
+
+private:
+    void genericPreamble(const NextParams &nparams);
 };
 
 class SimpleExecutor : public AbstractQueryExecutor {
@@ -81,7 +87,7 @@ public:
     ~SimpleExecutor() {}
 
     std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, const NextParams &nparams);
+        nextImpl(const ResType &res, const NextParams &nparams);
 };
 
 class NoOpExecutor : public AbstractQueryExecutor {
@@ -90,7 +96,7 @@ public:
     ~NoOpExecutor() {}
 
     std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, const NextParams &nparams);
+        nextImpl(const ResType &res, const NextParams &nparams);
 };
 
 class SQLHandler {

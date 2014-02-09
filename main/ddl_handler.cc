@@ -357,12 +357,10 @@ SQLDispatcher *buildDDLDispatcher()
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 DDLQueryExecutor::
-next(const ResType &res, const NextParams &nparams)
+nextImpl(const ResType &res, const NextParams &nparams)
 {
     reenter(this->corot) {
         yield {
-            genericPreamble(true, nparams);
-
             {
                 uint64_t embedded_completion_id;
                 TEST_ErrPkt(

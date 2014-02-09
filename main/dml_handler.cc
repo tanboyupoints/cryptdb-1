@@ -1182,14 +1182,10 @@ SQLDispatcher *buildDMLDispatcher()
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 DMLQueryExecutor::
-next(const ResType &res, const NextParams &nparams)
+nextImpl(const ResType &res, const NextParams &nparams)
 {
     reenter(this->corot) {
-        yield {
-            genericPreamble(false, nparams);
-
-            return CR_QUERY_AGAIN(this->query);
-        }
+        yield return CR_QUERY_AGAIN(this->query);
 
         yield {
             try {
@@ -1228,7 +1224,7 @@ rewriteAndGetFirstQuery(const std::string &query, NextParams nparams)
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 SpecialUpdateExecutor::
-next(const ResType &res, const NextParams &nparams)
+nextImpl(const ResType &res, const NextParams &nparams)
 {
     // FIXME: implement and remove the CALL later on
     /*
@@ -1243,8 +1239,6 @@ next(const ResType &res, const NextParams &nparams)
         assert(res.success());
 
         yield {
-            genericPreamble(false, nparams);
-
             // Retrieve rows from database.
             const std::string &select_q =
                 " SELECT * FROM " + this->plain_table +
@@ -1422,12 +1416,10 @@ next(const ResType &res, const NextParams &nparams)
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 ShowDirectiveExecutor::
-next(const ResType &res, const NextParams &nparams)
+nextImpl(const ResType &res, const NextParams &nparams)
 {
     reenter(this->corot) {
         yield {
-            genericPreamble(false, nparams);
-
             TEST_ErrPkt(deleteAllShowDirectiveEntries(nparams.ps.getEConn()),
                         "failed to initialize show directives table");
 
@@ -1514,12 +1506,10 @@ getAllShowDirectiveEntries(const std::unique_ptr<Connect> &e_conn,
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 SensitiveDirectiveExecutor::
-next(const ResType &res, const NextParams &nparams)
+nextImpl(const ResType &res, const NextParams &nparams)
 {
     reenter(this->corot) {
         yield {
-            genericPreamble(false, nparams);
-
             TEST_ErrPkt(nparams.ps.getEConn()->execute("START TRANSACTION"),
                       "failed to start transaction for sensitive directive");
 

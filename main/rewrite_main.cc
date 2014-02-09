@@ -1550,12 +1550,10 @@ OnionMetaAdjustor::pullCopyLayers(OnionMeta const &om)
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 OnionAdjustmentExecutor::
-next(const ResType &res, const NextParams &nparams)
+nextImpl(const ResType &res, const NextParams &nparams)
 {
     reenter(this->corot) {
         yield {
-            genericPreamble(true, nparams);
-
             assert(this->adjust_queries.size() == 1
                    || this->adjust_queries.size() == 2);
 

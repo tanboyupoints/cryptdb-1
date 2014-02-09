@@ -14,7 +14,7 @@ public:
         : query(lexToQuery(lex)), rmeta(rmeta) {}
     ~DMLQueryExecutor() {}
     std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, const NextParams &nparams);
+        nextImpl(const ResType &res, const NextParams &nparams);
 
 private:
     const std::string query;
@@ -22,17 +22,6 @@ private:
 };
 
 class SpecialUpdateExecutor : public AbstractQueryExecutor {
-public:
-    SpecialUpdateExecutor(const std::string &plain_table,
-                          const std::string &crypted_table,
-                          const std::string &where_clause)
-        : plain_table(plain_table), crypted_table(crypted_table),
-          where_clause(where_clause) {}
-    ~SpecialUpdateExecutor() {}
-    std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, const NextParams &nparams);
-
-private:
     const std::string original_query;
     const std::string plain_table;
     const std::string crypted_table;
@@ -44,6 +33,19 @@ private:
     AssignOnce<std::string> escaped_output_values;
     AssignOnce<ReturnMeta> select_rmeta;
     AssignOnce<bool> in_trx;
+
+public:
+    SpecialUpdateExecutor(const std::string &plain_table,
+                          const std::string &crypted_table,
+                          const std::string &where_clause)
+        : plain_table(plain_table), crypted_table(crypted_table),
+          where_clause(where_clause) {}
+    ~SpecialUpdateExecutor() {}
+    std::pair<ResultType, AbstractAnything *>
+        nextImpl(const ResType &res, const NextParams &nparams);
+
+private:
+    bool usesEmbedded() const {return true;}
 };
 
 class ShowDirectiveExecutor : public AbstractQueryExecutor {
@@ -55,10 +57,11 @@ public:
     ~ShowDirectiveExecutor() {}
 
     std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, const NextParams &nparams);
-
+        nextImpl(const ResType &res, const NextParams &nparams);
 
 private:
+    bool usesEmbedded() const {return true;}
+
     static bool
     deleteAllShowDirectiveEntries(const std::unique_ptr<Connect> &e_conn);
 
@@ -84,7 +87,11 @@ public:
     ~SensitiveDirectiveExecutor() {}
 
     std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, const NextParams &nparams);
+        nextImpl(const ResType &res, const NextParams &nparams);
+
+private:
+    bool stales() const {return true;}
+    bool usesEmbedded() const {return true;}
 };
 
 // Abstract base class for query handler.

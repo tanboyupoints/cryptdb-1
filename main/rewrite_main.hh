@@ -357,5 +357,9 @@ public:
           adjust_queries(adjust_queries), first_reissue(true) {}
 
     std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, const NextParams &nparams);
+        nextImpl(const ResType &res, const NextParams &nparams);
+
+private:
+    bool stales() const {return true;}
+    bool usesEmbedded() const {return true;}
 };
