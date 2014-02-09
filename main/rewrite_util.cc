@@ -514,12 +514,6 @@ typical_rewrite_insert_type(const Item &i, const FieldMeta &fm,
     }
 }
 
-std::string
-mysql_noop()
-{
-    return "do 0;";
-}
-
 /*
  * connection ids can be longer than 32 bits
  * http://dev.mysql.com/doc/refman/5.1/en/mysql-thread-id.html
@@ -572,57 +566,6 @@ retrieveDefaultDatabase(unsigned long long thread_id,
     const unsigned long *const l = mysql_fetch_lengths(dbres->n);
     *out_name = std::string(row[0], l[0]);
     return true;
-}
-
-void
-queryPreamble(const ProxyState &ps, const std::string &q,
-              std::unique_ptr<QueryRewrite> *const qr,
-              std::list<std::string> *const out_queryz,
-              SchemaCache *const schema_cache,
-              const std::string &default_db,
-              SchemaInfoRef *const schema_info_ref)
-{
-    const std::shared_ptr<const SchemaInfo> schema =
-        schema_cache->getSchema(ps.getConn(), ps.getEConn());
-
-    *qr = std::unique_ptr<QueryRewrite>(
-            new QueryRewrite(
-                Rewriter::rewrite(q, *schema.get(), default_db, ps)));
-
-    // lockless multithreading HACK: give the caller a reference to his
-    // SchemaInfo because the objects may be used in Deltaz
-    if (schema_info_ref) {
-        *schema_info_ref = schema;
-    }
-
-    return;
-
-    /*
-     * FIXME: implement in executors
-    // We handle before any queries because a failed query
-    // may stale the database during recovery and then
-    // we'd have to handle there as well.
-    schema_cache->updateStaleness(ps.getEConn(),
-                                  (*qr)->output->stalesSchema());
-
-    // ASK bites again...
-    // We want the embedded database to reflect the metadata for the
-    // current remote connection.
-    if ((*qr)->output->usesEmbeddedDB()) {
-        TEST_TextMessageError(lowLevelSetCurrentDatabase(ps.getEConn(),
-                                                         default_db),
-            "failed to set the embedded database to " + default_db + ";"
-            " your client may be in an unrecoverable bad loop"
-            " so consider restarting just the _client_. this can happen"
-            " if you tell your client to connect to a database that exists"
-            " but was not created through cryptdb.");
-    }
-
-    (*qr)->output->beforeQuery(ps.getConn(), ps.getEConn());
-    (*qr)->output->getQuery(out_queryz, *schema.get());
-
-    return;
-    */
 }
 
 /*
@@ -680,74 +623,6 @@ prettyPrintQueryResult(const ResType &res)
               << "RESULTS: " << COLOR_END << std::endl;
     printRes(res);
     std::cout << std::endl;
-}
-*/
-
-/*
-// returning the QueryAction is useful for sanity checking and for allowing
-// the proxy to determine if a ROLLBACK occurred
-EpilogueResult
-queryEpilogue(const ProxyState &ps, const QueryRewrite &qr,
-              const ResType &res, const std::string &query,
-              const std::string &default_db, bool pp)
-{
-    TEST_Sync(res.success(), "query did not produce good result");
-
-    std::pair<bool, std::unique_ptr<DBResult>> after_out =
-        qr.output->afterQuery(ps.getEConn());
-    assert(!!after_out.first == !!after_out.second);
-
-    const QueryAction action = qr.output->queryAction(ps.getConn());
-    switch (action) {
-        case QueryAction::AGAIN: {
-            std::unique_ptr<SchemaCache> schema_cache(new SchemaCache());
-            // onion adjustments that come from multideletes which use
-            // table aliases make the current database go to
-            // NULL; rectification
-            TEST_Text(lowLevelSetCurrentDatabase(ps.getConn(),
-                                                 default_db),
-                      "failed to set current db after onion adjustment");
-            const EpilogueResult &epi_res =
-                executeQuery(ps, query, default_db, schema_cache.get(),
-                             pp);
-            TEST_Sync(schema_cache->cleanupStaleness(ps.getEConn()),
-                      "failed to cleanup cache after requery!");
-            return epi_res;
-        }
-        case QueryAction::RETURN_AFTER: {
-            const ResType &after_res(after_out.second->unpack());
-            return EpilogueResult(QueryAction::NO_DECRYPT, after_res);
-        }
-        case QueryAction::DECRYPT:
-        case QueryAction::NO_DECRYPT:
-        case QueryAction::ROLLBACK:
-            break;
-        default:
-            FAIL_TextMessageError("unrecognized QueryAction");
-    }
-
-    if (pp) {
-        printEmbeddedState(ps);
-        prettyPrintQueryResult(res);
-    }
-
-    if (false == res.success()) {
-        // 0, 0 is an ugly HACK; will go away with new backend
-        return EpilogueResult(QueryAction::NO_DECRYPT, ResType(false, 0, 0));
-    }
-
-    if (QueryAction::DECRYPT == action) {
-        const ResType &dec_res =
-            Rewriter::decryptResults(res, qr.rmeta);
-        assert(dec_res.success());
-        if (pp) {
-            prettyPrintQueryResult(dec_res);
-        }
-
-        return EpilogueResult(action, dec_res);
-    }
-
-    return EpilogueResult(action, res);
 }
 */
 

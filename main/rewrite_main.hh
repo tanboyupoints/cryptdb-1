@@ -89,18 +89,10 @@ private:
     static const std::unique_ptr<SQLDispatcher> ddl_dispatcher;
 };
 
-class SchemaCache;
-class EpilogueResult;
-EpilogueResult
-executeQuery(const ProxyState &ps, const std::string &q,
-             const std::string &default_db,
-             SchemaCache *const schema_cache, bool pp=true);
-
 #define UNIMPLEMENTED                                               \
     FAIL_TextMessageError(std::string("Unimplemented: ") +          \
                             std::string(__PRETTY_FUNCTION__))
 
-class reason;
 class OLK;
 
 class CItemType {

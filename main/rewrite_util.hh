@@ -126,27 +126,12 @@ st_select_lex *
 rewrite_select_lex(const st_select_lex &select_lex, Analysis &a);
 
 std::string
-mysql_noop();
-
-std::string
 getDefaultDatabaseForConnection(const std::unique_ptr<Connect> &c);
 
 bool
 retrieveDefaultDatabase(unsigned long long thread_id,
                         const std::unique_ptr<Connect> &c,
                         std::string *const out_name);
-
-void
-queryPreamble(const ProxyState &ps, const std::string &q,
-              std::unique_ptr<QueryRewrite> *qr,
-              std::list<std::string> *const out_queryz,
-              SchemaCache *const schema,
-              const std::string &default_db,
-              SchemaInfoRef *const schema_info_ref=NULL);
-
-bool
-queryHandleRollback(const ProxyState &ps, const std::string &query,
-                    SchemaInfo const &schema);
 
 std::string terminalEscape(const std::string &s);
 
