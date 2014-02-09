@@ -16,7 +16,7 @@ genericPreamble(bool staleness, const NextParams &nparams)
 
     // FIXME: add flag so we only set this if the query actually needs the
     // embedded database
-    TEST_TextMessageError(
+    TEST_ErrPkt(
         lowLevelSetCurrentDatabase(nparams.ps.getEConn(), nparams.default_db),
         "failed to set the embedded database to " + nparams.default_db + ";"
         " your client may be in an unrecoverable bad loop"
