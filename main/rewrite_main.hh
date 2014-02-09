@@ -341,18 +341,24 @@ class OnionAdjustmentExecutor : public AbstractQueryExecutor {
     const std::unique_ptr<Connect> &e_conn;
     const std::string original_query;
     const std::vector<std::unique_ptr<Delta> > deltas;
+    const ProxyState &ps;
     const std::list<std::string> adjust_queries;
 
+    // coroutine state
+    bool first_reissue;
     AssignOnce<uint64_t> embedded_completion_id;
     AssignOnce<bool> in_trx;
+    QueryRewrite *reissue_query_rewrite;
 
 public:
     OnionAdjustmentExecutor(const std::unique_ptr<Connect> &e_conn,
                             const std::string &original_query,
                             std::vector<std::unique_ptr<Delta> > &&deltas,
+                            const ProxyState &ps,
                             const std::list<std::string> &adjust_queries)
         : e_conn(e_conn), original_query(original_query),
-          deltas(std::move(deltas)), adjust_queries(adjust_queries) {}
+          deltas(std::move(deltas)), ps(ps), adjust_queries(adjust_queries),
+          first_reissue(true) {}
 
     std::pair<ResultType, AbstractAnything *>
         next(const ResType &res, NextParams &nparams);

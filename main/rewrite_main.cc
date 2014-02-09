@@ -1312,6 +1312,7 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
 
             return new OnionAdjustmentExecutor(ps.getEConn(), query,
                                                std::move(deltas),
+                                               ps,
                                                adjust_queries);
         }
 
@@ -1585,9 +1586,13 @@ next(const ResType &res, NextParams &nparams)
             assert("1" == trx || "0" == trx);
             this->in_trx = ("1" == trx);
 
-            return CR_QUERY_AGAIN(std::make_pair(true,
-                                            this->adjust_queries.front()));
+            // always rollback
+            const std::string &rollback = "ROLLBACK";
+            return CR_QUERY_AGAIN(std::make_pair(false, rollback));
         }
+
+        yield return CR_QUERY_AGAIN(std::make_pair(true,
+                                            this->adjust_queries.front()));
 
         yield {
             assert(res.success());
@@ -1600,20 +1605,30 @@ next(const ResType &res, NextParams &nparams)
 
         deltaOutputAfterQuery(nparams.e_conn, this->deltas,
                               this->embedded_completion_id.get());
-
-        if (false == this->in_trx.get()) {
-            yield {
-                // FIXME: implement query reissue
-                const std::string &no_op = "DO 0;";
-                return CR_QUERY_RESULTS(no_op);
-            }
-        } else {
-            // FIXME: rollback
+        if (true == this->in_trx.get()) {
             throw ErrorPacketException("proxy did rollback", 1213, "40001");
         }
 
-        // FIXME: deal with reissued query
-        assert(false);
+        {
+            std::shared_ptr<const SchemaInfo> schema =
+                const_cast<ProxyState &>(this->ps).getSchemaInfo();
+            this->reissue_query_rewrite =
+                new QueryRewrite(Rewriter::rewrite(this->ps,
+                                                   this->original_query,
+                                                   *schema.get(),
+                                                   nparams.default_db));
+        }
+        while (true) {
+            yield {
+                auto result =
+                    this->reissue_query_rewrite->executor->next(
+                        first_reissue ? ResType(true, 0, 0)
+                                      : res,
+                        nparams);
+                this->first_reissue = false;
+                return result;
+            }
+        }
     }
 
     assert(false);
