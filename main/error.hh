@@ -156,3 +156,16 @@ public:
 #define TEST_ErrPkt(test, msg)                                  \
     TEST_GenericPacketException((test), (msg))
 
+class SchemaFailure : public AbstractException {
+public:
+    SchemaFailure(const std::string &file_name, int line_number)
+        : AbstractException(file_name, line_number) {}
+    std::string to_string() const {return "schema failure";}
+};
+
+#define TEST_SchemaFailure(test)                    \
+{                                                   \
+    if (!(test)) {                                  \
+        throw SchemaFailure(__FILE__, __LINE__);    \
+    }                                               \
+}

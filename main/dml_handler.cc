@@ -1206,18 +1206,24 @@ next(const ResType &res, const NextParams &nparams)
 static std::pair<std::string, ReturnMeta>
 rewriteAndGetFirstQuery(const std::string &query, NextParams nparams)
 {
-    std::shared_ptr<const SchemaInfo> schema = nparams.ps.getSchemaInfo();
-    QueryRewrite delete_rewrite =
-        Rewriter::rewrite(query, *schema.get(), nparams.default_db,
-                          nparams.ps.getMasterKey(),
-                          nparams.ps.defaultSecurityRating());
+    try {
+        std::shared_ptr<const SchemaInfo> schema = nparams.ps.getSchemaInfo();
+        QueryRewrite delete_rewrite =
+            Rewriter::rewrite(query, *schema.get(), nparams.default_db,
+                              nparams.ps.getMasterKey(),
+                              nparams.ps.defaultSecurityRating());
 
-    auto results =
-        delete_rewrite.executor->next(ResType(true, 0, 0), nparams);
-    assert(AbstractQueryExecutor::ResultType::QUERY_COME_AGAIN == results.first);
+        auto results =
+            delete_rewrite.executor->next(ResType(true, 0, 0), nparams);
+        assert(AbstractQueryExecutor::ResultType::QUERY_COME_AGAIN
+               == results.first);
 
-    return std::make_pair(std::get<1>(results)->extract<std::pair<bool, std::string> >().second,
-                          delete_rewrite.rmeta);
+        return std::make_pair(std::get<1>(results)->
+                                extract<std::pair<bool, std::string> >().second,
+                              delete_rewrite.rmeta);
+    } catch (const SchemaFailure &e) {
+        FAIL_GenericPacketException("failed to get schema info");
+    }
 }
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>

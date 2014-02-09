@@ -11,8 +11,12 @@ genericPreamble(bool staleness, const NextParams &nparams)
     // We handle before any queries because a failed query
     // may stale the database during recovery and then
     // we'd have to handle there as well.
-    nparams.ps.getSchemaCache().updateStaleness(nparams.ps.getEConn(),
-                                                staleness);
+    try {
+        nparams.ps.getSchemaCache().updateStaleness(
+            nparams.ps.getEConn(), staleness);
+    } catch (const SchemaFailure &e) {
+        FAIL_GenericPacketException("failed updating staleness");
+    }
 
     // FIXME: add flag so we only set this if the query actually needs the
     // embedded database

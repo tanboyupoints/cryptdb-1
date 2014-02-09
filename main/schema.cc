@@ -560,8 +560,7 @@ lowLevelGetCurrentStaleness(const std::unique_ptr<Connect> &e_conn,
         " SELECT stale FROM " + MetaData::Table::staleness() +
         "  WHERE cache_id = " + std::to_string(cache_id) + ";";
     std::unique_ptr<DBResult> db_res;
-    TEST_TextMessageError(e_conn->execute(query, &db_res),
-                          "failed to get schema!");
+    RFIF(e_conn->execute(query, &db_res));
     assert(1 == mysql_num_rows(db_res->n));
 
     const MYSQL_ROW row = mysql_fetch_row(db_res->n);
@@ -582,9 +581,7 @@ SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
                               "Failed to cleanup staleness for first"
                               " usage!");
         */
-        TEST_TextMessageError(initialStaleness(e_conn),
-                              "Failed to initialize staleness for first"
-                              " usage!");
+        TEST_SchemaFailure(initialStaleness(e_conn));
         this->no_loads = false;
     }
 
@@ -603,9 +600,7 @@ lowLevelAllStale(const std::unique_ptr<Connect> &e_conn)
     const std::string &query =
         " UPDATE " + MetaData::Table::staleness() +
         "    SET stale = TRUE;";
-
-    TEST_TextMessageError(e_conn->execute(query),
-                          "failed to all stale!");
+    TEST_SchemaFailure(e_conn->execute(query));
 }
 
 void
@@ -614,11 +609,11 @@ SchemaCache::updateStaleness(const std::unique_ptr<Connect> &e_conn,
 {
     if (true == staleness) {
         // Make everyone stale.
-        lowLevelAllStale(e_conn);
-    } else {
-        // We are no longer stale.
-        this->lowLevelCurrentUnstale(e_conn);
+        return lowLevelAllStale(e_conn);
     }
+
+    // We are no longer stale.
+    return this->lowLevelCurrentUnstale(e_conn);
 }
 
 bool
@@ -628,7 +623,7 @@ SchemaCache::initialStaleness(const std::unique_ptr<Connect> &e_conn) const
         " INSERT INTO " + MetaData::Table::staleness() +
         "   (cache_id, stale) VALUES " +
         "   (" + std::to_string(this->id) + ", TRUE);";
-    RETURN_FALSE_IF_FALSE(e_conn->execute(seed_staleness));
+    RFIF(e_conn->execute(seed_staleness));
 
     return true;
 }
@@ -639,11 +634,11 @@ SchemaCache::cleanupStaleness(const std::unique_ptr<Connect> &e_conn) const
     const std::string remove_staleness =
         " DELETE FROM " + MetaData::Table::staleness() +
         "       WHERE cache_id = " + std::to_string(this->id) + ";";
-    RETURN_FALSE_IF_FALSE(e_conn->execute(remove_staleness));
+    RFIF(e_conn->execute(remove_staleness));
 
     return true;
 }
-static void
+static bool
 lowLevelToggleCurrentStaleness(const std::unique_ptr<Connect> &e_conn,
                                unsigned int cache_id, bool staleness)
 {
@@ -651,22 +646,22 @@ lowLevelToggleCurrentStaleness(const std::unique_ptr<Connect> &e_conn,
         " UPDATE " + MetaData::Table::staleness() +
         "    SET stale = " + bool_to_string(staleness) +
         "  WHERE cache_id = " + std::to_string(cache_id) + ";";
+    RFIF(e_conn->execute(query));
 
-    TEST_TextMessageError(e_conn->execute(query),
-                          "failed to unstale current!");
+    return true;
 }
 
 void
 SchemaCache::lowLevelCurrentStale(const std::unique_ptr<Connect> &e_conn)
     const
 {
-    lowLevelToggleCurrentStaleness(e_conn, this->id, true);
+    TEST_SchemaFailure(lowLevelToggleCurrentStaleness(e_conn, this->id, true));
 }
 
 void
 SchemaCache::lowLevelCurrentUnstale(const std::unique_ptr<Connect> &e_conn)
     const
 {
-    lowLevelToggleCurrentStaleness(e_conn, this->id, false);
+    TEST_SchemaFailure(lowLevelToggleCurrentStaleness(e_conn, this->id, false));
 }
 
