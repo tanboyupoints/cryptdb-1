@@ -1560,10 +1560,18 @@ nextImpl(const ResType &res, const NextParams &nparams)
             ROLLBACK_ERROR_PACKET
         }
 
-        this->reissue_query_rewrite = new QueryRewrite(
-            Rewriter::rewrite(
-                nparams.original_query, *nparams.ps.getSchemaInfo().get(),
-                nparams.default_db, nparams.ps));
+        try {
+            this->reissue_query_rewrite = new QueryRewrite(
+                Rewriter::rewrite(
+                    nparams.original_query, *nparams.ps.getSchemaInfo().get(),
+                    nparams.default_db, nparams.ps));
+        } catch (const AbstractException &e) {
+            FAIL_GenericPacketException(e.to_string());
+        } catch (...) {
+            FAIL_GenericPacketException(
+                "unknown error occured while rewriting onion adjusment query");
+        }
+
         this->reissue_nparams =
             NextParams(nparams.ps, nparams.default_db, nparams.original_query);
         while (true) {

@@ -94,7 +94,7 @@ private:
     const int mysql_dummy;
     const std::unique_ptr<Connect> conn;
     const SECURITY_RATING default_sec_rating;
-    SchemaCache cache;
+    const SchemaCache cache;
 } SharedProxyState;
 
 class ProxyState {
@@ -110,12 +110,12 @@ public:
     const std::unique_ptr<Connect> &getEConn() const;
     void safeCreateEmbeddedTHD();
     void dumpTHDs();
-    SchemaCache &getSchemaCache() const {return shared.cache;}
+    const SchemaCache &getSchemaCache() const {return shared.cache;}
     std::shared_ptr<const SchemaInfo> getSchemaInfo() const
         {return shared.cache.getSchema(this->getConn(), this->getEConn());}
 
 private:
-    SharedProxyState &shared;
+    const SharedProxyState &shared;
     const std::unique_ptr<Connect> e_conn;
     std::vector<std::unique_ptr<THD, void (*)(THD *)> > thds;
 };
@@ -241,8 +241,7 @@ public:
           default_sec_rating(default_sec_rating) {}
     Analysis(const Analysis &analysis)
         : pos(0), inject_alias(false), db_name(analysis.getDatabaseName()),
-          schema(const_cast<Analysis &>(analysis).getSchema()),
-          master_key(analysis.getMasterKey()),
+          schema(analysis.getSchema()), master_key(analysis.getMasterKey()),
           default_sec_rating(analysis.getDefaultSecurityRating()) {}
 
     unsigned int pos; // > a counter indicating how many projection
@@ -297,7 +296,7 @@ public:
     SECLEVEL getOnionLevel(const FieldMeta &fm, onion o);
     static const std::vector<std::unique_ptr<EncLayer> > &
         getEncLayers(const OnionMeta &om);
-    const SchemaInfo &getSchema() {return schema;}
+    const SchemaInfo &getSchema() const {return schema;}
 
     std::vector<std::unique_ptr<Delta> > deltas;
 

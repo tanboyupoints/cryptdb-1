@@ -691,8 +691,7 @@ rewrite_select_lex(const st_select_lex &select_lex, Analysis &a)
     // rewrite_filters_lex must be called before rewrite_proj because
     // it is responsible for filling Analysis::item_cache which
     // rewrite_proj uses.
-    st_select_lex *const new_select_lex =
-        rewrite_filters_lex(select_lex, a);
+    st_select_lex *const new_select_lex = rewrite_filters_lex(select_lex, a);
 
     LOG(cdb_v) << "rewrite select lex input is "
                << select_lex << std::endl;

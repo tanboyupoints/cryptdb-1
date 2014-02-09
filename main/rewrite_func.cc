@@ -1020,11 +1020,11 @@ static class ANON : public CItemSubtypeFN<Item_func_strcmp, str_strcmp> {
     do_gather_type(const Item_func_strcmp &i, Analysis &a) const
     {
         //cerr << "do_a_t Item_func_strcmp reason " << tr << "\n";
-	/* Item **args = i->arguments();
-        for (uint x = 0; x < i->argument_count(); x++)
-            analyze(args[x], reason(EQ_EncSet, "strcmp", i, &tr), a);
-        return tr.encset;
-	*/
+        /* Item **args = i->arguments();
+            for (uint x = 0; x < i->argument_count(); x++)
+                analyze(args[x], reason(EQ_EncSet, "strcmp", i, &tr), a);
+            return tr.encset;
+        */
         UNIMPLEMENTED;
     }
     virtual Item * do_optimize_type(Item_func_strcmp *i, Analysis & a) const

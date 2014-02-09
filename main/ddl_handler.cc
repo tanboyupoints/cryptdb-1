@@ -233,8 +233,7 @@ class ChangeDBHandler : public DDLHandler {
             const
     {
         assert(a.deltas.size() == 0);
-        // FIXME: optimize so we don't do extra ddl queries
-        return new DDLQueryExecutor(*copyWithTHD(lex), std::move(a.deltas));
+        return new SimpleExecutor();
     }
 };
 
@@ -387,7 +386,6 @@ nextImpl(const ResType &res, const NextParams &nparams)
         TEST_ErrPkt(res.success(), "DDL query failed");
         // save the results so we can return them to the client
         this->ddl_res = res;
-
 
         yield {
             return CR_QUERY_AGAIN(
