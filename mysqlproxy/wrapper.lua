@@ -4,12 +4,15 @@ local proto = assert(require("mysql.proto"))
 
 local g_want_interim    = nil
 local skip              = false
+local client            = nil
 --
 -- Interception points provided by mysqlproxy
 --
 
 
 function read_auth()
+    client = proxy.connection.client.src.name 
+
     -- Use this instead of connect_server(), to get server name
     dprint("Connected " .. proxy.connection.client.src.name)
     CryptDB.connect(proxy.connection.client.src.name,
@@ -79,7 +82,7 @@ function printline(n)
        io.write("+")
     end
     for i = 1, n do
-    	io.write("--------------------+")
+        io.write("--------------------+")
     end
     print()
 end
@@ -91,13 +94,13 @@ function makePrintable(s)
     end
     local news = ""
     for i = 1, #s do
-    	local c = s:sub(i,i)
+        local c = s:sub(i,i)
         local b = string.byte(c)
-	if (b >= 32) and (b <= 126) then
-	   news = news .. c
-	else
-	   news = news .. '?'
-	end
+        if (b >= 32) and (b <= 126) then
+           news = news .. c
+        else
+           news = news .. '?'
+        end
     end
 
     return news
@@ -106,10 +109,10 @@ end
 
 function prettyNewQuery(q)
     if DEMO then
-       if string.find(q, "remote_db") then
-          -- don't print maintenance queries
-       	  return
-       end
+        if string.find(q, "remote_db") then
+            -- don't print maintenance queries
+            return
+        end
     end
  
     print(greentext("NEW QUERY: ")..makePrintable(q))
@@ -134,7 +137,6 @@ function read_query_real(packet)
         query = "USE `" .. query .. "`"
     end
 
-    local client = proxy.connection.client.src.name 
     if string.byte(packet) == proxy.COM_INIT_DB or
        string.byte(packet) == proxy.COM_QUERY then
         status, error_msg =
@@ -146,7 +148,7 @@ function read_query_real(packet)
             return proxy.PROXY_SEND_RESULT
         end
 
-        return next_handler("query", client, {}, {}, nil, nil)
+        return next_handler("query", true, client, {}, {}, nil, nil)
     elseif string.byte(packet) == proxy.COM_QUIT then
         -- do nothing
     else
@@ -155,29 +157,20 @@ function read_query_real(packet)
 end
 
 function read_query_result_real(inj)
+    local query = inj.query:sub(2)
+    prettyNewQuery(query)
+
     if skip == true then
         skip = false
         return
     end
-
     skip = false
 
     local resultset = inj.resultset
 
-    -- note that queries which result in an error are never handed back
-    -- to cryptdb ``proper''
     if resultset.query_status == proxy.MYSQLD_PACKET_ERR then
-        local err = proto.from_err_packet(resultset.raw)
-        proxy.response.type         = proxy.MYSQLD_PACKET_ERR
-        proxy.response.errmsg       = err.errmsg
-        proxy.response.errcode      = err.errcode
-        proxy.response.sqlstate     = err.sqlstate
-
-        return proxy.PROXY_SEND_RESULT
+        return next_handler("results", false, client, {}, {}, 0, 0)
     end
-
-    local query = inj.query:sub(2)
-    prettyNewQuery(query)
 
     local client = proxy.connection.client.src.name
     local interim_fields = {}
@@ -185,26 +178,26 @@ function read_query_result_real(inj)
 
     if true == g_want_interim then
         -- build up interim result for next(...) calls
-	    print(greentext("ENCRYPTED RESULTS:"))
+        print(greentext("ENCRYPTED RESULTS:"))
 
         -- mysqlproxy doesn't return real lua arrays, so re-package
         local resfields = resultset.fields
 
-	    printline(#resfields)
-	    if (#resfields) then
-	       io.write("|")
-	    end
-	    for i = 1, #resfields do
+        printline(#resfields)
+        if (#resfields) then
+           io.write("|")
+        end
+        for i = 1, #resfields do
             rfi = resfields[i]
             interim_fields[i] =
                 { type = resfields[i].type,
                   name = resfields[i].name }
-		    io.write(string.format("%-20s|",rfi.name))
+            io.write(string.format("%-20s|",rfi.name))
         end
 
-	    print()
-	    printline(#resfields)
-	    
+        print()
+        printline(#resfields)
+
         local resrows = resultset.rows
         if resrows then
             for row in resrows do
@@ -217,10 +210,10 @@ function read_query_result_real(inj)
             end
         end
 
-	    printline(#resfields)
+        printline(#resfields)
     end
 
-    return next_handler("results", client, interim_fields, interim_rows,
+    return next_handler("results", true, client, interim_fields, interim_rows,
                         resultset.affected_rows, resultset.insert_id)
 end
 
@@ -241,9 +234,10 @@ function handle_from(from)
     assert(nil)
 end
 
-function next_handler(from, client, fields, rows, affected_rows, insert_id)
+function next_handler(from, status, client, fields, rows, affected_rows,
+                      insert_id)
     local control, param0, param1, param2, param3 =
-        CryptDB.next(client, fields, rows, affected_rows, insert_id)
+        CryptDB.next(client, fields, rows, affected_rows, insert_id, status)
     if "again" == control then
         g_want_interim      = param0
         local query         = param1

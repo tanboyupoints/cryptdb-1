@@ -76,22 +76,22 @@ public:
 };
 
 class SimpleExecutor : public AbstractQueryExecutor {
-    const std::string query;
-
 public:
-    SimpleExecutor(const std::string &query)
-        : query(query) {}
+    SimpleExecutor() {}
     ~SimpleExecutor() {}
 
     std::pair<ResultType, AbstractAnything *>
         next(const ResType &res, const NextParams &nparams);
 };
 
-inline SimpleExecutor *
-noopExecutor()
-{
-    return new SimpleExecutor("do 0;");
-}
+class NoOpExecutor : public AbstractQueryExecutor {
+public:
+    NoOpExecutor() {}
+    ~NoOpExecutor() {}
+
+    std::pair<ResultType, AbstractAnything *>
+        next(const ResType &res, const NextParams &nparams);
+};
 
 class SQLHandler {
 public:

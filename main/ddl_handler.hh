@@ -10,17 +10,14 @@
 
 class DDLQueryExecutor : public AbstractQueryExecutor {
 public:
-    DDLQueryExecutor(const LEX &original_lex,
-                     const LEX &new_lex,
+    DDLQueryExecutor(const LEX &new_lex,
                      std::vector<std::unique_ptr<Delta> > &&deltas)
-        : original_query(lexToQuery(original_lex)),
-          new_query(lexToQuery(new_lex)), deltas(std::move(deltas)) {}
+        : new_query(lexToQuery(new_lex)), deltas(std::move(deltas)) {}
     ~DDLQueryExecutor() {}
     std::pair<ResultType, AbstractAnything *>
         next(const ResType &res, const NextParams &nparams);
 
 private:
-    const std::string original_query;
     const std::string new_query;
     const std::vector<std::unique_ptr<Delta> > deltas;
 

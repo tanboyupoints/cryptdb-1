@@ -625,30 +625,29 @@
   ("INSERT INTO trans VALUES (1, 2, 3)")
   ("INSERT INTO trans VALUES (33, 22, 11)")
   ("SELECT * FROM trans")
+
   ("START TRANSACTION")
   ("INSERT INTO trans VALUES (333, 222, 111)")
   ("ROLLBACK")
   ("SELECT * FROM trans")
   ("INSERT INTO trans VALUES (45, 22, 15)")
   ("UPDATE trans SET a = a + 1, b = c + 1")
+
+  ;; special update in transaction
   ("START TRANSACTION")
-  ;; no special update in transaction
-  ("UPDATE trans SET a = a + a, b = b + 12"
-   ()
-   :cryptdb
-   :must-fail)
+  ("UPDATE trans SET a = a + a, b = b + 12")
   ("SELECT * FROM trans")
   ("ROLLBACK")
   ("SELECT * FROM trans")
+
+  ;; special update in transaction
   ("START TRANSACTION")
-  ;; no special update in transaction
-  ("UPDATE trans SET a = c + 1, b = a + 1"
-   ()
-   :cryptdb
-   :must-fail)
+  ("UPDATE trans SET a = c + 1, b = a + 1")
   ("COMMIT")
+  ("SELECT * FROM trans")
   ("ROLLBACK")
   ("SELECT * FROM trans")
+
   ("START TRANSACTION")
   ;; query should fail as it's onion adjustment inside a transaction
   ("UPDATE trans SET a = a + 1, c = 50 WHERE a < 50000"
@@ -658,6 +657,7 @@
   ;; freeze things in case something went wrong
   ("COMMIT")
   ("SELECT * FROM trans")
+
   ("START TRANSACTION")
   ("INSERT INTO trans VALUES (1, 50, 150)")
   ;; query should fail as it's onion adjustment inside a transaction
@@ -852,6 +852,10 @@
  ;;;    quoted schema objects
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ("QuotedSchemaObjects" t
+  ("DROP DATABASE IF EXISTS `over+there`"
+   ()
+   :both
+   :ignore)
   ("CREATE DATABASE IF NOT EXISTS `over+there`")
   ("USE `over+there`")
   ("CREATE TABLE `over+there`.`more+quotes` (`quoted-+as*well` integer)"
@@ -1173,9 +1177,6 @@
                  (oOrder RND)
                  (oAdd HOM)
                  (oPLAIN RND)))))
- ("SET @cryptdb='sensitive',
-       @database='cryptdbtest', @table='ubug', @field='x',
-       @oOrder='OPE'")
  ("INSERT INTO ubug VALUES (1), (2)")
  ;; this must happen _before_ onion adjustment
  ("UPDATE ubug SET x = x + 1 WHERE x < 2"

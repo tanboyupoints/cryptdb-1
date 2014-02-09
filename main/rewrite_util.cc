@@ -763,3 +763,15 @@ determineSecurityRating()
     
     return SECURITY_RATING::SENSITIVE;
 }
+
+bool
+handleActiveTransactionPResults(const ResType &res)
+{
+    assert(res.success());
+    assert(res.rows.size() == 1);
+
+    const std::string &trx = ItemToString(*res.rows.front().front());
+    assert("1" == trx || "0" == trx);
+    return ("1" == trx);
+}
+

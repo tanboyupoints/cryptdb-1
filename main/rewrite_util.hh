@@ -156,6 +156,9 @@ prettyPrintQuery(const std::string &query);
 SECURITY_RATING
 determineSecurityRating();
 
+bool
+handleActiveTransactionPResults(const ResType &res);
+
 template <typename InType, typename InterimType, typename OutType>
 std::function<OutType(InType in)>
 fnCompose(std::function<OutType(InterimType)> outer,

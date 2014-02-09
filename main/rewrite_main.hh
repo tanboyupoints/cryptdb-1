@@ -339,7 +339,6 @@ private:
 };
 
 class OnionAdjustmentExecutor : public AbstractQueryExecutor {
-    const std::string original_query;
     const std::vector<std::unique_ptr<Delta> > deltas;
     const std::list<std::string> adjust_queries;
 
@@ -352,10 +351,9 @@ class OnionAdjustmentExecutor : public AbstractQueryExecutor {
     AssignOnce<NextParams> reissue_nparams;
 
 public:
-    OnionAdjustmentExecutor(const std::string &original_query,
-                            std::vector<std::unique_ptr<Delta> > &&deltas,
+    OnionAdjustmentExecutor(std::vector<std::unique_ptr<Delta> > &&deltas,
                             const std::list<std::string> &adjust_queries)
-        : original_query(original_query), deltas(std::move(deltas)),
+        : deltas(std::move(deltas)),
           adjust_queries(adjust_queries), first_reissue(true) {}
 
     std::pair<ResultType, AbstractAnything *>

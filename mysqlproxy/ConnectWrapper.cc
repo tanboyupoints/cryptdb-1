@@ -314,8 +314,13 @@ itemNullVector(unsigned int count)
 static ResType
 getResTypeFromLuaTable(lua_State *const L, int fields_index,
                        int rows_index, int affected_rows_index,
-                       int insert_id_index)
+                       int insert_id_index, int status_index)
 {
+    const bool status = lua_toboolean(L, status_index);
+    if (false == status) {
+        return ResType(false, 0, 0);
+    }
+
     std::vector<std::string> names;
     std::vector<enum_field_types> types;
     /* iterate over the fields argument */
@@ -373,7 +378,7 @@ getResTypeFromLuaTable(lua_State *const L, int fields_index,
         lua_pop(L, 1);
     }
 
-    return ResType(true, lua_tointeger(L, affected_rows_index),
+    return ResType(status, lua_tointeger(L, affected_rows_index),
                    lua_tointeger(L, insert_id_index), std::move(names),
                    std::move(types), std::move(rows));
 }
@@ -397,8 +402,13 @@ next(lua_State *const L)
 
     const std::string client = xlua_tolstring(L, 1);
     if (clients.find(client) == clients.end()) {
-        // FIXME: must return 5 parameters
-        return 0;
+        xlua_pushlstring(L, "error");
+        xlua_pushlstring(L, "unknown client");
+        lua_pushinteger(L,  100);
+        xlua_pushlstring(L, "12345");
+
+        nilBuffer(L, 1);
+        return 5;
     }
     WrapperState *const c_wrapper = clients[client];
 
@@ -408,7 +418,7 @@ next(lua_State *const L)
     assert(ps);
     ps->safeCreateEmbeddedTHD();
 
-    const ResType &res = getResTypeFromLuaTable(L, 2, 3, 4, 5);
+    const ResType &res = getResTypeFromLuaTable(L, 2, 3, 4, 5, 6);
     const std::unique_ptr<QueryRewrite> &qr = c_wrapper->getQueryRewrite();
     try {
         NextParams nparams(*ps, c_wrapper->default_db, c_wrapper->last_query);
@@ -427,7 +437,7 @@ next(lua_State *const L)
             lua_pushboolean(L, want_interim);
 
             const auto &next_query = output.second;
-            lua_pushlstring(L, next_query.c_str(), next_query.length());
+            xlua_pushlstring(L, next_query);
 
             nilBuffer(L, 2);
             return 5;

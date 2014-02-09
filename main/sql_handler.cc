@@ -39,4 +39,16 @@ next(const ResType &res, const NextParams &nparams)
     assert(false);
 }
 
+std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *> NoOpExecutor::
+next(const ResType &res, const NextParams &nparams)
+{
+    reenter(this->corot) {
+        genericPreamble(false, nparams);
+
+        yield return CR_QUERY_RESULTS("DO 0;");
+    }
+
+    assert(false);
+}
+
 

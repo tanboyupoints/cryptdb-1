@@ -107,7 +107,7 @@ class CreateTableHandler : public DDLHandler {
             // with the credit card field every time the server boots)
         }
 
-        return new DDLQueryExecutor(*lex, *new_lex, std::move(a.deltas));
+        return new DDLQueryExecutor(*new_lex, std::move(a.deltas));
     }
 };
 
@@ -150,7 +150,7 @@ class AlterTableHandler : public DDLHandler {
         new_lex->select_lex.table_list =
             rewrite_table_list(new_lex->select_lex.table_list, a, true);
 
-        return new DDLQueryExecutor(*lex, *new_lex, std::move(a.deltas));
+        return new DDLQueryExecutor(*new_lex, std::move(a.deltas));
     }
 
     const std::unique_ptr<AlterDispatcher> sub_dispatcher;
@@ -168,7 +168,7 @@ class DropTableHandler : public DDLHandler {
         LEX *const final_lex = rewrite(a, lex);
         update(a, lex);
 
-        return new DDLQueryExecutor(*lex, *final_lex, std::move(a.deltas));
+        return new DDLQueryExecutor(*final_lex, std::move(a.deltas));
     }
     
     LEX *rewrite(Analysis &a, LEX *lex) const
@@ -223,8 +223,7 @@ class CreateDBHandler : public DDLHandler {
                                 "Database " + dbname + " already exists!");
         }
 
-        return new DDLQueryExecutor(*lex, *copyWithTHD(lex),
-                                    std::move(a.deltas));
+        return new DDLQueryExecutor(*copyWithTHD(lex), std::move(a.deltas));
     }
 };
 
@@ -235,8 +234,7 @@ class ChangeDBHandler : public DDLHandler {
     {
         assert(a.deltas.size() == 0);
         // FIXME: optimize so we don't do extra ddl queries
-        return new DDLQueryExecutor(*lex, *copyWithTHD(lex),
-                                    std::move(a.deltas));
+        return new DDLQueryExecutor(*copyWithTHD(lex), std::move(a.deltas));
     }
 };
 
@@ -252,8 +250,7 @@ class DropDBHandler : public DDLHandler {
         a.deltas.push_back(std::unique_ptr<Delta>(
                                     new DeleteDelta(dm, a.getSchema())));
 
-        return new DDLQueryExecutor(*lex, *copyWithTHD(lex),
-                                    std::move(a.deltas));
+        return new DDLQueryExecutor(*copyWithTHD(lex), std::move(a.deltas));
     }
 };
 
@@ -268,7 +265,7 @@ class LockTablesHandler : public DDLHandler {
         new_lex->select_lex.table_list =
             rewrite_table_list(lex->select_lex.table_list, a);
 
-        return new DDLQueryExecutor(*lex, *new_lex, std::move(a.deltas));
+        return new DDLQueryExecutor(*new_lex, std::move(a.deltas));
     }
 };
 
@@ -290,7 +287,7 @@ class CreateIndexHandler : public DDLHandler {
 
         highLevelRewriteKey(tm, *lex, new_lex, a);
 
-        return new DDLQueryExecutor(*lex, *new_lex, std::move(a.deltas));
+        return new DDLQueryExecutor(*new_lex, std::move(a.deltas));
     }
 };
 
@@ -370,7 +367,7 @@ next(const ResType &res, const NextParams &nparams)
                 uint64_t embedded_completion_id;
                 TEST_ErrPkt(
                     deltaOutputBeforeQuery(nparams.ps.getEConn(),
-                                           this->original_query, this->deltas,
+                                           nparams.original_query, this->deltas,
                                            CompletionType::DDLCompletion,
                                            &embedded_completion_id),
                     "deltaOutputBeforeQuery failed for DDL");
@@ -385,16 +382,14 @@ next(const ResType &res, const NextParams &nparams)
                 "    , FALSE);");
 
         }
-
         TEST_ErrPkt(res.success(), "failed before issuing the ddl query");
 
         // execute the rewritten query
         yield return CR_QUERY_AGAIN(this->new_query);
-
+        TEST_ErrPkt(res.success(), "DDL query failed");
         // save the results so we can return them to the client
         this->ddl_res = res;
 
-        TEST_ErrPkt(res.success(), "DDL query failed");
 
         yield {
             return CR_QUERY_AGAIN(
@@ -403,11 +398,10 @@ next(const ResType &res, const NextParams &nparams)
                 "  WHERE embedded_completion_id = " +
                      std::to_string(this->embedded_completion_id.get()) + ";");
         }
-
         TEST_ErrPkt(res.success(), "failed after issuing the ddl query");
 
         // this is a ddl query so do not put it into a transaction
-        TEST_ErrPkt(nparams.ps.getEConn()->execute(this->original_query),
+        TEST_ErrPkt(nparams.ps.getEConn()->execute(nparams.original_query),
                   "Failed to execute DDL query against embedded database!");
 
         TEST_ErrPkt(deltaOutputAfterQuery(nparams.ps.getEConn(), this->deltas,

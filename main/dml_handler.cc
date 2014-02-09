@@ -268,8 +268,8 @@ class UpdateHandler : public DMLHandler {
                 where_clause = " TRUE ";
             }
 
-            return new SpecialUpdateExecutor(lexToQuery(*lex), plain_table,
-                                             crypted_table, where_clause.get());
+            return new SpecialUpdateExecutor(plain_table, crypted_table,
+                                             where_clause.get());
         }
 
         new_lex->select_lex.item_list = res_fields;
@@ -1018,7 +1018,7 @@ class SetHandler : public DMLHandler {
         }
 
         if (nullptr == dhandler) {
-            return new SimpleExecutor(lexToQuery(*lex));
+            return new SimpleExecutor();
         }
 
         return dhandler(var_pairs, a);
@@ -1048,7 +1048,7 @@ private:
             }
         }
 
-        return noopExecutor();
+        return new NoOpExecutor();
     }
 
 
@@ -1191,7 +1191,13 @@ next(const ResType &res, const NextParams &nparams)
             return CR_QUERY_AGAIN(this->query);
         }
 
-        yield return CR_RESULTS(Rewriter::decryptResults(res, this->rmeta));
+        yield {
+            try {
+                return CR_RESULTS(Rewriter::decryptResults(res, this->rmeta));
+            } catch (...) {
+                FAIL_GenericPacketException("error decrypting dml results");
+            }
+        }
     }
 
     assert(false);
@@ -1243,9 +1249,8 @@ next(const ResType &res, const NextParams &nparams)
             this->select_rmeta = rewritten_select_q.second;
             return CR_QUERY_AGAIN(rewritten_select_q.first);
         }
-
-        TEST_GenericPacketException(res.success(),
-            "initial select query in SpecialUpdate failed");
+        TEST_ErrPkt(res.success(),
+                    "initial select query in SpecialUpdate failed");
 
         this->dec_res = Rewriter::decryptResults(res, this->select_rmeta.get());
         assert(this->dec_res.get().success());
@@ -1311,7 +1316,7 @@ next(const ResType &res, const NextParams &nparams)
             // Run the original (unmodified) query on the data in the embedded
             // database.
             std::unique_ptr<DBResult> original_query_dbres;
-            SYNC_IF_FALSE(nparams.ps.getEConn()->execute(this->original_query,
+            SYNC_IF_FALSE(nparams.ps.getEConn()->execute(nparams.original_query,
                                                        &original_query_dbres),
                           nparams.ps.getEConn());
             assert(original_query_dbres);
@@ -1356,10 +1361,17 @@ next(const ResType &res, const NextParams &nparams)
         TEST_ErrPkt(res.success(),
             "transaction propagation query failed in SpecialUpdate");
 
-        yield return CR_QUERY_AGAIN("START TRANSACTION");
-
+        yield return CR_QUERY_AGAIN(
+            "CALL " + MetaData::Proc::activeTransactionP());
         TEST_ErrPkt(res.success(),
-                    "failed to start transaction in SpecialUpdate");
+                    "failed to determine if we are in a transaction");
+        this->in_trx = handleActiveTransactionPResults(res);
+
+        if (false == this->in_trx.get()) {
+            yield return CR_QUERY_AGAIN("START TRANSACTION");
+            TEST_ErrPkt(res.success(),
+                        "failed to start transaction in SpecialUpdate");
+        }
 
         yield {
             // DELETE the rows matching the WHERE clause from the database.
@@ -1370,7 +1382,6 @@ next(const ResType &res, const NextParams &nparams)
                 rewriteAndGetFirstQuery(delete_q, nparams);
             return CR_QUERY_AGAIN(rewritten_delete_q.first);
         }
-
         CR_ROLLBACK_AND_FAIL(res, "delete query failed in SpecialUpdate");
 
         yield {
@@ -1382,12 +1393,12 @@ next(const ResType &res, const NextParams &nparams)
                 rewriteAndGetFirstQuery(insert_q, nparams);
             return CR_QUERY_AGAIN(rewritten_insert_q.first);
         }
-
         CR_ROLLBACK_AND_FAIL(res, "insert query failed in SpecialUpdate");
 
-        yield return CR_QUERY_AGAIN("COMMIT");
-
-        CR_ROLLBACK_AND_FAIL(res, "commit failed in SpecialUpdate");
+        if (false == this->in_trx.get()) {
+            yield return CR_QUERY_AGAIN("COMMIT");
+            CR_ROLLBACK_AND_FAIL(res, "commit failed in SpecialUpdate");
+        }
 
         /*
         crStartBlock

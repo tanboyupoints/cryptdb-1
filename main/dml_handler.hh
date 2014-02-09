@@ -23,12 +23,11 @@ private:
 
 class SpecialUpdateExecutor : public AbstractQueryExecutor {
 public:
-    SpecialUpdateExecutor(const std::string &original_query,
-                          const std::string &plain_table,
+    SpecialUpdateExecutor(const std::string &plain_table,
                           const std::string &crypted_table,
                           const std::string &where_clause)
-        : original_query(original_query), plain_table(plain_table),
-          crypted_table(crypted_table), where_clause(where_clause) {}
+        : plain_table(plain_table), crypted_table(crypted_table),
+          where_clause(where_clause) {}
     ~SpecialUpdateExecutor() {}
     std::pair<ResultType, AbstractAnything *>
         next(const ResType &res, const NextParams &nparams);
@@ -39,10 +38,12 @@ private:
     const std::string crypted_table;
     const std::string where_clause;
 
+    // coroutine state
     AssignOnce<ResType> dec_res;
     AssignOnce<DBResult *> original_query_dbres;
     AssignOnce<std::string> escaped_output_values;
     AssignOnce<ReturnMeta> select_rmeta;
+    AssignOnce<bool> in_trx;
 };
 
 class ShowDirectiveExecutor : public AbstractQueryExecutor {

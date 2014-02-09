@@ -1279,13 +1279,13 @@ Rewriter::dispatchOnLex(Analysis &a, const std::string &query)
 
     // optimization: do not process queries that we will not rewrite
     if (noRewrite(*lex)) {
-        return new SimpleExecutor(query);
+        return new SimpleExecutor();
     } else if (dml_dispatcher->canDo(lex)) {
         // HACK: We don't want to process INFORMATION_SCHEMA queries
         if (lex->select_lex.table_list.first) {
             const std::string &db = lex->select_lex.table_list.first->db;
             if (equalsIgnoreCase("INFORMATION_SCHEMA", db)) {
-                return new SimpleExecutor(query);
+                return new SimpleExecutor();
             }
         }
 
@@ -1305,7 +1305,7 @@ Rewriter::dispatchOnLex(Analysis &a, const std::string &query)
             std::vector<std::unique_ptr<Delta> > &deltas = out_data.first;
             const std::list<std::string> &adjust_queries = out_data.second;
 
-            return new OnionAdjustmentExecutor(query, std::move(deltas),
+            return new OnionAdjustmentExecutor(std::move(deltas),
                                                adjust_queries);
         }
 
@@ -1341,7 +1341,7 @@ Rewriter::rewrite(const std::string &q, SchemaInfo const &schema,
     AbstractQueryExecutor *const executor =
         Rewriter::dispatchOnLex(analysis, q);
     if (!executor) {
-        return QueryRewrite(true, analysis.rmeta, noopExecutor());
+        return QueryRewrite(true, analysis.rmeta, new NoOpExecutor());
     }
 
     return QueryRewrite(true, analysis.rmeta, executor);
@@ -1562,7 +1562,7 @@ next(const ResType &res, const NextParams &nparams)
             {
                 uint64_t embedded_completion_id;
                 deltaOutputBeforeQuery(nparams.ps.getEConn(),
-                                       this->original_query, this->deltas,
+                                       nparams.original_query, this->deltas,
                                        CompletionType::AdjustOnionCompletion,
                                        &embedded_completion_id);
                 this->embedded_completion_id = embedded_completion_id;
@@ -1571,30 +1571,18 @@ next(const ResType &res, const NextParams &nparams)
             return CR_QUERY_AGAIN(
                 "CALL " + MetaData::Proc::activeTransactionP());
         }
-
         TEST_ErrPkt(res.success(),
                     "failed to determine if there is an active transasction");
+        this->in_trx = handleActiveTransactionPResults(res);
 
-        yield {
-            assert(res.success());
-            assert(res.rows.size() == 1);
-
-            const std::string &trx = ItemToString(*res.rows.front().front());
-            assert("1" == trx || "0" == trx);
-            this->in_trx = ("1" == trx);
-
-            // always rollback
-            return CR_QUERY_AGAIN("ROLLBACK");
-        }
-
+        // always rollback
+        yield return CR_QUERY_AGAIN("ROLLBACK");
         TEST_ErrPkt(res.success(), "failed to rollback");
 
         yield return CR_QUERY_AGAIN("START TRANSACTION");
-
         TEST_ErrPkt(res.success(), "failed to start transaction");
 
         yield return CR_QUERY_AGAIN(this->adjust_queries.front());
-
         CR_ROLLBACK_AND_FAIL(res,
                         "failed to execute first onion adjustment query!");
 
@@ -1606,12 +1594,10 @@ next(const ResType &res, const NextParams &nparams)
                     this->adjust_queries.size() == 2 ? this->adjust_queries.back()
                                                      : no_op);
         }
-
         CR_ROLLBACK_AND_FAIL(res,
                         "failed to execute second onion adjustment query!");
 
         yield return CR_QUERY_AGAIN("COMMIT");
-
         TEST_ErrPkt(res.success(), "failed to commit");
 
         TEST_ErrPkt(deltaOutputAfterQuery(nparams.ps.getEConn(), this->deltas,
@@ -1626,7 +1612,7 @@ next(const ResType &res, const NextParams &nparams)
 
         this->reissue_query_rewrite = new QueryRewrite(
             Rewriter::rewrite(
-                this->original_query, *nparams.ps.getSchemaInfo().get(),
+                nparams.original_query, *nparams.ps.getSchemaInfo().get(),
                 nparams.default_db, nparams.ps.getMasterKey(),
                 nparams.ps.defaultSecurityRating()));
         this->reissue_nparams =
@@ -1641,8 +1627,6 @@ next(const ResType &res, const NextParams &nparams)
                 this->first_reissue = false;
                 return result;
             }
-            TEST_ErrPkt(res.success(),
-                        "reissuing query after adjustment failed");
         }
     }
 
