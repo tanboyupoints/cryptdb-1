@@ -135,7 +135,7 @@ public:
     std::string getMessage() const
     {
         return "(" + file_name + ", " + std::to_string(line_number)
-               + ")\n" + msg;
+               + ")\n" + msg + "\n";
     }
 
     unsigned int getErrorCode() const {return error_code;}
