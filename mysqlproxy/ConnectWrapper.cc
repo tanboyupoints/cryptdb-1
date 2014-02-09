@@ -262,10 +262,9 @@ rewrite(lua_State *const L)
     t.lap_ms();
     if (EXECUTE_QUERIES) {
         try {
-            TEST_TextMessageError(retrieveDefaultDatabase(_thread_id,
-                                                          ps->getConn(),
-                                            &c_wrapper->default_db),
-                            "proxy failed to retrieve default database!");
+            TEST_Text(retrieveDefaultDatabase(_thread_id, ps->getConn(),
+                                              &c_wrapper->default_db),
+                      "proxy failed to retrieve default database!");
             // save a reference so a second thread won't eat objects
             // that DeltaOuput wants later
             std::shared_ptr<const SchemaInfo> schema = ps->getSchemaInfo();
@@ -274,8 +273,7 @@ rewrite(lua_State *const L)
             std::unique_ptr<QueryRewrite> qr =
                 std::unique_ptr<QueryRewrite>(new QueryRewrite(
                     Rewriter::rewrite(query, *schema.get(),
-                                      c_wrapper->default_db, ps->getMasterKey(),
-                                      ps->defaultSecurityRating())));
+                                      c_wrapper->default_db, *ps)));
             assert(qr);
 
             c_wrapper->setQueryRewrite(std::move(qr));

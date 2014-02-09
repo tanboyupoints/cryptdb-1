@@ -75,8 +75,7 @@ public:
     static QueryRewrite
         rewrite(const std::string &q, SchemaInfo const &schema,
                 const std::string &default_db,
-                const std::unique_ptr<AES_KEY> &master_key,
-                SECURITY_RATING default_sec_rating);
+                const ProxyState &ps);
 
     static ResType
         decryptResults(const ResType &dbres, const ReturnMeta &rm);

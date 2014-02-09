@@ -587,9 +587,7 @@ queryPreamble(const ProxyState &ps, const std::string &q,
 
     *qr = std::unique_ptr<QueryRewrite>(
             new QueryRewrite(
-                Rewriter::rewrite(q, *schema.get(), default_db,
-                                  ps.getMasterKey(),
-                                  ps.defaultSecurityRating())));
+                Rewriter::rewrite(q, *schema.get(), default_db, ps)));
 
     // lockless multithreading HACK: give the caller a reference to his
     // SchemaInfo because the objects may be used in Deltaz

@@ -1206,8 +1206,7 @@ rewriteAndGetFirstQuery(const std::string &query, NextParams nparams)
         std::shared_ptr<const SchemaInfo> schema = nparams.ps.getSchemaInfo();
         QueryRewrite delete_rewrite =
             Rewriter::rewrite(query, *schema.get(), nparams.default_db,
-                              nparams.ps.getMasterKey(),
-                              nparams.ps.defaultSecurityRating());
+                              nparams.ps);
 
         auto results =
             delete_rewrite.executor->next(ResType(true, 0, 0), nparams);

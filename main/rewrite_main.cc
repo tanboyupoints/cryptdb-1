@@ -1328,13 +1328,13 @@ Rewriter::dispatchOnLex(Analysis &a, const std::string &query)
 QueryRewrite
 Rewriter::rewrite(const std::string &q, SchemaInfo const &schema,
                   const std::string &default_db,
-                  const std::unique_ptr<AES_KEY> &master_key,
-                  SECURITY_RATING default_sec_rating)
+                  const ProxyState &ps)
 {
     LOG(cdb_v) << "q " << q;
     assert(0 == mysql_thread_init());
 
-    Analysis analysis(default_db, schema, master_key, default_sec_rating);
+    Analysis analysis(default_db, schema, ps.getMasterKey(),
+                      ps.defaultSecurityRating());
 
     // NOTE: Care what data you try to read from Analysis
     // at this height.
@@ -1611,8 +1611,7 @@ nextImpl(const ResType &res, const NextParams &nparams)
         this->reissue_query_rewrite = new QueryRewrite(
             Rewriter::rewrite(
                 nparams.original_query, *nparams.ps.getSchemaInfo().get(),
-                nparams.default_db, nparams.ps.getMasterKey(),
-                nparams.ps.defaultSecurityRating()));
+                nparams.default_db, nparams.ps));
         this->reissue_nparams =
             NextParams(nparams.ps, nparams.default_db, nparams.original_query);
         while (true) {
