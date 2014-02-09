@@ -1218,6 +1218,8 @@ rewriteAndGetFirstQuery(const std::string &query, NextParams nparams)
                               delete_rewrite.rmeta);
     } catch (const SchemaFailure &e) {
         FAIL_GenericPacketException("failed to get schema info");
+    } catch (...) {
+        FAIL_GenericPacketException("error rewriting a single query");
     }
 }
 
