@@ -84,7 +84,6 @@ typedef struct SharedProxyState {
         return masterKey;
     }
     const std::unique_ptr<Connect> &getConn() const {return conn;}
-    SchemaCache &getSchemaCache() {return cache;}
     static int db_init(const std::string &embed_dir);
 
     friend class ProxyState;
@@ -111,8 +110,8 @@ public:
     const std::unique_ptr<Connect> &getEConn() const;
     void safeCreateEmbeddedTHD();
     void dumpTHDs();
-    SchemaCache &getSchemaCache() {return shared.cache;}
-    std::shared_ptr<const SchemaInfo> getSchemaInfo()
+    SchemaCache &getSchemaCache() const {return shared.cache;}
+    std::shared_ptr<const SchemaInfo> getSchemaInfo() const
         {return shared.cache.getSchema(this->getConn(), this->getEConn());}
 
 private:
@@ -229,15 +228,22 @@ bool setBleedingTableToRegularTable(const std::unique_ptr<Connect> &e_conn);
 class RewritePlan;
 class Analysis {
     Analysis() = delete;
-    Analysis(const Analysis &a) = delete;
     Analysis(Analysis &&a) = delete;
     Analysis &operator=(const Analysis &a) = delete;
     Analysis &operator=(Analysis &&a) = delete;
 
 public:
-    Analysis(const std::string &default_db, const SchemaInfo &schema)
-        : pos(0), inject_alias(false),
-          db_name(default_db), schema(schema) {}
+    Analysis(const std::string &default_db, const SchemaInfo &schema,
+             const std::unique_ptr<AES_KEY> &master_key,
+             SECURITY_RATING default_sec_rating)
+        : pos(0), inject_alias(false), db_name(default_db),
+          schema(schema), master_key(master_key),
+          default_sec_rating(default_sec_rating) {}
+    Analysis(const Analysis &analysis)
+        : pos(0), inject_alias(false), db_name(analysis.getDatabaseName()),
+          schema(const_cast<Analysis &>(analysis).getSchema()),
+          master_key(analysis.getMasterKey()),
+          default_sec_rating(analysis.getDefaultSecurityRating()) {}
 
     unsigned int pos; // > a counter indicating how many projection
                       // fields have been analyzed so far
@@ -296,6 +302,9 @@ public:
     std::vector<std::unique_ptr<Delta> > deltas;
 
     std::string getDatabaseName() const {return db_name;}
+    const std::unique_ptr<AES_KEY> &getMasterKey() const {return master_key;}
+    SECURITY_RATING getDefaultSecurityRating() const
+        {return default_sec_rating;}
 
     // access to isAlias(...)
     friend class MultiDeleteHandler;
@@ -303,6 +312,8 @@ public:
 private:
     const std::string db_name;
     const SchemaInfo &schema;
+    const std::unique_ptr<AES_KEY> &master_key;
+    const SECURITY_RATING default_sec_rating;
 
     bool isAlias(const std::string &db,
                  const std::string &table) const;

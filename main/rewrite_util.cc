@@ -411,8 +411,7 @@ isUnique(const std::string &name,
 }
 
 List<Create_field>
-createAndRewriteField(Analysis &a, const ProxyState &ps,
-                      Create_field * const cf,
+createAndRewriteField(Analysis &a, Create_field * const cf,
                       TableMeta *const tm, bool new_table,
                       const std::vector<std::tuple<std::vector<std::string>,
                                         Key::Keytype> >
@@ -424,8 +423,9 @@ createAndRewriteField(Analysis &a, const ProxyState &ps,
 
     const std::string &name = std::string(cf->field_name);
     std::unique_ptr<FieldMeta>
-        fm(new FieldMeta(*cf, ps.getMasterKey().get(), ps.defaultSecurityRating(),
-                         tm->leaseCount(), isUnique(name, key_data)));
+        fm(new FieldMeta(*cf, a.getMasterKey().get(),
+                         a.getDefaultSecurityRating(), tm->leaseCount(),
+                         isUnique(name, key_data)));
 
     // -----------------------------
     //         Rewrite FIELD
@@ -586,8 +586,10 @@ queryPreamble(const ProxyState &ps, const std::string &q,
         schema_cache->getSchema(ps.getConn(), ps.getEConn());
 
     *qr = std::unique_ptr<QueryRewrite>(
-            new QueryRewrite(Rewriter::rewrite(ps, q, *schema.get(),
-                                               default_db)));
+            new QueryRewrite(
+                Rewriter::rewrite(q, *schema.get(), default_db,
+                                  ps.getMasterKey(),
+                                  ps.defaultSecurityRating())));
 
     // lockless multithreading HACK: give the caller a reference to his
     // SchemaInfo because the objects may be used in Deltaz

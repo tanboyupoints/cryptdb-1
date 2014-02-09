@@ -13,8 +13,7 @@
 
 class CreateTableHandler : public DDLHandler {
     virtual AbstractQueryExecutor *
-        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
-                         const Preamble &pre) const
+        rewriteAndUpdate(Analysis &a, LEX *lex, const Preamble &pre) const
     {
         assert(a.deltas.size() == 0);
 
@@ -64,9 +63,9 @@ class CreateTableHandler : public DDLHandler {
                 List_iterator<Create_field>(lex->alter_info.create_list);
             new_lex->alter_info.create_list =
                 accumList<Create_field>(it,
-                    [&a, &ps, &tm, &key_data] (List<Create_field> out_list,
-                                               Create_field *const cf) {
-                        return createAndRewriteField(a, ps, cf, tm.get(),
+                    [&a, &tm, &key_data] (List<Create_field> out_list,
+                                          Create_field *const cf) {
+                        return createAndRewriteField(a, cf, tm.get(),
                                                      true, key_data, out_list);
                 });
 
@@ -126,8 +125,7 @@ class CreateTableHandler : public DDLHandler {
 //      Records: 0  Duplicates: 0  Warnings: 0
 class AlterTableHandler : public DDLHandler {
     virtual AbstractQueryExecutor *
-        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
-                         const Preamble &pre) const
+        rewriteAndUpdate(Analysis &a, LEX *lex, const Preamble &pre) const
     {
         assert(a.deltas.size() == 0);
 
@@ -141,7 +139,7 @@ class AlterTableHandler : public DDLHandler {
         LEX *new_lex = copyWithTHD(lex);
 
         for (auto it : handlers) {
-            new_lex = it->transformLex(a, new_lex, ps);
+            new_lex = it->transformLex(a, new_lex);
         }
 
         // -----------------------------
@@ -163,18 +161,17 @@ public:
 
 class DropTableHandler : public DDLHandler {
     virtual AbstractQueryExecutor *
-        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
-                         const Preamble &pre) const
+        rewriteAndUpdate(Analysis &a, LEX *lex, const Preamble &pre) const
     {
         assert(a.deltas.size() == 0);
 
-        LEX *const final_lex = rewrite(a, lex, ps);
-        update(a, lex, ps);
+        LEX *const final_lex = rewrite(a, lex);
+        update(a, lex);
 
         return new DDLQueryExecutor(*lex, *final_lex, std::move(a.deltas));
     }
     
-    LEX *rewrite(Analysis &a, LEX *lex, const ProxyState &ps) const
+    LEX *rewrite(Analysis &a, LEX *lex) const
     {
         LEX *const new_lex = copyWithTHD(lex);
         new_lex->select_lex.table_list =
@@ -183,7 +180,7 @@ class DropTableHandler : public DDLHandler {
         return new_lex;
     }
 
-    void update(Analysis &a, LEX *lex, const ProxyState &ps) const
+    void update(Analysis &a, LEX *lex) const
     {
         TABLE_LIST *tbl = lex->select_lex.table_list.first;
         for (; tbl; tbl = tbl->next_local) {
@@ -207,8 +204,8 @@ class DropTableHandler : public DDLHandler {
 
 class CreateDBHandler : public DDLHandler {
     virtual AbstractQueryExecutor *
-        rewriteAndUpdate(Analysis &a, LEX *const lex, const ProxyState &ps,
-                         const Preamble &pre) const
+        rewriteAndUpdate(Analysis &a, LEX *const lex, const Preamble &pre)
+            const
     {
         assert(a.deltas.size() == 0);
 
@@ -233,8 +230,8 @@ class CreateDBHandler : public DDLHandler {
 
 class ChangeDBHandler : public DDLHandler {
     virtual AbstractQueryExecutor *
-        rewriteAndUpdate(Analysis &a, LEX *const lex, const ProxyState &ps,
-                         const Preamble &pre) const
+        rewriteAndUpdate(Analysis &a, LEX *const lex, const Preamble &pre)
+            const
     {
         assert(a.deltas.size() == 0);
         // FIXME: optimize so we don't do extra ddl queries
@@ -245,8 +242,8 @@ class ChangeDBHandler : public DDLHandler {
 
 class DropDBHandler : public DDLHandler {
     virtual AbstractQueryExecutor *
-        rewriteAndUpdate(Analysis &a, LEX *const lex, const ProxyState &ps,
-                         const Preamble &pre) const
+        rewriteAndUpdate(Analysis &a, LEX *const lex, const Preamble &pre)
+            const
     {
         assert(a.deltas.size() == 0);
 
@@ -262,8 +259,8 @@ class DropDBHandler : public DDLHandler {
 
 class LockTablesHandler : public DDLHandler {
     virtual AbstractQueryExecutor *
-        rewriteAndUpdate(Analysis &a, LEX *const lex, const ProxyState &ps,
-                         const Preamble &pre) const
+        rewriteAndUpdate(Analysis &a, LEX *const lex, const Preamble &pre)
+            const
     {
         assert(a.deltas.size() == 0);
 
@@ -277,8 +274,8 @@ class LockTablesHandler : public DDLHandler {
 
 class CreateIndexHandler : public DDLHandler {
     virtual AbstractQueryExecutor *
-        rewriteAndUpdate(Analysis &a, LEX *const lex, const ProxyState &ps,
-                         const Preamble &pre) const
+        rewriteAndUpdate(Analysis &a, LEX *const lex, const Preamble &pre)
+            const
     {
         assert(a.deltas.size() == 0);
 
@@ -306,7 +303,7 @@ empty_if_null(const char *const p)
 }
 
 AbstractQueryExecutor *DDLHandler::
-transformLex(Analysis &a, LEX *lex, const ProxyState &ps) const
+transformLex(Analysis &a, LEX *lex) const
 {
     assert(a.deltas.size() == 0);
 
@@ -321,7 +318,7 @@ transformLex(Analysis &a, LEX *lex, const ProxyState &ps) const
     }
 
     auto executor =
-        this->rewriteAndUpdate(a, lex, ps, Preamble(db.get(), table.get()));
+        this->rewriteAndUpdate(a, lex, Preamble(db.get(), table.get()));
 
     assert(a.deltas.size() == 0);
 
@@ -371,7 +368,7 @@ next(const ResType &res, NextParams &nparams)
 
             {
                 uint64_t embedded_completion_id;
-                deltaOutputBeforeQuery(nparams.e_conn, this->original_query,
+                deltaOutputBeforeQuery(nparams.ps.getEConn(), this->original_query,
                                        this->deltas,
                                        CompletionType::DDLCompletion,
                                        &embedded_completion_id);
@@ -403,9 +400,9 @@ next(const ResType &res, NextParams &nparams)
         }
 
         // this is a ddl query so do not put it into a transaction
-        TEST_Sync(nparams.e_conn->execute(this->original_query),
+        TEST_Sync(nparams.ps.getEConn()->execute(this->original_query),
                   "Failed to execute DDL query against embedded database!");
-        deltaOutputAfterQuery(nparams.e_conn, this->deltas,
+        deltaOutputAfterQuery(nparams.ps.getEConn(), this->deltas,
                               this->embedded_completion_id.get());
 
         return CR_RESULTS(this->ddl_res.get());

@@ -31,14 +31,12 @@ private:
 // Abstract base class for command handler.
 class DDLHandler : public SQLHandler {
 public:
-    virtual AbstractQueryExecutor *
-        transformLex(Analysis &analysis, LEX *lex, 
-                     const ProxyState &ps) const;
+    virtual AbstractQueryExecutor *transformLex(Analysis &analysis, LEX *lex)
+        const;
 
 private:
     virtual AbstractQueryExecutor *
-        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
-                         const Preamble &pre) const = 0;
+        rewriteAndUpdate(Analysis &a, LEX *lex, const Preamble &pre) const = 0;
 
 protected:
     DDLHandler() {;}

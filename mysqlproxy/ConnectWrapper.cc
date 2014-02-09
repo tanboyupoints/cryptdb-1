@@ -252,7 +252,7 @@ rewrite(lua_State *const L)
     ProxyState *const ps = thread_ps = c_wrapper->ps.get();
     assert(ps);
 
-    const std::string query = xlua_tolstring(L, 2);
+    const std::string &query = xlua_tolstring(L, 2);
     const unsigned long long _thread_id =
         strtoull(xlua_tolstring(L, 3).c_str(), NULL, 10);
 
@@ -262,18 +262,20 @@ rewrite(lua_State *const L)
     t.lap_ms();
     if (EXECUTE_QUERIES) {
         try {
-            SchemaCache &schema_cache = shared_ps->getSchemaCache();
-            std::unique_ptr<QueryRewrite> qr;
             TEST_TextMessageError(retrieveDefaultDatabase(_thread_id,
                                                           ps->getConn(),
                                             &c_wrapper->default_db),
                             "proxy failed to retrieve default database!");
             // save a reference so a second thread won't eat objects
             // that DeltaOuput wants later
-            SchemaInfoRef schema_info_ref;
-            queryPreamble(*ps, query, &qr, &new_queries, &schema_cache,
-                          c_wrapper->default_db, &schema_info_ref);
-            c_wrapper->schema_info_refs.push_back(schema_info_ref);
+            std::shared_ptr<const SchemaInfo> schema = ps->getSchemaInfo();
+            c_wrapper->schema_info_refs.push_back(schema);
+
+            std::unique_ptr<QueryRewrite> qr =
+                std::unique_ptr<QueryRewrite>(new QueryRewrite(
+                    Rewriter::rewrite(query, *schema.get(),
+                                      c_wrapper->default_db, ps->getMasterKey(),
+                                      ps->defaultSecurityRating())));
             assert(qr);
 
             c_wrapper->setQueryRewrite(std::move(qr));
@@ -286,7 +288,6 @@ rewrite(lua_State *const L)
             xlua_pushlstring(L, e.to_string());     // error message
             return 2;
         } catch (const CryptDBError &e) {
-            LOG(wrapper) << "cannot rewrite " << query << ": " << e.msg;
             lua_pushboolean(L, false);              // status
             xlua_pushlstring(L, e.msg);             // error message
             return 2;

@@ -573,7 +573,7 @@ lowLevelGetCurrentStaleness(const std::unique_ptr<Connect> &e_conn,
 
 std::shared_ptr<const SchemaInfo>
 SchemaCache::getSchema(const std::unique_ptr<Connect> &conn,
-                       const std::unique_ptr<Connect> &e_conn)
+                       const std::unique_ptr<Connect> &e_conn) const
 {
     if (true == this->no_loads) {
         // Use this cleanup if we can't maintain consistent states.
@@ -610,7 +610,7 @@ lowLevelAllStale(const std::unique_ptr<Connect> &e_conn)
 
 void
 SchemaCache::updateStaleness(const std::unique_ptr<Connect> &e_conn,
-                             bool staleness)
+                             bool staleness) const
 {
     if (true == staleness) {
         // Make everyone stale.
@@ -622,7 +622,7 @@ SchemaCache::updateStaleness(const std::unique_ptr<Connect> &e_conn,
 }
 
 bool
-SchemaCache::initialStaleness(const std::unique_ptr<Connect> &e_conn)
+SchemaCache::initialStaleness(const std::unique_ptr<Connect> &e_conn) const
 {
     const std::string seed_staleness =
         " INSERT INTO " + MetaData::Table::staleness() +
@@ -634,7 +634,7 @@ SchemaCache::initialStaleness(const std::unique_ptr<Connect> &e_conn)
 }
 
 bool
-SchemaCache::cleanupStaleness(const std::unique_ptr<Connect> &e_conn)
+SchemaCache::cleanupStaleness(const std::unique_ptr<Connect> &e_conn) const
 {
     const std::string remove_staleness =
         " DELETE FROM " + MetaData::Table::staleness() +
@@ -658,12 +658,14 @@ lowLevelToggleCurrentStaleness(const std::unique_ptr<Connect> &e_conn,
 
 void
 SchemaCache::lowLevelCurrentStale(const std::unique_ptr<Connect> &e_conn)
+    const
 {
     lowLevelToggleCurrentStaleness(e_conn, this->id, true);
 }
 
 void
 SchemaCache::lowLevelCurrentUnstale(const std::unique_ptr<Connect> &e_conn)
+    const
 {
     lowLevelToggleCurrentStaleness(e_conn, this->id, false);
 }

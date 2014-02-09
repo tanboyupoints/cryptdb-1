@@ -944,9 +944,7 @@ static class ANON : public CItemSubtypeIT<Item_subselect,
         const std::string why = "subselect";
 
         // create an Analysis object for subquery gathering/rewriting
-        std::unique_ptr<Analysis>
-            subquery_analysis(new Analysis(a.getDatabaseName(),
-                                           a.getSchema()));
+        std::unique_ptr<Analysis> subquery_analysis(new Analysis(a));
         // aliases should be available to the subquery as well
         subquery_analysis->table_aliases = a.table_aliases;
 
@@ -1265,8 +1263,7 @@ const std::unique_ptr<SQLDispatcher> Rewriter::ddl_dispatcher =
 
 // NOTE : This will probably choke on multidatabase queries.
 AbstractQueryExecutor *
-Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
-                        const std::string &query)
+Rewriter::dispatchOnLex(Analysis &a, const std::string &query)
 {
     std::unique_ptr<query_parse> p;
     try {
@@ -1296,7 +1293,7 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         AssignOnce<AbstractQueryExecutor *> executor;
 
         try {
-            executor = handler.transformLex(a, lex, ps);
+            executor = handler.transformLex(a, lex);
         } catch (OnionAdjustExcept e) {
             LOG(cdb_v) << "caught onion adjustment";
             std::cout << GREEN_BEGIN << "Adjusting onion!" << COLOR_END
@@ -1305,22 +1302,17 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
             std::pair<std::vector<std::unique_ptr<Delta> >,
                       std::list<std::string> >
                 out_data = adjustOnion(a, e.o, e.tm, e.fm, e.tolevel);
-            std::vector<std::unique_ptr<Delta> > &deltas =
-                out_data.first;
-            const std::list<std::string> &adjust_queries =
-                out_data.second;
+            std::vector<std::unique_ptr<Delta> > &deltas = out_data.first;
+            const std::list<std::string> &adjust_queries = out_data.second;
 
-            return new OnionAdjustmentExecutor(ps.getEConn(), query,
-                                               std::move(deltas),
-                                               ps,
+            return new OnionAdjustmentExecutor(query, std::move(deltas),
                                                adjust_queries);
         }
 
         return executor.get();
     } else if (ddl_dispatcher->canDo(lex)) {
         const SQLHandler &handler = ddl_dispatcher->dispatch(lex);
-        AbstractQueryExecutor *const executor =
-            handler.transformLex(a, lex, ps);
+        AbstractQueryExecutor *const executor = handler.transformLex(a, lex);
         /*
         // FIXME: put HACK back
         const std::string &original_query =
@@ -1330,22 +1322,24 @@ Rewriter::dispatchOnLex(Analysis &a, const ProxyState &ps,
         return executor;
     }
 
-    assert(false);
+    return NULL;
 }
 
 QueryRewrite
-Rewriter::rewrite(const ProxyState &ps, const std::string &q,
-                  SchemaInfo const &schema, const std::string &default_db)
+Rewriter::rewrite(const std::string &q, SchemaInfo const &schema,
+                  const std::string &default_db,
+                  const std::unique_ptr<AES_KEY> &master_key,
+                  SECURITY_RATING default_sec_rating)
 {
     LOG(cdb_v) << "q " << q;
     assert(0 == mysql_thread_init());
 
-    Analysis analysis(default_db, schema);
+    Analysis analysis(default_db, schema, master_key, default_sec_rating);
 
     // NOTE: Care what data you try to read from Analysis
     // at this height.
     AbstractQueryExecutor *const executor =
-        Rewriter::dispatchOnLex(analysis, ps, q);
+        Rewriter::dispatchOnLex(analysis, q);
     if (!executor) {
         return QueryRewrite(true, analysis.rmeta, noopExecutor());
     }
@@ -1567,8 +1561,8 @@ next(const ResType &res, NextParams &nparams)
 
             {
                 uint64_t embedded_completion_id;
-                deltaOutputBeforeQuery(nparams.e_conn, this->original_query,
-                                       this->deltas,
+                deltaOutputBeforeQuery(nparams.ps.getEConn(),
+                                       this->original_query, this->deltas,
                                        CompletionType::AdjustOnionCompletion,
                                        &embedded_completion_id);
                 this->embedded_completion_id = embedded_completion_id;
@@ -1603,21 +1597,19 @@ next(const ResType &res, NextParams &nparams)
                                                      : no_op));
         }
 
-        deltaOutputAfterQuery(nparams.e_conn, this->deltas,
+        deltaOutputAfterQuery(nparams.ps.getEConn(), this->deltas,
                               this->embedded_completion_id.get());
         if (true == this->in_trx.get()) {
             throw ErrorPacketException("proxy did rollback", 1213, "40001");
         }
 
-        {
-            std::shared_ptr<const SchemaInfo> schema =
-                const_cast<ProxyState &>(this->ps).getSchemaInfo();
-            this->reissue_query_rewrite =
-                new QueryRewrite(Rewriter::rewrite(this->ps,
-                                                   this->original_query,
-                                                   *schema.get(),
-                                                   nparams.default_db));
-        }
+        // FIXME: handle onion adjustment
+        // hold on to the reference for the SchemaInfo
+        this->reissue_query_rewrite = new QueryRewrite(
+            Rewriter::rewrite(
+                this->original_query, *nparams.ps.getSchemaInfo().get(),
+                nparams.default_db, nparams.ps.getMasterKey(),
+                nparams.ps.defaultSecurityRating()));
         while (true) {
             yield {
                 auto result =

@@ -59,10 +59,10 @@ bool_to_string(bool b);
 bool string_to_bool(const std::string &s);
 
 List<Create_field>
-createAndRewriteField(Analysis &a, const ProxyState &ps,
-                      Create_field * const cf,
+createAndRewriteField(Analysis &a, Create_field * const cf,
                       TableMeta *const tm, bool new_table,
-                      const std::vector<std::tuple<std::vector<std::string>, Key::Keytype> >
+                      const std::vector<std::tuple<std::vector<std::string>,
+                                        Key::Keytype> >
                           &key_data,
                       List<Create_field> &rewritten_cfield_list);
 

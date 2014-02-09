@@ -10,13 +10,11 @@
 class AlterSubHandler {
 public:
     virtual LEX *
-        transformLex(Analysis &a, LEX *lex,
-                     const ProxyState &ps) const;
+        transformLex(Analysis &a, LEX *lex) const;
     virtual ~AlterSubHandler() {;}
 
 private:
     virtual LEX *rewriteAndUpdate(Analysis &a, LEX *lex,
-                                  const ProxyState &ps,
                                   const Preamble &preamble) const = 0;
 
 protected:

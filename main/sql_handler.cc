@@ -11,12 +11,13 @@ genericPreamble(bool staleness, NextParams &nparams)
     // We handle before any queries because a failed query
     // may stale the database during recovery and then
     // we'd have to handle there as well.
-    nparams.schema_cache->updateStaleness(nparams.e_conn, staleness);
+    nparams.ps.getSchemaCache().updateStaleness(nparams.ps.getEConn(),
+                                                staleness);
 
     // FIXME: add flag so we only set this if the query actually needs the
     // embedded database
     TEST_TextMessageError(
-        lowLevelSetCurrentDatabase(nparams.e_conn, nparams.default_db),
+        lowLevelSetCurrentDatabase(nparams.ps.getEConn(), nparams.default_db),
         "failed to set the embedded database to " + nparams.default_db + ";"
         " your client may be in an unrecoverable bad loop"
         " so consider restarting just the _client_. this can happen"

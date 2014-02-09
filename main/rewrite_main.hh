@@ -72,17 +72,18 @@ class Rewriter {
     ~Rewriter();
 
 public:
-
     static QueryRewrite
-        rewrite(const ProxyState &ps, const std::string &q,
-                SchemaInfo const &schema, const std::string &default_db);
+        rewrite(const std::string &q, SchemaInfo const &schema,
+                const std::string &default_db,
+                const std::unique_ptr<AES_KEY> &master_key,
+                SECURITY_RATING default_sec_rating);
+
     static ResType
         decryptResults(const ResType &dbres, const ReturnMeta &rm);
 
 private:
     static AbstractQueryExecutor *
-        dispatchOnLex(Analysis &a, const ProxyState &ps,
-                      const std::string &query);
+        dispatchOnLex(Analysis &a, const std::string &query);
 
     static const bool translator_dummy;
     static const std::unique_ptr<SQLDispatcher> dml_dispatcher;
@@ -338,27 +339,23 @@ private:
 };
 
 class OnionAdjustmentExecutor : public AbstractQueryExecutor {
-    const std::unique_ptr<Connect> &e_conn;
     const std::string original_query;
     const std::vector<std::unique_ptr<Delta> > deltas;
-    const ProxyState &ps;
     const std::list<std::string> adjust_queries;
 
     // coroutine state
     bool first_reissue;
+    AssignOnce<std::shared_ptr<const SchemaInfo> > reissue_schema;
     AssignOnce<uint64_t> embedded_completion_id;
     AssignOnce<bool> in_trx;
     QueryRewrite *reissue_query_rewrite;
 
 public:
-    OnionAdjustmentExecutor(const std::unique_ptr<Connect> &e_conn,
-                            const std::string &original_query,
+    OnionAdjustmentExecutor(const std::string &original_query,
                             std::vector<std::unique_ptr<Delta> > &&deltas,
-                            const ProxyState &ps,
                             const std::list<std::string> &adjust_queries)
-        : e_conn(e_conn), original_query(original_query),
-          deltas(std::move(deltas)), ps(ps), adjust_queries(adjust_queries),
-          first_reissue(true) {}
+        : original_query(original_query), deltas(std::move(deltas)),
+          adjust_queries(adjust_queries), first_reissue(true) {}
 
     std::pair<ResultType, AbstractAnything *>
         next(const ResType &res, NextParams &nparams);

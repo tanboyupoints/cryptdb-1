@@ -51,17 +51,11 @@ newAnything(const Type &t)
 }
 
 struct NextParams {
-    SchemaCache *const schema_cache;
+    const ProxyState &ps;
     const std::string &default_db;
-    const std::unique_ptr<Connect> &e_conn;
-    const std::unique_ptr<Connect> &conn;
 
     NextParams(ProxyState &ps, const std::string &default_db)
-        : schema_cache(&ps.getSchemaCache()), default_db(default_db),
-          e_conn(ps.getEConn()), conn(ps.getConn())
-    {
-        assert(this->schema_cache && this->e_conn && this->conn);
-    }
+        : ps(ps), default_db(default_db) {}
 };
 
 class AbstractQueryExecutor {
@@ -100,8 +94,7 @@ noopExecutor()
 class SQLHandler {
 public:
     SQLHandler() {;}
-    virtual AbstractQueryExecutor *
-        transformLex(Analysis &a, LEX *lex, const ProxyState &ps)
+    virtual AbstractQueryExecutor * transformLex(Analysis &a, LEX *lex)
         const = 0;
     virtual ~SQLHandler() {;}
 };

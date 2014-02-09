@@ -12,8 +12,8 @@
 
 class AddColumnSubHandler : public AlterSubHandler {
     virtual LEX *
-        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
-                         const Preamble &preamble) const
+        rewriteAndUpdate(Analysis &a, LEX *lex, const Preamble &preamble)
+            const
     {
         TableMeta &tm = a.getTableMeta(preamble.dbname, preamble.table);
 
@@ -26,11 +26,11 @@ class AddColumnSubHandler : public AlterSubHandler {
             List_iterator<Create_field>(lex->alter_info.create_list);
         lex->alter_info.create_list =
             accumList<Create_field>(add_it,
-                [&a, &ps, &tm, &key_data] (List<Create_field> out_list,
-                                           Create_field *cf)
+                [&a, &tm, &key_data] (List<Create_field> out_list,
+                                      Create_field *cf)
             {
-                    return createAndRewriteField(a, ps, cf, &tm,
-                                                 false, key_data, out_list);
+                    return createAndRewriteField(a, cf, &tm, false, key_data,
+                                                 out_list);
             });
 
         return lex;
@@ -39,8 +39,8 @@ class AddColumnSubHandler : public AlterSubHandler {
 
 class DropColumnSubHandler : public AlterSubHandler {
     virtual LEX *
-        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
-                         const Preamble &preamble) const
+        rewriteAndUpdate(Analysis &a, LEX *lex, const Preamble &preamble)
+            const
     {
         // Get the column drops.
         auto drop_it =
@@ -100,8 +100,8 @@ class DropColumnSubHandler : public AlterSubHandler {
 
 class ChangeColumnSubHandler : public AlterSubHandler {
     virtual LEX *
-        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
-                         const Preamble &preamble) const
+        rewriteAndUpdate(Analysis &a, LEX *lex, const Preamble &preamble)
+            const
     {
         FAIL_TextMessageError("implement ChangeColumnSubHandler");
     }
@@ -109,8 +109,8 @@ class ChangeColumnSubHandler : public AlterSubHandler {
 
 class ForeignKeySubHandler : public AlterSubHandler {
     virtual LEX *
-        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
-                         const Preamble &preamble) const
+        rewriteAndUpdate(Analysis &a, LEX *lex, const Preamble &preamble)
+            const
     {
         FAIL_TextMessageError("implement ForeignKeySubHandler");
     }
@@ -118,8 +118,8 @@ class ForeignKeySubHandler : public AlterSubHandler {
 
 class AddIndexSubHandler : public AlterSubHandler {
     virtual LEX *
-        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
-                         const Preamble &preamble) const
+        rewriteAndUpdate(Analysis &a, LEX *lex, const Preamble &preamble)
+            const
     {
         TableMeta const &tm =
             a.getTableMeta(preamble.dbname, preamble.table);
@@ -132,8 +132,8 @@ class AddIndexSubHandler : public AlterSubHandler {
 
 class DropIndexSubHandler : public AlterSubHandler {
     virtual LEX *
-        rewriteAndUpdate(Analysis &a, LEX *lex, const ProxyState &ps,
-                         const Preamble &preamble) const
+        rewriteAndUpdate(Analysis &a, LEX *lex, const Preamble &preamble)
+            const
     {
         TableMeta const &tm =
             a.getTableMeta(preamble.dbname, preamble.table);
@@ -199,7 +199,7 @@ class DropIndexSubHandler : public AlterSubHandler {
 
 class DisableOrEnableKeys : public AlterSubHandler {
     virtual LEX *
-        rewriteAndUpdate(Analysis &a, LEX *const lex, const ProxyState &ps,
+        rewriteAndUpdate(Analysis &a, LEX *const lex,
                          const Preamble &preamble) const
     {
         return lex;
@@ -207,13 +207,13 @@ class DisableOrEnableKeys : public AlterSubHandler {
 };
 
 LEX *AlterSubHandler::
-transformLex(Analysis &a, LEX *const lex, const ProxyState &ps) const
+transformLex(Analysis &a, LEX *const lex) const
 {
     const std::string &db = lex->select_lex.table_list.first->db;
     TEST_DatabaseDiscrepancy(db, a.getDatabaseName());
     const Preamble preamble(db,
                             lex->select_lex.table_list.first->table_name);
-    return this->rewriteAndUpdate(a, lex, ps, preamble);
+    return this->rewriteAndUpdate(a, lex, preamble);
 }
 
 AlterDispatcher *buildAlterSubDispatcher() {

@@ -26,11 +26,9 @@ public:
     SpecialUpdateExecutor(const std::string &original_query,
                           const std::string &plain_table,
                           const std::string &crypted_table,
-                          const std::string &where_clause,
-                          const ProxyState &ps)     // FIXME: remove with rewrite
+                          const std::string &where_clause)
         : original_query(original_query), plain_table(plain_table),
-          crypted_table(crypted_table), where_clause(where_clause),
-          ps(ps) {}
+          crypted_table(crypted_table), where_clause(where_clause) {}
     ~SpecialUpdateExecutor() {}
     std::pair<ResultType, AbstractAnything *>
         next(const ResType &res, NextParams &nparams);
@@ -40,7 +38,6 @@ private:
     const std::string plain_table;
     const std::string crypted_table;
     const std::string where_clause;
-    const ProxyState &ps;               // FIXME: eliminate after rewrite
 
     AssignOnce<ResType> dec_res;
     AssignOnce<DBResult *> original_query_dbres;
@@ -93,15 +90,11 @@ public:
 class DMLHandler : public SQLHandler {
 public:
     virtual AbstractQueryExecutor *
-        transformLex(Analysis &a, LEX *lex,
-                     const ProxyState &ps) const;
+        transformLex(Analysis &a, LEX *lex) const;
 
 private:
-    virtual void gather(Analysis &a, LEX *lex, const ProxyState &ps)
-        const = 0;
-    virtual AbstractQueryExecutor *
-        rewrite(Analysis &a, LEX *lex, const ProxyState &ps)
-        const = 0;
+    virtual void gather(Analysis &a, LEX *lex) const = 0;
+    virtual AbstractQueryExecutor * rewrite(Analysis &a, LEX *lex) const = 0;
 
 protected:
     DMLHandler() {;}
