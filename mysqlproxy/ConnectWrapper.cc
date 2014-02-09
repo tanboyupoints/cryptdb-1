@@ -411,7 +411,7 @@ next(lua_State *const L)
     const ResType &res = getResTypeFromLuaTable(L, 2, 3, 4, 5);
     const std::unique_ptr<QueryRewrite> &qr = c_wrapper->getQueryRewrite();
     try {
-        NextParams nparams(*ps, c_wrapper->default_db);
+        NextParams nparams(*ps, c_wrapper->default_db, c_wrapper->last_query);
         auto new_results = qr->executor->next(res, nparams);
         const auto &result_type = std::get<0>(new_results);
         switch (result_type) {
@@ -436,7 +436,10 @@ next(lua_State *const L)
             // the results of executing this query should be send directly
             // back to the client
             xlua_pushlstring(L, "query-results");
-            xlua_pushlstring(L, std::get<1>(new_results)->extract<std::string>());
+            const auto &output =
+                std::get<1>(new_results)->extract<std::pair<bool, std::string> >();
+
+            xlua_pushlstring(L, output.second);
             nilBuffer(L, 3);
             return 5;
         }

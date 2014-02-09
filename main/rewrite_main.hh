@@ -349,6 +349,7 @@ class OnionAdjustmentExecutor : public AbstractQueryExecutor {
     AssignOnce<uint64_t> embedded_completion_id;
     AssignOnce<bool> in_trx;
     QueryRewrite *reissue_query_rewrite;
+    AssignOnce<NextParams> reissue_nparams;
 
 public:
     OnionAdjustmentExecutor(const std::string &original_query,
@@ -358,5 +359,5 @@ public:
           adjust_queries(adjust_queries), first_reissue(true) {}
 
     std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, NextParams &nparams);
+        next(const ResType &res, const NextParams &nparams);
 };

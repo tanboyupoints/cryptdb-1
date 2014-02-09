@@ -14,7 +14,7 @@ public:
         : query(lexToQuery(lex)), rmeta(rmeta) {}
     ~DMLQueryExecutor() {}
     std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, NextParams &nparams);
+        next(const ResType &res, const NextParams &nparams);
 
 private:
     const std::string query;
@@ -31,7 +31,7 @@ public:
           crypted_table(crypted_table), where_clause(where_clause) {}
     ~SpecialUpdateExecutor() {}
     std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, NextParams &nparams);
+        next(const ResType &res, const NextParams &nparams);
 
 private:
     const std::string original_query;
@@ -54,7 +54,7 @@ public:
     ~ShowDirectiveExecutor() {}
 
     std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, NextParams &nparams);
+        next(const ResType &res, const NextParams &nparams);
 
 
 private:
@@ -83,7 +83,7 @@ public:
     ~SensitiveDirectiveExecutor() {}
 
     std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, NextParams &nparams);
+        next(const ResType &res, const NextParams &nparams);
 };
 
 // Abstract base class for query handler.

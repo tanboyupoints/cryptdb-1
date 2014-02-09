@@ -6,7 +6,7 @@ AbstractAnything::~AbstractAnything() {}
 AbstractQueryExecutor::~AbstractQueryExecutor() {}
 
 void AbstractQueryExecutor::
-genericPreamble(bool staleness, NextParams &nparams)
+genericPreamble(bool staleness, const NextParams &nparams)
 {
     // We handle before any queries because a failed query
     // may stale the database during recovery and then
@@ -28,12 +28,12 @@ genericPreamble(bool staleness, NextParams &nparams)
 }
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *> SimpleExecutor::
-next(const ResType &res, NextParams &nparams)
+next(const ResType &res, const NextParams &nparams)
 {
     reenter(this->corot) {
         genericPreamble(false, nparams);
 
-        yield return CR_QUERY_RESULTS(this->query);
+        yield return CR_QUERY_RESULTS(nparams.original_query);
     }
 
     assert(false);

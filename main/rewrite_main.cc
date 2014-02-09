@@ -1550,7 +1550,7 @@ OnionMetaAdjustor::pullCopyLayers(OnionMeta const &om)
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 OnionAdjustmentExecutor::
-next(const ResType &res, NextParams &nparams)
+next(const ResType &res, const NextParams &nparams)
 {
     reenter(this->corot) {
         yield {
@@ -1618,25 +1618,26 @@ next(const ResType &res, NextParams &nparams)
                                           this->embedded_completion_id.get()),
                     "deltaOutputAfterQuery failed for onion adjustment");
 
-        // use the ROLLBACK error code
+        // if the client was in the middle of a transaction we must alert
+        // him that we had to rollback his queries
         if (true == this->in_trx.get()) {
-            throw ErrorPacketException("proxy did rollback", 1213, "40001");
+            ROLLBACK_ERROR_PACKET
         }
 
-        // FIXME: handle onion adjustment
-        // hold on to the reference for the SchemaInfo
         this->reissue_query_rewrite = new QueryRewrite(
             Rewriter::rewrite(
                 this->original_query, *nparams.ps.getSchemaInfo().get(),
                 nparams.default_db, nparams.ps.getMasterKey(),
                 nparams.ps.defaultSecurityRating()));
+        this->reissue_nparams =
+            NextParams(nparams.ps, nparams.default_db, nparams.original_query);
         while (true) {
             yield {
                 auto result =
                     this->reissue_query_rewrite->executor->next(
                         first_reissue ? ResType(true, 0, 0)
                                       : res,
-                        nparams);
+                        reissue_nparams.get());
                 this->first_reissue = false;
                 return result;
             }

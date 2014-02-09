@@ -3,9 +3,6 @@
 #include <main/rewrite_ds.hh>
 #include <main/error.hh>
 
-#define S(chars)            \
-    std::string((chars))
-
 #define TYPENAME(value)                                         \
     std::string typeName() const {return (value);}              \
     static std::string instanceTypeName() {return (value);}
@@ -165,3 +162,8 @@ testDatabaseNotFound(const std::string &file_name,
     }                                                                   \
 }
 
+#define ROLLBACK_ERROR_PACKET                                               \
+{                                                                           \
+    throw ErrorPacketException(__FILE__, __LINE__, "proxy did rollback",    \
+                               1213, "40001");                              \
+}

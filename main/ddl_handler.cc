@@ -360,7 +360,7 @@ SQLDispatcher *buildDDLDispatcher()
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 DDLQueryExecutor::
-next(const ResType &res, NextParams &nparams)
+next(const ResType &res, const NextParams &nparams)
 {
     reenter(this->corot) {
         yield {

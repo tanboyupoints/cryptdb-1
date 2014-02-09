@@ -17,7 +17,7 @@ public:
           new_query(lexToQuery(new_lex)), deltas(std::move(deltas)) {}
     ~DDLQueryExecutor() {}
     std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, NextParams &nparams);
+        next(const ResType &res, const NextParams &nparams);
 
 private:
     const std::string original_query;

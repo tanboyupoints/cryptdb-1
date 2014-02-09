@@ -1182,7 +1182,7 @@ SQLDispatcher *buildDMLDispatcher()
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 DMLQueryExecutor::
-next(const ResType &res, NextParams &nparams)
+next(const ResType &res, const NextParams &nparams)
 {
     reenter(this->corot) {
         yield {
@@ -1216,7 +1216,7 @@ rewriteAndGetFirstQuery(const std::string &query, NextParams nparams)
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 SpecialUpdateExecutor::
-next(const ResType &res, NextParams &nparams)
+next(const ResType &res, const NextParams &nparams)
 {
     // FIXME: implement and remove the CALL later on
     /*
@@ -1405,7 +1405,7 @@ next(const ResType &res, NextParams &nparams)
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 ShowDirectiveExecutor::
-next(const ResType &res, NextParams &nparams)
+next(const ResType &res, const NextParams &nparams)
 {
     reenter(this->corot) {
         yield {
@@ -1497,7 +1497,7 @@ getAllShowDirectiveEntries(const std::unique_ptr<Connect> &e_conn,
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 SensitiveDirectiveExecutor::
-next(const ResType &res, NextParams &nparams)
+next(const ResType &res, const NextParams &nparams)
 {
     reenter(this->corot) {
         yield {
@@ -1513,8 +1513,7 @@ next(const ResType &res, NextParams &nparams)
             SYNC_IF_FALSE(nparams.ps.getEConn()->execute("COMMIT"),
                           nparams.ps.getEConn());
 
-            const std::string &no_op = "do 0;";
-            return CR_QUERY_RESULTS(std::make_pair(true, no_op));
+            return CR_QUERY_RESULTS("DO 0;");
         }
     }
 

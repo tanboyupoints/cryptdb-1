@@ -11,9 +11,9 @@
     std::make_pair(AbstractQueryExecutor::ResultType::QUERY_COME_AGAIN,     \
                    newAnything(std::make_pair(true, std::string(query))))
 
-#define CR_QUERY_RESULTS(value)                                             \
+#define CR_QUERY_RESULTS(query)                                             \
     std::make_pair(AbstractQueryExecutor::ResultType::QUERY_USE_RESULTS,    \
-                   newAnything(value))
+                   newAnything(std::make_pair(true, std::string(query))))
 
 #define CR_RESULTS(value)                                                   \
     std::make_pair(AbstractQueryExecutor::ResultType::RESULTS,              \
@@ -53,9 +53,11 @@ newAnything(const Type &t)
 struct NextParams {
     const ProxyState &ps;
     const std::string &default_db;
+    const std::string original_query;
 
-    NextParams(ProxyState &ps, const std::string &default_db)
-        : ps(ps), default_db(default_db) {}
+    NextParams(const ProxyState &ps, const std::string &default_db,
+               const std::string &original_query)
+        : ps(ps), default_db(default_db), original_query(original_query) {}
 };
 
 class AbstractQueryExecutor {
@@ -68,9 +70,9 @@ public:
     AbstractQueryExecutor() {}
     virtual ~AbstractQueryExecutor();
     virtual std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, NextParams &nparams) = 0;
+        next(const ResType &res, const NextParams &nparams) = 0;
 
-    static void genericPreamble(bool staleness, NextParams &nparams);
+    static void genericPreamble(bool staleness, const NextParams &nparams);
 };
 
 class SimpleExecutor : public AbstractQueryExecutor {
@@ -82,7 +84,7 @@ public:
     ~SimpleExecutor() {}
 
     std::pair<ResultType, AbstractAnything *>
-        next(const ResType &res, NextParams &nparams);
+        next(const ResType &res, const NextParams &nparams);
 };
 
 inline SimpleExecutor *

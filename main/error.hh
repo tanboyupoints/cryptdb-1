@@ -116,19 +116,28 @@ private:
 };
 
 class ErrorPacketException {
+    const std::string file_name;
+    const uint64_t line_number;
     const std::string msg;
     const unsigned int error_code;
     const std::string sql_state;
 
 public:
-    ErrorPacketException(const std::string &msg, unsigned int error_code,
+    ErrorPacketException(const std::string &file_name, uint64_t line_number,
+                         const std::string &msg, unsigned int error_code,
                          const std::string &sql_state)
-        : msg(msg), error_code(error_code), sql_state(sql_state)
+        : file_name(file_name), line_number(line_number), msg(msg),
+          error_code(error_code), sql_state(sql_state)
     {
         assert(sql_state.length() == 5);
     }
 
-    std::string getMessage() const {return msg;}
+    std::string getMessage() const
+    {
+        return "(" + file_name + ", " + std::to_string(line_number)
+               + ")\n" + msg;
+    }
+
     unsigned int getErrorCode() const {return error_code;}
     std::string getSQLState() const {return sql_state;}
 };
@@ -136,7 +145,8 @@ public:
 #define TEST_GenericPacketException(test, msg)                  \
 {                                                               \
     if (false == (test)) {                                      \
-        throw ErrorPacketException((msg), 0xfff, "fail1");      \
+        throw ErrorPacketException(__FILE__, __LINE__, (msg),   \
+                                   0xfff, "fail1");             \
     }                                                           \
 }
 
