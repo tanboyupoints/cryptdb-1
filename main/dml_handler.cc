@@ -1563,10 +1563,10 @@ nextImpl(const ResType &res, const NextParams &nparams)
                     if (table.second->getAnonTableName()
                         == ItemToString(*it.front())) {
 
-                        const IdentityMetaKey plain_table_name
+                        const IdentityMetaKey &plain_table_name
                             = dm->getKey(*table.second.get());
-                        new_rows.push_back(
-                            std::vector<Item *>{make_item_string(plain_table_name.getValue())});
+                        new_rows.push_back(std::vector<Item *>
+                            {make_item_string(plain_table_name.getValue())});
                     }
                 }
             }

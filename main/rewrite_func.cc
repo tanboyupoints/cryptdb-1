@@ -997,6 +997,23 @@ class CItemMinMax : public CItemSubtypeFN<Item_func_min_max, FN> {
                                   " Item_func_min_max");
         }
 
+        // this monstrosity forces us to lower the DET onion from RND because
+        // we do not handle cases where a projection is not _just_ a field
+        // and requires a salt
+        // > EXCEPT: when we are being called from inside a SUM(...) function
+        //   'summation_hack'
+        FieldMeta *const fm = rp.olk.key;
+        if (fm
+            && false == a.summation_hack
+            && SECLEVEL::RND <= a.getOnionLevel(*fm, oDET)) {
+
+            const DatabaseMeta &dm = a.getDatabaseMeta(a.getDatabaseName());
+            const TableMeta *const tm = dm.getChildWithGChild(*fm);
+            if (tm) {
+                throw OnionAdjustExcept(*tm, *fm, oDET, SECLEVEL::DET);
+            }
+        }
+
         return new Item_func_if(cond.get(),
                                 itemTypes.do_rewrite(*args[0], constr,
                                                 *rp.childr_rp[0].get(),

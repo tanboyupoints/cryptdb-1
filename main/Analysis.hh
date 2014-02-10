@@ -236,12 +236,13 @@ public:
     Analysis(const std::string &default_db, const SchemaInfo &schema,
              const std::unique_ptr<AES_KEY> &master_key,
              SECURITY_RATING default_sec_rating)
-        : pos(0), inject_alias(false), db_name(default_db),
-          schema(schema), master_key(master_key),
+        : pos(0), inject_alias(false), summation_hack(false),
+          db_name(default_db), schema(schema), master_key(master_key),
           default_sec_rating(default_sec_rating) {}
     Analysis(const Analysis &analysis)
-        : pos(0), inject_alias(false), db_name(analysis.getDatabaseName()),
-          schema(analysis.getSchema()), master_key(analysis.getMasterKey()),
+        : pos(0), inject_alias(false), summation_hack(false),
+          db_name(analysis.getDatabaseName()), schema(analysis.getSchema()),
+          master_key(analysis.getMasterKey()),
           default_sec_rating(analysis.getDefaultSecurityRating()) {}
 
     unsigned int pos; // > a counter indicating how many projection
@@ -256,6 +257,7 @@ public:
     ReturnMeta rmeta;
 
     bool inject_alias;
+    bool summation_hack;
 
     // These functions are prefered to their lower level counterparts.
     bool addAlias(const std::string &alias, const std::string &db,

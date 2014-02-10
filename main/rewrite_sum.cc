@@ -188,9 +188,11 @@ class CItemSum : public CItemSubtypeST<Item_sum_sum, SFT> {
         TEST_Text(rp.es_out.contains(constr),
           "summation cannot support it's argument");
 
+        a.summation_hack = true;
         Item *const new_child =
             itemTypes.do_rewrite(*RiboldMYSQL::get_arg(i, 0), constr,
                                  *rp_wc.childr_rp[0].get(), a);
+        a.summation_hack = false;
         assert(new_child);
 
         if (oAGG == constr.o) {

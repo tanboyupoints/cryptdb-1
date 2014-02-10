@@ -772,8 +772,6 @@
   ("SELECT spider + spider FROM bugs")
   ("SELECT spider + spider FROM bugs")
   ("SELECT SUM(spider) FROM bugs")
-  ;; ("SELECT GREATEST(ant, 5000) FROM more_bugs")
-  ;; ("SELECT GREATEST(12, ant, 5000) FROM more_bugs")
   ("CREATE TABLE crawlers (pink DATE)")
   ("INSERT INTO crawlers VALUES ('0'), (0), ('2015-05-04 4:5:6')")
   ("SELECT * FROM crawlers")
@@ -843,6 +841,25 @@
   ("SELECT SUM(LEAST(505, 3000)) FROM t")
   ;; constants: big first
   ("SELECT SUM(LEAST(1000, 4)) FROM t")
+
+  ;; with column: constant first
+  ("SELECT GREATEST(50, x) FROM t"
+   (:update "t" x oEq DET))
+  ;; with column: column first
+  ("SELECT GREATEST(x, 101) FROM t")
+  ;; constants: small first
+  ("SELECT GREATEST(50, 55) FROM t")
+  ;; constants: big first
+  ("SELECT GREATEST(55, 40) FROM t")
+
+  ;; with column: constant first
+  ("SELECT LEAST(50, x) FROM t")
+  ;; with column: column first
+  ("SELECT LEAST(x, 101) FROM t")
+  ;; constants: small first
+  ("SELECT LEAST(505, 3000) FROM t")
+  ;; constants: big first
+  ("SELECT LEAST(1000, 4) FROM t")
 
   ("SELECT * FROM t"
    :check)

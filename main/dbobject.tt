@@ -105,3 +105,27 @@ MappedDBMeta<ChildType, KeyType>::applyToChildren(
     return true;
 }
 
+template <typename ChildType, typename KeyType>
+const ChildType *MappedDBMeta<ChildType, KeyType>::
+getChildWithGChild(const DBMeta &gchild) const
+{
+    bool match = false;
+    for (const auto &it : this->getChildren()) {
+        it.second->applyToChildren(
+            [&it, &gchild, &match] (const DBMeta &possible_match)
+            {
+                if (&possible_match == &gchild) {
+                    match = true;
+                    return false;       // shortcircuit
+                }
+
+                return true;
+            });
+        if (true == match) {
+            return it.second.get();
+        }
+    }
+
+    return nullptr;
+}
+
