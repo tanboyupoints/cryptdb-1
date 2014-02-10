@@ -125,11 +125,9 @@ class CItemChooseOrder : public CItemSubtypeST<Item_sum_hybrid, SFT> {
         TEST_NoAvailableEncSet(supported, i.type(), needed, why,
                                childr_rp);
         const OLK olk = supported.chooseOne();
-        const EncSet out = EncSet(olk);
         const reason rsn(out, why, i);
 
-        // INVESTIGATE: Should 'out' be 'supported'?
-        return new RewritePlanOneOLK(out, olk, childr_rp, rsn);
+        return new RewritePlanOneOLK(supported, olk, childr_rp, rsn);
     }
 
     virtual Item *

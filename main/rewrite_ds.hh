@@ -5,6 +5,7 @@
 #include <memory>
 
 #include <util/onions.hh>
+#include <parser/sql_utils.hh>
 
 class FieldMeta;
 /**
@@ -168,11 +169,11 @@ class reason {
 public:
     reason(const EncSet &es, const std::string &why,
            const Item &item)
-        : encset(es), why(why), item(item) {}
+        : encset(es), why(why), string_item(printItemToString(item)) {}
 
     const EncSet encset;
     const std::string why;
-    const Item &item;
+    const std::string string_item;
 };
 
 std::ostream&

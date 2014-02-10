@@ -105,8 +105,7 @@ friendlyGather(Analysis &a, const Item_func &i, const EncSet &filter_es,
     const EncSet solution =
         filter_es.intersect(childr_rp[0]->es_out).
                   intersect(childr_rp[1]->es_out);
-    TEST_NoAvailableEncSet(solution, i.type(), filter_es, why,
-                           childr_rp);
+    TEST_NoAvailableEncSet(solution, i.type(), filter_es, why, childr_rp);
 
     const reason rsn(solution, why, i);
 
