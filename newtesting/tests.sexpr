@@ -866,6 +866,40 @@
   ("DROP TABLE t"))
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;     miscellaneous bugs 3
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ("MiscBugs3" t
+  ("CREATE TABLE gutter (x integer, y integer)"
+   (:all-max gutter))
+  ("INSERT INTO gutter VALUES (1, 2), (20, 21), (500, NULL), (NULL, 1)")
+  ("SELECT * FROM gutter")
+  ;; one column
+  ("SELECT 5 + 4 + x from gutter")
+  ("SELECT x + 4 + 5 from gutter")
+  ("SELECT 1 + x + 5 from gutter")
+
+  ;; two (of the same) column
+  ("SELECT 1 + x + x from gutter")
+  ("SELECT x + 2 + x from gutter")
+  ("SELECT x + x + 3 from gutter")
+
+  ;; three column
+  ("SELECT x + x + x from gutter")
+
+  ;; goto plain
+  ("SELECT x + y from gutter"
+   (:update (gutter (x (oPlain PLAINVAL))
+                    (y (oPlain PLAINVAL)))))
+
+  ("SELECT 1 + x + y FROM gutter")
+  ("SELECT x + 4 + y FROM gutter")
+  ("SELECT x + y + 6 FROM gutter")
+
+  ("SELECT * FROM gutter"
+   :check)
+  ("DROP TABLE gutter"))
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;    quoted schema objects
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ("QuotedSchemaObjects" t

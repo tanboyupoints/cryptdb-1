@@ -90,6 +90,29 @@ rewrite_args_FN(const T &i, const OLK &constr,
     return out_i;
 }
 
+static RewritePlan *
+friendlyGather(Analysis &a, const Item_func &i, const EncSet &filter_es,
+               const std::string &why)
+{
+    const unsigned int arg_count = i.argument_count();
+    TEST_BadItemArgumentCount(i.type(), 2, arg_count);
+
+    Item *const *const args = i.arguments();
+    std::vector<std::shared_ptr<RewritePlan> >
+        childr_rp({std::shared_ptr<RewritePlan>(gather(*args[0], a)),
+                   std::shared_ptr<RewritePlan>(gather(*args[1], a))});
+
+    const EncSet solution =
+        filter_es.intersect(childr_rp[0]->es_out).
+                  intersect(childr_rp[1]->es_out);
+    TEST_NoAvailableEncSet(solution, i.type(), filter_es, why,
+                           childr_rp);
+
+    const reason rsn(solution, why, i);
+
+    return new RewritePlanWithChildren(solution, rsn, childr_rp);
+}
+
 // An implementation of gather for the common case operation
 // Works for Item_func with two arguments, solution encset is intersect of
 // children and my_es
@@ -470,7 +493,7 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
     do_gather_type(const IT &i, Analysis &a) const
     {
         const std::string why = NAME;
-        return typical_gather(a, i, ADD_EncSet, why, true);
+        return friendlyGather(a, i, ADD_EncSet, why);
     }
 
     virtual Item * do_optimize_type(IT *i, Analysis & a) const
@@ -489,8 +512,8 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
         TEST_BadItemArgumentCount(i.type(), 2, i.argument_count());
         Item *const *const args = i.arguments();
 
-        const RewritePlanOneOLK &rp =
-            static_cast<const RewritePlanOneOLK &>(_rp);
+        const RewritePlanWithChildren &rp =
+            static_cast<const RewritePlanWithChildren &>(_rp);
 
         LOG(cdb_v) << "Rewrite plan is " << &rp << std::endl;
 
@@ -501,14 +524,23 @@ class CItemAdditive : public CItemSubtypeFN<IT, NAME> {
             itemTypes.do_rewrite(*args[1], constr,
                                  *rp.childr_rp[1].get(), a);
 
-        if (oAGG == constr.o) {
-            OnionMeta *const om = rp.olk.key->getOnionMeta(oAGG);
+        const EncSet chose_encset = rp.es_out.intersect(EncSet(constr));
+        const OLK olk = chose_encset.chooseOne();
+        TEST_Text(OLK::isNotInvalid(olk),
+                  "no valid EncSet available for Addition/Subtraction");
+
+        switch (olk.o) {
+        case oAGG: {
+            TEST_Text(olk.key, "fail");
+
+            OnionMeta *const om = olk.key->getOnionMeta(oAGG);
             assert(om);
             EncLayer const &el = a.getBackEncLayer(*om);
             TEST_UnexpectedSecurityLevel(oAGG, SECLEVEL::HOM,
                                          el.level());
             return static_cast<const HOM &>(el).sumUDF(arg0, arg1);
-        } else {
+        }
+        default:
             return new IT(arg0, arg1);
         }
     }
