@@ -17,7 +17,7 @@ init_mysql(const std::string & embed_db);
 
 class ResType {
 public:
-    bool ok;  // query executed successfully
+    const bool ok;  // query executed successfully
     const uint64_t affected_rows;
     const uint64_t insert_id;
     const std::vector<std::string> names;
@@ -34,9 +34,15 @@ public:
           insert_id(std::move(insert_id)), names(std::move(names)),
           types(std::move(types)), rows(rows) {}
 
+    ResType(const ResType &res, const std::vector<std::vector<Item *> > &rows)
+        : ok(res.ok), affected_rows(res.affected_rows), insert_id(res.insert_id),
+          names(res.names), types(res.types), rows(rows) {}
+
     bool success() const {return this->ok;}
 };
 
 char * make_thd_string(const std::string &s, size_t *lenp = 0);
 
 std::string ItemToString(const Item &i);
+std::string printItemToString(const Item &i);
+
