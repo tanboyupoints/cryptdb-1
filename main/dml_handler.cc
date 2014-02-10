@@ -1210,11 +1210,14 @@ nextImpl(const ResType &res, const NextParams &nparams)
     assert(false);
 }
 
+// currently only supports queries that return QUERY_COME_AGAIN
+// > this is an attempt to keep this function simple
 static std::pair<std::string, ReturnMeta>
 rewriteAndGetFirstQuery(const std::string &query, NextParams nparams)
 {
     try {
-        std::shared_ptr<const SchemaInfo> schema = nparams.ps.getSchemaInfo();
+        const std::shared_ptr<const SchemaInfo> schema =
+            nparams.ps.getSchemaInfo();
         QueryRewrite delete_rewrite =
             Rewriter::rewrite(query, *schema.get(), nparams.default_db,
                               nparams.ps);
@@ -1233,6 +1236,9 @@ rewriteAndGetFirstQuery(const std::string &query, NextParams nparams)
         FAIL_GenericPacketException("error rewriting a single query");
     }
 }
+
+#define SPECIALIZED_SYNC(test)                               \
+    SYNC_IF_FALSE((test), nparams.ps.getEConn())
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 SpecialUpdateExecutor::
@@ -1264,7 +1270,13 @@ nextImpl(const ResType &res, const NextParams &nparams)
         TEST_ErrPkt(res.success(),
                     "initial select query in SpecialUpdate failed");
 
-        this->dec_res = Rewriter::decryptResults(res, this->select_rmeta.get());
+        try {
+            this->dec_res =
+                Rewriter::decryptResults(res, this->select_rmeta.get());
+        } catch (...) {
+            TEST_ErrPkt(res.success(),
+                        "decrypting initial SELECT failed for SpecialUpdate");
+        }
         assert(this->dec_res.get().success());
         if (this->dec_res.get().rows.size() == 0) {
             yield return CR_RESULTS(ResType(true, 0, 0));
@@ -1315,30 +1327,26 @@ nextImpl(const ResType &res, const NextParams &nparams)
 
             // turn on strict mode so we can determine if we have bad values
             // > ie trying to insert 256 into a TINYINT UNSIGNED column
-            SYNC_IF_FALSE(strictMode(nparams.ps.getEConn().get()),
-                          nparams.ps.getEConn());
+            SPECIALIZED_SYNC(strictMode(nparams.ps.getEConn().get()));
 
             // Push the plaintext rows to the embedded database.
             const std::string &push_q =
                 " INSERT INTO " + this->plain_table +
                 " VALUES " + values_string + ";";
-            SYNC_IF_FALSE(nparams.ps.getEConn()->execute(push_q),
-                          nparams.ps.getEConn());
+            SPECIALIZED_SYNC(nparams.ps.getEConn()->execute(push_q));
 
             // Run the original (unmodified) query on the data in the embedded
             // database.
             std::unique_ptr<DBResult> original_query_dbres;
-            SYNC_IF_FALSE(nparams.ps.getEConn()->execute(nparams.original_query,
-                                                       &original_query_dbres),
-                          nparams.ps.getEConn());
+            SPECIALIZED_SYNC(nparams.ps.getEConn()->execute(
+                                nparams.original_query, &original_query_dbres));
             assert(original_query_dbres);
             // HACK
             this->original_query_dbres = original_query_dbres.release();
 
             // strict mode off
-            SYNC_IF_FALSE(nparams.ps.getEConn()->execute(
-                                "SET SESSION sql_mode = ''"),
-                          nparams.ps.getEConn());
+            SPECIALIZED_SYNC(nparams.ps.getEConn()->execute(
+                                "SET SESSION sql_mode = ''"));
 
             // > Collect the results from the embedded database.
             // > This code relies on single threaded access to the database
@@ -1347,9 +1355,8 @@ nextImpl(const ResType &res, const NextParams &nparams)
             std::unique_ptr<DBResult> dbres;
             const std::string &select_results_q =
                 " SELECT * FROM " + this->plain_table + ";";
-            SYNC_IF_FALSE(nparams.ps.getEConn()->execute(select_results_q,
-                                                         &dbres),
-                          nparams.ps.getEConn());
+            SPECIALIZED_SYNC(nparams.ps.getEConn()->execute(select_results_q,
+                                                            &dbres));
             const ResType interim_res = ResType(dbres->unpack());
             assert(interim_res.success());
             this->escaped_output_values =
@@ -1358,11 +1365,9 @@ nextImpl(const ResType &res, const NextParams &nparams)
             // Cleanup the embedded database.
             const std::string &cleanup_q =
                 "DELETE FROM " + this->plain_table + ";";
-            SYNC_IF_FALSE(nparams.ps.getEConn()->execute(cleanup_q),
-                          nparams.ps.getEConn());
+            SPECIALIZED_SYNC(nparams.ps.getEConn()->execute(cleanup_q));
 
-            SYNC_IF_FALSE(nparams.ps.getEConn()->execute("COMMIT;"),
-                          nparams.ps.getEConn());
+            SPECIALIZED_SYNC(nparams.ps.getEConn()->execute("COMMIT;"));
 
             // This query is necessary to propagate a transaction into
             // INFORMATION_SCHEMA.
@@ -1525,12 +1530,10 @@ nextImpl(const ResType &res, const NextParams &nparams)
             TEST_ErrPkt(nparams.ps.getEConn()->execute("START TRANSACTION"),
                       "failed to start transaction for sensitive directive");
 
-            SYNC_IF_FALSE(writeDeltas(nparams.ps.getEConn(), this->deltas,
-                                      Delta::REGULAR_TABLE),
-                          nparams.ps.getEConn());
+            SPECIALIZED_SYNC(writeDeltas(nparams.ps.getEConn(), this->deltas,
+                                         Delta::REGULAR_TABLE));
 
-            SYNC_IF_FALSE(nparams.ps.getEConn()->execute("COMMIT"),
-                          nparams.ps.getEConn());
+            SPECIALIZED_SYNC(nparams.ps.getEConn()->execute("COMMIT"));
 
             return CR_QUERY_RESULTS("DO 0;");
         }
@@ -1538,6 +1541,8 @@ nextImpl(const ResType &res, const NextParams &nparams)
 
     assert(false);
 }
+
+#undef SPECIALIZED_SYNC
 
 std::pair<AbstractQueryExecutor::ResultType, AbstractAnything *>
 ShowTablesExecutor::

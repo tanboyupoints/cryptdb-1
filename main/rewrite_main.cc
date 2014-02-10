@@ -1540,10 +1540,9 @@ nextImpl(const ResType &res, const NextParams &nparams)
         yield {
             assert(res.success());
 
-            const std::string &no_op = "DO 0;";
             return CR_QUERY_AGAIN(
                     this->adjust_queries.size() == 2 ? this->adjust_queries.back()
-                                                     : no_op);
+                                                     : "DO 0;");
         }
         CR_ROLLBACK_AND_FAIL(res,
                         "failed to execute second onion adjustment query!");

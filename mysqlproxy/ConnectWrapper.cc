@@ -267,7 +267,8 @@ rewrite(lua_State *const L)
                       "proxy failed to retrieve default database!");
             // save a reference so a second thread won't eat objects
             // that DeltaOuput wants later
-            std::shared_ptr<const SchemaInfo> schema = ps->getSchemaInfo();
+            const std::shared_ptr<const SchemaInfo> &schema =
+                ps->getSchemaInfo();
             c_wrapper->schema_info_refs.push_back(schema);
 
             std::unique_ptr<QueryRewrite> qr =
@@ -402,7 +403,7 @@ next(lua_State *const L)
     if (clients.find(client) == clients.end()) {
         xlua_pushlstring(L, "error");
         xlua_pushlstring(L, "unknown client");
-        lua_pushinteger(L,  100);
+         lua_pushinteger(L,  100);
         xlua_pushlstring(L, "12345");
 
         nilBuffer(L, 1);
@@ -420,8 +421,8 @@ next(lua_State *const L)
     const std::unique_ptr<QueryRewrite> &qr = c_wrapper->getQueryRewrite();
     try {
         NextParams nparams(*ps, c_wrapper->default_db, c_wrapper->last_query);
-        auto new_results = qr->executor->next(res, nparams);
-        const auto &result_type = std::get<0>(new_results);
+        const auto &new_results = qr->executor->next(res, nparams);
+        const auto &result_type = new_results.first;
         switch (result_type) {
         case AbstractQueryExecutor::ResultType::QUERY_COME_AGAIN: {
             // more to do before we have the client's results
@@ -455,7 +456,7 @@ next(lua_State *const L)
             // ready to return results to the client
             xlua_pushlstring(L, "results");
 
-            const auto &res = std::get<1>(new_results)->extract<ResType>();
+            const auto &res = new_results.second->extract<ResType>();
             returnResultSet(L, res);        // pushes 4 items on stack
             return 5;
         }
@@ -466,7 +467,7 @@ next(lua_State *const L)
         // lua_pop(L, lua_gettop(L));
         xlua_pushlstring(L, "error");
         xlua_pushlstring(L, e.getMessage());
-        lua_pushinteger(L,  e.getErrorCode());
+         lua_pushinteger(L, e.getErrorCode());
         xlua_pushlstring(L, e.getSQLState());
 
         nilBuffer(L, 1);
