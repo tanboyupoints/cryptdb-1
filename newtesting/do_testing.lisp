@@ -145,6 +145,7 @@
                          (t (1+ (list-depth e)))))
                list)))))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;   handle test file input
@@ -209,10 +210,14 @@
     ((:cryptdb :control :both) dirty-execution-target)))
 
 (defun fixup-testing-strategy (dirty-testing-strategy)
-  (case dirty-testing-strategy
-    ((nil) :compare)
-    ((:compare :must-succeed :must-fail :ignore) dirty-testing-strategy)))
-
+  (when (null dirty-testing-strategy)
+    (return-from fixup-testing-strategy #'ts-compare))
+  (let ((ts-form
+          (intern
+            (concatenate 'string "TS-"
+                                 (string-upcase dirty-testing-strategy)))))
+    (cond ((fboundp ts-form) (symbol-function ts-form))
+          (t nil))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -355,6 +360,34 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;      testing strategies
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defgeneric ts-must-succeed (cryptdb-results plain-results)
+  (:method ((cryptdb-results query-result) plain-results)
+    (query-result-status cryptdb-results)))
+
+(defgeneric ts-must-fail (cryptdb-results plain-results)
+  (:method ((cryptdb-results query-result) plain-results)
+    (not (query-result-status cryptdb-results))))
+
+(defgeneric ts-ignore (cryptdb-results plain-results)
+  (:method (cryptdb-results plain-results)
+    t))
+
+(defgeneric ts-compare (cryptdb-results plain-results)
+  (:method ((cryptdb-results query-result) (plain-results query-result))
+    (compare-results cryptdb-results plain-results)))
+
+(defgeneric ts-ignore-fields (cryptdb-results plain-results)
+  (:method ((cryptdb-results query-result) (plain-results query-result))
+    (setf (query-result-fields cryptdb-results) nil
+          (query-result-fields plain-results)   nil)
+    (compare-results cryptdb-results plain-results)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;         run tests
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -373,6 +406,7 @@
     (incf (group-score-fails *score*))))
 
 (defun fast-compare (results-a results-b)
+  ; (break)
   (equal results-a results-b))
 
 (defun slow-compare (results-aye results-bee)
@@ -426,12 +460,6 @@
 (defun valid-group-default? (group-default)
   (or (equal t group-default) (equal nil group-default) (stringp group-default)))
 
-(defun valid-execution-target-and-testing-strategy? (execution-target testing-strategy)
-  (case testing-strategy
-    ((:must-succeed :must-fail) (member execution-target '(:both :cryptdb)))
-    (:compare   (eq :both execution-target))
-    (:ignore    t)))
-
 (defmethod execute-test-query ((connections connection-state) query execution-target)
   (let ((cryptdb (connection-state-cryptdb connections))
         (control (connection-state-plain connections)))
@@ -457,8 +485,6 @@
              (testing-strategy (fixup-testing-strategy (cadddr test-case))))
         ; (format t "~A~%~A~%~A~%~%" query test-case onion-checks)
         (assert (eq (null (cadr test-case)) (null onion-checks)))
-        (assert (valid-execution-target-and-testing-strategy?
-                  execution-target testing-strategy))
         (multiple-value-bind (cryptdb-results plain-results)
             (execute-test-query connections query execution-target)
           ;; do handle-onion-checks(...) first because we want to update our
@@ -469,13 +495,8 @@
             ;(format t "cryptdb results~A~%" cryptdb-results)
             ;(format t "plain results~A~%" plain-results)
             (update-score
-              (ecase testing-strategy
-                (:must-succeed (query-result-status cryptdb-results))
-                (:must-fail    (not (query-result-status cryptdb-results)))
-                (:ignore       t)
-                (:compare      (and onion-check-result
-                                    (compare-results cryptdb-results
-                                                     plain-results)))))))))))
+              (and onion-check-result
+                   (funcall testing-strategy cryptdb-results plain-results)))))))))
 
 (defun run-tests (all-test-groups)
   (let* ((connections
@@ -580,11 +601,11 @@
        (eq nil (fixup-execution-target 'whatever))))
 
 (defun test-fixup-testing-strategy ()
-  (and (eq :compare (fixup-testing-strategy :compare))
-       (eq :must-succeed (fixup-testing-strategy :must-succeed))
-       (eq :must-fail (fixup-testing-strategy :must-fail))
-       (eq :ignore (fixup-testing-strategy :ignore))
-       (eq :compare (fixup-testing-strategy nil))
+  (and (eq #'ts-compare (fixup-testing-strategy :compare))
+       (eq #'ts-must-succeed (fixup-testing-strategy :must-succeed))
+       (eq #'ts-must-fail (fixup-testing-strategy :must-fail))
+       (eq #'ts-ignore (fixup-testing-strategy :ignore))
+       (eq #'ts-compare (fixup-testing-strategy nil))
        (null (fixup-testing-strategy 'whatever))))
 
 (defun test-lookup-seclevel ()

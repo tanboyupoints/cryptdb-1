@@ -791,6 +791,7 @@
 
   ;; FAIL: we don't currently support; but it shouldn't crash the system
   ("CREATE TABLE jjj SELECT * FROM enums")
+  ("DROP TABLE IF EXISTS jjj")
 
   ("CREATE TABLE floating (x float)")
   ("INSERT INTO floating VALUES (23e+12), (12e+14), ('a'), (12),
@@ -898,6 +899,44 @@
   ("SELECT * FROM gutter"
    :check)
   ("DROP TABLE gutter"))
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;        show tabls
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ("ShowTables" t
+  ("CREATE TABLE cside (x integer)"
+   (:all-max cside))
+  ("SHOW TABLES"
+   ()
+   :both
+   :ignore-fields)
+  ("CREATE TABLE bside (y integer)"
+   (:all-max cside))
+  ("SHOW TABLES"
+   ()
+   :both
+   :ignore-fields)
+  ("DROP TABLE cside")
+  ("SHOW TABLES"
+   ()
+   :both
+   :ignore-fields)
+  ("DROP TABLE bside")
+  ("SHOW TABLES"
+   ()
+   :both
+   :ignore-fields)
+  ("CREATE TABLE eside (z integer)"
+   (:all-max eside))
+  ("SHOW TABLES"
+   ()
+   :both
+   :ignore-fields)
+  ("DROP TABLE eside")
+  ("SHOW TABLES"
+   :check
+   :both
+   :ignore-fields))
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;    quoted schema objects
