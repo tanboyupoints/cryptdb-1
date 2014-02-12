@@ -163,43 +163,53 @@
 (defun build-update-1 (tag database table field onion seclevel)
   `(,tag (,database (,table (,field (,onion ,seclevel))))))
 
+(defun assert-all-lists (list)
+  (dolist (e list) (assert (listp e))))
+
+(defun fix-onion-check-form (dirty-onion-check)
+  (cond ((null dirty-onion-check) nil)
+        ((atom dirty-onion-check) (list (list dirty-onion-check)))
+        ((atom (car dirty-onion-check))
+         (list dirty-onion-check))
+        (t (assert-all-lists dirty-onion-check)
+           dirty-onion-check)))
+
+(defun fix-onion-check-semantics (dirty-onion-check db)
+  (mapcar
+    #'(lambda (check)
+        (let ((tag (car check)))
+          (ecase (car check)
+            (:check (assert (= 1 (length check)))
+                    check)
+            ((:set :update)
+             (cond ((every #'atom check)
+                    (ecase (length check)
+                      ;; (:update <table> <field> <onion> <seclevel>)
+                      (5 (apply #'build-update-1 tag db (cdr check)))
+                      ;; (:update <database> <table> <field> <onion> <seclevel>)
+                      (6 (apply #'build-update-1 tag (cdr check)))))
+                   ((proper-onion-update? check)
+                    (ecase (list-depth (cdr check))
+                      ;; (:update (<table> (<field> ...)) (<table> ...) ...)
+                      (4 `(,tag (,db ,@(cdr check))))
+                      ;; (:update (<database> (<table> ...)) (<database> ...) ...)
+                      (5 check)))))
+            (:all-max
+              (when (every #'atom check)
+                (ecase (length check)
+                  ;; (:all-max <table>)
+                  (2 `(:all-max ,db ,(cadr check)))
+                  ;; (:all-max <database> <table>)
+                  (3 check)))))))
+      dirty-onion-check))
+
 ;;; take possibly shorthand onion-checks and produce full length checks
 ;;; > return nil if `dirty-onion-checks` are invalid
-(defun low-level-fixup-onion-checks (dirty-onion-checks default-database)
-  (when (atom dirty-onion-checks)
-    (return-from low-level-fixup-onion-checks
-      (when (eq :check dirty-onion-checks )
-        `(,dirty-onion-checks))))
-  (let ((default-db-name (if (eq t default-database) +default-database+ default-database))
-        (tag (car dirty-onion-checks)))
-    (cond ((eq :check tag)
-           (when (= 1 (length dirty-onion-checks))
-             dirty-onion-checks))
-          ((eq :all-max tag)
-           (when (every #'atom dirty-onion-checks)
-                   ;; (:check <table>)
-             (cond ((= 2 (length dirty-onion-checks))
-                    `(:all-max ,default-db-name ,(cadr dirty-onion-checks)))
-                   ;; (:check <database> <table>)
-                   ((= 3 (length dirty-onion-checks))
-                    dirty-onion-checks))))
-          ((member tag '(:set :update))
-           (cond ((every #'atom dirty-onion-checks)
-                   ;; (:update <table> <field> <onion> <seclevel>)
-                  (cond ((= 4 (length (cdr dirty-onion-checks)))
-                         (apply #'build-update-1 tag default-db-name (cdr dirty-onion-checks)))
-                        ;; (:update <database> <table> <field> <onion> <seclevel>)
-                        ((= 5 (length (cdr dirty-onion-checks)))
-                         (apply #'build-update-1 tag (cdr dirty-onion-checks)))))
-                   ;; (:update (<database> (<table> ...)) (<database> ...))
-                   ((every #'proper-onion-update? (cdr dirty-onion-checks))
-                    (cond ((= 4 (list-depth (cdr dirty-onion-checks)))
-                           `(,tag (,default-db-name ,@(cdr dirty-onion-checks))))
-                          ((= 5 (list-depth (cdr dirty-onion-checks)))
-                           dirty-onion-checks))))))))
-
 (defun fixup-onion-checks (dirty-onion-checks default-database)
-  (let ((fixed (low-level-fixup-onion-checks dirty-onion-checks default-database)))
+  (let* ((db (if (eq t default-database) +default-database+ default-database))
+         (fixed (fix-onion-check-semantics
+                  (fix-onion-check-form dirty-onion-checks)
+                  db)))
     ;; convert symbols to strings except for the initial directive
     (when fixed
       (cons (car fixed) (map-tree #'string (cdr fixed))))))
@@ -550,45 +560,62 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; FIXME: add tests for unspecified stuff
+(defmacro must-signal (&rest body)
+  `(handler-case
+     (progn
+       ,@body
+       nil)
+     (error ()
+        (progn
+          t))))
+
 (defun test-fixup-onion-checks ()
-       ;; a fully specifed check should be returned as is
-  (and (let ((line '(:update ("database0" ("table0" ("field0" ("onion0" "seclevel0")
-                                                              ("onion1" "seclevel1"))
-                                                    ("field1" ("onion2" "seclevel2")))))))
+  ;; a fully specifed check should be returned as is
+  (and (let ((line
+               '((:update
+                   ("database0"
+                    ("table0" ("field0" ("onion0" "seclevel0")
+                                        ("onion1" "seclevel1"))
+                              ("field1" ("onion2" "seclevel2"))))))))
          (equal line (fixup-onion-checks line nil)))
+       ;; :check doesn't take parameters
+       (must-signal (fixup-onion-checks '(:check 1 2 3) nil))
        ;; a single check does not require nesting
-       (equal '(:update ("database" ("table" ("field" ("onion" "seclevel")))))
-              (fixup-onion-checks '(:update "database" "table" "field" "onion" "seclevel") nil))
-       (null (fixup-onion-checks '(:update ()) nil))
-       (null (fixup-onion-checks :update nil))
-       (equal '(:check)
+       (equal '((:update ("database" ("table" ("field" ("onion" "seclevel"))))))
+              (fixup-onion-checks
+                '(:update "database" "table" "field" "onion" "seclevel") nil))
+       (must-signal (fixup-onion-checks '(:update ()) nil))
+       (must-signal (fixup-onion-checks :update nil))
+       (equal '((:check))
               (fixup-onion-checks '(:check) nil))
-       (equal '(:check)
+       (equal '((:check))
               (fixup-onion-checks :check nil))
-       (null (fixup-onion-checks  :all-max nil))
-       (equal '(:all-max "db" "table")
+       (must-signal (fixup-onion-checks :all-max nil))
+       (equal '((:all-max "db" "table"))
               (fixup-onion-checks '(:all-max "db" "table") nil))
        ;; use hardcoded default database
-       (equal `(:all-max ,+default-database+ "table")
+       (equal `((:all-max ,+default-database+ "table"))
               (fixup-onion-checks '(:all-max "table") t))
-       (equal `(:update (,+default-database+ ("table" ("field" ("onion" "seclevel")))))
-              (fixup-onion-checks '(:update "table" "field" "onion" "seclevel") t))
+       (equal `((:update (,+default-database+
+                           ("table" ("field" ("onion" "seclevel"))))))
+              (fixup-onion-checks
+                '(:update "table" "field" "onion" "seclevel") t))
        ;; use default database from test group
-       (equal '(:all-max "some-default" "table")
+       (equal '((:all-max "some-default" "table"))
               (fixup-onion-checks '(:all-max "table") "some-default"))
-       (equal '(:update ("a-default" ("table" ("field" ("onion" "seclevel")))))
-              (fixup-onion-checks '(:update "table" "field" "onion" "seclevel") "a-default"))))
+       (equal '((:update ("a-default" ("table" ("field" ("onion" "seclevel"))))))
+              (fixup-onion-checks
+                '(:update "table" "field" "onion" "seclevel") "a-default"))))
 
 (defun test-fixup-onion-checks-multiple-update-default-bug ()
   (let ((line '(:update ("t" ("f"  ("o"  "l"))
                              ("f2" ("o2" "l2"))))))
-    (equal `(:update (,+default-database+ ("t" ("f"  ("o"  "l"))
-                                               ("f2" ("o2" "l2")))))
+    (equal `((:update (,+default-database+ ("t" ("f"  ("o"  "l"))
+                                                ("f2" ("o2" "l2"))))))
            (fixup-onion-checks line t))))
 
 (defun test-fixup-onion-checks-set ()
-  (and (let ((line '(:set ("d" ("t" ("f" ("o" "l")))))))
+  (and (let ((line '((:set ("d" ("t" ("f" ("o" "l"))))))))
          (and (equal line (fixup-onion-checks line nil))
               (equal line
                      (fixup-onion-checks '(:set ("t" ("f" ("o" "l")))) "d"))))))
