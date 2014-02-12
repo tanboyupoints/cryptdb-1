@@ -637,12 +637,11 @@ deltaOutputBeforeQuery(const std::unique_ptr<Connect> &e_conn,
     // FIXME: NOTE: was previously escaping against remote database
     const std::string &q_completion =
         " INSERT INTO " + MetaData::Table::embeddedQueryCompletion() +
-        "   (begin, complete, original_query, default_db, aborted, type)"
-        "   VALUES (TRUE,  FALSE,"
-        "    '" + escapeString(e_conn, original_query) + "',"
-        "    (SELECT DATABASE()),  FALSE,"
-        "    '" + TypeText<CompletionType>::toText(completion_type)
-            + "');";
+        "   (complete, original_query, default_db, aborted, type)"
+        "   VALUES (FALSE, '" + escapeString(e_conn, original_query) + "',"
+        "           (SELECT DATABASE()),  FALSE,"
+        "           '" + TypeText<CompletionType>::toText(completion_type) + "'"
+        "          );";
     ROLLBACK_AND_RFIF(e_conn->execute(q_completion), e_conn);
     *embedded_completion_id = e_conn->last_insert_id();
     assert(*embedded_completion_id);

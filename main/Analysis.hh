@@ -204,7 +204,7 @@ public:
 
 class Rewriter;
 
-enum class CompletionType {DDLCompletion, AdjustOnionCompletion};
+enum class CompletionType {DDL, Onion};
 
 bool
 writeDeltas(const std::unique_ptr<Connect> &e_conn,
