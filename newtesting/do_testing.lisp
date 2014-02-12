@@ -362,10 +362,12 @@
 ;;; take the per query onion checks and use them to update our onion state;
 ;;; then compare this new onion state to the state reported by cryptdb for
 ;;; each testing onion
-(defmethod handle-onion-checks (connections (onions onion-state) onion-check)
-  (if (null onion-check)
-      t
-      (handle-check connections onions (car onion-check) onion-check)))
+(defmethod handle-onion-checks ((connections connection-state)
+                                (onions onion-state)
+                                (onion-checks list))
+  (every #'identity
+         (mapcar #'(lambda (c) (handle-check connections onions (car c) c))
+                 onion-checks)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
