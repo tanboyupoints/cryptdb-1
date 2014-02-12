@@ -171,8 +171,9 @@
         ((atom dirty-onion-check) (list (list dirty-onion-check)))
         ((atom (car dirty-onion-check))
          (list dirty-onion-check))
-        (t (assert-all-lists dirty-onion-check)
-           dirty-onion-check)))
+        (t (mapcar #'(lambda (e)
+                       (if (listp e) e (list e)))
+                   dirty-onion-check))))
 
 (defun fix-onion-check-semantics (dirty-onion-check db)
   (mapcar
@@ -211,8 +212,9 @@
                   (fix-onion-check-form dirty-onion-checks)
                   db)))
     ;; convert symbols to strings except for the initial directive
-    (when fixed
-      (cons (car fixed) (map-tree #'string (cdr fixed))))))
+    (mapcar #'(lambda (f)
+                (cons (car f) (map-tree #'string (cdr f))))
+            fixed)))
 
 (defun fixup-execution-target (dirty-execution-target)
   (case dirty-execution-target
@@ -630,6 +632,10 @@
               (equal line
                      (fixup-onion-checks '(:set ("t" ("f" ("o" "l")))) "d"))))))
 
+(defun test-fixup-onion-check-atoms-in-list ()
+  (equal '((:check) (:check))
+         (print (fixup-onion-checks '((:check) :check) nil))))
+
 (defun test-fixup-execution-target ()
   (and (eq :both (fixup-execution-target :both))
        (eq :both (fixup-execution-target nil))
@@ -676,15 +682,6 @@
     (string= "newlevel"
              (lookup-seclevel onions "database" "table1" "field1" "onion1"))))
 
-#|
-(defun test-multiple-update-onion-state! ()
-  (let ((onions
-          (make-onion-state
-            :databases '(("d" ("t" ("f"  ("o"  "l"))
-                                   ("f2" ("o2" "l2"))))))))
-    (update-onion-state! onions '(:update ("d" 
-  nil)
-|#
 
 (defun test-many-str-assoc ()
   (and (multiple-value-bind (success lookup unmatched-keys)
