@@ -29,6 +29,9 @@
 (defparameter +default-tests-path+       (concatenate 'string
                                            (sb-unix::posix-getenv "EDBDIR")
                                            "/newtesting/tests.sexpr"))
+(defparameter +default-kz-tests-path+    (concatenate 'string
+                                           (sb-unix::posix-getenv "EDBDIR")
+                                           "/newtesting/kz_tests.sexpr"))
 (defparameter +default-ip+               "127.0.0.1")
 (defparameter +default-username+         "root")
 (defparameter +default-password+         "letmein")
@@ -51,6 +54,19 @@
   (clsql:disconnect :database (connection-state-plain connections))
   (setf (connection-state-plain connections) nil))
 
+(defun init-use (connections)
+  (must-succeed-query (format nil "USE ~A" +default-database+)
+                      (connection-state-cryptdb connections))
+  (must-succeed-query (format nil "USE ~A" +default-control-database+)
+                      (connection-state-plain connections)))
+
+(defmethod revive-connections ((connections connection-state))
+  (setf (connection-state-cryptdb connections)
+        (clsql:reconnect :database (connection-state-cryptdb connections)))
+  (setf (connection-state-plain connections)
+        (clsql:reconnect :database (connection-state-plain connections)))
+  (init-use connections))
+
 (defun db-connect (db port &optional (ip       +default-ip+)
                                      (username +default-username+)
                                      (password +default-password+))
@@ -59,6 +75,9 @@
     :database-type :mysql
     :if-exists     :new
     :make-default  nil))
+
+(defmethod connection-alive? (c)
+  (query-result-status (issue-query "show databases" c)))
 
 (defstruct query-result
   status
@@ -145,6 +164,8 @@
                          (t (1+ (list-depth e)))))
                list)))))
 
+(defmethod all-true ((pair list))
+  (every #'identity pair))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -152,7 +173,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun load-tests (&optional (path +default-tests-path+))
+(defun load-tests (path)
   (read-from-string (read-file path)))
 
 ;; FIXME: implement
@@ -245,6 +266,9 @@
 ;;;  ...))
 (defstruct onion-state
   databases)
+
+(defmethod deep-copy-onion-state ((onions onion-state))
+  (make-onion-state :databases (copy-list (onion-state-databases onions))))
 
 (defmethod low-level-lookup-seclevel ((onions onion-state)
                                       database table field onion)
@@ -369,9 +393,9 @@
 (defmethod handle-onion-checks ((connections connection-state)
                                 (onions onion-state)
                                 (onion-checks list))
-  (every #'identity
-         (mapcar #'(lambda (c) (handle-check connections onions (car c) c))
-                 onion-checks)))
+  (all-true
+    (mapcar #'(lambda (c) (handle-check connections onions (car c) c))
+            onion-checks)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -487,36 +511,94 @@
       (:both    (values (issue-query query cryptdb)
                         (issue-query query control))))))
 
-(defun run-test-group (connections test-group)
-  (let* ((score (make-group-score))
-         (*score* score)
-         (onions (make-onion-state))
-         (group-name (car test-group))
-         (group-default (cadr test-group))
-         (test-list (cddr test-group)))
-    (declare (special *score*) (ignorable group-name))
-    (assert (valid-group-default? group-default))
-    (dolist (test-case test-list score)
-      (let* ((query (car test-case))
-             (onion-checks (fixup-onion-checks (cadr test-case) group-default))
-             (execution-target (fixup-execution-target (caddr test-case)))
-             (testing-strategy (fixup-testing-strategy (cadddr test-case))))
-        ; (format t "~A~%~A~%~A~%~%" query test-case onion-checks)
-        (assert (eq (null (cadr test-case)) (null onion-checks)))
-        (multiple-value-bind (cryptdb-results plain-results)
-            (execute-test-query connections query execution-target)
-          ;; do handle-onion-checks(...) first because we want to update our
-          ;; local onions even if the results don't match
-          (let ((onion-check-result
-                 (handle-onion-checks connections onions onion-checks)))
-            ;(format t "~%~%Onion-check-result ~A~%~%" onion-check-result)
-            ;(format t "cryptdb results~A~%" cryptdb-results)
-            ;(format t "plain results~A~%" plain-results)
-            (update-score
-              (and onion-check-result
-                   (funcall testing-strategy cryptdb-results plain-results)))))))))
+(defparameter *killed*    nil)
+(defparameter *reconnect* nil)
 
-(defun run-tests (all-test-groups)
+(defun handle-query (query-encoding onions connections default)
+  (let* ((query (car query-encoding))
+         (onion-checks (fixup-onion-checks (cadr query-encoding) default))
+         (execution-target (fixup-execution-target (caddr query-encoding)))
+         (testing-strategy (fixup-testing-strategy (cadddr query-encoding))))
+    (assert (eq (null (cadr query-encoding)) (null onion-checks)))
+    (multiple-value-bind (cryptdb-results plain-results)
+        (execute-test-query connections query execution-target)
+      (setf *killed*
+            (not (connection-alive? (connection-state-cryptdb connections))))
+      (when (and *killed* *reconnect*)
+        (sleep 1)
+        (revive-connections connections))
+      (let ((onion-check-result
+             (handle-onion-checks connections onions onion-checks)))
+        (and onion-check-result
+             (funcall testing-strategy cryptdb-results plain-results))))))
+
+(defun run-test-group (connections test-group)
+  (let* ((*score* (make-group-score))
+         (onions (make-onion-state)))
+    (declare (special *score*))
+    (destructuring-bind (group-name group-default &rest test-list) test-group
+      (declare (ignorable group-name))
+      (assert (valid-group-default? group-default))
+      (dolist (test-case test-list *score*)
+        (update-score
+          (handle-query test-case onions connections group-default))))))
+
+;; for each assertion we must;
+;; 0> do setup
+;; 1> set the kill count
+;; 2> issue the test query
+;; 3> check assertions
+;; 4> check comparison queries
+;; 5> do teardown
+;;
+;; in order to accomplish this we have two bindings for tracking onion state
+;; ! 'incremental-onions' tracks the state of our onions from one assertion
+;;   to the next; only the _first_ setup and the _first_ test query affect
+;;   this onion state, after that we incrememntally change it with assertions
+;; ! 'onions' tracks the state of our onions during a given test run; it is
+;;   reset after each teardown
+(defun kz-run-test-group (connections test-group)
+  (let* ((*score* (make-group-score))
+         (incremental-onions nil))
+    (declare (special *score*))
+    (destructuring-bind
+        (group-name group-default setup test-query compares asserts teardown)
+        test-group
+      (declare (ignorable group-name))
+      (assert (valid-group-default? group-default))
+      (dolist (assertion asserts *score*)
+        (let ((onions (make-onion-state)))
+          ;; do setup
+          (dolist (q setup)
+            (handle-query q onions connections group-default))
+          (destructuring-bind (where count stones) assertion
+            ;; set kill count
+            (must-succeed-query
+              (format nil "SET @cryptdb='killzone', @where='~A', @count='~A'"
+                          where count)
+              (connection-state-cryptdb connections))
+            ;; issue test query
+            (let ((*killed*    nil)
+                  (*reconnect* t))
+              (handle-query test-query onions connections group-default)
+              (assert *killed*)
+              ;; now throw stones (onion checks)
+              (let ((stones (fixup-onion-checks stones group-default)))
+                ;; should only happen the first time
+                (when (null incremental-onions)
+                  (setf incremental-onions (deep-copy-onion-state onions)))
+                (update-score
+                  (and (handle-onion-checks connections incremental-onions stones)
+                       (all-true
+                          (mapcar
+                            #'(lambda (c)
+                                (handle-query c onions connections group-default))
+                            compares)))))))
+          ;; do tear down
+          (dolist (q teardown)
+            (handle-query q onions connections group-default)))))))
+
+(defun run-tests (all-test-groups group-tester)
   (let* ((connections
            (make-connection-state :cryptdb (db-connect nil 3307)
                                   :plain   (db-connect nil 3306)))
@@ -534,11 +616,10 @@
     (must-succeed-query
       (format nil "CREATE DATABASE ~A" +default-control-database+) plain)
     ;; set proper default database
-    (must-succeed-query (format nil "USE ~A" +default-database+) cryptdb)
-    (must-succeed-query (format nil "USE ~A" +default-control-database+) plain)
+    (init-use connections)
     ;; begin testing
     (dolist (test-group all-test-groups results)
-      (let ((score (run-test-group connections test-group)))
+      (let ((score (funcall group-tester connections test-group)))
         (format t "~A:~25T~A failures~%"
                   (car test-group)
                   (group-score-fails score))
@@ -557,14 +638,19 @@
 ;; > no names indicates that all tests should be run
 (defparameter *filter-tests* '())
 
-(defun main ()
-  (let ((tests (load-tests)))
+(defun main (&optional (test-type 'functional))
+  (let* ((tpair
+           (ecase test-type
+             (functional (cons #'run-test-group +default-tests-path+))
+             (killzone   (cons #'kz-run-test-group +default-kz-tests-path+))))
+         (tests (load-tests (cdr tpair))))
     (run-tests (remove-if-not #'(lambda (name)
                                   (or (null *filter-tests*)
                                       (member name *filter-tests*
                                               :test #'string-equal)))
                               tests
-                              :key #'car))))
+                              :key #'car)
+               (car tpair))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

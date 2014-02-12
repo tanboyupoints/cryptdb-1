@@ -1282,9 +1282,8 @@ Rewriter::dispatchOnLex(Analysis &a, const std::string &query)
 }
 
 QueryRewrite
-Rewriter::rewrite(const std::string &q, SchemaInfo const &schema,
-                  const std::string &default_db,
-                  const ProxyState &ps)
+Rewriter::rewrite(const std::string &q, const SchemaInfo &schema,
+                  const std::string &default_db, const ProxyState &ps)
 {
     LOG(cdb_v) << "q " << q;
     assert(0 == mysql_thread_init());
@@ -1297,10 +1296,11 @@ Rewriter::rewrite(const std::string &q, SchemaInfo const &schema,
     AbstractQueryExecutor *const executor =
         Rewriter::dispatchOnLex(analysis, q);
     if (!executor) {
-        return QueryRewrite(true, analysis.rmeta, new NoOpExecutor());
+        return QueryRewrite(true, analysis.rmeta, analysis.kill_zone,
+                            new NoOpExecutor());
     }
 
-    return QueryRewrite(true, analysis.rmeta, executor);
+    return QueryRewrite(true, analysis.rmeta, analysis.kill_zone, executor);
 }
 
 //TODO: replace stringify with <<

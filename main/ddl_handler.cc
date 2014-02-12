@@ -388,13 +388,14 @@ nextImpl(const ResType &res, const NextParams &nparams)
         }
         TEST_ErrPkt(res.success(), "failed issuing ddl completion");
 
-        // this is a ddl query so do not put it into a transaction
+        // execute the original query against the embedded database
+        // > this is a ddl query so do not put it into a transaction
         TEST_ErrPkt(nparams.ps.getEConn()->execute(nparams.original_query),
-                  "Failed to execute DDL query against embedded database!");
+                   "Failed to execute DDL query against embedded database!");
 
         TEST_ErrPkt(deltaOutputAfterQuery(nparams.ps.getEConn(), this->deltas,
                                           this->embedded_completion_id.get()),
-                    "deltaOuputAfterQuery failed for DDL");
+                   "deltaOuputAfterQuery failed for DDL");
 
         yield return CR_RESULTS(this->ddl_res.get());
     }
