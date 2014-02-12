@@ -244,7 +244,8 @@
 (defstruct onion-state
   databases)
 
-(defmethod low-level-lookup-seclevel ((onions onion-state) database table field onion)
+(defmethod low-level-lookup-seclevel ((onions onion-state)
+                                      database table field onion)
   (multiple-value-bind (success lookup unmatched-keys)
         (many-str-assoc `(,database ,table ,field ,onion)
                         (onion-state-databases onions))
@@ -261,7 +262,8 @@
 (defun nest-unmatched-keys (unmatched-keys seclevel)
   (assert (not (null unmatched-keys)))
   (cond ((null (cdr unmatched-keys)) `(,(car unmatched-keys) ,seclevel))
-        (t `(,(car unmatched-keys) ,(nest-unmatched-keys (cdr unmatched-keys) seclevel)))))
+        (t `(,(car unmatched-keys) ,(nest-unmatched-keys
+             (cdr unmatched-keys) seclevel)))))
 
 (defmethod add-onion! ((onions onion-state) database table field onion seclevel)
   ;; don't try to look anything up if we don't have any onion data
@@ -472,7 +474,9 @@
 (defun valid-group-default? (group-default)
   (or (equal t group-default) (equal nil group-default) (stringp group-default)))
 
-(defmethod execute-test-query ((connections connection-state) query execution-target)
+(defmethod execute-test-query ((connections connection-state)
+                               query
+                               execution-target)
   (let ((cryptdb (connection-state-cryptdb connections))
         (control (connection-state-plain connections)))
     (ecase execution-target
@@ -518,11 +522,15 @@
          (plain (connection-state-plain connections))
          (results '()))
     ;; remove artefacts
-    (issue-query (format nil "DROP DATABASE ~A" +default-database+) cryptdb)
-    (issue-query (format nil "DROP DATABASE ~A" +default-control-database+) plain)
+    (issue-query
+      (format nil "DROP DATABASE ~A" +default-database+) cryptdb)
+    (issue-query
+      (format nil "DROP DATABASE ~A" +default-control-database+) plain)
     ;; create default database
-    (must-succeed-query (format nil "CREATE DATABASE ~A" +default-database+) cryptdb)
-    (must-succeed-query (format nil "CREATE DATABASE ~A" +default-control-database+) plain)
+    (must-succeed-query
+      (format nil "CREATE DATABASE ~A" +default-database+) cryptdb)
+    (must-succeed-query
+      (format nil "CREATE DATABASE ~A" +default-control-database+) plain)
     ;; set proper default database
     (must-succeed-query (format nil "USE ~A" +default-database+) cryptdb)
     (must-succeed-query (format nil "USE ~A" +default-control-database+) plain)
@@ -645,10 +653,15 @@
                             ("table1" ("field1" ("onion1" "anotherlevel")
                                                 ("onion2" "moremore"))
                                       ("field2" ("onion3" "again"))))))))
-    (and (string= "level"        (lookup-seclevel onions "database" "table0" "field0" "onion0"))
-         (string= "anotherlevel" (lookup-seclevel onions "database" "table1" "field1" "onion1"))
-         (string= "moremore"     (lookup-seclevel onions "database" "table1" "field1" "onion2"))
-         (string= "again"        (lookup-seclevel onions "database" "table1" "field2" "onion3")))))
+    (and (string= "level"
+                  (lookup-seclevel onions "database" "table0" "field0" "onion0"))
+         (string= "anotherlevel"
+                  (lookup-seclevel onions "database" "table1" "field1" "onion1"))
+         (string= "moremore"
+                  (lookup-seclevel onions "database" "table1" "field1" "onion2"))
+         (string=
+           "again"
+           (lookup-seclevel onions "database" "table1" "field2" "onion3")))))
 
 (defun test-update-onion-state! ()
   (let ((onions
@@ -658,7 +671,8 @@
                             ("table1" ("field1" ("onion1" "anotherlevel")
                                                 ("onion2" "moremore"))
                                       ("field2" ("onion3" "again"))))))))
-    (update-onion-state! onions '(:update ("database" ("table1" ("field1" ("onion1" "newlevel"))))))
+    (update-onion-state!
+      onions '(:update ("database" ("table1" ("field1" ("onion1" "newlevel"))))))
     (string= "newlevel"
              (lookup-seclevel onions "database" "table1" "field1" "onion1"))))
 
