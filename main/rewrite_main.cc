@@ -1325,6 +1325,8 @@ std::string ReturnMeta::stringify() {
 ResType
 Rewriter::decryptResults(const ResType &dbres, const ReturnMeta &rmeta)
 {
+    assert(dbres.success());
+
     const unsigned int rows = dbres.rows.size();
     LOG(cdb_v) << "rows in result " << rows << "\n";
     const unsigned int cols = dbres.names.size();
