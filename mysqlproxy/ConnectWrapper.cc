@@ -430,7 +430,7 @@ next(lua_State *const L)
     const std::unique_ptr<QueryRewrite> &qr = c_wrapper->getQueryRewrite();
     try {
         NextParams nparams(*ps, c_wrapper->default_db, c_wrapper->last_query);
-        
+
         c_wrapper->selfKill(KillZone::Where::Before);
         const auto &new_results = qr->executor->next(res, nparams);
         c_wrapper->selfKill(KillZone::Where::After);

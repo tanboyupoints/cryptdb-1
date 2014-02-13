@@ -15,12 +15,10 @@
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;        create table
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(
-#|
- ("CreateTable" t
+(("CreateTable" t
    ()                                               ;; setup
    ("CREATE TABLE tee (x integer)"                  ;; test query
-    (:all-max ess))
+    (:all-max tee))
    ()                                               ;; comparison queries
    ((:before 0 ((:does-not-exist tee x)))           ;; counter specific assertions
     (:after  0 ((:exists tee x)
@@ -29,8 +27,7 @@
                 :check))
     (:after  1 ((:exists tee x)
                 :check)))
-   ("DROP TABLE IF EXISTS tee"))                    ;; teardown
-|#
+   (("DROP TABLE IF EXISTS tee")))                  ;; teardown
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;;     ope adjustment
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -43,8 +40,8 @@
    ((:before 5 :check)                              ;; counter specific assertions
     (:after  5 :check)
     (:before 6 :check)
-    (:before 7 :update ess x oOrder OPE)))
+    (:before 7 (:update ess x oOrder OPE))
     (:after  7 :check))
-   (("DROP TABLE ess"))))                             ;; teardown
+   (("DROP TABLE ess"))))                           ;; teardown
 
 

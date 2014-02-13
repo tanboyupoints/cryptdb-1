@@ -364,7 +364,8 @@ nextImpl(const ResType &res, const NextParams &nparams)
                 uint64_t embedded_completion_id;
                 TEST_ErrPkt(
                     deltaOutputBeforeQuery(nparams.ps.getEConn(),
-                                           nparams.original_query, this->deltas,
+                                           nparams.original_query,
+                                           this->new_query, this->deltas,
                                            CompletionType::DDL,
                                            &embedded_completion_id),
                     "deltaOutputBeforeQuery failed for DDL");

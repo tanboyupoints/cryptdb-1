@@ -222,7 +222,16 @@
                   ;; (:all-max <table>)
                   (2 `(:all-max ,db ,(cadr check)))
                   ;; (:all-max <database> <table>)
-                  (3 check)))))))
+                  (3 check))))
+            ((:exists :does-not-exist)
+              (when (every #'atom check)
+                (ecase (length check)
+                  ;; (:exists <table>)
+                  (2 `(,tag ,db ,(cadr check)))
+                  ;; (:exists <table> <field>)
+                  (3 `(,tag ,db ,@(cdr check)))
+                  ;; (:exists <database> <table> <field>)
+                  (4 check)))))))
       dirty-onion-check))
 
 ;;; take possibly shorthand onion-checks and produce full length checks
@@ -385,7 +394,30 @@
                     ;; continue updating seclevel's after failure
                     (setf output nil))
                   (setf (lookup-seclevel onions database table field onion)
-                        seclevel))))))))
+                        seclevel)))))))
+  (:method (connections (onions onion-state) (type (eql :exists)) onion-check)
+    (let ((cryptdb (connection-state-cryptdb connections)))
+      (ecase (length onion-check)
+        ;; table
+        (3 (destructuring-bind (tag db table) onion-check
+             (declare (ignore tag))
+             (query-result-status
+               (issue-query
+                 (string-downcase (format nil "SELECT * FROM `~A`.`~A`" db table))
+                 cryptdb))))
+        ;; field
+        (4 (destructuring-bind (tag db table field) onion-check
+             (declare (ignore tag))
+             (query-result-status
+               (issue-query
+                 (string-downcase
+                   (format nil "SELECT `~A` FROM `~A`.`~A`" field db table))
+                 cryptdb)))))))
+  (:method (connections
+            (onions onion-state)
+            (type (eql :does-not-exist))
+            onion-check)
+    (not (handle-check connections onions :exists onion-check))))
 
 ;;; take the per query onion checks and use them to update our onion state;
 ;;; then compare this new onion state to the state reported by cryptdb for
@@ -513,6 +545,7 @@
 
 (defparameter *killed*    nil)
 (defparameter *reconnect* nil)
+(defparameter *reconnect-wait-time* 1)
 
 (defun handle-query (query-encoding onions connections default)
   (let* ((query (car query-encoding))
@@ -525,7 +558,7 @@
       (setf *killed*
             (not (connection-alive? (connection-state-cryptdb connections))))
       (when (and *killed* *reconnect*)
-        (sleep 1)
+        (sleep *reconnect-wait-time*)
         (revive-connections connections))
       (let ((onion-check-result
              (handle-onion-checks connections onions onion-checks)))
@@ -558,7 +591,8 @@
 ;; ! 'onions' tracks the state of our onions during a given test run; it is
 ;;   reset after each teardown
 (defun kz-run-test-group (connections test-group)
-  (let* ((*score* (make-group-score))
+  (let* ((*break-errant-database* nil)
+         (*score* (make-group-score))
          (incremental-onions nil))
     (declare (special *score*))
     (destructuring-bind
@@ -584,8 +618,9 @@
               (assert *killed*)
               ;; now throw stones (onion checks)
               (let ((stones (fixup-onion-checks stones group-default)))
-                ;; should only happen the first time
-                (when (null incremental-onions)
+                ;; should only happen the first time (or 2..?)
+                (when (or (null incremental-onions)
+                          (null (onion-state-databases incremental-onions)))
                   (setf incremental-onions (deep-copy-onion-state onions)))
                 (update-score
                   (and (handle-onion-checks connections incremental-onions stones)

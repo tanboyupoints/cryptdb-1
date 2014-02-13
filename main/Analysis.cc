@@ -625,6 +625,7 @@ writeDeltas(const std::unique_ptr<Connect> &e_conn,
 bool
 deltaOutputBeforeQuery(const std::unique_ptr<Connect> &e_conn,
                        const std::string &original_query,
+                       const std::string &rewritten_query,
                        const std::vector<std::unique_ptr<Delta> > &deltas,
                        CompletionType completion_type,
                        uint64_t *const embedded_completion_id)
@@ -637,8 +638,9 @@ deltaOutputBeforeQuery(const std::unique_ptr<Connect> &e_conn,
     // FIXME: NOTE: was previously escaping against remote database
     const std::string &q_completion =
         " INSERT INTO " + MetaData::Table::embeddedQueryCompletion() +
-        "   (complete, original_query, default_db, aborted, type)"
+        "   (complete, original_query, rewritten_query, default_db, aborted, type)"
         "   VALUES (FALSE, '" + escapeString(e_conn, original_query) + "',"
+        "          '" + escapeString(e_conn, rewritten_query) + "',"
         "           (SELECT DATABASE()),  FALSE,"
         "           '" + TypeText<CompletionType>::toText(completion_type) + "'"
         "          );";
