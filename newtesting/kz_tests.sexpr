@@ -29,6 +29,26 @@
                 :check)))
    (("DROP TABLE IF EXISTS tee")))                  ;; teardown
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;;;        drop table
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ("DropTable" t
+   (("CREATE TABLE gorge (y integer)"               ;; setup
+     (:all-max gorge)))
+   ("DROP TABLE gorge")                             ;; test query
+   ()                                               ;; comparison queries
+   ((:before 0 ((:exists gorge y)                   ;; counter specific assertions
+                :check))
+    (:after  0 ((:does-not-exist gorge)
+                :check))
+    (:before 1 ((:does-not-exist gorge)
+                :check))
+    (:after  1 ((:does-not-exist gorge)
+                :check)))
+   (("DROP TABLE gorge"                             ;; teardown
+     ()
+     :both
+     :ignore)))
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;;     ope adjustment
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ("OPEAdjustment" t
@@ -43,5 +63,4 @@
     (:before 7 (:update ess x oOrder OPE))
     (:after  7 :check))
    (("DROP TABLE ess"))))                           ;; teardown
-
 
