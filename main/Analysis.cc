@@ -630,6 +630,13 @@ deltaOutputBeforeQuery(const std::unique_ptr<Connect> &e_conn,
                        CompletionType completion_type,
                        uint64_t *const embedded_completion_id)
 {
+    const std::string &escaped_original_query =
+        escapeString(e_conn, original_query);
+    const std::string &escaped_rewritten_query =
+        escapeString(e_conn, rewritten_query);
+    RFIF(escaped_original_query.length()  <= STORED_QUERY_LENGTH
+      && escaped_rewritten_query.length() <= STORED_QUERY_LENGTH);
+
     RFIF(e_conn->execute("START TRANSACTION;"));
 
     // We must save the current default database because recovery
@@ -639,8 +646,8 @@ deltaOutputBeforeQuery(const std::unique_ptr<Connect> &e_conn,
     const std::string &q_completion =
         " INSERT INTO " + MetaData::Table::embeddedQueryCompletion() +
         "   (complete, original_query, rewritten_query, default_db, aborted, type)"
-        "   VALUES (FALSE, '" + escapeString(e_conn, original_query) + "',"
-        "          '" + escapeString(e_conn, rewritten_query) + "',"
+        "   VALUES (FALSE, '" + escaped_original_query + "',"
+        "          '" + escaped_rewritten_query + "',"
         "           (SELECT DATABASE()),  FALSE,"
         "           '" + TypeText<CompletionType>::toText(completion_type) + "'"
         "          );";
