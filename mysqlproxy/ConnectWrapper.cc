@@ -444,7 +444,6 @@ next(lua_State *const L)
         switch (result_type) {
         case AbstractQueryExecutor::ResultType::QUERY_COME_AGAIN: {
             // more to do before we have the client's results
-
             xlua_pushlstring(L, "again");
 
             const auto &output =
@@ -463,10 +462,10 @@ next(lua_State *const L)
             // the results of executing this query should be send directly
             // back to the client
             xlua_pushlstring(L, "query-results");
-            const auto &output =
-                std::get<1>(new_results)->extract<std::pair<bool, std::string> >();
+            const auto &new_query =
+                std::get<1>(new_results)->extract<std::string>();
 
-            xlua_pushlstring(L, output.second);
+            xlua_pushlstring(L, new_query);
             nilBuffer(L, 3);
             return 5;
         }
