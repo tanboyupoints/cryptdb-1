@@ -20,6 +20,9 @@ class CreateTableHandler : public DDLHandler {
         TEST_DatabaseDiscrepancy(pre.dbname, a.getDatabaseName());
         LEX *const new_lex = copyWithTHD(lex);
 
+        TEST_Text(DB_TYPE_INNODB == lex->create_info.db_type->db_type,
+                  "InnoDB is the only supported ENGINE")
+
         //TODO: support for "create table like"
         TEST_TextMessageError(
                 !(lex->create_info.options & HA_LEX_CREATE_TABLE_LIKE),
