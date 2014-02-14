@@ -379,6 +379,20 @@ SharedProxyState::SharedProxyState(ConnectionInfo ci,
       default_sec_rating(default_sec_rating),
       cache(std::move(SchemaCache()))
 {
+    // make sure the server was not started in SQL_SAFE_UPDATES mode
+    // > it might not even be possible to start the server in this mode;
+    //   better to be safe
+    {
+        std::unique_ptr<DBResult> dbres;
+        assert(conn->execute("SELECT @@sql_safe_updates", &dbres));
+        assert(1 == mysql_num_rows(dbres->n));
+
+        const MYSQL_ROW row = mysql_fetch_row(dbres->n);
+        const unsigned long *const l = mysql_fetch_lengths(dbres->n);
+        const unsigned long value = std::stoul(std::string(row[0], l[0]));
+        assert(0 == value);
+    }
+
     std::unique_ptr<Connect>
         init_e_conn(Connect::getEmbedded(embed_dir));
     assert(conn && init_e_conn);

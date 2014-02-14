@@ -110,8 +110,8 @@ static bool
 sanityCheck(SchemaInfo &schema)
 {
     for (const auto &it : schema.getChildren()) {
-        const auto &tm = it.second;
-        assert(sanityCheck(*tm.get()));
+        const auto &dm = it.second;
+        assert(sanityCheck(*dm.get()));
     }
     return true;
 }

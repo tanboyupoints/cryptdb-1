@@ -949,7 +949,7 @@ class SetHandler : public DMLHandler {
     virtual AbstractQueryExecutor *rewrite(Analysis &a, LEX *lex) const
     {
         #define DIRECTIVE_HANDLER(function)                         \
-            std::bind(function, this, std::placeholders::_1,        \
+            std::bind((function), this, std::placeholders::_1,      \
                       std::placeholders::_2)
         typedef std::function<AbstractQueryExecutor *(std::map<std::string,
                                                                std::string> &,
@@ -974,8 +974,9 @@ class SetHandler : public DMLHandler {
                 break;
             }
 
-            if (v->is_user_var()) {
-                const set_var_user *user_v =
+            switch (v->varType()) {
+            case set_var_base::V_USER: {
+                const set_var_user *const user_v =
                     static_cast<const set_var_user *>(v);
                 Item_func_set_user_var *const i =
                     user_v->*rob<set_var_user, Item_func_set_user_var *,
@@ -1015,6 +1016,27 @@ class SetHandler : public DMLHandler {
                                       + var_name + "`");
 
                 var_pairs[var_name] = var_value;
+            }
+            case set_var_base::V_SYSTEM: {
+                // do not allow the client to put us into SQL_SAFE_UPDATES
+                // mode; else bad things will happen
+                const set_var *const set_v =
+                    static_cast<const set_var *>(v);
+                const sys_var *const sys_v = set_v->var;
+                if (NULL == sys_v) {
+                    break;
+                }
+
+                const std::string &name = convert_lex_str(sys_v->name);
+                TEST_Text(false == equalsIgnoreCase("SQL_SAFE_UPDATES", name),
+                          "cryptDB does not support SQL_SAFE_UPDATES");
+                break;
+            }
+            case set_var_base::V_PASSWORD:
+            case set_var_base::V_COLLATION:
+                break;
+            default:
+                assert(false);
             }
         }
 

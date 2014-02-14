@@ -789,6 +789,12 @@
 
   ("SHOW ENGINES")
 
+  ;; SQL_SAFE_UPDATES will make us segfault
+  ("SET SQL_SAFE_UPDATES = 1"
+   ()
+   :cryptdb
+   :must-fail)
+
   ;; FAIL: we don't currently support; but it shouldn't crash the system
   ("CREATE TABLE jjj SELECT * FROM enums")
   ("DROP TABLE IF EXISTS jjj")
