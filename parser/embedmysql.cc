@@ -75,7 +75,7 @@ cloneItemInOrder(ORDER * o) {
  *
  * continuing, we can see sql/sql_yacc.yy where
  *   lex->create_info.db_type = ha_default_handlerton(thd);
- * ha_default_handlerton(...) is in sql/sql_handler.cc and it calls
+ * ha_default_handlerton(...) is in sql/handler.cc and it calls
  * ha_default_plugin(...). this function returns thd->variables.table_plugin.
  *
  * so if we change thd->variables.table_plugin to InnoDB, it will become our
@@ -84,7 +84,7 @@ cloneItemInOrder(ORDER * o) {
 static plugin_ref
 getInnoDBPlugin()
 {
-    static LEX_STRING name = string_to_lex_str("InnoDB");
+    static const LEX_STRING name = string_to_lex_str("InnoDB");
     // singleton
     static plugin_ref innodb_plugin = ha_resolve_by_name(0, &name);
     assert(innodb_plugin);
