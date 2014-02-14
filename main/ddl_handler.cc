@@ -23,8 +23,13 @@ class CreateTableHandler : public DDLHandler {
         TEST_Text(DB_TYPE_INNODB == lex->create_info.db_type->db_type,
                   "InnoDB is the only supported ENGINE")
 
+        // partitioning information is not currently printed by our LEX
+        // stringifications algorithms which leads to a truncated query
+        TEST_Text(NULL == lex->part_info,
+                  "CryptDB does not support partitioning");
+
         //TODO: support for "create table like"
-        TEST_TextMessageError(
+        TEST_Text(
                 !(lex->create_info.options & HA_LEX_CREATE_TABLE_LIKE),
                 "No support for create table like yet. "
                 "If you see this, please implement me");
