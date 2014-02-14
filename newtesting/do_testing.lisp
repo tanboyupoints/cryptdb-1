@@ -496,11 +496,11 @@
          t)
         ((or (not (query-result-status results-a))
              (not (query-result-status results-b)))
-         (break)
+         ; (break)
          nil)
         ((not (equal (query-result-fields results-a)
                      (query-result-fields results-b)))
-         (break)
+         ; (break)
          nil)
         (t ;; cryptdb returns all results as strings while the normal
            ;; database uses numbers and such
