@@ -437,6 +437,24 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
     }
 }
 
+static bool
+metaSanityCheck(const std::unique_ptr<Connect> &e_conn)
+{
+    std::unique_ptr<DBResult> dbres;
+    assert(e_conn->execute(
+        "SELECT * FROM " + MetaData::Table::metaObject() + " AS m"
+        " WHERE NOT EXISTS ("
+        " SELECT * FROM " +
+            MetaData::Table::bleedingMetaObject() + " AS b"
+        " WHERE"
+        "   m.serial_object = b.serial_object AND"
+        "   m.serial_key    = b.serial_key)",
+        &dbres));
+
+    assert(0 == mysql_num_rows(dbres->n));
+    return true;
+}
+
 // This function will not build all of our tables when it is run
 // on an empty database.  If you don't have a parent, your table won't be
 // built.  We probably want to seperate our database logic into 3 parts.
@@ -465,6 +483,7 @@ loadSchemaInfo(const std::unique_ptr<Connect> &conn,
     loadChildren(schema.get());
 
     assert(sanityCheck(*schema.get()));
+    assert(metaSanityCheck(e_conn));
 
     return std::move(schema);
 }

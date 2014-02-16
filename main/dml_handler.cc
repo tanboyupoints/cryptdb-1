@@ -1598,6 +1598,9 @@ nextImpl(const ResType &res, const NextParams &nparams)
                       "failed to start transaction for sensitive directive");
 
             SPECIALIZED_SYNC(writeDeltas(nparams.ps.getEConn(), this->deltas,
+                                         Delta::BLEEDING_TABLE));
+
+            SPECIALIZED_SYNC(writeDeltas(nparams.ps.getEConn(), this->deltas,
                                          Delta::REGULAR_TABLE));
 
             SPECIALIZED_SYNC(nparams.ps.getEConn()->execute("COMMIT"));

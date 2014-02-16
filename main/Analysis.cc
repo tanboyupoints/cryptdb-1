@@ -635,7 +635,6 @@ writeDeltas(const std::unique_ptr<Connect> &e_conn,
     return true;
 }
 
-
 bool
 deltaOutputBeforeQuery(const std::unique_ptr<Connect> &e_conn,
                        const std::string &original_query,
