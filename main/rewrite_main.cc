@@ -385,14 +385,9 @@ fixDDL(const std::unique_ptr<Connect> &conn,
         assert(false == details->embedded_complete);
 
         // reissue the original DDL query against the embedded database
-        bool embedded_bad_query;
-        RETURN_FALSE_IF_FALSE(retryQuery(e_conn, details->original_query,
-                                         &embedded_bad_query));
-        // if the query is 'bad' against the embedded database this is a
-        // problem because it already succeeded against the remote database
-        if (true == embedded_bad_query) {
-            return false;
-        }
+        // > it must succeed because presumably it already succeeded against
+        //   the remote database
+        RFIF(e_conn->execute(details->original_query));
 
         return finishQuery(e_conn, unfinished_id);
     }
