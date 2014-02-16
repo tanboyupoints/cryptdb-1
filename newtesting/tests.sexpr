@@ -973,9 +973,20 @@
    :both
    :ignore)
   ("CREATE DATABASE IF NOT EXISTS `over+there`")
-  ("USE `over+there`")
+  ("USE `over+there`"
+   ()
+   :cryptdb
+   :must-succeed)
+
   ("CREATE TABLE `over+there`.`more+quotes` (`quoted-+as*well` integer)"
-   (:all-max "over+there" "more+quotes"))
+   (:all-max "over+there" "more+quotes")
+   :cryptdb
+   :must-succeed)
+  ("CREATE TABLE `more+quotes` (`quoted-+as*well` integer)"
+   ()
+   :control
+   :ignore)
+
   ("CREATE TABLE `hard-+=quotes` (`!@abc` text, `$$eda` integer)"
    (:all-max "over+there" "hard-+=quotes"))
   ("INSERT INTO `hard-+=quotes`
@@ -986,9 +997,18 @@
   ("SELECT * FROM `hard-+=quotes`")
   ("SELECT * FROM `more+quotes`")
   ("SELECT * FROM `over+there`.`more+quotes`"
-   :check)
+   :check
+   :cryptdb
+   :must-succeed)
   ("DROP DATABASE IF EXISTS `over+there`")
-  ("USE cryptdbtest"))
+  ("DROP TABLE `more+quotes`"
+   ()
+   :control
+   :ignore)
+  ("USE cryptdbtest"
+   ()
+   :cryptdb
+   :ignore))
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;;          directives
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

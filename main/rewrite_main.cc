@@ -116,6 +116,71 @@ sanityCheck(SchemaInfo &schema)
     return true;
 }
 
+static std::map<std::string, int>
+collectTableNames(const std::string &db_name,
+                  const std::unique_ptr<Connect> &c)
+{
+    std::map<std::string, int> name_map;
+
+    assert(c->execute("USE " + quoteText(db_name)));
+
+    std::unique_ptr<DBResult> dbres;
+    assert(c->execute("SHOW TABLES", &dbres));
+
+    assert(1 == mysql_num_fields(dbres->n));
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(dbres->n))) {
+        const unsigned long *const l = mysql_fetch_lengths(dbres->n);
+        const std::string table_name(row[0], l[0]);
+        // all table names should be unique
+        assert(name_map.end() == name_map.find(table_name));
+        name_map[table_name] = 1;
+    }
+    assert(mysql_num_rows(dbres->n) == name_map.size());
+
+    return name_map;
+}
+
+static bool
+tablesSanityCheck(SchemaInfo &schema,
+                  const std::unique_ptr<Connect> &e_conn,
+                  const std::unique_ptr<Connect> &conn)
+{
+    for (const auto &dm_it : schema.getChildren()) {
+        const auto &db_name = dm_it.first.getValue();
+        const auto &dm = dm_it.second;
+        // gather anonymous tables
+        std::map<std::string, int> anon_name_map =
+            collectTableNames(db_name, conn);
+
+        // gather plain tables
+        std::map<std::string, int> plain_name_map =
+            collectTableNames(db_name, e_conn);
+
+        const auto &meta_tables = dm->getChildren();
+        std::cout << meta_tables.size() << "\t"
+                  << anon_name_map.size() << "\t"
+                  << plain_name_map.size() << "\t" << std::endl << std::endl;
+        assert(meta_tables.size() == anon_name_map.size());
+        assert(meta_tables.size() == plain_name_map.size());
+        for (const auto &tm_it : meta_tables) {
+            const auto &tm = tm_it.second;
+
+            assert(anon_name_map.find(tm->getAnonTableName())
+                   != anon_name_map.end());
+            anon_name_map.erase(tm->getAnonTableName());
+
+            assert(plain_name_map.find(tm_it.first.getValue())
+                   != plain_name_map.end());
+            plain_name_map.erase(tm_it.first.getValue());
+        }
+        assert(0 == anon_name_map.size());
+        assert(0 == plain_name_map.size());
+    }
+
+    return true;
+}
+
 struct RecoveryDetails {
     const bool embedded_complete;
     const bool remote_complete;
@@ -440,18 +505,54 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
 static bool
 metaSanityCheck(const std::unique_ptr<Connect> &e_conn)
 {
-    std::unique_ptr<DBResult> dbres;
-    assert(e_conn->execute(
-        "SELECT * FROM " + MetaData::Table::metaObject() + " AS m"
-        " WHERE NOT EXISTS ("
-        " SELECT * FROM " +
-            MetaData::Table::bleedingMetaObject() + " AS b"
-        " WHERE"
-        "   m.serial_object = b.serial_object AND"
-        "   m.serial_key    = b.serial_key)",
-        &dbres));
+    {
+        std::unique_ptr<DBResult> regular_dbres;
+        assert(e_conn->execute("SELECT * FROM " + MetaData::Table::metaObject(),
+                               &regular_dbres));
 
-    assert(0 == mysql_num_rows(dbres->n));
+        std::unique_ptr<DBResult> bleeding_dbres;
+        assert(e_conn->execute("SELECT * FROM "
+                               + MetaData::Table::bleedingMetaObject(),
+                               &bleeding_dbres));
+
+        assert(mysql_num_rows(bleeding_dbres->n)
+            == mysql_num_rows(regular_dbres->n));
+    }
+
+    {
+        std::unique_ptr<DBResult> dbres;
+        assert(e_conn->execute(
+            "SELECT * FROM " + MetaData::Table::metaObject() + " AS m"
+            " WHERE NOT EXISTS ("
+            "       SELECT * FROM " +
+                        MetaData::Table::bleedingMetaObject() + " AS b"
+            "       WHERE"
+            "           m.serial_object = b.serial_object AND"
+            "           m.serial_key    = b.serial_key AND"
+            "           m.id            = b.id AND"
+            "           m.parent_id     = b.parent_id)",
+            &dbres));
+
+        assert(0 == mysql_num_rows(dbres->n));
+    }
+
+    {
+        std::unique_ptr<DBResult> dbres;
+        assert(e_conn->execute(
+            "SELECT * FROM " + MetaData::Table::bleedingMetaObject() + " AS b"
+            " WHERE NOT EXISTS ("
+            "       SELECT * FROM " +
+                        MetaData::Table::metaObject() + " AS m"
+            "       WHERE"
+            "           m.serial_object = b.serial_object AND"
+            "           m.serial_key    = b.serial_key AND"
+            "           m.id            = b.id AND"
+            "           m.parent_id     = b.parent_id)",
+            &dbres));
+
+        assert(0 == mysql_num_rows(dbres->n));
+    }
+
     return true;
 }
 
@@ -484,6 +585,7 @@ loadSchemaInfo(const std::unique_ptr<Connect> &conn,
 
     assert(sanityCheck(*schema.get()));
     assert(metaSanityCheck(e_conn));
+    assert(tablesSanityCheck(*schema.get(), e_conn, conn));
 
     return std::move(schema);
 }
