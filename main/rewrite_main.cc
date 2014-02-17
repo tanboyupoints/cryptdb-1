@@ -141,6 +141,7 @@ collectTableNames(const std::string &db_name,
     return name_map;
 }
 
+// compares SHOW TABLES on embedded and remote with the SchemaInfo
 static bool
 tablesSanityCheck(SchemaInfo &schema,
                   const std::unique_ptr<Connect> &e_conn,
@@ -158,9 +159,6 @@ tablesSanityCheck(SchemaInfo &schema,
             collectTableNames(db_name, e_conn);
 
         const auto &meta_tables = dm->getChildren();
-        std::cout << meta_tables.size() << "\t"
-                  << anon_name_map.size() << "\t"
-                  << plain_name_map.size() << "\t" << std::endl << std::endl;
         assert(meta_tables.size() == anon_name_map.size());
         assert(meta_tables.size() == plain_name_map.size());
         for (const auto &tm_it : meta_tables) {
@@ -502,9 +500,13 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
     }
 }
 
+// bleeding and regular meta tables must have identical content
+// > note that their next auto_increment value will not necessarily be
+//   identical
 static bool
 metaSanityCheck(const std::unique_ptr<Connect> &e_conn)
 {
+    // same number of elements
     {
         std::unique_ptr<DBResult> regular_dbres;
         assert(e_conn->execute("SELECT * FROM " + MetaData::Table::metaObject(),
@@ -519,6 +521,7 @@ metaSanityCheck(const std::unique_ptr<Connect> &e_conn)
             == mysql_num_rows(regular_dbres->n));
     }
 
+    // scan through regular
     {
         std::unique_ptr<DBResult> dbres;
         assert(e_conn->execute(
@@ -536,6 +539,7 @@ metaSanityCheck(const std::unique_ptr<Connect> &e_conn)
         assert(0 == mysql_num_rows(dbres->n));
     }
 
+    // scan through bleeding
     {
         std::unique_ptr<DBResult> dbres;
         assert(e_conn->execute(
