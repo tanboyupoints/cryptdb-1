@@ -504,37 +504,18 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
 {
     const std::string table_name = tableNameFromType(table_type);
     std::function<bool(const DBMeta &, const DBMeta &,
-                       const AbstractMetaKey * const,
-                       const unsigned int * const)> helper =
+                       const AbstractMetaKey &,
+                       const unsigned int)> helper =
         [&e_conn, &helper, table_name] (const DBMeta &object,
                                         const DBMeta &parent,
-                                        const AbstractMetaKey * const k,
-                               const unsigned int * const ptr_parent_id)
+                                        const AbstractMetaKey &k,
+                                        const int parent_id)
     {
-        const std::string child_serial = object.serialize(parent);
+        const std::string &child_serial = object.serialize(parent);
         assert(0 == object.getDatabaseID());
-        unsigned int parent_id;
-        if (ptr_parent_id) {
-            parent_id = *ptr_parent_id;
-        } else {
-            parent_id = parent.getDatabaseID();
-        }
 
-        std::function<std::string(const DBMeta &, const DBMeta &,
-                                  const AbstractMetaKey *const)>
-            getSerialKey =
-                [] (const DBMeta &p, const DBMeta &o,
-                    const AbstractMetaKey *const keee)
-            {
-                if (NULL == keee) {
-                    return p.getKey(o).getSerial();  /* lambda */
-                }
-
-                return keee->getSerial();      /* lambda */
-            };
-
-        const std::string serial_key = getSerialKey(parent, object, k);
-        const std::string esc_serial_key =
+        const std::string &serial_key = k.getSerial();
+        const std::string &esc_serial_key =
             escapeString(e_conn, serial_key);
 
         // ------------------------
@@ -542,10 +523,10 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
         // ------------------------
 
         // On CREATE, the database generates a unique ID for us.
-        const std::string esc_child_serial =
+        const std::string &esc_child_serial =
             escapeString(e_conn, child_serial);
 
-        const std::string query =
+        const std::string &query =
             " INSERT INTO " + table_name + 
             "    (serial_object, serial_key, parent_id) VALUES (" 
             " '" + esc_child_serial + "',"
@@ -559,12 +540,12 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
             [&object, object_id, &helper]
                 (const DBMeta &child)
             {
-                return helper(child, object, NULL, &object_id);
+                return helper(child, object, object.getKey(child), object_id);
             };
         return object.applyToChildren(localCreateHandler);
     };
 
-    return helper(*meta.get(), parent_meta, &key, NULL);
+    return helper(*meta.get(), parent_meta, key, parent_meta.getDatabaseID());
 }
 
 // FIXME: used incorrectly, as we should be doing copy construction
