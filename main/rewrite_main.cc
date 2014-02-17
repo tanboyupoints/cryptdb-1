@@ -367,25 +367,22 @@ queryInitiallyFailedErrors(unsigned int err)
     return !ret;
 }
 
-// 'bad_query' : a query that is rejected by mysql (malformed, refers to 
-//               non-existent entities, etc)
-// returns false when a 'good' query fails
-static bool
-retryQuery(const std::unique_ptr<Connect> &c, const std::string &query,
-           bool *const bad_query)
+enum class QueryStatus {UNKNOWN_ERROR, MALFORMED_QUERY, SUCCESS,
+                        RECOVERABLE_ERROR};
+static QueryStatus
+retryQuery(const std::unique_ptr<Connect> &c, const std::string &query)
 {
-    assert(bad_query);
-
-    *bad_query = false;
     if (true == c->execute(query)) {
-        return true;
+        return QueryStatus::SUCCESS;
     }
 
     // the query failed again
     const unsigned int err = c->get_mysql_errno();
     if (true == recoverableDeltaError(err)) {
-        // the query succeeded initially and failed immediately afterwards
-        return true;
+        // the query possibly succeeded initially and failed immediately
+        // afterwards; or the query just failed originally for the same
+        // reason
+        return QueryStatus::RECOVERABLE_ERROR;
     }
 
     // the error is not recoverable and we want to determine if the query
@@ -394,11 +391,11 @@ retryQuery(const std::unique_ptr<Connect> &c, const std::string &query,
     // > if the query is just _bad_; tell the caller and he can handle
     // gracefully
     // > if there are hardware issues; we will need manual intervention
-    if (true == (*bad_query = queryInitiallyFailedErrors(err))) {
-        return true;
+    if (true == queryInitiallyFailedErrors(err)) {
+        return QueryStatus::MALFORMED_QUERY;
     }
 
-    return false;
+    return QueryStatus::UNKNOWN_ERROR;
 }
 
 static bool
@@ -414,18 +411,16 @@ fixDDL(const std::unique_ptr<Connect> &conn,
     lowLevelSetCurrentDatabase(e_conn, details->default_db);
     lowLevelSetCurrentDatabase(conn,   details->default_db);
 
-    // --------------------------------------------------
-    //  After this point we must run to completion as we
-    //        _may_ have made a DDL modification
-    //  > unless we determine that it is a bad query.
-    //  -------------------------------------------------
-
+    AssignOnce<QueryStatus> remote_query_status;
     // failure before remote queries complete
     if (false == details->remote_complete) {
-        bool remote_bad_query;
         // reissue the rewritten DDL query against the remote database.
-        RETURN_FALSE_IF_FALSE(
-            retryQuery(conn, details->rewritten_query, &remote_bad_query));
+        remote_query_status = 
+            retryQuery(conn, details->rewritten_query);
+        if (QueryStatus::UNKNOWN_ERROR == remote_query_status.get()) {
+            assert(false);
+            return false;
+        }
 
         // remote is now fully updated
         const std::string &insert_remote_complete =
@@ -436,11 +431,22 @@ fixDDL(const std::unique_ptr<Connect> &conn,
             "  );";
         RETURN_FALSE_IF_FALSE(conn->execute(insert_remote_complete));
 
-        // if the query is bad there is no reason to try it against the
-        // embedded database
-        if (true == remote_bad_query) {
+        if (QueryStatus::MALFORMED_QUERY == remote_query_status.get()) {
+            // if the query is bad there is no reason to try it against the
+            // embedded database
             return abortQuery(e_conn, unfinished_id);
         }
+    } else {
+        // query already succeeded initially
+        remote_query_status = QueryStatus::SUCCESS;
+    }
+
+    switch (remote_query_status.get()) {
+    case QueryStatus::SUCCESS:
+    case QueryStatus::RECOVERABLE_ERROR:
+        break;
+    default:
+        assert(false);
     }
 
     // failure after remote queries completed
@@ -448,9 +454,36 @@ fixDDL(const std::unique_ptr<Connect> &conn,
         assert(false == details->embedded_complete);
 
         // reissue the original DDL query against the embedded database
-        // > it must succeed because presumably it already succeeded against
-        //   the remote database
-        RFIF(e_conn->execute(details->original_query));
+        const QueryStatus embedded_query_status =
+            retryQuery(e_conn, details->original_query);
+        switch (embedded_query_status) {
+        // possibly a hardware issue
+        case QueryStatus::UNKNOWN_ERROR:
+        // a broken query should not have made it this far
+        case QueryStatus::MALFORMED_QUERY:
+            return false;
+
+        // --------------------------------------
+        // cases above this line are 'definitely'
+        // an invalid completion
+        // --------------------------------------
+
+        // sometimes you can have a valid success after a fail against the
+        // remote database; consider the case where the proxy fails immediately
+        // after a successfull DDL query (before it can do completion marking)
+        case QueryStatus::SUCCESS:
+            break;
+
+        case QueryStatus::RECOVERABLE_ERROR:
+            // if we originally succeeded, we have to succeed now as well
+            if (true == details->remote_complete) {
+                return false;
+            }
+            break;
+
+        default:
+            assert(false);
+        }
 
         return finishQuery(e_conn, unfinished_id);
     }
