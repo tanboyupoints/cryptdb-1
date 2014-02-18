@@ -26,6 +26,7 @@
 #include <main/macro_util.hh>
 
 #include "field.h"
+#include <errmsg.h>
 
 extern CItemTypesDir itemTypes;
 extern CItemFuncDir funcTypes;
@@ -351,20 +352,11 @@ recoverableDeltaError(unsigned int err)
 static bool
 queryInitiallyFailedErrors(unsigned int err)
 {
-    // lifted from mysql-src/includes/errmsg.h
-    const unsigned long
-        cr_unknown_error        = 2000,
-        cr_server_gone_error    = 2006,
-        cr_server_lost          = 2013,
-        cr_commands_out_of_sync = 2014;
+    std::map<unsigned int, int> errors{
+        {CR_UNKNOWN_ERROR, 1}, {CR_SERVER_GONE_ERROR, 1}, {CR_SERVER_LOST, 1},
+        {CR_COMMANDS_OUT_OF_SYNC, 1}, {ER_OUTOFMEMORY, 1}};
 
-    const bool ret =
-        cr_unknown_error == err ||
-        cr_server_gone_error == err ||
-        cr_server_lost == err ||
-        cr_commands_out_of_sync == err;
-
-    return !ret;
+    return errors.end() == errors.find(err);
 }
 
 enum class QueryStatus {UNKNOWN_ERROR, MALFORMED_QUERY, SUCCESS,
