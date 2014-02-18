@@ -57,6 +57,12 @@ Connect::do_connect(const std::string &server, const std::string &user,
     /* Connect to real server even if linked against embedded libmysqld */
     mysql_options(conn, MYSQL_OPT_USE_REMOTE_CONNECTION, 0);
 
+    {
+        my_bool reconnect = 1;
+        /* automatically reconnect */
+        mysql_options(conn, MYSQL_OPT_RECONNECT, &reconnect);
+    }
+
     /* Connect to database */
     if (!mysql_real_connect(conn, server.c_str(), user.c_str(),
                             passwd.c_str(), 0, port, 0,
