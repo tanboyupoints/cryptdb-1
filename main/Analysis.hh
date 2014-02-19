@@ -169,6 +169,7 @@ public:
 
 private:
     const std::unique_ptr<DBMeta> meta;
+    std::map<const DBMeta *, unsigned int> id_cache;
 };
 
 class DerivedKeyDelta : public Delta {

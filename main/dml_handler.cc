@@ -1055,9 +1055,6 @@ private:
                           Analysis &a) const
     {
         const ParameterCollection &params = collectParameters(var_pairs, a);
-        TEST_Text(0 == var_pairs.size() && params.onions.size() > 0,
-                  "extraneous directive parameter, indicate a single database,"
-                  " table and field; and then onion-seclevel pairs");
 
         for (const auto &it : params.onions) {
             const OnionMeta &om = a.getOnionMeta(params.fm, it.first);
@@ -1089,9 +1086,7 @@ private:
         assert(a.deltas.size() == 0);
 
         const ParameterCollection &params = collectParameters(var_pairs, a);
-        TEST_Text(0 == var_pairs.size() && params.onions.size() > 0,
-                  "extraneous directive parameter, indicate a single database,"
-                  " table and field; and then onion-seclevel pairs");
+
         for (const auto &it : params.onions) {
             OnionMeta &om = a.getOnionMeta(params.fm, it.first);
             const SECLEVEL current_level = a.getOnionLevel(om);
@@ -1114,8 +1109,9 @@ private:
     {
         auto count = var_pairs.find(std::string("count"));
         auto where = var_pairs.find(std::string("where"));
-        TEST_Text(var_pairs.end() != count && var_pairs.end() != where
-                  && var_pairs.size() == 2,
+        TEST_Text(var_pairs.end() != count
+               && var_pairs.end() != where
+               && var_pairs.size() == 2,
                   "the killzone directive takes two parameters, 'count'"
                   " and 'where'");
 
@@ -1206,6 +1202,12 @@ private:
             onions.push_back(std::make_pair(o.get(), l.get()));
             var_pairs.erase(it++);
         }
+
+        TEST_Text(0 == var_pairs.size(),
+                  "extraneous directive parameter, indicate a single database,"
+                  " table and field; and then onion-seclevel pairs");
+        TEST_Text(onions.size() > 0,
+                  "you must specify at least one onion");
 
         return ParameterCollection(a, database, table, field, onions);
     }
@@ -1594,6 +1596,9 @@ nextImpl(const ResType &res, const NextParams &nparams)
         yield {
             TEST_ErrPkt(nparams.ps.getEConn()->execute("START TRANSACTION"),
                       "failed to start transaction for sensitive directive");
+
+            SPECIALIZED_SYNC(writeDeltas(nparams.ps.getEConn(), this->deltas,
+                                         Delta::BLEEDING_TABLE));
 
             SPECIALIZED_SYNC(writeDeltas(nparams.ps.getEConn(), this->deltas,
                                          Delta::REGULAR_TABLE));

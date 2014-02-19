@@ -44,7 +44,7 @@
                 :check))
     (:after  1 ((:does-not-exist gorge)
                 :check)))
-   (("DROP TABLE gorge"                             ;; teardown
+   (("DROP TABLE IF EXISTS gorge"                             ;; teardown
      ()
      :both
      :ignore)))

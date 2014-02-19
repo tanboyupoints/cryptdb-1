@@ -26,6 +26,7 @@
 #include <main/macro_util.hh>
 
 #include "field.h"
+#include <errmsg.h>
 
 extern CItemTypesDir itemTypes;
 extern CItemFuncDir funcTypes;
@@ -113,6 +114,69 @@ sanityCheck(SchemaInfo &schema)
         const auto &dm = it.second;
         assert(sanityCheck(*dm.get()));
     }
+    return true;
+}
+
+static std::map<std::string, int>
+collectTableNames(const std::string &db_name,
+                  const std::unique_ptr<Connect> &c)
+{
+    std::map<std::string, int> name_map;
+
+    assert(c->execute("USE " + quoteText(db_name)));
+
+    std::unique_ptr<DBResult> dbres;
+    assert(c->execute("SHOW TABLES", &dbres));
+
+    assert(1 == mysql_num_fields(dbres->n));
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(dbres->n))) {
+        const unsigned long *const l = mysql_fetch_lengths(dbres->n);
+        const std::string table_name(row[0], l[0]);
+        // all table names should be unique
+        assert(name_map.end() == name_map.find(table_name));
+        name_map[table_name] = 1;
+    }
+    assert(mysql_num_rows(dbres->n) == name_map.size());
+
+    return name_map;
+}
+
+// compares SHOW TABLES on embedded and remote with the SchemaInfo
+static bool
+tablesSanityCheck(SchemaInfo &schema,
+                  const std::unique_ptr<Connect> &e_conn,
+                  const std::unique_ptr<Connect> &conn)
+{
+    for (const auto &dm_it : schema.getChildren()) {
+        const auto &db_name = dm_it.first.getValue();
+        const auto &dm = dm_it.second;
+        // gather anonymous tables
+        std::map<std::string, int> anon_name_map =
+            collectTableNames(db_name, conn);
+
+        // gather plain tables
+        std::map<std::string, int> plain_name_map =
+            collectTableNames(db_name, e_conn);
+
+        const auto &meta_tables = dm->getChildren();
+        assert(meta_tables.size() == anon_name_map.size());
+        assert(meta_tables.size() == plain_name_map.size());
+        for (const auto &tm_it : meta_tables) {
+            const auto &tm = tm_it.second;
+
+            assert(anon_name_map.find(tm->getAnonTableName())
+                   != anon_name_map.end());
+            anon_name_map.erase(tm->getAnonTableName());
+
+            assert(plain_name_map.find(tm_it.first.getValue())
+                   != plain_name_map.end());
+            plain_name_map.erase(tm_it.first.getValue());
+        }
+        assert(0 == anon_name_map.size());
+        assert(0 == plain_name_map.size());
+    }
+
     return true;
 }
 
@@ -288,41 +352,29 @@ recoverableDeltaError(unsigned int err)
 static bool
 queryInitiallyFailedErrors(unsigned int err)
 {
-    // lifted from mysql-src/includes/errmsg.h
-    const unsigned long
-        cr_unknown_error        = 2000,
-        cr_server_gone_error    = 2006,
-        cr_server_lost          = 2013,
-        cr_commands_out_of_sync = 2014;
+    std::map<unsigned int, int> errors{
+        {CR_UNKNOWN_ERROR, 1}, {CR_SERVER_GONE_ERROR, 1}, {CR_SERVER_LOST, 1},
+        {CR_COMMANDS_OUT_OF_SYNC, 1}, {ER_OUTOFMEMORY, 1}};
 
-    const bool ret =
-        cr_unknown_error == err ||
-        cr_server_gone_error == err ||
-        cr_server_lost == err ||
-        cr_commands_out_of_sync == err;
-
-    return !ret;
+    return errors.end() == errors.find(err);
 }
 
-// 'bad_query' : a query that is rejected by mysql (malformed, refers to 
-//               non-existent entities, etc)
-// returns false when a 'good' query fails
-static bool
-retryQuery(const std::unique_ptr<Connect> &c, const std::string &query,
-           bool *const bad_query)
+enum class QueryStatus {UNKNOWN_ERROR, MALFORMED_QUERY, SUCCESS,
+                        RECOVERABLE_ERROR};
+static QueryStatus
+retryQuery(const std::unique_ptr<Connect> &c, const std::string &query)
 {
-    assert(bad_query);
-
-    *bad_query = false;
     if (true == c->execute(query)) {
-        return true;
+        return QueryStatus::SUCCESS;
     }
 
     // the query failed again
     const unsigned int err = c->get_mysql_errno();
     if (true == recoverableDeltaError(err)) {
-        // the query succeeded initially and failed immediately afterwards
-        return true;
+        // the query possibly succeeded initially and failed immediately
+        // afterwards; or the query just failed originally for the same
+        // reason
+        return QueryStatus::RECOVERABLE_ERROR;
     }
 
     // the error is not recoverable and we want to determine if the query
@@ -331,11 +383,11 @@ retryQuery(const std::unique_ptr<Connect> &c, const std::string &query,
     // > if the query is just _bad_; tell the caller and he can handle
     // gracefully
     // > if there are hardware issues; we will need manual intervention
-    if (true == (*bad_query = queryInitiallyFailedErrors(err))) {
-        return true;
+    if (true == queryInitiallyFailedErrors(err)) {
+        return QueryStatus::MALFORMED_QUERY;
     }
 
-    return false;
+    return QueryStatus::UNKNOWN_ERROR;
 }
 
 static bool
@@ -351,18 +403,16 @@ fixDDL(const std::unique_ptr<Connect> &conn,
     lowLevelSetCurrentDatabase(e_conn, details->default_db);
     lowLevelSetCurrentDatabase(conn,   details->default_db);
 
-    // --------------------------------------------------
-    //  After this point we must run to completion as we
-    //        _may_ have made a DDL modification
-    //  > unless we determine that it is a bad query.
-    //  -------------------------------------------------
-
+    AssignOnce<QueryStatus> remote_query_status;
     // failure before remote queries complete
     if (false == details->remote_complete) {
-        bool remote_bad_query;
         // reissue the rewritten DDL query against the remote database.
-        RETURN_FALSE_IF_FALSE(
-            retryQuery(conn, details->rewritten_query, &remote_bad_query));
+        remote_query_status = 
+            retryQuery(conn, details->rewritten_query);
+        if (QueryStatus::UNKNOWN_ERROR == remote_query_status.get()) {
+            assert(false);
+            return false;
+        }
 
         // remote is now fully updated
         const std::string &insert_remote_complete =
@@ -373,11 +423,22 @@ fixDDL(const std::unique_ptr<Connect> &conn,
             "  );";
         RETURN_FALSE_IF_FALSE(conn->execute(insert_remote_complete));
 
-        // if the query is bad there is no reason to try it against the
-        // embedded database
-        if (true == remote_bad_query) {
+        if (QueryStatus::MALFORMED_QUERY == remote_query_status.get()) {
+            // if the query is bad there is no reason to try it against the
+            // embedded database
             return abortQuery(e_conn, unfinished_id);
         }
+    } else {
+        // query already succeeded initially
+        remote_query_status = QueryStatus::SUCCESS;
+    }
+
+    switch (remote_query_status.get()) {
+    case QueryStatus::SUCCESS:
+    case QueryStatus::RECOVERABLE_ERROR:
+        break;
+    default:
+        assert(false);
     }
 
     // failure after remote queries completed
@@ -385,13 +446,35 @@ fixDDL(const std::unique_ptr<Connect> &conn,
         assert(false == details->embedded_complete);
 
         // reissue the original DDL query against the embedded database
-        bool embedded_bad_query;
-        RETURN_FALSE_IF_FALSE(retryQuery(e_conn, details->original_query,
-                                         &embedded_bad_query));
-        // if the query is 'bad' against the embedded database this is a
-        // problem because it already succeeded against the remote database
-        if (true == embedded_bad_query) {
+        const QueryStatus embedded_query_status =
+            retryQuery(e_conn, details->original_query);
+        switch (embedded_query_status) {
+        // possibly a hardware issue
+        case QueryStatus::UNKNOWN_ERROR:
+        // a broken query should not have made it this far
+        case QueryStatus::MALFORMED_QUERY:
             return false;
+
+        // --------------------------------------
+        // cases above this line are 'definitely'
+        // an invalid completion
+        // --------------------------------------
+
+        // sometimes you can have a valid success after a fail against the
+        // remote database; consider the case where the proxy fails immediately
+        // after a successfull DDL query (before it can do completion marking)
+        case QueryStatus::SUCCESS:
+            break;
+
+        case QueryStatus::RECOVERABLE_ERROR:
+            // if we originally succeeded, we have to succeed now as well
+            if (true == details->remote_complete) {
+                return false;
+            }
+            break;
+
+        default:
+            assert(false);
         }
 
         return finishQuery(e_conn, unfinished_id);
@@ -442,6 +525,66 @@ deltaSanityCheck(const std::unique_ptr<Connect> &conn,
     }
 }
 
+// bleeding and regular meta tables must have identical content
+// > note that their next auto_increment value will not necessarily be
+//   identical
+static bool
+metaSanityCheck(const std::unique_ptr<Connect> &e_conn)
+{
+    // same number of elements
+    {
+        std::unique_ptr<DBResult> regular_dbres;
+        assert(e_conn->execute("SELECT * FROM " + MetaData::Table::metaObject(),
+                               &regular_dbres));
+
+        std::unique_ptr<DBResult> bleeding_dbres;
+        assert(e_conn->execute("SELECT * FROM "
+                               + MetaData::Table::bleedingMetaObject(),
+                               &bleeding_dbres));
+
+        assert(mysql_num_rows(bleeding_dbres->n)
+            == mysql_num_rows(regular_dbres->n));
+    }
+
+    // scan through regular
+    {
+        std::unique_ptr<DBResult> dbres;
+        assert(e_conn->execute(
+            "SELECT * FROM " + MetaData::Table::metaObject() + " AS m"
+            " WHERE NOT EXISTS ("
+            "       SELECT * FROM " +
+                        MetaData::Table::bleedingMetaObject() + " AS b"
+            "       WHERE"
+            "           m.serial_object = b.serial_object AND"
+            "           m.serial_key    = b.serial_key AND"
+            "           m.id            = b.id AND"
+            "           m.parent_id     = b.parent_id)",
+            &dbres));
+
+        assert(0 == mysql_num_rows(dbres->n));
+    }
+
+    // scan through bleeding
+    {
+        std::unique_ptr<DBResult> dbres;
+        assert(e_conn->execute(
+            "SELECT * FROM " + MetaData::Table::bleedingMetaObject() + " AS b"
+            " WHERE NOT EXISTS ("
+            "       SELECT * FROM " +
+                        MetaData::Table::metaObject() + " AS m"
+            "       WHERE"
+            "           m.serial_object = b.serial_object AND"
+            "           m.serial_key    = b.serial_key AND"
+            "           m.id            = b.id AND"
+            "           m.parent_id     = b.parent_id)",
+            &dbres));
+
+        assert(0 == mysql_num_rows(dbres->n));
+    }
+
+    return true;
+}
+
 // This function will not build all of our tables when it is run
 // on an empty database.  If you don't have a parent, your table won't be
 // built.  We probably want to seperate our database logic into 3 parts.
@@ -470,6 +613,8 @@ loadSchemaInfo(const std::unique_ptr<Connect> &conn,
     loadChildren(schema.get());
 
     assert(sanityCheck(*schema.get()));
+    assert(metaSanityCheck(e_conn));
+    assert(tablesSanityCheck(*schema.get(), e_conn, conn));
 
     return std::move(schema);
 }

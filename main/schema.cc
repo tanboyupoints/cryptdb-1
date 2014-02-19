@@ -58,6 +58,8 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels,
     : onionname(getpRandomName() + TypeText<onion>::toText(o)),
       uniq_count(uniq_count), minimum_seclevel(minimum_seclevel)
 {
+    assert(levels.size() >= 1);
+
     const Create_field * newcf = &cf;
     //generate enclayers for encrypted field
     const std::string uniqueFieldName = this->getAnonOnionName();
@@ -73,6 +75,8 @@ OnionMeta::OnionMeta(onion o, std::vector<SECLEVEL> levels,
 
         this->layers.push_back(std::move(el));
     }
+
+    assert(this->layers.size() >= 1);
 }
 
 std::unique_ptr<OnionMeta>
@@ -278,8 +282,11 @@ init_onions_layout(const AES_KEY *const m_key, FieldMeta *const fm,
         const onion o = it.first;
         const std::vector<SECLEVEL> &levels = it.second;
 
+        assert(levels.size() >= 1);
         const std::pair<std::vector<SECLEVEL>, SECLEVEL> level_data =
             determineSecLevelData(o, levels, unique);
+        assert(level_data.first.size() >= 1);
+
         // A new OnionMeta will only occur with a new FieldMeta so
         // we never have to build Deltaz for our OnionMetaz.
         std::unique_ptr<OnionMeta>

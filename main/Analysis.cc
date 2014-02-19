@@ -499,42 +499,29 @@ std::string Delta::tableNameFromType(TableType table_type) const
 }
 
 // Recursive.
+// > the hackery around BLEEDING v REGULAR ensures that both tables use the
+//   same ID for equivalent objects regardless of differences between
+//   auto_increment on the BLEEDING and REGULAR tables
 bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
                         TableType table_type)
 {
-    const std::string table_name = tableNameFromType(table_type);
+    if (BLEEDING_TABLE == table_type) {
+        assert(0 == id_cache.size());
+    }
+
+    const std::string &table_name = tableNameFromType(table_type);
     std::function<bool(const DBMeta &, const DBMeta &,
-                       const AbstractMetaKey * const,
-                       const unsigned int * const)> helper =
-        [&e_conn, &helper, table_name] (const DBMeta &object,
-                                        const DBMeta &parent,
-                                        const AbstractMetaKey * const k,
-                               const unsigned int * const ptr_parent_id)
+                       const AbstractMetaKey &,
+                       const unsigned int)> helper =
+        [this, &e_conn, &helper, &table_type, &table_name]
+        (const DBMeta &object, const DBMeta &parent,
+         const AbstractMetaKey &k, const int parent_id)
     {
-        const std::string child_serial = object.serialize(parent);
+        const std::string &child_serial = object.serialize(parent);
         assert(0 == object.getDatabaseID());
-        unsigned int parent_id;
-        if (ptr_parent_id) {
-            parent_id = *ptr_parent_id;
-        } else {
-            parent_id = parent.getDatabaseID();
-        }
 
-        std::function<std::string(const DBMeta &, const DBMeta &,
-                                  const AbstractMetaKey *const)>
-            getSerialKey =
-                [] (const DBMeta &p, const DBMeta &o,
-                    const AbstractMetaKey *const keee)
-            {
-                if (NULL == keee) {
-                    return p.getKey(o).getSerial();  /* lambda */
-                }
-
-                return keee->getSerial();      /* lambda */
-            };
-
-        const std::string serial_key = getSerialKey(parent, object, k);
-        const std::string esc_serial_key =
+        const std::string &serial_key = k.getSerial();
+        const std::string &esc_serial_key =
             escapeString(e_conn, serial_key);
 
         // ------------------------
@@ -542,29 +529,59 @@ bool CreateDelta::apply(const std::unique_ptr<Connect> &e_conn,
         // ------------------------
 
         // On CREATE, the database generates a unique ID for us.
-        const std::string esc_child_serial =
+        const std::string &esc_child_serial =
             escapeString(e_conn, child_serial);
 
-        const std::string query =
+        AssignOnce<unsigned int> old_object_id;
+        if (BLEEDING_TABLE == table_type) {
+            old_object_id = 0;          // forces the DB to assign an ID
+        } else {
+            assert(REGULAR_TABLE == table_type);
+            auto const &cached = this->id_cache.find(&object);
+            assert(cached != this->id_cache.end());
+            old_object_id = cached->second;
+        }
+
+        const std::string &query =
             " INSERT INTO " + table_name + 
-            "    (serial_object, serial_key, parent_id) VALUES (" 
+            "    (serial_object, serial_key, parent_id, id) VALUES (" 
             " '" + esc_child_serial + "',"
             " '" + esc_serial_key + "',"
-            " " + std::to_string(parent_id) + ");";
+            " " + std::to_string(parent_id) + ","
+            " " + std::to_string(old_object_id.get()) + ");";
         RETURN_FALSE_IF_FALSE(e_conn->execute(query));
 
         const unsigned int object_id = e_conn->last_insert_id();
+
+        if (BLEEDING_TABLE == table_type) {
+            assert(this->id_cache.find(&object) == this->id_cache.end());
+            this->id_cache[&object] = object_id;
+        } else {
+            assert(REGULAR_TABLE == table_type);
+            // should only be used one time
+            this->id_cache.erase(&object);
+        }
 
         std::function<bool(const DBMeta &)> localCreateHandler =
             [&object, object_id, &helper]
                 (const DBMeta &child)
             {
-                return helper(child, object, NULL, &object_id);
+                return helper(child, object, object.getKey(child), object_id);
             };
         return object.applyToChildren(localCreateHandler);
     };
 
-    return helper(*meta.get(), parent_meta, &key, NULL);
+    const bool b =
+        helper(*meta.get(), parent_meta, key, parent_meta.getDatabaseID());
+
+    if (BLEEDING_TABLE == table_type) {
+        assert(0 != this->id_cache.size());
+    } else {
+        assert(REGULAR_TABLE == table_type);
+        assert(0 == this->id_cache.size());
+    }
+
+    return b;
 }
 
 // FIXME: used incorrectly, as we should be doing copy construction
@@ -634,7 +651,6 @@ writeDeltas(const std::unique_ptr<Connect> &e_conn,
 
     return true;
 }
-
 
 bool
 deltaOutputBeforeQuery(const std::unique_ptr<Connect> &e_conn,
